@@ -18,6 +18,10 @@ export function TextCell({
   preset = runtime.preset,
 }: PresetCellProps<string>) {
   const textMode = "text" in preset ? preset.text.display : undefined;
+  const className =
+    preset.kind === "identifier"
+      ? "block truncate text-sap-muted"
+      : "block truncate";
   const style: CSSProperties = textMode
     ? {
         display: "-webkit-box",
@@ -29,5 +33,9 @@ export function TextCell({
       }
     : { overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" };
 
-  return <span style={style}>{value}</span>;
+  return (
+    <span className={className} style={style}>
+      {value}
+    </span>
+  );
 }

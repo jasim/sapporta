@@ -1,18 +1,40 @@
-/* Minimal CSS for the grid layout. The grid uses CSS variable
+/* Dense spreadsheet chrome for the grid runtime. The grid uses CSS variable
  * `--grid-template-columns` set per-instance from the column schema.
  * Rows use subgrid so intrinsic tracks such as `max-content` are resolved
  * across header and body cells together. */
 
 .grid {
+  --grid-active-focus-background: var(
+    --grid-cell-active-focus-background,
+    var(--sap-selection)
+  );
+  --grid-active-focus-ring-color: var(
+    --grid-cell-active-focus-ring-color,
+    var(--sap-brand)
+  );
+  --grid-active-selection-background: var(
+    --grid-cell-active-selection-background,
+    var(--sap-selection)
+  );
+  --grid-current-focus-background: var(--grid-active-focus-background);
+  --grid-current-focus-ring-color: var(--grid-active-focus-ring-color);
+  --grid-current-selection-background: var(--grid-active-selection-background);
+  --grid-editing-ring-color: var(
+    --grid-cell-editing-ring-color,
+    var(--sap-brand)
+  );
+
   display: grid;
-  font-size: var(--grid-font-size, inherit);
+  color: var(--grid-color, var(--sap-fg));
+  font-size: var(--grid-font-size, var(--text-sap-body));
   grid-template-columns: var(
     --grid-template-columns,
     repeat(auto-fit, minmax(80px, 1fr))
   );
+  line-height: var(--grid-line-height, 1.45);
   position: relative;
   outline: none;
-  background: var(--grid-background, transparent);
+  background: var(--grid-background, var(--sap-surface));
 }
 
 .grid-header,
@@ -26,7 +48,11 @@
   display: grid;
   grid-column: 1 / -1;
   grid-template-columns: subgrid;
-  border-bottom: var(--grid-row-border-block-end, 0);
+  border-bottom: var(--grid-row-border-block-end, 1px solid var(--sap-border));
+}
+
+.grid-row:not(.grid-row--header):not(.grid-row--level-label):hover {
+  background: var(--grid-row-hover-background, var(--sap-row-hover));
 }
 
 .grid-body > .grid,
@@ -37,8 +63,12 @@
 }
 
 .grid-row--header {
-  background: var(--grid-header-background, transparent);
-  font-weight: var(--grid-header-font-weight, inherit);
+  background: var(--grid-header-background, var(--sap-sidebar));
+  border-bottom: var(
+    --grid-header-border-block-end,
+    1px solid var(--sap-border)
+  );
+  font-weight: var(--grid-header-font-weight, 500);
   position: sticky;
   top: 0;
   z-index: 1;
@@ -46,8 +76,9 @@
 
 .grid-cell {
   box-sizing: border-box;
+  background: transparent;
   position: relative;
-  border-right: var(--grid-cell-border-inline-end, 0);
+  border-right: var(--grid-cell-border-inline-end, 1px solid var(--sap-border));
   overflow: visible;
   min-width: 0;
 }
@@ -60,11 +91,11 @@
   box-sizing: border-box;
   display: flex;
   align-items: center;
-  min-height: var(--grid-cell-min-height, auto);
+  min-height: var(--grid-cell-min-height, var(--height-sap-row));
   min-width: 0;
   width: 100%;
   overflow: hidden;
-  padding: var(--grid-cell-padding, 0);
+  padding: var(--grid-cell-padding, 0 10px);
 }
 
 .grid-cell__content > * {
@@ -72,34 +103,51 @@
 }
 
 .grid-cell--header {
-  font-weight: var(--grid-header-font-weight, inherit);
-  color: var(--grid-header-color, inherit);
+  color: var(--grid-header-color, var(--sap-fg-subtle));
+  cursor: var(--grid-header-cursor, default);
+  font-size: var(--grid-header-font-size, var(--text-sap-label));
+  font-weight: var(--grid-header-font-weight, 500);
+  letter-spacing: var(--grid-header-letter-spacing, var(--tracking-sap-head));
+  line-height: 1;
+  text-transform: uppercase;
   user-select: none;
 }
 
 .grid-cell--header > .grid-cell__content {
+  gap: var(--grid-header-cell-gap, 4px);
+  min-height: var(--grid-header-min-height, var(--height-sap-header));
+  padding: var(--grid-header-cell-padding, 0 10px);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.grid-cell--header[data-sortable="false"] {
+  cursor: default;
+}
+
+.grid-header-label {
+  min-width: 0;
+  overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .grid-cell--focus {
-  background: var(--grid-cell-focus-background, transparent);
+  background: var(--grid-current-focus-background);
+  box-shadow: inset 0 0 0 var(--grid-cell-focus-ring-width, 1.5px)
+    var(--grid-current-focus-ring-color);
+  z-index: var(--grid-cell-focus-ring-z-index, 3);
 }
 
-.grid-cell--focus::after,
-.grid-cell--editing::after {
-  content: "";
-  box-sizing: border-box;
-  position: absolute;
-  inset: var(--grid-cell-focus-ring-inset, 0);
-  pointer-events: none;
-  border: var(--grid-cell-focus-ring-width, 0) solid
-    var(--grid-cell-focus-ring-color, transparent);
-  z-index: var(--grid-cell-focus-ring-z-index, 2);
+.grid-cell--editing {
+  background: var(--grid-cell-editing-background, transparent);
+  box-shadow: inset 0 0 0 var(--grid-cell-focus-ring-width, 1.5px)
+    var(--grid-editing-ring-color);
+  z-index: var(--grid-cell-focus-ring-z-index, 3);
 }
 
 .grid-cell--in-selection {
-  background: var(--grid-cell-selection-background, transparent);
+  background: var(--grid-current-selection-background);
 }
 
 /* Active vs ghost is level-scoped — every cell in a level shares it.
@@ -112,26 +160,218 @@
 }
 .grid[data-active="false"] {
   --grid-active: 0;
+  --grid-current-focus-background: var(
+    --grid-cell-ghost-focus-background,
+    var(--sap-nested-bg)
+  );
+  --grid-current-focus-ring-color: var(
+    --grid-cell-ghost-focus-ring-color,
+    var(--sap-focus-ring)
+  );
+  --grid-current-selection-background: var(
+    --grid-cell-ghost-selection-background,
+    var(--sap-nested-bg)
+  );
 }
 
 .grid-row[data-row-kind="phantom"] {
-  background: var(--grid-phantom-row-background, transparent);
+  background: var(--grid-phantom-row-background, var(--sap-nested-bg));
 }
 
 .grid-editor-overlay {
   background: var(
     --grid-editor-background,
-    var(--grid-background, transparent)
+    var(--grid-background, var(--sap-surface))
   );
+  color: var(--grid-color, var(--sap-fg));
 }
 
 .grid-editor-input {
+  background: var(--grid-editor-input-background, transparent);
   border: none;
-  outline: none;
-  padding: var(--grid-cell-padding, 0);
+  border-radius: 0;
+  box-sizing: border-box;
+  color: inherit;
   font: inherit;
-  background: var(
-    --grid-editor-background,
-    var(--grid-background, transparent)
+  height: 100%;
+  line-height: var(--grid-line-height, 1.45);
+  min-height: var(--grid-cell-min-height, var(--height-sap-row));
+  outline: none;
+  padding: var(--grid-cell-padding, 0 10px);
+  width: 100%;
+}
+
+textarea.grid-editor-input {
+  overflow-wrap: anywhere;
+  resize: none;
+  white-space: pre-wrap;
+}
+
+.grid-editor-overlay [cmdk-input-wrapper] {
+  border-bottom: 0;
+  height: 100%;
+  padding: 0;
+}
+
+.grid-editor-overlay [cmdk-input-wrapper] input {
+  font-size: var(--text-sap-body);
+  line-height: var(--grid-line-height, 1.45);
+  padding: var(--grid-cell-padding, 0 10px);
+}
+
+.grid-header-menu-button {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius-sm);
+  color: var(--sap-fg-subtle);
+  cursor: pointer;
+  display: inline-flex;
+  height: 16px;
+  justify-content: center;
+  margin-left: auto;
+  padding: 0;
+  width: 16px;
+}
+
+.grid-header-menu-button:hover,
+.grid-header-menu-button[aria-expanded="true"] {
+  background: var(--sap-row-hover);
+  color: var(--sap-fg);
+}
+
+.grid-header-sort-indicator {
+  align-items: center;
+  color: var(--sap-fg-subtle);
+  display: inline-flex;
+  flex: none;
+  font-size: var(--text-sap-tiny);
+  gap: 1px;
+  opacity: 0.75;
+}
+
+.grid-cell__popover {
+  background: var(--sap-surface);
+  border: 1px solid var(--sap-border);
+  border-radius: var(--radius);
+  box-shadow: 0 8px 24px rgb(0 0 0 / 0.12);
+  color: var(--sap-fg);
+  font-size: var(--text-sap-body);
+  letter-spacing: 0;
+  line-height: 1.45;
+  text-transform: none;
+}
+
+.grid-expand-cell {
+  align-items: center;
+  display: inline-flex;
+  gap: 4px;
+  max-width: 100%;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  width: 100%;
+}
+
+.grid-expand-chevron,
+.grid-expand-placeholder {
+  flex: 0 0 auto;
+  height: 16px;
+  width: 16px;
+}
+
+.grid-expand-chevron {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius-sm);
+  color: var(--sap-fg-subtle);
+  cursor: pointer;
+  display: inline-flex;
+  justify-content: center;
+  padding: 0;
+}
+
+.grid-expand-chevron:hover {
+  background: var(--sap-row-hover);
+  color: var(--sap-fg);
+}
+
+.grid-expand-content {
+  display: block;
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.grid-expand-content > * {
+  max-width: 100%;
+}
+
+.grid-cell-frame {
+  display: block;
+  min-width: 0;
+  position: relative;
+  width: 100%;
+}
+
+.grid-cell-frame__content {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.grid-cell-frame--with-action .grid-cell-frame__content {
+  padding-right: 30px;
+}
+
+.grid-cell-frame__actions {
+  align-items: center;
+  background: linear-gradient(
+    to left,
+    var(--grid-row-hover-background, var(--sap-row-hover)) 60%,
+    transparent
   );
+  display: flex;
+  inset-block: 0;
+  opacity: 0;
+  padding-left: 12px;
+  padding-right: 6px;
+  pointer-events: none;
+  position: absolute;
+  right: -6px;
+  transition: opacity 120ms ease;
+}
+
+.grid-cell:hover .grid-cell-frame__actions,
+.grid-cell:focus-within .grid-cell-frame__actions,
+.grid-cell--focus .grid-cell-frame__actions,
+.grid-cell--editing .grid-cell-frame__actions {
+  opacity: 1;
+}
+
+.grid-cell-frame__action-inner {
+  pointer-events: auto;
+}
+
+.grid-cell-frame__actions button {
+  align-items: center;
+  background: var(--sap-surface);
+  border: 1px solid var(--sap-border);
+  border-radius: var(--radius-sm);
+  color: var(--sap-fg-subtle);
+  display: inline-flex;
+  height: 24px;
+  justify-content: center;
+  padding: 0;
+  width: 24px;
+}
+
+.grid-cell-frame__actions button:hover {
+  background: var(--sap-row-hover);
+  color: var(--sap-fg);
 }

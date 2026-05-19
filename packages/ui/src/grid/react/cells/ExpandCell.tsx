@@ -1,5 +1,6 @@
 import { useStore } from "zustand";
-import type { ReactNode } from "react";
+import { ChevronDown, ChevronRight } from "lucide-react";
+import type { MouseEvent, ReactNode } from "react";
 import type { GridPath, RowId } from "../../types/identity";
 import type { LevelRow } from "../../types/level-row";
 import { capabilitiesFor } from "../../types/capabilities";
@@ -27,21 +28,17 @@ export function ExpandCell({
   );
 
   const caps = capabilitiesFor(row.kind);
-  const hasDeclaredChildren =
-    runtime.schemaAt(path).childLevels.length > 0;
+  const hasDeclaredChildren = runtime.schemaAt(path).childLevels.length > 0;
   const showChevron =
     caps.canExpand && row.kind === "data" && hasDeclaredChildren;
 
-  function toggle(e: React.MouseEvent) {
+  function toggle(e: MouseEvent) {
     e.stopPropagation();
     runtime.coordinator.toggleExpand(path, row.id);
   }
 
   return (
-    <span
-      className="grid-expand-cell"
-      style={{ display: "inline-flex", alignItems: "center", gap: 4 }}
-    >
+    <span className="grid-expand-cell">
       {showChevron ? (
         <button
           type="button"
@@ -49,21 +46,17 @@ export function ExpandCell({
           aria-label={isExpanded ? "Collapse" : "Expand"}
           aria-expanded={isExpanded}
           className="grid-expand-chevron"
-          style={{
-            width: 16,
-            height: 16,
-            padding: 0,
-            border: 0,
-            background: "transparent",
-            cursor: "pointer",
-          }}
         >
-          {isExpanded ? "▾" : "▸"}
+          {isExpanded ? (
+            <ChevronDown aria-hidden="true" size={14} strokeWidth={1.75} />
+          ) : (
+            <ChevronRight aria-hidden="true" size={14} strokeWidth={1.75} />
+          )}
         </button>
       ) : (
-        <span style={{ display: "inline-block", width: 16 }} />
+        <span className="grid-expand-placeholder" />
       )}
-      <span>{children}</span>
+      <span className="grid-expand-content">{children}</span>
     </span>
   );
 }

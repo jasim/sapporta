@@ -120,7 +120,7 @@ export function tableColumnToGridThemeColumn(args: {
       return columnPreset.currency({
         ...common,
         colorRule: column.colorRule,
-        zeroDisplay: column.zeroDisplay,
+        zeroDisplay: column.zeroDisplay ?? "dot",
         strong: column.strong,
       });
     case "percentage":

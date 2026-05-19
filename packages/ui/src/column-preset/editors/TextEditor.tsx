@@ -24,6 +24,7 @@ export function TextEditor(props: CellEditorProps) {
     return (
       <textarea
         ref={textareaRef}
+        className="grid-editor-input"
         value={value}
         onChange={(e) => setValue(e.target.value)}
         onBlur={() => props.onCommit(parseForCommit(props, value))}
@@ -46,12 +47,7 @@ export function TextEditor(props: CellEditorProps) {
           }
         }}
         style={{
-          width: "100%",
           height: "100%",
-          boxSizing: "border-box",
-          resize: "none",
-          whiteSpace: "pre-wrap",
-          overflowWrap: "anywhere",
         }}
       />
     );
@@ -60,6 +56,7 @@ export function TextEditor(props: CellEditorProps) {
   return (
     <input
       ref={inputRef}
+      className="grid-editor-input"
       value={value}
       onChange={(e) => setValue(e.target.value)}
       onBlur={() => props.onCommit(parseForCommit(props, value))}
@@ -75,7 +72,6 @@ export function TextEditor(props: CellEditorProps) {
           );
         }
       }}
-      style={{ width: "100%", height: "100%", boxSizing: "border-box" }}
     />
   );
 }

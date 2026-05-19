@@ -1,7 +1,9 @@
-import { useState, type ReactNode } from "react";
+import { useState, type MouseEvent, type ReactNode } from "react";
+import { ChevronDown, ChevronUp } from "lucide-react";
 import type { ColumnSchema } from "../../grid/types/schema";
 import type { GridPath } from "../../grid/types/identity";
 import { decomposePath } from "../../grid/types/identity";
+import { cycleSort } from "../../lib/sort";
 import {
   useGridRuntime,
   useLevelSnapshot,
@@ -106,41 +108,66 @@ function HeaderCell<TMeta = unknown, TFilter = unknown>({
     renderColumnHeaderMenu ??
     (runtime?.headerBehavior
       .renderColumnHeaderMenu as typeof renderColumnHeaderMenu);
-  const sort = level.sort?.find((s) => s.colId === column.column.id);
+  const sortIndex = level.sort?.findIndex((s) => s.colId === column.column.id);
+  const sort =
+    sortIndex != null && sortIndex >= 0 && level.sort
+      ? level.sort[sortIndex]
+      : undefined;
+  const sortRank =
+    sortIndex != null && sortIndex >= 0 && (level.sort?.length ?? 0) > 1
+      ? sortIndex + 1
+      : null;
+  const sortable = runtime?.headerBehavior.sortable === true;
   const close = () => setOpen(false);
+  const headerName = column.column.name;
+
+  function handleHeaderClick(e: MouseEvent<HTMLDivElement>) {
+    if (!sortable) return;
+    commands.setSort(
+      cycleSort(
+        level.sort ?? [],
+        column.column.id,
+        e.shiftKey ? "extend" : "replace",
+      ),
+    );
+  }
 
   return (
     <div
       className="grid-cell grid-cell--header"
       role="columnheader"
+      aria-sort={
+        sort?.direction === "asc"
+          ? "ascending"
+          : sort?.direction === "desc"
+            ? "descending"
+            : undefined
+      }
       data-col-id={column.column.id}
+      data-sortable={sortable}
+      title={headerName}
+      onClick={handleHeaderClick}
     >
       <div
         className="grid-cell__content"
         style={{
           justifyContent:
             columnPreset?.layout.align === "right" ? "flex-end" : "flex-start",
-          gap: "var(--grid-header-cell-gap, 0)",
         }}
       >
-        <span
-          style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis" }}
-        >
-          {customHeader ?? defaultHeader(column.column.name, sort?.direction)}
-        </span>
+        {customHeader ?? defaultHeader(headerName, sort?.direction, sortRank)}
         {menu ? (
           <button
             type="button"
             aria-label={`${column.column.name} menu`}
-            onClick={() => setOpen((v) => !v)}
-            style={{
-              border: 0,
-              background: "transparent",
-              cursor: "pointer",
-              padding: "var(--grid-header-menu-button-padding, 0)",
+            aria-expanded={open}
+            className="grid-header-menu-button"
+            onClick={(e) => {
+              e.stopPropagation();
+              setOpen((v) => !v);
             }}
           >
-            ...
+            <ChevronDown aria-hidden="true" size={11} strokeWidth={1.8} />
           </button>
         ) : null}
       </div>
@@ -148,15 +175,13 @@ function HeaderCell<TMeta = unknown, TFilter = unknown>({
         <div
           role="menu"
           className="grid-cell__popover"
+          onClick={(e) => e.stopPropagation()}
           style={{
             position: "absolute",
             top: "100%",
             right: 0,
             zIndex: 20,
             minWidth: 160,
-            background: "var(--background, white)",
-            border: "1px solid var(--border, #ddd)",
-            boxShadow: "0 8px 24px rgb(0 0 0 / 0.12)",
           }}
         >
           {menu({ level, column, commands, close }) as ReactNode}
@@ -166,9 +191,26 @@ function HeaderCell<TMeta = unknown, TFilter = unknown>({
   );
 }
 
-function defaultHeader(name: string, direction: "asc" | "desc" | undefined) {
-  if (!direction) return name;
-  return `${name} ${direction}`;
+function defaultHeader(
+  name: string,
+  direction: "asc" | "desc" | undefined,
+  rank: number | null,
+) {
+  return (
+    <>
+      <span className="grid-header-label">{name}</span>
+      {direction ? (
+        <span className="grid-header-sort-indicator">
+          {direction === "asc" ? (
+            <ChevronUp aria-hidden="true" size={10} strokeWidth={1.8} />
+          ) : (
+            <ChevronDown aria-hidden="true" size={10} strokeWidth={1.8} />
+          )}
+          {rank}
+        </span>
+      ) : null}
+    </>
+  );
 }
 
 function LevelLabelRow({ label, title }: { label: string; title: string }) {
@@ -185,7 +227,7 @@ function LevelLabelRow({ label, title }: { label: string; title: string }) {
           className="grid-cell__content"
           title={title}
           style={{
-            color: "var(--grid-level-label-color, var(--sap-muted))",
+            color: "var(--grid-level-label-color, var(--sap-fg-muted))",
             fontSize: "var(--grid-level-label-font-size, 11px)",
             fontWeight: "var(--grid-level-label-font-weight, 600)",
             lineHeight: 1,

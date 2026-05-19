@@ -13,6 +13,7 @@ export function SelectEditor(props: CellEditorProps) {
   return (
     <select
       ref={ref}
+      className="grid-editor-input"
       value={String(props.value ?? "")}
       onChange={(e) => {
         const option = options.find((o) => String(o.value) === e.target.value);
@@ -22,7 +23,6 @@ export function SelectEditor(props: CellEditorProps) {
       onKeyDown={(e) => {
         if (e.key === "Escape") props.onCancel();
       }}
-      style={{ width: "100%", height: "100%", boxSizing: "border-box" }}
     >
       {options.map((option) => (
         <option key={String(option.value)} value={String(option.value)}>

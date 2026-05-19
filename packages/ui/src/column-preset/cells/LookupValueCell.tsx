@@ -11,6 +11,7 @@ export function LookupValueCell({
   value,
   empty,
   fallbackLabel,
+  preset,
   valueLookup,
 }: Omit<CellRenderProps, "value"> & {
   value: LookupValue | null;
@@ -29,11 +30,26 @@ export function LookupValueCell({
   );
 
   if (empty) return null;
+  const foreignKey = preset.kind === "foreignKey";
   if (value == null)
     return <span className="text-sap-muted">{fallbackLabel}</span>;
 
   const entry = valueLookup.entryForValue(value);
-  if (entry) return <span>{entry.label}</span>;
+  if (entry) {
+    return foreignKey ? (
+      <span className="mono truncate text-sap-data text-sap-link">
+        {entry.label}
+      </span>
+    ) : (
+      <span className="block truncate">{entry.label}</span>
+    );
+  }
 
-  return <span className="text-sap-muted">{fallbackLabel}</span>;
+  return foreignKey ? (
+    <span className="mono truncate text-sap-data text-sap-subtle">
+      {fallbackLabel}
+    </span>
+  ) : (
+    <span className="text-sap-muted">{fallbackLabel}</span>
+  );
 }

@@ -9,5 +9,10 @@ export function SelectCell({
   runtime: ColumnPresetCellRenderRuntime;
   preset: SelectPreset;
 }) {
-  return <span>{value}</span>;
+  if (value === "") return null;
+  return (
+    <span className="inline-flex h-[18px] items-center rounded-[3px] border border-sap-border bg-sap-chip px-[6px] text-sap-menu text-sap-fg">
+      {value}
+    </span>
+  );
 }

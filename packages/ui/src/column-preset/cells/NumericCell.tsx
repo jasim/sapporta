@@ -18,29 +18,32 @@ export function NumericCell({
       : preset.kind === "currency"
         ? preset.currency
         : preset.percentage;
-  const color =
-    value !== null && display.colorRule
-      ? display.colorRule === "signed"
-        ? value > 0
-          ? "var(--color-emerald-700, #047857)"
-          : value < 0
-            ? "var(--color-rose-700, #be123c)"
-            : undefined
-        : display.colorRule === "positive"
-          ? "var(--color-emerald-700, #047857)"
-          : "var(--color-rose-700, #be123c)"
-      : undefined;
-  return (
-    <span
-      style={{
-        display: "block",
-        textAlign: "right",
-        fontVariantNumeric: "tabular-nums",
-        fontWeight: display.strong ? 600 : undefined,
-        color,
-      }}
-    >
-      {text}
-    </span>
-  );
+  const isEmpty = value === null || value === 0;
+  const base = "mono text-sap-data tabular-nums block w-full text-right";
+
+  if (text === "·") {
+    return <span className={`${base} text-sap-subtle`}>{text}</span>;
+  }
+
+  let toneClass: string;
+  if (isEmpty) {
+    toneClass = base;
+  } else if (display.strong) {
+    toneClass = `${base} font-medium text-sap-fg`;
+  } else if (display.colorRule === "positive") {
+    toneClass = `${base} font-medium text-sap-positive`;
+  } else if (display.colorRule === "negative") {
+    toneClass = `${base} font-medium text-sap-negative`;
+  } else if (display.colorRule === "signed") {
+    toneClass =
+      value > 0
+        ? `${base} font-medium text-sap-positive`
+        : value < 0
+          ? `${base} font-medium text-sap-negative`
+          : base;
+  } else {
+    toneClass = `${base} font-medium`;
+  }
+
+  return <span className={toneClass}>{text}</span>;
 }
