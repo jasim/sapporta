@@ -1,0 +1,28 @@
+{
+  "name": "__SLUG__-api",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsc-watch --onFirstSuccess \"node --watch dist/boot.js\"",
+    "build": "tsc",
+    "start": "node dist/boot.js",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@sapporta/server": "__CORE_SPEC__",
+    "@sapporta/shared": "__SHARED_SPEC__",
+    "__SLUG__-shared": "workspace:*",
+    "@hono/node-server": "^1.14.1",
+    "hono": "^4.0.0",
+    "drizzle-orm": "__DRIZZLE_VERSION__",
+    "better-sqlite3": "^12.x",
+    "@js-temporal/polyfill": "__TEMPORAL_VERSION__",
+    "zod": "__ZOD_VERSION__"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.0",
+    "tsc-watch": "^7.2.0",
+    "@types/better-sqlite3": "^7.6.0",
+    "vitest": "^3.1.0"
+  }
+}

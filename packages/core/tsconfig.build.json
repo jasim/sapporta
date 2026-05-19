@@ -1,0 +1,7 @@
+// tsconfig.json includes tests and fixtures for dev type-checking.
+// This config excludes them so `tsc -p tsconfig.build.json` produces
+// a clean dist with only production code.
+{
+  "extends": "./tsconfig.json",
+  "exclude": ["src/**/*.test.ts", "src/integration/**", "src/test-fixtures/**", "src/templates/**", "dist"]
+}

@@ -1,0 +1,30 @@
+# @sapporta/server — AI Instructions
+
+## After Modifying Schema, Reports, or Actions
+
+Always run `sapporta check` after creating or modifying files in a project's `schema/`, `reports/`, or `actions/` directories. Fix all issues before considering work complete.
+
+When creating or modifying reports, schemas, or actions, invoke the `/sapporta` skill to get specialist guidance and ensure all validation steps are followed.
+
+## Dev Server
+
+```bash
+pnpm dev              # Start backend server (port 3000)
+sapporta init <name>  # Create a new Sapporta project in ./<name>/
+```
+
+## Principles
+
+### Schema-as-Code
+Tables are defined as TypeScript files using Drizzle ORM + Sapporta's `table()` wrapper. Schema changes are applied by running `sapporta schema sync`, which uses Drizzle Kit's programmatic API. External projects must have their own `package.json` with dependencies installed (`sapporta init`) so that schema file imports resolve correctly.
+
+### No Coercion
+Data is accepted as-is. Do not convert between types (e.g., no `"$95k"→9500`, no `"yes"→true`). Provide data in the exact type the column expects.
+
+### Data Integrity
+- Always look up foreign key values before inserting — never guess or fabricate IDs
+- Respect NOT NULL constraints — include all required columns
+- Omit auto-generated columns (id, created_at, updated_at) from inserts
+
+### Derive Types from Schema
+Row types come from the Drizzle schema: `typeof xTable.$inferSelect` for values read from the DB, `typeof xTable.$inferInsert` for values about to be written. Never hand-write a parallel `type FooRow = { ... }` — it drifts silently when columns change. See the `table-creation` skill for details.

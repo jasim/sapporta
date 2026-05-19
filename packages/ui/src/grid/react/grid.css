@@ -1,0 +1,124 @@
+/* Minimal CSS for the new grid layout. The grid uses CSS variable
+ * `--grid-template-columns` set per-instance from the column schema so
+ * header and body rows align. */
+
+.grid {
+  font-size: var(--grid-font-size, inherit);
+  position: relative;
+  outline: none;
+  background: var(--grid-background, transparent);
+}
+
+.grid-header,
+.grid-body {
+  display: block;
+}
+
+.grid-row {
+  display: grid;
+  grid-template-columns: var(
+    --grid-template-columns,
+    repeat(auto-fit, minmax(80px, 1fr))
+  );
+  border-bottom: var(--grid-row-border-block-end, 0);
+}
+
+.grid-row--header {
+  background: var(--grid-header-background, transparent);
+  font-weight: var(--grid-header-font-weight, inherit);
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+.grid-cell {
+  box-sizing: border-box;
+  position: relative;
+  border-right: var(--grid-cell-border-inline-end, 0);
+  overflow: visible;
+  min-width: 0;
+}
+
+.grid-cell:last-child {
+  border-right: none;
+}
+
+.grid-cell__content {
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  min-height: var(--grid-cell-min-height, auto);
+  min-width: 0;
+  width: 100%;
+  overflow: hidden;
+  padding: var(--grid-cell-padding, 0);
+}
+
+.grid-cell__content > * {
+  min-width: 0;
+}
+
+.grid-cell--header {
+  font-weight: var(--grid-header-font-weight, inherit);
+  color: var(--grid-header-color, inherit);
+  user-select: none;
+}
+
+.grid-cell--header > .grid-cell__content {
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.grid-cell--focus {
+  background: var(--grid-cell-focus-background, transparent);
+}
+
+.grid-cell--focus::after,
+.grid-cell--editing::after {
+  content: "";
+  box-sizing: border-box;
+  position: absolute;
+  inset: var(--grid-cell-focus-ring-inset, 0);
+  pointer-events: none;
+  border: var(--grid-cell-focus-ring-width, 0) solid
+    var(--grid-cell-focus-ring-color, transparent);
+  z-index: var(--grid-cell-focus-ring-z-index, 2);
+}
+
+.grid-cell--in-selection {
+  background: var(--grid-cell-selection-background, transparent);
+}
+
+/* Active vs ghost is level-scoped — every cell in a level shares it.
+ * Each `.grid` re-declares `--grid-active` at its own scope so a nested
+ * grid does not inherit a parent's ghost dim through the cascade. Ghost
+ * styling reads `var(--grid-active)`; the var itself is just a flag,
+ * 1 for active, 0 for ghost. */
+.grid {
+  --grid-active: 1;
+}
+.grid[data-active="false"] {
+  --grid-active: 0;
+}
+
+.grid-row[data-row-kind="phantom"] {
+  background: var(--grid-phantom-row-background, transparent);
+}
+
+.grid-editor-overlay {
+  background: var(
+    --grid-editor-background,
+    var(--grid-background, transparent)
+  );
+}
+
+.grid-editor-input {
+  border: none;
+  outline: none;
+  padding: var(--grid-cell-padding, 0);
+  font: inherit;
+  background: var(
+    --grid-editor-background,
+    var(--grid-background, transparent)
+  );
+}

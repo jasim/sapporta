@@ -1,0 +1,306 @@
+/* Sapporta design tokens and base rules. Shipped as raw CSS — this file
+   does NOT `@import "tailwindcss"`. It is declarative theme data that
+   expects a Tailwind v4 pipeline to be running upstream, i.e. a consumer
+   `app.css` that does:
+
+     @import "tailwindcss";
+     @import "@sapporta/ui/index.css";
+     @source "./";
+
+   Two parallel `@import "tailwindcss"` (one in the library, one in the
+   consumer) re-emit Tailwind's defaults into @layer theme and clobber
+   each other's tokens on source order. One pipeline owned by the
+   consumer keeps the cascade predictable: Tailwind defaults → Sapporta
+   tokens → user overrides.
+
+   Font loading sits in the consumer's index.html (as a <link> tag), not
+   here, so apps can swap family / self-host / pick a loading strategy
+   without forking this file. */
+
+/* Scan this package's own source for Tailwind utility classes. Path is
+   relative to this file, so it resolves both in dev (src/) and when
+   shipped (dist/). Tailwind v4 excludes node_modules from automatic
+   content detection, so without this @source a consumer's Tailwind
+   pipeline would only see their own classes — not the ones used by
+   components in this package. */
+@source "./";
+
+/* ────────────────────────────────────────────────────────────────────────────
+ * Design tokens
+ *
+ * Two palettes with identical structure — the refined-shadcn direction from
+ * the Sapporta design explorations. Data-role names (positive/negative, not
+ * debit/credit) so non-accounting apps can reuse them for any numeric
+ * emphasis.
+ *
+ * The `sap-` prefix namespaces the canonical palette to the library so
+ * `bg-sap-surface` / `text-sap-fg` / `border-sap-border` won't collide
+ * with a downstream project's own `--bg`, `--fg`, or `--border`. The same
+ * prefix applies to the typography, tracking, and density scales below.
+ *
+ * Shadcn-compat aliases (unprefixed `--background`, `--primary`, `--muted`,
+ * `--accent`, etc.) are provided at the bottom of each palette so that
+ * existing shadcn utility classes like `bg-primary`, `text-muted-foreground`,
+ * `bg-accent` continue to resolve; they delegate to the canonical tokens.
+ * ───────────────────────────────────────────────────────────────────────── */
+
+:root {
+  /* Surfaces */
+  --sap-bg: #fbfbfa;
+  --sap-surface: #ffffff;
+  --sap-sidebar: #f7f6f3;
+  --sap-nested-bg: #faf9f4;
+  --sap-chip-bg: #fbfaf7;
+  --sap-row: #ffffff;
+  --sap-row-hover: #f6f4ef;
+
+  /* Borders */
+  --sap-border: #ebe9e3;
+  --sap-border-strong: #d9d6cd;
+
+  /* Text hierarchy */
+  --sap-fg: #17171a;
+  --sap-fg-muted: #6b6a63;
+  --sap-fg-subtle: #8e8c82;
+
+  /* Brand / emphasis */
+  --sap-brand: #4a55cc;
+  --sap-brand-soft: #eef0fb;
+  --sap-selection: #e4e7f8;
+  --sap-focus-ring: #c1c6ea;
+  --sap-link: #1f6fb0;
+
+  /* Numeric emphasis (any deltas / gains-losses / data accents) */
+  --sap-positive: #1a4d2e;
+  --sap-negative: #8b2f2f;
+
+  /* Nav chrome */
+  --sap-active-nav-bg: #eae7de;
+  --sap-nav-count-bg: #ece9e0;
+
+  /* Kbd chrome */
+  --sap-kbd-bg: #ffffff;
+  --sap-kbd-inverted-bg: rgba(255, 255, 255, 0.15);
+  --sap-proj-chip-kbd-bg: #f7f6f3;
+
+  /* Project switcher */
+  --sap-proj-bg: #ffffff;
+  --sap-proj-grad: linear-gradient(135deg, #4a55cc, #8a5fcf);
+
+  /* Radii */
+  --radius: 6px;
+  --radius-sm: 3px;
+  --radius-lg: 8px;
+  --radius-xl: 10px;
+
+  /* ── shadcn-compat aliases ───────────────────────────────────────────── */
+  --background: var(--sap-bg);
+  --foreground: var(--sap-fg);
+  --card: var(--sap-surface);
+  --card-foreground: var(--sap-fg);
+  --popover: var(--sap-surface);
+  --popover-foreground: var(--sap-fg);
+  --primary: var(--sap-fg);            /* filled button bg (dark-on-light) */
+  --primary-foreground: var(--sap-bg);
+  --secondary: var(--sap-chip-bg);
+  --secondary-foreground: var(--sap-fg);
+  --muted: var(--sap-nested-bg);
+  --muted-foreground: var(--sap-fg-muted);
+  --accent: var(--sap-active-nav-bg);  /* shadcn bg-accent → hover wash  */
+  --accent-foreground: var(--sap-fg);
+  --destructive: var(--sap-negative);
+  --destructive-foreground: var(--sap-bg);
+  --input: var(--sap-border);
+  --ring: var(--sap-brand);
+  --sidebar-foreground: var(--sap-fg);
+  --sidebar-border: var(--sap-border);
+  --sidebar-accent: var(--sap-active-nav-bg);
+  --sidebar-accent-foreground: var(--sap-fg);
+}
+
+/* Terminal-inspired dark: warm-tinted near-blacks, amber emphasis, bright-
+   green positives, soft-red negatives, warm-green selection. Same structure
+   as light — only values change. */
+[data-theme="dark"] {
+  --sap-bg: #0e0f0b;
+  --sap-surface: #14150f;
+  --sap-sidebar: #0a0b07;
+  --sap-nested-bg: #18190f;
+  --sap-chip-bg: #14150f;
+  --sap-row: #14150f;
+  --sap-row-hover: #1a1b13;
+
+  --sap-border: #2a2b22;
+  --sap-border-strong: #3d3e32;
+
+  --sap-fg: #e8e6d8;
+  --sap-fg-muted: #9a998a;
+  --sap-fg-subtle: #6a6a5c;
+
+  --sap-brand: #e8b34a;
+  --sap-brand-soft: rgba(232, 179, 74, 0.1);
+  --sap-selection: #2a3a1e;
+  --sap-focus-ring: #a8841d;
+  --sap-link: #6dc0e0;
+
+  --sap-positive: #7bc67b;
+  --sap-negative: #e08070;
+
+  --sap-active-nav-bg: rgba(232, 179, 74, 0.1);
+  --sap-nav-count-bg: #1f1f17;
+
+  --sap-kbd-bg: #1a1b13;
+  --sap-kbd-inverted-bg: rgba(0, 0, 0, 0.15);
+  --sap-proj-chip-kbd-bg: #1a1b13;
+
+  --sap-proj-bg: #14150f;
+  --sap-proj-grad: linear-gradient(135deg, #e8b34a, #c8723a);
+}
+
+/* ────────────────────────────────────────────────────────────────────────────
+ * Tailwind @theme inline — registers tokens as utility classes
+ *
+ * Every `--color-sap-*` here emits `bg-sap-*`, `text-sap-*`, `border-sap-*`,
+ * `ring-sap-*` utilities. The unprefixed shadcn block below keeps
+ * `bg-primary`, `text-muted-foreground`, `bg-accent` etc. resolving so
+ * pasted-in shadcn components keep working.
+ * ───────────────────────────────────────────────────────────────────────── */
+
+@theme inline {
+  /* Fonts */
+  --font-sans:
+    "Geist", "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI",
+    system-ui, sans-serif;
+  --font-mono:
+    "Geist Mono", "JetBrains Mono", "IBM Plex Mono", ui-monospace, Menlo,
+    monospace;
+
+  /* Canonical tokens → utility classes */
+  --color-sap-bg: var(--sap-bg);
+  --color-sap-surface: var(--sap-surface);
+  --color-sap-sidebar: var(--sap-sidebar);
+  --color-sap-nested: var(--sap-nested-bg);
+  --color-sap-chip: var(--sap-chip-bg);
+  --color-sap-row: var(--sap-row);
+  --color-sap-row-hover: var(--sap-row-hover);
+
+  --color-sap-border: var(--sap-border);
+  --color-sap-border-strong: var(--sap-border-strong);
+
+  --color-sap-fg: var(--sap-fg);
+  --color-sap-muted: var(--sap-fg-muted);
+  --color-sap-subtle: var(--sap-fg-subtle);
+
+  --color-sap-brand: var(--sap-brand);
+  --color-sap-brand-soft: var(--sap-brand-soft);
+  --color-sap-selection: var(--sap-selection);
+  --color-sap-focus-ring: var(--sap-focus-ring);
+  --color-sap-link: var(--sap-link);
+
+  --color-sap-positive: var(--sap-positive);
+  --color-sap-negative: var(--sap-negative);
+
+  --color-sap-active-nav: var(--sap-active-nav-bg);
+  --color-sap-nav-count: var(--sap-nav-count-bg);
+
+  --color-sap-kbd: var(--sap-kbd-bg);
+  --color-sap-proj-chip-kbd: var(--sap-proj-chip-kbd-bg);
+  --color-sap-proj: var(--sap-proj-bg);
+
+  /* Shadcn-compat → utility classes (keeps bg-primary, bg-muted, etc. working) */
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+
+  /* Radii */
+  --radius-sm: var(--radius-sm);
+  --radius-md: var(--radius);
+  --radius-lg: var(--radius-lg);
+  --radius-xl: var(--radius-xl);
+
+  /* ── Typography scale ────────────────────────────────────────────────
+   * Ten tiers, matching the target's measured sizes. Names describe the
+   * role (label/data/emph/body/display), not the px value, so components
+   * don't need to know the exact measurement. Changing a tier here
+   * propagates everywhere. Tailwind's defaults (`text-xs`, `text-sm`,
+   * `text-base`, `text-lg`) remain available — a consumer that doesn't
+   * care about Sapporta's dense UI scale can keep using the native
+   * ladder. */
+  --text-sap-tiny: 9px;        /* sort indicators and other tertiary glyphs */
+  --text-sap-micro: 10px;      /* stat card labels (smallest uppercase tier) */
+  --text-sap-label: 10.5px;    /* section labels, grid column headers, nav counts, version chip */
+  --text-sap-meta: 11px;       /* status bar, breadcrumb separator, chip metadata */
+  --text-sap-menu: 11.5px;     /* command-menu label, select cell */
+  --text-sap-data: 12px;       /* inline data — IDs, dates, FK refs, chips, child rows */
+  --text-sap-emph: 12.5px;     /* buttons, search input, ledger/child row body */
+  --text-sap-body: 13px;       /* primary data rows, top-bar title, sidebar items */
+  --text-sap-mark: 14.5px;     /* wordmark */
+  --text-sap-display: 18px;    /* stat card values (the one "shout" tier) */
+
+  /* ── Letter-spacing scale ────────────────────────────────────────────
+   * Four tiers from the design doc. Named by typographic role. */
+  --tracking-sap-display: -0.3px;  /* tighten display type — wordmark, stat values */
+  --tracking-sap-head: 0.3px;      /* grid column headers, uppercase labels */
+  --tracking-sap-label: 0.6px;     /* stat card labels */
+  --tracking-sap-section: 0.8px;   /* sidebar section labels (widest) */
+
+  /* ── Density tiers ───────────────────────────────────────────────────
+   * Row-height ladder. Registered under `--height-*` so only `h-sap-*`
+   * utilities are emitted — not `p-sap-row`, `w-sap-row`, `gap-sap-row`,
+   * which would come along for the ride under `--spacing-*`. */
+  --height-sap-row: 30px;      /* primary data rows */
+  --height-sap-header: 28px;   /* grid header, sidebar items, child rows, pagination, filter bar */
+  --height-sap-ctl: 26px;      /* buttons, inputs, search — interactive affordances */
+  --height-sap-bar: 24px;      /* status bar, chip strips */
+  --height-sap-topbar: 46px;   /* application top bar (outlier, named for grep-ability) */
+}
+
+/* ────────────────────────────────────────────────────────────────────────────
+ * Base
+ * ───────────────────────────────────────────────────────────────────────── */
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: var(--font-sans);
+  font-size: 13px;
+  line-height: 1.45;
+  text-rendering: optimizeLegibility;
+  background: var(--sap-bg);
+  color: var(--sap-fg);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+/* Monospace for tabular data. `tnum` lines up digit columns; `cv11` is
+   Geist Mono's single-storey alternate `a` — reads more code-like. */
+.mono,
+.font-mono {
+  font-family: var(--font-mono);
+  font-feature-settings: "tnum" 1, "cv11" 1;
+}

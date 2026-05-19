@@ -1,0 +1,38 @@
+{
+  "name": "sapporta",
+  "version": "0.2.0",
+  "type": "module",
+  "description": "Canonical CLI for Sapporta projects.",
+  "keywords": [
+    "sapporta",
+    "cli",
+    "database",
+    "typescript",
+    "sqlite",
+    "crud"
+  ],
+  "author": "Jasim A Basheer <jasim@nuabase.com>",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jasim/sapporta.git",
+    "directory": "packages/cli"
+  },
+  "homepage": "https://github.com/jasim/sapporta#readme",
+  "bugs": {
+    "url": "https://github.com/jasim/sapporta/issues"
+  },
+  "bin": {
+    "sapporta": "./bin/sapporta.mjs"
+  },
+  "files": [
+    "bin/",
+    "package.json"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "dependencies": {
+    "@sapporta/server": "workspace:*"
+  }
+}

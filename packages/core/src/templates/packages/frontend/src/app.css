@@ -1,0 +1,17 @@
+/* Single CSS entrypoint for this app. The cascade order matters:
+
+     1. @import "tailwindcss"        — Tailwind v4 defaults (preflight, theme).
+     2. @import "@sapporta/ui/..."    — Sapporta tokens, @theme, and base rules.
+     3. @source "./"                  — scan this project's src/ for utilities.
+     4. Your own CSS below            — has the last word.
+
+   Sapporta ships its CSS as raw theme data (no `@import "tailwindcss"`
+   inside), so your Tailwind pipeline is the only one in play. That means
+   you can redeclare any token (`--bg`, `--font-sans`, …) or drop in your
+   own `@theme` block below and it will win without fighting the library. */
+
+@import "tailwindcss";
+@import "@sapporta/ui/index.css";
+@source "./";
+
+/* Add your own tokens, utilities, and overrides below. */

@@ -1,0 +1,63 @@
+{
+  "name": "@sapporta/honest",
+  "version": "0.3.0",
+  "type": "module",
+  "description": "Honest — the Hono + ts-rest adapter. Mount ts-rest contracts on Hono with one-schema-two-uses request parsing and OpenAPI 3.1 emission. Adds dispatch families for runtime-resolved routes.",
+  "keywords": [
+    "hono",
+    "ts-rest",
+    "openapi",
+    "zod",
+    "typescript",
+    "contract",
+    "rest",
+    "api",
+    "sapporta"
+  ],
+  "author": "Jasim A Basheer <jasim@nuabase.com>",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jasim/sapporta.git",
+    "directory": "packages/honest"
+  },
+  "homepage": "https://github.com/jasim/sapporta/tree/master/packages/honest#readme",
+  "bugs": "https://github.com/jasim/sapporta/issues",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist/",
+    "README.md",
+    "package.json"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "build": "rm -rf dist tsconfig.build.tsbuildinfo && tsc -p tsconfig.build.json",
+    "build:watch": "tsc -p tsconfig.build.json --watch --preserveWatchOutput",
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "pnpm build"
+  },
+  "peerDependencies": {
+    "@sapporta/rest-core": "^3.52.2",
+    "hono": "^4",
+    "zod": "^4"
+  },
+  "dependencies": {
+    "@sapporta/rest-open-api": "^3.52.2"
+  },
+  "devDependencies": {
+    "@sapporta/rest-core": "3.52.2",
+    "hono": "^4.7.4",
+    "typescript": "^5.7.3",
+    "zod": "^4.3.6"
+  }
+}

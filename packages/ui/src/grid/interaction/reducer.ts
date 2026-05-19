@@ -1,0 +1,122 @@
+import type { ColumnSchema } from "../types/schema";
+import { triggerAllowed } from "../types/schema";
+import type { ControllerState } from "../types/controller-state";
+import type { DisplayedRows, LevelRowKind } from "../types/level-row";
+import type { RowCapabilities } from "../types/capabilities";
+import type { GridAction } from "../types/action";
+import type { GridEffect } from "../types/effects";
+
+// Pure reducer for path-local edit lifecycle.
+//
+// Cursor motion and per-path `liveFocus` writes do NOT pass through this
+// reducer — those flow through the focus manager, which is the sole
+// writer of `coordinator.cursor` and every controller's `liveFocus`.
+// Range writes (`selection`) on Shift+arrow extension also bypass this
+// reducer; they are the focus manager's `extendTo` responsibility.
+//
+// What this reducer still owns:
+//
+//   - START_EDIT / CANCEL_EDIT / COMMIT_EDIT — the editor lifecycle is a
+//     path-local concern and the only DOM effect is `focusCellEditor` on
+//     open and `focusContainer` on close.
+
+export type ReducerContext = {
+  displayed: DisplayedRows;
+  schema: ColumnSchema[];
+  capabilitiesFor: (kind: LevelRowKind) => RowCapabilities;
+};
+
+export type ReducerOutcome = {
+  state: ControllerState;
+  effects: GridEffect[];
+} | null;
+
+export function reduceController(
+  state: ControllerState,
+  action: GridAction,
+  ctx: ReducerContext,
+): ReducerOutcome {
+  const transition = transitionFor(state, action, ctx);
+  if (!transition) return null;
+  return {
+    state: transition,
+    effects: deriveEffects(state, transition),
+  };
+}
+
+type Next = ControllerState;
+
+function transitionFor(
+  state: ControllerState,
+  action: GridAction,
+  ctx: ReducerContext,
+): Next | null {
+  switch (action.type) {
+    case "START_EDIT": {
+      const row = ctx.displayed.rowById.get(action.coord.rowId);
+      if (!row) return null;
+      if (!ctx.capabilitiesFor(row.kind).editable) return null;
+      const column = ctx.schema.find((c) => c.id === action.coord.colId);
+      if (!column?.editCell) return null;
+      if (!triggerAllowed(column, action.trigger)) return null;
+      const editStart =
+        action.trigger === "type"
+          ? { trigger: action.trigger, typedSeed: action.initial }
+          : { trigger: action.trigger };
+      return {
+        liveFocus: state.liveFocus,
+        selection: state.selection,
+        editing: {
+          coord: action.coord,
+          ...editStart,
+        },
+      };
+    }
+
+    case "CANCEL_EDIT": {
+      if (!state.editing) return null;
+      return {
+        liveFocus: state.liveFocus,
+        selection: state.selection,
+        editing: null,
+      };
+    }
+
+    case "COMMIT_EDIT": {
+      if (!state.editing) return null;
+      // Reducer produces only the state change here — the actual data write
+      // and the directional follow-up come from `commitEdit` on the
+      // controller (see controller.ts), which calls `writeValue` (the runtime
+      // emits `mutationCommitted` from there) and then issues a
+      // movement intent through the focus manager.
+      return {
+        liveFocus: state.liveFocus,
+        selection: state.selection,
+        editing: null,
+      };
+    }
+  }
+}
+
+// Edit-lifecycle effects only. Cursor-motion effects (focusContainer +
+// scrollFocusIntoView for cursor moves) are queued by the focus manager,
+// not derived here.
+function deriveEffects(prev: ControllerState, next: Next): GridEffect[] {
+  // Entered an edit: cursor placement inside the editor.
+  if (next.editing && !prev.editing) {
+    return [
+      {
+        type: "focusCellEditor",
+        cursor: next.editing.trigger === "type" ? "atEnd" : "selectAll",
+      },
+    ];
+  }
+  // Exited an edit: return browser focus to the grid container. A
+  // directional follow-up (commitEdit's `commit !== "stay"` path) may
+  // queue another focusContainer afterward — that's harmless, it's just
+  // a second `.focus()` on the same already-focused container.
+  if (prev.editing && !next.editing) {
+    return [{ type: "focusContainer" }];
+  }
+  return [];
+}

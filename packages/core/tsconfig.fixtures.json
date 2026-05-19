@@ -1,0 +1,22 @@
+{
+  // Precompiles integration fixtures so the runtime loaders can stay
+  // .js-only. Run by the root `pretest` script; output is gitignored.
+  //
+  // rootDir is intentionally unset: fixture files have type-only imports
+  // reaching into other parts of src/ (e.g. `type { SapportaEnv }`),
+  // which tsc still loads into the program and would reject under a
+  // narrowed rootDir (TS6059). With rootDir inferred as src/, compiled
+  // fixtures land under fixtures-dist/integration/fixtures/ — the path
+  // setup.ts points at.
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "outDir": "fixtures-dist",
+    "composite": false,
+    "declaration": false,
+    "declarationMap": false,
+    "sourceMap": false,
+    "noEmit": false
+  },
+  "include": ["src/integration/fixtures/**/*", "src/test-fixtures/**/*"],
+  "exclude": []
+}

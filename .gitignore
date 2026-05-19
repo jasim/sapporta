@@ -1,0 +1,12 @@
+.idea
+node_modules
+dist
+fixtures-dist
+*.tsbuildinfo
+.DS_Store
+backups
+mise.toml
+.playwright-mcp
+.pnpm-store
+.agents
+.claude
