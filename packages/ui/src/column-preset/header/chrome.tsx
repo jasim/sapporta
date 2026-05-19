@@ -1,5 +1,6 @@
 import type { CSSProperties } from "react";
 import type { GridLevelChrome } from "../../grid/react/GridLevel";
+import { decomposePath } from "../../grid/types/identity";
 import type { PresetChromeOptions } from "../types";
 import { templateColumns } from "../width";
 import { ColumnPresetHeader } from "./ColumnPresetHeader";
@@ -16,8 +17,9 @@ export function chrome<TMeta = unknown, TFilter = unknown>(
         options={options}
       />
     ),
-    levelContainerStyle: ({ schema }) =>
-      ({
+    levelContainerStyle: ({ path, schema }) => {
+      const isNested = decomposePath(path).edges.length > 0;
+      return {
         "--grid-template-columns": templateColumns(schema),
         "--grid-font-size": "13px",
         "--grid-background": "var(--sap-surface)",
@@ -37,6 +39,9 @@ export function chrome<TMeta = unknown, TFilter = unknown>(
         "--grid-header-menu-button-padding": "0 2px",
         "--grid-phantom-row-background": "var(--sap-nested)",
         "--grid-editor-background": "var(--sap-surface)",
-      }) as CSSProperties,
+        // Child grids are grid items; margin indents without changing tracks.
+        marginInlineStart: isNested ? "32px" : undefined,
+      } as CSSProperties;
+    },
   };
 }

@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from "react";
 import type { ColumnSchema } from "../../grid/types/schema";
 import type { GridPath } from "../../grid/types/identity";
+import { decomposePath } from "../../grid/types/identity";
 import {
   useGridRuntime,
   useLevelSnapshot,
@@ -51,9 +52,14 @@ export function ColumnPresetHeader<TMeta = unknown, TFilter = unknown>({
     ...defaultCommands,
     ...options.commandOverrides?.(levelState),
   };
+  // Child levels get a compact label row above their column headers.
+  const levelLabel = nestedLevelLabel(path, levelName);
 
   return (
     <div className="grid-header" role="rowgroup">
+      {levelLabel ? (
+        <LevelLabelRow label={levelLabel} title={levelName} />
+      ) : null}
       <div className="grid-row grid-row--header" role="row">
         {schema.map((column, columnIndex) => (
           <HeaderCell
@@ -163,4 +169,46 @@ function HeaderCell<TMeta = unknown, TFilter = unknown>({
 function defaultHeader(name: string, direction: "asc" | "desc" | undefined) {
   if (!direction) return name;
   return `${name} ${direction}`;
+}
+
+function LevelLabelRow({ label, title }: { label: string; title: string }) {
+  return (
+    <div className="grid-row grid-row--level-label" role="row">
+      <div
+        className="grid-cell grid-cell--level-label"
+        role="columnheader"
+        style={{
+          gridColumn: "1 / -1",
+        }}
+      >
+        <div
+          className="grid-cell__content"
+          title={title}
+          style={{
+            color: "var(--grid-level-label-color, var(--sap-muted))",
+            fontSize: "var(--grid-level-label-font-size, 11px)",
+            fontWeight: "var(--grid-level-label-font-weight, 600)",
+            lineHeight: 1,
+            minHeight: "var(--grid-level-label-min-height, 18px)",
+            overflow: "hidden",
+            padding: "var(--grid-level-label-padding, 2px 8px)",
+            textOverflow: "ellipsis",
+            whiteSpace: "nowrap",
+          }}
+        >
+          {label}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function nestedLevelLabel(path: GridPath, levelName: string): string | null {
+  if (decomposePath(path).edges.length === 0) return null;
+  return compactLevelName(levelName);
+}
+
+function compactLevelName(levelName: string): string {
+  const dot = levelName.lastIndexOf(".");
+  return dot >= 0 ? levelName.slice(dot + 1) : levelName;
 }
