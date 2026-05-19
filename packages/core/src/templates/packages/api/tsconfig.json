@@ -1,0 +1,19 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "outDir": "dist",
+    "declaration": true,
+    "sourceMap": true,
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "baseUrl": ".",
+    "paths": {
+      "__SLUG__-shared": ["../shared/dist/index.d.ts", "../shared/src/index.ts"]
+    }
+  },
+  "include": ["*.ts", "app", "schema", "reports"],
+  "exclude": ["dist"]
+}

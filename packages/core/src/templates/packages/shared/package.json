@@ -1,0 +1,27 @@
+{
+  "name": "__SLUG__-shared",
+  "private": true,
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "build": "tsc",
+    "build:watch": "tsc --watch --preserveWatchOutput",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@js-temporal/polyfill": "__TEMPORAL_VERSION__",
+    "@sapporta/rest-core": "__SAPPORTA_REST_CORE_VERSION__",
+    "zod": "__ZOD_VERSION__"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.0"
+  }
+}

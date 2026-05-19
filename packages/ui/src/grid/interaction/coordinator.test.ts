@@ -1,0 +1,606 @@
+import { describe, expect, it } from "vitest";
+import { createGridRuntime } from "../runtime/create-grid-runtime";
+import type { GridRuntime } from "../runtime/create-grid-runtime";
+import { inMemoryGridDataSource } from "../data-sources/memory/in-memory-grid-source";
+import { childPath, makeRowId, rootPath } from "../types/identity";
+import type { GridPath, RowId } from "../types/identity";
+import type { TreeNode } from "../types/level-row";
+import type { GridSchema } from "../types/schema";
+
+const TestEditor = () => null;
+const testColumn = (id: string, name: string) => ({
+  id,
+  name,
+  renderCell: ({ value }: { value: unknown }) => String(value ?? ""),
+  editCell: TestEditor,
+});
+
+const reportSchema: GridSchema = {
+  rootLevel: "cat",
+  levels: {
+    cat: {
+      name: "cat",
+      columns: [testColumn("name", "Name"), testColumn("qty", "Qty")],
+      options: { rowKey: (n: TreeNode) => String(n.columns.name) },
+      childLevels: ["items"],
+    },
+    items: {
+      name: "items",
+      columns: [testColumn("name", "Name"), testColumn("qty", "Qty")],
+      options: { rowKey: (n: TreeNode) => String(n.columns.name) },
+      childLevels: [],
+    },
+  },
+};
+
+const root = rootPath("cat");
+const fruitItems = childPath(root, "Fruit", "items");
+const vegItems = childPath(root, "Veg", "items");
+
+const tree: TreeNode[] = [
+  {
+    levelName: "cat",
+    columns: { name: "Fruit" },
+    children: {
+      items: [
+        { levelName: "items", columns: { name: "Apple" } },
+        { levelName: "items", columns: { name: "Banana" } },
+      ],
+    },
+  },
+  {
+    levelName: "cat",
+    columns: { name: "Veg" },
+    children: {
+      items: [{ levelName: "items", columns: { name: "Carrot" } }],
+    },
+  },
+];
+
+function setupExpanded() {
+  const ds = inMemoryGridDataSource({
+    schema: reportSchema,
+    tree,
+    levels: {
+      cat: { sortMode: "none", filterMode: "none", paginationMode: "none" },
+      items: { sortMode: "none", filterMode: "none", paginationMode: "none" },
+    },
+  });
+  const rt = createGridRuntime({ schema: reportSchema, dataSource: ds });
+  rt.coordinator.toggleExpand(root, makeRowId(root, "Fruit"));
+  rt.coordinator.toggleExpand(root, makeRowId(root, "Veg"));
+  return rt;
+}
+
+function focusCell(
+  rt: GridRuntime,
+  path: GridPath,
+  coord: { rowId: RowId; colId: "name" | "qty" },
+) {
+  rt.focusManager.setRange(path, coord, coord);
+}
+
+describe("GridCoordinator", () => {
+  it("focusManager.apply sets the cursor", () => {
+    const rt = setupExpanded();
+    rt.focusManager.apply({
+      path: root,
+      rowId: makeRowId(root, "Fruit"),
+      colId: "name",
+    });
+    expect(rt.coordinator.getState().cursor?.path).toBe(root);
+  });
+
+  it("focusManager.moveTo clears the remembered range", () => {
+    const rt = setupExpanded();
+    const anchor = {
+      rowId: makeRowId(root, "Fruit"),
+      colId: "name" as const,
+    };
+    const head = { rowId: makeRowId(root, "Fruit"), colId: "qty" as const };
+    rt.focusManager.setRange(root, anchor, head);
+
+    rt.focusManager.moveTo({
+      path: root,
+      rowId: makeRowId(root, "Veg"),
+      colId: "name",
+    });
+
+    expect(rt.controllerFor(root).getState().selection).toBe(null);
+  });
+
+  it("focusManager.moveTo clears remembered ranges across paths", () => {
+    const rt = setupExpanded();
+    rt.focusManager.setRange(
+      root,
+      { rowId: makeRowId(root, "Fruit"), colId: "name" },
+      { rowId: makeRowId(root, "Fruit"), colId: "qty" },
+    );
+    rt.focusManager.setRange(
+      fruitItems,
+      { rowId: makeRowId(fruitItems, "Apple"), colId: "name" },
+      { rowId: makeRowId(fruitItems, "Banana"), colId: "qty" },
+    );
+
+    rt.focusManager.moveTo({
+      path: root,
+      rowId: makeRowId(root, "Veg"),
+      colId: "name",
+    });
+
+    expect(rt.controllerFor(root).getState().selection).toBe(null);
+    expect(rt.controllerFor(fruitItems).getState().selection).toBe(null);
+  });
+
+  it("horizontal arrow movement without shift clears the selected range", () => {
+    const rt = setupExpanded();
+    const anchor = {
+      rowId: makeRowId(root, "Fruit"),
+      colId: "name" as const,
+    };
+    const head = { rowId: makeRowId(root, "Fruit"), colId: "qty" as const };
+    rt.focusManager.setRange(root, anchor, head);
+    expect(
+      rt.controllerFor(root).handleKey({
+        key: "ArrowLeft",
+        ctrlKey: false,
+        metaKey: false,
+        shiftKey: false,
+        altKey: false,
+      } as KeyboardEvent),
+    ).toBe(true);
+    expect(rt.coordinator.getState().cursor).toEqual({
+      path: root,
+      rowId: makeRowId(root, "Fruit"),
+      colId: "name",
+    });
+    expect(rt.controllerFor(root).getState().liveFocus).toEqual({
+      rowId: makeRowId(root, "Fruit"),
+      colId: "name",
+    });
+    expect(rt.controllerFor(root).getState().selection).toBe(null);
+  });
+
+  it("Shift+Arrow starts a range anchored at the previously focused cell", () => {
+    const rt = setupExpanded();
+    const anchor = {
+      rowId: makeRowId(root, "Fruit"),
+      colId: "name" as const,
+    };
+    const head = {
+      rowId: makeRowId(root, "Fruit"),
+      colId: "qty" as const,
+    };
+    rt.focusManager.moveTo({ path: root, ...anchor });
+    expect(rt.controllerFor(root).getState().selection).toBe(null);
+
+    expect(
+      rt.controllerFor(root).handleKey({
+        key: "ArrowRight",
+        ctrlKey: false,
+        metaKey: false,
+        shiftKey: true,
+        altKey: false,
+      } as KeyboardEvent),
+    ).toBe(true);
+
+    expect(rt.controllerFor(root).getState().selection).toEqual({
+      anchor,
+      head,
+    });
+  });
+
+  it("Shift+click starts a range anchored at the previously focused cell", () => {
+    const rt = setupExpanded();
+    const anchor = {
+      rowId: makeRowId(root, "Fruit"),
+      colId: "name" as const,
+    };
+    const head = {
+      rowId: makeRowId(root, "Veg"),
+      colId: "qty" as const,
+    };
+    rt.focusManager.moveTo({ path: root, ...anchor });
+    expect(rt.controllerFor(root).getState().selection).toBe(null);
+
+    rt.focusManager.extendTo({ path: root, ...head });
+
+    expect(rt.controllerFor(root).getState().selection).toEqual({
+      anchor,
+      head,
+    });
+  });
+
+  it("commit follow-up uses coordinator navigation", () => {
+    const rt = setupExpanded();
+    const coord = { rowId: makeRowId(root, "Fruit"), colId: "name" as const };
+    focusCell(rt, root, coord);
+    const controller = rt.controllerFor(root);
+    controller.startEdit(coord, "f2");
+    controller.commitEdit("x", "next");
+    expect(rt.coordinator.getState().cursor).toEqual({
+      path: root,
+      rowId: makeRowId(root, "Fruit"),
+      colId: "qty",
+    });
+    expect(controller.getState().liveFocus).toEqual({
+      rowId: makeRowId(root, "Fruit"),
+      colId: "qty",
+    });
+  });
+
+  it("toggleExpand flips a row in the expansion set", () => {
+    const ds = inMemoryGridDataSource({
+      schema: reportSchema,
+      tree,
+      levels: {
+        cat: { sortMode: "none", filterMode: "none", paginationMode: "none" },
+        items: { sortMode: "none", filterMode: "none", paginationMode: "none" },
+      },
+    });
+    const rt = createGridRuntime({ schema: reportSchema, dataSource: ds });
+    const id = makeRowId(root, "Fruit");
+    rt.coordinator.toggleExpand(root, id);
+    expect(rt.coordinator.getState().expansion.get(root)?.has(id)).toBe(true);
+    rt.coordinator.toggleExpand(root, id);
+    expect(rt.coordinator.getState().expansion.get(root)).toBeUndefined();
+  });
+
+  // The visible sequence under the new model interleaves children
+  // between their owning parent rows. With Fruit and Veg both expanded:
+  //   Fruit → Apple → Banana → Veg → Carrot
+  // The navigation tests below assert this new (correct) order rather
+  // than the old expansion-order sibling walk.
+  it("navigate down from last child row dispatches focus on the parent's next row", () => {
+    const rt = setupExpanded();
+    // Seed cursor on the source path so coordinator.navigate can
+    // resolve a target relative to the current cursor.
+    rt.focusManager.apply({
+      path: fruitItems,
+      rowId: makeRowId(fruitItems, "Banana"),
+      colId: "name",
+    });
+    rt.coordinator.navigate(fruitItems, {
+      type: "moveRow",
+      direction: "down",
+      colPolicy: "preserve",
+      extend: false,
+    });
+    expect(rt.coordinator.getState().cursor).toEqual({
+      path: root,
+      rowId: makeRowId(root, "Veg"),
+      colId: "name",
+    });
+    expect(rt.controllerFor(root).getState().liveFocus).toEqual({
+      rowId: makeRowId(root, "Veg"),
+      colId: "name",
+    });
+  });
+
+  it("navigate up from first child row dispatches focus on its owning parent row", () => {
+    const rt = setupExpanded();
+    rt.focusManager.apply({
+      path: fruitItems,
+      rowId: makeRowId(fruitItems, "Apple"),
+      colId: "name",
+    });
+    rt.coordinator.navigate(fruitItems, {
+      type: "moveRow",
+      direction: "up",
+      colPolicy: "preserve",
+      extend: false,
+    });
+    expect(rt.coordinator.getState().cursor).toEqual({
+      path: root,
+      rowId: makeRowId(root, "Fruit"),
+      colId: "name",
+    });
+    expect(rt.controllerFor(fruitItems).getState().liveFocus).toBe(null);
+  });
+
+  it("navigate up from a parent row dispatches focus on the previous expanded child's last row", () => {
+    const rt = setupExpanded();
+    rt.focusManager.apply({
+      path: root,
+      rowId: makeRowId(root, "Veg"),
+      colId: "name",
+    });
+    rt.coordinator.navigate(root, {
+      type: "moveRow",
+      direction: "up",
+      colPolicy: "preserve",
+      extend: false,
+    });
+    expect(rt.coordinator.getState().cursor).toEqual({
+      path: fruitItems,
+      rowId: makeRowId(fruitItems, "Banana"),
+      colId: "name",
+    });
+  });
+
+  it("navigate down from a parent row dispatches focus into its expanded child", () => {
+    const rt = setupExpanded();
+    rt.focusManager.apply({
+      path: root,
+      rowId: makeRowId(root, "Fruit"),
+      colId: "name",
+    });
+    rt.coordinator.navigate(root, {
+      type: "moveRow",
+      direction: "down",
+      colPolicy: "preserve",
+      extend: false,
+    });
+    expect(rt.coordinator.getState().cursor).toEqual({
+      path: fruitItems,
+      rowId: makeRowId(fruitItems, "Apple"),
+      colId: "name",
+    });
+  });
+
+  it("navigate to last from a parent row lands on the deepest expanded leaf", () => {
+    // Ctrl+End across multiple expanded levels — the plan's headline
+    // cross-level case. With Fruit + Veg both expanded:
+    //   Fruit → Apple → Banana → Veg → Carrot
+    // 'last' must walk to Carrot, not stop at Veg.
+    const rt = setupExpanded();
+    rt.focusManager.apply({
+      path: root,
+      rowId: makeRowId(root, "Fruit"),
+      colId: "name",
+    });
+    rt.coordinator.navigate(root, {
+      type: "moveGridEdge",
+      edge: "last",
+      colPolicy: "preserve",
+      extend: false,
+    });
+    expect(rt.coordinator.getState().cursor).toEqual({
+      path: vegItems,
+      rowId: makeRowId(vegItems, "Carrot"),
+      colId: "name",
+    });
+  });
+
+  it("navigate to first from a leaf returns to the root's first row", () => {
+    const rt = setupExpanded();
+    rt.focusManager.apply({
+      path: vegItems,
+      rowId: makeRowId(vegItems, "Carrot"),
+      colId: "name",
+    });
+    rt.coordinator.navigate(vegItems, {
+      type: "moveGridEdge",
+      edge: "first",
+      colPolicy: "preserve",
+      extend: false,
+    });
+    expect(rt.coordinator.getState().cursor).toEqual({
+      path: root,
+      rowId: makeRowId(root, "Fruit"),
+      colId: "name",
+    });
+  });
+
+  it("navigate by row delta jumps across the cross-level visible sequence", () => {
+    // Sequence with both expanded: Fruit, Apple, Banana, Veg, Carrot.
+    // From Fruit (idx 0), +3 lands on Veg.
+    const rt = setupExpanded();
+    rt.focusManager.apply({
+      path: root,
+      rowId: makeRowId(root, "Fruit"),
+      colId: "name",
+    });
+    rt.coordinator.navigate(root, {
+      type: "moveRowDelta",
+      delta: 3,
+      colPolicy: "preserve",
+      extend: false,
+    });
+    expect(rt.coordinator.getState().cursor).toEqual({
+      path: root,
+      rowId: makeRowId(root, "Veg"),
+      colId: "name",
+    });
+  });
+
+  it("navigate dispatches focus to a target controller before any DOM mounts", () => {
+    // The target controller is created lazily by `controllerFor`, but that
+    // is a pure-state object — it has no dependency on a Grid being
+    // mounted. The focus dispatch sets cursor + liveFocus and queues
+    // effects immediately; EffectRunner drains them whenever the target
+    // Grid eventually mounts (controllers outlive DOM presence).
+    const rt = setupExpanded();
+    rt.focusManager.apply({
+      path: vegItems,
+      rowId: makeRowId(vegItems, "Carrot"),
+      colId: "name",
+    });
+    rt.coordinator.navigate(vegItems, {
+      type: "moveRow",
+      direction: "up",
+      colPolicy: "preserve",
+      extend: false,
+    });
+    expect(rt.coordinator.getState().cursor).toEqual({
+      path: root,
+      rowId: makeRowId(root, "Veg"),
+      colId: "name",
+    });
+  });
+
+  it("handleKey ArrowDown from an expanded parent enters the first child row", () => {
+    const rt = setupExpanded();
+    focusCell(rt, root, {
+      rowId: makeRowId(root, "Fruit"),
+      colId: "name",
+    });
+    expect(
+      rt.controllerFor(root).handleKey({
+        key: "ArrowDown",
+        ctrlKey: false,
+        metaKey: false,
+        shiftKey: false,
+        altKey: false,
+      } as KeyboardEvent),
+    ).toBe(true);
+    expect(rt.coordinator.getState().cursor).toEqual({
+      path: fruitItems,
+      rowId: makeRowId(fruitItems, "Apple"),
+      colId: "name",
+    });
+    expect(rt.controllerFor(fruitItems).getState().liveFocus).toEqual({
+      rowId: makeRowId(fruitItems, "Apple"),
+      colId: "name",
+    });
+  });
+
+  it("handleKey ArrowUp from a parent enters the previous expanded child's last row", () => {
+    const rt = setupExpanded();
+    focusCell(rt, root, {
+      rowId: makeRowId(root, "Veg"),
+      colId: "name",
+    });
+    expect(
+      rt.controllerFor(root).handleKey({
+        key: "ArrowUp",
+        ctrlKey: false,
+        metaKey: false,
+        shiftKey: false,
+        altKey: false,
+      } as KeyboardEvent),
+    ).toBe(true);
+    expect(rt.coordinator.getState().cursor).toEqual({
+      path: fruitItems,
+      rowId: makeRowId(fruitItems, "Banana"),
+      colId: "name",
+    });
+  });
+
+  it("handleKey ArrowDown from the last child lands on the next parent row", () => {
+    const rt = setupExpanded();
+    focusCell(rt, fruitItems, {
+      rowId: makeRowId(fruitItems, "Banana"),
+      colId: "name",
+    });
+    expect(
+      rt.controllerFor(fruitItems).handleKey({
+        key: "ArrowDown",
+        ctrlKey: false,
+        metaKey: false,
+        shiftKey: false,
+        altKey: false,
+      } as KeyboardEvent),
+    ).toBe(true);
+    expect(rt.coordinator.getState().cursor).toEqual({
+      path: root,
+      rowId: makeRowId(root, "Veg"),
+      colId: "name",
+    });
+  });
+
+  it("handleKey ArrowUp from the first child lands on the owning parent row", () => {
+    const rt = setupExpanded();
+    focusCell(rt, fruitItems, {
+      rowId: makeRowId(fruitItems, "Apple"),
+      colId: "name",
+    });
+    expect(
+      rt.controllerFor(fruitItems).handleKey({
+        key: "ArrowUp",
+        ctrlKey: false,
+        metaKey: false,
+        shiftKey: false,
+        altKey: false,
+      } as KeyboardEvent),
+    ).toBe(true);
+    expect(rt.coordinator.getState().cursor).toEqual({
+      path: root,
+      rowId: makeRowId(root, "Fruit"),
+      colId: "name",
+    });
+  });
+
+  it("handleKey Tab from a parent row enters the expanded child row", () => {
+    const rt = setupExpanded();
+    focusCell(rt, root, {
+      rowId: makeRowId(root, "Fruit"),
+      colId: "qty",
+    });
+    expect(
+      rt.controllerFor(root).handleKey({
+        key: "Tab",
+        ctrlKey: false,
+        metaKey: false,
+        shiftKey: false,
+        altKey: false,
+      } as KeyboardEvent),
+    ).toBe(true);
+    expect(rt.coordinator.getState().cursor).toEqual({
+      path: fruitItems,
+      rowId: makeRowId(fruitItems, "Apple"),
+      colId: "name",
+    });
+  });
+
+  it("handleKey Shift+Tab from a parent row enters the previous expanded child row", () => {
+    const rt = setupExpanded();
+    focusCell(rt, root, {
+      rowId: makeRowId(root, "Veg"),
+      colId: "name",
+    });
+    expect(
+      rt.controllerFor(root).handleKey({
+        key: "Tab",
+        ctrlKey: false,
+        metaKey: false,
+        shiftKey: true,
+        altKey: false,
+      } as KeyboardEvent),
+    ).toBe(true);
+    expect(rt.coordinator.getState().cursor).toEqual({
+      path: fruitItems,
+      rowId: makeRowId(fruitItems, "Banana"),
+      colId: "qty",
+    });
+  });
+
+  it("collapsing a row containing the cursor's subtree moves the cursor to the parent row", () => {
+    const rt = setupExpanded();
+    focusCell(rt, fruitItems, {
+      rowId: makeRowId(fruitItems, "Apple"),
+      colId: "name",
+    });
+    rt.coordinator.toggleExpand(root, makeRowId(root, "Fruit"));
+    expect(rt.coordinator.getState().cursor).toEqual({
+      path: root,
+      rowId: makeRowId(root, "Fruit"),
+      colId: "name",
+    });
+    expect(rt.controllerFor(fruitItems).getState().liveFocus).toBe(null);
+  });
+
+  it("focusManager.setRange on a non-active path activates that path", () => {
+    const rt = setupExpanded();
+    focusCell(rt, root, {
+      rowId: makeRowId(root, "Fruit"),
+      colId: "name",
+    });
+    expect(rt.coordinator.getState().cursor?.path).toBe(root);
+    focusCell(rt, fruitItems, {
+      rowId: makeRowId(fruitItems, "Apple"),
+      colId: "name",
+    });
+    // The cursor moves to the new path; the prior path's liveFocus is
+    // cleared. This is the regression the focus-management abstraction
+    // prevents — a stale `selection.head` on the inactive path used to
+    // short-circuit cross-path delivery and leave DOM focus on the
+    // wrong grid.
+    expect(rt.coordinator.getState().cursor?.path).toBe(fruitItems);
+    expect(rt.controllerFor(root).getState().liveFocus).toBe(null);
+    expect(rt.controllerFor(fruitItems).getState().liveFocus).toEqual({
+      rowId: makeRowId(fruitItems, "Apple"),
+      colId: "name",
+    });
+  });
+});

@@ -1,0 +1,86 @@
+import { uiClient } from "../client";
+import type {
+  CountResponse,
+  PaginatedRows,
+  Row,
+  SingleRow,
+} from "@sapporta/shared/contracts";
+import { stringifySortOrder } from "../lib/sort";
+import type { SortDescriptor } from "@/grid";
+import { encodeFilters, type FilterCondition } from "@sapporta/shared/filter";
+import type { RowId } from "@sapporta/shared/row-id";
+
+export interface FetchRowsParams {
+  tableName: string;
+  page?: number;
+  limit?: number;
+  sort?: SortDescriptor[];
+  filters?: FilterCondition[];
+  search?: string;
+}
+
+/** Serialize filter/sort/search/pagination into the query-shape the server's
+ *  `parseQuery()` expects. Single source of truth for both the typed list
+ *  fetch and the CSV-export URL. Filter encoding is delegated to
+ *  `@sapporta/shared/filter` so the URL the router produces and the query
+ *  this fetch layer sends use the same format. */
+export function buildRowsQuery(
+  params: Omit<FetchRowsParams, "tableName">,
+): Record<string, string> {
+  const out: Record<string, string> = {};
+  if (params.filters) {
+    for (const [k, v] of encodeFilters(params.filters)) out[k] = v;
+  }
+  if (params.page) out.page = String(params.page);
+  if (params.limit) out.limit = String(params.limit);
+  const sortStr = params.sort ? stringifySortOrder(params.sort) : null;
+  if (sortStr) out.sort = sortStr;
+  if (params.search) out.q = params.search;
+  return out;
+}
+
+export async function fetchRows(params: FetchRowsParams): Promise<PaginatedRows> {
+  const { tableName, ...rest } = params;
+  return uiClient.listRows({
+    params: { tableName },
+    query: buildRowsQuery(rest),
+  });
+}
+
+export async function fetchRow(tableName: string, id: RowId): Promise<SingleRow> {
+  return uiClient.getRow({ params: { tableName, id } });
+}
+
+export async function createRow(
+  tableName: string,
+  data: Row,
+): Promise<{ data: Row | Row[] }> {
+  return uiClient.createRow({ params: { tableName }, body: data });
+}
+
+export async function updateRow(
+  tableName: string,
+  id: RowId,
+  data: Row,
+): Promise<SingleRow> {
+  return uiClient.updateRow({ params: { tableName, id }, body: data });
+}
+
+export async function deleteRow(
+  tableName: string,
+  id: RowId,
+): Promise<SingleRow> {
+  return uiClient.deleteRow({ params: { tableName, id } });
+}
+
+export async function fetchChildCounts(
+  childTable: string,
+  fkColumn: string,
+  parentIds: RowId[],
+): Promise<CountResponse> {
+  if (parentIds.length === 0) return { data: {} };
+  return uiClient.count({
+    params: { tableName: childTable },
+    query: { group_by: fkColumn, ids: parentIds.join(",") },
+  });
+}

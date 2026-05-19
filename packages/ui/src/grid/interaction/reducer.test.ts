@@ -1,0 +1,102 @@
+import { describe, expect, it } from "vitest";
+import { reduceController } from "./reducer";
+import { capabilitiesFor } from "../types/capabilities";
+import { rootPath, makeRowId } from "../types/identity";
+import type { GridAction } from "../types/action";
+import type { ColumnSchema } from "../types/schema";
+import type { ControllerState } from "../types/controller-state";
+import type { DisplayedRows, LevelRow } from "../types/level-row";
+import { buildDisplayed } from "../pipeline/stages/build-displayed";
+
+const path = rootPath("rows");
+const rowId = makeRowId(path, "r0");
+const TestEditor = () => null;
+
+const columns: ColumnSchema[] = [
+  {
+    id: "a",
+    name: "A",
+    renderCell: ({ value }) => String(value ?? ""),
+    editCell: TestEditor,
+  },
+];
+
+const displayed: DisplayedRows = buildDisplayed([
+  {
+    kind: "data",
+    id: rowId,
+    columns: {},
+    hasChildren: false,
+    source: {} as never,
+  } satisfies LevelRow,
+]);
+
+const state: ControllerState = {
+  liveFocus: null,
+  selection: null,
+  editing: null,
+};
+
+function start(action: GridAction) {
+  return reduceController(state, action, {
+    displayed,
+    schema: columns,
+    capabilitiesFor,
+  })?.state.editing;
+}
+
+describe("reduceController START_EDIT", () => {
+  it("stores a typed seed for type-started edits", () => {
+    expect(
+      start({
+        type: "START_EDIT",
+        coord: { rowId, colId: "a" },
+        trigger: "type",
+        initial: "x",
+      }),
+    ).toEqual({
+      coord: { rowId: "rows#r0", colId: "a" },
+      trigger: "type",
+      typedSeed: "x",
+    });
+  });
+
+  it("stores no typed seed for click-started edits", () => {
+    expect(
+      start({
+        type: "START_EDIT",
+        coord: { rowId, colId: "a" },
+        trigger: "click",
+      }),
+    ).toEqual({
+      coord: { rowId: "rows#r0", colId: "a" },
+      trigger: "click",
+    });
+  });
+
+  it("stores no typed seed for enter-started edits", () => {
+    expect(
+      start({
+        type: "START_EDIT",
+        coord: { rowId, colId: "a" },
+        trigger: "enter",
+      }),
+    ).toEqual({
+      coord: { rowId: "rows#r0", colId: "a" },
+      trigger: "enter",
+    });
+  });
+
+  it("stores no typed seed for f2-started edits", () => {
+    expect(
+      start({
+        type: "START_EDIT",
+        coord: { rowId, colId: "a" },
+        trigger: "f2",
+      }),
+    ).toEqual({
+      coord: { rowId: "rows#r0", colId: "a" },
+      trigger: "f2",
+    });
+  });
+});

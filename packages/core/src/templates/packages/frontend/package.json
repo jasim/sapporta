@@ -1,0 +1,29 @@
+{
+  "name": "__SLUG__-frontend",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@sapporta/shared": "__SHARED_SPEC__",
+    "@sapporta/ui": "__UI_SPEC__",
+    "__SLUG__-shared": "workspace:*",
+    "@js-temporal/polyfill": "__TEMPORAL_VERSION__",
+    "lucide-react": "__LUCIDE_REACT_VERSION__",
+    "react": "__REACT_VERSION__",
+    "react-dom": "__REACT_DOM_VERSION__",
+    "react-router-dom": "__REACT_ROUTER_VERSION__"
+  },
+  "devDependencies": {
+    "@types/react": "__TYPES_REACT_VERSION__",
+    "@types/react-dom": "__TYPES_REACT_DOM_VERSION__",
+    "typescript": "^5.7.0",
+    "vite": "__VITE_VERSION__",
+    "@vitejs/plugin-react": "__VITE_REACT_VERSION__",
+    "@tailwindcss/vite": "__TAILWIND_VITE_VERSION__",
+    "tailwindcss": "__TAILWIND_VERSION__"
+  }
+}

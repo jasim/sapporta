@@ -1,0 +1,19 @@
+{
+  "name": "__NAME__",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "predev": "pnpm --filter ./packages/shared build",
+    "dev": "rm -rf packages/frontend/dist && mkdir -p packages/frontend/dist && concurrently \"pnpm --filter ./packages/shared build:watch\" \"pnpm --filter ./packages/api dev\" \"sleep 1 && pnpm --filter ./packages/frontend dev\"",
+    "dev:server": "pnpm --filter ./packages/api dev",
+    "dev:ui": "pnpm --filter ./packages/frontend dev",
+    "build": "pnpm --filter ./packages/shared build && pnpm --filter ./packages/api build && pnpm --filter ./packages/frontend build",
+    "start": "pnpm --filter ./packages/api start"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": ["better-sqlite3"]
+  },
+  "devDependencies": {
+    "concurrently": "^9.0.0"
+  }
+}
