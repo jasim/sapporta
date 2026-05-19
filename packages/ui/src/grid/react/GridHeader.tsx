@@ -13,7 +13,9 @@ export function GridHeader({ schema }: { schema: ColumnSchema[] }) {
             role="columnheader"
             data-col-id={col.id}
           >
-            <div className="grid-cell__content">{col.name}</div>
+            <div className="grid-cell__content">
+              <span className="grid-header-label">{col.name}</span>
+            </div>
           </div>
         ))}
       </div>

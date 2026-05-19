@@ -11,19 +11,22 @@ export function CellFrame({
 } & CellRenderProps) {
   return (
     <span
-      style={{
-        display: "grid",
-        gridTemplateColumns: action ? "minmax(0, 1fr) auto" : "minmax(0, 1fr)",
-        alignItems: "center",
-        gap: 6,
-        minWidth: 0,
-        width: "100%",
-      }}
+      className={
+        action
+          ? "grid-cell-frame grid-cell-frame--with-action"
+          : "grid-cell-frame"
+      }
     >
-      <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis" }}>
-        {children}
-      </span>
-      {action ? <span>{action(props)}</span> : null}
+      <span className="grid-cell-frame__content">{children}</span>
+      {action ? (
+        <span
+          className="grid-cell-frame__actions"
+          onClick={(e) => e.stopPropagation()}
+          onDoubleClick={(e) => e.stopPropagation()}
+        >
+          <span className="grid-cell-frame__action-inner">{action(props)}</span>
+        </span>
+      ) : null}
     </span>
   );
 }

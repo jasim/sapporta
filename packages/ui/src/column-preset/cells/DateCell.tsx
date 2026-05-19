@@ -10,8 +10,6 @@ export function DateCell({
   preset: DatePreset;
 }) {
   return (
-    <span style={{ fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" }}>
-      {value}
-    </span>
+    <span className="mono text-sap-data text-sap-muted truncate">{value}</span>
   );
 }

@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import type { MouseEvent, ReactNode } from "react";
 import type { CellSelectionStatus } from "../../types/selection";
 import type { ColumnSchema } from "../../types/schema";
 import { cellClasses } from "./cell-classes";
@@ -14,12 +14,13 @@ export function CellShell(props: {
   status: CellSelectionStatus;
   column: ColumnSchema;
   children: ReactNode;
-  onMouseDown?: (e: React.MouseEvent) => void;
-  onDoubleClick?: (e: React.MouseEvent) => void;
+  onMouseDown?: (e: MouseEvent) => void;
+  onDoubleClick?: (e: MouseEvent) => void;
 }) {
   return (
     <div
       className={cellClasses(props.status)}
+      role="gridcell"
       data-cell-status={props.status}
       data-col-id={props.column.id}
       onMouseDown={props.onMouseDown}

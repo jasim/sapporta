@@ -59,6 +59,31 @@ describe("columnPreset columns", () => {
     });
   });
 
+  it("numeric renderer uses a middle dot for dot zero display", () => {
+    const column = columnPreset.currency({
+      id: "amount",
+      name: "Amount",
+      zeroDisplay: "dot",
+    });
+    const rendered = column.renderCell({
+      value: 0,
+      column,
+      path: rootPath("books"),
+      row: {
+        kind: "data",
+        id: "books#1" as never,
+        columns: { amount: 0 },
+        hasChildren: false,
+        source: { levelName: "books", columns: { amount: 0 } },
+      },
+    });
+
+    expect(isValidElement(rendered)).toBe(true);
+    expect(
+      isValidElement<{ text?: string }>(rendered) ? rendered.props.text : null,
+    ).toBe("·");
+  });
+
   it("select normalizes string and object options", () => {
     const column = select({
       id: "unit",

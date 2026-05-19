@@ -1,4 +1,5 @@
 import { useStore } from "zustand";
+import type { MouseEvent } from "react";
 import type { GridPath } from "../../types/identity";
 import type { ColumnSchema } from "../../types/schema";
 import { triggerAllowed } from "../../types/schema";
@@ -48,7 +49,7 @@ export function GridDataCell({
     ),
   );
 
-  function onMouseDown(e: React.MouseEvent) {
+  function onMouseDown(e: MouseEvent) {
     if (e.button !== 0) return;
     e.preventDefault();
     const coord = { rowId: row.id, colId: column.id };

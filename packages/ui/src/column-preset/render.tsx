@@ -115,9 +115,14 @@ function numericCellValue<TMeta>(
   runtime: ColumnPresetRuntime<TMeta>,
   preset: NumberPreset | CurrencyPreset | PercentagePreset,
 ): { value: number | null; text: string } {
-  const n = typeof rawValue === "number" ? rawValue : Number(rawValue);
-  const value = Number.isFinite(n) ? n : null;
-  const isZero = value === 0;
+  const n =
+    rawValue === null || rawValue === undefined || rawValue === ""
+      ? null
+      : typeof rawValue === "number"
+        ? rawValue
+        : Number(rawValue);
+  const value = n !== null && Number.isFinite(n) ? n : null;
+  const isEmpty = value === null || value === 0;
   const display =
     preset.kind === "number"
       ? preset.number
@@ -125,10 +130,10 @@ function numericCellValue<TMeta>(
         ? preset.currency
         : preset.percentage;
   const text =
-    isZero && display.zeroDisplay === "blank"
+    isEmpty && display.zeroDisplay === "blank"
       ? ""
-      : isZero && display.zeroDisplay === "dot"
-        ? "."
+      : isEmpty && display.zeroDisplay === "dot"
+        ? "·"
         : runtime.valueCodec.format(rawValue);
   return { value, text };
 }

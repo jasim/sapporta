@@ -158,6 +158,26 @@ describe("tableColumnsToGridThemeColumns", () => {
     });
   });
 
+  it("defaults currency zero display to a dot", () => {
+    const columns = tableColumnsToGridThemeColumns({
+      table: table([
+        {
+          name: "price",
+          kind: "number",
+          displayFormat: "currency",
+        },
+      ]),
+      immutable: false,
+      expandable: false,
+      context,
+    });
+    const p = preset(columns[0]);
+
+    expect(p?.kind).toBe("currency");
+    if (!p || !("currency" in p)) throw new Error("expected currency preset");
+    expect(p.currency.zeroDisplay).toBe("dot");
+  });
+
   it("assigns FK label and editor lookups to preset data", () => {
     const columns = tableColumnsToGridThemeColumns({
       table: table([

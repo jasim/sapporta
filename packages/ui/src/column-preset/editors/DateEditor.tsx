@@ -15,18 +15,22 @@ export function DateEditor(props: CellEditorProps) {
     <input
       ref={ref}
       type="date"
+      className="grid-editor-input mono text-sap-data text-sap-muted"
       value={value}
       onChange={(e) => setValue(e.target.value)}
       onBlur={() => props.onCommit(parseForCommit(props, value))}
       onKeyDown={(e) => {
         if (e.key === "Escape") props.onCancel();
-        if (e.key === "Enter") props.onCommit(parseForCommit(props, value), "down");
+        if (e.key === "Enter")
+          props.onCommit(parseForCommit(props, value), "down");
         if (e.key === "Tab") {
           e.preventDefault();
-          props.onCommit(parseForCommit(props, value), e.shiftKey ? "prev" : "next");
+          props.onCommit(
+            parseForCommit(props, value),
+            e.shiftKey ? "prev" : "next",
+          );
         }
       }}
-      style={{ width: "100%", height: "100%", boxSizing: "border-box" }}
     />
   );
 }
