@@ -1,9 +1,15 @@
-/* Minimal CSS for the new grid layout. The grid uses CSS variable
- * `--grid-template-columns` set per-instance from the column schema so
- * header and body rows align. */
+/* Minimal CSS for the grid layout. The grid uses CSS variable
+ * `--grid-template-columns` set per-instance from the column schema.
+ * Rows use subgrid so intrinsic tracks such as `max-content` are resolved
+ * across header and body cells together. */
 
 .grid {
+  display: grid;
   font-size: var(--grid-font-size, inherit);
+  grid-template-columns: var(
+    --grid-template-columns,
+    repeat(auto-fit, minmax(80px, 1fr))
+  );
   position: relative;
   outline: none;
   background: var(--grid-background, transparent);
@@ -11,16 +17,23 @@
 
 .grid-header,
 .grid-body {
-  display: block;
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: subgrid;
 }
 
 .grid-row {
   display: grid;
-  grid-template-columns: var(
-    --grid-template-columns,
-    repeat(auto-fit, minmax(80px, 1fr))
-  );
+  grid-column: 1 / -1;
+  grid-template-columns: subgrid;
   border-bottom: var(--grid-row-border-block-end, 0);
+}
+
+.grid-body > .grid,
+.grid-body > .grid-level-status,
+.grid-body > .grid-level-empty {
+  grid-column: 1 / -1;
+  min-width: 0;
 }
 
 .grid-row--header {
