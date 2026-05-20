@@ -7,6 +7,7 @@ import { GridHeader } from "./GridHeader";
 import { CellEditorOverlay } from "./cells/CellEditorOverlay";
 import { EffectRunner } from "./EffectRunner";
 import { useGridRuntime } from "./GridRuntimeProvider";
+import { cn } from "../../lib/utils";
 
 export type GridChromeContext = {
   path: GridPath;
@@ -50,6 +51,7 @@ export function Grid({
   schema,
   controller,
   renderLevelHeader,
+  levelContainerClassName,
   levelContainerStyle,
   children,
 }: {
@@ -57,6 +59,7 @@ export function Grid({
   schema: ColumnSchema[];
   controller: GridControllerPublic;
   renderLevelHeader?: (ctx: GridChromeContext) => ReactNode;
+  levelContainerClassName?: (ctx: GridChromeContext) => string | undefined;
   levelContainerStyle?: (ctx: GridChromeContext) => CSSProperties | undefined;
   children?: ReactNode;
 }) {
@@ -68,6 +71,7 @@ export function Grid({
   );
   const chromeContext = { path, levelName: levelNameFromPath(path), schema };
   const header = renderLevelHeader?.(chromeContext);
+  const className = levelContainerClassName?.(chromeContext);
   const style = levelContainerStyle?.(chromeContext);
   const depth = decomposePath(path).edges.length;
 
@@ -94,7 +98,7 @@ export function Grid({
   return (
     <div
       ref={containerRef}
-      className="grid"
+      className={cn("grid", className)}
       tabIndex={0}
       role="grid"
       data-grid-path={path}

@@ -1,0 +1,111 @@
+@reference "../index.css";
+
+.presetGrid {
+  --grid-font-size: var(--text-sap-body);
+  --grid-background: var(--sap-surface);
+  --grid-row-border-block-end: 1px solid var(--sap-border-soft);
+  --grid-cell-border-inline-end: 0;
+  --grid-cell-min-height: var(--height-sap-row);
+  --grid-cell-padding: 0 10px;
+  --grid-cell-focus-ring-width: 0;
+  --grid-cell-active-focus-background: var(--sap-selection);
+  --grid-cell-active-focus-ring-color: transparent;
+  --grid-cell-active-selection-background: var(--sap-selection);
+  --grid-cell-ghost-focus-background: var(--sap-selection);
+  --grid-cell-ghost-focus-ring-color: transparent;
+  --grid-cell-ghost-selection-background: var(--sap-selection);
+  --grid-cell-editing-ring-width: 1.5px;
+  --grid-cell-editing-ring-color: var(--sap-brand);
+  --grid-header-background: var(--sap-surface);
+  --grid-header-color: var(--sap-fg-muted);
+  --grid-header-font-size: var(--text-sap-label);
+  --grid-header-font-weight: 760;
+  --grid-header-letter-spacing: var(--tracking-sap-head);
+  --grid-header-min-height: var(--height-sap-header);
+  --grid-header-cell-gap: 4px;
+  --grid-header-cell-padding: 0 10px;
+  --grid-header-cursor: pointer;
+  --grid-phantom-row-background: var(--sap-surface);
+  --grid-editor-background: var(--sap-surface);
+}
+
+.presetGrid[data-grid-depth]:not([data-grid-depth="0"]) {
+  --grid-cell-min-height: 31px;
+
+  background: var(--sap-nested-bg);
+  padding-block-end: 14px;
+  padding-block-start: 10px;
+  padding-inline-end: 14px;
+}
+
+.presetGrid[data-grid-depth="1"] {
+  margin-inline-start: 58px;
+}
+
+.presetGrid[data-grid-depth]:not([data-grid-depth="0"]):not(
+    [data-grid-depth="1"]
+  ) {
+  margin-inline-start: 46px;
+}
+
+.headerContent {
+  justify-content: flex-start;
+}
+
+.headerContentRight {
+  justify-content: flex-end;
+}
+
+.headerPopover {
+  min-width: 160px;
+  position: absolute;
+  right: 0;
+  top: 100%;
+  z-index: 20;
+}
+
+.levelLabelCell {
+  grid-column: 1 / -1;
+}
+
+.levelLabelContent {
+  color: var(--grid-level-label-color, var(--sap-fg-subtle));
+  font-size: var(--grid-level-label-font-size, var(--text-sap-label));
+  font-weight: var(--grid-level-label-font-weight, 700);
+  letter-spacing: var(
+    --grid-level-label-letter-spacing,
+    var(--tracking-sap-head)
+  );
+  line-height: 1;
+  min-height: var(--grid-level-label-min-height, 18px);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-transform: var(--grid-level-label-text-transform, uppercase);
+  white-space: nowrap;
+}
+
+.textCell {
+  @apply block truncate;
+}
+
+.identifierTextCell {
+  @apply block w-full truncate text-right text-sap-data text-sap-muted;
+
+  font-family: var(--font-mono);
+  font-feature-settings:
+    "tnum" 1,
+    "cv11" 1;
+}
+
+.multiLineTextCell {
+  display: -webkit-box;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 4;
+  white-space: pre-wrap;
+}
+
+.textEditorMultiline {
+  height: 100%;
+}

@@ -14,6 +14,7 @@ import {
 
 export type GridLevelChrome = {
   renderLevelHeader?: (ctx: GridChromeContext) => ReactNode;
+  levelContainerClassName?: (ctx: GridChromeContext) => string | undefined;
   levelContainerStyle?: (ctx: GridChromeContext) => CSSProperties | undefined;
 };
 
@@ -62,6 +63,7 @@ export function GridLevel({
         schema={schema}
         controller={controller}
         renderLevelHeader={chrome?.renderLevelHeader}
+        levelContainerClassName={chrome?.levelContainerClassName}
         levelContainerStyle={chrome?.levelContainerStyle}
       >
         <DisplayedRowsBody

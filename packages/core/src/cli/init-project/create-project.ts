@@ -60,6 +60,7 @@ const SCAFFOLD_FILES: Array<{ src: string; dest: string } | string> = [
   "packages/frontend/src/Welcome.tsx",
   "packages/frontend/src/api.ts",
   "packages/frontend/src/app.css",
+  "packages/frontend/src/vite-env.d.ts",
   "packages/shared/package.json",
   "packages/shared/tsconfig.json",
   "packages/shared/src/index.ts",

@@ -8,7 +8,9 @@ import {
   useGridRuntime,
   useLevelSnapshot,
 } from "../../grid/react/GridRuntimeProvider";
+import { cn } from "../../lib/utils";
 import { meta, preset, presetRuntime } from "../preset";
+import styles from "../sapporta-preset.module.css";
 import type {
   GridLevelCommands,
   HeaderColumn,
@@ -149,11 +151,11 @@ function HeaderCell<TMeta = unknown, TFilter = unknown>({
       onClick={handleHeaderClick}
     >
       <div
-        className="grid-cell__content"
-        style={{
-          justifyContent:
-            columnPreset?.layout.align === "right" ? "flex-end" : "flex-start",
-        }}
+        className={cn(
+          "grid-cell__content",
+          styles.headerContent,
+          columnPreset?.layout.align === "right" && styles.headerContentRight,
+        )}
       >
         {customHeader ?? defaultHeader(headerName, sort?.direction, sortRank)}
         {menu ? (
@@ -174,15 +176,8 @@ function HeaderCell<TMeta = unknown, TFilter = unknown>({
       {open && menu ? (
         <div
           role="menu"
-          className="grid-cell__popover"
+          className={cn("grid-cell__popover", styles.headerPopover)}
           onClick={(e) => e.stopPropagation()}
-          style={{
-            position: "absolute",
-            top: "100%",
-            right: 0,
-            zIndex: 20,
-            minWidth: 160,
-          }}
         >
           {menu({ level, column, commands, close }) as ReactNode}
         </div>
@@ -217,27 +212,12 @@ function LevelLabelRow({ label, title }: { label: string; title: string }) {
   return (
     <div className="grid-row grid-row--level-label" role="row">
       <div
-        className="grid-cell grid-cell--level-label"
+        className={cn("grid-cell grid-cell--level-label", styles.levelLabelCell)}
         role="columnheader"
-        style={{
-          gridColumn: "1 / -1",
-        }}
       >
         <div
-          className="grid-cell__content"
+          className={cn("grid-cell__content", styles.levelLabelContent)}
           title={title}
-          style={{
-            color: "var(--grid-level-label-color, var(--sap-fg-muted))",
-            fontSize: "var(--grid-level-label-font-size, 11px)",
-            fontWeight: "var(--grid-level-label-font-weight, 600)",
-            letterSpacing: "var(--grid-level-label-letter-spacing, 0)",
-            lineHeight: 1,
-            minHeight: "var(--grid-level-label-min-height, 18px)",
-            overflow: "hidden",
-            textOverflow: "ellipsis",
-            textTransform: "var(--grid-level-label-text-transform, none)",
-            whiteSpace: "nowrap",
-          }}
         >
           {label}
         </div>

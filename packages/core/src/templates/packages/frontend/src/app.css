@@ -10,6 +10,10 @@
    you can redeclare any token (`--bg`, `--font-sans`, …) or drop in your
    own `@theme` block below and it will win without fighting the library. */
 
+/* CSS modules are supported by Vite. If a module needs Tailwind `@apply`
+   or Sapporta theme utilities, add `@reference` with a relative path to
+   this file at the top of that module. */
+
 @import "tailwindcss";
 @import "@sapporta/ui/index.css";
 @source "./";
