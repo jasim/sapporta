@@ -26,9 +26,20 @@ export const GridRow = memo(function GridRow({
   const row = useDisplayedRow(path, rowId);
 
   return (
-    <div className="grid-row" data-row-id={row.id} data-row-kind={row.kind} role="row">
+    <div
+      data-grid-part="row"
+      data-row-id={row.id}
+      data-row-kind={row.kind}
+      role="row"
+    >
       {schema.map((col) => (
-        <GridDataCell key={col.id} row={row} column={col} path={path} colOrder={colOrder} />
+        <GridDataCell
+          key={col.id}
+          row={row}
+          column={col}
+          path={path}
+          colOrder={colOrder}
+        />
       ))}
     </div>
   );

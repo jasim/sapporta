@@ -1,9 +1,13 @@
 /* Dense spreadsheet chrome for the grid runtime. The grid uses CSS variable
  * `--grid-template-columns` set per-instance from the column schema.
  * Rows use subgrid so intrinsic tracks such as `max-content` are resolved
- * across header and body cells together. */
+ * across header and body cells together.
+ *
+ * Only `.root` is a CSS-module class. Descendant styling is scoped under that
+ * root through stable `data-grid-part` attributes so consumers can target the
+ * DOM without depending on generated CSS-module names. */
 
-.grid[data-grid-path] {
+.root[data-grid-path] {
   --grid-active-focus-background: var(
     --grid-cell-active-focus-background,
     var(--sap-selection)
@@ -23,6 +27,7 @@
     --grid-cell-editing-ring-color,
     var(--sap-brand)
   );
+  --grid-active: 1;
 
   display: grid;
   color: var(--grid-color, var(--sap-fg));
@@ -37,141 +42,12 @@
   background: var(--grid-background, var(--sap-surface));
 }
 
-.grid-header,
-.grid-body {
-  display: grid;
-  grid-column: 1 / -1;
-  grid-template-columns: subgrid;
-}
-
-.grid-row {
-  display: grid;
-  grid-column: 1 / -1;
-  grid-template-columns: subgrid;
-  border-bottom: var(--grid-row-border-block-end, 1px solid var(--sap-border));
-}
-
-.grid-row:not(.grid-row--header):not(.grid-row--level-label):hover {
-  background: var(--grid-row-hover-background, var(--sap-row-hover));
-}
-
-.grid-body > .grid[data-grid-path],
-.grid-body > .grid-level-status,
-.grid-body > .grid-level-empty {
-  grid-column: 1 / -1;
-  min-width: 0;
-}
-
-.grid-row--header {
-  background: var(--grid-header-background, var(--sap-sidebar));
-  border-bottom: var(
-    --grid-header-border-block-end,
-    1px solid var(--sap-border)
-  );
-  font-weight: var(--grid-header-font-weight, 760);
-  position: sticky;
-  top: 0;
-  z-index: 1;
-}
-
-.grid-row--level-label {
-  border-bottom: 0;
-}
-
-.grid[data-grid-path][data-grid-depth]:not([data-grid-depth="0"])
-  .grid-row--header {
-  position: static;
-}
-
-.grid-cell {
-  box-sizing: border-box;
-  background: transparent;
-  position: relative;
-  border-right: var(--grid-cell-border-inline-end, 1px solid var(--sap-border));
-  overflow: visible;
-  min-width: 0;
-}
-
-.grid-cell:last-child {
-  border-right: none;
-}
-
-.grid-cell__content {
-  box-sizing: border-box;
-  display: flex;
-  align-items: center;
-  min-height: var(--grid-cell-min-height, var(--height-sap-row));
-  min-width: 0;
-  width: 100%;
-  overflow: hidden;
-  padding: var(--grid-cell-padding, 0 10px);
-}
-
-.grid-cell__content > * {
-  min-width: 0;
-}
-
-.grid-cell--header {
-  color: var(--grid-header-color, var(--sap-fg-subtle));
-  cursor: var(--grid-header-cursor, default);
-  font-size: var(--grid-header-font-size, var(--text-sap-label));
-  font-weight: var(--grid-header-font-weight, 760);
-  letter-spacing: var(--grid-header-letter-spacing, var(--tracking-sap-head));
-  line-height: 1;
-  text-transform: uppercase;
-  user-select: none;
-}
-
-.grid-cell--header > .grid-cell__content {
-  gap: var(--grid-header-cell-gap, 4px);
-  min-height: var(--grid-header-min-height, var(--height-sap-header));
-  padding: var(--grid-header-cell-padding, 0 10px);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.grid-cell--header[data-sortable="false"] {
-  cursor: default;
-}
-
-.grid-header-label {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.grid-cell--focus {
-  background: var(--grid-current-focus-background);
-  box-shadow: inset 0 0 0 var(--grid-cell-focus-ring-width, 1.5px)
-    var(--grid-current-focus-ring-color);
-  z-index: var(--grid-cell-focus-ring-z-index, 3);
-}
-
-.grid-cell--editing {
-  background: var(--grid-cell-editing-background, transparent);
-  box-shadow: inset 0 0 0
-    var(
-      --grid-cell-editing-ring-width,
-      var(--grid-cell-focus-ring-width, 1.5px)
-    )
-    var(--grid-editing-ring-color);
-  z-index: var(--grid-cell-focus-ring-z-index, 3);
-}
-
-.grid-cell--in-selection {
-  background: var(--grid-current-selection-background);
-}
-
 /* Active vs ghost is level-scoped — every cell in a level shares it.
- * Each `.grid[data-grid-path]` re-declares `--grid-active` at its own scope so
- * a nested grid does not inherit a parent's ghost dim through the cascade. Ghost
- * styling reads `var(--grid-active)`; the var itself is just a flag,
- * 1 for active, 0 for ghost. */
-.grid[data-grid-path] {
-  --grid-active: 1;
-}
-.grid[data-grid-path][data-active="false"] {
+ * Each grid root re-declares `--grid-active` at its own scope so a nested grid
+ * does not inherit a parent's ghost dim through the cascade. Ghost styling
+ * reads `var(--grid-active)`; the var itself is just a flag, 1 for active, 0
+ * for ghost. */
+.root[data-grid-path][data-active="false"] {
   --grid-active: 0;
   --grid-current-focus-background: var(
     --grid-cell-ghost-focus-background,
@@ -187,11 +63,146 @@
   );
 }
 
-.grid-row[data-row-kind="phantom"] {
+/* `:where()` gives `.root` zero specificity here. That lets consumer CSS like
+ * `.myGrid [data-grid-part="cell"]` override internal grid chrome without
+ * depending on CSS-module hashes or selector escalation. */
+:where(.root) [data-grid-part="header"],
+:where(.root) [data-grid-part="body"] {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: subgrid;
+}
+
+:where(.root) [data-grid-part="row"],
+:where(.root) [data-grid-part="header-row"],
+:where(.root) [data-grid-part="level-label-row"] {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: subgrid;
+  border-bottom: var(--grid-row-border-block-end, 1px solid var(--sap-border));
+}
+
+:where(.root) [data-grid-part="row"]:hover {
+  background: var(--grid-row-hover-background, var(--sap-row-hover));
+}
+
+:where(.root) [data-grid-part="body"] > .root[data-grid-path],
+:where(.root) [data-grid-part="body"] > [data-grid-part="level-status"],
+:where(.root) [data-grid-part="body"] > [data-grid-part="level-empty"] {
+  grid-column: 1 / -1;
+  min-width: 0;
+}
+
+:where(.root) [data-grid-part="header-row"] {
+  background: var(--grid-header-background, var(--sap-sidebar));
+  border-bottom: var(
+    --grid-header-border-block-end,
+    1px solid var(--sap-border)
+  );
+  font-weight: var(--grid-header-font-weight, 760);
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+:where(.root) [data-grid-part="level-label-row"] {
+  border-bottom: 0;
+}
+
+.root[data-grid-path][data-grid-depth]:not([data-grid-depth="0"])
+  [data-grid-part="header-row"] {
+  position: static;
+}
+
+:where(.root) [data-grid-part="cell"],
+:where(.root) [data-grid-part="header-cell"],
+:where(.root) [data-grid-part="level-label-cell"] {
+  box-sizing: border-box;
+  background: transparent;
+  position: relative;
+  border-right: var(--grid-cell-border-inline-end, 1px solid var(--sap-border));
+  overflow: visible;
+  min-width: 0;
+}
+
+:where(.root) [data-grid-part="cell"]:last-child,
+:where(.root) [data-grid-part="header-cell"]:last-child,
+:where(.root) [data-grid-part="level-label-cell"]:last-child {
+  border-right: none;
+}
+
+:where(.root) [data-grid-part="cell-content"] {
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  min-height: var(--grid-cell-min-height, var(--height-sap-row));
+  min-width: 0;
+  width: 100%;
+  overflow: hidden;
+  padding: var(--grid-cell-padding, 0 10px);
+}
+
+:where(.root) [data-grid-part="cell-content"] > * {
+  min-width: 0;
+}
+
+:where(.root) [data-grid-part="header-cell"] {
+  color: var(--grid-header-color, var(--sap-fg-subtle));
+  cursor: var(--grid-header-cursor, default);
+  font-size: var(--grid-header-font-size, var(--text-sap-label));
+  font-weight: var(--grid-header-font-weight, 760);
+  letter-spacing: var(--grid-header-letter-spacing, var(--tracking-sap-head));
+  line-height: 1;
+  text-transform: uppercase;
+  user-select: none;
+}
+
+:where(.root) [data-grid-part="header-cell"] > [data-grid-part="cell-content"] {
+  gap: var(--grid-header-cell-gap, 4px);
+  min-height: var(--grid-header-min-height, var(--height-sap-header));
+  padding: var(--grid-header-cell-padding, 0 10px);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+:where(.root) [data-grid-part="header-cell"][data-sortable="false"] {
+  cursor: default;
+}
+
+:where(.root) [data-grid-part="header-label"] {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+:where(.root) [data-grid-part="cell"][data-cell-status="focus"] {
+  background: var(--grid-current-focus-background);
+  box-shadow: inset 0 0 0 var(--grid-cell-focus-ring-width, 1.5px)
+    var(--grid-current-focus-ring-color);
+  z-index: var(--grid-cell-focus-ring-z-index, 3);
+}
+
+:where(.root) [data-grid-part="cell"][data-cell-status="editing"] {
+  background: var(--grid-cell-editing-background, transparent);
+  box-shadow: inset 0 0 0
+    var(
+      --grid-cell-editing-ring-width,
+      var(--grid-cell-focus-ring-width, 1.5px)
+    )
+    var(--grid-editing-ring-color);
+  z-index: var(--grid-cell-focus-ring-z-index, 3);
+}
+
+:where(.root) [data-grid-part="cell"][data-cell-status="in-selection"] {
+  background: var(--grid-current-selection-background);
+}
+
+:where(.root) [data-grid-part="row"][data-row-kind="phantom"] {
   background: var(--grid-phantom-row-background, var(--sap-nested-bg));
 }
 
-.grid-editor-overlay {
+:where(.root) [data-grid-part="editor-overlay"] {
   background: var(
     --grid-editor-background,
     var(--grid-background, var(--sap-surface))
@@ -199,7 +210,7 @@
   color: var(--grid-color, var(--sap-fg));
 }
 
-.grid-editor-input {
+:where(.root) [data-grid-part="editor-input"] {
   background: var(--grid-editor-input-background, transparent);
   border: none;
   border-radius: 0;
@@ -214,25 +225,25 @@
   width: 100%;
 }
 
-textarea.grid-editor-input {
+:where(.root) textarea[data-grid-part="editor-input"] {
   overflow-wrap: anywhere;
   resize: none;
   white-space: pre-wrap;
 }
 
-.grid-editor-overlay [cmdk-input-wrapper] {
+:where(.root) [data-grid-part="editor-overlay"] [cmdk-input-wrapper] {
   border-bottom: 0;
   height: 100%;
   padding: 0;
 }
 
-.grid-editor-overlay [cmdk-input-wrapper] input {
+:where(.root) [data-grid-part="editor-overlay"] [cmdk-input-wrapper] input {
   font-size: var(--text-sap-body);
   line-height: var(--grid-line-height, 1.45);
   padding: var(--grid-cell-padding, 0 10px);
 }
 
-.grid-header-menu-button {
+:where(.root) [data-grid-part="header-menu-button"] {
   align-items: center;
   background: transparent;
   border: 0;
@@ -247,13 +258,13 @@ textarea.grid-editor-input {
   width: 16px;
 }
 
-.grid-header-menu-button:hover,
-.grid-header-menu-button[aria-expanded="true"] {
+:where(.root) [data-grid-part="header-menu-button"]:hover,
+:where(.root) [data-grid-part="header-menu-button"][aria-expanded="true"] {
   background: var(--sap-row-hover);
   color: var(--sap-fg);
 }
 
-.grid-header-sort-indicator {
+:where(.root) [data-grid-part="header-sort-indicator"] {
   align-items: center;
   color: var(--sap-fg-subtle);
   display: inline-flex;
@@ -263,7 +274,7 @@ textarea.grid-editor-input {
   opacity: 0.75;
 }
 
-.grid-cell__popover {
+:where(.root) [data-grid-part="cell-popover"] {
   background: var(--sap-surface);
   border: 1px solid var(--sap-border);
   border-radius: var(--radius);
@@ -275,7 +286,7 @@ textarea.grid-editor-input {
   text-transform: none;
 }
 
-.grid-expand-cell {
+:where(.root) [data-grid-part="expand-cell"] {
   align-items: center;
   display: inline-flex;
   gap: 7px;
@@ -286,14 +297,14 @@ textarea.grid-editor-input {
   width: 100%;
 }
 
-.grid-expand-chevron,
-.grid-expand-placeholder {
+:where(.root) [data-grid-part="expand-chevron"],
+:where(.root) [data-grid-part="expand-placeholder"] {
   flex: 0 0 auto;
   height: 20px;
   width: 20px;
 }
 
-.grid-expand-chevron {
+:where(.root) [data-grid-part="expand-chevron"] {
   align-items: center;
   background: transparent;
   border: 0;
@@ -305,12 +316,12 @@ textarea.grid-editor-input {
   padding: 0;
 }
 
-.grid-expand-chevron:hover {
+:where(.root) [data-grid-part="expand-chevron"]:hover {
   background: var(--sap-row-hover);
   color: var(--sap-fg);
 }
 
-.grid-expand-content {
+:where(.root) [data-grid-part="expand-content"] {
   display: block;
   flex: 1 1 auto;
   min-width: 0;
@@ -319,18 +330,18 @@ textarea.grid-editor-input {
   white-space: nowrap;
 }
 
-.grid-expand-content > * {
+:where(.root) [data-grid-part="expand-content"] > * {
   max-width: 100%;
 }
 
-.grid-cell-frame {
+:where(.root) [data-grid-part="cell-frame"] {
   display: block;
   min-width: 0;
   position: relative;
   width: 100%;
 }
 
-.grid-cell-frame__content {
+:where(.root) [data-grid-part="cell-frame-content"] {
   display: block;
   min-width: 0;
   overflow: hidden;
@@ -338,11 +349,13 @@ textarea.grid-editor-input {
   white-space: nowrap;
 }
 
-.grid-cell-frame--with-action .grid-cell-frame__content {
+:where(.root)
+  [data-grid-part="cell-frame"][data-with-action="true"]
+  [data-grid-part="cell-frame-content"] {
   padding-right: 30px;
 }
 
-.grid-cell-frame__actions {
+:where(.root) [data-grid-part="cell-frame-actions"] {
   align-items: center;
   background: linear-gradient(
     to left,
@@ -360,18 +373,26 @@ textarea.grid-editor-input {
   transition: opacity 120ms ease;
 }
 
-.grid-cell:hover .grid-cell-frame__actions,
-.grid-cell:focus-within .grid-cell-frame__actions,
-.grid-cell--focus .grid-cell-frame__actions,
-.grid-cell--editing .grid-cell-frame__actions {
+:where(.root)
+  [data-grid-part="cell"]:hover
+  [data-grid-part="cell-frame-actions"],
+:where(.root)
+  [data-grid-part="cell"]:focus-within
+  [data-grid-part="cell-frame-actions"],
+:where(.root)
+  [data-grid-part="cell"][data-cell-status="focus"]
+  [data-grid-part="cell-frame-actions"],
+:where(.root)
+  [data-grid-part="cell"][data-cell-status="editing"]
+  [data-grid-part="cell-frame-actions"] {
   opacity: 1;
 }
 
-.grid-cell-frame__action-inner {
+:where(.root) [data-grid-part="cell-frame-action-inner"] {
   pointer-events: auto;
 }
 
-.grid-cell-frame__actions button {
+:where(.root) [data-grid-part="cell-frame-actions"] button {
   align-items: center;
   background: var(--sap-surface);
   border: 1px solid var(--sap-border);
@@ -384,7 +405,7 @@ textarea.grid-editor-input {
   width: 24px;
 }
 
-.grid-cell-frame__actions button:hover {
+:where(.root) [data-grid-part="cell-frame-actions"] button:hover {
   background: var(--sap-row-hover);
   color: var(--sap-fg);
 }

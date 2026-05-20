@@ -13,7 +13,7 @@ export function SelectEditor(props: CellEditorProps) {
   return (
     <select
       ref={ref}
-      className="grid-editor-input"
+      data-grid-part="editor-input"
       value={String(props.value ?? "")}
       onChange={(e) => {
         const option = options.find((o) => String(o.value) === e.target.value);

@@ -7,7 +7,6 @@ import {
 } from "@/grid";
 import type { StoreApi } from "zustand";
 import { columnPreset } from "@/column-preset";
-import "@/grid/react/grid.css";
 import type { TableState } from "@/table/state/table-state";
 import type { TableFilter } from "@/table/grid-adapter/compile-table-grid";
 import type { TableGridThemeColumnMeta } from "@/table/grid-adapter/table-grid-theme";

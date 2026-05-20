@@ -38,14 +38,14 @@ export function ExpandCell({
   }
 
   return (
-    <span className="grid-expand-cell">
+    <span data-grid-part="expand-cell">
       {showChevron ? (
         <button
           type="button"
           onClick={toggle}
           aria-label={isExpanded ? "Collapse" : "Expand"}
           aria-expanded={isExpanded}
-          className="grid-expand-chevron"
+          data-grid-part="expand-chevron"
         >
           {isExpanded ? (
             <ChevronDown aria-hidden="true" size={14} strokeWidth={1.75} />
@@ -54,9 +54,9 @@ export function ExpandCell({
           )}
         </button>
       ) : (
-        <span className="grid-expand-placeholder" />
+        <span data-grid-part="expand-placeholder" />
       )}
-      <span className="grid-expand-content">{children}</span>
+      <span data-grid-part="expand-content">{children}</span>
     </span>
   );
 }

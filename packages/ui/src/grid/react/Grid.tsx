@@ -7,6 +7,7 @@ import { GridHeader } from "./GridHeader";
 import { CellEditorOverlay } from "./cells/CellEditorOverlay";
 import { EffectRunner } from "./EffectRunner";
 import { useGridRuntime } from "./GridRuntimeProvider";
+import styles from "./grid.module.css";
 import { cn } from "@/ui/utils/cn";
 
 export type GridChromeContext = {
@@ -32,7 +33,7 @@ export type GridChromeContext = {
 // `data-active` (from `coordinator.cursor?.path === path`); the
 // active/ghost distinction is level-scoped and reaches every descendant
 // cell via the CSS cascade, not via per-cell subscriptions. Each nested
-// `.grid[data-grid-path]` re-declares `--grid-active` at its own scope so
+// each grid root re-declares `--grid-active` at its own scope so
 // child grids do not inherit a parent's ghost dim.
 //
 // Grid also mounts EffectRunner (drains the controller's effects channel)
@@ -98,9 +99,10 @@ export function Grid({
   return (
     <div
       ref={containerRef}
-      className={cn("grid", className)}
+      className={cn(styles.root, className)}
       tabIndex={0}
       role="grid"
+      data-grid-part="root"
       data-grid-path={path}
       data-grid-depth={depth}
       data-active={String(isActive)}

@@ -4,17 +4,17 @@ import type { ColumnSchema } from "../types/schema";
 // presentation details are the consumer's job.
 export function GridHeader({ schema }: { schema: ColumnSchema[] }) {
   return (
-    <div className="grid-header" role="rowgroup">
-      <div className="grid-row grid-row--header" role="row">
+    <div data-grid-part="header" role="rowgroup">
+      <div data-grid-part="header-row" role="row">
         {schema.map((col) => (
           <div
             key={col.id}
-            className="grid-cell grid-cell--header"
             role="columnheader"
+            data-grid-part="header-cell"
             data-col-id={col.id}
           >
-            <div className="grid-cell__content">
-              <span className="grid-header-label">{col.name}</span>
+            <div data-grid-part="cell-content">
+              <span data-grid-part="header-label">{col.name}</span>
             </div>
           </div>
         ))}

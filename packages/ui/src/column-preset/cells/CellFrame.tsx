@@ -10,21 +10,15 @@ export function CellFrame({
   action?: (props: CellRenderProps) => ReactNode;
 } & CellRenderProps) {
   return (
-    <span
-      className={
-        action
-          ? "grid-cell-frame grid-cell-frame--with-action"
-          : "grid-cell-frame"
-      }
-    >
-      <span className="grid-cell-frame__content">{children}</span>
+    <span data-grid-part="cell-frame" data-with-action={String(action != null)}>
+      <span data-grid-part="cell-frame-content">{children}</span>
       {action ? (
         <span
-          className="grid-cell-frame__actions"
+          data-grid-part="cell-frame-actions"
           onClick={(e) => e.stopPropagation()}
           onDoubleClick={(e) => e.stopPropagation()}
         >
-          <span className="grid-cell-frame__action-inner">{action(props)}</span>
+          <span data-grid-part="cell-frame-action-inner">{action(props)}</span>
         </span>
       ) : null}
     </span>

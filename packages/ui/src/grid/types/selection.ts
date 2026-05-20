@@ -11,10 +11,10 @@ export type CellSelectionStatus = "none" | "in-selection" | "focus" | "editing";
 // Active-vs-ghost is NOT part of this enum. Active-ness is structural and
 // lives on the coordinator (`cursor?.path === myPath`). It is level-scoped —
 // every cell in a level shares the same value — so it lives on the grid
-// container's `data-active` attribute, not on cell classes. Cells compose
-// only `cellClasses(status)`; the active/ghost distinction reaches descendant
-// cells via the CSS cascade. Transient-channel changes never invalidate
-// active-ness selectors and vice versa.
+// container's `data-active` attribute, not on cell classes. Cells expose only
+// `data-cell-status`; the active/ghost distinction reaches descendant cells
+// via the CSS cascade. Transient-channel changes never invalidate active-ness
+// selectors and vice versa.
 
 export function makeSelection(coord: Coord): SelectionState {
   return { anchor: coord, head: coord };
