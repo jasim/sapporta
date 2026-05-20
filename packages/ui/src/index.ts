@@ -36,6 +36,21 @@ export { TableRoute } from "@/table/route/TableRoute";
 export { NewRecordRoute } from "@/table/route/NewRecordRoute";
 export { ReportRoute } from "@/report/route/ReportRoute";
 export { NewRecordPage } from "@/table/form/NewRecordPage";
+export { RecordFormField } from "@/table/form/RecordFormField";
+export {
+  RecordFormProvider,
+  useRecordFieldValue,
+  useRecordFormSetValue,
+  useRecordFormStore,
+} from "@/table/form/RecordFormProvider";
+export {
+  compactRecordFormValues,
+  createRecordFormStore,
+  initialRecordFormValues,
+  type RecordFormState,
+  type RecordFormStore,
+  type RecordFormValues,
+} from "@/table/form/record-form-store";
 
 // Grid primitives
 export * from "@/grid";
