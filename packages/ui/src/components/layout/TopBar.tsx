@@ -3,11 +3,11 @@ import { cn } from "@/lib/utils";
 import { Kbd } from "../ui/kbd";
 
 /**
- * Application top bar. 46px tall, sits on the content surface with a
+ * Application top bar. 52px tall, sits on the content surface with a
  * hairline border below. Left side: breadcrumb (section/title) + optional
  * subtitle in mono. Right side: actions slot (buttons, search, etc.).
  *
- * Layout rule: everything in the top bar is either 26px tall (buttons,
+ * Layout rule: everything in the top bar is either 30px tall (buttons,
  * search input) or vertically centered text. Nothing taller.
  */
 export function TopBar({
@@ -22,25 +22,25 @@ export function TopBar({
   title: string;
   /** Mono-styled right-of-title metadata (record counts, timing, etc.). */
   subtitle?: ReactNode;
-  /** Right-aligned slot. Actions should be 26px tall to match the bar. */
+  /** Right-aligned slot. Actions should be 30px tall to match the bar. */
   actions?: ReactNode;
 }) {
   return (
-    <div className="h-sap-topbar shrink-0 flex items-center px-[14px] gap-[10px] border-b border-sap-border bg-sap-surface">
+    <div className="sticky top-0 z-10 h-sap-topbar shrink-0 flex items-center px-5 gap-[14px] border-b border-sap-border-soft bg-sap-surface/90">
       {section && (
         <>
-          <span className="text-sap-data text-sap-subtle">{section}</span>
-          <span className="text-sap-meta text-sap-subtle">/</span>
+          <span className="text-sap-body text-sap-muted">{section}</span>
+          <span className="text-sap-body text-sap-subtle">/</span>
         </>
       )}
-      <span className="text-sap-body font-medium text-sap-fg">{title}</span>
+      <span className="text-[15px] font-[720] text-sap-fg">{title}</span>
       {subtitle && (
-        <span className="mono text-sap-meta text-sap-subtle ml-1">{subtitle}</span>
+        <span className="mono text-[11.5px] text-sap-muted ml-1">
+          {subtitle}
+        </span>
       )}
       <div className="flex-1" />
-      {actions && (
-        <div className="flex items-center gap-2">{actions}</div>
-      )}
+      {actions && <div className="flex items-center gap-2">{actions}</div>}
     </div>
   );
 }
@@ -77,10 +77,10 @@ export function TopBarButton({
       ? "bg-primary text-primary-foreground hover:bg-primary/90 border border-transparent"
       : tone === "danger"
         ? "bg-sap-negative text-primary-foreground hover:bg-sap-negative/90 border border-transparent"
-        : "bg-sap-surface text-sap-fg hover:bg-sap-row-hover border border-sap-border";
+        : "bg-sap-surface text-sap-soft hover:bg-sap-row-hover border border-sap-border";
 
   const cls = cn(
-    "inline-flex items-center gap-[6px] h-sap-ctl px-[10px] rounded-[5px] text-sap-emph font-medium whitespace-nowrap",
+    "inline-flex items-center gap-[6px] h-sap-ctl px-[10px] rounded-[6px] text-sap-emph font-[650] whitespace-nowrap",
     toneCls,
   );
 

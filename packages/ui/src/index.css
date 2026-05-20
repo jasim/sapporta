@@ -46,28 +46,30 @@
 
 :root {
   /* Surfaces */
-  --sap-bg: #fbfbfa;
+  --sap-bg: #ffffff;
   --sap-surface: #ffffff;
-  --sap-sidebar: #f7f6f3;
-  --sap-nested-bg: #faf9f4;
-  --sap-chip-bg: #fbfaf7;
+  --sap-sidebar: #fafafa;
+  --sap-nested-bg: #ffffff;
+  --sap-chip-bg: #eeeeee;
   --sap-row: #ffffff;
-  --sap-row-hover: #f6f4ef;
+  --sap-row-hover: #f4f4f5;
 
   /* Borders */
-  --sap-border: #ebe9e3;
-  --sap-border-strong: #d9d6cd;
+  --sap-border: #e4e4e7;
+  --sap-border-strong: #d4d4d8;
+  --sap-border-soft: #eeeeef;
 
   /* Text hierarchy */
-  --sap-fg: #17171a;
-  --sap-fg-muted: #6b6a63;
-  --sap-fg-subtle: #8e8c82;
+  --sap-fg: #111111;
+  --sap-fg-soft: #3f3f46;
+  --sap-fg-muted: #71717a;
+  --sap-fg-subtle: #a1a1aa;
 
   /* Brand / emphasis */
-  --sap-brand: #4a55cc;
-  --sap-brand-soft: #eef0fb;
-  --sap-selection: #e4e7f8;
-  --sap-focus-ring: #c1c6ea;
+  --sap-brand: #e23d18;
+  --sap-brand-soft: #fff1ed;
+  --sap-selection: #eeeeee;
+  --sap-focus-ring: #d4d4d8;
   --sap-link: #1f6fb0;
 
   /* Numeric emphasis (any deltas / gains-losses / data accents) */
@@ -75,8 +77,8 @@
   --sap-negative: #8b2f2f;
 
   /* Nav chrome */
-  --sap-active-nav-bg: #eae7de;
-  --sap-nav-count-bg: #ece9e0;
+  --sap-active-nav-bg: #ededed;
+  --sap-nav-count-bg: #eeeeee;
 
   /* Kbd chrome */
   --sap-kbd-bg: #ffffff;
@@ -85,7 +87,7 @@
 
   /* Project switcher */
   --sap-proj-bg: #ffffff;
-  --sap-proj-grad: linear-gradient(135deg, #4a55cc, #8a5fcf);
+  --sap-proj-grad: linear-gradient(135deg, #111111 0 58%, #e23d18 58% 100%);
 
   /* Radii */
   --radius: 6px;
@@ -100,13 +102,13 @@
   --card-foreground: var(--sap-fg);
   --popover: var(--sap-surface);
   --popover-foreground: var(--sap-fg);
-  --primary: var(--sap-fg);            /* filled button bg (dark-on-light) */
+  --primary: var(--sap-fg); /* filled button bg (dark-on-light) */
   --primary-foreground: var(--sap-bg);
   --secondary: var(--sap-chip-bg);
   --secondary-foreground: var(--sap-fg);
   --muted: var(--sap-nested-bg);
   --muted-foreground: var(--sap-fg-muted);
-  --accent: var(--sap-active-nav-bg);  /* shadcn bg-accent → hover wash  */
+  --accent: var(--sap-active-nav-bg); /* shadcn bg-accent → hover wash  */
   --accent-foreground: var(--sap-fg);
   --destructive: var(--sap-negative);
   --destructive-foreground: var(--sap-bg);
@@ -132,8 +134,10 @@
 
   --sap-border: #2a2b22;
   --sap-border-strong: #3d3e32;
+  --sap-border-soft: #202119;
 
   --sap-fg: #e8e6d8;
+  --sap-fg-soft: #c7c5b8;
   --sap-fg-muted: #9a998a;
   --sap-fg-subtle: #6a6a5c;
 
@@ -169,10 +173,10 @@
 @theme inline {
   /* Fonts */
   --font-sans:
-    "Geist", "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI",
-    system-ui, sans-serif;
+    ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui,
+    sans-serif;
   --font-mono:
-    "Geist Mono", "JetBrains Mono", "IBM Plex Mono", ui-monospace, Menlo,
+    "SFMono-Regular", "Cascadia Mono", "Liberation Mono", ui-monospace, Menlo,
     monospace;
 
   /* Canonical tokens → utility classes */
@@ -186,8 +190,10 @@
 
   --color-sap-border: var(--sap-border);
   --color-sap-border-strong: var(--sap-border-strong);
+  --color-sap-border-soft: var(--sap-border-soft);
 
   --color-sap-fg: var(--sap-fg);
+  --color-sap-soft: var(--sap-fg-soft);
   --color-sap-muted: var(--sap-fg-muted);
   --color-sap-subtle: var(--sap-fg-subtle);
 
@@ -245,33 +251,33 @@
    * `text-base`, `text-lg`) remain available — a consumer that doesn't
    * care about Sapporta's dense UI scale can keep using the native
    * ladder. */
-  --text-sap-tiny: 9px;        /* sort indicators and other tertiary glyphs */
-  --text-sap-micro: 10px;      /* stat card labels (smallest uppercase tier) */
-  --text-sap-label: 10.5px;    /* section labels, grid column headers, nav counts, version chip */
-  --text-sap-meta: 11px;       /* status bar, breadcrumb separator, chip metadata */
-  --text-sap-menu: 11.5px;     /* command-menu label, select cell */
-  --text-sap-data: 12px;       /* inline data — IDs, dates, FK refs, chips, child rows */
-  --text-sap-emph: 12.5px;     /* buttons, search input, ledger/child row body */
-  --text-sap-body: 13px;       /* primary data rows, top-bar title, sidebar items */
-  --text-sap-mark: 14.5px;     /* wordmark */
-  --text-sap-display: 18px;    /* stat card values (the one "shout" tier) */
+  --text-sap-tiny: 9px; /* sort indicators and other tertiary glyphs */
+  --text-sap-micro: 10px; /* stat card labels (smallest uppercase tier) */
+  --text-sap-label: 10.5px; /* section labels, grid column headers, nav counts, version chip */
+  --text-sap-meta: 11px; /* status bar, breadcrumb separator, chip metadata */
+  --text-sap-menu: 11.5px; /* command-menu label, select cell */
+  --text-sap-data: 12px; /* inline data — IDs, dates, FK refs, chips, child rows */
+  --text-sap-emph: 12.5px; /* buttons, search input, ledger/child row body */
+  --text-sap-body: 13px; /* primary data rows, top-bar title, sidebar items */
+  --text-sap-mark: 14.5px; /* wordmark */
+  --text-sap-display: 18px; /* stat card values (the one "shout" tier) */
 
   /* ── Letter-spacing scale ────────────────────────────────────────────
    * Four tiers from the design doc. Named by typographic role. */
-  --tracking-sap-display: -0.3px;  /* tighten display type — wordmark, stat values */
-  --tracking-sap-head: 0.3px;      /* grid column headers, uppercase labels */
-  --tracking-sap-label: 0.6px;     /* stat card labels */
-  --tracking-sap-section: 0.8px;   /* sidebar section labels (widest) */
+  --tracking-sap-display: 0; /* wordmark, stat values */
+  --tracking-sap-head: 0.06em; /* grid column headers, uppercase labels */
+  --tracking-sap-label: 0.06em; /* stat card labels */
+  --tracking-sap-section: 0.08em; /* sidebar section labels (widest) */
 
   /* ── Density tiers ───────────────────────────────────────────────────
    * Row-height ladder. Registered under `--height-*` so only `h-sap-*`
    * utilities are emitted — not `p-sap-row`, `w-sap-row`, `gap-sap-row`,
    * which would come along for the ride under `--spacing-*`. */
-  --height-sap-row: 30px;      /* primary data rows */
-  --height-sap-header: 28px;   /* grid header, sidebar items, child rows, pagination, filter bar */
-  --height-sap-ctl: 26px;      /* buttons, inputs, search — interactive affordances */
-  --height-sap-bar: 24px;      /* status bar, chip strips */
-  --height-sap-topbar: 46px;   /* application top bar (outlier, named for grep-ability) */
+  --height-sap-row: 32px; /* primary data rows */
+  --height-sap-header: 29px; /* grid header, child rows, pagination, filter bar */
+  --height-sap-ctl: 30px; /* buttons, inputs, search — interactive affordances */
+  --height-sap-bar: 24px; /* status bar, chip strips */
+  --height-sap-topbar: 52px; /* application top bar (outlier, named for grep-ability) */
 }
 
 /* ────────────────────────────────────────────────────────────────────────────
@@ -287,7 +293,8 @@ body {
 body {
   font-family: var(--font-sans);
   font-size: 13px;
-  line-height: 1.45;
+  line-height: 1.38;
+  letter-spacing: 0;
   text-rendering: optimizeLegibility;
   background: var(--sap-bg);
   color: var(--sap-fg);
@@ -302,5 +309,7 @@ body {
 .mono,
 .font-mono {
   font-family: var(--font-mono);
-  font-feature-settings: "tnum" 1, "cv11" 1;
+  font-feature-settings:
+    "tnum" 1,
+    "cv11" 1;
 }

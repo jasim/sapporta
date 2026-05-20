@@ -1,14 +1,14 @@
 import { useState } from "react";
 import { X } from "lucide-react";
-import type { FilterCondition, NewFilterCondition } from "@sapporta/shared/filter";
+import type {
+  FilterCondition,
+  NewFilterCondition,
+} from "@sapporta/shared/filter";
 import { Popover, PopoverContent, PopoverTrigger } from "../../ui/popover";
 import type { ColumnSchema } from "@sapporta/shared/contracts";
 import type { FkOptionsMap } from "../../../types";
 import { ConditionEditor } from "./ConditionEditor";
-import {
-  findEntryForCondition,
-  inferFilterColumnType,
-} from "./column-catalog";
+import { findEntryForCondition, inferFilterColumnType } from "./column-catalog";
 
 export interface FilterCardProps {
   condition: FilterCondition;
@@ -49,21 +49,19 @@ export function FilterCard({
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <div className="inline-flex flex-col gap-[2px]">
-        <div
-          className={
-            "inline-flex items-stretch h-sap-ctl rounded-[5px] border overflow-hidden " +
-            (error ? "border-sap-negative" : "border-sap-border")
-          }
-        >
+        <div className="inline-flex h-sap-ctl items-center gap-1">
           <PopoverTrigger asChild>
             <button
               type="button"
-              className="flex items-center gap-[6px] px-[10px] bg-sap-surface hover:bg-sap-row-hover text-sap-fg text-sap-emph"
+              className={
+                "flex min-w-0 items-center gap-[6px] border-b bg-transparent px-0 pb-[2px] text-[17px] leading-[1.25] font-[620] text-sap-fg hover:border-sap-muted " +
+                (error ? "border-sap-negative" : "border-sap-border-strong")
+              }
             >
               <span className="text-sap-muted">{label}</span>
               <span className="text-sap-subtle">{opLabel}</span>
               {valueSummary && (
-                <span className="font-medium truncate max-w-[180px]">
+                <span className="truncate max-w-[180px] text-sap-fg">
                   {valueSummary}
                 </span>
               )}
@@ -73,7 +71,7 @@ export function FilterCard({
             type="button"
             aria-label={`Remove ${label} filter`}
             onClick={() => onRemove(condition.id)}
-            className="flex items-center px-[8px] bg-sap-surface hover:bg-sap-row-hover text-sap-muted hover:text-sap-fg border-l border-sap-border"
+            className="flex h-6 w-6 items-center justify-center rounded-[4px] bg-transparent text-sap-subtle hover:bg-sap-row-hover hover:text-sap-soft"
           >
             <X className="h-[11px] w-[11px]" />
           </button>

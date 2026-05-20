@@ -69,6 +69,7 @@ export function Grid({
   const chromeContext = { path, levelName: levelNameFromPath(path), schema };
   const header = renderLevelHeader?.(chromeContext);
   const style = levelContainerStyle?.(chromeContext);
+  const depth = decomposePath(path).edges.length;
 
   useEffect(() => {
     const node = containerRef.current;
@@ -97,6 +98,7 @@ export function Grid({
       tabIndex={0}
       role="grid"
       data-grid-path={path}
+      data-grid-depth={depth}
       data-active={String(isActive)}
       style={{ position: "relative", outline: "none", ...style }}
     >
