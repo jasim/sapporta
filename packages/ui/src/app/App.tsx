@@ -5,8 +5,8 @@ import { HomeRedirect } from "@/app/boot/HomeRedirect";
 import { NotFoundView } from "@/app/boot/NotFoundView";
 import { setNavigate } from "@/app/router/router-bridge";
 import { AppShell } from "@/shell/components/AppShell";
-import { RecordDrawer } from "@/table/drawer/RecordDrawer";
 import { TableRoute } from "@/table/route/TableRoute";
+import { NewRecordRoute } from "@/table/route/NewRecordRoute";
 import { ReportRoute } from "@/report/route/ReportRoute";
 
 /**
@@ -23,10 +23,10 @@ export function App() {
   return (
     <BootLoader>
       <Routes>
-        <Route element={<AppShell drawerSlot={<RecordDrawer />} />}>
+        <Route element={<AppShell />}>
           <Route index element={<HomeRedirect />} />
+          <Route path="tables/:tableName/new" element={<NewRecordRoute />} />
           <Route path="tables/:tableName" element={<TableRoute />} />
-          <Route path="tables/:tableName/new" element={<TableRoute />} />
           <Route path="reports/:reportName" element={<ReportRoute />} />
         </Route>
         <Route path="*" element={<NotFoundView />} />
