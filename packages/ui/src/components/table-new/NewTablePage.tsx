@@ -177,6 +177,16 @@ function NewTablePageInner({
     buildRowsQuery({ sort, filters, search: search ?? undefined }),
   ).toString();
   const exportUrl = `${getApiBase()}/tables/${tableSchema.name}/export.csv${exportQueryString ? `?${exportQueryString}` : ""}`;
+  const hrefForPage = (nextPage: number): string => {
+    const params = buildTableSearchParams({
+      page: nextPage,
+      sort,
+      filters,
+      search,
+    });
+    const queryString = params.toString();
+    return `/tables/${tableSchema.name}${queryString ? `?${queryString}` : ""}`;
+  };
 
   const showSpinner = status === "loading" && totalCount === 0;
   const errorMessage =
@@ -252,6 +262,7 @@ function NewTablePageInner({
         page={page}
         pages={pages}
         onPageChange={(p) => handle.store.getState().setPage(p)}
+        hrefForPage={hrefForPage}
       />
     </div>
   );
