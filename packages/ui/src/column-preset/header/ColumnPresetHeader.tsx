@@ -3,12 +3,12 @@ import { ChevronDown, ChevronUp } from "lucide-react";
 import type { ColumnSchema } from "../../grid/types/schema";
 import type { GridPath } from "../../grid/types/identity";
 import { decomposePath } from "../../grid/types/identity";
-import { cycleSort } from "../../lib/sort";
+import { cycleSort } from "@/grid/sort";
 import {
   useGridRuntime,
   useLevelSnapshot,
 } from "../../grid/react/GridRuntimeProvider";
-import { cn } from "../../lib/utils";
+import { cn } from "@/ui/utils/cn";
 import { meta, preset, presetRuntime } from "../preset";
 import styles from "../sapporta-preset.module.css";
 import type {

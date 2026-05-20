@@ -9,8 +9,8 @@ import type {
   TextDisplayMode,
   ZeroDisplay,
 } from "./types";
-import type { SearchLookup } from "../modules/lookup-cache/search-lookup";
-import type { ValueLookup } from "../modules/lookup-cache/value-lookup";
+import type { SearchLookup } from "@/lookup/cache/search-lookup";
+import type { ValueLookup } from "@/lookup/cache/value-lookup";
 import type { ColumnPresetRuntime } from "./runtime";
 
 export const GRID_COLUMN_PRESET_RUNTIME: unique symbol = Symbol(

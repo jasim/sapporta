@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import type { CellEditorProps } from "../../grid/types/schema";
-import { ComboboxList } from "../../components/ui/combobox";
-import type { RowId } from "../../lib/row-id";
+import { ComboboxList } from "@/ui/composite/combobox";
+import type { RowId } from "@sapporta/shared/row-id";
 import { lookupCapabilities, presetRuntime } from "../preset";
 
 const SEARCH_LIMIT = 50;

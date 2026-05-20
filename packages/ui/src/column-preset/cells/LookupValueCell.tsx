@@ -5,7 +5,7 @@ import type { ColumnPresetCellRenderRuntime } from "../runtime";
 import type {
   LookupValue,
   ValueLookup,
-} from "../../modules/lookup-cache/value-lookup";
+} from "@/lookup/cache/value-lookup";
 
 export function LookupValueCell({
   value,

@@ -44,7 +44,7 @@ export default defineConfig({
           __dirname,
           "src/column-preset/index.ts",
         ),
-        layout: path.resolve(__dirname, "src/components/layout/SidebarShell.tsx"),
+        layout: path.resolve(__dirname, "src/shell/components/SidebarShell.tsx"),
       },
       formats: ["es"],
     },

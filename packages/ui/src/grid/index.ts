@@ -431,3 +431,9 @@ export {
   selectionIsSingleCell,
   rowsInSelection,
 } from "./types";
+export {
+  parseSortString,
+  stringifySortOrder,
+  cycleSort,
+  sortOrderEqual,
+} from "./sort";
