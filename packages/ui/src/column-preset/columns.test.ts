@@ -3,8 +3,8 @@ import { describe, expect, it } from "vitest";
 import type { CellEditorProps } from "../grid/types/schema";
 import { rootPath, childPath } from "../grid/types/identity";
 import { TextCell } from "./cells/TextCell";
-import { StaticSearchLookup } from "../modules/lookup-cache/search-lookup";
-import { StaticValueLookup } from "../modules/lookup-cache/value-lookup";
+import { StaticSearchLookup } from "@/lookup/cache/search-lookup";
+import { StaticValueLookup } from "@/lookup/cache/value-lookup";
 import {
   foreignKey,
   columnPreset,
@@ -128,16 +128,13 @@ describe("columnPreset columns", () => {
       });
 
       expect(isValidElement(rendered)).toBe(true);
-      expect(
-        isValidElement<{ style?: unknown }>(rendered)
-          ? rendered.props.style
-          : null,
-      ).toMatchObject({
-        WebkitLineClamp: 4,
-        overflow: "hidden",
-        overflowWrap: "anywhere",
-        whiteSpace: "pre-wrap",
-      });
+      const className = isValidElement<{ className?: unknown }>(rendered)
+        ? rendered.props.className
+        : null;
+      expect(className).toEqual(expect.stringContaining("textCell"));
+      expect(className).toEqual(
+        expect.stringContaining("multiLineTextCell"),
+      );
     }
   });
 
@@ -161,15 +158,13 @@ describe("columnPreset columns", () => {
     });
 
     expect(isValidElement(rendered)).toBe(true);
-    expect(
-      isValidElement<{ style?: unknown }>(rendered)
-        ? rendered.props.style
-        : null,
-    ).toMatchObject({
-      overflow: "hidden",
-      textOverflow: "ellipsis",
-      whiteSpace: "nowrap",
-    });
+    const className = isValidElement<{ className?: unknown }>(rendered)
+      ? rendered.props.className
+      : null;
+    expect(className).toEqual(expect.stringContaining("textCell"));
+    expect(className).not.toEqual(
+      expect.stringContaining("multiLineTextCell"),
+    );
   });
 
   it("lookupValue and foreignKey store lookup capabilities", () => {

@@ -7,7 +7,7 @@ import { GridHeader } from "./GridHeader";
 import { CellEditorOverlay } from "./cells/CellEditorOverlay";
 import { EffectRunner } from "./EffectRunner";
 import { useGridRuntime } from "./GridRuntimeProvider";
-import { cn } from "../../lib/utils";
+import { cn } from "@/ui/utils/cn";
 
 export type GridChromeContext = {
   path: GridPath;

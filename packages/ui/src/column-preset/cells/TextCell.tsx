@@ -1,5 +1,5 @@
 import type { CellRenderProps } from "../../grid/types/schema";
-import { cn } from "../../lib/utils";
+import { cn } from "@/ui/utils/cn";
 import type { ColumnPreset } from "../preset";
 import type { ColumnPresetCellRenderRuntime } from "../runtime";
 import styles from "../sapporta-preset.module.css";

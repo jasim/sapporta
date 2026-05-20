@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { CellEditorProps } from "../../grid/types/schema";
-import { cn } from "../../lib/utils";
+import { cn } from "@/ui/utils/cn";
 import { presetRuntime } from "../preset";
 import styles from "../sapporta-preset.module.css";
 import { parseForCommit } from "./parse-for-commit";
