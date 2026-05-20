@@ -60,11 +60,11 @@ export function ColumnPresetHeader<TMeta = unknown, TFilter = unknown>({
   const levelLabel = nestedLevelLabel(path, levelName);
 
   return (
-    <div className="grid-header" role="rowgroup">
+    <div data-grid-part="header" role="rowgroup">
       {levelLabel ? (
         <LevelLabelRow label={levelLabel} title={levelName} />
       ) : null}
-      <div className="grid-row grid-row--header" role="row">
+      <div data-grid-part="header-row" role="row">
         {schema.map((column, columnIndex) => (
           <HeaderCell
             key={column.id}
@@ -136,8 +136,8 @@ function HeaderCell<TMeta = unknown, TFilter = unknown>({
 
   return (
     <div
-      className="grid-cell grid-cell--header"
       role="columnheader"
+      data-grid-part="header-cell"
       aria-sort={
         sort?.direction === "asc"
           ? "ascending"
@@ -152,10 +152,10 @@ function HeaderCell<TMeta = unknown, TFilter = unknown>({
     >
       <div
         className={cn(
-          "grid-cell__content",
           styles.headerContent,
           columnPreset?.layout.align === "right" && styles.headerContentRight,
         )}
+        data-grid-part="cell-content"
       >
         {customHeader ?? defaultHeader(headerName, sort?.direction, sortRank)}
         {menu ? (
@@ -163,7 +163,7 @@ function HeaderCell<TMeta = unknown, TFilter = unknown>({
             type="button"
             aria-label={`${column.column.name} menu`}
             aria-expanded={open}
-            className="grid-header-menu-button"
+            data-grid-part="header-menu-button"
             onClick={(e) => {
               e.stopPropagation();
               setOpen((v) => !v);
@@ -176,7 +176,8 @@ function HeaderCell<TMeta = unknown, TFilter = unknown>({
       {open && menu ? (
         <div
           role="menu"
-          className={cn("grid-cell__popover", styles.headerPopover)}
+          className={styles.headerPopover}
+          data-grid-part="cell-popover"
           onClick={(e) => e.stopPropagation()}
         >
           {menu({ level, column, commands, close }) as ReactNode}
@@ -193,9 +194,9 @@ function defaultHeader(
 ) {
   return (
     <>
-      <span className="grid-header-label">{name}</span>
+      <span data-grid-part="header-label">{name}</span>
       {direction ? (
-        <span className="grid-header-sort-indicator">
+        <span data-grid-part="header-sort-indicator">
           {direction === "asc" ? (
             <ChevronUp aria-hidden="true" size={10} strokeWidth={1.8} />
           ) : (
@@ -210,13 +211,15 @@ function defaultHeader(
 
 function LevelLabelRow({ label, title }: { label: string; title: string }) {
   return (
-    <div className="grid-row grid-row--level-label" role="row">
+    <div data-grid-part="level-label-row" role="row">
       <div
-        className={cn("grid-cell grid-cell--level-label", styles.levelLabelCell)}
+        className={styles.levelLabelCell}
         role="columnheader"
+        data-grid-part="level-label-cell"
       >
         <div
-          className={cn("grid-cell__content", styles.levelLabelContent)}
+          className={styles.levelLabelContent}
+          data-grid-part="cell-content"
           title={title}
         >
           {label}

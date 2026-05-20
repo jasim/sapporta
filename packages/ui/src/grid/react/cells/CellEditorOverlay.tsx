@@ -100,7 +100,7 @@ export function CellEditorOverlay({
 
   return (
     <div
-      className="grid-editor-overlay"
+      data-grid-part="editor-overlay"
       style={{
         position: "absolute",
         left: position.left,

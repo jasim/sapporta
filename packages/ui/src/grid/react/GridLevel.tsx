@@ -96,7 +96,7 @@ function DisplayedRowsBody({
   const expansion = useStore(runtime.coordinator, (s) => s.expansion.get(path));
 
   return (
-    <div className="grid-body" role="rowgroup">
+    <div data-grid-part="body" role="rowgroup">
       {sequence.rows.map((rowRef) => {
         const childPaths = expansion?.has(rowRef.id)
           ? runtime.materializedChildren(path, rowRef.id)

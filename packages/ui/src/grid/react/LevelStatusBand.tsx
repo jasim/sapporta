@@ -42,7 +42,10 @@ export function levelStatusBandModel(
         page !== undefined
       ) {
         const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
-        return { kind: "loading", text: `Loading ${levelName}, page ${page} of ${totalPages}…` };
+        return {
+          kind: "loading",
+          text: `Loading ${levelName}, page ${page} of ${totalPages}…`,
+        };
       }
       return { kind: "loading", text: `Loading ${levelName}…` };
     }
@@ -66,7 +69,8 @@ export function LevelStatusBand({ path }: { path: GridPath }) {
   if (model.kind === "loading") {
     return (
       <div
-        className="grid-level-status grid-level-status--loading"
+        data-grid-part="level-status"
+        data-grid-status="loading"
         role="status"
         aria-live="polite"
         data-grid-path={path}
@@ -78,14 +82,15 @@ export function LevelStatusBand({ path }: { path: GridPath }) {
 
   return (
     <div
-      className="grid-level-status grid-level-status--error"
+      data-grid-part="level-status"
+      data-grid-status="error"
       role="alert"
       data-grid-path={path}
     >
       <span>{model.text}</span>
       <button
         type="button"
-        className="grid-level-status__retry"
+        data-grid-part="level-status-retry"
         onClick={() => runtime.sourceFor(path).refetch()}
       >
         Retry

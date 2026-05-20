@@ -7,7 +7,11 @@
 
 import type { LevelSnapshot } from "../data-sources/types";
 import type { GridPath } from "../types/identity";
-import { useGridRuntime, useLevelSnapshot, usePhantoms } from "./GridRuntimeProvider";
+import {
+  useGridRuntime,
+  useLevelSnapshot,
+  usePhantoms,
+} from "./GridRuntimeProvider";
 
 // Pure decision logic. Lifted out so tests can drive the four
 // guard conditions without a renderer.
@@ -29,7 +33,7 @@ export function EmptyLevel({ path }: { path: GridPath }) {
   if (!shouldRenderEmpty(snapshot, phantoms.length)) return null;
   const levelName = runtime.schemaAt(path).name;
   return (
-    <div className="grid-level-empty" role="status" data-grid-path={path}>
+    <div data-grid-part="level-empty" role="status" data-grid-path={path}>
       No {levelName}.
     </div>
   );

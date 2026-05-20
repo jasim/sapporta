@@ -1,7 +1,6 @@
 import type { MouseEvent, ReactNode } from "react";
 import type { CellSelectionStatus } from "../../types/selection";
 import type { ColumnSchema } from "../../types/schema";
-import { cellClasses } from "./cell-classes";
 
 // Wraps cell content with focus/selection chrome.
 //
@@ -19,14 +18,14 @@ export function CellShell(props: {
 }) {
   return (
     <div
-      className={cellClasses(props.status)}
       role="gridcell"
+      data-grid-part="cell"
       data-cell-status={props.status}
       data-col-id={props.column.id}
       onMouseDown={props.onMouseDown}
       onDoubleClick={props.onDoubleClick}
     >
-      <div className="grid-cell__content">{props.children}</div>
+      <div data-grid-part="cell-content">{props.children}</div>
     </div>
   );
 }

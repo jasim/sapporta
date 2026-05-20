@@ -15,7 +15,8 @@ export function DateEditor(props: CellEditorProps) {
     <input
       ref={ref}
       type="date"
-      className="grid-editor-input mono text-sap-data text-sap-muted"
+      className="mono text-sap-data text-sap-muted"
+      data-grid-part="editor-input"
       value={value}
       onChange={(e) => setValue(e.target.value)}
       onBlur={() => props.onCommit(parseForCommit(props, value))}

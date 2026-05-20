@@ -50,7 +50,8 @@ export function LookupValueEditor(props: CellEditorProps) {
         onKeyDown={(e) => {
           if (e.key === "Escape") props.onCancel();
         }}
-        className="grid-editor-input h-full w-full"
+        className="h-full w-full"
+        data-grid-part="editor-input"
       />
     );
   }
