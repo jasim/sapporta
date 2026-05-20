@@ -1,14 +1,13 @@
 /**
  * Route component for /p/:projectId/tables/:tableName
  *
- * The route owns shell-level effects (active sidebar state, create-drawer URL
- * sync, key hints) and delegates the table surface to the table page.
+ * The route owns table-grid shell effects (active sidebar state, key hints) and
+ * delegates the table surface to the table page.
  */
 
 import { useEffect } from "react";
-import { useParams, useLocation } from "react-router-dom";
+import { useParams } from "react-router-dom";
 import { useSchemaStore } from "@/schema-catalog/state/schema-store";
-import { useDrawerStore } from "@/table/state/drawer-store";
 import { useKeyHints, type KeyHint } from "@/shell/state/hints-store";
 import { TablePage } from "@/table/page/TablePage";
 
@@ -25,33 +24,18 @@ const TABLE_HINTS: KeyHint[] = [
 
 export function TableRoute() {
   const { tableName } = useParams<{ tableName: string }>();
-  const location = useLocation();
-  const isNewRoute = location.pathname.endsWith("/new");
   const { loaded, tables } = useSchemaStore();
-  const tableExists = tables.some((t) => t.name === tableName);
+  const tableSchema = tables.find((t) => t.name === tableName);
 
   useKeyHints(TABLE_HINTS);
 
   useEffect(() => {
-    if (!tableName || !tableExists) return;
+    if (!tableName || !tableSchema) return;
     useSchemaStore.getState().setActiveTable(tableName);
-  }, [tableName, tableExists]);
-
-  useEffect(() => {
-    if (!loaded || !tableName || !tableExists) return;
-
-    const drawer = useDrawerStore.getState();
-    if (isNewRoute) {
-      if (!drawer.open || drawer.tableName !== tableName) {
-        drawer.openCreate(tableName);
-      }
-    } else if (drawer.open) {
-      drawer.close();
-    }
-  }, [loaded, tableName, tableExists, isNewRoute]);
+  }, [tableName, tableSchema]);
 
   if (!loaded) return null;
-  if (!tableName || !tableExists) {
+  if (!tableName || !tableSchema) {
     return (
       <div className="flex items-center justify-center h-full text-sap-muted">
         Table not found

@@ -1,7 +1,7 @@
-export { createRecord, openDrawerCreate, closeDrawer } from "./actions/record-actions";
+export { createRecord, navigateToNewRecord } from "./actions/record-actions";
 export * from "./api/rows";
-export { RecordDrawer } from "./drawer/RecordDrawer";
-export { FormField } from "./drawer/FormField";
+export { FormField } from "./form/FormField";
+export { NewRecordPage } from "./form/NewRecordPage";
 export * from "./grid-adapter/compile-table-grid";
 export * from "./grid-adapter/table-grid-theme";
 export * from "./grid-adapter/table-grid-theme-context";
@@ -15,6 +15,7 @@ export {
   visiblePaginationItems,
   type PaginationRangeItem,
 } from "./pagination/visible-pagination-items";
+export { NewRecordRoute } from "./route/NewRecordRoute";
 export { TableRoute } from "./route/TableRoute";
 export {
   createTable,
@@ -27,5 +28,4 @@ export {
   registerTable,
   unregisterTable,
 } from "./state/table-grid-registry";
-export { useDrawerStore } from "./state/drawer-store";
 export * from "./url/table-url";

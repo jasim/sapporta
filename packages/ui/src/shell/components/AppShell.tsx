@@ -6,10 +6,9 @@ import { useSchemaStore } from "@/schema-catalog/state/schema-store";
 
 interface AppShellProps {
   sidebarContent?: ReactNode;
-  drawerSlot?: ReactNode;
 }
 
-export function AppShell({ sidebarContent, drawerSlot }: AppShellProps) {
+export function AppShell({ sidebarContent }: AppShellProps) {
   const { loaded, error } = useSchemaStore();
 
   return (
@@ -31,7 +30,6 @@ export function AppShell({ sidebarContent, drawerSlot }: AppShellProps) {
         </main>
       </div>
       <StatusBar />
-      {drawerSlot}
     </div>
   );
 }

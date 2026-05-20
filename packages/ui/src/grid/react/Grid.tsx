@@ -32,8 +32,8 @@ export type GridChromeContext = {
 // `data-active` (from `coordinator.cursor?.path === path`); the
 // active/ghost distinction is level-scoped and reaches every descendant
 // cell via the CSS cascade, not via per-cell subscriptions. Each nested
-// `.grid` re-declares `--grid-active` at its own scope so child grids
-// do not inherit a parent's ghost dim.
+// `.grid[data-grid-path]` re-declares `--grid-active` at its own scope so
+// child grids do not inherit a parent's ghost dim.
 //
 // Grid also mounts EffectRunner (drains the controller's effects channel)
 // and the overlay portal slot (`data-grid-overlay`) that editors portal

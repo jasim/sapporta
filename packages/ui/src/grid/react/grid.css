@@ -3,7 +3,7 @@
  * Rows use subgrid so intrinsic tracks such as `max-content` are resolved
  * across header and body cells together. */
 
-.grid {
+.grid[data-grid-path] {
   --grid-active-focus-background: var(
     --grid-cell-active-focus-background,
     var(--sap-selection)
@@ -55,7 +55,7 @@
   background: var(--grid-row-hover-background, var(--sap-row-hover));
 }
 
-.grid-body > .grid,
+.grid-body > .grid[data-grid-path],
 .grid-body > .grid-level-status,
 .grid-body > .grid-level-empty {
   grid-column: 1 / -1;
@@ -78,7 +78,8 @@
   border-bottom: 0;
 }
 
-.grid[data-grid-depth]:not([data-grid-depth="0"]) .grid-row--header {
+.grid[data-grid-path][data-grid-depth]:not([data-grid-depth="0"])
+  .grid-row--header {
   position: static;
 }
 
@@ -163,14 +164,14 @@
 }
 
 /* Active vs ghost is level-scoped — every cell in a level shares it.
- * Each `.grid` re-declares `--grid-active` at its own scope so a nested
- * grid does not inherit a parent's ghost dim through the cascade. Ghost
+ * Each `.grid[data-grid-path]` re-declares `--grid-active` at its own scope so
+ * a nested grid does not inherit a parent's ghost dim through the cascade. Ghost
  * styling reads `var(--grid-active)`; the var itself is just a flag,
  * 1 for active, 0 for ghost. */
-.grid {
+.grid[data-grid-path] {
   --grid-active: 1;
 }
-.grid[data-active="false"] {
+.grid[data-grid-path][data-active="false"] {
   --grid-active: 0;
   --grid-current-focus-background: var(
     --grid-cell-ghost-focus-background,

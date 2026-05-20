@@ -13,7 +13,7 @@ import { TableGrid } from "./TableGrid";
 import { TableToolbar } from "./TableToolbar";
 import { Pagination } from "@/table/pagination/Pagination";
 import { useSchemaStore } from "@/schema-catalog/state/schema-store";
-import { openDrawerCreate } from "@/table/actions/record-actions";
+import { navigateToNewRecord } from "@/table/actions/record-actions";
 import { getApiBase } from "@/platform/client";
 import { buildRowsQuery } from "@/table/api/rows";
 import {
@@ -25,7 +25,10 @@ import { loadPref, savePref } from "@/platform/prefs";
 import type { ColId, SortDescriptor } from "@/grid";
 import { createTable, type TableHandle } from "@/table/state/table-state";
 import { startTableLookupLoading } from "@/table/lookup/table-lookup-loading";
-import { registerTable, unregisterTable } from "@/table/state/table-grid-registry";
+import {
+  registerTable,
+  unregisterTable,
+} from "@/table/state/table-grid-registry";
 
 // Sort pref shape: a serializable mirror of `SortDescriptor[]`. Kept in
 // localStorage under `sapporta:grid-sort:<tableName>` so it survives reloads.
@@ -215,7 +218,7 @@ function TablePageInner({
         onNewRecord={
           tableSchema.immutable
             ? undefined
-            : () => openDrawerCreate(tableSchema.name)
+            : () => navigateToNewRecord(tableSchema.name)
         }
       />
 

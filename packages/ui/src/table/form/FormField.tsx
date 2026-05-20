@@ -11,7 +11,10 @@ import {
 import { inferDisplayType } from "@/table/model/column-types";
 import type { ColumnSchema } from "@sapporta/shared/contracts";
 import type { KeyedValues } from "@/lookup/types";
-import { parseCanonicalInstant, parsePlainDate } from "@sapporta/shared/temporal";
+import {
+  parseCanonicalInstant,
+  parsePlainDate,
+} from "@sapporta/shared/temporal";
 
 interface FormFieldProps {
   column: ColumnSchema;
@@ -20,7 +23,12 @@ interface FormFieldProps {
   fkOptions?: KeyedValues;
 }
 
-export function FormField({ column, value, onChange, fkOptions }: FormFieldProps) {
+export function FormField({
+  column,
+  value,
+  onChange,
+  fkOptions,
+}: FormFieldProps) {
   const type = inferDisplayType(column);
   const id = `field-${column.name}`;
 
@@ -97,7 +105,9 @@ export function FormField({ column, value, onChange, fkOptions }: FormFieldProps
           onValueChange={(v) => onChange(v || null)}
         >
           <SelectTrigger id={id}>
-            <SelectValue placeholder={`Select ${column.header ?? column.name}`} />
+            <SelectValue
+              placeholder={`Select ${column.header ?? column.name}`}
+            />
           </SelectTrigger>
           <SelectContent>
             {Object.entries(fkOptions).map(([id, label]) => (
@@ -107,18 +117,20 @@ export function FormField({ column, value, onChange, fkOptions }: FormFieldProps
             ))}
           </SelectContent>
         </Select>
-      ) : type === "fk" && (
-        <Input
-          id={id}
-          type="text"
-          value={value != null ? String(value) : ""}
-          placeholder={`${column.foreignKey!.table} ID`}
-          onChange={(e) => onChange(e.target.value || null)}
-        />
+      ) : (
+        type === "fk" && (
+          <Input
+            id={id}
+            type="text"
+            value={value != null ? String(value) : ""}
+            placeholder={`${column.foreignKey!.table} ID`}
+            onChange={(e) => onChange(e.target.value || null)}
+          />
+        )
       )}
 
-      {(type === "text" || type === "pk") && (
-        type === "text" && column.textDisplay ? (
+      {(type === "text" || type === "pk") &&
+        (type === "text" && column.textDisplay ? (
           <textarea
             id={id}
             value={value != null ? String(value) : ""}
@@ -132,8 +144,7 @@ export function FormField({ column, value, onChange, fkOptions }: FormFieldProps
             value={value != null ? String(value) : ""}
             onChange={(e) => onChange(e.target.value || null)}
           />
-        )
-      )}
+        ))}
     </div>
   );
 }
@@ -146,7 +157,9 @@ export function FormField({ column, value, onChange, fkOptions }: FormFieldProps
 function formatDateForInput(value: unknown): string {
   if (typeof value !== "string" || value === "") return "";
   try {
-    return parseCanonicalInstant(value).toString({ smallestUnit: "minute" }).slice(0, 16);
+    return parseCanonicalInstant(value)
+      .toString({ smallestUnit: "minute" })
+      .slice(0, 16);
   } catch {}
   try {
     return `${parsePlainDate(value).toString()}T00:00`;

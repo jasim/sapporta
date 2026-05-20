@@ -7,7 +7,6 @@ export { getApiBase, API_ORIGIN, uiClient } from "@/platform/client";
 
 // Stores
 export { useSchemaStore } from "@/schema-catalog/state/schema-store";
-export { useDrawerStore } from "@/table/state/drawer-store";
 export { useThemeStore, type ThemeMode } from "@/shell/state/theme-store";
 export {
   useHintsStore,
@@ -25,8 +24,7 @@ export {
 export { navigateToTable, navigateToReport } from "@/app/actions/navigation";
 export {
   createRecord,
-  openDrawerCreate,
-  closeDrawer,
+  navigateToNewRecord,
 } from "@/table/actions/record-actions";
 
 // Default admin and routes
@@ -35,7 +33,9 @@ export { BootLoader } from "@/app/boot/BootLoader";
 export { HomeRedirect } from "@/app/boot/HomeRedirect";
 export { NotFoundView } from "@/app/boot/NotFoundView";
 export { TableRoute } from "@/table/route/TableRoute";
+export { NewRecordRoute } from "@/table/route/NewRecordRoute";
 export { ReportRoute } from "@/report/route/ReportRoute";
+export { NewRecordPage } from "@/table/form/NewRecordPage";
 
 // Grid primitives
 export * from "@/grid";
