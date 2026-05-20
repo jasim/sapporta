@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import type { CellEditorProps } from "../../grid/types/schema";
+import { cn } from "../../lib/utils";
 import { presetRuntime } from "../preset";
+import styles from "../sapporta-preset.module.css";
 import { parseForCommit } from "./parse-for-commit";
 
 export function TextEditor(props: CellEditorProps) {
@@ -24,7 +26,7 @@ export function TextEditor(props: CellEditorProps) {
     return (
       <textarea
         ref={textareaRef}
-        className="grid-editor-input"
+        className={cn("grid-editor-input", styles.textEditorMultiline)}
         value={value}
         onChange={(e) => setValue(e.target.value)}
         onBlur={() => props.onCommit(parseForCommit(props, value))}
@@ -45,9 +47,6 @@ export function TextEditor(props: CellEditorProps) {
             e.preventDefault();
             props.onCommit(parseForCommit(props, value));
           }
-        }}
-        style={{
-          height: "100%",
         }}
       />
     );

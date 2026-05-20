@@ -1,7 +1,8 @@
-import type { CSSProperties } from "react";
 import type { CellRenderProps } from "../../grid/types/schema";
+import { cn } from "../../lib/utils";
 import type { ColumnPreset } from "../preset";
 import type { ColumnPresetCellRenderRuntime } from "../runtime";
+import styles from "../sapporta-preset.module.css";
 
 export type PresetCellProps<TValue = string> = Omit<
   CellRenderProps,
@@ -18,24 +19,12 @@ export function TextCell({
   preset = runtime.preset,
 }: PresetCellProps<string>) {
   const textMode = "text" in preset ? preset.text.display : undefined;
-  const className =
+  const className = cn(
     preset.kind === "identifier"
-      ? "mono block w-full truncate text-right text-sap-data text-sap-muted"
-      : "block truncate";
-  const style: CSSProperties = textMode
-    ? {
-        display: "-webkit-box",
-        WebkitBoxOrient: "vertical",
-        WebkitLineClamp: 4,
-        overflow: "hidden",
-        overflowWrap: "anywhere",
-        whiteSpace: "pre-wrap",
-      }
-    : { overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" };
-
-  return (
-    <span className={className} style={style}>
-      {value}
-    </span>
+      ? styles.identifierTextCell
+      : styles.textCell,
+    textMode && styles.multiLineTextCell,
   );
+
+  return <span className={className}>{value}</span>;
 }
