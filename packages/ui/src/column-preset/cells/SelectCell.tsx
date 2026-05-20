@@ -11,7 +11,7 @@ export function SelectCell({
 }) {
   if (value === "") return null;
   return (
-    <span className="inline-flex h-[18px] items-center rounded-[3px] border border-sap-border bg-sap-chip px-[6px] text-sap-menu text-sap-fg">
+    <span className="inline-flex h-[18px] items-center rounded-[4px] bg-sap-chip px-[6px] text-sap-meta font-bold text-sap-soft">
       {value}
     </span>
   );

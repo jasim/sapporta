@@ -123,8 +123,8 @@ function SearchInput({
   }, [debounced]);
 
   return (
-    <div className="relative flex items-center h-sap-ctl w-[220px] rounded-[5px] border border-sap-border bg-sap-surface pl-[26px] pr-[8px]">
-      <Search className="absolute left-[8px] h-[11px] w-[11px] text-sap-subtle" />
+    <div className="relative flex items-center h-sap-ctl w-[260px] rounded-[6px] border border-sap-border bg-sap-surface pl-[28px] pr-[9px]">
+      <Search className="absolute left-[9px] h-3 w-3 text-sap-subtle" />
       <input
         type="search"
         value={input}

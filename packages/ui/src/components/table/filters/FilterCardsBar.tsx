@@ -1,6 +1,9 @@
 import { useState, useMemo } from "react";
 import { Plus } from "lucide-react";
-import type { FilterCondition, NewFilterCondition } from "@sapporta/shared/filter";
+import type {
+  FilterCondition,
+  NewFilterCondition,
+} from "@sapporta/shared/filter";
 import { Popover, PopoverContent, PopoverTrigger } from "../../ui/popover";
 import type { ColumnSchema } from "@sapporta/shared/contracts";
 import type { FkOptionsMap } from "../../../types";
@@ -48,7 +51,7 @@ export function FilterCardsBar({
   if (filterableColumns.length === 0 && filters.length === 0) return null;
 
   return (
-    <div className="shrink-0 flex flex-wrap items-center gap-[6px] px-[14px] py-[8px] border-b border-sap-border bg-sap-chip">
+    <div className="shrink-0 flex flex-wrap items-center gap-3 px-5 pt-[14px] pb-4 bg-sap-surface">
       {entries.map((entry) =>
         entry.kind === "range" ? (
           <DateRangeCard
@@ -73,7 +76,7 @@ export function FilterCardsBar({
         <PopoverTrigger asChild>
           <button
             type="button"
-            className="inline-flex items-center gap-[4px] h-sap-ctl px-[10px] rounded-[5px] border border-dashed border-sap-border text-sap-muted hover:text-sap-fg hover:bg-sap-row-hover text-sap-emph"
+            className="inline-flex items-center gap-[4px] h-sap-ctl px-[10px] rounded-[6px] border border-sap-border-soft text-sap-muted hover:text-sap-fg hover:bg-sap-row-hover text-sap-data font-semibold"
           >
             <Plus className="h-[11px] w-[11px]" />
             Add filter

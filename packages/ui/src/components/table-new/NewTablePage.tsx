@@ -187,7 +187,7 @@ function NewTablePageInner({
       : null;
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full bg-sap-surface">
       <NewTableToolbar
         tableLabel={tableSchema.label ?? tableSchema.name}
         totalCount={totalCount}
@@ -241,8 +241,10 @@ function NewTablePageInner({
       )}
 
       {!showSpinner && !errorMessage && (
-        <div className="flex-1 overflow-auto">
-          <NewTableGrid runtime={handle.runtime} store={handle.store} />
+        <div className="flex-1 overflow-auto px-5 pb-7">
+          <div className="bg-sap-surface">
+            <NewTableGrid runtime={handle.runtime} store={handle.store} />
+          </div>
         </div>
       )}
 

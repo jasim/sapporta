@@ -20,7 +20,7 @@ export function TextCell({
   const textMode = "text" in preset ? preset.text.display : undefined;
   const className =
     preset.kind === "identifier"
-      ? "block truncate text-sap-muted"
+      ? "mono block w-full truncate text-right text-sap-data text-sap-muted"
       : "block truncate";
   const style: CSSProperties = textMode
     ? {

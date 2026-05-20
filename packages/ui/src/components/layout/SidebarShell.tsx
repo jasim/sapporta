@@ -16,13 +16,13 @@ export function SidebarShell({
   children?: ReactNode;
 }) {
   return (
-    <aside className="w-[220px] shrink-0 border-r border-sidebar-border bg-sap-sidebar text-sidebar-foreground flex flex-col h-full">
-      <div className="px-[14px] pt-[14px] pb-[10px] flex items-center gap-2">
+    <aside className="w-[220px] shrink-0 border-r border-sap-border-soft bg-sap-sidebar text-sap-fg flex flex-col h-full px-3 py-[18px]">
+      <div className="h-[28px] mb-6 px-[2px] flex items-center gap-[10px]">
         {header}
       </div>
       <nav className="flex-1 overflow-y-auto">{children}</nav>
       {footer && (
-        <div className="border-t border-sap-border px-[14px] py-[10px]">
+        <div className="border-t border-sap-border-soft mt-4 pt-3 px-[2px]">
           {footer}
         </div>
       )}

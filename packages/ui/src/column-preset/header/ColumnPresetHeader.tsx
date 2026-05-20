@@ -230,11 +230,12 @@ function LevelLabelRow({ label, title }: { label: string; title: string }) {
             color: "var(--grid-level-label-color, var(--sap-fg-muted))",
             fontSize: "var(--grid-level-label-font-size, 11px)",
             fontWeight: "var(--grid-level-label-font-weight, 600)",
+            letterSpacing: "var(--grid-level-label-letter-spacing, 0)",
             lineHeight: 1,
             minHeight: "var(--grid-level-label-min-height, 18px)",
             overflow: "hidden",
-            padding: "var(--grid-level-label-padding, 2px 8px)",
             textOverflow: "ellipsis",
+            textTransform: "var(--grid-level-label-text-transform, none)",
             whiteSpace: "nowrap",
           }}
         >

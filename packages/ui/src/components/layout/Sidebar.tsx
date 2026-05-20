@@ -12,49 +12,31 @@ interface AppSidebarProps {
   sidebarContent?: ReactNode;
 }
 
-/** 17px stroked bracket + S-curve mark. Inherits currentColor so it picks
- *  up the wordmark's text color without any per-theme tuning. */
 export function SapportaMark({ size = 17 }: { size?: number }) {
   return (
-    <svg
-      width={size}
-      height={size}
-      viewBox="0 0 24 24"
-      fill="none"
+    <span
       aria-hidden="true"
-      style={{ flexShrink: 0 }}
-    >
-      <path
-        d="M6.5 4.5 H4 V19.5 H6.5"
-        stroke="currentColor"
-        strokeWidth={1.75}
-        strokeLinecap="square"
-        strokeLinejoin="miter"
-      />
-      <path
-        d="M17.5 4.5 H20 V19.5 H17.5"
-        stroke="currentColor"
-        strokeWidth={1.75}
-        strokeLinecap="square"
-        strokeLinejoin="miter"
-      />
-      <path
-        d="M14.5 8 C 14.5 6.5, 13 6, 12 6 C 10 6, 9 7.5, 9 9 C 9 10.5, 10.5 11, 12 11 C 13.5 11, 15 11.5, 15 13.5 C 15 15.5, 13.5 17, 11.5 17 C 10 17, 8.5 16.4, 8.5 15"
-        stroke="currentColor"
-        strokeWidth={1.75}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
+      className="inline-block rounded-[5px]"
+      style={{
+        width: size,
+        height: size,
+        flexShrink: 0,
+        background:
+          "linear-gradient(135deg, var(--sap-fg) 0 58%, var(--sap-brand) 58% 100%)",
+      }}
+    />
   );
 }
 
 function SidebarHeader() {
   const slug = useSchemaStore((s) => s.slug);
   return (
-    <span className="text-sap-mark font-semibold tracking-sap-display truncate">
-      {slug ?? ""}
-    </span>
+    <>
+      <SapportaMark size={18} />
+      <span className="text-sap-body font-bold tracking-sap-display truncate">
+        {slug ?? ""}
+      </span>
+    </>
   );
 }
 
@@ -69,16 +51,15 @@ export function SidebarSectionLabel({
   action?: ReactNode;
 }) {
   return (
-    <div className="px-[14px] pt-[14px] pb-[6px] flex items-center justify-between text-sap-label font-semibold uppercase tracking-sap-section text-sap-subtle">
+    <div className="mt-[18px] mb-[6px] px-[2px] flex items-center justify-between text-sap-label font-bold uppercase tracking-sap-section text-sap-subtle">
       <span>{children}</span>
       {action}
     </div>
   );
 }
 
-/** Sidebar navigation row. Active state: 2px brand left stripe, active-nav
- *  background tint, and the icon is replaced by a ▸ caret. Deliberately
- *  flat — the stripe reads as a cursor parked on a row.
+/** Sidebar navigation row. Active state: rounded active-nav background and
+ *  the icon is replaced by a ▸ caret.
  *
  *  Exported so host projects can render Views-section entries that match
  *  the library's Tables/Reports items pixel-for-pixel. */
@@ -99,10 +80,10 @@ export function SidebarNavItem({
     <Link
       to={to}
       className={cn(
-        "flex items-center gap-2 h-sap-header pl-[12px] pr-[10px] border-l-2 text-sap-body",
+        "flex items-center gap-2 h-[28px] rounded-[6px] px-2 text-sap-body no-underline",
         active
-          ? "border-l-sap-brand bg-sap-active-nav text-sap-fg font-medium"
-          : "border-l-transparent text-sap-muted hover:bg-sap-row-hover",
+          ? "bg-sap-active-nav text-sap-fg font-[650]"
+          : "text-sap-soft hover:bg-sap-row-hover",
       )}
     >
       <span
@@ -141,7 +122,9 @@ export function AppSidebar({ sidebarContent }: AppSidebarProps) {
       <SidebarSectionLabel>Tables</SidebarSectionLabel>
 
       {loading && (
-        <div className="px-[14px] py-3 text-sap-data text-sap-muted">Loading…</div>
+        <div className="px-[14px] py-3 text-sap-data text-sap-muted">
+          Loading…
+        </div>
       )}
 
       {tables.map((table) => {
