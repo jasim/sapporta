@@ -95,6 +95,8 @@ export type TGridSession<
   getQueryState<LevelId extends TGridLevelId<RowsByLevel>>(
     levelId?: LevelId,
   ): TGridLevelQueryState<RowsByLevel[LevelId]>;
+  // The session registry narrows full sessions to this one method when
+  // app-level actions only need to refetch a mounted table page.
   reloadRows(levelId?: TGridLevelId<RowsByLevel>, path?: GridPath): void;
   csvExportUrl(levelId?: TGridLevelId<RowsByLevel>): string;
   dispose(): void;
