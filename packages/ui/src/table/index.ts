@@ -30,16 +30,17 @@ export * from "./grid-adapter/tgrid-column-spec";
 export * from "./grid-adapter/tgrid-schema-compiler";
 export * from "./grid-adapter/tgrid-binding";
 export * from "./grid-adapter/tgrid-types";
+export * from "./grid-adapter/tgrid-table-url";
+export { Pagination, type PaginationProps } from "./grid-adapter/Pagination";
+export {
+  visiblePaginationItems,
+  type PaginationRangeItem,
+} from "./grid-adapter/visible-pagination-items";
 export * from "./lookup/tgrid-lookup-loading";
 export * from "./lookup/table-lookup-registry";
 export { TGrid } from "./page/TGrid";
 export { TablePage } from "./page/TablePage";
 export { TableToolbar } from "./page/TableToolbar";
-export { Pagination } from "./pagination/Pagination";
-export {
-  visiblePaginationItems,
-  type PaginationRangeItem,
-} from "./pagination/visible-pagination-items";
 export { NewRecordRoute } from "./route/NewRecordRoute";
 export { TableRoute } from "./route/TableRoute";
 export * from "./state/tgrid-level-query-state";
@@ -53,4 +54,3 @@ export {
   registerTGridSession,
   unregisterTGridSession,
 } from "./state/tgrid-session-registry";
-export * from "./url/table-url";

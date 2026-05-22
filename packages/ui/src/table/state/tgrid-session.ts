@@ -40,6 +40,7 @@ import {
 } from "@/table/lookup/table-lookup-registry";
 import { buildTableRowsQuery } from "@/table/api/rows";
 import { getApiBase } from "@/platform/client";
+import { buildTableSearchParams } from "@/table/grid-adapter/tgrid-table-url";
 import type {
   TGridLevelId,
   TGridRowsByLevel,
@@ -99,6 +100,7 @@ export type TGridSession<
   // app-level actions only need to refetch a mounted table page.
   reloadRows(levelId?: TGridLevelId<RowsByLevel>, path?: GridPath): void;
   csvExportUrl(levelId?: TGridLevelId<RowsByLevel>): string;
+  tablePageUrl(page: number, levelId?: TGridLevelId<RowsByLevel>): string;
   dispose(): void;
 };
 
@@ -260,6 +262,22 @@ class DefaultTGridSession<
   csvExportUrl(levelId: TGridLevelId<RowsByLevel> = this.rootLevel): string {
     const runtimeLevel = this.levels[levelId];
     return runtimeLevel.csvExportUrl();
+  }
+
+  tablePageUrl(
+    page: number,
+    levelId: TGridLevelId<RowsByLevel> = this.rootLevel,
+  ): string {
+    const level = this.levels[levelId];
+    const s = this.getQueryStore(levelId).getState();
+    const params = buildTableSearchParams({
+      page,
+      sort: s.sort,
+      filters: s.filters,
+      search: s.search,
+    });
+    const queryString = params.toString();
+    return `/tables/${level.table.name}${queryString ? `?${queryString}` : ""}`;
   }
 
   dispose(): void {
