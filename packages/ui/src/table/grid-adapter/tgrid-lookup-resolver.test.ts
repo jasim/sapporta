@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { ColumnSchema } from "@sapporta/shared/contracts";
-import { createTableGridThemeContext } from "./table-grid-theme-context";
+import { createTGridLookupResolver } from "./tgrid-lookup-resolver";
 import type {
   TableForeignKeyLookupBundle,
   TableLookupRegistry,
@@ -22,16 +22,16 @@ const bundle = {
   searchLookup: {} as never,
 } satisfies TableForeignKeyLookupBundle;
 
-describe("createTableGridThemeContext", () => {
+describe("createTGridLookupResolver", () => {
   it("delegates FK bundle lookup to the table lookup registry", () => {
     const registry: TableLookupRegistry = {
       bundleFor: vi.fn(() => bundle),
       dispose: vi.fn(),
     };
-    const context = createTableGridThemeContext(registry);
+    const resolver = createTGridLookupResolver(registry);
 
     expect(
-      context.lookupBundleFor({ tableName: "orders", column: ownerColumn }),
+      resolver.bundleFor({ tableName: "orders", column: ownerColumn }),
     ).toBe(bundle);
     expect(registry.bundleFor).toHaveBeenCalledWith({
       sourceTable: "orders",

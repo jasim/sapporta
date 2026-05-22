@@ -1,23 +1,22 @@
-import type { TableHandle } from "@/table/state/table-state";
+import type { TGridSession } from "@/table/state/tgrid-session";
 import { startLoadingValueLookupEntriesForGridRows } from "@/lookup/cache/grid-row-loader";
-import { tableGridThemeColumnMeta } from "@/table/grid-adapter/table-grid-theme";
 
 // Returns a teardown function. Caller wires this to `useEffect` cleanup so
 // long-lived subscriptions stop when the page unmounts.
-export function startTableLookupLoading(handle: TableHandle): () => void {
+export function startTGridLookupLoading(session: TGridSession): () => void {
   return startLoadingValueLookupEntriesForGridRows({
-    runtime: handle.runtime,
+    runtime: session.runtime,
     lookupColumnsForGridPath: (path) => {
-      const level = handle.runtime.schemaAt(path);
-      const levelMeta = handle.levelMetaById[level.name];
-      if (!levelMeta) return [];
+      const level = session.runtime.schemaAt(path);
+      const levelInfo = session.levelInfoById[level.name];
+      if (!levelInfo) return [];
 
       return level.columns.flatMap((gridColumn) => {
-        const tableColumn = tableGridThemeColumnMeta(gridColumn)?.schema;
+        const tableColumn = session.columnMapper.metaOf(gridColumn)?.schema;
         if (!tableColumn?.foreignKey) return [];
 
-        const bundle = handle.lookupRegistry.bundleFor({
-          sourceTable: levelMeta.tableName,
+        const bundle = session.lookupRegistry.bundleFor({
+          sourceTable: levelInfo.tableName,
           column: tableColumn,
         });
         if (!bundle) return [];

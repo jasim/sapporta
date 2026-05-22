@@ -10,7 +10,7 @@ import type { SortDescriptor } from "@/grid";
 import { encodeFilters, type FilterCondition } from "@sapporta/shared/filter";
 import type { RowId } from "@sapporta/shared/row-id";
 
-export interface FetchRowsParams {
+export interface FetchTableRowsParams {
   tableName: string;
   page?: number;
   limit?: number;
@@ -24,8 +24,8 @@ export interface FetchRowsParams {
  *  fetch and the CSV-export URL. Filter encoding is delegated to
  *  `@sapporta/shared/filter` so the URL the router produces and the query
  *  this fetch layer sends use the same format. */
-export function buildRowsQuery(
-  params: Omit<FetchRowsParams, "tableName">,
+export function buildTableRowsQuery(
+  params: Omit<FetchTableRowsParams, "tableName">,
 ): Record<string, string> {
   const out: Record<string, string> = {};
   if (params.filters) {
@@ -39,26 +39,31 @@ export function buildRowsQuery(
   return out;
 }
 
-export async function fetchRows(params: FetchRowsParams): Promise<PaginatedRows> {
+export async function fetchTableRows(
+  params: FetchTableRowsParams,
+): Promise<PaginatedRows> {
   const { tableName, ...rest } = params;
   return uiClient.listRows({
     params: { tableName },
-    query: buildRowsQuery(rest),
+    query: buildTableRowsQuery(rest),
   });
 }
 
-export async function fetchRow(tableName: string, id: RowId): Promise<SingleRow> {
+export async function fetchTableRow(
+  tableName: string,
+  id: RowId,
+): Promise<SingleRow> {
   return uiClient.getRow({ params: { tableName, id } });
 }
 
-export async function createRow(
+export async function createTableRow(
   tableName: string,
   data: Row,
 ): Promise<{ data: Row | Row[] }> {
   return uiClient.createRow({ params: { tableName }, body: data });
 }
 
-export async function updateRow(
+export async function updateTableRow(
   tableName: string,
   id: RowId,
   data: Row,
@@ -66,7 +71,7 @@ export async function updateRow(
   return uiClient.updateRow({ params: { tableName, id }, body: data });
 }
 
-export async function deleteRow(
+export async function deleteTableRow(
   tableName: string,
   id: RowId,
 ): Promise<SingleRow> {

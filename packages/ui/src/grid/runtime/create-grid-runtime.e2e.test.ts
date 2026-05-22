@@ -412,6 +412,11 @@ describe("GridRuntime over restGridDataSource — full lifecycle", () => {
       rowKey: "O1",
       colId: "amount",
       value: 100,
+      row: {
+        id: "O1",
+        customer: "Acme",
+        amount: 100,
+      },
     });
   });
 

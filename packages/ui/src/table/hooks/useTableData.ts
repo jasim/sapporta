@@ -1,8 +1,11 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { fetchRows } from "@/table/api/rows";
+import { fetchTableRows } from "@/table/api/rows";
 import type { SortDescriptor } from "@/grid";
 import type { Row } from "@sapporta/shared/contracts";
-import { normalizeFilters, type FilterCondition } from "@sapporta/shared/filter";
+import {
+  normalizeFilters,
+  type FilterCondition,
+} from "@sapporta/shared/filter";
 
 export interface UseTableDataResult {
   rows: Row[];
@@ -59,7 +62,7 @@ export function useTableData(
     setLoading(true);
     setError(null);
     try {
-      const res = await fetchRows({
+      const res = await fetchTableRows({
         tableName,
         page,
         limit,
@@ -80,5 +83,14 @@ export function useTableData(
     load();
   }, [load]);
 
-  return { rows, loading, error, totalCount, page, pages, reload: load, setPage };
+  return {
+    rows,
+    loading,
+    error,
+    totalCount,
+    page,
+    pages,
+    reload: load,
+    setPage,
+  };
 }

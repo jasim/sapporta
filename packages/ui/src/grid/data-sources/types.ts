@@ -55,11 +55,7 @@
 //      event iff a runtime write verb was invoked.
 
 import type { ColId, GridPath, RowKey } from "../types/identity";
-import type {
-  FooterRow,
-  PhantomRow,
-  TreeNode,
-} from "../types/level-row";
+import type { FooterRow, PhantomRow, TreeNode } from "../types/level-row";
 import type { RowPredicate, SortDescriptor } from "../pipeline/types";
 
 export type LevelStatus = "idle" | "loading" | "error" | "ready";
@@ -79,7 +75,7 @@ export type LevelStatus = "idle" | "loading" | "error" | "ready";
 // `unknown` is uninhabited: you can't read `filter.x` off it without a
 // cast. So an unparameterized source physically cannot be combined with a
 // `query` / `fetchPage` that depends on the grammar. Either commit to a
-// grammar by parameterizing the factory (`restLevelSource<TableFilter>`)
+// grammar by parameterizing the factory (`restLevelSource<TGridFilter>`)
 // or don't use filtering — there is no third path where the grid quietly
 // accepts a bag of anything.
 //
@@ -177,9 +173,9 @@ export type ReconcileEvent =
 //
 // `LevelDataSource` is intentionally non-parametric over `F`. The reason
 // is type-system contravariance: `setFilter: (f?: F) => void` is *contra*
-// in `F`, so `LevelDataSource<TableFilter>` would NOT be assignable to
+// in `F`, so `LevelDataSource<TGridFilter>` would NOT be assignable to
 // `LevelDataSource<unknown>` (a caller passing `unknown` couldn't safely
-// hand it to a callee expecting `TableFilter`). The runtime needs to hold
+// hand it to a callee expecting `TGridFilter`). The runtime needs to hold
 // any source uniformly regardless of grammar, so the cross-source contract
 // erases `F` to `unknown` here. Type-safe filter wiring lives one layer up:
 // `RestLevelSourceOpts<F>` / `InMemoryLevelSourceOpts<F>` thread `F` through
@@ -210,14 +206,20 @@ export type ReadonlyLevelDataSource = {
 // Host-facing source view returned by `GridRuntime.sourceFor`. It preserves
 // read/query/reconcile access while hiding write verbs, so all mutations flow
 // through runtime methods.
-export type RuntimeLevelDataSource = Omit<ReadonlyLevelDataSource, "writable"> & {
+export type RuntimeLevelDataSource = Omit<
+  ReadonlyLevelDataSource,
+  "writable"
+> & {
   writable: boolean;
   onReconcile(fn: (e: ReconcileEvent) => void): () => void;
 };
 
 // Write surface — extends the read surface. Edit verbs and the
 // reconciliation channel only exist on writable sources.
-export type WritableLevelDataSource = Omit<ReadonlyLevelDataSource, "writable"> & {
+export type WritableLevelDataSource = Omit<
+  ReadonlyLevelDataSource,
+  "writable"
+> & {
   writable: true;
   // Optimistic in-place edit. The source applies the change locally and
   // kicks off any server roundtrip.
@@ -262,7 +264,12 @@ export type PhantomChannel = {
   get: (path: GridPath) => PhantomRow[];
   add: (path: GridPath, phantom: PhantomRow) => void;
   remove: (path: GridPath, rowKey: RowKey) => void;
-  setCell: (path: GridPath, rowKey: RowKey, colId: ColId, value: unknown) => void;
+  setCell: (
+    path: GridPath,
+    rowKey: RowKey,
+    colId: ColId,
+    value: unknown,
+  ) => void;
   subscribe: (path: GridPath, fn: () => void) => () => void;
 };
 
@@ -294,13 +301,18 @@ export type PatchCellRequest = {
   rowKey: RowKey;
   colId: ColId;
   value: unknown;
+  row: Record<ColId, unknown>;
 };
 
-// `patchCell` returns the authoritative cell value as the server stored
-// it. If it equals the optimistic value, the source emits `agreed`. If
-// it differs, the source updates `nodes` to the authoritative value and
-// emits `diverged`.
-export type PatchCellResponse = { value: unknown };
+// `patchCell` can return the authoritative cell value, a row patch, a full
+// row replacement, or request a reload. The simple `{ value }` shape remains
+// supported for low-level sources and legacy table updates.
+export type PatchCellResponse =
+  | { value: unknown }
+  | { kind: "value"; value: unknown }
+  | { kind: "patch"; patch: Record<ColId, unknown> }
+  | { kind: "row"; node: TreeNode }
+  | { kind: "reload" };
 
 export type InsertNodeRequest = {
   node: TreeNode;

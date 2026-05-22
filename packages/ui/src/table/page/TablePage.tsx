@@ -9,13 +9,11 @@ import { useSearchParams } from "react-router-dom";
 import { useStore } from "zustand";
 import { Loader2 } from "lucide-react";
 import type { TableSchema } from "@sapporta/shared/contracts";
-import { TableGrid } from "./TableGrid";
+import { TGrid } from "./TGrid";
 import { TableToolbar } from "./TableToolbar";
 import { Pagination } from "@/table/pagination/Pagination";
 import { useSchemaStore } from "@/schema-catalog/state/schema-store";
 import { navigateToNewRecord } from "@/table/actions/record-actions";
-import { getApiBase } from "@/platform/client";
-import { buildRowsQuery } from "@/table/api/rows";
 import {
   parseTableSearchParams,
   buildTableSearchParams,
@@ -23,24 +21,42 @@ import {
 import { getNavigate } from "@/app/router/router-bridge";
 import { loadPref, savePref } from "@/platform/prefs";
 import type { ColId, SortDescriptor } from "@/grid";
-import { createTable, type TableHandle } from "@/table/state/table-state";
-import { startTableLookupLoading } from "@/table/lookup/table-lookup-loading";
 import {
-  registerTable,
-  unregisterTable,
-} from "@/table/state/table-grid-registry";
+  createTGridSession,
+  type TGridSession,
+} from "@/table/state/tgrid-session";
+import {
+  buildSessionLevelsFromTableGridGraph,
+  buildTableGridGraphFromSchema,
+} from "@/table/grid-adapter/tgrid-schema-compiler";
+import { startTGridLookupLoading } from "@/table/lookup/tgrid-lookup-loading";
+import {
+  registerTGridSession,
+  unregisterTGridSession,
+} from "@/table/state/tgrid-session-registry";
+
+type SchemaDrivenRowsByLevel = Record<string, Record<string, unknown>>;
 
 // Sort pref shape: a serializable mirror of `SortDescriptor[]`. Kept in
 // localStorage under `sapporta:grid-sort:<tableName>` so it survives reloads.
 type PersistedSort = Array<{ colId: string; direction: string }>;
 
+// User entrypoint for table URLs (`/tables/:tableName`) that builds runtime.
+// It compiles schema children into explicit levels, creates a session, and renders TGrid + controls.
+// Table pages are schema-driven bootstrap paths:
+// they derive an explicit TGrid level graph from `TableSchema.children` so
+// nested tables keep working even without hand-written TGrid level declarations.
+//
+// This preserves the legacy "point table route at any table name" behavior while
+// still honoring the explicit `rootLevel + levels + childLevels` contract in the
+// TGrid runtime.
 function sortPrefKey(tableName: string): string {
   return `sapporta:grid-sort:${tableName}`;
 }
 
 // Top-level entry for the table path. Owns:
-//   - the URL-synced state store + REST-backed grid runtime (`TableHandle`)
-//   - URL ↔ store sync (both directions)
+//   - the URL-synced query store + REST-backed grid runtime (`TGridSession`)
+//   - URL-store sync in both directions
 //   - FK lookup loading
 //   - drawer-create wiring + registry entry so external dispatchers can refetch
 //   - layout: toolbar + grid + pagination + status bands (loading/error)
@@ -50,12 +66,15 @@ export function TablePage({ tableName }: { tableName: string }) {
     s.tables.find((t) => t.name === tableName),
   );
   const tables = useSchemaStore((s) => s.tables);
+  const [searchParams] = useSearchParams();
+  const [session, setSession] = useState<
+    TGridSession<SchemaDrivenRowsByLevel> | null
+  >(null);
+
   const tablesByName = useMemo(
-    () => Object.fromEntries(tables.map((t) => [t.name, t])),
+    () => Object.fromEntries(tables.map((table) => [table.name, table])),
     [tables],
   );
-  const [searchParams] = useSearchParams();
-  const [handle, setHandle] = useState<TableHandle | null>(null);
 
   // Snapshot the URL once at construction so the initial fetch matches the
   // address bar. Subsequent URL changes flow through Effect 2 below.
@@ -76,15 +95,26 @@ export function TablePage({ tableName }: { tableName: string }) {
       initial.sort ??
       (loadPref<PersistedSort>(sortPrefKey(tableName), []) as SortDescriptor[]);
 
-    const h = createTable({
-      tableName,
-      tableSchema,
-      tablesByName,
-      initialSort,
-      initialFilters: initial.filters,
-      initialSearch: initial.search,
-      initialPage: initial.page,
+    // This is the compatibility compiler that turns schema child metadata into
+    // the explicit level map expected by the session runtime.
+    const sessionConfig = buildSessionLevelsFromTableGridGraph({
+      graph: buildTableGridGraphFromSchema({
+        rootTableName: tableSchema.name,
+        tablesByName,
+      }),
+      rootLevelQuery: {
+        initialSort,
+        initialFilters: initial.filters,
+        initialSearch: initial.search,
+        initialPage: initial.page,
+        urlSync: true,
+      },
+    });
+
+    const nextSession = createTGridSession<SchemaDrivenRowsByLevel>({
+      ...sessionConfig,
       onUrlChange: (state) => {
+        if (state.level !== tableName) return;
         // Persist the user's sort so it survives a reload.
         savePref<PersistedSort>(sortPrefKey(tableName), state.sort);
         const params = buildTableSearchParams({
@@ -103,30 +133,30 @@ export function TablePage({ tableName }: { tableName: string }) {
       },
     });
 
-    registerTable(tableName, h);
-    const stopLookupLoading = startTableLookupLoading(h);
-    setHandle(h);
+    registerTGridSession(tableName, nextSession);
+    const stopLookupLoading = startTGridLookupLoading(nextSession);
+    setSession(nextSession);
 
     return () => {
       stopLookupLoading();
-      unregisterTable(tableName);
-      h.dispose();
-      setHandle(null);
+      unregisterTGridSession(tableName);
+      nextSession.dispose();
+      setSession(null);
     };
   }, [tableName, tableSchema, tablesByName]);
 
   // URL → store sync. Fires on browser back/forward and on our own URL
   // pushes (the store's equality guards in `syncFromUrl` suppress feedback
-  // loops). Disabled until the handle exists so we don't queue a sync
+  // loops). Disabled until the session exists so we don't queue a sync
   // before the store is constructed.
   useEffect(() => {
-    if (!handle || !tableSchema) return;
+    if (!session || !tableSchema) return;
     const validColIds: ReadonlySet<ColId> = new Set(
       tableSchema.columns.map((c) => c.name as ColId),
     );
     const params = parseTableSearchParams(searchParams, validColIds);
-    handle.store.getState().syncFromUrl(params);
-  }, [handle, searchParams, tableSchema]);
+    session.queryStore.getState().syncFromUrl(params);
+  }, [session, searchParams, tableSchema]);
 
   if (!tableSchema) {
     return (
@@ -136,7 +166,7 @@ export function TablePage({ tableName }: { tableName: string }) {
     );
   }
 
-  if (!handle) {
+  if (!session) {
     return (
       <div className="flex-1 flex items-center justify-center">
         <Loader2 className="h-6 w-6 animate-spin text-sap-muted" />
@@ -144,42 +174,39 @@ export function TablePage({ tableName }: { tableName: string }) {
     );
   }
 
-  return <TablePageInner handle={handle} tableSchema={tableSchema} />;
+  return <TablePageInner session={session} tableSchema={tableSchema} />;
 }
 
 // Splitting the inner component keeps the hook count stable across the
-// "no schema yet" / "no handle yet" early returns above. This component
+// "no schema yet" / "no session yet" early returns above. This component
 // only mounts when both are present.
 function TablePageInner({
-  handle,
+  session,
   tableSchema,
 }: {
-  handle: TableHandle;
+  session: TGridSession<SchemaDrivenRowsByLevel>;
   tableSchema: TableSchema;
 }) {
-  const sort = useStore(handle.store, (s) => s.sort);
-  const filters = useStore(handle.store, (s) => s.filters);
-  const search = useStore(handle.store, (s) => s.search);
-  const page = useStore(handle.store, (s) => s.page);
-  const errorBanner = useStore(handle.store, (s) => s.errorBanner);
+  const sort = useStore(session.queryStore, (s) => s.sort);
+  const filters = useStore(session.queryStore, (s) => s.filters);
+  const search = useStore(session.queryStore, (s) => s.search);
+  const page = useStore(session.queryStore, (s) => s.page);
+  const errorBanner = useStore(session.queryStore, (s) => s.errorBanner);
 
   // Source-driven chrome state. We subscribe to the source's snapshot
   // identity so loading/error/totalCount/pages flips wake exactly this
   // component (not the cell tree).
-  const status = useSourceField(handle, (s) => s.status);
-  const errorObj = useSourceField(handle, (s) => s.error);
+  const status = useSourceField(session, (s) => s.status);
+  const errorObj = useSourceField(session, (s) => s.error);
   const totalCount = useSourceField(
-    handle,
+    session,
     (s) => s.pagination?.totalCount ?? 0,
   );
-  const pageSize = useStore(handle.store, (s) => s.pageSize);
+  const pageSize = useStore(session.queryStore, (s) => s.pageSize);
   const pages =
     totalCount > 0 ? Math.max(1, Math.ceil(totalCount / pageSize)) : 0;
 
-  const exportQueryString = new URLSearchParams(
-    buildRowsQuery({ sort, filters, search: search ?? undefined }),
-  ).toString();
-  const exportUrl = `${getApiBase()}/tables/${tableSchema.name}/export.csv${exportQueryString ? `?${exportQueryString}` : ""}`;
+  const exportUrl = session.csvExportUrl();
   const hrefForPage = (nextPage: number): string => {
     const params = buildTableSearchParams({
       page: nextPage,
@@ -210,11 +237,13 @@ function TablePageInner({
         searchable={(tableSchema.search?.columns.length ?? 0) > 0}
         exportUrl={exportUrl}
         hasSort={sort.length > 0}
-        onAddFilter={(c) => handle.store.getState().addFilter(c)}
-        onUpdateFilter={(id, p) => handle.store.getState().updateFilter(id, p)}
-        onRemoveFilter={(id) => handle.store.getState().removeFilter(id)}
-        onSearchChange={(q) => handle.store.getState().setSearch(q)}
-        onClearSort={() => handle.store.getState().clearSort()}
+        onAddFilter={(c) => session.queryStore.getState().addFilter(c)}
+        onUpdateFilter={(id, p) =>
+          session.queryStore.getState().updateFilter(id, p)
+        }
+        onRemoveFilter={(id) => session.queryStore.getState().removeFilter(id)}
+        onSearchChange={(q) => session.queryStore.getState().setSearch(q)}
+        onClearSort={() => session.queryStore.getState().clearSort()}
         onNewRecord={
           tableSchema.immutable
             ? undefined
@@ -232,7 +261,7 @@ function TablePageInner({
           </pre>
           <button
             type="button"
-            onClick={() => handle.store.getState().setErrorBanner(null)}
+            onClick={() => session.queryStore.getState().setErrorBanner(null)}
             aria-label="Dismiss error"
             className="opacity-70 hover:opacity-100"
           >
@@ -256,7 +285,7 @@ function TablePageInner({
       {!showSpinner && !errorMessage && (
         <div className="flex-1 overflow-auto px-5 pb-7">
           <div className="bg-sap-surface">
-            <TableGrid runtime={handle.runtime} store={handle.store} />
+            <TGrid runtime={session.runtime} sessionContext={session} />
           </div>
         </div>
       )}
@@ -264,7 +293,7 @@ function TablePageInner({
       <Pagination
         page={page}
         pages={pages}
-        onPageChange={(p) => handle.store.getState().setPage(p)}
+        onPageChange={(p) => session.queryStore.getState().setPage(p)}
         hrefForPage={hrefForPage}
       />
     </div>
@@ -276,11 +305,11 @@ function TablePageInner({
 // bailout keeps re-renders narrow: a status flip wakes only this component,
 // not the cell tree.
 function useSourceField<T>(
-  handle: TableHandle,
-  pick: (snap: ReturnType<TableHandle["source"]["snapshot"]>) => T,
+  session: TGridSession,
+  pick: (snap: ReturnType<TGridSession["rootSource"]["snapshot"]>) => T,
 ): T {
   return useSyncExternalStore(
-    (cb) => handle.source.subscribe(cb),
-    () => pick(handle.source.snapshot()),
+    (cb) => session.rootSource.subscribe(cb),
+    () => pick(session.rootSource.snapshot()),
   );
 }

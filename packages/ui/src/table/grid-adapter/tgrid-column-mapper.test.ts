@@ -6,10 +6,10 @@ import { preset } from "@/column-preset";
 import { StaticSearchLookup } from "@/lookup/cache/search-lookup";
 import { StaticValueLookup } from "@/lookup/cache/value-lookup";
 import {
-  tableColumnsToGridThemeColumns,
+  createTGridColumnMapper,
   tableColumnPresetWidth,
-  type TableGridThemeContext,
-} from "./table-grid-theme";
+} from "./tgrid-column-mapper";
+import type { TGridLookupResolver } from "./tgrid-lookup-resolver";
 import type { TableForeignKeyLookupBundle } from "@/table/lookup/table-lookup-registry";
 
 const valueLookup = new StaticValueLookup([{ value: "a", label: "Alpha" }]);
@@ -23,9 +23,10 @@ const bundle: TableForeignKeyLookupBundle = {
   valueLookup,
   searchLookup,
 };
-const context: TableGridThemeContext = {
-  lookupBundleFor: () => bundle,
+const lookupResolver: TGridLookupResolver = {
+  bundleFor: () => bundle,
 };
+const columnMapper = createTGridColumnMapper(lookupResolver);
 
 function table(columns: ColumnSchema[], immutable = false): TableSchema {
   return {
@@ -37,9 +38,9 @@ function table(columns: ColumnSchema[], immutable = false): TableSchema {
   };
 }
 
-describe("tableColumnsToGridThemeColumns", () => {
+describe("TGridColumnMapper.columnsFor", () => {
   it("maps every table display type to the matching preset kind", () => {
-    const columns = tableColumnsToGridThemeColumns({
+    const columns = columnMapper.columnsFor({
       table: table([
         { name: "id", primary: true, kind: "number" },
         {
@@ -61,7 +62,6 @@ describe("tableColumnsToGridThemeColumns", () => {
       ]),
       immutable: false,
       expandable: false,
-      context,
     });
 
     expect(columns.map((c) => preset(c)?.kind)).toEqual([
@@ -78,7 +78,7 @@ describe("tableColumnsToGridThemeColumns", () => {
   });
 
   it("applies projection, hidden columns, editability, and metadata", () => {
-    const columns = tableColumnsToGridThemeColumns({
+    const columns = columnMapper.columnsFor({
       table: table(
         [
           { name: "id", primary: true, kind: "number" },
@@ -88,10 +88,9 @@ describe("tableColumnsToGridThemeColumns", () => {
         ],
         false,
       ),
-      projectedColumns: ["name", "secret", "created_at"],
+      includedColumnNames: ["name", "secret", "created_at"],
       immutable: false,
       expandable: false,
-      context,
     });
 
     expect(columns.map((c) => c.id)).toEqual(["name", "created_at"]);
@@ -106,11 +105,10 @@ describe("tableColumnsToGridThemeColumns", () => {
   });
 
   it("makes immutable tables read-only", () => {
-    const columns = tableColumnsToGridThemeColumns({
+    const columns = columnMapper.columnsFor({
       table: table([{ name: "name", kind: "text" }], true),
       immutable: true,
       expandable: false,
-      context,
     });
 
     expect(columns[0].editCell).toBeUndefined();
@@ -118,11 +116,10 @@ describe("tableColumnsToGridThemeColumns", () => {
   });
 
   it("maps textDisplay into the text preset display", () => {
-    const columns = tableColumnsToGridThemeColumns({
+    const columns = columnMapper.columnsFor({
       table: table([{ name: "body", kind: "text", textDisplay: "markdown" }]),
       immutable: false,
       expandable: false,
-      context,
     });
     const p = preset(columns[0]);
 
@@ -132,7 +129,7 @@ describe("tableColumnsToGridThemeColumns", () => {
   });
 
   it("maps numeric display metadata into the numeric preset display", () => {
-    const columns = tableColumnsToGridThemeColumns({
+    const columns = columnMapper.columnsFor({
       table: table([
         {
           name: "balance",
@@ -145,7 +142,6 @@ describe("tableColumnsToGridThemeColumns", () => {
       ]),
       immutable: false,
       expandable: false,
-      context,
     });
     const p = preset(columns[0]);
 
@@ -159,7 +155,7 @@ describe("tableColumnsToGridThemeColumns", () => {
   });
 
   it("defaults currency zero display to a dot", () => {
-    const columns = tableColumnsToGridThemeColumns({
+    const columns = columnMapper.columnsFor({
       table: table([
         {
           name: "price",
@@ -169,7 +165,6 @@ describe("tableColumnsToGridThemeColumns", () => {
       ]),
       immutable: false,
       expandable: false,
-      context,
     });
     const p = preset(columns[0]);
 
@@ -179,7 +174,7 @@ describe("tableColumnsToGridThemeColumns", () => {
   });
 
   it("assigns FK label and editor lookups to preset data", () => {
-    const columns = tableColumnsToGridThemeColumns({
+    const columns = columnMapper.columnsFor({
       table: table([
         {
           name: "owner_id",
@@ -189,7 +184,6 @@ describe("tableColumnsToGridThemeColumns", () => {
       ]),
       immutable: false,
       expandable: false,
-      context,
     });
     const p = preset(columns[0]);
 
@@ -200,11 +194,10 @@ describe("tableColumnsToGridThemeColumns", () => {
   });
 
   it("wraps the first visible column for expandable levels", () => {
-    const columns = tableColumnsToGridThemeColumns({
+    const columns = columnMapper.columnsFor({
       table: table([{ name: "id", primary: true, kind: "number" }]),
       immutable: false,
       expandable: true,
-      context,
     });
     const rendered = columns[0].renderCell({
       value: 1,

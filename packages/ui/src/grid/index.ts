@@ -367,6 +367,7 @@ export type {
   InMemoryLevelOpts,
   RestGridDataSourceOpts,
   RestEndpointFactory,
+  PatchCellResponse,
 } from "./data-sources";
 
 export type {
