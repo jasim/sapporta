@@ -1,13 +1,15 @@
 // Registry for table pages that need to reload from app-level dispatchers,
 // such as the drawer's `createRecord` flow.
 
-import type { TGridSession } from "./tgrid-session";
+type ReloadableTGridSession = {
+  reloadRows(): void;
+};
 
-const sessions = new Map<string, TGridSession>();
+const sessions = new Map<string, ReloadableTGridSession>();
 
 export function registerTGridSession(
   rootTableName: string,
-  session: TGridSession,
+  session: ReloadableTGridSession,
 ) {
   sessions.set(rootTableName, session);
 }

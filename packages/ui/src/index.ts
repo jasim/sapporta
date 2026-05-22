@@ -51,6 +51,33 @@ export {
   type RecordFormStore,
   type RecordFormValues,
 } from "@/table/form/record-form-store";
+export {
+  bindTGridTypes,
+  buildTGridRuntimeConfig,
+  createTGridColumnMapper,
+  createTGridColumnsBuilder,
+  createTGridSession,
+  TableToolbar,
+  TGrid,
+  useCurrentTGridSession,
+  useTGridCell,
+  useTGridCellEditor,
+  useTGridQueryState,
+  useTGridSession,
+  type CreateTGridSessionArgs,
+  type TGridCellContext,
+  type TGridCellEditorContext,
+  type TGridCellWriteContext,
+  type TGridCellWriteHandler,
+  type TGridCellWriteResult,
+  type TGridColumnSpec,
+  type TGridColumnSpecBuilder,
+  type TGridColumnsBuilder,
+  type TGridLevelConfig,
+  type TGridLevelQueryConfig,
+  type TGridLevelQueryState,
+  type TGridSession,
+} from "@/table";
 
 // Grid primitives
 export * from "@/grid";

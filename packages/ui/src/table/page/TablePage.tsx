@@ -304,9 +304,9 @@ function TablePageInner({
 // identity-stable snapshots, so React's `useSyncExternalStore` value-equality
 // bailout keeps re-renders narrow: a status flip wakes only this component,
 // not the cell tree.
-function useSourceField<T>(
-  session: TGridSession,
-  pick: (snap: ReturnType<TGridSession["rootSource"]["snapshot"]>) => T,
+function useSourceField<RowsByLevel extends SchemaDrivenRowsByLevel, T>(
+  session: TGridSession<RowsByLevel>,
+  pick: (snap: ReturnType<TGridSession<RowsByLevel>["rootSource"]["snapshot"]>) => T,
 ): T {
   return useSyncExternalStore(
     (cb) => session.rootSource.subscribe(cb),
