@@ -11,13 +11,13 @@ import { Loader2 } from "lucide-react";
 import type { TableSchema } from "@sapporta/shared/contracts";
 import { TGrid } from "./TGrid";
 import { TableToolbar } from "./TableToolbar";
-import { Pagination } from "@/table/pagination/Pagination";
+import { Pagination } from "@/table/grid-adapter/Pagination";
 import { useSchemaStore } from "@/schema-catalog/state/schema-store";
 import { navigateToNewRecord } from "@/table/actions/record-actions";
 import {
-  parseTableSearchParams,
   buildTableSearchParams,
-} from "@/table/url/table-url";
+  parseTableSearchParams,
+} from "@/table/grid-adapter/tgrid-table-url";
 import { getNavigate } from "@/app/router/router-bridge";
 import { loadPref, savePref } from "@/platform/prefs";
 import type { ColId, SortDescriptor } from "@/grid";
@@ -207,17 +207,6 @@ function TablePageInner({
     totalCount > 0 ? Math.max(1, Math.ceil(totalCount / pageSize)) : 0;
 
   const exportUrl = session.csvExportUrl();
-  const hrefForPage = (nextPage: number): string => {
-    const params = buildTableSearchParams({
-      page: nextPage,
-      sort,
-      filters,
-      search,
-    });
-    const queryString = params.toString();
-    return `/tables/${tableSchema.name}${queryString ? `?${queryString}` : ""}`;
-  };
-
   const showSpinner = status === "loading" && totalCount === 0;
   const errorMessage =
     status === "error"
@@ -294,7 +283,7 @@ function TablePageInner({
         page={page}
         pages={pages}
         onPageChange={(p) => session.queryStore.getState().setPage(p)}
-        hrefForPage={hrefForPage}
+        hrefForPage={(nextPage) => session.tablePageUrl(nextPage)}
       />
     </div>
   );

@@ -249,12 +249,15 @@ export function InvoiceGridView() {
     session,
     level: "invoices",
   });
+  const totalCount = session.rootSource.snapshot().pagination?.totalCount ?? 0;
+  const pages =
+    totalCount > 0 ? Math.max(1, Math.ceil(totalCount / query.pageSize)) : 0;
 
   return (
     <>
       <TableToolbar
         tableLabel="Invoices"
-        totalCount={session.rootSource.snapshot().pagination?.totalCount ?? 0}
+        totalCount={totalCount}
         columns={invoicesTable.columns}
         filters={query.filters}
         search={query.search}
@@ -269,6 +272,13 @@ export function InvoiceGridView() {
       />
 
       <TGrid runtime={session.runtime} sessionContext={session} />
+
+      <Pagination
+        page={query.page}
+        pages={pages}
+        onPageChange={query.setPage}
+        hrefForPage={(page) => session.tablePageUrl(page)}
+      />
     </>
   );
 }
@@ -897,6 +907,7 @@ Useful properties and methods:
 - `getQueryState(levelId?)`: host-owned query state snapshot.
 - `reloadRows(levelId?, path?)`: refetch loaded rows for a path.
 - `csvExportUrl(levelId?)`: CSV URL for a level.
+- `tablePageUrl(page, levelId?)`: table page URL for a host-owned level.
 - `dispose()`: release runtime and lookup resources.
 
 ### Standalone exports
@@ -913,6 +924,10 @@ convenient:
 - `useCurrentTGridSession`
 - `createTGridColumnsBuilder`
 - `buildTGridRuntimeConfig`
+- `Pagination`
+- `visiblePaginationItems`
+- `buildTableSearchParams`
+- `parseTableSearchParams`
 
 Use standalone runtime/compiler exports only when building your own wrapper or
 integrating TGrid into a non-standard host. For ordinary product views, prefer

@@ -2,7 +2,7 @@ import { describe, expect, test } from "vitest";
 import {
   buildTableSearchParams,
   parseTableSearchParams,
-} from "./table-url";
+} from "./tgrid-table-url";
 import type { ColId } from "@/grid";
 
 const COLS: ReadonlySet<ColId> = new Set(["name", "created_at"] as ColId[]);
