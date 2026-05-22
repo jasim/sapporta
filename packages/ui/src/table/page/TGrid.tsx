@@ -1,5 +1,10 @@
 import { useMemo } from "react";
-import { GridLevel, GridRuntimeProvider, rootPath } from "@/grid";
+import {
+  GridLevel,
+  GridRuntimeProvider,
+  rootPath,
+  type GridRuntime,
+} from "@/grid";
 import { columnPreset } from "@/column-preset";
 import type { TGridFilter } from "@/table/grid-adapter/tgrid-filter";
 import type { TGridTableColumnMeta } from "@/table/grid-adapter/tgrid-column-mapper";
@@ -11,12 +16,23 @@ import {
 import type { TGridRowsByLevel } from "@/table/grid-adapter/tgrid-types";
 import type { TGridLevelQueryState } from "@/table/state/tgrid-level-query-state";
 
+type TGridRenderableSessionContext = {
+  rootLevel: string;
+  runtime: GridRuntime;
+  levels: Record<string, { queryStore?: unknown }>;
+  appServices: unknown;
+  lookupRegistry: TGridSessionContext<
+    TGridRowsByLevel,
+    unknown
+  >["lookupRegistry"];
+};
+
 export function TGrid({
   runtime,
   sessionContext,
 }: {
-  runtime: TGridSessionContext<TGridRowsByLevel, unknown>["runtime"];
-  sessionContext: TGridSessionContext<TGridRowsByLevel, unknown>;
+  runtime: GridRuntime;
+  sessionContext: TGridRenderableSessionContext;
 }) {
   const root = rootPath(runtime.schema.rootLevel);
   const chrome = useMemo(
@@ -42,7 +58,7 @@ export function TGrid({
   return (
     <GridRuntimeProvider runtime={runtime}>
       {withTGridSessionContext(
-        sessionContext,
+        sessionContext as unknown as TGridSessionContext<TGridRowsByLevel, unknown>,
         <GridLevel path={root} chrome={chrome} />,
       )}
     </GridRuntimeProvider>

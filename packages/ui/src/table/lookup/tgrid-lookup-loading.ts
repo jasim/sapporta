@@ -1,9 +1,13 @@
 import type { TGridSession } from "@/table/state/tgrid-session";
+import type { TGridRowsByLevel } from "@/table/grid-adapter/tgrid-types";
 import { startLoadingValueLookupEntriesForGridRows } from "@/lookup/cache/grid-row-loader";
 
 // Returns a teardown function. Caller wires this to `useEffect` cleanup so
 // long-lived subscriptions stop when the page unmounts.
-export function startTGridLookupLoading(session: TGridSession): () => void {
+export function startTGridLookupLoading<
+  RowsByLevel extends TGridRowsByLevel,
+  AppServices = unknown,
+>(session: TGridSession<RowsByLevel, AppServices>): () => void {
   return startLoadingValueLookupEntriesForGridRows({
     runtime: session.runtime,
     lookupColumnsForGridPath: (path) => {
