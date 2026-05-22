@@ -9,21 +9,21 @@ import type { ColumnHeaderMenuProps } from "@/column-preset";
 import { lookupCapabilities } from "@/column-preset";
 import { HeaderFilterMenuContent } from "@/table/filters/HeaderFilterPopover";
 import type { FkOptionsMap } from "@/lookup/types";
-import type { TableFilter } from "./compile-table-grid";
-import type { TableGridThemeColumnMeta } from "./table-grid-theme";
+import type { TGridFilter } from "./tgrid-filter";
+import type { TGridTableColumnMeta } from "./tgrid-column-mapper";
 
-export function renderTableGridHeaderMenu(
-  props: ColumnHeaderMenuProps<TableGridThemeColumnMeta, TableFilter>,
+export function renderTGridHeaderMenu(
+  props: ColumnHeaderMenuProps<TGridTableColumnMeta, TGridFilter>,
 ): React.ReactNode {
-  return <TableGridHeaderMenu {...props} />;
+  return <TGridHeaderMenu {...props} />;
 }
 
-function TableGridHeaderMenu({
+function TGridHeaderMenu({
   level,
   column,
   commands,
   close,
-}: ColumnHeaderMenuProps<TableGridThemeColumnMeta, TableFilter>) {
+}: ColumnHeaderMenuProps<TGridTableColumnMeta, TGridFilter>) {
   const tableColumn = column.meta?.schema;
   if (!tableColumn) return null;
 
@@ -46,7 +46,7 @@ function TableGridHeaderMenu({
   const filter = level.filter ?? { conditions: [], search: null };
   const tableColumns = level.schema
     .map((c) => c.meta)
-    .filter(isTableGridThemeColumnMeta)
+    .filter(isTGridTableColumnMeta)
     .map((m) => m.schema);
   const fkOptions = searchLookup
     ? ({
@@ -95,9 +95,7 @@ function lookupToKeyedValues(
   );
 }
 
-function isTableGridThemeColumnMeta(
-  value: unknown,
-): value is TableGridThemeColumnMeta {
+function isTGridTableColumnMeta(value: unknown): value is TGridTableColumnMeta {
   return (
     typeof value === "object" &&
     value !== null &&

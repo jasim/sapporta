@@ -42,13 +42,10 @@
 // footgun. Construction throws synchronously when the set is incomplete.
 // If none are supplied, the source returns a `ReadonlyLevelDataSource`.
 //
-// `PatchCellResponse.value` is required. If the response lacks a `value`
-// field, the source throws — surfacing contract violations at the source
-// boundary, where they are most diagnosable. The value the server returns
-// is the authoritative cell value; if it equals the optimistic value the
-// source emits `agreed`, if it differs the source updates `nodes` to the
-// authoritative value (the grid is showing truth by the time the host sees
-// the `diverged` event) and emits `diverged`.
+// `PatchCellResponse` may confirm one value, patch the row, replace the row,
+// or request a reload. The value for the edited cell drives the reconcile
+// event; row patch/replacement responses can update sibling cells before the
+// host sees `agreed` or `diverged`.
 
 import { defaultRowKey } from "../../pipeline/stages/build-data";
 import type { ColId, RowKey } from "../../types/identity";
@@ -211,9 +208,7 @@ export function restLevelSource<F = unknown>(
       // `query()` return; in source-owned mode it's our internal `filter`.
       // `compileFilter` is non-null here because construction throws
       // when `serverManaged.filter === false && compileFilter === undefined`.
-      const predicate = opts.compileFilter!(
-        hostOwned ? q?.filter : filter,
-      );
+      const predicate = opts.compileFilter!(hostOwned ? q?.filter : filter);
       if (predicate) snap.applyFilter = predicate;
     }
     return snap;
@@ -409,32 +404,21 @@ export function restLevelSource<F = unknown>(
     emit();
 
     const myToken = bumpCellToken(rowKey, colId);
-    opts.patchCell!({ rowKey, colId, value }).then(
+    opts.patchCell!({
+      rowKey,
+      colId,
+      value,
+      row: { ...nodes[idx].columns },
+    }).then(
       (res) => {
         if (disposed) return;
         if (!isCellTokenCurrent(rowKey, colId, myToken)) return;
         clearCellToken(rowKey, colId, myToken);
-        if (!res || !("value" in res)) {
-          throw new Error(
-            `restLevelSource: patchCell response missing 'value' field — contract requires { value: unknown }`,
-          );
-        }
-        const serverValue = (res as PatchCellResponse).value;
-        if (Object.is(serverValue, value)) {
-          emitReconcile({ kind: "agreed", rowKey, colId, value: serverValue });
-          return;
-        }
-        const i = findNodeIdx(rowKey);
-        if (i >= 0) {
-          setNodeCell(i, colId, serverValue);
-          emit();
-        }
-        emitReconcile({
-          kind: "diverged",
+        applyPatchCellResponse({
+          res,
           rowKey,
           colId,
           optimisticValue: value,
-          authoritativeValue: serverValue,
           priorValue,
         });
       },
@@ -453,6 +437,202 @@ export function restLevelSource<F = unknown>(
       },
     );
   };
+
+  function applyPatchCellResponse(args: {
+    res: PatchCellResponse;
+    rowKey: RowKey;
+    colId: ColId;
+    optimisticValue: unknown;
+    priorValue: unknown;
+  }): void {
+    const { res, rowKey, colId, optimisticValue, priorValue } = args;
+    if (!res || typeof res !== "object") {
+      emitReconcile({
+        kind: "rejected",
+        rowKey,
+        colId,
+        optimisticValue,
+        reason: "patchCell response missing result object",
+        priorValue,
+      });
+      return;
+    }
+
+    if ("kind" in res) {
+      switch (res.kind) {
+        case "value":
+          applyAuthoritativeValue({
+            rowKey,
+            colId,
+            optimisticValue,
+            authoritativeValue: res.value,
+            priorValue,
+          });
+          return;
+        case "patch":
+          applyAuthoritativePatch({
+            rowKey,
+            colId,
+            optimisticValue,
+            patch: res.patch,
+            priorValue,
+          });
+          return;
+        case "row":
+          applyAuthoritativeRow({
+            rowKey,
+            colId,
+            optimisticValue,
+            node: res.node,
+            priorValue,
+          });
+          return;
+        case "reload":
+          refetch();
+          emitReconcile({
+            kind: "agreed",
+            rowKey,
+            colId,
+            value: optimisticValue,
+          });
+          return;
+      }
+    }
+
+    if (!("value" in res)) {
+      emitReconcile({
+        kind: "rejected",
+        rowKey,
+        colId,
+        optimisticValue,
+        reason: "patchCell response missing 'value' field",
+        priorValue,
+      });
+      return;
+    }
+
+    applyAuthoritativeValue({
+      rowKey,
+      colId,
+      optimisticValue,
+      authoritativeValue: res.value,
+      priorValue,
+    });
+  }
+
+  function applyAuthoritativeValue(args: {
+    rowKey: RowKey;
+    colId: ColId;
+    optimisticValue: unknown;
+    authoritativeValue: unknown;
+    priorValue: unknown;
+  }): void {
+    const { rowKey, colId, optimisticValue, authoritativeValue, priorValue } =
+      args;
+    if (Object.is(authoritativeValue, optimisticValue)) {
+      emitReconcile({
+        kind: "agreed",
+        rowKey,
+        colId,
+        value: authoritativeValue,
+      });
+      return;
+    }
+    const idx = findNodeIdx(rowKey);
+    if (idx >= 0) {
+      setNodeCell(idx, colId, authoritativeValue);
+      emit();
+    }
+    emitReconcile({
+      kind: "diverged",
+      rowKey,
+      colId,
+      optimisticValue,
+      authoritativeValue,
+      priorValue,
+    });
+  }
+
+  function applyAuthoritativePatch(args: {
+    rowKey: RowKey;
+    colId: ColId;
+    optimisticValue: unknown;
+    patch: Record<ColId, unknown>;
+    priorValue: unknown;
+  }): void {
+    const { rowKey, colId, optimisticValue, patch, priorValue } = args;
+    const authoritativeValue = colId in patch ? patch[colId] : optimisticValue;
+    const idx = findNodeIdx(rowKey);
+    if (idx >= 0) {
+      const next = nodes.slice();
+      next[idx] = {
+        ...next[idx],
+        columns: { ...next[idx].columns, ...patch },
+      };
+      nodes = next;
+      emit();
+    }
+    emitPatchReconcile({
+      rowKey,
+      colId,
+      optimisticValue,
+      authoritativeValue,
+      priorValue,
+    });
+  }
+
+  function applyAuthoritativeRow(args: {
+    rowKey: RowKey;
+    colId: ColId;
+    optimisticValue: unknown;
+    node: TreeNode;
+    priorValue: unknown;
+  }): void {
+    const { rowKey, colId, optimisticValue, node, priorValue } = args;
+    const authoritativeValue = node.columns[colId];
+    const idx = findNodeIdx(rowKey);
+    if (idx >= 0) {
+      const next = nodes.slice();
+      next[idx] = node;
+      nodes = next;
+      emit();
+    }
+    emitPatchReconcile({
+      rowKey,
+      colId,
+      optimisticValue,
+      authoritativeValue,
+      priorValue,
+    });
+  }
+
+  function emitPatchReconcile(args: {
+    rowKey: RowKey;
+    colId: ColId;
+    optimisticValue: unknown;
+    authoritativeValue: unknown;
+    priorValue: unknown;
+  }): void {
+    const { rowKey, colId, optimisticValue, authoritativeValue, priorValue } =
+      args;
+    if (Object.is(authoritativeValue, optimisticValue)) {
+      emitReconcile({
+        kind: "agreed",
+        rowKey,
+        colId,
+        value: authoritativeValue,
+      });
+      return;
+    }
+    emitReconcile({
+      kind: "diverged",
+      rowKey,
+      colId,
+      optimisticValue,
+      authoritativeValue,
+      priorValue,
+    });
+  }
 
   const applyChanges: WritableLevelDataSource["applyChanges"] = (changes) => {
     if (changes.length === 0) return;
@@ -479,7 +659,12 @@ export function restLevelSource<F = unknown>(
 
     Promise.allSettled(
       changes.map((c) =>
-        opts.patchCell!({ rowKey: c.rowKey, colId: c.colId, value: c.value }),
+        opts.patchCell!({
+          rowKey: c.rowKey,
+          colId: c.colId,
+          value: c.value,
+          row: { ...nodes[requireNodeIdx(c.rowKey)].columns },
+        }),
       ),
     ).then((results) => {
       if (disposed) return;
@@ -525,52 +710,19 @@ export function restLevelSource<F = unknown>(
       }
 
       // All live results fulfilled. Process agreed/diverged per cell.
-      let dirty = false;
       for (let i = 0; i < live.length; i++) {
         const r = live[i];
         if (r === null) continue;
         clearCellToken(changes[i].rowKey, changes[i].colId, myTokens[i]);
         if (r.status !== "fulfilled") continue;
-        const res = r.value;
-        if (!res || !("value" in res)) {
-          // Surface contract violations as rejected; the optimistic value
-          // stands so the user does not lose work, and the host gets a
-          // clear error.
-          emitReconcile({
-            kind: "rejected",
-            rowKey: changes[i].rowKey,
-            colId: changes[i].colId,
-            optimisticValue: changes[i].value,
-            reason: "patchCell response missing 'value' field",
-            priorValue: localPriors[i].value,
-          });
-          continue;
-        }
-        const serverValue = (res as PatchCellResponse).value;
-        if (Object.is(serverValue, changes[i].value)) {
-          emitReconcile({
-            kind: "agreed",
-            rowKey: changes[i].rowKey,
-            colId: changes[i].colId,
-            value: serverValue,
-          });
-          continue;
-        }
-        const idx = findNodeIdx(changes[i].rowKey);
-        if (idx >= 0) {
-          setNodeCell(idx, changes[i].colId, serverValue);
-          dirty = true;
-        }
-        emitReconcile({
-          kind: "diverged",
+        applyPatchCellResponse({
+          res: r.value,
           rowKey: changes[i].rowKey,
           colId: changes[i].colId,
           optimisticValue: changes[i].value,
-          authoritativeValue: serverValue,
           priorValue: localPriors[i].value,
         });
       }
-      if (dirty) emit();
     });
   };
 

@@ -1,0 +1,414 @@
+import { describe, expect, it, vi } from "vitest";
+import { isValidElement } from "react";
+import type { Row, TableSchema } from "@sapporta/shared/contracts";
+import type { GridRuntime, RestEndpointFactory } from "@/grid";
+import { ExpandCell } from "@/grid/react/cells/ExpandCell";
+import { preset } from "@/column-preset";
+import { buildTGridRuntimeConfig } from "./tgrid-runtime-config";
+import type { TableRowsClient } from "./tgrid-level-config";
+import type { TGridFilter } from "./tgrid-filter";
+import { createTGridColumnMapper } from "./tgrid-column-mapper";
+import type { TGridLookupResolver } from "./tgrid-lookup-resolver";
+import { createTGridColumnsBuilder } from "./tgrid-column-spec";
+import type { TGridSessionContext } from "./tgrid-cell-context";
+import type { TableLookupRegistry } from "@/table/lookup/table-lookup-registry";
+
+type OrderRow = { id: number; customer: string; internal?: string };
+type LineRow = {
+  id: number;
+  order_id: number;
+  line_no: number;
+  sku: string;
+  cost: number;
+};
+type AllocationRow = { id: number; line_id: number; warehouse: string };
+
+type RowsByLevel = {
+  orders: OrderRow;
+  "orders.lines": LineRow;
+  "orders.lines.allocations": AllocationRow;
+};
+
+describe("buildTGridRuntimeConfig", () => {
+  const orderSchema: TableSchema = {
+    name: "orders",
+    label: "Orders",
+    immutable: false,
+    columns: [
+      { name: "id", primary: true, kind: "number" },
+      { name: "customer", kind: "text" },
+      { name: "internal", kind: "text", visuallyHidden: true },
+    ],
+    children: [],
+  };
+
+  const lineSchema: TableSchema = {
+    name: "lines",
+    label: "Lines",
+    immutable: false,
+    columns: [
+      { name: "id", primary: true, kind: "number" },
+      { name: "order_id", kind: "number" },
+      { name: "line_no", kind: "number" },
+      { name: "sku", kind: "text" },
+      { name: "cost", kind: "number" },
+    ],
+    children: [],
+  };
+
+  const allocationSchema: TableSchema = {
+    name: "allocations",
+    label: "Allocations",
+    immutable: true,
+    columns: [
+      { name: "id", primary: true, kind: "number" },
+      { name: "line_id", kind: "number" },
+      { name: "warehouse", kind: "text" },
+    ],
+    children: [],
+  };
+
+  function build(rowsClient?: Partial<TableRowsClient>) {
+    const lookupResolver: TGridLookupResolver = {
+      bundleFor: () => undefined,
+    };
+    const lineColumns = createTGridColumnsBuilder<
+      RowsByLevel,
+      unknown,
+      "orders.lines"
+    >("orders.lines");
+    const allocationColumns = createTGridColumnsBuilder<
+      RowsByLevel,
+      unknown,
+      "orders.lines.allocations"
+    >("orders.lines.allocations");
+    const client = {
+      fetch: vi.fn(),
+      create: vi.fn(),
+      update: vi.fn(),
+      remove: vi.fn(),
+      ...rowsClient,
+    } as TableRowsClient;
+
+    return buildTGridRuntimeConfig<RowsByLevel>({
+      rootLevel: "orders",
+      levels: {
+        orders: {
+          table: orderSchema,
+          childLevels: ["orders.lines"],
+          query: { owner: "host" },
+          rowsClient: client,
+        },
+        "orders.lines": {
+          table: lineSchema,
+          parent: {
+            level: "orders",
+            foreignKey: "order_id",
+            defaultSort: "line_no",
+          },
+          childLevels: ["orders.lines.allocations"],
+          query: { owner: "source", pageSize: 10 },
+          rowsClient: client,
+          columns: [lineColumns.table("line_no"), lineColumns.table("sku")],
+        },
+        "orders.lines.allocations": {
+          table: allocationSchema,
+          parent: {
+            level: "orders.lines",
+            foreignKey: "line_id",
+            defaultSort: "-warehouse",
+          },
+          childLevels: [],
+          query: { owner: "source", pageSize: 10 },
+          rowsClient: client,
+          columns: [allocationColumns.table("warehouse")],
+        },
+      },
+      columnMapper: createTGridColumnMapper(lookupResolver),
+      hostQueryState: () => ({
+        page: 2,
+        pageSize: 25,
+        sort: [{ colId: "customer", direction: "asc" }],
+        filters: [],
+        search: "acme",
+      }),
+    });
+  }
+
+  it("emits stable semantic levels with child topology and table metadata", () => {
+    const config = build();
+
+    expect(config.gridSchema.rootLevel).toBe("orders");
+    expect(Object.keys(config.gridSchema.levels)).toEqual([
+      "orders",
+      "orders.lines",
+      "orders.lines.allocations",
+    ]);
+    expect(config.gridSchema.levels.orders.childLevels).toEqual([
+      "orders.lines",
+    ]);
+    expect(config.gridSchema.levels["orders.lines"].childLevels).toEqual([
+      "orders.lines.allocations",
+    ]);
+    expect(config.levelInfoById["orders.lines"]).toMatchObject({
+      levelId: "orders.lines",
+      tableName: "lines",
+      parent: { parentLevelId: "orders", foreignKey: "order_id" },
+    });
+  });
+
+  it("uses each table primary key as row identity", () => {
+    const config = build();
+    const rootKey = config.gridSchema.levels.orders.options.rowKey!;
+    const childKey = config.gridSchema.levels["orders.lines"].options.rowKey!;
+
+    expect(rootKey({ levelName: "orders", columns: { id: 7 } }, 0)).toBe("7");
+    expect(
+      childKey({ levelName: "orders.lines", columns: { id: 42 } }, 0),
+    ).toBe("42");
+  });
+
+  it("uses level-scoped columns instead of synthesizing from table children", () => {
+    const config = build();
+
+    expect(config.gridSchema.levels.orders.columns.map((c) => c.id)).toEqual([
+      "id",
+      "customer",
+    ]);
+    expect(
+      config.gridSchema.levels["orders.lines"].columns.map((c) => c.id),
+    ).toEqual(["line_no", "sku"]);
+    expect(
+      config.gridSchema.levels["orders.lines.allocations"].columns.map(
+        (c) => c.id,
+      ),
+    ).toEqual(["warehouse"]);
+  });
+
+  it("builds emitted columns through column-preset constructors", () => {
+    const config = build();
+
+    for (const level of Object.values(config.gridSchema.levels)) {
+      for (const column of level.columns) {
+        expect(preset(column)).toBeDefined();
+      }
+    }
+  });
+
+  it("wraps the first visible column of expandable levels with ExpandCell", () => {
+    const config = build();
+    const col = config.gridSchema.levels.orders.columns[0];
+    const rendered = col.renderCell?.({
+      value: 1,
+      column: col,
+      path: "orders" as never,
+      row: {
+        kind: "data",
+        id: "orders#1" as never,
+        columns: { id: 1 },
+        hasChildren: false,
+        source: { levelName: "orders", columns: { id: 1 } },
+      },
+    });
+
+    expect(isValidElement(rendered)).toBe(true);
+    expect(isValidElement(rendered) ? rendered.type : null).toBe(ExpandCell);
+  });
+
+  it("child endpoint applies the parent FK filter and default sort", async () => {
+    const fetch = vi.fn(async () => ({
+      data: [{ id: 10, order_id: 7, line_no: 1, sku: "A" }],
+      meta: { total: 1, page: 1, limit: 10, pages: 1 },
+    }));
+    const config = build({ fetch });
+    const endpoint = (
+      config.endpointFactoriesByLevel[
+        "orders.lines"
+      ] as RestEndpointFactory<TGridFilter>
+    )({
+      ancestors: [{ levelName: "orders", rowKey: "7" as never }],
+    });
+
+    await endpoint.fetchPage(endpoint.query!());
+
+    expect(fetch).toHaveBeenCalledWith({
+      tableName: "lines",
+      page: 1,
+      limit: 10,
+      sort: [{ colId: "line_no", direction: "asc" }],
+      filters: [
+        expect.objectContaining({
+          column: "order_id",
+          op: "eq",
+          value: "7",
+        }),
+      ],
+      search: undefined,
+    });
+  });
+
+  it("source-owned endpoints honor initialPage", async () => {
+    const fetch = vi.fn(async () => ({
+      data: [],
+      meta: { total: 0, page: 3, limit: 10, pages: 0 },
+    }));
+    const lookupResolver: TGridLookupResolver = {
+      bundleFor: () => undefined,
+    };
+    const config = buildTGridRuntimeConfig<RowsByLevel>({
+      rootLevel: "orders",
+      levels: {
+        orders: {
+          table: orderSchema,
+          childLevels: ["orders.lines"],
+        },
+        "orders.lines": {
+          table: lineSchema,
+          parent: { level: "orders", foreignKey: "order_id" },
+          childLevels: [],
+          query: { owner: "source", pageSize: 10, initialPage: 3 },
+          rowsClient: {
+            fetch,
+            create: vi.fn(),
+            update: vi.fn(),
+            remove: vi.fn(),
+          } as TableRowsClient,
+        },
+        "orders.lines.allocations": {
+          table: allocationSchema,
+          parent: { level: "orders.lines", foreignKey: "line_id" },
+          childLevels: [],
+        },
+      },
+      columnMapper: createTGridColumnMapper(lookupResolver),
+      hostQueryState: () => ({
+        page: 1,
+        pageSize: 25,
+        sort: [],
+        filters: [],
+        search: null,
+      }),
+    });
+
+    const endpoint = config.endpointFactoriesByLevel["orders.lines"]({
+      ancestors: [{ levelName: "orders", rowKey: "7" as never }],
+    });
+
+    await endpoint.fetchPage(endpoint.query!());
+
+    expect(fetch).toHaveBeenCalledWith(
+      expect.objectContaining({ page: 3, limit: 10 }),
+    );
+  });
+
+  it("child insert seeds the parent FK at the adapter boundary", async () => {
+    const create = vi.fn(async (_table: string, data: Row) => ({
+      data: { id: 99, ...data },
+    }));
+    const config = build({ create });
+    const endpoint = config.endpointFactoriesByLevel["orders.lines"]({
+      ancestors: [{ levelName: "orders", rowKey: "7" as never }],
+    });
+
+    const inserted = await endpoint.insertNode!({
+      node: { levelName: "orders.lines", columns: { sku: "A" } },
+    });
+
+    expect(create).toHaveBeenCalledWith("lines", {
+      sku: "A",
+      order_id: "7",
+    });
+    expect(inserted).toEqual({
+      levelName: "orders.lines",
+      columns: { id: 99, sku: "A", order_id: "7" },
+    });
+  });
+
+  it("uses typed column specs for ordering, client columns, and custom cell writes", async () => {
+    type Services = { suffix: string };
+    const columns = createTGridColumnsBuilder<RowsByLevel, Services, "orders">(
+      "orders",
+    );
+    const session: TGridSessionContext<RowsByLevel, Services> = {
+      rootLevel: "orders",
+      runtime: {} as unknown as GridRuntime,
+      appServices: { suffix: "saved" },
+      lookupRegistry: {} as unknown as TableLookupRegistry,
+      levels: {} as unknown as TGridSessionContext<RowsByLevel, Services>["levels"],
+    };
+    const lookupResolver: TGridLookupResolver = {
+      bundleFor: () => undefined,
+    };
+    const config = buildTGridRuntimeConfig<RowsByLevel, Services>({
+      rootLevel: "orders",
+      levels: {
+        orders: {
+          table: orderSchema,
+          childLevels: [],
+          query: { owner: "host" },
+          columns: [
+            columns.table("customer", {
+              header: "Customer Name",
+              saveCellValue: async (ctx) => ({
+                kind: "row",
+                row: {
+                  ...ctx.row,
+                  customer: `${ctx.value}-${ctx.appServices.suffix}`,
+                },
+              }),
+            }),
+            columns.client("status", {
+              header: "Status",
+              readsRowFields: ["customer"],
+              renderCell: () => "ok",
+            }),
+            columns.remainingTable({ exclude: ["id"] }),
+          ],
+        },
+        "orders.lines": {
+          table: lineSchema,
+          parent: { level: "orders", foreignKey: "order_id" },
+          childLevels: [],
+        },
+        "orders.lines.allocations": {
+          table: allocationSchema,
+          parent: { level: "orders.lines", foreignKey: "line_id" },
+          childLevels: [],
+        },
+      },
+      columnMapper: createTGridColumnMapper(lookupResolver),
+      sessionContext: () => session,
+      hostQueryState: () => ({
+        page: 1,
+        pageSize: 25,
+        sort: [],
+        filters: [],
+        search: null,
+      }),
+    });
+
+    expect(config.gridSchema.levels.orders.columns.map((c) => c.id)).toEqual([
+      "customer",
+      "status",
+    ]);
+    expect(config.gridSchema.levels.orders.columns[0].name).toBe(
+      "Customer Name",
+    );
+
+    const endpoint = config.endpointFactoriesByLevel.orders({ ancestors: [] });
+    const result = await endpoint.patchCell!({
+      rowKey: "1" as never,
+      colId: "customer" as never,
+      value: "ACME",
+      row: { id: 1, customer: "Old" },
+    });
+
+    expect(result).toEqual({
+      kind: "row",
+      node: {
+        levelName: "orders",
+        columns: { id: 1, customer: "ACME-saved" },
+      },
+    });
+  });
+});

@@ -1,13 +1,13 @@
 import { getNavigate } from "@/app/router/router-bridge";
-import { createRow } from "@/table/api/rows";
-import { refetchTable } from "@/table/state/table-grid-registry";
+import { createTableRow } from "@/table/api/rows";
+import { reloadTGridRows } from "@/table/state/tgrid-session-registry";
 
 export async function createRecord(
   tableName: string,
   data: Record<string, unknown>,
 ) {
-  const res = await createRow(tableName, data);
-  refetchTable(tableName);
+  const res = await createTableRow(tableName, data);
+  reloadTGridRows(tableName);
   try {
     getNavigate()(`/tables/${tableName}`, { replace: true });
   } catch {

@@ -10,9 +10,10 @@ import {
   type RuntimeLevelDataSource,
   type TreeNode,
 } from "@/grid";
-import type { TableHandle } from "@/table/state/table-state";
+import type { TGridSession } from "@/table/state/tgrid-session";
 import type { TableForeignKeyLookupBundle } from "./table-lookup-registry";
-import { startTableLookupLoading } from "./table-lookup-loading";
+import { startTGridLookupLoading } from "./tgrid-lookup-loading";
+import { createTGridColumnMapper } from "@/table/grid-adapter/tgrid-column-mapper";
 
 const ordersPath = rootPath("orders");
 const linesPath = childPath(ordersPath, "42", "orders.lines");
@@ -115,7 +116,7 @@ function makeBundle(args: {
   };
 }
 
-describe("startTableLookupLoading", () => {
+describe("startTGridLookupLoading", () => {
   it("loads FK labels for every registered table path", () => {
     const ordersLevel = makeLevel({
       name: "orders",
@@ -169,10 +170,11 @@ describe("startTableLookupLoading", () => {
         path === ordersPath ? ordersLevel : linesLevel,
       subscribeRegistry: () => () => {},
     } as unknown as GridRuntime;
-    const handle = {
+    const session = {
       runtime,
       lookupRegistry,
-      levelMetaById: {
+      columnMapper: createTGridColumnMapper({ bundleFor: vi.fn() }),
+      levelInfoById: {
         orders: { levelId: "orders", tableName: "orders", childSchemas: [] },
         "orders.lines": {
           levelId: "orders.lines",
@@ -181,9 +183,9 @@ describe("startTableLookupLoading", () => {
           childSchemas: [],
         },
       },
-    } as unknown as TableHandle;
+    } as unknown as TGridSession;
 
-    const stop = startTableLookupLoading(handle);
+    const stop = startTGridLookupLoading(session);
 
     expect(customerLoad).toHaveBeenCalledWith(["2", "3"]);
     expect(productLoad).toHaveBeenCalledWith(["5", "6"]);
