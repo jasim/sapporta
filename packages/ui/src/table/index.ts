@@ -21,7 +21,10 @@ export {
 } from "./form/record-form-store";
 export * from "./grid-adapter/tgrid-filter";
 export * from "./grid-adapter/tgrid-level-config";
-export * from "./grid-adapter/tgrid-runtime-config";
+export {
+  defineTGrid,
+  type TGridDefinition,
+} from "./grid-adapter/tgrid-runtime-config";
 export * from "./grid-adapter/tgrid-column-mapper";
 export * from "./grid-adapter/tgrid-lookup-resolver";
 export * from "./grid-adapter/tgrid-cell-context";
@@ -47,6 +50,7 @@ export * from "./state/tgrid-level-query-state";
 export {
   createTGridSession,
   type CreateTGridSessionArgs,
+  type TGridHostQuerySeeds,
   type TGridSession,
 } from "./state/tgrid-session";
 export {

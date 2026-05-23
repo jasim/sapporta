@@ -18,7 +18,10 @@ import {
   type NewFilterCondition,
 } from "@sapporta/shared/filter";
 import { sortOrderEqual } from "@/grid/sort";
-import { buildTGridRuntimeConfig } from "@/table/grid-adapter/tgrid-runtime-config";
+import {
+  compileTGridRuntimeConfig,
+  type TGridDefinition,
+} from "@/table/grid-adapter/tgrid-runtime-config";
 import type { TGridFilter } from "@/table/grid-adapter/tgrid-filter";
 import type {
   TGridLevelConfig,
@@ -61,16 +64,36 @@ export type CreateTGridSessionArgs<
   RowsByLevel extends TGridRowsByLevel = TGridRowsByLevel,
   AppServices = unknown,
 > = {
-  rootLevel: TGridLevelId<RowsByLevel>;
-  levels: TGridLevelsConfigMap<RowsByLevel, AppServices>;
-  appServices?: AppServices;
-  onUrlChange?: (state: {
+  services?: AppServices;
+  onQueryUrlChange?: (state: {
     level: TGridLevelId<RowsByLevel>;
     page: number;
     sort: SortDescriptor[];
     filters: FilterCondition[];
     search: string | null;
   }) => void;
+  hostQuerySeeds?: Partial<
+    Record<TGridLevelId<RowsByLevel>, TGridHostQuerySeeds>
+  >;
+};
+
+export type TGridHostQuerySeeds = {
+  page?: number;
+  sort?: readonly SortDescriptor[];
+  filters?: readonly FilterCondition[];
+  search?: string | null;
+};
+
+export type TGridLiveInputs<
+  RowsByLevel extends TGridRowsByLevel = TGridRowsByLevel,
+  AppServices = unknown,
+> = CreateTGridSessionArgs<RowsByLevel, AppServices>;
+
+export type TGridLiveInputsRef<
+  RowsByLevel extends TGridRowsByLevel = TGridRowsByLevel,
+  AppServices = unknown,
+> = {
+  current: TGridLiveInputs<RowsByLevel, AppServices>;
 };
 
 // Public session contract returned to app code.
@@ -110,9 +133,20 @@ export function createTGridSession<
   RowsByLevel extends TGridRowsByLevel = TGridRowsByLevel,
   AppServices = unknown,
 >(
-  args: CreateTGridSessionArgs<RowsByLevel, AppServices>,
+  definition: TGridDefinition<RowsByLevel, AppServices>,
+  args: CreateTGridSessionArgs<RowsByLevel, AppServices> = {},
 ): TGridSession<RowsByLevel, AppServices> {
-  return new DefaultTGridSession(args);
+  return createTGridSessionWithRef(definition, { current: args });
+}
+
+export function createTGridSessionWithRef<
+  RowsByLevel extends TGridRowsByLevel = TGridRowsByLevel,
+  AppServices = unknown,
+>(
+  definition: TGridDefinition<RowsByLevel, AppServices>,
+  liveInputsRef: TGridLiveInputsRef<RowsByLevel, AppServices>,
+): TGridSession<RowsByLevel, AppServices> {
+  return new DefaultTGridSession(definition, liveInputsRef);
 }
 
 class DefaultTGridSession<
@@ -121,11 +155,7 @@ class DefaultTGridSession<
 > implements TGridSession<RowsByLevel, AppServices> {
   readonly rootLevel: TGridLevelId<RowsByLevel>;
   readonly rootTableName: string;
-  readonly appServices: AppServices;
-  private readonly onUrlChange: CreateTGridSessionArgs<
-    RowsByLevel,
-    AppServices
-  >["onUrlChange"];
+  private readonly liveInputsRef: TGridLiveInputsRef<RowsByLevel, AppServices>;
   private readonly rootGridPath: GridPath;
   private readonly queryStoresByLevel = new Map<
     TGridLevelId<RowsByLevel>,
@@ -140,11 +170,13 @@ class DefaultTGridSession<
   readonly levelInfoById: Record<TGridLevelId<RowsByLevel>, TGridLevelInfo>;
   readonly levels: TGridSessionContext<RowsByLevel, AppServices>["levels"];
 
-  constructor(args: CreateTGridSessionArgs<RowsByLevel, AppServices>) {
-    this.rootLevel = args.rootLevel;
-    this.rootTableName = args.levels[args.rootLevel].table.name;
-    this.appServices = args.appServices as AppServices;
-    this.onUrlChange = args.onUrlChange;
+  constructor(
+    definition: TGridDefinition<RowsByLevel, AppServices>,
+    liveInputsRef: TGridLiveInputsRef<RowsByLevel, AppServices>,
+  ) {
+    this.liveInputsRef = liveInputsRef;
+    this.rootLevel = definition.rootLevel;
+    this.rootTableName = definition.levels[definition.rootLevel].table.name;
     this.lookupRegistry = createTableLookupRegistry();
 
     const lookupResolver = createTGridLookupResolver(this.lookupRegistry);
@@ -152,10 +184,10 @@ class DefaultTGridSession<
 
     // Only levels that own host query state get local stores.
     // This is usually root + explicitly host-owned descendants.
-    for (const [levelId, level] of Object.entries(args.levels) as Array<
+    for (const [levelId, level] of Object.entries(definition.levels) as Array<
       [TGridLevelId<RowsByLevel>, TGridLevelConfig<RowsByLevel, AppServices>]
     >) {
-      if (((level.query?.owner ?? (levelId === args.rootLevel ? "host" : "source")) === "host")) {
+      if (((level.query?.owner ?? (levelId === definition.rootLevel ? "host" : "source")) === "host")) {
         this.queryStoresByLevel.set(
           levelId,
           this.createQueryStore(levelId, level),
@@ -163,9 +195,9 @@ class DefaultTGridSession<
       }
     }
 
-    const runtimeConfig = buildTGridRuntimeConfig({
-      rootLevel: args.rootLevel,
-      levels: args.levels,
+    const runtimeConfig = compileTGridRuntimeConfig({
+      rootLevel: definition.rootLevel,
+      levels: definition.levels,
       columnMapper: this.columnMapper,
       hostQueryState: (levelId) => {
         const state = this.queryStoresByLevel.get(levelId)?.getState();
@@ -209,10 +241,14 @@ class DefaultTGridSession<
       TGridLevelId<RowsByLevel>,
       TGridLevelInfo
     >;
-    this.levels = this.createRuntimeLevels(args.levels);
-    this.queryStore = this.getQueryStore(args.rootLevel) as StoreApi<
+    this.levels = this.createRuntimeLevels(definition.levels);
+    this.queryStore = this.getQueryStore(definition.rootLevel) as StoreApi<
       TGridLevelQueryState<RowsByLevel[TGridLevelId<RowsByLevel>]>
     >;
+  }
+
+  get appServices(): AppServices {
+    return this.liveInputsRef.current.services as AppServices;
   }
 
   getVisibleRows<LevelId extends TGridLevelId<RowsByLevel>>(
@@ -335,10 +371,10 @@ class DefaultTGridSession<
 
     return createStore<TGridLevelQueryState<TGridTableRow>>()((set, get) => ({
       level: levelId,
-      sort: [...(query.initialSort ?? [])],
-      filters: normalizeFilters([...(query.initialFilters ?? [])]),
-      search: query.initialSearch ?? null,
-      page: query.initialPage ?? 1,
+      sort: [...(this.hostQuerySeed(levelId)?.sort ?? [])],
+      filters: normalizeFilters([...(this.hostQuerySeed(levelId)?.filters ?? [])]),
+      search: this.hostQuerySeed(levelId)?.search ?? null,
+      page: this.hostQuerySeed(levelId)?.page ?? 1,
       pageSize,
       errorBanner: null,
 
@@ -440,15 +476,22 @@ class DefaultTGridSession<
   private pushUrl(levelId: TGridLevelId<RowsByLevel>): void {
     const runtimeLevel = this.levels[levelId];
     const syncEnabled = runtimeLevel.config.query?.urlSync ?? levelId === this.rootLevel;
-    if (!syncEnabled || !this.onUrlChange) return;
+    const onQueryUrlChange = this.liveInputsRef.current.onQueryUrlChange;
+    if (!syncEnabled || !onQueryUrlChange) return;
     const s = this.getQueryStore(levelId).getState();
-    this.onUrlChange({
+    onQueryUrlChange({
       level: levelId,
       page: s.page,
       sort: s.sort,
       filters: s.filters,
       search: s.search,
     });
+  }
+
+  private hostQuerySeed(
+    levelId: TGridLevelId<RowsByLevel>,
+  ): TGridHostQuerySeeds | undefined {
+    return this.liveInputsRef.current.hostQuerySeeds?.[levelId];
   }
 
   private getQueryStore<LevelId extends TGridLevelId<RowsByLevel>>(

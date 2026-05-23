@@ -15,6 +15,7 @@ import {
 } from "@/table/grid-adapter/tgrid-cell-context";
 import type { TGridRowsByLevel } from "@/table/grid-adapter/tgrid-types";
 import type { TGridLevelQueryState } from "@/table/state/tgrid-level-query-state";
+import type { TGridSession } from "@/table/state/tgrid-session";
 
 type TGridRenderableSessionContext = {
   rootLevel: string;
@@ -27,13 +28,16 @@ type TGridRenderableSessionContext = {
   >["lookupRegistry"];
 };
 
-export function TGrid({
-  runtime,
-  sessionContext,
+export function TGrid<
+  RowsByLevel extends TGridRowsByLevel,
+  AppServices = unknown,
+>({
+  session,
 }: {
-  runtime: GridRuntime;
-  sessionContext: TGridRenderableSessionContext;
+  session: TGridSession<RowsByLevel, AppServices>;
 }) {
+  const runtime = session.runtime;
+  const sessionContext = session as TGridRenderableSessionContext;
   const root = rootPath(runtime.schema.rootLevel);
   const chrome = useMemo(
     () =>

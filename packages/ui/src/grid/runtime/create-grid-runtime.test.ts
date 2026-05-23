@@ -165,6 +165,33 @@ describe("GridRuntime", () => {
     expect(c1).toBe(c2);
   });
 
+  it("guards public state reads after disposal", () => {
+    const rt = createGridRuntime({
+      schema: tableSchema,
+      dataSource: tableDataSource(),
+    });
+
+    rt.dispose();
+    rt.dispose();
+
+    expect(() => rt.sourceFor(rowsRoot)).toThrow("GridRuntime has been disposed.");
+    expect(() => rt.displayedRowsFor(rowsRoot)).toThrow(
+      "GridRuntime has been disposed.",
+    );
+  });
+
+  it("distinguishes missing child sources from missing root sources", () => {
+    const rt = createGridRuntime({
+      schema: reportSchema,
+      dataSource: reportDataSource(),
+    });
+    const unresolvedChildPath = childPath(reportRoot, "Fruit" as RowKey, "items");
+
+    expect(() => rt.sourceFor(unresolvedChildPath)).toThrow(
+      'GridRuntime.sourceFor: no source has been resolved for path "cat.Fruit.items". Expand the parent row first.',
+    );
+  });
+
   it("writeCell flows through the source and emits mutationCommitted", () => {
     const mutation = vi.fn();
     const rt = createGridRuntime({

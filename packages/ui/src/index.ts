@@ -52,14 +52,19 @@ export {
   type RecordFormValues,
 } from "@/table/form/record-form-store";
 export {
-  bindTGridTypes,
-  buildTGridRuntimeConfig,
+  defineTGrid,
+  applySchemaOverrides,
+  createColumnsBuilder,
   createTGridColumnMapper,
   createTGridColumnsBuilder,
   createTGridSession,
+  defineTableSchema,
   buildTableSearchParams,
+  buildSessionLevelsFromTableGridGraph,
+  buildTableGridGraphFromSchema,
   Pagination,
   parseTableSearchParams,
+  startTGridLookupLoading,
   TableToolbar,
   TGrid,
   tableFilteredByUrl,
@@ -73,6 +78,7 @@ export {
   type PaginationProps,
   type PaginationRangeItem,
   type TableUrlState,
+  type TableRowsClient,
   type TGridCellContext,
   type TGridCellEditorContext,
   type TGridCellWriteContext,
@@ -84,7 +90,10 @@ export {
   type TGridLevelConfig,
   type TGridLevelQueryConfig,
   type TGridLevelQueryState,
+  type TGridDefinition,
+  type TGridHostQuerySeeds,
   type TGridSession,
+  type TGridSessionLevelConfigFromGraph,
 } from "@/table";
 
 // Grid primitives

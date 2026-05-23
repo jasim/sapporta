@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { TableSchema } from "@sapporta/shared/contracts";
 import { eqCondition } from "@sapporta/shared/filter";
 import { createTGridSession } from "./tgrid-session";
+import { defineTGrid } from "@/table/grid-adapter/tgrid-runtime-config";
 
 type OrderRow = {
   id: number;
@@ -27,7 +28,7 @@ const ordersTable: TableSchema = {
 
 describe("TGridSession", () => {
   it("builds table page links from host query state", () => {
-    const session = createTGridSession<RowsByLevel>({
+    const definition = defineTGrid<RowsByLevel>({
       rootLevel: "orders",
       levels: {
         orders: {
@@ -35,10 +36,16 @@ describe("TGridSession", () => {
           childLevels: [],
           query: {
             owner: "host",
-            initialSort: [{ colId: "customer", direction: "asc" }],
-            initialFilters: [eqCondition("status", "open")],
-            initialSearch: "acme",
           },
+        },
+      },
+    });
+    const session = createTGridSession<RowsByLevel>(definition, {
+      hostQuerySeeds: {
+        orders: {
+          sort: [{ colId: "customer", direction: "asc" }],
+          filters: [eqCondition("status", "open")],
+          search: "acme",
         },
       },
     });
