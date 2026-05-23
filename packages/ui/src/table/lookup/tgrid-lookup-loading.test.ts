@@ -83,7 +83,6 @@ function makeSource(nodes: TreeNode[]) {
     setFilter: () => {},
     setPage: () => {},
     refetch: () => {},
-    dispose: () => {},
     onReconcile: () => () => {},
   };
   return { source, unsubscribe };
