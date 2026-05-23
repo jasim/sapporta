@@ -46,12 +46,30 @@ import type {
   TGridLevelsConfigMap,
 } from "./tgrid-level-config";
 
+export type TGridDefinition<
+  RowsByLevel extends TGridRowsByLevel = TGridRowsByLevel,
+  AppServices = unknown,
+> = {
+  readonly rootLevel: TGridLevelId<RowsByLevel>;
+  readonly levels: TGridLevelsConfigMap<RowsByLevel, AppServices>;
+};
+
+export function defineTGrid<
+  RowsByLevel extends TGridRowsByLevel = TGridRowsByLevel,
+  AppServices = unknown,
+>(
+  definition: TGridDefinition<RowsByLevel, AppServices>,
+): TGridDefinition<RowsByLevel, AppServices> {
+  validateTGridDefinition(definition.rootLevel, definition.levels, "defineTGrid");
+  return definition;
+}
+
 // Final adapter from typed level contracts to base-grid runtime inputs.
 // After this stage the generic runtime sees only `GridSchema`, endpoints, and metadata.
 
 // Input contract used by the session constructor to build runtime assets.
 // Every runtime behavior (queries, sorting, endpoints) is derived from these fields.
-export type BuildTGridRuntimeConfigArgs<
+type CompileTGridRuntimeConfigArgs<
   RowsByLevel extends TGridRowsByLevel = TGridRowsByLevel,
   AppServices = unknown,
 > = {
@@ -66,18 +84,22 @@ export type BuildTGridRuntimeConfigArgs<
 
 // Runtime bundle emitted for one session.
 // Contains grid schema, per-level endpoint factories, and compiled level metadata.
-export type TGridRuntimeConfig<RowsByLevel extends TGridRowsByLevel = TGridRowsByLevel> = {
+export type CompiledTGridRuntimeConfig<
+  RowsByLevel extends TGridRowsByLevel = TGridRowsByLevel,
+> = {
   gridSchema: GridSchema;
   endpointFactoriesByLevel: Record<TGridLevelId<RowsByLevel>, RestEndpointFactory<TGridFilter>>;
   levelInfoById: Record<TGridLevelId<RowsByLevel>, TGridLevelInfo>;
 };
 
-// User-level bridge into runtime construction.
-// This function is the main compile step that turns typed config into grid runtime inputs.
-export function buildTGridRuntimeConfig<
+// Internal session compiler. `defineTGrid` is the public structural API; this
+// function turns one definition plus session resources into live runtime inputs.
+export function compileTGridRuntimeConfig<
   RowsByLevel extends TGridRowsByLevel = TGridRowsByLevel,
   AppServices = unknown,
->(args: BuildTGridRuntimeConfigArgs<RowsByLevel, AppServices>): TGridRuntimeConfig<RowsByLevel> {
+>(
+  args: CompileTGridRuntimeConfigArgs<RowsByLevel, AppServices>,
+): CompiledTGridRuntimeConfig<RowsByLevel> {
   const levels: Record<string, LevelSchema> = {};
   const endpointFactoriesByLevel: Record<
     string,
@@ -86,11 +108,7 @@ export function buildTGridRuntimeConfig<
   const levelInfoById: Record<string, TGridLevelInfo> = {};
 
   const rootLevel = args.rootLevel;
-  if (!args.levels[rootLevel]) {
-    throw new Error(
-      `buildTGridRuntimeConfig: root level '${String(rootLevel)}' was not found in levels`,
-    );
-  }
+  validateTGridDefinition(rootLevel, args.levels, "compileTGridRuntimeConfig");
 
   const entries = Object.entries(args.levels) as Array<
     [
@@ -98,33 +116,6 @@ export function buildTGridRuntimeConfig<
       TGridLevelConfig<RowsByLevel, AppServices, TGridLevelId<RowsByLevel>>,
     ]
   >;
-
-  // Validation pass: make graph consistency errors explicit before any
-  // datasource creation. These checks enforce the invariants used by all callers:
-  //   - rootLevel must exist,
-  //   - non-root levels must declare a parent,
-  //   - parent and child references must resolve.
-  for (const [levelId, config] of entries) {
-    if (config.parent) {
-      if (!(config.parent.level in args.levels)) {
-        throw new Error(
-          `buildTGridRuntimeConfig: level '${String(levelId)}' parent level '${String(config.parent.level)}' was not found`,
-        );
-      }
-    } else if (levelId !== rootLevel) {
-      throw new Error(
-        `buildTGridRuntimeConfig: non-root level '${String(levelId)}' has no parent`,
-      );
-    }
-
-    for (const childLevelId of config.childLevels) {
-      if (!args.levels[childLevelId]) {
-        throw new Error(
-          `buildTGridRuntimeConfig: level '${String(levelId)}' child level '${String(childLevelId)}' was not found`,
-        );
-      }
-    }
-  }
 
   for (const [levelId, config] of entries) {
     const table = config.table;
@@ -218,6 +209,50 @@ export function buildTGridRuntimeConfig<
   };
 }
 
+function validateTGridDefinition<
+  RowsByLevel extends TGridRowsByLevel,
+  AppServices,
+>(
+  rootLevel: TGridLevelId<RowsByLevel>,
+  levels: TGridLevelsConfigMap<RowsByLevel, AppServices>,
+  label: string,
+): void {
+  if (!levels[rootLevel]) {
+    throw new Error(
+      `${label}: root level '${String(rootLevel)}' was not found in levels`,
+    );
+  }
+
+  const entries = Object.entries(levels) as Array<
+    [
+      TGridLevelId<RowsByLevel>,
+      TGridLevelConfig<RowsByLevel, AppServices, TGridLevelId<RowsByLevel>>,
+    ]
+  >;
+
+  for (const [levelId, config] of entries) {
+    if (config.parent) {
+      if (!(config.parent.level in levels)) {
+        throw new Error(
+          `${label}: level '${String(levelId)}' parent level '${String(config.parent.level)}' was not found`,
+        );
+      }
+    } else if (levelId !== rootLevel) {
+      throw new Error(`${label}: non-root level '${String(levelId)}' has no parent`);
+    }
+
+    for (const childLevelId of config.childLevels) {
+      if (!levels[childLevelId]) {
+        throw new Error(
+          `${label}: level '${String(levelId)}' child level '${String(childLevelId)}' was not found`,
+        );
+      }
+    }
+
+    primaryKeyOf(config.table, levelId);
+  }
+}
+
 function resolveColumns<
   RowsByLevel extends TGridRowsByLevel,
   AppServices,
@@ -241,7 +276,7 @@ function primaryKeyOf(
   const pk = table.columns.find((c) => c.primary);
   if (!pk) {
     throw new Error(
-      `buildTGridRuntimeConfig: level '${levelId}' table '${table.name}' has no primary key column`,
+      `compileTGridRuntimeConfig: level '${levelId}' table '${table.name}' has no primary key column`,
     );
   }
   return pk;
@@ -271,7 +306,7 @@ function defaultPageSize(
 
 function missingTGridSessionContext(): never {
   throw new Error(
-    "buildTGridRuntimeConfig: a custom TGrid column requested session context before a session was supplied",
+    "compileTGridRuntimeConfig: a custom TGrid column requested session context before a session was supplied",
   );
 }
 
@@ -331,7 +366,7 @@ function makeEndpointFactory(args: {
         if (saveCellValue) {
           if (!args.sessionContext) {
             throw new Error(
-              `buildTGridRuntimeConfig: custom saveCellValue for '${args.levelId}.${req.colId}' requires a TGrid session context`,
+              `compileTGridRuntimeConfig: custom saveCellValue for '${args.levelId}.${req.colId}' requires a TGrid session context`,
             );
           }
           const session = args.sessionContext();
@@ -402,7 +437,7 @@ function makeQuery(
         const q = args.rowQueryState?.();
         if (!q) {
           throw new Error(
-            `buildTGridRuntimeConfig: no host query state found for level '${args.levelId}'.`,
+            `compileTGridRuntimeConfig: no host query state found for level '${args.levelId}'.`,
           );
         }
         return {
@@ -473,12 +508,12 @@ function parentKeyFor(
   const parent = ancestors[ancestors.length - 1];
   if (!parent) {
     throw new Error(
-      `buildTGridRuntimeConfig: child level '${levelId}' requires a parent ancestor`,
+      `compileTGridRuntimeConfig: child level '${levelId}' requires a parent ancestor`,
     );
   }
   if (parent.levelName !== parentLevelId) {
     throw new Error(
-      `buildTGridRuntimeConfig: child level '${levelId}' expected parent level '${parentLevelId}', got '${parent.levelName}'`,
+      `compileTGridRuntimeConfig: child level '${levelId}' expected parent level '${parentLevelId}', got '${parent.levelName}'`,
     );
   }
   return parent.rowKey;

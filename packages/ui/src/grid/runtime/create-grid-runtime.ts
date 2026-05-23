@@ -56,6 +56,7 @@ import {
   childPath as makeChildPath,
   decomposePath,
   makeRowId,
+  rootPath,
   rowKeyOfRowId,
 } from "../types/identity";
 import type { ColId, Coord, GridPath, RowId, RowKey } from "../types/identity";
@@ -211,7 +212,14 @@ export function createGridRuntime(args: RuntimeArgs): GridRuntime {
   const reconcileUnsubs = new Map<GridPath, () => void>();
   const lastStatusByPath = new Map<GridPath, LevelStatus>();
 
-  const root = schemaTopology.rootLevelName as GridPath;
+  const root = rootPath(schemaTopology.rootLevelName);
+  let disposed = false;
+
+  function assertLive(): void {
+    if (disposed) {
+      throw new Error("GridRuntime has been disposed.");
+    }
+  }
 
   // One displayed-rows store per path that has been rendered or read. The
   // runtime owns these stores because only the runtime can gather the full
@@ -241,6 +249,7 @@ export function createGridRuntime(args: RuntimeArgs): GridRuntime {
   let registeredPathSnapshot: GridPath[] | null = null;
 
   function registeredPaths(): GridPath[] {
+    assertLive();
     if (!registeredPathSnapshot) {
       registeredPathSnapshot = Array.from(sources.keys());
     }
@@ -248,6 +257,7 @@ export function createGridRuntime(args: RuntimeArgs): GridRuntime {
   }
 
   function subscribeRegistry(fn: () => void): () => void {
+    assertLive();
     registryListeners.add(fn);
     return () => {
       registryListeners.delete(fn);
@@ -344,16 +354,21 @@ export function createGridRuntime(args: RuntimeArgs): GridRuntime {
   }
 
   function snapshotFor(path: GridPath): LevelSnapshot {
+    assertLive();
     const src = sources.get(path);
     if (!src) {
+      const root = rootPath(schemaTopology.rootLevelName);
       throw new Error(
-        `GridRuntime.snapshotFor: no source has been resolved for path "${path}". Expand the parent row first or invoke runtime.sourceFor on a known path.`,
+        path === root
+          ? `GridRuntime.snapshotFor: root source for "${path}" is missing. The runtime was initialized inconsistently or has been disposed.`
+          : `GridRuntime.snapshotFor: no source has been resolved for path "${path}". Expand the parent row first or invoke runtime.sourceFor on a known path.`,
       );
     }
     return src.snapshot();
   }
 
   function schemaForPath(path: GridPath): LevelSchema {
+    assertLive();
     let s = schemaCache.get(path);
     if (s) return s;
     s = schemaTopology.levelOf(levelNameOf(path));
@@ -365,6 +380,7 @@ export function createGridRuntime(args: RuntimeArgs): GridRuntime {
     parentPath: GridPath,
     rowId: RowId,
   ): GridPath[] {
+    assertLive();
     const parentLevelName = levelNameOf(parentPath);
     const childLevelNames = schemaTopology.childLevelsOf(parentLevelName);
     if (childLevelNames.length === 0) return [];
@@ -415,6 +431,7 @@ export function createGridRuntime(args: RuntimeArgs): GridRuntime {
   // interaction, navigation, and tests. React body rendering uses the sequence
   // surface below because it must not wake on cell-content edits.
   function displayedRowsFor(path: GridPath): DisplayedRows {
+    assertLive();
     return displayedRowsStoreFor(path).getDisplayedRows();
   }
 
@@ -422,10 +439,12 @@ export function createGridRuntime(args: RuntimeArgs): GridRuntime {
   // shells; cell content stays behind `displayedRowFor` so a cell edit is local
   // to the affected row subscriber.
   function displayedRowSequenceFor(path: GridPath): DisplayedRowSequence {
+    assertLive();
     return displayedRowsStoreFor(path).getDisplayedRowSequence();
   }
 
   function displayedRowFor(path: GridPath, rowId: RowId): LevelRow | undefined {
+    assertLive();
     return displayedRowsStoreFor(path).getDisplayedRow(rowId);
   }
 
@@ -433,6 +452,7 @@ export function createGridRuntime(args: RuntimeArgs): GridRuntime {
     path: GridPath,
     fn: () => void,
   ): () => void {
+    assertLive();
     return displayedRowsStoreFor(path).subscribeDisplayedRowSequence(fn);
   }
 
@@ -441,6 +461,7 @@ export function createGridRuntime(args: RuntimeArgs): GridRuntime {
     rowId: RowId,
     fn: () => void,
   ): () => void {
+    assertLive();
     return displayedRowsStoreFor(path).subscribeDisplayedRow(rowId, fn);
   }
 
@@ -448,6 +469,7 @@ export function createGridRuntime(args: RuntimeArgs): GridRuntime {
     path: GridPath,
     reason: DisplayedRowsInvalidationReason,
   ): void {
+    assertLive();
     const store = displayedRowsStoresByPath.get(path);
     if (!store) {
       return;
@@ -456,10 +478,14 @@ export function createGridRuntime(args: RuntimeArgs): GridRuntime {
   }
 
   function sourceFor(path: GridPath): RuntimeLevelDataSource {
+    assertLive();
     const src = sources.get(path);
     if (!src) {
+      const root = rootPath(schemaTopology.rootLevelName);
       throw new Error(
-        `GridRuntime.sourceFor: no source has been resolved for path "${path}". Expand the parent row first.`,
+        path === root
+          ? `GridRuntime.sourceFor: root source for "${path}" is missing. The runtime was initialized inconsistently or has been disposed.`
+          : `GridRuntime.sourceFor: no source has been resolved for path "${path}". Expand the parent row first.`,
       );
     }
     let view = sourceViews.get(path);
@@ -470,6 +496,7 @@ export function createGridRuntime(args: RuntimeArgs): GridRuntime {
   }
 
   function requireWritable(path: GridPath): WritableLevelDataSource {
+    assertLive();
     const src = sources.get(path);
     if (!src) {
       throw new Error(
@@ -641,10 +668,13 @@ export function createGridRuntime(args: RuntimeArgs): GridRuntime {
   }
 
   function controllerFor(path: GridPath): GridControllerPublic {
+    assertLive();
     return controllerFocusPortFor(path);
   }
 
   function dispose() {
+    if (disposed) return;
+    disposed = true;
     for (const u of controllerUnsubs) u();
     controllerUnsubs.length = 0;
     for (const u of sourceUnsubs.values()) u();

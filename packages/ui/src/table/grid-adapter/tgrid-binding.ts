@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useStore } from "zustand";
 import type { StoreApi } from "zustand/vanilla";
 import type {
@@ -6,37 +6,23 @@ import type {
   TableSchema,
 } from "@sapporta/shared/contracts";
 import {
-  createTGridSession,
+  createTGridSessionWithRef,
   type CreateTGridSessionArgs,
+  type TGridLiveInputs,
   type TGridSession,
 } from "@/table/state/tgrid-session";
 import type { TGridLevelQueryState } from "@/table/state/tgrid-level-query-state";
-import type { TGridLevelConfig } from "./tgrid-level-config";
+import type { TGridDefinition } from "./tgrid-runtime-config";
 import {
   createTGridColumnsBuilder,
-  type TGridColumnSpecBuilder,
   type TGridColumnsBuilder,
 } from "./tgrid-column-spec";
-import {
-  useCurrentTGridSession,
-  useTGridCell,
-  useTGridCellEditor,
-  type TGridCellContext,
-  type TGridCellEditorContext,
-  type TGridSessionContext,
-} from "./tgrid-cell-context";
 import type {
   RowFieldName,
   TGridLevelId,
   TGridRowsByLevel,
   TGridTableRow,
 } from "./tgrid-types";
-
-// Public front-door API that glues typed level declarations to sessions.
-// This module owns the stable ergonomic imports: define levels, columns, sessions, and hooks.
-export type BindTGridTypesArgs<AppServices> = {
-  appServices?: AppServices;
-};
 
 // Table schema constructor input without hardcoding `name`.
 // Lets callers pass shared table metadata and inject a runtime name separately.
@@ -68,134 +54,6 @@ export type UseTGridSessionArgs<
   AppServices,
 > = CreateTGridSessionArgs<RowsByLevel, AppServices>;
 
-// Structured result of `bindTGridTypes`.
-// It exposes level-first APIs for sessions, hooks, and typed runtime access.
-export type TGridBinding<
-  RowsByLevel extends TGridRowsByLevel,
-  AppServices,
-> = {
-  appServices: AppServices | undefined;
-  level<LevelId extends TGridLevelId<RowsByLevel>>(
-    levelId: LevelId,
-    config: TGridLevelConfig<RowsByLevel, AppServices, LevelId>,
-  ): TGridLevelConfig<RowsByLevel, AppServices, LevelId>;
-  columns<LevelId extends TGridLevelId<RowsByLevel>>(
-    levelId: LevelId,
-    build: TGridColumnSpecBuilder<RowsByLevel, AppServices, LevelId>,
-  ): TGridColumnSpecBuilder<RowsByLevel, AppServices, LevelId>;
-  createColumnsBuilder<LevelId extends TGridLevelId<RowsByLevel>>(
-    levelId: LevelId,
-  ): TGridColumnsBuilder<RowsByLevel, AppServices, LevelId>;
-  defineTableSchema(name: string, input: TGridTableSchemaInput): TableSchema;
-  applySchemaOverrides<LevelId extends TGridLevelId<RowsByLevel>>(
-    levelId: LevelId,
-    schema: TableSchema,
-    overrides: TGridTableSchemaOverrides<RowsByLevel[LevelId]>,
-  ): TableSchema;
-  createSession(
-    args: CreateTGridSessionArgs<RowsByLevel, AppServices>,
-  ): TGridSession<RowsByLevel, AppServices>;
-  useQueryState<LevelId extends TGridLevelId<RowsByLevel>>(
-    args: UseTGridQueryStateArgs<RowsByLevel, AppServices, LevelId>,
-  ): TGridLevelQueryState<RowsByLevel[LevelId]>;
-  useSession(
-    args: UseTGridSessionArgs<RowsByLevel, AppServices>,
-  ): TGridSession<RowsByLevel, AppServices>;
-  useCell<LevelId extends TGridLevelId<RowsByLevel>>(
-    levelId: LevelId,
-  ): TGridCellContext<RowsByLevel, AppServices, LevelId>;
-  useEditor<
-    LevelId extends TGridLevelId<RowsByLevel>,
-    K extends RowFieldName<RowsByLevel[LevelId]>,
-  >(
-    levelId: LevelId,
-    column: K,
-  ): TGridCellEditorContext<RowsByLevel, AppServices, LevelId, K>;
-  useCurrentSession(): TGridSessionContext<RowsByLevel, AppServices>;
-};
-
-// Entry point API for apps: declare typed levels once, then construct/use sessions.
-// `bindTGridTypes()` is usually the first call in a typed grid feature.
-export function bindTGridTypes<
-  RowsByLevel extends TGridRowsByLevel,
-  AppServices = unknown,
->(
-  args: BindTGridTypesArgs<AppServices> = {},
-): TGridBinding<RowsByLevel, AppServices> {
-  const appServices = args.appServices;
-
-  return {
-    appServices,
-
-    level(_levelId, config) {
-      return config;
-    },
-
-    columns(_levelId, build) {
-      return build;
-    },
-
-    createColumnsBuilder(levelId) {
-      return createTGridColumnsBuilder<RowsByLevel, AppServices, typeof levelId>(
-        levelId,
-      );
-    },
-
-    defineTableSchema(name, input) {
-      return { ...input, name };
-    },
-
-    applySchemaOverrides(_levelId, schema, overrides) {
-      return {
-        ...schema,
-        ...withoutColumnOverrides(overrides),
-        columns: schema.columns.map((column) => ({
-          ...column,
-          ...overrides.columns?.[column.name as keyof NonNullable<typeof overrides.columns> & string],
-        })),
-      };
-    },
-
-    createSession(sessionArgs) {
-      // The session API is the single constructor for a concrete runtime.
-      // `appServices` are injected here and then visible to custom cell
-      // write handlers through `sessionContext`.
-      return createTGridSession({
-        ...sessionArgs,
-        appServices: sessionArgs.appServices ?? appServices,
-      });
-    },
-
-    useQueryState(queryArgs) {
-      return useTGridQueryState(queryArgs);
-    },
-
-    useSession(sessionArgs) {
-      // React hook wrapper around `createTGridSession`. The return object is
-      // the host context that `TGrid` renderers and custom editors consume.
-      return useTGridSession({
-        ...sessionArgs,
-        appServices: sessionArgs.appServices ?? appServices,
-      });
-    },
-
-    useCell(levelId) {
-      return useTGridCell<RowsByLevel, AppServices, typeof levelId>(levelId);
-    },
-
-    useEditor(levelId, column) {
-      return useTGridCellEditor<RowsByLevel, AppServices, typeof levelId, typeof column>(
-        levelId,
-        column,
-      );
-    },
-
-    useCurrentSession() {
-      return useCurrentTGridSession<RowsByLevel, AppServices>();
-    },
-  };
-}
-
 // User-facing hook to get host query state for a specific level.
 // Useful in toolbar-like UI that edits sorting, filtering, and search.
 export function useTGridQueryState<
@@ -223,14 +81,65 @@ export function useTGridSession<
   RowsByLevel extends TGridRowsByLevel,
   AppServices,
 >(
-  args: UseTGridSessionArgs<RowsByLevel, AppServices>,
-): TGridSession<RowsByLevel, AppServices> {
-  const session = useMemo(
-    () => createTGridSession(args),
-    [args.rootLevel, args.levels, args.appServices, args.onUrlChange],
-  );
-  useEffect(() => () => session.dispose(), [session]);
+  definition: TGridDefinition<RowsByLevel, AppServices>,
+  args: UseTGridSessionArgs<RowsByLevel, AppServices> = {},
+): TGridSession<RowsByLevel, AppServices> | null {
+  const liveInputsRef = useRef<TGridLiveInputs<RowsByLevel, AppServices>>({});
+  liveInputsRef.current = {
+    services: args.services,
+    onQueryUrlChange: args.onQueryUrlChange,
+    hostQuerySeeds: args.hostQuerySeeds,
+  };
+
+  const [session, setSession] = useState<
+    TGridSession<RowsByLevel, AppServices> | null
+  >(null);
+
+  useEffect(() => {
+    const next = createTGridSessionWithRef(definition, liveInputsRef);
+    setSession(next);
+    return () => {
+      next.dispose();
+      setSession((current) => (current === next ? null : current));
+    };
+  }, [definition]);
+
   return session;
+}
+
+export function createColumnsBuilder<
+  RowsByLevel extends TGridRowsByLevel,
+  AppServices = unknown,
+  LevelId extends TGridLevelId<RowsByLevel> = TGridLevelId<RowsByLevel>,
+>(levelId: LevelId): TGridColumnsBuilder<RowsByLevel, AppServices, LevelId> {
+  return createTGridColumnsBuilder<RowsByLevel, AppServices, LevelId>(levelId);
+}
+
+export function defineTableSchema(
+  name: string,
+  input: TGridTableSchemaInput,
+): TableSchema {
+  return { ...input, name };
+}
+
+export function applySchemaOverrides<
+  RowsByLevel extends TGridRowsByLevel,
+  LevelId extends TGridLevelId<RowsByLevel>,
+>(
+  _levelId: LevelId,
+  schema: TableSchema,
+  overrides: TGridTableSchemaOverrides<RowsByLevel[LevelId]>,
+): TableSchema {
+  return {
+    ...schema,
+    ...withoutColumnOverrides(overrides),
+    columns: schema.columns.map((column) => ({
+      ...column,
+      ...overrides.columns?.[
+        column.name as keyof NonNullable<typeof overrides.columns> & string
+      ],
+    })),
+  };
 }
 
 function withoutColumnOverrides<RowShape extends TGridTableRow>(

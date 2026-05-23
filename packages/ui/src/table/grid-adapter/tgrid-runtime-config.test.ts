@@ -4,7 +4,7 @@ import type { Row, TableSchema } from "@sapporta/shared/contracts";
 import type { GridRuntime, RestEndpointFactory } from "@/grid";
 import { ExpandCell } from "@/grid/react/cells/ExpandCell";
 import { preset } from "@/column-preset";
-import { buildTGridRuntimeConfig } from "./tgrid-runtime-config";
+import { compileTGridRuntimeConfig } from "./tgrid-runtime-config";
 import type { TableRowsClient } from "./tgrid-level-config";
 import type { TGridFilter } from "./tgrid-filter";
 import { createTGridColumnMapper } from "./tgrid-column-mapper";
@@ -29,7 +29,7 @@ type RowsByLevel = {
   "orders.lines.allocations": AllocationRow;
 };
 
-describe("buildTGridRuntimeConfig", () => {
+describe("compileTGridRuntimeConfig", () => {
   const orderSchema: TableSchema = {
     name: "orders",
     label: "Orders",
@@ -90,7 +90,7 @@ describe("buildTGridRuntimeConfig", () => {
       ...rowsClient,
     } as TableRowsClient;
 
-    return buildTGridRuntimeConfig<RowsByLevel>({
+    return compileTGridRuntimeConfig<RowsByLevel>({
       rootLevel: "orders",
       levels: {
         orders: {
@@ -255,7 +255,7 @@ describe("buildTGridRuntimeConfig", () => {
     const lookupResolver: TGridLookupResolver = {
       bundleFor: () => undefined,
     };
-    const config = buildTGridRuntimeConfig<RowsByLevel>({
+    const config = compileTGridRuntimeConfig<RowsByLevel>({
       rootLevel: "orders",
       levels: {
         orders: {
@@ -339,7 +339,7 @@ describe("buildTGridRuntimeConfig", () => {
     const lookupResolver: TGridLookupResolver = {
       bundleFor: () => undefined,
     };
-    const config = buildTGridRuntimeConfig<RowsByLevel, Services>({
+    const config = compileTGridRuntimeConfig<RowsByLevel, Services>({
       rootLevel: "orders",
       levels: {
         orders: {

@@ -1,8 +1,6 @@
 import {
   useEffect,
   useMemo,
-  useRef,
-  useState,
   useSyncExternalStore,
 } from "react";
 import { useSearchParams } from "react-router-dom";
@@ -21,10 +19,9 @@ import {
 import { getNavigate } from "@/app/router/router-bridge";
 import { loadPref, savePref } from "@/platform/prefs";
 import type { ColId, SortDescriptor } from "@/grid";
-import {
-  createTGridSession,
-  type TGridSession,
-} from "@/table/state/tgrid-session";
+import { useTGridSession } from "@/table/grid-adapter/tgrid-binding";
+import type { TGridSession } from "@/table/state/tgrid-session";
+import { defineTGrid } from "@/table/grid-adapter/tgrid-runtime-config";
 import {
   buildSessionLevelsFromTableGridGraph,
   buildTableGridGraphFromSchema,
@@ -66,97 +63,6 @@ export function TablePage({ tableName }: { tableName: string }) {
     s.tables.find((t) => t.name === tableName),
   );
   const tables = useSchemaStore((s) => s.tables);
-  const [searchParams] = useSearchParams();
-  const [session, setSession] = useState<
-    TGridSession<SchemaDrivenRowsByLevel> | null
-  >(null);
-
-  const tablesByName = useMemo(
-    () => Object.fromEntries(tables.map((table) => [table.name, table])),
-    [tables],
-  );
-
-  // Snapshot the URL once at construction so the initial fetch matches the
-  // address bar. Subsequent URL changes flow through Effect 2 below.
-  const initialParamsRef = useRef(searchParams);
-
-  useEffect(() => {
-    if (!tableSchema) return;
-    const validColIds: ReadonlySet<ColId> = new Set(
-      tableSchema.columns.map((c) => c.name as ColId),
-    );
-    const initial = parseTableSearchParams(
-      initialParamsRef.current,
-      validColIds,
-    );
-    // Sort precedence at mount: URL (when ?sort= present) > localStorage
-    // preference > [].
-    const initialSort: SortDescriptor[] =
-      initial.sort ??
-      (loadPref<PersistedSort>(sortPrefKey(tableName), []) as SortDescriptor[]);
-
-    // This is the compatibility compiler that turns schema child metadata into
-    // the explicit level map expected by the session runtime.
-    const sessionConfig = buildSessionLevelsFromTableGridGraph({
-      graph: buildTableGridGraphFromSchema({
-        rootTableName: tableSchema.name,
-        tablesByName,
-      }),
-      rootLevelQuery: {
-        initialSort,
-        initialFilters: initial.filters,
-        initialSearch: initial.search,
-        initialPage: initial.page,
-        urlSync: true,
-      },
-    });
-
-    const nextSession = createTGridSession<SchemaDrivenRowsByLevel>({
-      ...sessionConfig,
-      onUrlChange: (state) => {
-        if (state.level !== tableName) return;
-        // Persist the user's sort so it survives a reload.
-        savePref<PersistedSort>(sortPrefKey(tableName), state.sort);
-        const params = buildTableSearchParams({
-          page: state.page,
-          sort: state.sort,
-          filters: state.filters,
-          search: state.search,
-        });
-        const search = params.toString();
-        const url = `/tables/${tableName}${search ? `?${search}` : ""}`;
-        try {
-          getNavigate()(url, { replace: true });
-        } catch {
-          // Router bridge not yet initialized.
-        }
-      },
-    });
-
-    registerTGridSession(tableName, nextSession);
-    const stopLookupLoading = startTGridLookupLoading(nextSession);
-    setSession(nextSession);
-
-    return () => {
-      stopLookupLoading();
-      unregisterTGridSession(tableName);
-      nextSession.dispose();
-      setSession(null);
-    };
-  }, [tableName, tableSchema, tablesByName]);
-
-  // URL → store sync. Fires on browser back/forward and on our own URL
-  // pushes (the store's equality guards in `syncFromUrl` suppress feedback
-  // loops). Disabled until the session exists so we don't queue a sync
-  // before the store is constructed.
-  useEffect(() => {
-    if (!session || !tableSchema) return;
-    const validColIds: ReadonlySet<ColId> = new Set(
-      tableSchema.columns.map((c) => c.name as ColId),
-    );
-    const params = parseTableSearchParams(searchParams, validColIds);
-    session.queryStore.getState().syncFromUrl(params);
-  }, [session, searchParams, tableSchema]);
 
   if (!tableSchema) {
     return (
@@ -165,6 +71,110 @@ export function TablePage({ tableName }: { tableName: string }) {
       </div>
     );
   }
+
+  return (
+    <TablePageWithSession
+      tableName={tableName}
+      tableSchema={tableSchema}
+      tables={tables}
+    />
+  );
+}
+
+function TablePageWithSession({
+  tableName,
+  tableSchema,
+  tables,
+}: {
+  tableName: string;
+  tableSchema: TableSchema;
+  tables: readonly TableSchema[];
+}) {
+  const [searchParams] = useSearchParams();
+
+  const tablesByName = useMemo(
+    () => Object.fromEntries(tables.map((table) => [table.name, table])),
+    [tables],
+  );
+
+  const validColIds = useMemo<ReadonlySet<ColId>>(
+    () =>
+      new Set((tableSchema?.columns ?? []).map((c) => c.name as ColId)),
+    [tableSchema],
+  );
+
+  const initial = useMemo(
+    () => parseTableSearchParams(searchParams, validColIds),
+    [searchParams, validColIds],
+  );
+
+  const initialSort: SortDescriptor[] = useMemo(
+    () =>
+      initial.sort ??
+      (loadPref<PersistedSort>(sortPrefKey(tableName), []) as SortDescriptor[]),
+    [initial.sort, tableName],
+  );
+
+  const definition = useMemo(() => {
+    const sessionConfig = buildSessionLevelsFromTableGridGraph({
+      graph: buildTableGridGraphFromSchema({
+        rootTableName: tableSchema.name,
+        tablesByName,
+      }),
+      rootLevelQuery: {
+        urlSync: true,
+      },
+    });
+    return defineTGrid<SchemaDrivenRowsByLevel>(sessionConfig);
+  }, [tableSchema, tablesByName]);
+
+  const session = useTGridSession(definition, {
+    onQueryUrlChange: (state) => {
+      if (state.level !== tableName) return;
+      savePref<PersistedSort>(sortPrefKey(tableName), state.sort);
+      const params = buildTableSearchParams({
+        page: state.page,
+        sort: state.sort,
+        filters: state.filters,
+        search: state.search,
+      });
+      const search = params.toString();
+      const url = `/tables/${tableName}${search ? `?${search}` : ""}`;
+      try {
+        getNavigate()(url, { replace: true });
+      } catch {
+        // Router bridge not yet initialized.
+      }
+    },
+    hostQuerySeeds: {
+      [tableName]: {
+        sort: initialSort,
+        filters: initial.filters,
+        search: initial.search,
+        page: initial.page,
+      },
+    },
+  });
+
+  useEffect(() => {
+    if (!session) return;
+    registerTGridSession(tableName, session);
+    const stopLookupLoading = startTGridLookupLoading(session);
+    return () => {
+      stopLookupLoading();
+      unregisterTGridSession(tableName);
+    };
+  }, [tableName, session]);
+
+  // URL → store sync. Fires on browser back/forward and on our own URL
+  // pushes (the store's equality guards in `syncFromUrl` suppress feedback
+  // loops). Disabled until the session exists so we don't queue a sync
+  // before the store is constructed.
+  useEffect(() => {
+    if (!session || !tableSchema) return;
+    const params = parseTableSearchParams(searchParams, validColIds);
+    session.queryStore.getState().syncFromUrl(params);
+  }, [session, searchParams, tableSchema, validColIds]);
 
   if (!session) {
     return (
@@ -274,7 +284,7 @@ function TablePageInner({
       {!showSpinner && !errorMessage && (
         <div className="flex-1 overflow-auto px-5 pb-7">
           <div className="bg-sap-surface">
-            <TGrid runtime={session.runtime} sessionContext={session} />
+            <TGrid session={session} />
           </div>
         </div>
       )}
