@@ -180,6 +180,47 @@ describe("GridRuntime", () => {
     );
   });
 
+  it("guards retained source views after disposal", () => {
+    const rt = createGridRuntime({
+      schema: tableSchema,
+      dataSource: tableDataSource(),
+    });
+    const source = rt.sourceFor(rowsRoot);
+
+    rt.dispose();
+
+    expect(() => source.snapshot()).toThrow("GridRuntime has been disposed.");
+    expect(() => source.refetch()).toThrow("GridRuntime has been disposed.");
+    expect(() => source.subscribe(() => {})).toThrow(
+      "GridRuntime has been disposed.",
+    );
+    expect(() => source.setSort([{ colId: "qty", direction: "asc" }])).toThrow(
+      "GridRuntime has been disposed.",
+    );
+    expect(() => source.setFilter(undefined)).toThrow(
+      "GridRuntime has been disposed.",
+    );
+    expect(() => source.setPage(1, 25)).toThrow(
+      "GridRuntime has been disposed.",
+    );
+    expect(() => source.onReconcile(() => {})).toThrow(
+      "GridRuntime has been disposed.",
+    );
+  });
+
+  it("allows retained source-view unsubscribe after disposal", () => {
+    const rt = createGridRuntime({
+      schema: tableSchema,
+      dataSource: tableDataSource(),
+    });
+    const source = rt.sourceFor(rowsRoot);
+    const unsubscribe = source.subscribe(() => {});
+
+    rt.dispose();
+
+    expect(() => unsubscribe()).not.toThrow();
+  });
+
   it("distinguishes missing child sources from missing root sources", () => {
     const rt = createGridRuntime({
       schema: reportSchema,
@@ -224,7 +265,23 @@ describe("GridRuntime", () => {
     expect("applyChanges" in src).toBe(false);
     expect("insertNode" in src).toBe(false);
     expect("removeNode" in src).toBe(false);
+    expect("dispose" in src).toBe(false);
     expect(src.snapshot().nodes).toHaveLength(2);
+  });
+
+  it("sourceFor returns a live view for read, query, and refresh operations", () => {
+    const rt = createGridRuntime({
+      schema: tableSchema,
+      dataSource: tableDataSource(),
+    });
+    const source = rt.sourceFor(rowsRoot);
+
+    expect(() => {
+      source.snapshot();
+      source.setSort([{ colId: "qty", direction: "desc" }]);
+      source.setPage(1, 25);
+      source.refetch();
+    }).not.toThrow();
   });
 
   it("writeCell on a readonly source throws synchronously", () => {

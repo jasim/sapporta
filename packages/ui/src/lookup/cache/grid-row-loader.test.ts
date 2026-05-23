@@ -45,7 +45,6 @@ function makeSource(initialNodes: TreeNode[]) {
     setFilter: () => {},
     setPage: () => {},
     refetch: () => {},
-    dispose: () => {},
     onReconcile: () => () => {},
   };
 

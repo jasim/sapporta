@@ -490,7 +490,38 @@ export function createGridRuntime(args: RuntimeArgs): GridRuntime {
     }
     let view = sourceViews.get(path);
     if (view) return view;
-    view = runtimeSourceView(src);
+    view = {
+      writable: src.writable,
+      snapshot: () => {
+        assertLive();
+        return src.snapshot();
+      },
+      subscribe: (fn) => {
+        assertLive();
+        return src.subscribe(fn);
+      },
+      setSort: (sort) => {
+        assertLive();
+        src.setSort(sort);
+      },
+      setFilter: (filter) => {
+        assertLive();
+        src.setFilter(filter);
+      },
+      setPage: (page, pageSize) => {
+        assertLive();
+        src.setPage(page, pageSize);
+      },
+      refetch: () => {
+        assertLive();
+        src.refetch();
+      },
+      onReconcile(fn) {
+        assertLive();
+        if (!src.writable) return () => {};
+        return src.onReconcile(fn);
+      },
+    };
     sourceViews.set(path, view);
     return view;
   }
@@ -725,26 +756,6 @@ export function createGridRuntime(args: RuntimeArgs): GridRuntime {
   };
   runtimeRef = runtime;
   return runtime;
-}
-
-// Host-facing facade for a concrete source. The runtime keeps the real
-// source privately so all writes pass through runtime verbs, where
-// pre-state capture and `mutationCommitted` emission are centralized.
-function runtimeSourceView(src: LevelDataSource): RuntimeLevelDataSource {
-  return {
-    writable: src.writable,
-    snapshot: src.snapshot,
-    subscribe: src.subscribe,
-    setSort: src.setSort,
-    setFilter: src.setFilter,
-    setPage: src.setPage,
-    refetch: src.refetch,
-    dispose: src.dispose,
-    onReconcile(fn) {
-      if (!src.writable) return () => {};
-      return src.onReconcile(fn);
-    },
-  };
 }
 
 // Read a cell value from a snapshot using the level schema's rowKey function.

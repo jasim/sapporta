@@ -208,7 +208,7 @@ export type ReadonlyLevelDataSource = {
 // through runtime methods.
 export type RuntimeLevelDataSource = Omit<
   ReadonlyLevelDataSource,
-  "writable"
+  "writable" | "dispose"
 > & {
   writable: boolean;
   onReconcile(fn: (e: ReconcileEvent) => void): () => void;
