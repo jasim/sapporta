@@ -78,6 +78,16 @@ export type {
   RowNavigationIntent,
 } from "./action";
 export type * from "./interaction";
+export {
+  CELL_EDITING_GRID,
+  CELL_EDITING_NO_SELECTION_GRID,
+  CELL_GRID_WITH_ACTIVE_ROW,
+  CELL_GRID_WITH_INDEPENDENT_ROW_SELECTION,
+  CELL_PRIMARY_WITH_SIDE_PANEL_ROW,
+  CELL_PRIMARY_WITH_SELECTED_SIDE_PANEL_ROW,
+  ROW_MULTISELECT_LIST,
+  ROW_PRIMARY_MASTER_DETAIL,
+} from "./interaction";
 export type * from "./row-selection";
 
 export type {

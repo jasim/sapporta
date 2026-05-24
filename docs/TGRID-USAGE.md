@@ -14,7 +14,7 @@ application services.
 
 A TGrid has four public pieces:
 
-- `defineTGrid({ rootLevel, levels })` creates a pure definition.
+- `defineTGrid({ rootLevel, interaction, levels })` creates a pure definition.
 - `createTGridSession(definition, args)` creates a disposable live session
   outside React.
 - `useTGridSession(definition, args)` creates and disposes a live session inside
@@ -372,6 +372,36 @@ Every level declares:
 - `query`: optional query policy and defaults.
 - `columns`: optional column specs or a column builder callback.
 - `rowsClient`: optional custom row transport.
+
+## Interaction
+
+`interaction` is an optional property on the TGrid definition. TGrid forwards it
+to the underlying BaseGrid runtime when the session is created.
+
+```ts
+import { ROW_PRIMARY_MASTER_DETAIL, defineTGrid } from "@sapporta/ui";
+
+const authorsGrid = defineTGrid<RowsByLevel>({
+  rootLevel: "authors",
+  interaction: ROW_PRIMARY_MASTER_DETAIL,
+  levels: {
+    authors: {
+      table: authorsTable,
+      childLevels: [],
+      query: { owner: "host", pageSize: 50 },
+    },
+  },
+});
+```
+
+Omit `interaction` for the default spreadsheet-like cell editing mode. Use a
+row-list preset such as `ROW_PRIMARY_MASTER_DETAIL` for master lists where row
+navigation and row selection are the primary interaction.
+
+Interaction is structural session configuration, not a live session input. To
+change it, pass a new definition object so `useTGridSession` creates a new
+runtime. For the full preset list and behavior model, see
+[`BASEGRID-INTERACTIONS.md`](./BASEGRID-INTERACTIONS.md).
 
 ## Query Ownership
 

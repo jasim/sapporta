@@ -5,7 +5,7 @@ import type {
   TableSchema,
 } from "@sapporta/shared/contracts";
 import { eqCondition, type FilterCondition } from "@sapporta/shared/filter";
-import { childPath, rootPath } from "@/grid";
+import { childPath, rootPath, type GridInteractionConfig } from "@/grid";
 import type { ColId, GridPath, GridSchema, LevelSchema, PatchCellResponse, RestEndpointFactory, RowKey, SortDescriptor, TreeNode } from "@/grid";
 import { parseSortString } from "@/grid/sort";
 import {
@@ -51,6 +51,7 @@ export type TGridDefinition<
   AppServices = unknown,
 > = {
   readonly rootLevel: TGridLevelId<RowsByLevel>;
+  readonly interaction?: GridInteractionConfig;
   readonly levels: TGridLevelsConfigMap<RowsByLevel, AppServices>;
 };
 

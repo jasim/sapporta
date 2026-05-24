@@ -221,6 +221,7 @@ class DefaultTGridSession<
     this.runtime = createGridRuntime({
       schema: runtimeConfig.gridSchema,
       dataSource,
+      interaction: definition.interaction,
       on: {
         cellReconciled: ({ event }) => {
           if (event.kind === "rejected") {
