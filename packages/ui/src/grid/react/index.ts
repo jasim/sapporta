@@ -5,6 +5,8 @@ export {
   useGridRuntime,
   useLevelSnapshot,
   usePhantoms,
+  useRowInteractionStatus,
+  useRowSelectionContainsRow,
 } from "./GridRuntimeProvider";
 
 export { GridLevel, type GridLevelChrome } from "./GridLevel";
