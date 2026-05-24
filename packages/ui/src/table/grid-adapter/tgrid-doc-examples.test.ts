@@ -2,8 +2,10 @@ import { createElement } from "react";
 import { describe, expect, it } from "vitest";
 import type { TableSchema } from "@sapporta/shared/contracts";
 import {
+  CELL_EDITING_GRID,
   createTGridSession,
   defineTGrid,
+  ROW_PRIMARY_MASTER_DETAIL,
   useTGridCell,
   type TGridCellWriteContext,
   type TGridColumnsBuilder,
@@ -29,6 +31,10 @@ type InvoiceItemRow = {
 type RowsByLevel = {
   invoices: InvoiceRow;
   "invoices.items": InvoiceItemRow;
+};
+
+type InvoiceOnlyRowsByLevel = {
+  invoices: InvoiceRow;
 };
 
 type AppServices = {
@@ -216,5 +222,49 @@ describe("TGRID-USAGE examples", () => {
     ).toEqual(["item_id", "quantity", "balance_stock", "stock_hold"]);
     expect(session.levels["invoices.items"]).toBeDefined();
     session.dispose();
+  });
+
+  it("passes interaction presets from a TGrid definition into the runtime", () => {
+    const rowPrimaryDefinition = defineTGrid<InvoiceOnlyRowsByLevel, AppServices>({
+      rootLevel: "invoices",
+      interaction: ROW_PRIMARY_MASTER_DETAIL,
+      levels: {
+        invoices: {
+          table: invoicesTable,
+          childLevels: [],
+          query: { owner: "host", pageSize: 50 },
+          columns: (columns) => [
+            columns.table("customer_id", { editable: false }),
+          ],
+        },
+      },
+    });
+
+    const rowPrimarySession = createTGridSession(rowPrimaryDefinition);
+    try {
+      expect(rowPrimarySession.runtime.interaction).toBe(
+        ROW_PRIMARY_MASTER_DETAIL,
+      );
+    } finally {
+      rowPrimarySession.dispose();
+    }
+
+    const defaultDefinition = defineTGrid<InvoiceOnlyRowsByLevel, AppServices>({
+      rootLevel: "invoices",
+      levels: {
+        invoices: {
+          table: invoicesTable,
+          childLevels: [],
+          query: { owner: "host", pageSize: 50 },
+        },
+      },
+    });
+
+    const defaultSession = createTGridSession(defaultDefinition);
+    try {
+      expect(defaultSession.runtime.interaction).toBe(CELL_EDITING_GRID);
+    } finally {
+      defaultSession.dispose();
+    }
   });
 });
