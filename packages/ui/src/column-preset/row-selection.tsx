@@ -4,10 +4,8 @@ import type { ColumnSchema } from "../grid/types/schema";
 import type { ColumnWidth } from "./types";
 import { column } from "./columns";
 import { Checkbox } from "@/ui/primitives/checkbox";
-import {
-  useGridRuntime,
-  useRowSelectionContainsRow,
-} from "../grid/react/GridRuntimeProvider";
+import { useGridRuntime } from "../grid/react/GridRuntimeProvider";
+import { useCurrentRowInteractionStatus } from "../grid/react/cells/GridRow";
 import styles from "./sapporta-preset.module.css";
 
 // Row-selection chrome belongs to ColumnPreset, not the base grid.
@@ -44,7 +42,10 @@ function RowSelectionCell({
   path,
 }: Parameters<ColumnSchema["renderCell"]>[0]) {
   const runtime = useGridRuntime();
-  const checked = useRowSelectionContainsRow(path, row.id);
+  const rowInteractionStatus = useCurrentRowInteractionStatus();
+  const checked =
+    rowInteractionStatus === "selected" ||
+    rowInteractionStatus === "cursor-selected";
   const disabled = !row.rowSelectable;
 
   function onClick(event: MouseEvent<HTMLButtonElement>) {

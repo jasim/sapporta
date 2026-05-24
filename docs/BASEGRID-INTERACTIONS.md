@@ -529,8 +529,10 @@ import {
   useActiveRow,
   useCellSelection,
   useGridRuntime,
+  useRowInteractionSnapshot,
   useSelectedRowIds,
   useSelectedRows,
+  rowInteractionStatusFor,
 } from "@sapporta/ui";
 
 function MyComponent() {
@@ -550,12 +552,17 @@ function MyComponent() {
   // Selected row ids in displayed order
   runtime.selectedRowIds(path); // readonly RowId[]
 
-  if (rowId) {
-    // Does a specific row appear in the effective selection?
-    runtime.rowSelectionContainsRow(path, rowId); // boolean
+  // Path-level row chrome state
+  const rowInteraction = runtime.rowInteractionSnapshotFor(path);
+  // {
+  //   activeRowId: RowId | null,
+  //   selectedRowIds: readonly RowId[],
+  //   statusByRowId: ReadonlyMap<RowId, RowInteractionStatus>
+  // }
 
+  if (rowId) {
     // Combined cursor + selection status for row chrome
-    runtime.rowInteractionStatusFor(path, rowId);
+    rowInteractionStatusFor(rowId, rowInteraction);
     // "idle" | "selected" | "cursor" | "cursor-selected"
   }
 }
@@ -572,6 +579,7 @@ function TaskSelectionSummary() {
   const activeRow = useActiveRow(path); // RowCursor | null
   const selectedRows = useSelectedRows(path); // RowSelection
   const selectedRowIds = useSelectedRowIds(path); // readonly RowId[]
+  const rowInteraction = useRowInteractionSnapshot(path); // RowInteractionSnapshot
 
   return (
     <section>
@@ -586,6 +594,7 @@ function TaskSelectionSummary() {
       <p>Active row: {activeRow?.rowId ?? "none"}</p>
       <p>Selected row shape: {selectedRows?.kind ?? "none"}</p>
       <p>Selected rows: {selectedRowIds.length}</p>
+      <p>Row chrome source: {rowInteraction.activeRowId ?? "none"}</p>
     </section>
   );
 }
@@ -606,25 +615,21 @@ const unsubSelected = runtime.subscribeSelectedRowIds(path, () => {
   console.log("Selected count:", ids.length);
 });
 
-// Per-row membership (useful for checkbox state)
-const unsubContains = runtime.subscribeRowSelectionContainsRow(
-  path, rowId, () => {
-    const isIn = runtime.rowSelectionContainsRow(path, rowId);
-  },
-);
+const unsubInteraction = runtime.subscribeRowInteractionSnapshot(path, () => {
+  const snapshot = runtime.rowInteractionSnapshotFor(path);
+  console.log("Active row:", snapshot.activeRowId);
+});
 
-// Per-row combined status (useful for row styling)
-const unsubStatus = runtime.subscribeRowInteractionStatus(
-  path, rowId, () => {
-    const status = runtime.rowInteractionStatusFor(path, rowId);
-  },
+// Combined per-row status is derived from the path-level snapshot.
+const status = rowInteractionStatusFor(
+  rowId,
+  runtime.rowInteractionSnapshotFor(path),
 );
 
 // Clean up
 unsubActive();
 unsubSelected();
-unsubContains();
-unsubStatus();
+unsubInteraction();
 ```
 
 ### Row Interaction Commands
@@ -671,6 +676,9 @@ Selection commands no-op when row selection is disabled or when sync is `follows
 ### Row Interaction Status (React)
 
 The base grid exposes row-level data attributes for styling without prescribing chrome:
+`GridLevel` subscribes once to the path-level row interaction snapshot, derives
+each row's status while mapping displayed rows, and passes that status to the
+row shell.
 
 ```tsx
 <div
@@ -694,11 +702,11 @@ Status values:
 
 ### Selector Columns
 
-The base grid does not render checkboxes. Row-selection chrome is a ColumnPreset concern — it builds a normal `ColumnSchema` that reads row-selection state through the headless runtime.
+The base grid does not render checkboxes. Row-selection chrome is a ColumnPreset concern — it builds a normal `ColumnSchema` that consumes the row status already derived by `GridRow`.
 
 Prepend `rowSelectionColumn()` to your column list (see the [Bulk Actions recipe](#bulk-actions-in-an-editable-grid) for a complete example). The checkbox cell renderer:
 
-1. Reads checked state through `runtime.rowSelectionContainsRow(path, row.id)`.
+1. Reads checked state from the current row interaction status.
 2. Calls `runtime.rowInteraction.toggleRowSelection(path, row.id)` on plain click.
 3. Calls `runtime.rowInteraction.extendRowSelectionTo(path, row.id)` on Shift+Click.
 4. Calls `stopPropagation` and `preventDefault` so the click does not propagate to row or cell handlers.
@@ -927,6 +935,20 @@ type RowInteractionStatus = "idle" | "selected" | "cursor" | "cursor-selected";
 
 See [Row Interaction Status](#row-interaction-status-react).
 
+#### `RowInteractionSnapshot`
+
+```ts
+type RowInteractionSnapshot = {
+  activeRowId: RowId | null;
+  selectedRowIds: readonly RowId[];
+  statusByRowId: ReadonlyMap<RowId, RowInteractionStatus>;
+};
+```
+
+Path-level snapshot used to derive row chrome. `GridLevel` subscribes to this
+once for the rendered path and computes each row's `RowInteractionStatus` while
+mapping rows.
+
 #### `CellNavigationIntent`
 
 ```ts
@@ -1068,18 +1090,6 @@ function rowIdsInRowSelection(
 ```
 
 Projects selection into an ordered list of displayed, row-selectable ids.
-
-#### `rowSelectionContainsRow`
-
-```ts
-function rowSelectionContainsRow(
-  selection: RowSelection,
-  rowId: RowId,
-  displayed: DisplayedRows,
-): boolean;
-```
-
-Membership check. Uses same row-selectability rules as `rowIdsInRowSelection`.
 
 #### `normalizeRowSelection`
 

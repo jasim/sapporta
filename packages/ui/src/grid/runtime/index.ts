@@ -3,8 +3,11 @@ export {
   type GridRuntime,
   type RuntimeArgs,
   type RowInteractionCommands,
-  type RowInteractionStatus,
 } from "./create-grid-runtime";
+export type {
+  RowInteractionSnapshot,
+  RowInteractionStatus,
+} from "../types/row-selection";
 
 export type { GridEmitter, GridEvents } from "./emitter";
 

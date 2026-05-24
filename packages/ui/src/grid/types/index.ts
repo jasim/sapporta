@@ -89,6 +89,7 @@ export {
   ROW_PRIMARY_MASTER_DETAIL,
 } from "./interaction";
 export type * from "./row-selection";
+export { rowInteractionStatusFor } from "./row-selection";
 
 export type {
   LevelStatus,

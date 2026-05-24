@@ -369,6 +369,7 @@ export {
   type GridRuntime,
   type RuntimeArgs,
   type RowInteractionCommands,
+  type RowInteractionSnapshot,
   type RowInteractionStatus,
   type TableController,
   type ReadonlyTableController,
@@ -391,8 +392,7 @@ export {
   usePhantoms,
   useSelectedRowIds,
   useSelectedRows,
-  useRowInteractionStatus,
-  useRowSelectionContainsRow,
+  useRowInteractionSnapshot,
   GridLevel,
   type GridLevelChrome,
 } from "./react";
@@ -504,6 +504,7 @@ export {
   selectionContainsCoord,
   selectionIsSingleCell,
   rowsInSelection,
+  rowInteractionStatusFor,
 } from "./types";
 export {
   parseSortString,

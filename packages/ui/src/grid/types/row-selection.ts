@@ -36,6 +36,18 @@ export type RowSelection =
   // projection always returns ids in displayed order, never insertion order.
   | { kind: "set"; rowIds: ReadonlySet<RowId> };
 
+export type RowInteractionStatus =
+  | "idle"
+  | "selected"
+  | "cursor"
+  | "cursor-selected";
+
+export type RowInteractionSnapshot = {
+  activeRowId: RowId | null;
+  selectedRowIds: readonly RowId[];
+  statusByRowId: ReadonlyMap<RowId, RowInteractionStatus>;
+};
+
 export function makeRowCursor(path: GridPath, rowId: RowId): RowCursor {
   return { path, rowId };
 }
@@ -121,6 +133,13 @@ export function rowSelectionContainsRow(
   displayed: DisplayedRows,
 ): boolean {
   return rowIdsInRowSelection(selection, displayed).includes(rowId);
+}
+
+export function rowInteractionStatusFor(
+  rowId: RowId,
+  snapshot: RowInteractionSnapshot,
+): RowInteractionStatus {
+  return snapshot.statusByRowId.get(rowId) ?? "idle";
 }
 
 export function normalizeRowSelection(

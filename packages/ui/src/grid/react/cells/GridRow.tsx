@@ -1,12 +1,9 @@
-import { memo } from "react";
+import { createContext, memo, useContext, type ReactNode } from "react";
 import type { GridPath, ColId, RowId } from "../../types/identity";
+import type { RowInteractionStatus } from "../../types/row-selection";
 import type { ColumnSchema } from "../../types/schema";
 import { capabilitiesFor } from "../../types/capabilities";
-import {
-  useDisplayedRow,
-  useGridRuntime,
-  useRowInteractionStatus,
-} from "../GridRuntimeProvider";
+import { useDisplayedRow, useGridRuntime } from "../GridRuntimeProvider";
 import { GridDataCell } from "./GridDataCell";
 
 // The only `React.memo` in the grid — structurally justified, not a
@@ -22,15 +19,16 @@ export const GridRow = memo(function GridRow({
   schema,
   path,
   colOrder,
+  rowInteractionStatus,
 }: {
   rowId: RowId;
   schema: ColumnSchema[];
   path: GridPath;
   colOrder: readonly ColId[];
+  rowInteractionStatus: RowInteractionStatus;
 }) {
   const runtime = useGridRuntime();
   const row = useDisplayedRow(path, rowId);
-  const rowInteractionStatus = useRowInteractionStatus(path, row.id);
 
   return (
     <div
@@ -49,21 +47,47 @@ export const GridRow = memo(function GridRow({
         // cell click owns the cell cursor instead, so this row shell stays out
         // of the cell interaction path.
         if (event.shiftKey) {
-          runtime.cursorManager.extendRowSelectionToCursor({ path, rowId: row.id });
+          runtime.cursorManager.extendRowSelectionToCursor({
+            path,
+            rowId: row.id,
+          });
         } else {
           runtime.cursorManager.moveRowCursorTo({ path, rowId: row.id });
         }
       }}
     >
-      {schema.map((col) => (
-        <GridDataCell
-          key={col.id}
-          row={row}
-          column={col}
-          path={path}
-          colOrder={colOrder}
-        />
-      ))}
+      <RowInteractionStatusProvider status={rowInteractionStatus}>
+        {schema.map((col) => (
+          <GridDataCell
+            key={col.id}
+            row={row}
+            column={col}
+            path={path}
+            colOrder={colOrder}
+          />
+        ))}
+      </RowInteractionStatusProvider>
     </div>
   );
 });
+
+const CurrentRowInteractionStatusContext =
+  createContext<RowInteractionStatus>("idle");
+
+function RowInteractionStatusProvider({
+  status,
+  children,
+}: {
+  status: RowInteractionStatus;
+  children: ReactNode;
+}) {
+  return (
+    <CurrentRowInteractionStatusContext.Provider value={status}>
+      {children}
+    </CurrentRowInteractionStatusContext.Provider>
+  );
+}
+
+export function useCurrentRowInteractionStatus(): RowInteractionStatus {
+  return useContext(CurrentRowInteractionStatusContext);
+}

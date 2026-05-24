@@ -77,7 +77,12 @@ import {
 import type { ColId, Coord, GridPath, RowId, RowKey } from "../types/identity";
 import type { GridInteractionConfig } from "../types/interaction";
 import { normalizeInteraction } from "../interaction/normalize-interaction";
-import type { RowCursor, RowSelection } from "../types/row-selection";
+import type {
+  RowCursor,
+  RowInteractionSnapshot,
+  RowInteractionStatus,
+  RowSelection,
+} from "../types/row-selection";
 import {
   activeRowFor,
   makeRowRangeSelection,
@@ -162,22 +167,12 @@ export type GridRuntime = {
   activeRowFor: (path: GridPath) => RowCursor | null;
   selectedRowsFor: (path: GridPath) => RowSelection;
   selectedRowIds: (path: GridPath) => readonly RowId[];
-  rowSelectionContainsRow: (path: GridPath, rowId: RowId) => boolean;
-  rowInteractionStatusFor: (
-    path: GridPath,
-    rowId: RowId,
-  ) => RowInteractionStatus;
+  rowInteractionSnapshotFor: (path: GridPath) => RowInteractionSnapshot;
   subscribeActiveRow: (path: GridPath, fn: () => void) => () => void;
   subscribeSelectedRows: (path: GridPath, fn: () => void) => () => void;
   subscribeSelectedRowIds: (path: GridPath, fn: () => void) => () => void;
-  subscribeRowSelectionContainsRow: (
+  subscribeRowInteractionSnapshot: (
     path: GridPath,
-    rowId: RowId,
-    fn: () => void,
-  ) => () => void;
-  subscribeRowInteractionStatus: (
-    path: GridPath,
-    rowId: RowId,
     fn: () => void,
   ) => () => void;
   rowInteraction: RowInteractionCommands;
@@ -236,12 +231,6 @@ export type GridRuntime = {
   on: GridEmitter["on"];
   dispose: () => void;
 };
-
-export type RowInteractionStatus =
-  | "idle"
-  | "selected"
-  | "cursor"
-  | "cursor-selected";
 
 export type RowInteractionCommands = {
   setRowCursor: (target: RowCursor) => void;
@@ -309,6 +298,7 @@ export function createGridRuntime(args: RuntimeArgs): GridRuntime {
   const activeRowSnapshots = new Map<GridPath, RowCursor | null>();
   const selectedRowsSnapshots = new Map<GridPath, RowSelection>();
   const selectedRowIdSnapshots = new Map<GridPath, readonly RowId[]>();
+  const rowInteractionSnapshots = new Map<GridPath, RowInteractionSnapshot>();
 
   // Memoized `LevelSchema` per path. The path's level name is a function
   // of the path string, so the entry is stable for the runtime's
@@ -852,24 +842,36 @@ export function createGridRuntime(args: RuntimeArgs): GridRuntime {
     return next;
   }
 
-  function rowSelectionContainsRow(path: GridPath, rowId: RowId): boolean {
-    return rowSelectionHasRow(
-      selectedRowsForPath(path),
-      rowId,
-      displayedRowsFor(path),
-    );
-  }
-
-  function rowInteractionStatusFor(
+  function rowInteractionSnapshotForPath(
     path: GridPath,
-    rowId: RowId,
-  ): RowInteractionStatus {
+  ): RowInteractionSnapshot {
     const active = activeRowForPath(path);
-    const cursor = active?.rowId === rowId;
-    const selected = rowSelectionContainsRow(path, rowId);
-    if (cursor && selected) return "cursor-selected";
-    if (cursor) return "cursor";
-    return selected ? "selected" : "idle";
+    const activeRowId = active?.rowId ?? null;
+    const selectedIds = selectedRowIds(path);
+    const prev = rowInteractionSnapshots.get(path);
+    if (
+      prev?.activeRowId === activeRowId &&
+      prev.selectedRowIds === selectedIds
+    ) {
+      return prev;
+    }
+    const statusByRowId = new Map<RowId, RowInteractionStatus>();
+    for (const rowId of selectedIds) {
+      statusByRowId.set(rowId, "selected");
+    }
+    if (activeRowId) {
+      statusByRowId.set(
+        activeRowId,
+        statusByRowId.has(activeRowId) ? "cursor-selected" : "cursor",
+      );
+    }
+    const next = {
+      activeRowId,
+      selectedRowIds: selectedIds,
+      statusByRowId,
+    };
+    rowInteractionSnapshots.set(path, next);
+    return next;
   }
 
   function subscribeActiveRow(path: GridPath, fn: () => void): () => void {
@@ -934,37 +936,35 @@ export function createGridRuntime(args: RuntimeArgs): GridRuntime {
     };
   }
 
-  function subscribeRowSelectionContainsRow(
+  function subscribeRowInteractionSnapshot(
     path: GridPath,
-    rowId: RowId,
     fn: () => void,
   ): () => void {
-    let prev = rowSelectionContainsRow(path, rowId);
-    return subscribeSelectedRowIds(path, () => {
-      const next = rowSelectionContainsRow(path, rowId);
-      if (prev === next) return;
-      prev = next;
-      fn();
-    });
-  }
-
-  function subscribeRowInteractionStatus(
-    path: GridPath,
-    rowId: RowId,
-    fn: () => void,
-  ): () => void {
-    let prev = rowInteractionStatusFor(path, rowId);
+    let prev = rowInteractionSnapshotForPath(path);
     const maybeNotify = () => {
-      const next = rowInteractionStatusFor(path, rowId);
+      const next = rowInteractionSnapshotForPath(path);
       if (prev === next) return;
       prev = next;
       fn();
     };
-    const unsubActive = subscribeActiveRow(path, maybeNotify);
-    const unsubSelected = subscribeSelectedRowIds(path, maybeNotify);
+    const unsubs: Array<() => void> = [];
+    const activeRowCanChange =
+      interaction.mode === "row-list" ||
+      (interaction.mode === "cell-grid" &&
+        interaction.activeRow.kind === "from-active-cell");
+    if (activeRowCanChange) {
+      unsubs.push(subscribeActiveRow(path, maybeNotify));
+    }
+    const selectedRows = interaction.selectedRows;
+    if (selectedRows.kind === "enabled") {
+      if (selectedRows.sync.kind === "independent") {
+        unsubs.push(subscribeSelectedRowIds(path, maybeNotify));
+      } else {
+        unsubs.push(subscribeDisplayedRowSequence(path, maybeNotify));
+      }
+    }
     return () => {
-      unsubActive();
-      unsubSelected();
+      for (const unsub of unsubs) unsub();
     };
   }
 
@@ -1059,6 +1059,7 @@ export function createGridRuntime(args: RuntimeArgs): GridRuntime {
     activeRowSnapshots.clear();
     selectedRowsSnapshots.clear();
     selectedRowIdSnapshots.clear();
+    rowInteractionSnapshots.clear();
     schemaCache.clear();
     lastStatusByPath.clear();
     dataSource.dispose();
@@ -1077,13 +1078,11 @@ export function createGridRuntime(args: RuntimeArgs): GridRuntime {
     activeRowFor: activeRowForPath,
     selectedRowsFor: selectedRowsForPath,
     selectedRowIds,
-    rowSelectionContainsRow,
-    rowInteractionStatusFor,
+    rowInteractionSnapshotFor: rowInteractionSnapshotForPath,
     subscribeActiveRow,
     subscribeSelectedRows,
     subscribeSelectedRowIds,
-    subscribeRowSelectionContainsRow,
-    subscribeRowInteractionStatus,
+    subscribeRowInteractionSnapshot,
     rowInteraction,
     displayedRowsFor,
     displayedRowSequenceFor,

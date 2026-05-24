@@ -10,7 +10,9 @@ import {
   useDisplayedRowSequence,
   useGridRuntime,
   useLevelSnapshot,
+  useRowInteractionSnapshot,
 } from "./GridRuntimeProvider";
+import { rowInteractionStatusFor } from "../types/row-selection";
 
 export type GridLevelChrome = {
   renderLevelHeader?: (ctx: GridChromeContext) => ReactNode;
@@ -93,6 +95,7 @@ function DisplayedRowsBody({
   // Body mapping subscribes to row refs, not `LevelRow` objects. A cell edit
   // should re-render only the owning `GridRow`, not this mapper.
   const sequence = useDisplayedRowSequence(path);
+  const rowInteraction = useRowInteractionSnapshot(path);
   const expansion = useStore(runtime.coordinator, (s) => s.expansion.get(path));
 
   return (
@@ -108,6 +111,10 @@ function DisplayedRowsBody({
               schema={schema}
               path={path}
               colOrder={colOrder}
+              rowInteractionStatus={rowInteractionStatusFor(
+                rowRef.id,
+                rowInteraction,
+              )}
             />
             {childPaths?.map((cp) => (
               <ChildLevelMount key={cp} path={cp} chrome={chrome} />

@@ -23,6 +23,7 @@ import {
   CELL_PRIMARY_WITH_SIDE_PANEL_ROW,
   ROW_MULTISELECT_LIST,
 } from "../types/interaction";
+import { rowInteractionStatusFor } from "../types/row-selection";
 
 const TestEditor = () => null;
 const cols: ColumnSchema[] = [
@@ -920,6 +921,33 @@ describe("GridRuntime", () => {
     expect(rt.activeRowFor(rowsRoot)).toBe(rt.activeRowFor(rowsRoot));
     expect(rt.selectedRowsFor(rowsRoot)).toBe(rt.selectedRowsFor(rowsRoot));
     expect(rt.selectedRowIds(rowsRoot)).toBe(rt.selectedRowIds(rowsRoot));
+    expect(rt.rowInteractionSnapshotFor(rowsRoot)).toBe(
+      rt.rowInteractionSnapshotFor(rowsRoot),
+    );
+  });
+
+  it("row interaction snapshot projects active and selected row chrome", () => {
+    const rt = createGridRuntime({
+      schema: tableSchema,
+      dataSource: tableDataSource(),
+      interaction: ROW_MULTISELECT_LIST,
+    });
+    const a = makeRowId(rowsRoot, "a");
+    const b = makeRowId(rowsRoot, "b");
+    const c = makeRowId(rowsRoot, "c");
+
+    rt.rowInteraction.setRowCursor({ path: rowsRoot, rowId: a });
+    rt.rowInteraction.setRowSelection(rowsRoot, {
+      kind: "set",
+      rowIds: new Set([a, b]),
+    });
+
+    const snapshot = rt.rowInteractionSnapshotFor(rowsRoot);
+    expect(snapshot.activeRowId).toBe(a);
+    expect(snapshot.selectedRowIds).toEqual([a, b]);
+    expect(rowInteractionStatusFor(a, snapshot)).toBe("cursor-selected");
+    expect(rowInteractionStatusFor(b, snapshot)).toBe("selected");
+    expect(rowInteractionStatusFor(c, snapshot)).toBe("idle");
   });
 
   it("selectedRowsFor preserves selection shape when projected row ids match", () => {
@@ -939,10 +967,10 @@ describe("GridRuntime", () => {
 
     const selectedRowsChanged = vi.fn();
     const selectedRowIdsChanged = vi.fn();
-    const containsAChanged = vi.fn();
+    const rowInteractionChanged = vi.fn();
     rt.subscribeSelectedRows(rowsRoot, selectedRowsChanged);
     rt.subscribeSelectedRowIds(rowsRoot, selectedRowIdsChanged);
-    rt.subscribeRowSelectionContainsRow(rowsRoot, a, containsAChanged);
+    rt.subscribeRowInteractionSnapshot(rowsRoot, rowInteractionChanged);
 
     rt.rowInteraction.setRowSelection(rowsRoot, {
       kind: "set",
@@ -956,7 +984,7 @@ describe("GridRuntime", () => {
     expect(rt.selectedRowIds(rowsRoot)).toEqual([a, b]);
     expect(selectedRowsChanged).toHaveBeenCalledTimes(1);
     expect(selectedRowIdsChanged).not.toHaveBeenCalled();
-    expect(containsAChanged).not.toHaveBeenCalled();
+    expect(rowInteractionChanged).not.toHaveBeenCalled();
   });
 
   it("selected row id subscribers wake when displayed order changes", () => {

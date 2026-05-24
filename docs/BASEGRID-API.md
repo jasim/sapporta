@@ -31,9 +31,12 @@ import {
   useActiveCellForPath,
   useActiveRow,
   useCellSelection,
+  useRowInteractionSnapshot,
   useSelectedRowIds,
   useSelectedRows,
+  rowInteractionStatusFor,
   type GridSchema,
+  type RowInteractionSnapshot,
   type TreeNode,
 } from "@sapporta/ui";
 ```
@@ -860,8 +863,7 @@ function useCellSelection(path: GridPath): CellSelectionState | null;
 function useActiveRow(path: GridPath): RowCursor | null;
 function useSelectedRows(path: GridPath): RowSelection;
 function useSelectedRowIds(path: GridPath): readonly RowId[];
-function useRowSelectionContainsRow(path: GridPath, rowId: RowId): boolean;
-function useRowInteractionStatus(path: GridPath, rowId: RowId): RowInteractionStatus;
+function useRowInteractionSnapshot(path: GridPath): RowInteractionSnapshot;
 ```
 
 Example:
@@ -915,9 +917,10 @@ runtime-facing surface most BaseGrid screens use.
 runtime.activeRowFor(path); // RowCursor | null
 runtime.selectedRowsFor(path); // RowSelection
 runtime.selectedRowIds(path); // readonly RowId[]
-runtime.rowSelectionContainsRow(path, rowId); // boolean
-runtime.rowInteractionStatusFor(path, rowId);
-// "idle" | "selected" | "cursor" | "cursor-selected"
+runtime.rowInteractionSnapshotFor(path); // RowInteractionSnapshot
+
+rowInteractionStatusFor(rowId, runtime.rowInteractionSnapshotFor(path));
+// RowInteractionStatus: "idle" | "selected" | "cursor" | "cursor-selected"
 ```
 
 ### Subscriptions
@@ -926,8 +929,7 @@ runtime.rowInteractionStatusFor(path, rowId);
 runtime.subscribeActiveRow(path, callback);
 runtime.subscribeSelectedRows(path, callback);
 runtime.subscribeSelectedRowIds(path, callback);
-runtime.subscribeRowSelectionContainsRow(path, rowId, callback);
-runtime.subscribeRowInteractionStatus(path, rowId, callback);
+runtime.subscribeRowInteractionSnapshot(path, callback);
 ```
 
 ### Commands
