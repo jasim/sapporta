@@ -49,7 +49,22 @@
 // key per runtime lifetime). `dispose()` tears down every entry, the
 // data-source itself, the phantom channel, then the controllers.
 //
-// For the three-channel invariant this wires together, see `index.ts`.
+// For the four-channel invariant this wires together, see `index.ts`.
+//
+// Row interaction theory in one place:
+//
+//   - `activeRowFor(path)` is the canonical read for the active row. In a
+//     cell-grid it is derived from the cell cursor when configured; in a
+//     row-list it is derived from that path's live row focus.
+//
+//   - `selectedRowsFor(path)` is the canonical read for selected operation
+//     targets. It may be disabled, derived from active row, or read from the
+//     path-local stored row selection depending on `interaction.selectedRows`.
+//
+//   - `rowInteraction` commands mutate operation targets without moving either
+//     cursor, except for the explicitly cursor-shaped commands. This lets a
+//     checkbox column be ordinary presentation chrome on top of headless
+//     runtime primitives.
 
 import { capabilitiesFor } from "../types/capabilities";
 import {
@@ -60,6 +75,19 @@ import {
   rowKeyOfRowId,
 } from "../types/identity";
 import type { ColId, Coord, GridPath, RowId, RowKey } from "../types/identity";
+import type { GridInteractionConfig } from "../types/interaction";
+import { normalizeInteraction } from "../interaction/normalize-interaction";
+import type { RowCursor, RowSelection } from "../types/row-selection";
+import {
+  activeRowFor,
+  makeRowRangeSelection,
+  makeRowSetSelection,
+  makeSingleRowSelection,
+  normalizeRowSelection,
+  rowIdsInRowSelection,
+  rowSelectionContainsRow as rowSelectionHasRow,
+  selectedRowsFor,
+} from "../types/row-selection";
 import type {
   DisplayedRows,
   DisplayedRowSequence,
@@ -101,9 +129,9 @@ import {
   type GridCoordinatorStore,
 } from "../interaction/coordinator";
 import {
-  createFocusManager,
-  type FocusManager,
-} from "../interaction/focus-manager";
+  createCursorManager,
+  type CursorManager,
+} from "../interaction/cursor-manager";
 import { createPhantomChannel } from "../data-sources/phantom-channel";
 import { createEmitter, type GridEmitter, type GridEvents } from "./emitter";
 import type { PhantomChannel } from "../data-sources/types";
@@ -111,6 +139,7 @@ import type { PhantomChannel } from "../data-sources/types";
 export type RuntimeArgs = {
   schema: GridSchema;
   dataSource: GridDataSource;
+  interaction?: GridInteractionConfig;
   initialPhantomsByPath?: Map<GridPath, PhantomRow[]>;
   on?: { [E in keyof GridEvents]?: (payload: GridEvents[E]) => void };
 };
@@ -126,8 +155,31 @@ export type GridRuntime = {
   subscribeRegistry: (fn: () => void) => () => void;
 
   coordinator: GridCoordinatorPublic;
-  focusManager: FocusManager;
+  cursorManager: CursorManager;
   phantoms: PhantomChannel;
+  interaction: GridInteractionConfig;
+
+  activeRowFor: (path: GridPath) => RowCursor | null;
+  selectedRowsFor: (path: GridPath) => RowSelection;
+  selectedRowIds: (path: GridPath) => readonly RowId[];
+  rowSelectionContainsRow: (path: GridPath, rowId: RowId) => boolean;
+  rowInteractionStatusFor: (
+    path: GridPath,
+    rowId: RowId,
+  ) => RowInteractionStatus;
+  subscribeActiveRow: (path: GridPath, fn: () => void) => () => void;
+  subscribeSelectedRows: (path: GridPath, fn: () => void) => () => void;
+  subscribeRowSelectionContainsRow: (
+    path: GridPath,
+    rowId: RowId,
+    fn: () => void,
+  ) => () => void;
+  subscribeRowInteractionStatus: (
+    path: GridPath,
+    rowId: RowId,
+    fn: () => void,
+  ) => () => void;
+  rowInteraction: RowInteractionCommands;
 
   displayedRowsFor: (path: GridPath) => DisplayedRows;
   displayedRowSequenceFor: (path: GridPath) => DisplayedRowSequence;
@@ -184,8 +236,26 @@ export type GridRuntime = {
   dispose: () => void;
 };
 
+export type RowInteractionStatus =
+  | "idle"
+  | "selected"
+  | "cursor"
+  | "cursor-selected";
+
+export type RowInteractionCommands = {
+  setRowCursor: (target: RowCursor) => void;
+  clearRowCursor: () => void;
+  selectRow: (path: GridPath, rowId: RowId) => void;
+  setRowSelection: (path: GridPath, selection: RowSelection) => void;
+  toggleRowSelection: (path: GridPath, rowId: RowId) => void;
+  extendRowSelectionTo: (path: GridPath, rowId: RowId) => void;
+  extendRowSelectionToCursor: (target: RowCursor) => void;
+  clearRowSelection: (path: GridPath) => void;
+};
+
 export function createGridRuntime(args: RuntimeArgs): GridRuntime {
   const { schema, dataSource } = args;
+  const interaction = normalizeInteraction(args.interaction);
   const schemaTopology = buildSchemaTopology(schema);
 
   const emitter = createEmitter();
@@ -475,6 +545,28 @@ export function createGridRuntime(args: RuntimeArgs): GridRuntime {
       return;
     }
     store.invalidateDisplayedRows(reason);
+    // Data/view changes may make a stored row selection invalid: a selected row
+    // can be filtered out, deleted, or become non-row-selectable. The reverse
+    // is not true — row selection changes must not invalidate displayed rows.
+    reconcileRowSelection(path);
+  }
+
+  function reconcileRowSelection(path: GridPath): void {
+    const selectedRows = interaction.selectedRows;
+    if (
+      selectedRows.kind !== "enabled" ||
+      selectedRows.sync.kind !== "independent"
+    ) {
+      return;
+    }
+    const controller = controllerCursorPortFor(path);
+    const current = controller.getState().rowSelection;
+    const next = normalizeRowSelection(
+      current,
+      displayedRowsFor(path),
+      selectedRows.mode,
+    );
+    if (next !== current) controller.setRowSelection(next);
   }
 
   function sourceFor(path: GridPath): RuntimeLevelDataSource {
@@ -642,7 +734,7 @@ export function createGridRuntime(args: RuntimeArgs): GridRuntime {
   // invalidation. The reference is late-bound because the runtime
   // object is built below.
   let runtimeRef: GridRuntime | null = null;
-  let focusManagerRef: FocusManager | null = null;
+  let cursorManagerRef: CursorManager | null = null;
   const coordinator: GridCoordinatorStore = createGridCoordinator({
     getRuntime: () => {
       if (!runtimeRef) {
@@ -652,46 +744,60 @@ export function createGridRuntime(args: RuntimeArgs): GridRuntime {
       }
       return runtimeRef;
     },
-    getFocusManager: () => {
-      if (!focusManagerRef) {
+    getCursorManager: () => {
+      if (!cursorManagerRef) {
         throw new Error(
-          "GridRuntime: coordinator queried focus manager before runtime was constructed",
+          "GridRuntime: coordinator queried cursor manager before runtime was constructed",
         );
       }
-      return focusManagerRef;
+      return cursorManagerRef;
     },
     capabilitiesFor,
     onExpand: (path, rowId) => ensureChildSources(path, rowId),
   });
 
-  // Focus manager — sole writer of `coordinator.cursor` and every
-  // controller's `liveFocus`.
-  const focusManager = createFocusManager({
+  const cursorManager = createCursorManager({
+    interaction,
     coordinator,
-    controllerFocusPortFor: (path) => controllerFocusPortFor(path),
+    controllerCursorPortFor: (path) => controllerCursorPortFor(path),
+    displayedRowsFor,
   });
-  focusManagerRef = focusManager;
+  cursorManagerRef = cursorManager;
 
-  function controllerFocusPortFor(path: GridPath): GridControllerStore {
+  function controllerCursorPortFor(path: GridPath): GridControllerStore {
     let c = controllers.get(path);
     if (c) return c;
     c = createGridController({
       path,
+      interaction,
       getDisplayed: () => displayedRowsFor(path),
       getSchema: () => schemaForPath(path).columns,
       capabilitiesFor,
-      onNavigate: (intent) => {
-        coordinator.navigate(path, intent);
+      onNavigateCell: (intent) => {
+        coordinator.navigateCell(path, intent);
       },
-      clearRange: (path) => focusManager.clearRange(path),
+      onNavigateRow: (intent) => {
+        coordinator.navigateRow(path, intent);
+      },
+      clearCellRange: (path) => cursorManager.clearCellRange(path),
+      clearRowSelection: (path) => cursorManager.clearRowSelection(path),
       writeValue: (coord, newValue) => {
         writeCell(path, coord, newValue);
       },
     });
     controllers.set(path, c);
     const unsub = c.subscribe((s, prev) => {
-      if (s.selection !== prev.selection) {
-        emitter.emit("selectionChanged", { path, selection: s.selection });
+      if (s.cellSelection !== prev.cellSelection) {
+        emitter.emit("cellSelectionChanged", {
+          path,
+          selection: s.cellSelection,
+        });
+      }
+      if (s.rowSelection !== prev.rowSelection) {
+        emitter.emit("rowSelectionChanged", {
+          path,
+          selection: s.rowSelection,
+        });
       }
     });
     controllerUnsubs.push(unsub);
@@ -700,8 +806,195 @@ export function createGridRuntime(args: RuntimeArgs): GridRuntime {
 
   function controllerFor(path: GridPath): GridControllerPublic {
     assertLive();
-    return controllerFocusPortFor(path);
+    return controllerCursorPortFor(path);
   }
+
+  function activeRowForPath(path: GridPath): RowCursor | null {
+    const controller = controllerCursorPortFor(path);
+    const active = activeRowFor(
+      interaction,
+      coordinator.getState().cellCursor,
+      controller.getState().liveRowFocus,
+      path,
+    );
+    return active?.path === path ? active : null;
+  }
+
+  function selectedRowsForPath(path: GridPath): RowSelection {
+    const controller = controllerCursorPortFor(path);
+    return selectedRowsFor(
+      interaction,
+      activeRowForPath(path),
+      controller.getState().rowSelection,
+    );
+  }
+
+  function selectedRowIds(path: GridPath): readonly RowId[] {
+    return rowIdsInRowSelection(selectedRowsForPath(path), displayedRowsFor(path));
+  }
+
+  function rowSelectionContainsRow(path: GridPath, rowId: RowId): boolean {
+    return rowSelectionHasRow(selectedRowsForPath(path), rowId, displayedRowsFor(path));
+  }
+
+  function rowInteractionStatusFor(
+    path: GridPath,
+    rowId: RowId,
+  ): RowInteractionStatus {
+    const active = activeRowForPath(path);
+    const cursor = active?.rowId === rowId;
+    const selected = rowSelectionContainsRow(path, rowId);
+    if (cursor && selected) return "cursor-selected";
+    if (cursor) return "cursor";
+    return selected ? "selected" : "idle";
+  }
+
+  function subscribeActiveRow(path: GridPath, fn: () => void): () => void {
+    if (
+      interaction.mode === "cell-grid" &&
+      interaction.activeRow.kind === "from-active-cell"
+    ) {
+      let prev = activeRowForPath(path);
+      return coordinator.subscribe(() => {
+        const next = activeRowForPath(path);
+        if (rowCursorSnapshotEqual(prev, next)) return;
+        prev = next;
+        fn();
+      });
+    }
+    if (interaction.mode === "row-list") {
+      const controller = controllerCursorPortFor(path);
+      let prev = activeRowForPath(path);
+      return controller.subscribe(() => {
+        const next = activeRowForPath(path);
+        if (rowCursorSnapshotEqual(prev, next)) return;
+        prev = next;
+        fn();
+      });
+    }
+    return () => {};
+  }
+
+  function subscribeSelectedRows(path: GridPath, fn: () => void): () => void {
+    const selectedRows = interaction.selectedRows;
+    if (selectedRows.kind === "none") return () => {};
+    let prev = selectedRowsForPath(path);
+    const maybeNotify = () => {
+      const next = selectedRowsForPath(path);
+      // Compare the projected selected ids, not object identity. Normalization
+      // preserves object identity on no-ops, but derived follows-active-row
+      // selection creates fresh value objects during reads.
+      if (rowSelectionSnapshotEqual(prev, next, displayedRowsFor(path))) return;
+      prev = next;
+      fn();
+    };
+    if (selectedRows.sync.kind === "follows-active-row") {
+      return subscribeActiveRow(path, maybeNotify);
+    }
+    return controllerCursorPortFor(path).subscribe((s, previous) => {
+      if (s.rowSelection !== previous.rowSelection) maybeNotify();
+    });
+  }
+
+  function subscribeRowSelectionContainsRow(
+    path: GridPath,
+    rowId: RowId,
+    fn: () => void,
+  ): () => void {
+    let prev = rowSelectionContainsRow(path, rowId);
+    return subscribeSelectedRows(path, () => {
+      const next = rowSelectionContainsRow(path, rowId);
+      if (prev === next) return;
+      prev = next;
+      fn();
+    });
+  }
+
+  function subscribeRowInteractionStatus(
+    path: GridPath,
+    rowId: RowId,
+    fn: () => void,
+  ): () => void {
+    let prev = rowInteractionStatusFor(path, rowId);
+    const maybeNotify = () => {
+      const next = rowInteractionStatusFor(path, rowId);
+      if (prev === next) return;
+      prev = next;
+      fn();
+    };
+    const unsubActive = subscribeActiveRow(path, maybeNotify);
+    const unsubSelected = subscribeSelectedRows(path, maybeNotify);
+    return () => {
+      unsubActive();
+      unsubSelected();
+    };
+  }
+
+  const rowInteraction: RowInteractionCommands = {
+    setRowCursor(target) {
+      if (interaction.mode !== "row-list") return;
+      if (!displayedRowsFor(target.path).rowById.get(target.rowId)?.rowSelectable) return;
+      cursorManager.moveRowCursorTo(target);
+    },
+    clearRowCursor() {
+      if (interaction.mode !== "row-list") return;
+      cursorManager.clearRowCursor();
+    },
+    selectRow(path, rowId) {
+      cursorManager.setRowSelection(path, makeSingleRowSelection(rowId));
+    },
+    setRowSelection(path, selection) {
+      cursorManager.setRowSelection(path, selection);
+    },
+    toggleRowSelection(path, rowId) {
+      const displayed = displayedRowsFor(path);
+      if (!displayed.rowById.get(rowId)?.rowSelectable) return;
+      const config = interaction.selectedRows;
+      if (config.kind !== "enabled" || config.sync.kind !== "independent") return;
+      const current = controllerCursorPortFor(path).getState().rowSelection;
+      if (config.mode === "single") {
+        cursorManager.setRowSelection(
+          path,
+          rowSelectionHasRow(current, rowId, displayed)
+            ? null
+            : makeSingleRowSelection(rowId),
+        );
+        return;
+      }
+      // Multi/range toggles rebuild from displayed-order projection. That
+      // keeps the stored Set independent of insertion order and automatically
+      // drops rows that are no longer displayed or row-selectable.
+      const ids = new Set(rowIdsInRowSelection(current, displayed));
+      if (ids.has(rowId)) ids.delete(rowId);
+      else ids.add(rowId);
+      cursorManager.setRowSelection(path, makeRowSetSelection(ids));
+    },
+    extendRowSelectionTo(path, rowId) {
+      const displayed = displayedRowsFor(path);
+      if (!displayed.rowById.get(rowId)?.rowSelectable) return;
+      const current = controllerCursorPortFor(path).getState().rowSelection;
+      const currentCursor = cursorManager.currentRowCursor();
+      // Pointer/checkbox shift-extension is a selection command, not a cursor
+      // command. Prefer an existing range anchor, then a single selected row,
+      // then the current row cursor on this path, and finally the clicked row.
+      const anchor =
+        current?.kind === "range"
+          ? current.anchor
+          : current?.kind === "single"
+            ? current.rowId
+            : currentCursor?.path === path
+              ? currentCursor.rowId
+              : rowId;
+      cursorManager.setRowSelection(path, makeRowRangeSelection(anchor, rowId));
+    },
+    extendRowSelectionToCursor(target) {
+      if (interaction.mode !== "row-list") return;
+      cursorManager.extendRowSelectionToCursor(target);
+    },
+    clearRowSelection(path) {
+      cursorManager.clearRowSelection(path);
+    },
+  };
 
   function dispose() {
     if (disposed) return;
@@ -733,8 +1026,19 @@ export function createGridRuntime(args: RuntimeArgs): GridRuntime {
     registeredPaths,
     subscribeRegistry,
     coordinator,
-    focusManager,
+    cursorManager,
     phantoms,
+    interaction,
+    activeRowFor: activeRowForPath,
+    selectedRowsFor: selectedRowsForPath,
+    selectedRowIds,
+    rowSelectionContainsRow,
+    rowInteractionStatusFor,
+    subscribeActiveRow,
+    subscribeSelectedRows,
+    subscribeRowSelectionContainsRow,
+    subscribeRowInteractionStatus,
+    rowInteraction,
     displayedRowsFor,
     displayedRowSequenceFor,
     displayedRowFor,
@@ -791,4 +1095,27 @@ function readNodeWithIndex(
     }
   }
   throw new Error(`GridRuntime.removeRow: no node with rowKey '${rowKey}'`);
+}
+
+function rowCursorSnapshotEqual(
+  a: RowCursor | null,
+  b: RowCursor | null,
+): boolean {
+  if (!a && !b) return true;
+  if (!a || !b) return false;
+  return a.path === b.path && a.rowId === b.rowId;
+}
+
+function rowSelectionSnapshotEqual(
+  a: RowSelection,
+  b: RowSelection,
+  displayed: DisplayedRows,
+): boolean {
+  const aIds = rowIdsInRowSelection(a, displayed);
+  const bIds = rowIdsInRowSelection(b, displayed);
+  if (aIds.length !== bIds.length) return false;
+  for (let i = 0; i < aIds.length; i++) {
+    if (aIds[i] !== bIds[i]) return false;
+  }
+  return true;
 }

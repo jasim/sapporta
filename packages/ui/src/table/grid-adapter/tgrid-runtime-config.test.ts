@@ -205,6 +205,7 @@ describe("compileTGridRuntimeConfig", () => {
       row: {
         kind: "data",
         id: "orders#1" as never,
+        rowSelectable: true,
         columns: { id: 1 },
         hasChildren: false,
         source: { levelName: "orders", columns: { id: 1 } },

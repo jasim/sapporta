@@ -25,6 +25,7 @@ const displayed: DisplayedRows = buildDisplayed([
   {
     kind: "data",
     id: rowId,
+    rowSelectable: true,
     columns: {},
     hasChildren: false,
     source: {} as never,
@@ -32,9 +33,11 @@ const displayed: DisplayedRows = buildDisplayed([
 ]);
 
 const state: ControllerState = {
-  liveFocus: null,
-  selection: null,
+  liveCellFocus: null,
+  cellSelection: null,
   editing: null,
+  liveRowFocus: null,
+  rowSelection: null,
 };
 
 function start(action: GridAction) {

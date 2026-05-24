@@ -213,13 +213,13 @@ export function coordsEqual(a: Coord, b: Coord): boolean {
 }
 
 // The canonical location of the live focus across the whole grid. There is
-// at most one. Owned by the focus manager; the coordinator stores it and the
-// controller for `path` mirrors `(rowId, colId)` as `liveFocus`.
-export type GridCursor = { path: GridPath; rowId: RowId; colId: ColId };
+// at most one. Owned by the cursor manager; the coordinator stores it and the
+// controller for `path` mirrors `(rowId, colId)` as `liveCellFocus`.
+export type CellCursor = { path: GridPath; rowId: RowId; colId: ColId };
 
 export function cursorEqual(
-  a: GridCursor | null,
-  b: GridCursor | null,
+  a: CellCursor | null,
+  b: CellCursor | null,
 ): boolean {
   if (!a && !b) return true;
   if (!a || !b) return false;

@@ -14,13 +14,13 @@ function buildDisplayed(specs: Array<{ key: string; kind: LevelRow["kind"] }>): 
   const rows = specs.map((s) => {
     const id = makeRowId(path, s.key);
     if (s.kind === "data") {
-      return { kind: "data", id, columns: {}, hasChildren: false, source: {} as never };
+      return { kind: "data", id, rowSelectable: true, columns: {}, hasChildren: false, source: {} as never };
     }
     if (s.kind === "footer") {
-      return { kind: "footer", id, columns: {}, source: {} as never };
+      return { kind: "footer", id, rowSelectable: false, columns: {}, source: {} as never };
     }
-    if (s.kind === "rollup") return { kind: "rollup", id, columns: {}, source: {} as never };
-    return { kind: s.kind, id, columns: {}, source: {} as never };
+    if (s.kind === "rollup") return { kind: "rollup", id, rowSelectable: true, columns: {}, source: {} as never };
+    return { kind: s.kind, id, rowSelectable: true, columns: {}, source: {} as never };
   }) as LevelRow[];
   const rowById = new Map(rows.map((r) => [r.id, r] as const));
   const rowIndexById = new Map(rows.map((r, i) => [r.id, i] as const));

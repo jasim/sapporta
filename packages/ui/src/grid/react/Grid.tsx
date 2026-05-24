@@ -30,7 +30,7 @@ export type GridChromeContext = {
 //   4. Render <CellEditorOverlay> for this path (singleton overlay).
 //
 // Grid also decorates its container with `data-grid-path` and
-// `data-active` (from `coordinator.cursor?.path === path`); the
+// `data-active` (from `coordinator.cellCursor?.path === path`); the
 // active/ghost distinction is level-scoped and reaches every descendant
 // cell via the CSS cascade, not via per-cell subscriptions. Each nested
 // each grid root re-declares `--grid-active` at its own scope so
@@ -39,7 +39,7 @@ export type GridChromeContext = {
 // Grid also mounts EffectRunner (drains the controller's effects channel)
 // and the overlay portal slot (`data-grid-overlay`) that editors portal
 // dropdowns/calendars into. Cursor movement queues focus effects through
-// the focus manager, so EffectRunner drains the target path's queue on the
+// the cursor manager, so EffectRunner drains the target path's queue on the
 // next paint — including when this Grid is mounting for the first time,
 // since controllers outlive DOM presence and the queue persists across
 // mounts.
@@ -66,9 +66,10 @@ export function Grid({
 }) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const runtime = useGridRuntime();
-  const isActive = useStore(
-    runtime.coordinator,
-    (s) => s.cursor?.path === path,
+  const isActive = useStore(runtime.coordinator, (s) =>
+    runtime.interaction.mode === "cell-grid"
+      ? s.cellCursor?.path === path
+      : s.rowCursor?.path === path,
   );
   const chromeContext = { path, levelName: levelNameFromPath(path), schema };
   const header = renderLevelHeader?.(chromeContext);

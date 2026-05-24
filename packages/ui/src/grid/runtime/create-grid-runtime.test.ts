@@ -18,6 +18,10 @@ import {
 } from "../types/identity";
 import type { TreeNode } from "../types/level-row";
 import type { ColumnSchema, GridSchema, LevelSchema } from "../types/schema";
+import {
+  CELL_GRID_WITH_ACTIVE_ROW,
+  ROW_MULTISELECT_LIST,
+} from "../types/interaction";
 
 const TestEditor = () => null;
 const cols: ColumnSchema[] = [
@@ -647,7 +651,7 @@ describe("GridRuntime", () => {
     });
     const c = rt.controllerFor(rowsRoot);
     const coord = { rowId: makeRowId(rowsRoot, "a"), colId: "qty" };
-    rt.focusManager.setRange(rowsRoot, coord, coord);
+    rt.cursorManager.setCellRange(rowsRoot, coord, coord);
     c.startEdit(coord, "f2");
     c.commitEdit(42);
     expect(handler).toHaveBeenCalledWith(
@@ -825,6 +829,106 @@ describe("GridRuntime", () => {
       path: rowsRoot,
       node: { levelName: "rows", columns: { id: "b", name: "Banana", qty: 2 } },
       atIndex: 1,
+    });
+  });
+
+  it("cursorManager rejects cursor commands from the wrong interaction mode", () => {
+    const rowList = createGridRuntime({
+      schema: tableSchema,
+      dataSource: tableDataSource(),
+      interaction: ROW_MULTISELECT_LIST,
+    });
+    expect(() =>
+      rowList.cursorManager.moveCellCursorTo({
+        path: rowsRoot,
+        rowId: makeRowId(rowsRoot, "a"),
+        colId: "name",
+      }),
+    ).toThrow(/cell-grid interaction/);
+    expect(rowList.coordinator.getState().cellCursor).toBe(null);
+
+    const cellGrid = createGridRuntime({
+      schema: tableSchema,
+      dataSource: tableDataSource(),
+      interaction: CELL_GRID_WITH_ACTIVE_ROW,
+    });
+    expect(() =>
+      cellGrid.cursorManager.extendRowSelectionToCursor({
+        path: rowsRoot,
+        rowId: makeRowId(rowsRoot, "a"),
+      }),
+    ).toThrow(/row-list interaction/);
+    expect(cellGrid.coordinator.getState().rowCursor).toBe(null);
+  });
+
+  it("controller startEdit is a no-op in row-list mode", () => {
+    const rt = createGridRuntime({
+      schema: tableSchema,
+      dataSource: tableDataSource(),
+      interaction: ROW_MULTISELECT_LIST,
+    });
+
+    rt.controllerFor(rowsRoot).startEdit(
+      { rowId: makeRowId(rowsRoot, "a"), colId: "name" },
+      "f2",
+    );
+
+    expect(rt.controllerFor(rowsRoot).getState().editing).toBe(null);
+  });
+
+  it("row selection reconciliation preserves identity on no-op normalization", () => {
+    const rowSelectionChanged = vi.fn();
+    const rt = createGridRuntime({
+      schema: tableSchema,
+      dataSource: tableDataSource(),
+      interaction: ROW_MULTISELECT_LIST,
+      on: { rowSelectionChanged },
+    });
+    const selection = {
+      kind: "single" as const,
+      rowId: makeRowId(rowsRoot, "a"),
+    };
+
+    rt.rowInteraction.setRowSelection(rowsRoot, selection);
+    rowSelectionChanged.mockClear();
+    rt.invalidateDisplayedRows(rowsRoot, { type: "view" });
+
+    expect(rt.controllerFor(rowsRoot).getState().rowSelection).toBe(selection);
+    expect(rowSelectionChanged).not.toHaveBeenCalled();
+  });
+
+  it("active row is path-local in cell-grid mode", () => {
+    const rt = createGridRuntime({
+      schema: reportSchema,
+      dataSource: reportDataSource(),
+      interaction: CELL_GRID_WITH_ACTIVE_ROW,
+    });
+    rt.coordinator.toggleExpand(reportRoot, makeRowId(reportRoot, "Fruit"));
+    const itemsPath = childPath(reportRoot, "Fruit", "items") as GridPath;
+    const rootActive = vi.fn();
+    const childActive = vi.fn();
+    rt.subscribeActiveRow(reportRoot, rootActive);
+    rt.subscribeActiveRow(itemsPath, childActive);
+
+    rt.cursorManager.moveCellCursorTo({
+      path: reportRoot,
+      rowId: makeRowId(reportRoot, "Fruit"),
+      colId: "name",
+    });
+    expect(rootActive).toHaveBeenCalledTimes(1);
+    expect(childActive).not.toHaveBeenCalled();
+
+    rt.cursorManager.moveCellCursorTo({
+      path: itemsPath,
+      rowId: makeRowId(itemsPath, "Apple"),
+      colId: "name",
+    });
+    expect(rootActive).toHaveBeenCalledTimes(2);
+    expect(childActive).toHaveBeenCalledTimes(1);
+    expect(rt.activeRowFor(reportRoot)).toBe(null);
+    expect(rt.activeRowFor(itemsPath)).toEqual({
+      path: itemsPath,
+      rowId: makeRowId(itemsPath, "Apple"),
     });
   });
 });

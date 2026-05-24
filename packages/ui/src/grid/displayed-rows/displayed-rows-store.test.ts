@@ -28,6 +28,7 @@ function row(key: string, columns: Record<string, unknown>): LevelRow {
   return {
     kind: "data",
     id: `${path}#${key}` as RowId,
+    rowSelectable: true,
     columns,
     hasChildren: false,
     source: { levelName: "rows", columns },

@@ -26,6 +26,7 @@ function props(
   const row: LevelRow = {
     kind: "data",
     id: makeRowId(path, "r0"),
+    rowSelectable: true,
     columns: { a: value },
     hasChildren: false,
     source: {} as never,

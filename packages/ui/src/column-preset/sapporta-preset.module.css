@@ -29,6 +29,13 @@
   --grid-editor-background: var(--sap-surface);
 }
 
+.rowSelectionCell {
+  align-items: center;
+  display: flex;
+  height: 100%;
+  justify-content: center;
+}
+
 .presetGrid[data-grid-depth]:not([data-grid-depth="0"]) {
   --grid-cell-min-height: 31px;
 

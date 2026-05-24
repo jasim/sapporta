@@ -66,6 +66,7 @@ export type LevelRow =
   | {
       kind: "data";
       id: RowId;
+      rowSelectable: boolean;
       columns: Record<ColId, unknown>;
       hasChildren: boolean;
       source: TreeNode;
@@ -73,24 +74,28 @@ export type LevelRow =
   | {
       kind: "rollup";
       id: RowId;
+      rowSelectable: boolean;
       columns: Record<ColId, unknown>;
       source: TreeNode;
     }
   | {
       kind: "opening" | "closing" | "subtotal";
       id: RowId;
+      rowSelectable: boolean;
       columns: Record<ColId, unknown>;
       source: TreeNode;
     }
   | {
       kind: "footer";
       id: RowId;
+      rowSelectable: boolean;
       columns: Record<ColId, unknown>;
       source: FooterRow;
     }
   | {
       kind: "phantom";
       id: RowId;
+      rowSelectable: boolean;
       columns: Record<ColId, unknown>;
       source: PhantomRow;
     };

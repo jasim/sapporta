@@ -51,6 +51,14 @@ function runEffect(e: GridEffect, container: HTMLDivElement | null) {
       cell?.scrollIntoView({ block: "nearest", inline: "nearest" });
       return;
     }
+    case "scrollRowIntoView": {
+      if (!container) return;
+      const row = container.querySelector<HTMLElement>(
+        `[data-row-id="${cssEscape(e.rowId)}"]`,
+      );
+      row?.scrollIntoView({ block: "nearest", inline: "nearest" });
+      return;
+    }
   }
 }
 

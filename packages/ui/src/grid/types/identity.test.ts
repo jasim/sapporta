@@ -220,6 +220,7 @@ describe("capabilitiesFor", () => {
       editable: true,
       focusable: true,
       selectable: true,
+      rowSelectable: true,
       hasContextMenu: true,
       canExpand: true,
     });
@@ -230,6 +231,7 @@ describe("capabilitiesFor", () => {
     expect(c.focusable).toBe(false);
     expect(c.editable).toBe(false);
     expect(c.selectable).toBe(false);
+    expect(c.rowSelectable).toBe(false);
   });
 
   it("opening / closing rows are focusable but not editable or selectable", () => {
@@ -238,12 +240,14 @@ describe("capabilitiesFor", () => {
       expect(c.focusable).toBe(true);
       expect(c.editable).toBe(false);
       expect(c.selectable).toBe(false);
+      expect(c.rowSelectable).toBe(false);
     }
   });
 
   it("phantoms are editable but cannot expand", () => {
     const c = capabilitiesFor("phantom");
     expect(c.editable).toBe(true);
+    expect(c.rowSelectable).toBe(true);
     expect(c.canExpand).toBe(false);
   });
 });

@@ -7,7 +7,7 @@
 // (`controller.effects`). EffectRunner subscribes to that store and
 // drains the queue in a single useEffect after layout.
 //
-// Host I/O (mutationCommitted, selectionChanged, etc.) does NOT travel
+// Host I/O (mutationCommitted, cellSelectionChanged, etc.) does NOT travel
 // through this channel — it goes through the runtime emitter. The
 // effects channel is DOM-only.
 //
@@ -16,7 +16,7 @@
 // render path. The queue's array identity is preserved across no-op
 // transitions — the subscription only fires when new effects are queued.
 
-import type { Coord } from "./identity";
+import type { Coord, RowId } from "./identity";
 
 // Cursor placement when an editor opens.
 export type CursorPlacement = "selectAll" | "atEnd";
@@ -24,4 +24,5 @@ export type CursorPlacement = "selectAll" | "atEnd";
 export type GridEffect =
   | { type: "focusContainer" }
   | { type: "focusCellEditor"; cursor: CursorPlacement }
-  | { type: "scrollFocusIntoView"; coord: Coord };
+  | { type: "scrollFocusIntoView"; coord: Coord }
+  | { type: "scrollRowIntoView"; rowId: RowId };

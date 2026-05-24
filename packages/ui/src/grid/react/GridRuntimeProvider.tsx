@@ -4,7 +4,10 @@ import {
   useSyncExternalStore,
   type ReactNode,
 } from "react";
-import type { GridRuntime } from "../runtime/create-grid-runtime";
+import type {
+  GridRuntime,
+  RowInteractionStatus,
+} from "../runtime/create-grid-runtime";
 import type { LevelSnapshot } from "../data-sources/types";
 import type { GridPath, RowId } from "../types/identity";
 import type {
@@ -85,5 +88,29 @@ export function useDisplayedRow(path: GridPath, rowId: RowId): LevelRow {
       }
       return row;
     },
+  );
+}
+
+export function useRowSelectionContainsRow(
+  path: GridPath,
+  rowId: RowId,
+): boolean {
+  const runtime = useGridRuntime();
+  return useSyncExternalStore(
+    (cb) => runtime.subscribeRowSelectionContainsRow(path, rowId, cb),
+    () => runtime.rowSelectionContainsRow(path, rowId),
+    () => false,
+  );
+}
+
+export function useRowInteractionStatus(
+  path: GridPath,
+  rowId: RowId,
+): RowInteractionStatus {
+  const runtime = useGridRuntime();
+  return useSyncExternalStore(
+    (cb) => runtime.subscribeRowInteractionStatus(path, rowId, cb),
+    () => runtime.rowInteractionStatusFor(path, rowId),
+    () => "idle",
   );
 }

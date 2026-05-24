@@ -8,11 +8,11 @@ import type { GridEffect } from "../types/effects";
 
 // Pure reducer for path-local edit lifecycle.
 //
-// Cursor motion and per-path `liveFocus` writes do NOT pass through this
-// reducer — those flow through the focus manager, which is the sole
-// writer of `coordinator.cursor` and every controller's `liveFocus`.
-// Range writes (`selection`) on Shift+arrow extension also bypass this
-// reducer; they are the focus manager's `extendTo` responsibility.
+// Cursor motion and per-path `liveCellFocus` writes do NOT pass through this
+// reducer — those flow through the cursor manager, which is the sole
+// writer of `coordinator.cellCursor` and every controller's `liveCellFocus`.
+// Cell range writes on Shift+arrow extension also bypass this reducer; they
+// are the cursor manager's `extendCellSelectionTo` responsibility.
 //
 // What this reducer still owns:
 //
@@ -64,8 +64,10 @@ function transitionFor(
           ? { trigger: action.trigger, typedSeed: action.initial }
           : { trigger: action.trigger };
       return {
-        liveFocus: state.liveFocus,
-        selection: state.selection,
+        liveCellFocus: state.liveCellFocus,
+        cellSelection: state.cellSelection,
+        liveRowFocus: state.liveRowFocus,
+        rowSelection: state.rowSelection,
         editing: {
           coord: action.coord,
           ...editStart,
@@ -76,8 +78,10 @@ function transitionFor(
     case "CANCEL_EDIT": {
       if (!state.editing) return null;
       return {
-        liveFocus: state.liveFocus,
-        selection: state.selection,
+        liveCellFocus: state.liveCellFocus,
+        cellSelection: state.cellSelection,
+        liveRowFocus: state.liveRowFocus,
+        rowSelection: state.rowSelection,
         editing: null,
       };
     }
@@ -88,10 +92,12 @@ function transitionFor(
       // and the directional follow-up come from `commitEdit` on the
       // controller (see controller.ts), which calls `writeValue` (the runtime
       // emits `mutationCommitted` from there) and then issues a
-      // movement intent through the focus manager.
+      // movement intent through the cursor manager.
       return {
-        liveFocus: state.liveFocus,
-        selection: state.selection,
+        liveCellFocus: state.liveCellFocus,
+        cellSelection: state.cellSelection,
+        liveRowFocus: state.liveRowFocus,
+        rowSelection: state.rowSelection,
         editing: null,
       };
     }
@@ -99,7 +105,7 @@ function transitionFor(
 }
 
 // Edit-lifecycle effects only. Cursor-motion effects (focusContainer +
-// scrollFocusIntoView for cursor moves) are queued by the focus manager,
+// scrollFocusIntoView for cursor moves) are queued by the cursor manager,
 // not derived here.
 function deriveEffects(prev: ControllerState, next: Next): GridEffect[] {
   // Entered an edit: cursor placement inside the editor.

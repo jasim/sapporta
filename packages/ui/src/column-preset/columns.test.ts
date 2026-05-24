@@ -72,6 +72,7 @@ describe("columnPreset columns", () => {
       row: {
         kind: "data",
         id: "books#1" as never,
+        rowSelectable: true,
         columns: { amount: 0 },
         hasChildren: false,
         source: { levelName: "books", columns: { amount: 0 } },
@@ -121,6 +122,7 @@ describe("columnPreset columns", () => {
         row: {
           kind: "data",
           id: "books#1" as never,
+          rowSelectable: true,
           columns: { quote: "line 1" },
           hasChildren: false,
           source: { levelName: "books", columns: { quote: "line 1" } },
@@ -151,6 +153,7 @@ describe("columnPreset columns", () => {
       row: {
         kind: "data",
         id: "books#1" as never,
+        rowSelectable: true,
         columns: { title: "A short title" },
         hasChildren: false,
         source: { levelName: "books", columns: { title: "A short title" } },
