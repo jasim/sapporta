@@ -83,7 +83,12 @@ export function GridDataCell({
   }
 
   const value = row.columns[column.id];
-  const content = column.renderCell({ value, row, column, path });
+  const content = column.renderCell({
+    value,
+    row,
+    column,
+    path,
+  });
 
   return (
     <CellShell

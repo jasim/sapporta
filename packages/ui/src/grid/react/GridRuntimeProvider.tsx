@@ -5,14 +5,16 @@ import {
   type ReactNode,
 } from "react";
 import { useStore } from "zustand";
-import type {
-  GridRuntime,
-  RowInteractionStatus,
-} from "../runtime/create-grid-runtime";
+import type { GridRuntime } from "../runtime/create-grid-runtime";
 import type { LevelSnapshot } from "../data-sources/types";
 import type { CellCursor, Coord, GridPath, RowId } from "../types/identity";
 import type { CellSelectionState } from "../types/selection";
-import type { RowCursor, RowSelection } from "../types/row-selection";
+import type {
+  RowCursor,
+  RowInteractionSnapshot,
+  RowInteractionStatus,
+  RowSelection,
+} from "../types/row-selection";
 import type { ControllerState } from "../types/controller-state";
 import type {
   DisplayedRowSequence,
@@ -143,26 +145,21 @@ export function useSelectedRowIds(path: GridPath): readonly RowId[] {
   );
 }
 
-export function useRowSelectionContainsRow(
+export function useRowInteractionSnapshot(
   path: GridPath,
-  rowId: RowId,
-): boolean {
+): RowInteractionSnapshot {
   const runtime = useGridRuntime();
   return useSyncExternalStore(
-    (cb) => runtime.subscribeRowSelectionContainsRow(path, rowId, cb),
-    () => runtime.rowSelectionContainsRow(path, rowId),
-    () => false,
+    (cb) => runtime.subscribeRowInteractionSnapshot(path, cb),
+    () => runtime.rowInteractionSnapshotFor(path),
+    () => EMPTY_ROW_INTERACTION,
   );
 }
 
-export function useRowInteractionStatus(
-  path: GridPath,
-  rowId: RowId,
-): RowInteractionStatus {
-  const runtime = useGridRuntime();
-  return useSyncExternalStore(
-    (cb) => runtime.subscribeRowInteractionStatus(path, rowId, cb),
-    () => runtime.rowInteractionStatusFor(path, rowId),
-    () => "idle",
-  );
-}
+const EMPTY_ROW_IDS: readonly RowId[] = [];
+const EMPTY_ROW_STATUS: ReadonlyMap<RowId, RowInteractionStatus> = new Map();
+const EMPTY_ROW_INTERACTION: RowInteractionSnapshot = {
+  activeRowId: null,
+  selectedRowIds: EMPTY_ROW_IDS,
+  statusByRowId: EMPTY_ROW_STATUS,
+};
