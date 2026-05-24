@@ -27,6 +27,12 @@ import {
   inMemoryGridDataSource,
   rootPath,
   text,
+  useActiveCell,
+  useActiveCellForPath,
+  useActiveRow,
+  useCellSelection,
+  useSelectedRowIds,
+  useSelectedRows,
   type GridSchema,
   type TreeNode,
 } from "@sapporta/ui";
@@ -848,6 +854,12 @@ function useLevelSnapshot(path: GridPath): LevelSnapshot;
 function usePhantoms(path: GridPath): PhantomRow[];
 function useDisplayedRowSequence(path: GridPath): DisplayedRowSequence;
 function useDisplayedRow(path: GridPath, rowId: RowId): LevelRow;
+function useActiveCell(): CellCursor | null;
+function useActiveCellForPath(path: GridPath): Coord | null;
+function useCellSelection(path: GridPath): CellSelectionState | null;
+function useActiveRow(path: GridPath): RowCursor | null;
+function useSelectedRows(path: GridPath): RowSelection;
+function useSelectedRowIds(path: GridPath): readonly RowId[];
 function useRowSelectionContainsRow(path: GridPath, rowId: RowId): boolean;
 function useRowInteractionStatus(path: GridPath, rowId: RowId): RowInteractionStatus;
 ```
@@ -858,6 +870,36 @@ Example:
 function LevelStatus({ path }: { path: GridPath }) {
   const snapshot = useLevelSnapshot(path);
   return <span>{snapshot.status}</span>;
+}
+```
+
+Host components that sit next to a `GridLevel` should use these hooks instead
+of subscribing to runtime internals directly:
+
+```tsx
+function TaskInspector({ path }: { path: GridPath }) {
+  const activeCellInGrid = useActiveCell();
+  const activeCell = useActiveCellForPath(path);
+  const cellSelection = useCellSelection(path);
+  const activeRow = useActiveRow(path);
+  const selectedRows = useSelectedRows(path);
+  const selectedRowIds = useSelectedRowIds(path);
+
+  return (
+    <aside>
+      <p>Active row: {activeRow?.rowId ?? "none"}</p>
+      <p>Active cell: {activeCell?.colId ?? "none"}</p>
+      <p>Grid cursor path: {activeCellInGrid?.path ?? "none"}</p>
+      <p>
+        Cell range:{" "}
+        {cellSelection
+          ? `${cellSelection.anchor.rowId}:${cellSelection.anchor.colId} to ${cellSelection.head.rowId}:${cellSelection.head.colId}`
+          : "none"}
+      </p>
+      <p>Selected row shape: {selectedRows?.kind ?? "none"}</p>
+      <p>Selected rows: {selectedRowIds.length}</p>
+    </aside>
+  );
 }
 ```
 
@@ -883,6 +925,7 @@ runtime.rowInteractionStatusFor(path, rowId);
 ```ts
 runtime.subscribeActiveRow(path, callback);
 runtime.subscribeSelectedRows(path, callback);
+runtime.subscribeSelectedRowIds(path, callback);
 runtime.subscribeRowSelectionContainsRow(path, rowId, callback);
 runtime.subscribeRowInteractionStatus(path, rowId, callback);
 ```

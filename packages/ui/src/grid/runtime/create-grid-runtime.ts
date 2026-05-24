@@ -169,6 +169,7 @@ export type GridRuntime = {
   ) => RowInteractionStatus;
   subscribeActiveRow: (path: GridPath, fn: () => void) => () => void;
   subscribeSelectedRows: (path: GridPath, fn: () => void) => () => void;
+  subscribeSelectedRowIds: (path: GridPath, fn: () => void) => () => void;
   subscribeRowSelectionContainsRow: (
     path: GridPath,
     rowId: RowId,
@@ -305,6 +306,9 @@ export function createGridRuntime(args: RuntimeArgs): GridRuntime {
   // lifetime; collapsing/re-expanding does not recreate them.
   const controllers = new Map<GridPath, GridControllerStore>();
   const controllerUnsubs: Array<() => void> = [];
+  const activeRowSnapshots = new Map<GridPath, RowCursor | null>();
+  const selectedRowsSnapshots = new Map<GridPath, RowSelection>();
+  const selectedRowIdSnapshots = new Map<GridPath, readonly RowId[]>();
 
   // Memoized `LevelSchema` per path. The path's level name is a function
   // of the path string, so the entry is stable for the runtime's
@@ -817,24 +821,43 @@ export function createGridRuntime(args: RuntimeArgs): GridRuntime {
       controller.getState().liveRowFocus,
       path,
     );
-    return active?.path === path ? active : null;
+    const next = active?.path === path ? active : null;
+    const prev = activeRowSnapshots.get(path) ?? null;
+    if (rowCursorSnapshotEqual(prev, next)) return prev;
+    activeRowSnapshots.set(path, next);
+    return next;
   }
 
   function selectedRowsForPath(path: GridPath): RowSelection {
     const controller = controllerCursorPortFor(path);
-    return selectedRowsFor(
+    const next = selectedRowsFor(
       interaction,
       activeRowForPath(path),
       controller.getState().rowSelection,
     );
+    const prev = selectedRowsSnapshots.get(path) ?? null;
+    if (rowSelectionExactEqual(prev, next)) return prev;
+    selectedRowsSnapshots.set(path, next);
+    return next;
   }
 
   function selectedRowIds(path: GridPath): readonly RowId[] {
-    return rowIdsInRowSelection(selectedRowsForPath(path), displayedRowsFor(path));
+    const next = rowIdsInRowSelection(
+      selectedRowsForPath(path),
+      displayedRowsFor(path),
+    );
+    const prev = selectedRowIdSnapshots.get(path) ?? [];
+    if (rowIdSnapshotsEqual(prev, next)) return prev;
+    selectedRowIdSnapshots.set(path, next);
+    return next;
   }
 
   function rowSelectionContainsRow(path: GridPath, rowId: RowId): boolean {
-    return rowSelectionHasRow(selectedRowsForPath(path), rowId, displayedRowsFor(path));
+    return rowSelectionHasRow(
+      selectedRowsForPath(path),
+      rowId,
+      displayedRowsFor(path),
+    );
   }
 
   function rowInteractionStatusFor(
@@ -881,10 +904,7 @@ export function createGridRuntime(args: RuntimeArgs): GridRuntime {
     let prev = selectedRowsForPath(path);
     const maybeNotify = () => {
       const next = selectedRowsForPath(path);
-      // Compare the projected selected ids, not object identity. Normalization
-      // preserves object identity on no-ops, but derived follows-active-row
-      // selection creates fresh value objects during reads.
-      if (rowSelectionSnapshotEqual(prev, next, displayedRowsFor(path))) return;
+      if (rowSelectionExactEqual(prev, next)) return;
       prev = next;
       fn();
     };
@@ -896,13 +916,31 @@ export function createGridRuntime(args: RuntimeArgs): GridRuntime {
     });
   }
 
+  function subscribeSelectedRowIds(path: GridPath, fn: () => void): () => void {
+    const selectedRows = interaction.selectedRows;
+    if (selectedRows.kind === "none") return () => {};
+    let prev = selectedRowIds(path);
+    const maybeNotify = () => {
+      const next = selectedRowIds(path);
+      if (rowIdSnapshotsEqual(prev, next)) return;
+      prev = next;
+      fn();
+    };
+    const unsubSelected = subscribeSelectedRows(path, maybeNotify);
+    const unsubDisplayed = subscribeDisplayedRowSequence(path, maybeNotify);
+    return () => {
+      unsubSelected();
+      unsubDisplayed();
+    };
+  }
+
   function subscribeRowSelectionContainsRow(
     path: GridPath,
     rowId: RowId,
     fn: () => void,
   ): () => void {
     let prev = rowSelectionContainsRow(path, rowId);
-    return subscribeSelectedRows(path, () => {
+    return subscribeSelectedRowIds(path, () => {
       const next = rowSelectionContainsRow(path, rowId);
       if (prev === next) return;
       prev = next;
@@ -923,7 +961,7 @@ export function createGridRuntime(args: RuntimeArgs): GridRuntime {
       fn();
     };
     const unsubActive = subscribeActiveRow(path, maybeNotify);
-    const unsubSelected = subscribeSelectedRows(path, maybeNotify);
+    const unsubSelected = subscribeSelectedRowIds(path, maybeNotify);
     return () => {
       unsubActive();
       unsubSelected();
@@ -933,7 +971,10 @@ export function createGridRuntime(args: RuntimeArgs): GridRuntime {
   const rowInteraction: RowInteractionCommands = {
     setRowCursor(target) {
       if (interaction.mode !== "row-list") return;
-      if (!displayedRowsFor(target.path).rowById.get(target.rowId)?.rowSelectable) return;
+      if (
+        !displayedRowsFor(target.path).rowById.get(target.rowId)?.rowSelectable
+      )
+        return;
       cursorManager.moveRowCursorTo(target);
     },
     clearRowCursor() {
@@ -950,7 +991,8 @@ export function createGridRuntime(args: RuntimeArgs): GridRuntime {
       const displayed = displayedRowsFor(path);
       if (!displayed.rowById.get(rowId)?.rowSelectable) return;
       const config = interaction.selectedRows;
-      if (config.kind !== "enabled" || config.sync.kind !== "independent") return;
+      if (config.kind !== "enabled" || config.sync.kind !== "independent")
+        return;
       const current = controllerCursorPortFor(path).getState().rowSelection;
       if (config.mode === "single") {
         cursorManager.setRowSelection(
@@ -1014,6 +1056,9 @@ export function createGridRuntime(args: RuntimeArgs): GridRuntime {
     for (const unsub of phantomSubscriptionUnsubs.values()) unsub();
     phantomSubscriptionUnsubs.clear();
     controllers.clear();
+    activeRowSnapshots.clear();
+    selectedRowsSnapshots.clear();
+    selectedRowIdSnapshots.clear();
     schemaCache.clear();
     lastStatusByPath.clear();
     dataSource.dispose();
@@ -1036,6 +1081,7 @@ export function createGridRuntime(args: RuntimeArgs): GridRuntime {
     rowInteractionStatusFor,
     subscribeActiveRow,
     subscribeSelectedRows,
+    subscribeSelectedRowIds,
     subscribeRowSelectionContainsRow,
     subscribeRowInteractionStatus,
     rowInteraction,
@@ -1106,16 +1152,33 @@ function rowCursorSnapshotEqual(
   return a.path === b.path && a.rowId === b.rowId;
 }
 
-function rowSelectionSnapshotEqual(
-  a: RowSelection,
-  b: RowSelection,
-  displayed: DisplayedRows,
+function rowSelectionExactEqual(a: RowSelection, b: RowSelection): boolean {
+  if (a === b) return true;
+  if (!a || !b) return false;
+  if (a.kind !== b.kind) return false;
+  switch (a.kind) {
+    case "single":
+      return b.kind === "single" && a.rowId === b.rowId;
+    case "range":
+      return b.kind === "range" && a.anchor === b.anchor && a.head === b.head;
+    case "set": {
+      if (b.kind !== "set") return false;
+      if (a.rowIds.size !== b.rowIds.size) return false;
+      for (const rowId of a.rowIds) {
+        if (!b.rowIds.has(rowId)) return false;
+      }
+      return true;
+    }
+  }
+}
+
+function rowIdSnapshotsEqual(
+  a: readonly RowId[],
+  b: readonly RowId[],
 ): boolean {
-  const aIds = rowIdsInRowSelection(a, displayed);
-  const bIds = rowIdsInRowSelection(b, displayed);
-  if (aIds.length !== bIds.length) return false;
-  for (let i = 0; i < aIds.length; i++) {
-    if (aIds[i] !== bIds[i]) return false;
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) {
+    if (a[i] !== b[i]) return false;
   }
   return true;
 }

@@ -20,6 +20,7 @@ import type { TreeNode } from "../types/level-row";
 import type { ColumnSchema, GridSchema, LevelSchema } from "../types/schema";
 import {
   CELL_GRID_WITH_ACTIVE_ROW,
+  CELL_PRIMARY_WITH_SIDE_PANEL_ROW,
   ROW_MULTISELECT_LIST,
 } from "../types/interaction";
 
@@ -178,7 +179,9 @@ describe("GridRuntime", () => {
     rt.dispose();
     rt.dispose();
 
-    expect(() => rt.sourceFor(rowsRoot)).toThrow("GridRuntime has been disposed.");
+    expect(() => rt.sourceFor(rowsRoot)).toThrow(
+      "GridRuntime has been disposed.",
+    );
     expect(() => rt.displayedRowsFor(rowsRoot)).toThrow(
       "GridRuntime has been disposed.",
     );
@@ -230,7 +233,11 @@ describe("GridRuntime", () => {
       schema: reportSchema,
       dataSource: reportDataSource(),
     });
-    const unresolvedChildPath = childPath(reportRoot, "Fruit" as RowKey, "items");
+    const unresolvedChildPath = childPath(
+      reportRoot,
+      "Fruit" as RowKey,
+      "items",
+    );
 
     expect(() => rt.sourceFor(unresolvedChildPath)).toThrow(
       'GridRuntime.sourceFor: no source has been resolved for path "cat.Fruit.items". Expand the parent row first.',
@@ -895,6 +902,102 @@ describe("GridRuntime", () => {
 
     expect(rt.controllerFor(rowsRoot).getState().rowSelection).toBe(selection);
     expect(rowSelectionChanged).not.toHaveBeenCalled();
+  });
+
+  it("derived row projections preserve identity across unchanged reads", () => {
+    const rt = createGridRuntime({
+      schema: tableSchema,
+      dataSource: tableDataSource(),
+      interaction: CELL_PRIMARY_WITH_SIDE_PANEL_ROW,
+    });
+
+    rt.cursorManager.moveCellCursorTo({
+      path: rowsRoot,
+      rowId: makeRowId(rowsRoot, "a"),
+      colId: "name",
+    });
+
+    expect(rt.activeRowFor(rowsRoot)).toBe(rt.activeRowFor(rowsRoot));
+    expect(rt.selectedRowsFor(rowsRoot)).toBe(rt.selectedRowsFor(rowsRoot));
+    expect(rt.selectedRowIds(rowsRoot)).toBe(rt.selectedRowIds(rowsRoot));
+  });
+
+  it("selectedRowsFor preserves selection shape when projected row ids match", () => {
+    const rt = createGridRuntime({
+      schema: tableSchema,
+      dataSource: tableDataSource(),
+      interaction: ROW_MULTISELECT_LIST,
+    });
+    const a = makeRowId(rowsRoot, "a");
+    const b = makeRowId(rowsRoot, "b");
+
+    rt.rowInteraction.setRowSelection(rowsRoot, {
+      kind: "range",
+      anchor: a,
+      head: b,
+    });
+
+    const selectedRowsChanged = vi.fn();
+    const selectedRowIdsChanged = vi.fn();
+    const containsAChanged = vi.fn();
+    rt.subscribeSelectedRows(rowsRoot, selectedRowsChanged);
+    rt.subscribeSelectedRowIds(rowsRoot, selectedRowIdsChanged);
+    rt.subscribeRowSelectionContainsRow(rowsRoot, a, containsAChanged);
+
+    rt.rowInteraction.setRowSelection(rowsRoot, {
+      kind: "set",
+      rowIds: new Set([a, b]),
+    });
+
+    expect(rt.selectedRowsFor(rowsRoot)).toEqual({
+      kind: "set",
+      rowIds: new Set([a, b]),
+    });
+    expect(rt.selectedRowIds(rowsRoot)).toEqual([a, b]);
+    expect(selectedRowsChanged).toHaveBeenCalledTimes(1);
+    expect(selectedRowIdsChanged).not.toHaveBeenCalled();
+    expect(containsAChanged).not.toHaveBeenCalled();
+  });
+
+  it("selected row id subscribers wake when displayed order changes", () => {
+    const rt = createGridRuntime({
+      schema: tableSchema,
+      dataSource: inMemoryGridDataSource({
+        schema: tableSchema,
+        tree: tableNodes(),
+        levels: {
+          rows: {
+            sortMode: "client",
+            filterMode: "none",
+            paginationMode: "none",
+          },
+        },
+      }),
+      interaction: ROW_MULTISELECT_LIST,
+    });
+    const a = makeRowId(rowsRoot, "a");
+    const b = makeRowId(rowsRoot, "b");
+    const selectedRowsChanged = vi.fn();
+    const selectedRowIdsChanged = vi.fn();
+
+    rt.rowInteraction.setRowSelection(rowsRoot, {
+      kind: "set",
+      rowIds: new Set([a, b]),
+    });
+    expect(rt.selectedRowIds(rowsRoot)).toEqual([a, b]);
+
+    rt.subscribeSelectedRows(rowsRoot, selectedRowsChanged);
+    rt.subscribeSelectedRowIds(rowsRoot, selectedRowIdsChanged);
+
+    rt.sourceFor(rowsRoot).setSort([{ colId: "qty", direction: "desc" }]);
+
+    expect(rt.selectedRowsFor(rowsRoot)).toEqual({
+      kind: "set",
+      rowIds: new Set([a, b]),
+    });
+    expect(rt.selectedRowIds(rowsRoot)).toEqual([b, a]);
+    expect(selectedRowsChanged).not.toHaveBeenCalled();
+    expect(selectedRowIdsChanged).toHaveBeenCalledTimes(1);
   });
 
   it("active row is path-local in cell-grid mode", () => {
