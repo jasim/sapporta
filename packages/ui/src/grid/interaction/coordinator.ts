@@ -1,12 +1,13 @@
 // The structural channel — one store per runtime.
 //
-// Owns cross-path state: the global `cursor` and which rows are expanded.
-// These are cross-path decisions because:
+// Owns cross-path state: the global `cellCursor`, the global `rowCursor`, and
+// which rows are expanded. These are cross-path decisions because:
 //
-//   - The cursor is a single piece of state across the whole grid; the
-//     active path is derived from `cursor?.path`. Active-ness determines
-//     whether a level is "live" or "ghost" — a visual distinction that
-//     belongs to the grid as a whole.
+//   - A cursor is a single piece of state across the whole grid. In cell-grid
+//     mode the active path is derived from `cellCursor?.path`; in row-list mode
+//     it is derived from `rowCursor?.path`. Active-ness determines whether a
+//     level is "live" or "ghost" — a visual distinction that belongs to the
+//     grid as a whole.
 //   - Expansion drives which GridLevels mount and how cross-level
 //     keyboard routing works between levels. Toggling expand on path
 //     "orders" affects what the user sees under path
@@ -18,17 +19,15 @@
 // snapshot": render and navigation read the same live inputs and so
 // cannot disagree.
 //
-// Navigation: a key handler emits a path-local `NavigationIntent`.
-// The coordinator resolves that intent from the canonical cursor via
-// `resolveMovement`, then dispatches focus through the focus manager —
-// the sole writer of `cursor` and of every controller's `liveFocus`.
-// The per-controller reducer is not in the cursor movement path.
+// Navigation: a key handler emits either a `CellNavigationIntent` or a
+// `RowNavigationIntent` depending on `interaction.mode`. The coordinator
+// resolves that intent from the canonical cursor, then dispatches through the
+// cursor manager — the sole writer of global cursors and controller live-focus
+// mirrors. The per-controller reducer is not in either cursor movement path.
 //
-// `setCursor` is the coordinator's only `cursor` writer. It is invoked
-// only by the focus manager — every other call site (movement,
-// navigate, click) goes through the focus manager so
-// the denormalization invariant (controller.liveFocus mirrors cursor on
-// the matching path) is maintained in lockstep.
+// `setCellCursor` and `setRowCursor` are invoked only by the cursor manager.
+// Every other call site (movement, navigate, click) goes through the cursor
+// manager so the denormalization invariant is maintained in lockstep.
 //
 // `onExpand(path, rowId)` is the seam the runtime uses to drive its child
 // source registry: when a row is first expanded the runtime resolves any
@@ -38,27 +37,31 @@
 // For the four-channel invariant this wires into, see `index.ts`.
 
 import { createStore, type StoreApi } from "zustand/vanilla";
-import type { ColId, GridCursor, GridPath, RowId } from "../types/identity";
+import type { CellCursor, ColId, GridPath, RowId } from "../types/identity";
+import type { RowCursor } from "../types/row-selection";
 import type { LevelRowKind } from "../types/level-row";
 import type { RowCapabilities } from "../types/capabilities";
 import type {
   CommitTarget,
-  NavigationIntent,
+  CellNavigationIntent,
+  RowNavigationIntent,
   RowDirection,
 } from "../types/action";
 import type { GridRuntime } from "../runtime/create-grid-runtime";
-import type { FocusManager } from "./focus-manager";
-import { nextVisibleRow } from "./visible-order";
+import type { CursorManager } from "./cursor-manager";
+import { nextRowSelectablePosition, nextVisibleRow } from "./visible-order";
 import { firstFocusableRow } from "../types/level-row-traversal";
 
 export type CoordinatorState = {
-  cursor: GridCursor | null;
+  cellCursor: CellCursor | null;
+  rowCursor: RowCursor | null;
   expansion: Map<GridPath, Set<RowId>>;
 };
 
 export interface GridCoordinatorVerbs {
   toggleExpand: (path: GridPath, rowId: RowId) => void;
-  navigate: (fromPath: GridPath, intent: NavigationIntent) => void;
+  navigateCell: (fromPath: GridPath, intent: CellNavigationIntent) => void;
+  navigateRow: (fromPath: GridPath, intent: RowNavigationIntent) => void;
 }
 
 type ReadonlyCoordinatorStore = Pick<
@@ -71,8 +74,9 @@ export type GridCoordinatorPublic = ReadonlyCoordinatorStore &
 
 export type GridCoordinatorStore = StoreApi<CoordinatorState> &
   GridCoordinatorVerbs & {
-    // Internal: only the focus manager writes the cursor.
-    setCursor: (cursor: GridCursor | null) => void;
+    // Internal: only the cursor manager writes the cursor.
+    setCellCursor: (cursor: CellCursor | null) => void;
+    setRowCursor: (cursor: RowCursor | null) => void;
   };
 
 export type CreateCoordinatorArgs = {
@@ -80,12 +84,12 @@ export type CreateCoordinatorArgs = {
   // view; it queries the runtime each call so a freshly resolved child
   // source or a freshly applied sort is reflected immediately.
   getRuntime: () => GridRuntime;
-  // Focus manager reference, bound after construction (the focus
-  // manager depends on the coordinator and the controllerFor lookup).
-  // The coordinator never writes `cursor` itself — it asks the focus
-  // manager to apply targets, and the focus manager reaches back to
-  // `setCursor` to write the global half of the denormalisation.
-  getFocusManager: () => FocusManager;
+  // Cursor manager reference, bound after construction (the cursor manager
+  // depends on the coordinator and the controllerFor lookup). The coordinator
+  // never writes cursors itself — it asks the cursor manager to apply targets,
+  // and the cursor manager reaches back to `setCellCursor` / `setRowCursor` to
+  // write the global half of the denormalisation.
+  getCursorManager: () => CursorManager;
   capabilitiesFor: (kind: LevelRowKind) => RowCapabilities;
   // Invoked just before the coordinator commits a toggleExpand that
   // adds `rowId` to `path`'s expansion set. The runtime hooks this to
@@ -99,7 +103,8 @@ export function createGridCoordinator(
   args: CreateCoordinatorArgs,
 ): GridCoordinatorStore {
   const initial: CoordinatorState = {
-    cursor: null,
+    cellCursor: null,
+    rowCursor: null,
     expansion: new Map(),
   };
   const store = createStore<CoordinatorState>(
@@ -108,10 +113,16 @@ export function createGridCoordinator(
 
   const coordinatorStore = store;
 
-  store.setCursor = (cursor) => {
+  store.setCellCursor = (cursor) => {
     const cur = store.getState();
-    if (cur.cursor === cursor) return;
-    store.setState({ ...cur, cursor }, true);
+    if (cur.cellCursor === cursor) return;
+    store.setState({ ...cur, cellCursor: cursor }, true);
+  };
+
+  store.setRowCursor = (cursor) => {
+    const cur = store.getState();
+    if (cur.rowCursor === cursor) return;
+    store.setState({ ...cur, rowCursor: cursor }, true);
   };
 
   store.toggleExpand = (path, rowId) => {
@@ -133,38 +144,54 @@ export function createGridCoordinator(
 
     if (!willExpand) {
       const runtime = args.getRuntime();
-      const focusManager = args.getFocusManager();
-      const cursor = cur.cursor;
-      if (!cursor) return;
+      const cursorManager = args.getCursorManager();
+      const cellCursor = cur.cellCursor;
+      const rowCursor = cur.rowCursor;
       const collapsedChildPaths = runtime.materializedChildren(path, rowId);
-      const cursorIsInCollapsedSubtree = collapsedChildPaths.some(
-        (cp) => cursor.path === cp || cursor.path.startsWith(`${cp}.`),
-      );
-      if (!cursorIsInCollapsedSubtree) return;
-
       const parentRow = runtime.displayedRowsFor(path).rowById.get(rowId);
       const parentSchema = runtime.schemaAt(path);
-      const parentCol =
-        parentSchema.columns.find((c) => c.id === cursor.colId)?.id ??
-        parentSchema.columns[0]?.id;
-      if (
-        parentRow &&
-        parentCol &&
-        args.capabilitiesFor(parentRow.kind).focusable
-      ) {
-        focusManager.apply({ path, rowId, colId: parentCol });
-        return;
+      if (cellCursor) {
+        const cellCursorIsInCollapsedSubtree = collapsedChildPaths.some(
+          (cp) => cellCursor.path === cp || cellCursor.path.startsWith(`${cp}.`),
+        );
+        if (cellCursorIsInCollapsedSubtree) {
+          const parentCol =
+            parentSchema.columns.find((c) => c.id === cellCursor.colId)?.id ??
+            parentSchema.columns[0]?.id;
+          if (
+            parentRow &&
+            parentCol &&
+            args.capabilitiesFor(parentRow.kind).focusable
+          ) {
+            cursorManager.applyCellCursor({ path, rowId, colId: parentCol });
+          } else {
+            cursorManager.clearCellRange(cellCursor.path);
+            cursorManager.clearCellCursor();
+          }
+        }
       }
-      // No focusable parent fallback — the cursor's home is gone, so we
-      // clear both the cursor and the (now-orphaned) range on the path
-      // the cursor was leaving.
-      focusManager.clearRange(cursor.path);
-      focusManager.clearFocus();
+      if (rowCursor) {
+        const rowCursorIsInCollapsedSubtree = collapsedChildPaths.some(
+          (cp) => rowCursor.path === cp || rowCursor.path.startsWith(`${cp}.`),
+        );
+        // Row cursor fallback is row-selectability based, not cell-focusability
+        // based. The row cursor exists to drive row operations, so it must only
+        // land where row selection could also land.
+        if (
+          rowCursorIsInCollapsedSubtree &&
+          parentRow &&
+          parentRow.rowSelectable
+        ) {
+          cursorManager.applyRowCursor({ path, rowId });
+        } else if (rowCursorIsInCollapsedSubtree) {
+          cursorManager.clearRowCursor();
+        }
+      }
     }
   };
 
   function rowMoveFor(
-    intent: NavigationIntent,
+    intent: CellNavigationIntent,
   ): {
     direction: RowDirection;
     colPolicy: "preserve" | "first" | "last";
@@ -221,9 +248,9 @@ export function createGridCoordinator(
 
   function intentForCommit(
     target: Exclude<CommitTarget, "stay">,
-    current: GridCursor,
+    current: CellCursor,
     runtime: GridRuntime,
-  ): NavigationIntent {
+  ): CellNavigationIntent {
     switch (target) {
       case "up":
       case "down":
@@ -288,12 +315,12 @@ export function createGridCoordinator(
   }
 
   function resolveMovement(
-    intent: NavigationIntent,
+    intent: CellNavigationIntent,
     fromPath: GridPath,
-    cursor: GridCursor | null,
+    cursor: CellCursor | null,
     runtime: GridRuntime,
-  ): GridCursor | null {
-    if (intent.type === "focusFirst") {
+  ): CellCursor | null {
+    if (intent.type === "focusFirstCell") {
       const first = firstFocusableRow(
         runtime.displayedRowsFor(fromPath),
         args.capabilitiesFor,
@@ -336,17 +363,81 @@ export function createGridCoordinator(
     );
   }
 
-  store.navigate = (fromPath, intent) => {
+  store.navigateCell = (fromPath, intent) => {
     const runtime = args.getRuntime();
-    const focusManager = args.getFocusManager();
-    const current = focusManager.currentCursor();
+    const cursorManager = args.getCursorManager();
+    if (intent.type === "toggleActiveRowSelection") {
+      // Space in a cell-grid may toggle the effective active row, but it still
+      // routes through rowInteraction so the operation target changes without
+      // moving the cell cursor.
+      const active = runtime.activeRowFor(fromPath);
+      if (active) runtime.rowInteraction.toggleRowSelection(active.path, active.rowId);
+      return;
+    }
+    const current = cursorManager.currentCellCursor();
     const target = resolveMovement(intent, fromPath, current, runtime);
     if (!target) return;
     const extend = "extend" in intent && intent.extend;
     if (extend && current && target.path === current.path) {
-      focusManager.extendTo(target);
+      cursorManager.extendCellSelectionTo(target);
     } else {
-      focusManager.moveTo(target);
+      cursorManager.moveCellCursorTo(target);
+    }
+  };
+
+  function resolveRowMovement(
+    intent: RowNavigationIntent,
+    fromPath: GridPath,
+    rowCursor: RowCursor | null,
+    runtime: GridRuntime,
+  ): RowCursor | null {
+    if (intent.type === "focusFirstRow") {
+      // Row-list focus starts on the first row that can be an operation target.
+      // Synthetic subtotal/footer rows may still render, but the row cursor
+      // should not land on them.
+      const first = runtime
+        .displayedRowsFor(fromPath)
+        .rows.find((row) => row.rowSelectable);
+      return first ? { path: fromPath, rowId: first.id } : null;
+    }
+    if (!rowCursor || rowCursor.path !== fromPath) return null;
+    if (intent.type === "moveActiveRow") {
+      // Row traversal is deliberately column-free. It uses the same
+      // rowSelectable gate as row selection so keyboard focus and operation
+      // selection cannot disagree about which rows are valid.
+      return nextRowSelectablePosition(runtime, coordinatorStore, rowCursor, intent.direction);
+    }
+    if (intent.type === "moveActiveRowEdge") {
+      return nextRowSelectablePosition(runtime, coordinatorStore, rowCursor, intent.edge === "first" ? "first" : "last");
+    }
+    if (intent.type === "moveActiveRowDelta") {
+      return nextRowSelectablePosition(runtime, coordinatorStore, rowCursor, { delta: intent.delta });
+    }
+    return null;
+  }
+
+  store.navigateRow = (fromPath, intent) => {
+    const runtime = args.getRuntime();
+    const cursorManager = args.getCursorManager();
+    if (intent.type === "toggleActiveRowSelection") {
+      const active = runtime.activeRowFor(fromPath);
+      if (active) runtime.rowInteraction.toggleRowSelection(active.path, active.rowId);
+      return;
+    }
+    if (intent.type === "clearRowSelection") {
+      runtime.rowInteraction.clearRowSelection(fromPath);
+      return;
+    }
+    const current = cursorManager.currentRowCursor();
+    const target = resolveRowMovement(intent, fromPath, current, runtime);
+    if (!target) return;
+    if ("extend" in intent && intent.extend) {
+      // Keyboard shift-extension is a row-cursor command: it moves the active
+      // row and, when the interaction config allows it, extends independent
+      // row selection from the old row cursor.
+      cursorManager.extendRowSelectionToCursor(target);
+    } else {
+      cursorManager.moveRowCursorTo(target);
     }
   };
 
@@ -354,8 +445,8 @@ export function createGridCoordinator(
 }
 
 // Convenience selector for code that wants the active path. Stored as a
-// derived value of `cursor?.path` rather than a separate field — the
+// derived value of `cellCursor?.path` rather than a separate field — the
 // active path is, by definition, the path the cursor is in.
 export function activePathOf(state: CoordinatorState): GridPath | null {
-  return state.cursor?.path ?? null;
+  return state.cellCursor?.path ?? state.rowCursor?.path ?? null;
 }

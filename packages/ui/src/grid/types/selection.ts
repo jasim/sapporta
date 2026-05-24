@@ -1,7 +1,7 @@
 import type { ColId, Coord, RowId } from "./identity";
 import type { DisplayedRows } from "./level-row";
 
-export type SelectionState = {
+export type CellSelectionState = {
   anchor: Coord;
   head: Coord;
 };
@@ -16,11 +16,11 @@ export type CellSelectionStatus = "none" | "in-selection" | "focus" | "editing";
 // via the CSS cascade. Transient-channel changes never invalidate active-ness
 // selectors and vice versa.
 
-export function makeSelection(coord: Coord): SelectionState {
+export function makeSelection(coord: Coord): CellSelectionState {
   return { anchor: coord, head: coord };
 }
 
-export function selectionFocus(s: SelectionState): Coord {
+export function selectionFocus(s: CellSelectionState): Coord {
   return s.head;
 }
 
@@ -30,7 +30,7 @@ export function selectionFocus(s: SelectionState): Coord {
 // Column order is determined by the `colOrder` array (the level's schema ids
 // in display order).
 export function selectionContainsCoord(
-  selection: SelectionState,
+  selection: CellSelectionState,
   coord: Coord,
   displayed: DisplayedRows,
   colOrder: readonly ColId[],
@@ -52,12 +52,12 @@ export function selectionContainsCoord(
   return cc >= minC && cc <= maxC;
 }
 
-export function selectionIsSingleCell(s: SelectionState): boolean {
+export function selectionIsSingleCell(s: CellSelectionState): boolean {
   return s.anchor.rowId === s.head.rowId && s.anchor.colId === s.head.colId;
 }
 
 export function rowsInSelection(
-  s: SelectionState,
+  s: CellSelectionState,
   displayed: DisplayedRows,
 ): RowId[] {
   const ai = displayed.rowIndexById.get(s.anchor.rowId);

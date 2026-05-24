@@ -12,6 +12,8 @@ export {
   foreignKey,
   column,
 } from "./columns";
+export { rowSelectionColumn } from "./row-selection";
+export type { RowSelectionColumnOptions } from "./row-selection";
 export {
   GRID_COLUMN_PRESET_RUNTIME,
   preset,

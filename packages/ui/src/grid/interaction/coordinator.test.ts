@@ -77,59 +77,59 @@ function focusCell(
   path: GridPath,
   coord: { rowId: RowId; colId: "name" | "qty" },
 ) {
-  rt.focusManager.setRange(path, coord, coord);
+  rt.cursorManager.setCellRange(path, coord, coord);
 }
 
 describe("GridCoordinator", () => {
-  it("focusManager.apply sets the cursor", () => {
+  it("cursorManager.apply sets the cursor", () => {
     const rt = setupExpanded();
-    rt.focusManager.apply({
+    rt.cursorManager.applyCellCursor({
       path: root,
       rowId: makeRowId(root, "Fruit"),
       colId: "name",
     });
-    expect(rt.coordinator.getState().cursor?.path).toBe(root);
+    expect(rt.coordinator.getState().cellCursor?.path).toBe(root);
   });
 
-  it("focusManager.moveTo clears the remembered range", () => {
+  it("cursorManager.moveTo clears the remembered range", () => {
     const rt = setupExpanded();
     const anchor = {
       rowId: makeRowId(root, "Fruit"),
       colId: "name" as const,
     };
     const head = { rowId: makeRowId(root, "Fruit"), colId: "qty" as const };
-    rt.focusManager.setRange(root, anchor, head);
+    rt.cursorManager.setCellRange(root, anchor, head);
 
-    rt.focusManager.moveTo({
+    rt.cursorManager.moveCellCursorTo({
       path: root,
       rowId: makeRowId(root, "Veg"),
       colId: "name",
     });
 
-    expect(rt.controllerFor(root).getState().selection).toBe(null);
+    expect(rt.controllerFor(root).getState().cellSelection).toBe(null);
   });
 
-  it("focusManager.moveTo clears remembered ranges across paths", () => {
+  it("cursorManager.moveTo clears remembered ranges across paths", () => {
     const rt = setupExpanded();
-    rt.focusManager.setRange(
+    rt.cursorManager.setCellRange(
       root,
       { rowId: makeRowId(root, "Fruit"), colId: "name" },
       { rowId: makeRowId(root, "Fruit"), colId: "qty" },
     );
-    rt.focusManager.setRange(
+    rt.cursorManager.setCellRange(
       fruitItems,
       { rowId: makeRowId(fruitItems, "Apple"), colId: "name" },
       { rowId: makeRowId(fruitItems, "Banana"), colId: "qty" },
     );
 
-    rt.focusManager.moveTo({
+    rt.cursorManager.moveCellCursorTo({
       path: root,
       rowId: makeRowId(root, "Veg"),
       colId: "name",
     });
 
-    expect(rt.controllerFor(root).getState().selection).toBe(null);
-    expect(rt.controllerFor(fruitItems).getState().selection).toBe(null);
+    expect(rt.controllerFor(root).getState().cellSelection).toBe(null);
+    expect(rt.controllerFor(fruitItems).getState().cellSelection).toBe(null);
   });
 
   it("horizontal arrow movement without shift clears the selected range", () => {
@@ -139,7 +139,7 @@ describe("GridCoordinator", () => {
       colId: "name" as const,
     };
     const head = { rowId: makeRowId(root, "Fruit"), colId: "qty" as const };
-    rt.focusManager.setRange(root, anchor, head);
+    rt.cursorManager.setCellRange(root, anchor, head);
     expect(
       rt.controllerFor(root).handleKey({
         key: "ArrowLeft",
@@ -149,16 +149,16 @@ describe("GridCoordinator", () => {
         altKey: false,
       } as KeyboardEvent),
     ).toBe(true);
-    expect(rt.coordinator.getState().cursor).toEqual({
+    expect(rt.coordinator.getState().cellCursor).toEqual({
       path: root,
       rowId: makeRowId(root, "Fruit"),
       colId: "name",
     });
-    expect(rt.controllerFor(root).getState().liveFocus).toEqual({
+    expect(rt.controllerFor(root).getState().liveCellFocus).toEqual({
       rowId: makeRowId(root, "Fruit"),
       colId: "name",
     });
-    expect(rt.controllerFor(root).getState().selection).toBe(null);
+    expect(rt.controllerFor(root).getState().cellSelection).toBe(null);
   });
 
   it("Shift+Arrow starts a range anchored at the previously focused cell", () => {
@@ -171,8 +171,8 @@ describe("GridCoordinator", () => {
       rowId: makeRowId(root, "Fruit"),
       colId: "qty" as const,
     };
-    rt.focusManager.moveTo({ path: root, ...anchor });
-    expect(rt.controllerFor(root).getState().selection).toBe(null);
+    rt.cursorManager.moveCellCursorTo({ path: root, ...anchor });
+    expect(rt.controllerFor(root).getState().cellSelection).toBe(null);
 
     expect(
       rt.controllerFor(root).handleKey({
@@ -184,7 +184,7 @@ describe("GridCoordinator", () => {
       } as KeyboardEvent),
     ).toBe(true);
 
-    expect(rt.controllerFor(root).getState().selection).toEqual({
+    expect(rt.controllerFor(root).getState().cellSelection).toEqual({
       anchor,
       head,
     });
@@ -200,12 +200,12 @@ describe("GridCoordinator", () => {
       rowId: makeRowId(root, "Veg"),
       colId: "qty" as const,
     };
-    rt.focusManager.moveTo({ path: root, ...anchor });
-    expect(rt.controllerFor(root).getState().selection).toBe(null);
+    rt.cursorManager.moveCellCursorTo({ path: root, ...anchor });
+    expect(rt.controllerFor(root).getState().cellSelection).toBe(null);
 
-    rt.focusManager.extendTo({ path: root, ...head });
+    rt.cursorManager.extendCellSelectionTo({ path: root, ...head });
 
-    expect(rt.controllerFor(root).getState().selection).toEqual({
+    expect(rt.controllerFor(root).getState().cellSelection).toEqual({
       anchor,
       head,
     });
@@ -218,12 +218,12 @@ describe("GridCoordinator", () => {
     const controller = rt.controllerFor(root);
     controller.startEdit(coord, "f2");
     controller.commitEdit("x", "next");
-    expect(rt.coordinator.getState().cursor).toEqual({
+    expect(rt.coordinator.getState().cellCursor).toEqual({
       path: root,
       rowId: makeRowId(root, "Fruit"),
       colId: "qty",
     });
-    expect(controller.getState().liveFocus).toEqual({
+    expect(controller.getState().liveCellFocus).toEqual({
       rowId: makeRowId(root, "Fruit"),
       colId: "qty",
     });
@@ -255,23 +255,23 @@ describe("GridCoordinator", () => {
     const rt = setupExpanded();
     // Seed cursor on the source path so coordinator.navigate can
     // resolve a target relative to the current cursor.
-    rt.focusManager.apply({
+    rt.cursorManager.applyCellCursor({
       path: fruitItems,
       rowId: makeRowId(fruitItems, "Banana"),
       colId: "name",
     });
-    rt.coordinator.navigate(fruitItems, {
+    rt.coordinator.navigateCell(fruitItems, {
       type: "moveRow",
       direction: "down",
       colPolicy: "preserve",
       extend: false,
     });
-    expect(rt.coordinator.getState().cursor).toEqual({
+    expect(rt.coordinator.getState().cellCursor).toEqual({
       path: root,
       rowId: makeRowId(root, "Veg"),
       colId: "name",
     });
-    expect(rt.controllerFor(root).getState().liveFocus).toEqual({
+    expect(rt.controllerFor(root).getState().liveCellFocus).toEqual({
       rowId: makeRowId(root, "Veg"),
       colId: "name",
     });
@@ -279,39 +279,39 @@ describe("GridCoordinator", () => {
 
   it("navigate up from first child row dispatches focus on its owning parent row", () => {
     const rt = setupExpanded();
-    rt.focusManager.apply({
+    rt.cursorManager.applyCellCursor({
       path: fruitItems,
       rowId: makeRowId(fruitItems, "Apple"),
       colId: "name",
     });
-    rt.coordinator.navigate(fruitItems, {
+    rt.coordinator.navigateCell(fruitItems, {
       type: "moveRow",
       direction: "up",
       colPolicy: "preserve",
       extend: false,
     });
-    expect(rt.coordinator.getState().cursor).toEqual({
+    expect(rt.coordinator.getState().cellCursor).toEqual({
       path: root,
       rowId: makeRowId(root, "Fruit"),
       colId: "name",
     });
-    expect(rt.controllerFor(fruitItems).getState().liveFocus).toBe(null);
+    expect(rt.controllerFor(fruitItems).getState().liveCellFocus).toBe(null);
   });
 
   it("navigate up from a parent row dispatches focus on the previous expanded child's last row", () => {
     const rt = setupExpanded();
-    rt.focusManager.apply({
+    rt.cursorManager.applyCellCursor({
       path: root,
       rowId: makeRowId(root, "Veg"),
       colId: "name",
     });
-    rt.coordinator.navigate(root, {
+    rt.coordinator.navigateCell(root, {
       type: "moveRow",
       direction: "up",
       colPolicy: "preserve",
       extend: false,
     });
-    expect(rt.coordinator.getState().cursor).toEqual({
+    expect(rt.coordinator.getState().cellCursor).toEqual({
       path: fruitItems,
       rowId: makeRowId(fruitItems, "Banana"),
       colId: "name",
@@ -320,18 +320,18 @@ describe("GridCoordinator", () => {
 
   it("navigate down from a parent row dispatches focus into its expanded child", () => {
     const rt = setupExpanded();
-    rt.focusManager.apply({
+    rt.cursorManager.applyCellCursor({
       path: root,
       rowId: makeRowId(root, "Fruit"),
       colId: "name",
     });
-    rt.coordinator.navigate(root, {
+    rt.coordinator.navigateCell(root, {
       type: "moveRow",
       direction: "down",
       colPolicy: "preserve",
       extend: false,
     });
-    expect(rt.coordinator.getState().cursor).toEqual({
+    expect(rt.coordinator.getState().cellCursor).toEqual({
       path: fruitItems,
       rowId: makeRowId(fruitItems, "Apple"),
       colId: "name",
@@ -344,18 +344,18 @@ describe("GridCoordinator", () => {
     //   Fruit → Apple → Banana → Veg → Carrot
     // 'last' must walk to Carrot, not stop at Veg.
     const rt = setupExpanded();
-    rt.focusManager.apply({
+    rt.cursorManager.applyCellCursor({
       path: root,
       rowId: makeRowId(root, "Fruit"),
       colId: "name",
     });
-    rt.coordinator.navigate(root, {
+    rt.coordinator.navigateCell(root, {
       type: "moveGridEdge",
       edge: "last",
       colPolicy: "preserve",
       extend: false,
     });
-    expect(rt.coordinator.getState().cursor).toEqual({
+    expect(rt.coordinator.getState().cellCursor).toEqual({
       path: vegItems,
       rowId: makeRowId(vegItems, "Carrot"),
       colId: "name",
@@ -364,18 +364,18 @@ describe("GridCoordinator", () => {
 
   it("navigate to first from a leaf returns to the root's first row", () => {
     const rt = setupExpanded();
-    rt.focusManager.apply({
+    rt.cursorManager.applyCellCursor({
       path: vegItems,
       rowId: makeRowId(vegItems, "Carrot"),
       colId: "name",
     });
-    rt.coordinator.navigate(vegItems, {
+    rt.coordinator.navigateCell(vegItems, {
       type: "moveGridEdge",
       edge: "first",
       colPolicy: "preserve",
       extend: false,
     });
-    expect(rt.coordinator.getState().cursor).toEqual({
+    expect(rt.coordinator.getState().cellCursor).toEqual({
       path: root,
       rowId: makeRowId(root, "Fruit"),
       colId: "name",
@@ -386,18 +386,18 @@ describe("GridCoordinator", () => {
     // Sequence with both expanded: Fruit, Apple, Banana, Veg, Carrot.
     // From Fruit (idx 0), +3 lands on Veg.
     const rt = setupExpanded();
-    rt.focusManager.apply({
+    rt.cursorManager.applyCellCursor({
       path: root,
       rowId: makeRowId(root, "Fruit"),
       colId: "name",
     });
-    rt.coordinator.navigate(root, {
+    rt.coordinator.navigateCell(root, {
       type: "moveRowDelta",
       delta: 3,
       colPolicy: "preserve",
       extend: false,
     });
-    expect(rt.coordinator.getState().cursor).toEqual({
+    expect(rt.coordinator.getState().cellCursor).toEqual({
       path: root,
       rowId: makeRowId(root, "Veg"),
       colId: "name",
@@ -407,22 +407,22 @@ describe("GridCoordinator", () => {
   it("navigate dispatches focus to a target controller before any DOM mounts", () => {
     // The target controller is created lazily by `controllerFor`, but that
     // is a pure-state object — it has no dependency on a Grid being
-    // mounted. The focus dispatch sets cursor + liveFocus and queues
+    // mounted. The focus dispatch sets cursor + liveCellFocus and queues
     // effects immediately; EffectRunner drains them whenever the target
     // Grid eventually mounts (controllers outlive DOM presence).
     const rt = setupExpanded();
-    rt.focusManager.apply({
+    rt.cursorManager.applyCellCursor({
       path: vegItems,
       rowId: makeRowId(vegItems, "Carrot"),
       colId: "name",
     });
-    rt.coordinator.navigate(vegItems, {
+    rt.coordinator.navigateCell(vegItems, {
       type: "moveRow",
       direction: "up",
       colPolicy: "preserve",
       extend: false,
     });
-    expect(rt.coordinator.getState().cursor).toEqual({
+    expect(rt.coordinator.getState().cellCursor).toEqual({
       path: root,
       rowId: makeRowId(root, "Veg"),
       colId: "name",
@@ -444,12 +444,12 @@ describe("GridCoordinator", () => {
         altKey: false,
       } as KeyboardEvent),
     ).toBe(true);
-    expect(rt.coordinator.getState().cursor).toEqual({
+    expect(rt.coordinator.getState().cellCursor).toEqual({
       path: fruitItems,
       rowId: makeRowId(fruitItems, "Apple"),
       colId: "name",
     });
-    expect(rt.controllerFor(fruitItems).getState().liveFocus).toEqual({
+    expect(rt.controllerFor(fruitItems).getState().liveCellFocus).toEqual({
       rowId: makeRowId(fruitItems, "Apple"),
       colId: "name",
     });
@@ -470,7 +470,7 @@ describe("GridCoordinator", () => {
         altKey: false,
       } as KeyboardEvent),
     ).toBe(true);
-    expect(rt.coordinator.getState().cursor).toEqual({
+    expect(rt.coordinator.getState().cellCursor).toEqual({
       path: fruitItems,
       rowId: makeRowId(fruitItems, "Banana"),
       colId: "name",
@@ -492,7 +492,7 @@ describe("GridCoordinator", () => {
         altKey: false,
       } as KeyboardEvent),
     ).toBe(true);
-    expect(rt.coordinator.getState().cursor).toEqual({
+    expect(rt.coordinator.getState().cellCursor).toEqual({
       path: root,
       rowId: makeRowId(root, "Veg"),
       colId: "name",
@@ -514,7 +514,7 @@ describe("GridCoordinator", () => {
         altKey: false,
       } as KeyboardEvent),
     ).toBe(true);
-    expect(rt.coordinator.getState().cursor).toEqual({
+    expect(rt.coordinator.getState().cellCursor).toEqual({
       path: root,
       rowId: makeRowId(root, "Fruit"),
       colId: "name",
@@ -536,7 +536,7 @@ describe("GridCoordinator", () => {
         altKey: false,
       } as KeyboardEvent),
     ).toBe(true);
-    expect(rt.coordinator.getState().cursor).toEqual({
+    expect(rt.coordinator.getState().cellCursor).toEqual({
       path: fruitItems,
       rowId: makeRowId(fruitItems, "Apple"),
       colId: "name",
@@ -558,7 +558,7 @@ describe("GridCoordinator", () => {
         altKey: false,
       } as KeyboardEvent),
     ).toBe(true);
-    expect(rt.coordinator.getState().cursor).toEqual({
+    expect(rt.coordinator.getState().cellCursor).toEqual({
       path: fruitItems,
       rowId: makeRowId(fruitItems, "Banana"),
       colId: "qty",
@@ -572,33 +572,33 @@ describe("GridCoordinator", () => {
       colId: "name",
     });
     rt.coordinator.toggleExpand(root, makeRowId(root, "Fruit"));
-    expect(rt.coordinator.getState().cursor).toEqual({
+    expect(rt.coordinator.getState().cellCursor).toEqual({
       path: root,
       rowId: makeRowId(root, "Fruit"),
       colId: "name",
     });
-    expect(rt.controllerFor(fruitItems).getState().liveFocus).toBe(null);
+    expect(rt.controllerFor(fruitItems).getState().liveCellFocus).toBe(null);
   });
 
-  it("focusManager.setRange on a non-active path activates that path", () => {
+  it("cursorManager.setRange on a non-active path activates that path", () => {
     const rt = setupExpanded();
     focusCell(rt, root, {
       rowId: makeRowId(root, "Fruit"),
       colId: "name",
     });
-    expect(rt.coordinator.getState().cursor?.path).toBe(root);
+    expect(rt.coordinator.getState().cellCursor?.path).toBe(root);
     focusCell(rt, fruitItems, {
       rowId: makeRowId(fruitItems, "Apple"),
       colId: "name",
     });
-    // The cursor moves to the new path; the prior path's liveFocus is
+    // The cursor moves to the new path; the prior path's liveCellFocus is
     // cleared. This is the regression the focus-management abstraction
     // prevents — a stale `selection.head` on the inactive path used to
     // short-circuit cross-path delivery and leave DOM focus on the
     // wrong grid.
-    expect(rt.coordinator.getState().cursor?.path).toBe(fruitItems);
-    expect(rt.controllerFor(root).getState().liveFocus).toBe(null);
-    expect(rt.controllerFor(fruitItems).getState().liveFocus).toEqual({
+    expect(rt.coordinator.getState().cellCursor?.path).toBe(fruitItems);
+    expect(rt.controllerFor(root).getState().liveCellFocus).toBe(null);
+    expect(rt.controllerFor(fruitItems).getState().liveCellFocus).toEqual({
       rowId: makeRowId(fruitItems, "Apple"),
       colId: "name",
     });

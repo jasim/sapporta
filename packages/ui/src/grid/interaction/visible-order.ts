@@ -34,6 +34,11 @@ export type VisibleCursor = {
   colId: ColId;
 };
 
+export type VisibleRowPosition = {
+  path: GridPath;
+  rowId: RowId;
+};
+
 export type ColDirection = "left" | "right" | "start" | "end";
 
 type CapabilitiesFn = (kind: LevelRowKind) => RowCapabilities;
@@ -79,6 +84,10 @@ function isFocusable(
   const row = getRow(runtime, step);
   if (!row) return false;
   return capabilities(row.kind).focusable;
+}
+
+function isRowSelectable(runtime: GridRuntime, step: RowStep): boolean {
+  return getRow(runtime, step)?.rowSelectable === true;
 }
 
 // Materialize the visible sequence. The traversal is O(visible rows
@@ -239,6 +248,62 @@ export function nextVisibleRow(
   if (!target) return null;
   if (target.path === from.path && target.rowId === from.rowId) return null;
   return makeCursor(target, runtime, from.colId, colPolicy);
+}
+
+export function nextRowSelectablePosition(
+  runtime: GridRuntime,
+  coordinator: GridCoordinatorPublic,
+  from: VisibleRowPosition,
+  direction: "up" | "down" | "first" | "last" | { delta: number },
+): VisibleRowPosition | null {
+  const steps = collect(runtime, coordinator);
+  const idx = indexOfStep(steps, from.path, from.rowId);
+  let target: RowStep | null;
+  if (direction === "first") {
+    target = nextRowSelectableStep(steps, -1, 1, runtime);
+  } else if (direction === "last") {
+    target = nextRowSelectableStep(steps, steps.length, -1, runtime);
+  } else if (direction === "up") {
+    if (idx < 0) return null;
+    target = nextRowSelectableStep(steps, idx, -1, runtime);
+  } else if (direction === "down") {
+    if (idx < 0) return null;
+    target = nextRowSelectableStep(steps, idx, 1, runtime);
+  } else {
+    if (idx < 0) return null;
+    target = rowDeltaHop(steps, idx, direction.delta, runtime);
+  }
+  if (!target) return null;
+  if (target.path === from.path && target.rowId === from.rowId) return null;
+  return target;
+}
+
+function nextRowSelectableStep(
+  steps: RowStep[],
+  fromIndex: number,
+  step: 1 | -1,
+  runtime: GridRuntime,
+): RowStep | null {
+  for (let i = fromIndex + step; i >= 0 && i < steps.length; i += step) {
+    if (isRowSelectable(runtime, steps[i])) return steps[i];
+  }
+  return null;
+}
+
+function rowDeltaHop(
+  steps: RowStep[],
+  fromIndex: number,
+  delta: number,
+  runtime: GridRuntime,
+): RowStep | null {
+  if (steps.length === 0) return null;
+  const target = Math.max(0, Math.min(steps.length - 1, fromIndex + delta));
+  const step: 1 | -1 = delta >= 0 ? 1 : -1;
+  const back: 1 | -1 = step === 1 ? -1 : 1;
+  return (
+    nextRowSelectableStep(steps, target - step, step, runtime) ??
+    nextRowSelectableStep(steps, target - back, back, runtime)
+  );
 }
 
 // Path-local column motion. Returns the next ColId in the level's

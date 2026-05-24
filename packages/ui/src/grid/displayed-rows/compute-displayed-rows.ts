@@ -140,6 +140,7 @@ function canReuseDisplayedRowObject(
 ): boolean {
   if (previous.id !== next.id) return false;
   if (previous.kind !== next.kind) return false;
+  if (previous.rowSelectable !== next.rowSelectable) return false;
   if (previous.source !== next.source) return false;
   if (
     previous.kind === "data" &&

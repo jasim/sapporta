@@ -1,29 +1,35 @@
 // The transient channel — one store per `GridPath`.
 //
-// Holds three orthogonal pieces of per-path state:
+// Holds five orthogonal pieces of per-path state:
 //
-//   - `liveFocus` — the per-path mirror of the global cursor. Non-null
-//     iff this path is the path the cursor is in. Cells subscribe to
-//     this for the focus indicator. Owned and written exclusively by
-//     the focus manager (via `setLiveFocus`); no reducer, movement
-//     code, or click handler writes it directly. The single invariant
-//     is enforced in one place — see `focus-manager.ts`.
+//   - `liveCellFocus` — the per-path mirror of the global cell cursor. Non-null
+//     iff this path is the path the cell cursor is in. Cells subscribe to this
+//     for the focus indicator. Owned and written exclusively by the cursor
+//     manager (via `setLiveCellFocus`); no reducer, movement code, or click
+//     handler writes it directly.
 //
-//   - `selection` — the per-path *remembered range* (`anchor` + `head`).
+//   - `cellSelection` — the per-path remembered cell range (`anchor` + `head`).
 //     Updated only by genuinely range-changing operations: shift+arrow,
 //     click+drag, explicit range API. Non-extending user movement clears
-//     it through the focus manager; the low-level cursor synchronisation
+//     it through the cursor manager; the low-level cursor synchronisation
 //     primitive does not rewrite it.
 //
 //   - `editing` — per-cell editor lifecycle, untouched by this design.
 //
+//   - `liveRowFocus` — the path-local mirror of the global row cursor. It is
+//     meaningful only in row-list mode; cell-grid mode derives any active row
+//     from the active cell instead.
+//
+//   - `rowSelection` — stored independent row operation targets. It is ignored
+//     when selected rows are configured to follow the active row.
+//
 // State outlives DOM presence: collapsing and re-expanding a level
-// preserves its focus mirror and selection (the controller is lazily
+// preserves its focus mirrors and selections (the controller is lazily
 // created by the runtime and cached for its lifetime, not tied to
 // mount/unmount).
 //
 // A sibling `effects` store carries pure reducer outputs out to
-// EffectRunner for DOM work — see `types/effects.ts`. The focus manager
+// EffectRunner for DOM work — see `types/effects.ts`. The cursor manager
 // also queues onto this channel directly via `queueEffect`, since
 // `focusContainer` and `scrollFocusIntoView` are keyed off the global
 // cursor diff (not any per-store equality).
@@ -36,7 +42,7 @@
 // For the four-channel invariant this wires into, see `index.ts`.
 
 import { createStore, type StoreApi } from "zustand/vanilla";
-import { keyEventToIntent } from "./key-handling";
+import { keyEventToCellIntent, keyEventToRowIntent } from "./key-handling";
 import type {
   ColumnSchema,
   EditTrigger,
@@ -46,14 +52,17 @@ import { triggerAllowed } from "../types/schema";
 import type { ControllerState } from "../types/controller-state";
 import type { DisplayedRows, LevelRowKind } from "../types/level-row";
 import type { RowCapabilities } from "../types/capabilities";
-import type { Coord, GridPath } from "../types/identity";
+import type { Coord, GridPath, RowId } from "../types/identity";
 import type {
   CommitTarget,
+  CellNavigationIntent,
   GridAction,
-  NavigationIntent,
+  RowNavigationIntent,
 } from "../types/action";
 import type { GridEffect } from "../types/effects";
-import type { SelectionState } from "../types/selection";
+import type { CellSelectionState } from "../types/selection";
+import type { GridInteractionConfig } from "../types/interaction";
+import type { RowSelection } from "../types/row-selection";
 import { reduceController } from "./reducer";
 
 export interface GridControllerPublicVerbs {
@@ -66,7 +75,8 @@ export interface GridControllerPublicVerbs {
   // `commit !== "stay"`) fires a movement intent in the requested
   // direction so the user lands where Tab / Enter / Shift+Tab promised.
   commitEdit: (value: unknown, commit?: CommitTarget) => void;
-  clearSelection: () => void;
+  clearCellSelection: () => void;
+  clearRowSelection: () => void;
   // host I/O — stable; bound once to DOM by Grid.tsx. Returns true if the
   // event was consumed (caller should preventDefault), false otherwise.
   handleKey: (e: KeyboardEvent) => boolean;
@@ -76,10 +86,12 @@ export interface GridControllerPublicVerbs {
   effects: StoreApi<GridEffect[]>;
 }
 
-export interface GridControllerFocusPort {
+export interface GridControllerCursorPort {
   getState: StoreApi<ControllerState>["getState"];
-  setLiveFocus: (focus: Coord | null) => void;
-  setSelection: (selection: SelectionState | null) => void;
+  setLiveCellFocus: (focus: Coord | null) => void;
+  setCellSelection: (selection: CellSelectionState | null) => void;
+  setLiveRowFocus: (rowId: RowId | null) => void;
+  setRowSelection: (selection: RowSelection) => void;
   queueEffect: (effect: GridEffect) => void;
 }
 
@@ -93,20 +105,23 @@ export type GridControllerPublic = ReadonlyControllerStore &
 
 export type GridControllerStore = StoreApi<ControllerState> &
   GridControllerPublicVerbs &
-  GridControllerFocusPort & {
+  GridControllerCursorPort & {
     dispatch: (action: GridAction) => void;
   };
 
 export type CreateControllerArgs = {
   path: GridPath;
+  interaction: GridInteractionConfig;
   // The runtime supplies these as live getters — the controller doesn't store
   // them so changing the displayed/schema/capabilities does not invalidate
   // the store.
   getDisplayed: () => DisplayedRows;
   getSchema: () => ColumnSchema[];
   capabilitiesFor: (kind: LevelRowKind) => RowCapabilities;
-  onNavigate?: (intent: NavigationIntent) => void;
-  clearRange?: (path: GridPath) => void;
+  onNavigateCell?: (intent: CellNavigationIntent) => void;
+  onNavigateRow?: (intent: RowNavigationIntent) => void;
+  clearCellRange?: (path: GridPath) => void;
+  clearRowSelection?: (path: GridPath) => void;
   // Cell value writer — invoked from commitEdit. The runtime wires this to the
   // path's writable `LevelDataSource.setCell` via `writeCell`, where
   // `mutationCommitted` is emitted.
@@ -114,9 +129,11 @@ export type CreateControllerArgs = {
 };
 
 const INITIAL: ControllerState = {
-  liveFocus: null,
-  selection: null,
+  liveCellFocus: null,
+  cellSelection: null,
   editing: null,
+  liveRowFocus: null,
+  rowSelection: null,
 };
 
 const EMPTY_EFFECTS: GridEffect[] = [];
@@ -153,25 +170,37 @@ export function createGridController(
 
   store.dispatch = dispatch;
 
-  // Focus-manager-owned writers. Path-local idempotence is the only
-  // short-circuit here; cross-path concerns are handled in the focus
-  // manager.
-  store.setLiveFocus = (focus) => {
+  // Cursor-manager-owned writers. Path-local idempotence is the only
+  // short-circuit here; cross-path clearing and global cursor writes are
+  // handled in the cursor manager.
+  store.setLiveCellFocus = (focus) => {
     const cur = store.getState();
     const same =
-      (cur.liveFocus === null && focus === null) ||
-      (!!cur.liveFocus &&
+      (cur.liveCellFocus === null && focus === null) ||
+      (!!cur.liveCellFocus &&
         !!focus &&
-        cur.liveFocus.rowId === focus.rowId &&
-        cur.liveFocus.colId === focus.colId);
+        cur.liveCellFocus.rowId === focus.rowId &&
+        cur.liveCellFocus.colId === focus.colId);
     if (same) return;
-    store.setState({ ...cur, liveFocus: focus }, true);
+    store.setState({ ...cur, liveCellFocus: focus }, true);
   };
 
-  store.setSelection = (selection) => {
+  store.setCellSelection = (selection) => {
     const cur = store.getState();
-    if (cur.selection === selection) return;
-    store.setState({ ...cur, selection }, true);
+    if (cur.cellSelection === selection) return;
+    store.setState({ ...cur, cellSelection: selection }, true);
+  };
+
+  store.setLiveRowFocus = (rowId) => {
+    const cur = store.getState();
+    if (cur.liveRowFocus === rowId) return;
+    store.setState({ ...cur, liveRowFocus: rowId }, true);
+  };
+
+  store.setRowSelection = (selection) => {
+    const cur = store.getState();
+    if (cur.rowSelection === selection) return;
+    store.setState({ ...cur, rowSelection: selection }, true);
   };
 
   store.queueEffect = (effect) => {
@@ -179,6 +208,7 @@ export function createGridController(
   };
 
   store.startEdit = (coord, trigger, initial?: string) => {
+    if (args.interaction.mode !== "cell-grid") return;
     if (trigger === "type") {
       if (initial === undefined) return;
       dispatch({ type: "START_EDIT", coord, trigger, initial });
@@ -187,19 +217,24 @@ export function createGridController(
     dispatch({ type: "START_EDIT", coord, trigger });
   };
   store.cancelEdit = () => dispatch({ type: "CANCEL_EDIT" });
-  store.clearSelection = () => {
-    args.clearRange?.(args.path);
+  store.clearCellSelection = () => {
+    args.clearCellRange?.(args.path);
   };
+  store.clearRowSelection = () => args.clearRowSelection?.(args.path);
 
-  function applyIntent(intent: NavigationIntent): boolean {
-    const focus = store.getState().liveFocus;
+  function applyCellIntent(intent: CellNavigationIntent): boolean {
+    const focus = store.getState().liveCellFocus;
     switch (intent.type) {
-      case "clearSelection":
-        store.clearSelection();
+      case "clearCellSelection":
+        store.clearCellSelection();
         return true;
-      case "focusFirst": {
-        args.onNavigate?.(intent);
-        return !!args.onNavigate;
+      case "focusFirstCell": {
+        args.onNavigateCell?.(intent);
+        return !!args.onNavigateCell;
+      }
+      case "toggleActiveRowSelection": {
+        args.onNavigateCell?.(intent);
+        return !!args.onNavigateCell;
       }
       case "startEdit":
         if (!focus) return false;
@@ -223,9 +258,26 @@ export function createGridController(
       case "moveRowDelta":
       case "moveGridEdge":
       case "commitMove":
-        args.onNavigate?.(intent);
-        return !!args.onNavigate;
+        args.onNavigateCell?.(intent);
+        return !!args.onNavigateCell;
     }
+    return false;
+  }
+
+  function applyRowIntent(intent: RowNavigationIntent): boolean {
+    switch (intent.type) {
+      case "clearRowSelection":
+        store.clearRowSelection();
+        return true;
+      case "focusFirstRow":
+      case "moveActiveRow":
+      case "moveActiveRowDelta":
+      case "moveActiveRowEdge":
+      case "toggleActiveRowSelection":
+        args.onNavigateRow?.(intent);
+        return !!args.onNavigateRow;
+    }
+    return false;
   }
 
   store.commitEdit = (value, commit = "stay") => {
@@ -240,20 +292,31 @@ export function createGridController(
     dispatch({ type: "COMMIT_EDIT", value, commit });
     // Directional follow-up: Tab / Enter / Shift+Tab promised a focus move.
     if (commit !== "stay") {
-      applyIntent({ type: "commitMove", target: commit });
+      applyCellIntent({ type: "commitMove", target: commit });
     }
   };
 
   store.handleKey = (e) => {
-    const intent = keyEventToIntent(
-      e,
-      store.getState(),
-      args.getDisplayed(),
-      args.getSchema(),
-      args.capabilitiesFor,
-    );
+    const state = store.getState();
+    const displayed = args.getDisplayed();
+    // Mode owns keyboard routing. The controller does not ask which UI element
+    // was touched last; a cell-grid runtime always parses keys as cell intents,
+    // and a row-list runtime always parses keys as row intents.
+    const intent =
+      args.interaction.mode === "cell-grid"
+        ? keyEventToCellIntent(
+            e,
+            args.interaction,
+            state,
+            displayed,
+            args.getSchema(),
+            args.capabilitiesFor,
+          )
+        : keyEventToRowIntent(e, args.interaction, state, displayed);
     if (!intent) return false;
-    return applyIntent(intent);
+    return args.interaction.mode === "cell-grid"
+      ? applyCellIntent(intent as CellNavigationIntent)
+      : applyRowIntent(intent as RowNavigationIntent);
   };
 
   store.flushEffects = () => {

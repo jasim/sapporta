@@ -206,6 +206,7 @@ describe("TGridColumnMapper.columnsFor", () => {
       row: {
         kind: "data",
         id: "things#1" as never,
+        rowSelectable: true,
         columns: { id: 1 },
         hasChildren: false,
         source: { levelName: "things", columns: { id: 1 } },

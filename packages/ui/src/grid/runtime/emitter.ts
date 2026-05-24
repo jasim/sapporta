@@ -1,10 +1,10 @@
 // Emitters — how the grid talks to host code.
 //
-// Host callbacks (mutationCommitted, selectionChanged, cellReconciled,
-// levelStatusChanged, phantomCommitted) are wired via `runtime.on(...)` at
-// runtime construction and torn down with `dispose()`. The runtime is created
-// from a `RuntimeArgs` that includes initial subscriptions; React props are not
-// the carrier.
+// Host callbacks (mutationCommitted, cellSelectionChanged, rowSelectionChanged,
+// cellReconciled, levelStatusChanged, phantomCommitted) are wired via
+// `runtime.on(...)` at runtime construction and torn down with `dispose()`.
+// The runtime is created from a `RuntimeArgs` that includes initial
+// subscriptions; React props are not the carrier.
 //
 // Why not callback props? React consumers whose handler identities change
 // on every render would churn subscriptions if they were wired through
@@ -20,11 +20,16 @@
 // refetches, authoritative reconcile updates, and atomic rollbacks are data
 // updates only; they flow through source subscriptions and never emit this
 // event.
+//
+// Selection events are domain-specific. There is no generic
+// `selectionChanged`, because the grid has two unrelated selection concepts:
+// a rectangular cell range and row operation targets.
 
 import type { Coord, GridPath, RowKey } from "../types/identity";
 import type { LevelStatus, ReconcileEvent } from "../data-sources/types";
 import type { TreeNode } from "../types/level-row";
-import type { SelectionState } from "../types/selection";
+import type { CellSelectionState } from "../types/selection";
+import type { RowSelection } from "../types/row-selection";
 
 export type MutationCommittedEvent =
   | {
@@ -49,7 +54,11 @@ export type MutationCommittedEvent =
 // Events emitted by the runtime to host code.
 export type GridEvents = {
   mutationCommitted: MutationCommittedEvent;
-  selectionChanged: { path: GridPath; selection: SelectionState | null };
+  cellSelectionChanged: {
+    path: GridPath;
+    selection: CellSelectionState | null;
+  };
+  rowSelectionChanged: { path: GridPath; selection: RowSelection };
   // Reconciliation result for an optimistic edit. The path identifies the
   // source that emitted the event; the inner `event` is the source's own
   // ReconcileEvent (`agreed` | `diverged` | `rejected`). Wrapped rather

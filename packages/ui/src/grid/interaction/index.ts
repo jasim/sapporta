@@ -1,7 +1,7 @@
 export {
   createGridController,
   type GridControllerPublic,
-  type GridControllerFocusPort,
+  type GridControllerCursorPort,
   type GridControllerStore,
   type CreateControllerArgs,
 } from "./controller";
@@ -16,9 +16,10 @@ export {
 } from "./coordinator";
 
 export {
-  createFocusManager,
-  type FocusManager,
-  type FocusManagerDeps,
-} from "./focus-manager";
+  createCursorManager,
+  type CursorManager,
+  type CursorManagerDeps,
+} from "./cursor-manager";
 
-export { keyEventToIntent } from "./key-handling";
+export { keyEventToCellIntent, keyEventToRowIntent } from "./key-handling";
+export { normalizeInteraction, assertValidInteraction } from "./normalize-interaction";

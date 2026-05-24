@@ -2,6 +2,8 @@ export {
   createGridRuntime,
   type GridRuntime,
   type RuntimeArgs,
+  type RowInteractionCommands,
+  type RowInteractionStatus,
 } from "./create-grid-runtime";
 
 export type { GridEmitter, GridEvents } from "./emitter";

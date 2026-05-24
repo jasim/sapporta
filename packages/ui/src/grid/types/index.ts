@@ -6,7 +6,7 @@ export type {
   GridPath,
   RowId,
   Coord,
-  GridCursor,
+  CellCursor,
 } from "./identity";
 export {
   rootPath,
@@ -52,7 +52,7 @@ export {
   nextFocusableRow,
 } from "./level-row-traversal";
 
-export type { SelectionState, CellSelectionStatus } from "./selection";
+export type { CellSelectionState, CellSelectionStatus } from "./selection";
 export {
   makeSelection,
   selectionFocus,
@@ -74,8 +74,11 @@ export type {
   GridAction,
   ColPolicy,
   RowDirection,
-  NavigationIntent,
+  CellNavigationIntent,
+  RowNavigationIntent,
 } from "./action";
+export type * from "./interaction";
+export type * from "./row-selection";
 
 export type {
   LevelStatus,

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { keyEventToIntent } from "./key-handling";
+import { keyEventToCellIntent as parseCellIntent } from "./key-handling";
 import { capabilitiesFor } from "../types/capabilities";
+import { CELL_EDITING_GRID } from "../types/interaction";
 import { rootPath, makeRowId } from "../types/identity";
 import type { ControllerState } from "../types/controller-state";
 import type { ColumnSchema } from "../types/schema";
@@ -30,6 +31,7 @@ function makeRows(
       return {
         kind: "data",
         id,
+        rowSelectable: true,
         columns: {},
         hasChildren: false,
         source: {} as never,
@@ -46,18 +48,32 @@ function makeRows(
 }
 
 const baseState: ControllerState = {
-  liveFocus: null,
-  selection: null,
+  liveCellFocus: null,
+  cellSelection: null,
   editing: null,
+  liveRowFocus: null,
+  rowSelection: null,
 };
 
 function focusAt(rowKey: string, colId: string): ControllerState {
   const c = { rowId: makeRowId(path, rowKey), colId };
   return {
-    liveFocus: c,
-    selection: { anchor: c, head: c },
+    liveCellFocus: c,
+    cellSelection: { anchor: c, head: c },
     editing: null,
+    liveRowFocus: null,
+    rowSelection: null,
   };
+}
+
+function keyEventToCellIntent(
+  e: KeyboardEvent,
+  state: ControllerState,
+  displayed: DisplayedRows,
+  schema: ColumnSchema[],
+  caps: typeof capabilitiesFor,
+) {
+  return parseCellIntent(e, CELL_EDITING_GRID, state, displayed, schema, caps);
 }
 
 function ev(key: string, mods: Partial<KeyboardEvent> = {}): KeyboardEvent {
@@ -71,7 +87,7 @@ function ev(key: string, mods: Partial<KeyboardEvent> = {}): KeyboardEvent {
   } as unknown as KeyboardEvent;
 }
 
-describe("keyEventToIntent", () => {
+describe("keyEventToCellIntent", () => {
   const displayed = makeRows([
     { key: "r0", kind: "data" },
     { key: "r1", kind: "data" },
@@ -80,8 +96,8 @@ describe("keyEventToIntent", () => {
 
   it("returns null in edit mode regardless of key", () => {
     const editing: ControllerState = {
-      liveFocus: { rowId: makeRowId(path, "r0"), colId: "a" },
-      selection: {
+      liveCellFocus: { rowId: makeRowId(path, "r0"), colId: "a" },
+      cellSelection: {
         anchor: { rowId: makeRowId(path, "r0"), colId: "a" },
         head: { rowId: makeRowId(path, "r0"), colId: "a" },
       },
@@ -89,9 +105,11 @@ describe("keyEventToIntent", () => {
         coord: { rowId: makeRowId(path, "r0"), colId: "a" },
         trigger: "f2",
       },
+      liveRowFocus: null,
+      rowSelection: null,
     };
     expect(
-      keyEventToIntent(
+      keyEventToCellIntent(
         ev("ArrowDown"),
         editing,
         displayed,
@@ -100,44 +118,44 @@ describe("keyEventToIntent", () => {
       ),
     ).toBe(null);
     expect(
-      keyEventToIntent(ev("Escape"), editing, displayed, cols, capabilitiesFor),
+      keyEventToCellIntent(ev("Escape"), editing, displayed, cols, capabilitiesFor),
     ).toBe(null);
   });
 
-  it("emits focusFirst when there is no live focus and an arrow is pressed", () => {
-    const r = keyEventToIntent(
+  it("emits focusFirstCell when there is no live focus and an arrow is pressed", () => {
+    const r = keyEventToCellIntent(
       ev("ArrowDown"),
       baseState,
       displayed,
       cols,
       capabilitiesFor,
     );
-    expect(r).toEqual({ type: "focusFirst" });
+    expect(r).toEqual({ type: "focusFirstCell" });
   });
 
   it("ignores edit-trigger keys when there is no live focus", () => {
     expect(
-      keyEventToIntent(ev("F2"), baseState, displayed, cols, capabilitiesFor),
+      keyEventToCellIntent(ev("F2"), baseState, displayed, cols, capabilitiesFor),
     ).toBe(null);
     expect(
-      keyEventToIntent(ev("a"), baseState, displayed, cols, capabilitiesFor),
+      keyEventToCellIntent(ev("a"), baseState, displayed, cols, capabilitiesFor),
     ).toBe(null);
   });
 
   it("Escape clears selection when one exists", () => {
     expect(
-      keyEventToIntent(
+      keyEventToCellIntent(
         ev("Escape"),
         focusAt("r0", "a"),
         displayed,
         cols,
         capabilitiesFor,
       ),
-    ).toEqual({ type: "clearSelection" });
+    ).toEqual({ type: "clearCellSelection" });
   });
 
   it("ArrowDown emits a moveRow intent", () => {
-    const r = keyEventToIntent(
+    const r = keyEventToCellIntent(
       ev("ArrowDown"),
       focusAt("r0", "a"),
       displayed,
@@ -153,7 +171,7 @@ describe("keyEventToIntent", () => {
   });
 
   it("Shift+ArrowDown sets extend on moveRow", () => {
-    const r = keyEventToIntent(
+    const r = keyEventToCellIntent(
       ev("ArrowDown", { shiftKey: true }),
       focusAt("r0", "a"),
       displayed,
@@ -170,7 +188,7 @@ describe("keyEventToIntent", () => {
 
   it("Tab emits target movement for coordinator resolution", () => {
     expect(
-      keyEventToIntent(
+      keyEventToCellIntent(
         ev("Tab"),
         focusAt("r0", "a"),
         displayed,
@@ -179,7 +197,7 @@ describe("keyEventToIntent", () => {
       ),
     ).toEqual({ type: "commitMove", target: "next" });
     expect(
-      keyEventToIntent(
+      keyEventToCellIntent(
         ev("Tab", { shiftKey: true }),
         focusAt("r0", "b"),
         displayed,
@@ -191,7 +209,7 @@ describe("keyEventToIntent", () => {
 
   it("F2 opens an edit on a data cell", () => {
     expect(
-      keyEventToIntent(
+      keyEventToCellIntent(
         ev("F2"),
         focusAt("r0", "a"),
         displayed,
@@ -203,7 +221,7 @@ describe("keyEventToIntent", () => {
 
   it("Enter opens an edit", () => {
     expect(
-      keyEventToIntent(
+      keyEventToCellIntent(
         ev("Enter"),
         focusAt("r0", "a"),
         displayed,
@@ -215,7 +233,7 @@ describe("keyEventToIntent", () => {
 
   it("printable key opens a 'type' edit and forwards the keystroke", () => {
     expect(
-      keyEventToIntent(
+      keyEventToCellIntent(
         ev("z"),
         focusAt("r0", "a"),
         displayed,
@@ -227,7 +245,7 @@ describe("keyEventToIntent", () => {
 
   it("does not open a 'type' edit on Ctrl+letter", () => {
     expect(
-      keyEventToIntent(
+      keyEventToCellIntent(
         ev("z", { ctrlKey: true }),
         focusAt("r0", "a"),
         displayed,
@@ -244,7 +262,7 @@ describe("keyEventToIntent", () => {
       testColumn("c", "C"),
     ];
     expect(
-      keyEventToIntent(
+      keyEventToCellIntent(
         ev("z"),
         focusAt("r0", "a"),
         displayed,
@@ -253,7 +271,7 @@ describe("keyEventToIntent", () => {
       ),
     ).toBe(null);
     expect(
-      keyEventToIntent(
+      keyEventToCellIntent(
         ev("F2"),
         focusAt("r0", "a"),
         displayed,
@@ -274,7 +292,7 @@ describe("keyEventToIntent", () => {
     ];
 
     expect(
-      keyEventToIntent(
+      keyEventToCellIntent(
         ev("F2"),
         focusAt("r0", "a"),
         displayed,
@@ -290,7 +308,7 @@ describe("keyEventToIntent", () => {
       { key: "r1", kind: "data" },
     ]);
     expect(
-      keyEventToIntent(
+      keyEventToCellIntent(
         ev("F2"),
         focusAt("open", "a"),
         d,
@@ -299,12 +317,12 @@ describe("keyEventToIntent", () => {
       ),
     ).toBe(null);
     expect(
-      keyEventToIntent(ev("z"), focusAt("open", "a"), d, cols, capabilitiesFor),
+      keyEventToCellIntent(ev("z"), focusAt("open", "a"), d, cols, capabilitiesFor),
     ).toBe(null);
   });
 
   it("Ctrl+Home is moveGridEdge 'first'", () => {
-    const r = keyEventToIntent(
+    const r = keyEventToCellIntent(
       ev("Home", { ctrlKey: true }),
       focusAt("r1", "c"),
       displayed,
@@ -320,7 +338,7 @@ describe("keyEventToIntent", () => {
   });
 
   it("Ctrl+End is moveGridEdge 'last'", () => {
-    const r = keyEventToIntent(
+    const r = keyEventToCellIntent(
       ev("End", { ctrlKey: true }),
       focusAt("r0", "a"),
       displayed,
@@ -337,7 +355,7 @@ describe("keyEventToIntent", () => {
 
   it("PageDown is moveRowDelta with positive delta", () => {
     expect(
-      keyEventToIntent(
+      keyEventToCellIntent(
         ev("PageDown"),
         focusAt("r0", "a"),
         displayed,
@@ -354,7 +372,7 @@ describe("keyEventToIntent", () => {
 
   it("PageUp is moveRowDelta with negative delta", () => {
     expect(
-      keyEventToIntent(
+      keyEventToCellIntent(
         ev("PageUp"),
         focusAt("r1", "b"),
         displayed,

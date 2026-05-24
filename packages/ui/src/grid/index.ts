@@ -45,8 +45,8 @@
 // level name, with `rootLevel` and `childLevels` describing the tree's
 // shape. Data lives on a `GridDataSource` (in-memory, REST, or custom).
 // The runtime is a plain TypeScript value, not a React thing. Components
-// reach it via context. Host events (mutationCommitted, selectionChanged,
-// cellReconciled, levelStatusChanged, phantomCommitted)
+// reach it via context. Host events (mutationCommitted, cellSelectionChanged,
+// rowSelectionChanged, cellReconciled, levelStatusChanged, phantomCommitted)
 // are wired at construction via `runtime.on(…)`, not through React props —
 // see `emitter.ts`.
 //
@@ -57,23 +57,24 @@
 //   3. data-sources/types.ts — data-source contract and snapshot shape.
 //   4. displayed-rows/ — pure `DisplayedRowsInput` → row read models.
 //   5. react/GridLevel.tsx — recursive render bridge.
-//   6. interaction/controller.ts — selection, focus, editing, and
-//      keyboard dispatch.
+//   6. interaction/controller.ts — cell selection, row selection, focus,
+//      editing, and keyboard dispatch.
 //
 // =====================================================================
 // A concrete scenario — what happens when you click a cell
 // =====================================================================
 //
-// 1. The cell's mousedown handler calls `runtime.focusManager.moveTo(...)`
-//    for a plain click, or `extendTo(...)` for a shift-click range.
-// 2. The focus manager writes the global cursor on the coordinator and
-//    the per-path `liveFocus` mirror on the controller, in lockstep.
+// 1. The cell's mousedown handler calls
+//    `runtime.cursorManager.moveCellCursorTo(...)` for a plain click, or
+//    `extendCellSelectionTo(...)` for a shift-click range.
+// 2. The cursor manager writes the global cursor on the coordinator and
+//    the per-path `liveCellFocus` mirror on the controller, in lockstep.
 //    Two cells flip their `status` selector: old focus → "none", new
 //    focus → "focus". That's exactly two React re-renders across the
 //    entire grid. Cells subscribe only to their own controller's
-//    `liveFocus`, so cursor moves in unrelated paths produce zero
+//    `liveCellFocus`, so cursor moves in unrelated paths produce zero
 //    re-renders here.
-// 3. `Grid` subscribes to `cursor?.path === path` and updates its
+// 3. `Grid` subscribes to `cellCursor?.path === path` and updates its
 //    container's `data-active` attribute; cells stay idle and the CSS
 //    cascade applies the active/ghost visual treatment. Active-ness is
 //    level-scoped, so it lives at level scope on the DOM rather than
@@ -100,9 +101,10 @@
 //      `GridSchema` is replaced.
 //
 //   2. TRANSIENT — `GridController`, one Zustand store per `GridPath`
-//      (interaction/controller.ts). Selection, focus, editing. This
+//      (interaction/controller.ts). Cell selection, row selection, live focus
+//      mirrors, editing. This
 //      state outlives DOM presence: collapsing and re-expanding a level
-//      preserves its focus and selection. Each path's controller is
+//      preserves its focus and selection state. Each path's controller is
 //      independent — a selection change in path "orders.ord-3.lines" never
 //      wakes subscribers in path "orders.ord-4.notes". That is *why*
 //      transient is
@@ -111,12 +113,13 @@
 //
 //   3. STRUCTURAL — `GridCoordinator`, one Zustand store per runtime
 //      (interaction/coordinator.ts). Cross-path concerns: which levels
-//      are expanded and the global `cursor` (the active path is
-//      `cursor?.path`). Boundary navigation (arrowing past the last
-//      row of one level into the first row of the next) is resolved
-//      on demand via `nextVisibleRow` and applied through the focus
-//      manager — the sole writer of `cursor` and of every controller's
-//      `liveFocus`. The coordinator holds no per-mount focus mailbox.
+//      are expanded, the global `cellCursor`, and the global `rowCursor`.
+//      In cell-grid mode the active path is `cellCursor?.path`; in row-list
+//      mode it is `rowCursor?.path`. Boundary navigation (arrowing past the
+//      last row of one level into the first row of the next) is resolved on
+//      demand via `visible-order.ts` and applied through the cursor manager —
+//      the sole writer of global cursors and every controller's live-focus
+//      mirrors. The coordinator holds no per-mount focus mailbox.
 //      Active-ness is structural because it determines whether a level
 //      is "live" or "ghost" — a visual distinction that belongs to
 //      the grid as a whole, not to any one level. Expansion is
@@ -136,6 +139,44 @@
 //      as paths are expanded. Sources emit identity-stable snapshots;
 //      displayed-row derivation is a pure function of `DisplayedRowsInput`.
 //      Seven invariants govern the data plane — see `data-sources/types.ts`.
+//
+// =====================================================================
+// Interaction domains
+// =====================================================================
+//
+// The grid has two interaction domains:
+//
+//   - Cell-grid mode: the keyboard target is a `CellCursor`
+//     (`path + rowId + colId`). Shift movement may extend
+//     `cellSelection`, a rectangular range interpreted in displayed-row
+//     and displayed-column order. Editing lives only in this mode.
+//
+//   - Row-list mode: the keyboard target is a `RowCursor`
+//     (`path + rowId`). Shift movement may extend `rowSelection` when
+//     configured. Traversal is column-free and lands only on rows whose
+//     `rowSelectable` flag is true.
+//
+// `interaction.mode` owns keyboard routing for the lifetime of the runtime.
+// A checkbox, row-selector column, or side-panel affordance can mutate row
+// operation targets, but it does not change whether ArrowUp moves a cell or a
+// row.
+//
+// Active row and selected rows are canonical runtime reads:
+//
+//   - `runtime.activeRowFor(path)` derives from the cell cursor in cell-grid
+//     mode when configured, or from live row focus in row-list mode.
+//
+//   - `runtime.selectedRowsFor(path)` is disabled, derived from active row, or
+//     read from stored independent row selection depending on
+//     `interaction.selectedRows`.
+//
+// Stored row selection is path-local, normalized at the write boundary, and may
+// contain only currently displayed, row-selectable rows. Empty row sets are
+// represented as `null`. Row selection changes do not invalidate displayed
+// rows; displayed-row changes may prune row selection.
+//
+// Cell range selection and row operation selection use separate types and
+// separate capability gates: `selectable` for cells, `rowSelectable` for rows.
 //
 // =====================================================================
 // The effects channel
@@ -395,7 +436,7 @@ export type {
   DisplayedRowSequence,
   DisplayedRows,
   RowCapabilities,
-  SelectionState,
+  CellSelectionState,
   CellSelectionStatus,
   EditingState,
   ControllerState,
@@ -407,8 +448,12 @@ export type {
   GridAction,
   ColPolicy,
   RowDirection,
-  NavigationIntent,
+  CellNavigationIntent,
+  RowNavigationIntent,
   SortDescriptor,
+  GridInteractionConfig,
+  RowCursor,
+  RowSelection,
 } from "./types";
 export {
   rootPath,

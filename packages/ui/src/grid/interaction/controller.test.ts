@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { createGridController } from "./controller";
 import { capabilitiesFor } from "../types/capabilities";
+import { CELL_EDITING_GRID } from "../types/interaction";
 import { rootPath, makeRowId } from "../types/identity";
 import type { ColumnSchema } from "../types/schema";
 import type { DisplayedRows, LevelRow } from "../types/level-row";
@@ -32,6 +33,7 @@ function makeRows(
       return {
         kind: "data",
         id,
+        rowSelectable: true,
         columns: {},
         hasChildren: false,
         source: {} as never,
@@ -52,17 +54,18 @@ const displayed = makeRows([
 function makeController(
   opts: {
     onNavigate?: ReturnType<typeof vi.fn>;
-    clearRange?: ReturnType<typeof vi.fn>;
+    clearCellRange?: ReturnType<typeof vi.fn>;
     writeValue?: ReturnType<typeof vi.fn>;
   } = {},
 ) {
   return createGridController({
     path,
+    interaction: CELL_EDITING_GRID,
     getDisplayed: () => displayed,
     getSchema: () => cols,
     capabilitiesFor,
-    onNavigate: opts.onNavigate,
-    clearRange: opts.clearRange,
+    onNavigateCell: opts.onNavigate,
+    clearCellRange: opts.clearCellRange,
     writeValue: opts.writeValue,
   });
 }
@@ -75,7 +78,7 @@ describe("GridController — verbs", () => {
       coord: { rowId: "rows#r0", colId: "a" },
       trigger: "f2",
     });
-    expect(c.getState().selection).toBe(null);
+    expect(c.getState().cellSelection).toBe(null);
     c.cancelEdit();
     expect(c.getState().editing).toBe(null);
   });
@@ -135,6 +138,7 @@ describe("GridController — verbs", () => {
   it("does not start editing when the target column has no editor", () => {
     const c = createGridController({
       path,
+      interaction: CELL_EDITING_GRID,
       getDisplayed: () => displayed,
       getSchema: () => [
         {
@@ -155,6 +159,7 @@ describe("GridController — verbs", () => {
   it("does not let direct startEdit bypass editTriggers", () => {
     const c = createGridController({
       path,
+      interaction: CELL_EDITING_GRID,
       getDisplayed: () => displayed,
       getSchema: () => [
         {
@@ -189,7 +194,7 @@ describe("GridController — effects channel identity", () => {
     c.cancelEdit();
     c.flushEffects();
     const empty2 = c.effects.getState();
-    c.clearSelection();
+    c.clearCellSelection();
     expect(c.effects.getState()).toBe(empty2);
     // Sanity: the *first* effect array is distinct from the post-flush one.
     expect(before).not.toBe(empty);

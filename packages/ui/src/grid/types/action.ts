@@ -18,10 +18,10 @@ export type NavigationDirection =
 // What target a commit should move to. "stay" keeps focus on the same cell.
 export type CommitTarget = NavigationDirection | "stay";
 
-// Reducer-level actions. Verbs on the controller (startEdit, commitEdit, …)
-// fan out to one of these. Cursor motion does NOT — it goes through the
-// focus manager (see `interaction/focus-manager.ts`); the reducer only
-// handles edit lifecycle and range clearing.
+// Reducer-level actions. Verbs on the controller (startEdit, commitEdit, ...)
+// fan out to one of these. Cursor motion does NOT — it goes through the cursor
+// manager (see `interaction/cursor-manager.ts`); the reducer only handles edit
+// lifecycle.
 export type StartEditAction =
   | { type: "START_EDIT"; coord: Coord; trigger: "type"; initial: string }
   | {
@@ -44,7 +44,11 @@ export type RowDirection = "up" | "down" | "first" | "last" | { delta: number };
 // "last" — always use the target's last focusable column.
 export type ColPolicy = "preserve" | "first" | "last";
 
-export type NavigationIntent =
+// Navigation intents are split by domain so a row operation never has to be
+// smuggled through a cell movement shape. The controller chooses the parser
+// from `interaction.mode`, then the coordinator resolves the intent using the
+// matching global cursor.
+export type CellNavigationIntent =
   | {
       type: "commitMove";
       target: Exclude<CommitTarget, "stay">;
@@ -74,5 +78,14 @@ export type NavigationIntent =
     }
   | { type: "startEdit"; trigger: "type"; initial: string }
   | { type: "startEdit"; trigger: NonTypedEditTrigger; initial?: never }
-  | { type: "clearSelection" }
-  | { type: "focusFirst" };
+  | { type: "clearCellSelection" }
+  | { type: "focusFirstCell" }
+  | { type: "toggleActiveRowSelection" };
+
+export type RowNavigationIntent =
+  | { type: "moveActiveRow"; direction: "up" | "down"; extend: boolean }
+  | { type: "moveActiveRowDelta"; delta: number; extend: boolean }
+  | { type: "moveActiveRowEdge"; edge: "first" | "last"; extend: boolean }
+  | { type: "focusFirstRow" }
+  | { type: "toggleActiveRowSelection" }
+  | { type: "clearRowSelection" };
