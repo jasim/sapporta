@@ -912,6 +912,11 @@ describe("GridRuntime", () => {
       interaction: CELL_PRIMARY_WITH_SIDE_PANEL_ROW,
     });
 
+    expect(rt.selectedRowIds(rowsRoot)).toBe(rt.selectedRowIds(rowsRoot));
+    expect(rt.rowInteractionSnapshotFor(rowsRoot)).toBe(
+      rt.rowInteractionSnapshotFor(rowsRoot),
+    );
+
     rt.cursorManager.moveCellCursorTo({
       path: rowsRoot,
       rowId: makeRowId(rowsRoot, "a"),

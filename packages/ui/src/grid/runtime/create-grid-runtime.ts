@@ -299,6 +299,7 @@ export function createGridRuntime(args: RuntimeArgs): GridRuntime {
   const selectedRowsSnapshots = new Map<GridPath, RowSelection>();
   const selectedRowIdSnapshots = new Map<GridPath, readonly RowId[]>();
   const rowInteractionSnapshots = new Map<GridPath, RowInteractionSnapshot>();
+  const emptyRowIds: readonly RowId[] = [];
 
   // Memoized `LevelSchema` per path. The path's level name is a function
   // of the path string, so the entry is stable for the runtime's
@@ -832,11 +833,12 @@ export function createGridRuntime(args: RuntimeArgs): GridRuntime {
   }
 
   function selectedRowIds(path: GridPath): readonly RowId[] {
-    const next = rowIdsInRowSelection(
+    const projected = rowIdsInRowSelection(
       selectedRowsForPath(path),
       displayedRowsFor(path),
     );
-    const prev = selectedRowIdSnapshots.get(path) ?? [];
+    const next = projected.length === 0 ? emptyRowIds : projected;
+    const prev = selectedRowIdSnapshots.get(path) ?? emptyRowIds;
     if (rowIdSnapshotsEqual(prev, next)) return prev;
     selectedRowIdSnapshots.set(path, next);
     return next;
