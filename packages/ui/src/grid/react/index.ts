@@ -1,10 +1,16 @@
 export {
   GridRuntimeProvider,
+  useActiveCell,
+  useActiveCellForPath,
+  useActiveRow,
+  useCellSelection,
   useDisplayedRow,
   useDisplayedRowSequence,
   useGridRuntime,
   useLevelSnapshot,
   usePhantoms,
+  useSelectedRowIds,
+  useSelectedRows,
   useRowInteractionStatus,
   useRowSelectionContainsRow,
 } from "./GridRuntimeProvider";

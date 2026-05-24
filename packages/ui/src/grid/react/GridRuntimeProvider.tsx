@@ -4,12 +4,16 @@ import {
   useSyncExternalStore,
   type ReactNode,
 } from "react";
+import { useStore } from "zustand";
 import type {
   GridRuntime,
   RowInteractionStatus,
 } from "../runtime/create-grid-runtime";
 import type { LevelSnapshot } from "../data-sources/types";
-import type { GridPath, RowId } from "../types/identity";
+import type { CellCursor, Coord, GridPath, RowId } from "../types/identity";
+import type { CellSelectionState } from "../types/selection";
+import type { RowCursor, RowSelection } from "../types/row-selection";
+import type { ControllerState } from "../types/controller-state";
 import type {
   DisplayedRowSequence,
   LevelRow,
@@ -88,6 +92,54 @@ export function useDisplayedRow(path: GridPath, rowId: RowId): LevelRow {
       }
       return row;
     },
+  );
+}
+
+export function useActiveCell(): CellCursor | null {
+  const runtime = useGridRuntime();
+  return useStore(runtime.coordinator, (s) => s.cellCursor);
+}
+
+export function useActiveCellForPath(path: GridPath): Coord | null {
+  const runtime = useGridRuntime();
+  return useStore(
+    runtime.controllerFor(path),
+    (s: ControllerState) => s.liveCellFocus,
+  );
+}
+
+export function useCellSelection(path: GridPath): CellSelectionState | null {
+  const runtime = useGridRuntime();
+  return useStore(
+    runtime.controllerFor(path),
+    (s: ControllerState) => s.cellSelection,
+  );
+}
+
+export function useActiveRow(path: GridPath): RowCursor | null {
+  const runtime = useGridRuntime();
+  return useSyncExternalStore(
+    (cb) => runtime.subscribeActiveRow(path, cb),
+    () => runtime.activeRowFor(path),
+    () => null,
+  );
+}
+
+export function useSelectedRows(path: GridPath): RowSelection {
+  const runtime = useGridRuntime();
+  return useSyncExternalStore(
+    (cb) => runtime.subscribeSelectedRows(path, cb),
+    () => runtime.selectedRowsFor(path),
+    () => null,
+  );
+}
+
+export function useSelectedRowIds(path: GridPath): readonly RowId[] {
+  const runtime = useGridRuntime();
+  return useSyncExternalStore(
+    (cb) => runtime.subscribeSelectedRowIds(path, cb),
+    () => runtime.selectedRowIds(path),
+    () => [],
   );
 }
 

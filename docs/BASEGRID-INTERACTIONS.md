@@ -522,11 +522,21 @@ If you pass `undefined` for the interaction argument, `normalizeInteraction` def
 ### Reading State
 
 ```ts
-import { useGridRuntime, rootPath } from "@sapporta/ui";
+import {
+  rootPath,
+  useActiveCell,
+  useActiveCellForPath,
+  useActiveRow,
+  useCellSelection,
+  useGridRuntime,
+  useSelectedRowIds,
+  useSelectedRows,
+} from "@sapporta/ui";
 
 function MyComponent() {
   const runtime = useGridRuntime();
-  const path = rootPath();
+  const path = rootPath("tasks");
+  const rowId = runtime.displayedRowSequenceFor(path).rows[0]?.id;
 
   // The normalized interaction config
   runtime.interaction; // GridInteractionConfig
@@ -540,12 +550,44 @@ function MyComponent() {
   // Selected row ids in displayed order
   runtime.selectedRowIds(path); // readonly RowId[]
 
-  // Does a specific row appear in the effective selection?
-  runtime.rowSelectionContainsRow(path, rowId); // boolean
+  if (rowId) {
+    // Does a specific row appear in the effective selection?
+    runtime.rowSelectionContainsRow(path, rowId); // boolean
 
-  // Combined cursor + selection status for row chrome
-  runtime.rowInteractionStatusFor(path, rowId);
-  // "idle" | "selected" | "cursor" | "cursor-selected"
+    // Combined cursor + selection status for row chrome
+    runtime.rowInteractionStatusFor(path, rowId);
+    // "idle" | "selected" | "cursor" | "cursor-selected"
+  }
+}
+```
+
+React components should use the exported hooks for subscription-backed reads:
+
+```tsx
+function TaskSelectionSummary() {
+  const path = rootPath("tasks");
+  const activeCell = useActiveCell(); // CellCursor | null
+  const activeCellInPath = useActiveCellForPath(path); // Coord | null
+  const cellSelection = useCellSelection(path); // CellSelectionState | null
+  const activeRow = useActiveRow(path); // RowCursor | null
+  const selectedRows = useSelectedRows(path); // RowSelection
+  const selectedRowIds = useSelectedRowIds(path); // readonly RowId[]
+
+  return (
+    <section>
+      <p>Active path: {activeCell?.path ?? "none"}</p>
+      <p>Active column: {activeCellInPath?.colId ?? "none"}</p>
+      <p>
+        Cell range:{" "}
+        {cellSelection
+          ? `${cellSelection.anchor.rowId}:${cellSelection.anchor.colId} to ${cellSelection.head.rowId}:${cellSelection.head.colId}`
+          : "none"}
+      </p>
+      <p>Active row: {activeRow?.rowId ?? "none"}</p>
+      <p>Selected row shape: {selectedRows?.kind ?? "none"}</p>
+      <p>Selected rows: {selectedRowIds.length}</p>
+    </section>
+  );
 }
 ```
 
@@ -559,7 +601,7 @@ const unsubActive = runtime.subscribeActiveRow(path, () => {
   console.log("Active row:", row?.rowId);
 });
 
-const unsubSelected = runtime.subscribeSelectedRows(path, () => {
+const unsubSelected = runtime.subscribeSelectedRowIds(path, () => {
   const ids = runtime.selectedRowIds(path);
   console.log("Selected count:", ids.length);
 });

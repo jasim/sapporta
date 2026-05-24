@@ -503,17 +503,7 @@ The active row is the row that owns keyboard focus. Depending on the interaction
 config, it may come from the active cell or from a row cursor.
 
 ```tsx
-import { useSyncExternalStore } from "react";
-import { rootPath, useGridRuntime, type GridPath } from "@sapporta/ui";
-
-function useActiveRow(path: GridPath) {
-  const runtime = useGridRuntime();
-  return useSyncExternalStore(
-    (callback) => runtime.subscribeActiveRow(path, callback),
-    () => runtime.activeRowFor(path),
-    () => null,
-  );
-}
+import { rootPath, useActiveRow, useGridRuntime } from "@sapporta/ui";
 
 function TaskDetailPanel() {
   const path = rootPath("tasks");
@@ -532,8 +522,41 @@ function TaskDetailPanel() {
 }
 ```
 
-Use `runtime.selectedRowsFor(path)` instead when the panel should follow the
-effective row selection rather than keyboard focus.
+Use `useSelectedRows(path)` or `useSelectedRowIds(path)` instead when the panel
+should follow the effective row selection rather than keyboard focus.
+
+For React components, prefer the exported selection hooks:
+
+```tsx
+import {
+  rootPath,
+  useActiveCellForPath,
+  useSelectedRows,
+  useCellSelection,
+  useSelectedRowIds,
+} from "@sapporta/ui";
+
+function GridToolbar() {
+  const path = rootPath("tasks");
+  const activeCell = useActiveCellForPath(path);
+  const cellSelection = useCellSelection(path);
+  const selectedRows = useSelectedRows(path);
+  const selectedRowIds = useSelectedRowIds(path);
+
+  return (
+    <div>
+      <span>{activeCell?.colId ?? "No active cell"}</span>
+      <span>
+        {cellSelection
+          ? `${cellSelection.anchor.colId} to ${cellSelection.head.colId}`
+          : "No cell range"}
+      </span>
+      <span>{selectedRows?.kind ?? "No row selection"}</span>
+      <span>{selectedRowIds.length} rows selected</span>
+    </div>
+  );
+}
+```
 
 ## Custom Data Sources
 
