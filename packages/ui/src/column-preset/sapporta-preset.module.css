@@ -16,6 +16,10 @@
   --grid-cell-ghost-selection-background: var(--sap-selection);
   --grid-cell-editing-ring-width: 1.5px;
   --grid-cell-editing-ring-color: var(--sap-brand);
+  --grid-row-hover-background: var(--sap-row-hover);
+  --grid-row-selected-background: var(--sap-selection);
+  --grid-row-active-background: transparent;
+  --grid-row-active-selected-background: var(--sap-selection);
   --grid-header-background: var(--sap-surface);
   --grid-header-color: var(--sap-fg-muted);
   --grid-header-font-size: var(--text-sap-label);
@@ -27,6 +31,17 @@
   --grid-header-cursor: pointer;
   --grid-phantom-row-background: var(--sap-surface);
   --grid-editor-background: var(--sap-surface);
+}
+
+.presetGrid [data-grid-part="row"][data-row-active="true"]::before {
+  background: var(--sap-brand);
+  content: "";
+  inset-block: 0;
+  inset-inline-start: 0;
+  pointer-events: none;
+  position: absolute;
+  width: 2px;
+  z-index: 2;
 }
 
 .rowSelectionCell {

@@ -6,6 +6,20 @@ import { capabilitiesFor } from "../../types/capabilities";
 import { useDisplayedRow, useGridRuntime } from "../GridRuntimeProvider";
 import { GridDataCell } from "./GridDataCell";
 
+export type RowChromeState = {
+  active: boolean;
+  selected: boolean;
+};
+
+export function rowChromeStateFromInteractionStatus(
+  status: RowInteractionStatus,
+): RowChromeState {
+  return {
+    active: status === "cursor" || status === "cursor-selected",
+    selected: status === "selected" || status === "cursor-selected",
+  };
+}
+
 // The only `React.memo` in the grid — structurally justified, not a
 // hot-path hack.
 //
@@ -29,14 +43,19 @@ export const GridRow = memo(function GridRow({
 }) {
   const runtime = useGridRuntime();
   const row = useDisplayedRow(path, rowId);
+  const { active, selected } =
+    rowChromeStateFromInteractionStatus(rowInteractionStatus);
 
   return (
     <div
       data-grid-part="row"
       data-row-id={row.id}
       data-row-kind={row.kind}
+      data-row-active={active ? "true" : undefined}
+      data-row-selected={selected ? "true" : undefined}
       data-row-interaction-status={rowInteractionStatus}
       data-row-selectable={String(capabilitiesFor(row.kind).rowSelectable)}
+      aria-selected={selected ? true : undefined}
       role="row"
       onMouseDown={(event) => {
         if (event.button !== 0) return;
