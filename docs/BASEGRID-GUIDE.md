@@ -755,7 +755,9 @@ filtering is enabled.
 
 BaseGrid also writes data attributes such as `data-grid-part`,
 `data-grid-path`, `data-grid-depth`, and `data-active`. Row and cell components
-write row/cell status attributes that you can target in CSS.
+write row/cell status attributes that you can target in CSS. For the row and
+cell selection styling contract, read
+[BASEGRID-STYLING.md](./BASEGRID-STYLING.md).
 
 ## Performance Rules
 

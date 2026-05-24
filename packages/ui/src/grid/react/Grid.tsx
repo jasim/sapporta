@@ -30,11 +30,9 @@ export type GridChromeContext = {
 //   4. Render <CellEditorOverlay> for this path (singleton overlay).
 //
 // Grid also decorates its container with `data-grid-path` and
-// `data-active` (from `coordinator.cellCursor?.path === path`); the
-// active/ghost distinction is level-scoped and reaches every descendant
-// cell via the CSS cascade, not via per-cell subscriptions. Each nested
-// each grid root re-declares `--grid-active` at its own scope so
-// child grids do not inherit a parent's ghost dim.
+// `data-active` (from `coordinator.cellCursor?.path === path`). The
+// active/ghost distinction is level-scoped state that preset or app CSS can
+// style through the root attribute, not via per-cell subscriptions.
 //
 // Grid also mounts EffectRunner (drains the controller's effects channel)
 // and the overlay portal slot (`data-grid-overlay`) that editors portal

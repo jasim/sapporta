@@ -13,7 +13,8 @@ This reference is organized in the order you normally build a BaseGrid:
 
 For a tutorial, read [BASEGRID-GUIDE.md](./BASEGRID-GUIDE.md). For detailed
 keyboard and selection behavior, read
-[BASEGRID-INTERACTIONS.md](./BASEGRID-INTERACTIONS.md).
+[BASEGRID-INTERACTIONS.md](./BASEGRID-INTERACTIONS.md). For row and cell
+selection styling, read [BASEGRID-STYLING.md](./BASEGRID-STYLING.md).
 
 ## Import Surface
 
@@ -1024,6 +1025,8 @@ Common attributes:
 - `data-grid-path` on a level root
 - `data-grid-depth` on a level root
 - `data-active="true" | "false"` on a level root
+- `data-row-active="true"` on active row elements
+- `data-row-selected="true"` on selected row elements
 - `data-row-interaction-status` on row elements
 - `data-row-selectable` on row elements
 
@@ -1034,9 +1037,12 @@ Example:
   opacity: 0.72;
 }
 
-[data-row-interaction-status="cursor"],
-[data-row-interaction-status="cursor-selected"] {
-  outline: 1px solid var(--accent);
+[data-grid-part="row"][data-row-active="true"] {
+  background: #eef4ff;
+}
+
+[data-grid-part="row"][data-row-selected="true"] {
+  font-weight: 520;
 }
 ```
 

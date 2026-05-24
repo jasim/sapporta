@@ -685,8 +685,11 @@ row shell.
   data-grid-part="row"
   data-row-id={row.id}
   data-row-kind={row.kind}
+  data-row-active={active ? "true" : undefined}
+  data-row-selected={selected ? "true" : undefined}
   data-row-interaction-status={status}
   data-row-selectable={String(capabilitiesFor(row.kind).rowSelectable)}
+  aria-selected={selected ? true : undefined}
   role="row"
 >
 ```
