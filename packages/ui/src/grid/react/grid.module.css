@@ -1,79 +1,20 @@
-/* Dense spreadsheet chrome for the grid runtime. The grid uses CSS variable
- * `--grid-template-columns` set per-instance from the column schema.
- * Rows use subgrid so intrinsic tracks such as `max-content` are resolved
- * across header and body cells together.
+/* Structural grid layout only.
  *
- * Only `.root` is a CSS-module class. Descendant styling is scoped under that
- * root through stable `data-grid-part` attributes so consumers can target the
- * DOM without depending on generated CSS-module names. */
+ * Visual chrome belongs to the column preset layer. This module owns the
+ * behavior-critical display model, positioning, and stable part structure so
+ * consumers can style the grid through data-grid-part/data-row/data-cell
+ * attributes without fighting Sapporta product CSS. */
 
 .root[data-grid-path] {
-  --grid-active-focus-background: var(
-    --grid-cell-active-focus-background,
-    var(--sap-selection)
-  );
-  --grid-active-focus-ring-color: var(
-    --grid-cell-active-focus-ring-color,
-    var(--sap-brand)
-  );
-  --grid-active-selection-background: var(
-    --grid-cell-active-selection-background,
-    var(--sap-selection)
-  );
-  --grid-current-focus-background: var(--grid-active-focus-background);
-  --grid-current-focus-ring-color: var(--grid-active-focus-ring-color);
-  --grid-current-selection-background: var(--grid-active-selection-background);
-  --grid-editing-ring-color: var(
-    --grid-cell-editing-ring-color,
-    var(--sap-brand)
-  );
-  --grid-row-base-background: transparent;
-  --grid-row-background: var(--grid-row-base-background);
-  --grid-row-hover-background: transparent;
-  --grid-row-selected-background: var(--grid-row-base-background);
-  --grid-row-active-background: var(--grid-row-base-background);
-  --grid-row-active-selected-background: var(--grid-row-selected-background);
-  --grid-phantom-row-background: transparent;
-  --grid-cell-background: var(--grid-row-background);
-  --grid-active: 1;
-
   display: grid;
-  color: var(--grid-color, var(--sap-fg));
-  font-size: var(--grid-font-size, var(--text-sap-body));
   grid-template-columns: var(
     --grid-template-columns,
     repeat(auto-fit, minmax(80px, 1fr))
   );
-  line-height: var(--grid-line-height, 1.38);
   position: relative;
   outline: none;
-  background: var(--grid-background, var(--sap-surface));
 }
 
-/* Active vs ghost is level-scoped — every cell in a level shares it.
- * Each grid root re-declares `--grid-active` at its own scope so a nested grid
- * does not inherit a parent's ghost dim through the cascade. Ghost styling
- * reads `var(--grid-active)`; the var itself is just a flag, 1 for active, 0
- * for ghost. */
-.root[data-grid-path][data-active="false"] {
-  --grid-active: 0;
-  --grid-current-focus-background: var(
-    --grid-cell-ghost-focus-background,
-    var(--sap-nested-bg)
-  );
-  --grid-current-focus-ring-color: var(
-    --grid-cell-ghost-focus-ring-color,
-    var(--sap-focus-ring)
-  );
-  --grid-current-selection-background: var(
-    --grid-cell-ghost-selection-background,
-    var(--sap-nested-bg)
-  );
-}
-
-/* `:where()` gives `.root` zero specificity here. That lets consumer CSS like
- * `.myGrid [data-grid-part="cell"]` override internal grid chrome without
- * depending on CSS-module hashes or selector escalation. */
 :where(.root) [data-grid-part="header"],
 :where(.root) [data-grid-part="body"] {
   display: grid;
@@ -87,51 +28,10 @@
   display: grid;
   grid-column: 1 / -1;
   grid-template-columns: subgrid;
-  border-bottom: var(--grid-row-border-block-end, 1px solid var(--sap-border));
 }
 
 :where(.root) [data-grid-part="row"] {
-  --grid-row-base-background: transparent;
-  --grid-row-background: var(--grid-row-base-background);
-
-  background: var(--grid-row-background);
   position: relative;
-}
-
-:where(.root) [data-grid-part="row"][data-row-kind="phantom"] {
-  --grid-row-base-background: var(--grid-phantom-row-background);
-}
-
-:where(.root)
-  [data-grid-part="row"]:not([data-row-selected="true"]):not(
-    [data-row-active="true"]
-  ):hover {
-  --grid-row-background: var(
-    --grid-row-hover-background,
-    var(--grid-row-base-background)
-  );
-}
-
-:where(.root) [data-grid-part="row"][data-row-selected="true"] {
-  --grid-row-background: var(
-    --grid-row-selected-background,
-    var(--grid-row-base-background)
-  );
-}
-
-:where(.root) [data-grid-part="row"][data-row-active="true"] {
-  --grid-row-background: var(
-    --grid-row-active-background,
-    var(--grid-row-base-background)
-  );
-}
-
-:where(.root)
-  [data-grid-part="row"][data-row-active="true"][data-row-selected="true"] {
-  --grid-row-background: var(
-    --grid-row-active-selected-background,
-    var(--grid-row-selected-background, var(--grid-row-base-background))
-  );
 }
 
 :where(.root) [data-grid-part="body"] > .root[data-grid-path],
@@ -141,85 +41,31 @@
   min-width: 0;
 }
 
-:where(.root) [data-grid-part="header-row"] {
-  background: var(--grid-header-background, var(--sap-sidebar));
-  border-bottom: var(
-    --grid-header-border-block-end,
-    1px solid var(--sap-border)
-  );
-  font-weight: var(--grid-header-font-weight, 760);
-  position: sticky;
-  top: 0;
-  z-index: 1;
-}
-
-:where(.root) [data-grid-part="level-label-row"] {
-  border-bottom: 0;
-}
-
-.root[data-grid-path][data-grid-depth]:not([data-grid-depth="0"])
-  [data-grid-part="header-row"] {
-  position: static;
-}
-
 :where(.root) [data-grid-part="cell"],
 :where(.root) [data-grid-part="header-cell"],
 :where(.root) [data-grid-part="level-label-cell"] {
   box-sizing: border-box;
   position: relative;
-  border-right: var(--grid-cell-border-inline-end, 1px solid var(--sap-border));
   overflow: visible;
   min-width: 0;
-}
-
-:where(.root) [data-grid-part="cell"] {
-  --grid-cell-background: var(--grid-row-background);
-
-  background: var(--grid-cell-background);
-}
-
-:where(.root) [data-grid-part="cell"]:last-child,
-:where(.root) [data-grid-part="header-cell"]:last-child,
-:where(.root) [data-grid-part="level-label-cell"]:last-child {
-  border-right: none;
 }
 
 :where(.root) [data-grid-part="cell-content"] {
   box-sizing: border-box;
   display: flex;
   align-items: center;
-  min-height: var(--grid-cell-min-height, var(--height-sap-row));
   min-width: 0;
   width: 100%;
   overflow: hidden;
-  padding: var(--grid-cell-padding, 0 10px);
 }
 
 :where(.root) [data-grid-part="cell-content"] > * {
   min-width: 0;
 }
 
-:where(.root) [data-grid-part="header-cell"] {
-  color: var(--grid-header-color, var(--sap-fg-subtle));
-  cursor: var(--grid-header-cursor, default);
-  font-size: var(--grid-header-font-size, var(--text-sap-label));
-  font-weight: var(--grid-header-font-weight, 760);
-  letter-spacing: var(--grid-header-letter-spacing, var(--tracking-sap-head));
-  line-height: 1;
-  text-transform: uppercase;
-  user-select: none;
-}
-
 :where(.root) [data-grid-part="header-cell"] > [data-grid-part="cell-content"] {
-  gap: var(--grid-header-cell-gap, 4px);
-  min-height: var(--grid-header-min-height, var(--height-sap-header));
-  padding: var(--grid-header-cell-padding, 0 10px);
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-:where(.root) [data-grid-part="header-cell"][data-sortable="false"] {
-  cursor: default;
 }
 
 :where(.root) [data-grid-part="header-label"] {
@@ -229,53 +75,15 @@
   white-space: nowrap;
 }
 
-:where(.root) [data-grid-part="cell"][data-cell-status="focus"] {
-  --grid-cell-background: var(--grid-current-focus-background);
-
-  box-shadow: inset 0 0 0 var(--grid-cell-focus-ring-width, 1.5px)
-    var(--grid-current-focus-ring-color);
-  z-index: var(--grid-cell-focus-ring-z-index, 3);
-}
-
-:where(.root) [data-grid-part="cell"][data-cell-status="editing"] {
-  --grid-cell-background: var(
-    --grid-cell-editing-background,
-    var(--grid-row-background)
-  );
-
-  box-shadow: inset 0 0 0
-    var(
-      --grid-cell-editing-ring-width,
-      var(--grid-cell-focus-ring-width, 1.5px)
-    )
-    var(--grid-editing-ring-color);
-  z-index: var(--grid-cell-focus-ring-z-index, 3);
-}
-
-:where(.root) [data-grid-part="cell"][data-cell-status="in-selection"] {
-  --grid-cell-background: var(--grid-current-selection-background);
-}
-
-:where(.root) [data-grid-part="editor-overlay"] {
-  background: var(
-    --grid-editor-background,
-    var(--grid-background, var(--sap-surface))
-  );
-  color: var(--grid-color, var(--sap-fg));
-}
-
 :where(.root) [data-grid-part="editor-input"] {
-  background: var(--grid-editor-input-background, transparent);
+  background: transparent;
   border: none;
   border-radius: 0;
   box-sizing: border-box;
   color: inherit;
   font: inherit;
   height: 100%;
-  line-height: var(--grid-line-height, 1.45);
-  min-height: var(--grid-cell-min-height, var(--height-sap-row));
   outline: none;
-  padding: var(--grid-cell-padding, 0 10px);
   width: 100%;
 }
 
@@ -291,55 +99,6 @@
   padding: 0;
 }
 
-:where(.root) [data-grid-part="editor-overlay"] [cmdk-input-wrapper] input {
-  font-size: var(--text-sap-body);
-  line-height: var(--grid-line-height, 1.45);
-  padding: var(--grid-cell-padding, 0 10px);
-}
-
-:where(.root) [data-grid-part="header-menu-button"] {
-  align-items: center;
-  background: transparent;
-  border: 0;
-  border-radius: var(--radius-sm);
-  color: var(--sap-fg-subtle);
-  cursor: pointer;
-  display: inline-flex;
-  height: 16px;
-  justify-content: center;
-  margin-left: auto;
-  padding: 0;
-  width: 16px;
-}
-
-:where(.root) [data-grid-part="header-menu-button"]:hover,
-:where(.root) [data-grid-part="header-menu-button"][aria-expanded="true"] {
-  background: var(--sap-row-hover);
-  color: var(--sap-fg);
-}
-
-:where(.root) [data-grid-part="header-sort-indicator"] {
-  align-items: center;
-  color: var(--sap-fg-subtle);
-  display: inline-flex;
-  flex: none;
-  font-size: var(--text-sap-tiny);
-  gap: 1px;
-  opacity: 0.75;
-}
-
-:where(.root) [data-grid-part="cell-popover"] {
-  background: var(--sap-surface);
-  border: 1px solid var(--sap-border);
-  border-radius: var(--radius);
-  box-shadow: 0 8px 24px rgb(0 0 0 / 0.12);
-  color: var(--sap-fg);
-  font-size: var(--text-sap-body);
-  letter-spacing: 0;
-  line-height: 1.45;
-  text-transform: none;
-}
-
 :where(.root) [data-grid-part="expand-cell"] {
   align-items: center;
   display: inline-flex;
@@ -349,30 +108,6 @@
   overflow: hidden;
   white-space: nowrap;
   width: 100%;
-}
-
-:where(.root) [data-grid-part="expand-chevron"],
-:where(.root) [data-grid-part="expand-placeholder"] {
-  flex: 0 0 auto;
-  height: 20px;
-  width: 20px;
-}
-
-:where(.root) [data-grid-part="expand-chevron"] {
-  align-items: center;
-  background: transparent;
-  border: 0;
-  border-radius: var(--radius-sm);
-  color: var(--sap-fg-subtle);
-  cursor: pointer;
-  display: inline-flex;
-  justify-content: center;
-  padding: 0;
-}
-
-:where(.root) [data-grid-part="expand-chevron"]:hover {
-  background: var(--sap-row-hover);
-  color: var(--sap-fg);
 }
 
 :where(.root) [data-grid-part="expand-content"] {
@@ -386,80 +121,4 @@
 
 :where(.root) [data-grid-part="expand-content"] > * {
   max-width: 100%;
-}
-
-:where(.root) [data-grid-part="cell-frame"] {
-  display: block;
-  min-width: 0;
-  position: relative;
-  width: 100%;
-}
-
-:where(.root) [data-grid-part="cell-frame-content"] {
-  display: block;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-:where(.root)
-  [data-grid-part="cell-frame"][data-with-action="true"]
-  [data-grid-part="cell-frame-content"] {
-  padding-right: 30px;
-}
-
-:where(.root) [data-grid-part="cell-frame-actions"] {
-  align-items: center;
-  background: linear-gradient(
-    to left,
-    var(--grid-cell-background) 60%,
-    transparent
-  );
-  display: flex;
-  inset-block: 0;
-  opacity: 0;
-  padding-left: 12px;
-  padding-right: 6px;
-  pointer-events: none;
-  position: absolute;
-  right: -6px;
-  transition: opacity 120ms ease;
-}
-
-:where(.root)
-  [data-grid-part="cell"]:hover
-  [data-grid-part="cell-frame-actions"],
-:where(.root)
-  [data-grid-part="cell"]:focus-within
-  [data-grid-part="cell-frame-actions"],
-:where(.root)
-  [data-grid-part="cell"][data-cell-status="focus"]
-  [data-grid-part="cell-frame-actions"],
-:where(.root)
-  [data-grid-part="cell"][data-cell-status="editing"]
-  [data-grid-part="cell-frame-actions"] {
-  opacity: 1;
-}
-
-:where(.root) [data-grid-part="cell-frame-action-inner"] {
-  pointer-events: auto;
-}
-
-:where(.root) [data-grid-part="cell-frame-actions"] button {
-  align-items: center;
-  background: var(--sap-surface);
-  border: 1px solid var(--sap-border);
-  border-radius: var(--radius-sm);
-  color: var(--sap-fg-subtle);
-  display: inline-flex;
-  height: 24px;
-  justify-content: center;
-  padding: 0;
-  width: 24px;
-}
-
-:where(.root) [data-grid-part="cell-frame-actions"] button:hover {
-  background: var(--sap-row-hover);
-  color: var(--sap-fg);
 }

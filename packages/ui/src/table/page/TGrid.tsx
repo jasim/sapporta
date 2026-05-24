@@ -1,11 +1,13 @@
-import { useMemo } from "react";
+import { useMemo, type CSSProperties } from "react";
 import {
   GridLevel,
   GridRuntimeProvider,
   rootPath,
+  type GridLevelChrome,
   type GridRuntime,
 } from "@/grid";
 import { columnPreset } from "@/column-preset";
+import { cn } from "@/ui/utils/cn";
 import type { TGridFilter } from "@/table/grid-adapter/tgrid-filter";
 import type { TGridTableColumnMeta } from "@/table/grid-adapter/tgrid-column-mapper";
 import { renderTGridHeaderMenu } from "@/table/grid-adapter/tgrid-header-menu";
@@ -33,15 +35,19 @@ export function TGrid<
   AppServices = unknown,
 >({
   session,
+  className,
+  style,
 }: {
   session: TGridSession<RowsByLevel, AppServices>;
+  className?: string;
+  style?: CSSProperties;
 }) {
   const runtime = session.runtime;
   const sessionContext = session as TGridRenderableSessionContext;
   const root = rootPath(runtime.schema.rootLevel);
   const chrome = useMemo(
-    () =>
-      columnPreset.chrome<TGridTableColumnMeta, TGridFilter>({
+    () => {
+      const presetChrome = columnPreset.chrome<TGridTableColumnMeta, TGridFilter>({
         renderColumnHeaderMenu: renderTGridHeaderMenu,
         commandOverrides: (level) => {
           const queryStore = sessionContext.levels[runtime.schemaAt(level.path).name]
@@ -55,8 +61,10 @@ export function TGrid<
             setPage: (page) => queryStore.getState().setPage(page),
           };
         },
-      }),
-    [sessionContext],
+      });
+      return mergeTGridRootChrome(presetChrome, root, className, style);
+    },
+    [className, root, sessionContext, style],
   );
 
   return (
@@ -67,4 +75,21 @@ export function TGrid<
       )}
     </GridRuntimeProvider>
   );
+}
+
+function mergeTGridRootChrome(
+  chrome: GridLevelChrome,
+  root: string,
+  className: string | undefined,
+  style: CSSProperties | undefined,
+): GridLevelChrome {
+  return {
+    renderLevelHeader: chrome.renderLevelHeader,
+    levelContainerClassName: (ctx) =>
+      cn(chrome.levelContainerClassName?.(ctx), ctx.path === root && className),
+    levelContainerStyle: (ctx) => ({
+      ...chrome.levelContainerStyle?.(ctx),
+      ...(ctx.path === root ? style : undefined),
+    }),
+  };
 }
