@@ -59,21 +59,21 @@ The public CLI package is `sapporta`. `@sapporta/server` keeps the command imple
 
 ### CLI Architecture
 
-The CLI mirrors the API namespace structure and routes all data commands through the HTTP API server. The CLI is a regular API consumer, not a privileged path.
+The CLI exposes resource-centered commands and routes all data commands through the HTTP API server. The CLI is a regular API consumer, not a privileged path.
 
 **Requires a running server** (`pnpm dev` or `pnpm start` from the project) for all API commands, including project management (project list/add/remove). Local commands (init, check, describe) work without a server.
 
 ### CLI Self-Introspection
 
-**The CLI is self-describing.** Use `describe` to discover commands, their HTTP endpoints, and input schemas:
+Use `describe` to discover live HTTP endpoints and their input schemas:
 
 ```bash
-# List ALL available commands with HTTP method + path
+# List all available HTTP endpoints
 sapporta describe
 
-# Get full input schema (JSON Schema) for any command
-sapporta describe "meta sql"
-sapporta describe "tables add-row"
+# Get full input schema (JSON Schema) for an endpoint
+sapporta describe "POST /api/meta/sql"
+sapporta describe "POST /api/tables/accounts"
 ```
 
 ### Global Flags
@@ -84,62 +84,69 @@ sapporta describe "tables add-row"
 --input-body-json '{...}'  # JSON object to send as the request body for commands that accept one
 ```
 
-### Meta Commands (schema introspection, DB inspection, SQL proxy)
+### Table Definition Commands
 
 ```bash
 # List all tables with schema metadata and row counts
-sapporta meta tables
+sapporta tables
 
 # Show table structure (columns, types, constraints, foreign keys)
-sapporta meta tables show <name>
+sapporta tables show <name>
 
 # Show indexes on a table
-sapporta meta tables indexes <name>
+sapporta tables indexes <name>
 
 # Show sample rows from a table
-sapporta meta tables sample <name> --limit 10 --fields name,type
+sapporta tables sample <name> --limit 10 --fields name,type
 
 # Update table properties
-sapporta meta tables update <name> --data '{"label":"New Label"}'
+sapporta tables update <name> --data '{"label":"New Label"}'
 
 # Rename a table
-sapporta meta tables update <name> --data '{"name":"new_name"}'
+sapporta tables update <name> --data '{"name":"new_name"}'
 
 # Drop a UI-managed table
-sapporta meta tables drop <name> --confirm true
-
-# Run any SQL statement — reads return rows, writes report row counts
-sapporta meta sql "SELECT * FROM accounts"
-sapporta meta sql --input-body-json '{"sql": "SELECT * FROM accounts", "limit": 50}'
-sapporta meta sql --input-body-json '{"sql": "DELETE FROM accounts WHERE id = 5"}'
-
-# Sync schema files to database
-sapporta meta schema sync
+sapporta tables drop <name> --confirm true
 ```
 
-### Table Commands (CRUD operations)
+### Enum, Schema, and Database Commands
+
+```bash
+# List enum definitions
+sapporta enums
+
+# Sync schema files to database
+sapporta schema sync
+
+# Run any SQL statement — reads return rows, writes report row counts
+sapporta db exec-sql "SELECT * FROM accounts"
+sapporta db exec-sql --input-body-json '{"sql": "SELECT * FROM accounts", "limit": 50}'
+sapporta db exec-sql --input-body-json '{"sql": "DELETE FROM accounts WHERE id = 5"}'
+```
+
+### Row Commands (CRUD operations)
 
 ```bash
 # List rows (with filters, sort, pagination)
-sapporta tables list <table> --limit 50 --page 2 --sort name --order asc
+sapporta rows <table> --limit 50 --page 2 --sort name --order asc
 
 # Get a single row by ID
-sapporta tables get <table> <id>
+sapporta rows get <table> <id>
 
 # Insert a single row
-sapporta tables add-row <table> --data '{"name":"Cash","type":"asset"}'
+sapporta rows insert <table> --data '{"name":"Cash","type":"asset"}'
 
 # Insert multiple rows (batch)
-sapporta tables add-row <table> --data '[{"name":"Cash"},{"name":"Revenue"}]'
+sapporta rows insert <table> --data '[{"name":"Cash"},{"name":"Revenue"}]'
 
 # Insert master + detail records atomically
-sapporta tables add-row orders --data '{"customer":"Alice","$details":{"table":"order_items","fk":"order_id","rows":[{"product":"Widget","quantity":3}]}}'
+sapporta rows insert orders --data '{"customer":"Alice","$details":{"table":"order_items","fk":"order_id","rows":[{"product":"Widget","quantity":3}]}}'
 
 # Update a row
-sapporta tables update <table> <id> --data '{"name":"Updated"}'
+sapporta rows update <table> <id> --data '{"name":"Updated"}'
 
 # Delete a row
-sapporta tables delete <table> <id>
+sapporta rows delete <table> <id>
 ```
 
 ### Report Commands

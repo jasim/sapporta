@@ -8,7 +8,8 @@
  * app (no /p/:slug prefix).
  */
 import { describe, it, expect, beforeAll } from "vitest";
-import { ROUTES } from "../cli/routes.js";
+import { Command } from "commander";
+import { ROUTES, registerRoutes } from "../cli/routes.js";
 import type { CliRoute } from "../cli/routes.js";
 import { createIntegrationApp, request } from "./setup.js";
 
@@ -24,74 +25,81 @@ function findRoute(fixedSegments: string[]): CliRoute | undefined {
 // ── Route table verification (no DB needed) ─────────────────────────
 
 describe("CLI route table", () => {
-  it("meta tables → GET /api/meta/tables", () => {
-    const route = findRoute(["meta", "tables"]);
+  it("tables → GET /api/meta/tables", () => {
+    const route = findRoute(["tables"]);
     expect(route).toBeDefined();
     expect(route!.path).toBe("/api/meta/tables");
     expect(route!.method).toBe("GET");
   });
 
-  it("meta tables indexes → GET /api/meta/tables/:name/indexes", () => {
-    const route = findRoute(["meta", "tables", "indexes"]);
+  it("tables indexes → GET /api/meta/tables/:table/indexes", () => {
+    const route = findRoute(["tables", "indexes"]);
     expect(route).toBeDefined();
-    expect(route!.path).toBe("/api/meta/tables/:name/indexes");
-    expect(route!.params).toEqual(["name"]);
+    expect(route!.path).toBe("/api/meta/tables/:table/indexes");
+    expect(route!.params).toEqual(["table"]);
   });
 
-  it("meta tables sample → GET /api/meta/tables/:name/sample", () => {
-    const route = findRoute(["meta", "tables", "sample"]);
+  it("tables sample → GET /api/meta/tables/:table/sample", () => {
+    const route = findRoute(["tables", "sample"]);
     expect(route).toBeDefined();
-    expect(route!.path).toBe("/api/meta/tables/:name/sample");
-    expect(route!.params).toEqual(["name"]);
+    expect(route!.path).toBe("/api/meta/tables/:table/sample");
+    expect(route!.params).toEqual(["table"]);
   });
 
-  it("meta tables show → GET /api/meta/tables/:name", () => {
-    const route = findRoute(["meta", "tables", "show"]);
+  it("tables show → GET /api/meta/tables/:table", () => {
+    const route = findRoute(["tables", "show"]);
     expect(route).toBeDefined();
-    expect(route!.path).toBe("/api/meta/tables/:name");
+    expect(route!.path).toBe("/api/meta/tables/:table");
     expect(route!.method).toBe("GET");
   });
 
-  it("meta sql → POST /api/meta/sql", () => {
-    const route = findRoute(["meta", "sql"]);
+  it("enums → GET /api/meta/enums", () => {
+    const route = findRoute(["enums"]);
+    expect(route).toBeDefined();
+    expect(route!.path).toBe("/api/meta/enums");
+    expect(route!.method).toBe("GET");
+  });
+
+  it("db exec-sql → POST /api/meta/sql", () => {
+    const route = findRoute(["db", "exec-sql"]);
     expect(route).toBeDefined();
     expect(route!.path).toBe("/api/meta/sql");
     expect(route!.method).toBe("POST");
   });
 
-  it("meta schema sync → POST /api/meta/schema/sync", () => {
-    const route = findRoute(["meta", "schema", "sync"]);
+  it("schema sync → POST /api/meta/schema/sync", () => {
+    const route = findRoute(["schema", "sync"]);
     expect(route).toBeDefined();
     expect(route!.path).toBe("/api/meta/schema/sync");
     expect(route!.method).toBe("POST");
   });
 
-  it("tables list → GET /api/tables/:table", () => {
-    const route = findRoute(["tables", "list"]);
+  it("rows → GET /api/tables/:table", () => {
+    const route = findRoute(["rows"]);
     expect(route).toBeDefined();
     expect(route!.path).toBe("/api/tables/:table");
     expect(route!.method).toBe("GET");
     expect(route!.params).toEqual(["table"]);
   });
 
-  it("tables add-row → POST /api/tables/:table", () => {
-    const route = findRoute(["tables", "add-row"]);
+  it("rows insert → POST /api/tables/:table", () => {
+    const route = findRoute(["rows", "insert"]);
     expect(route).toBeDefined();
     expect(route!.path).toBe("/api/tables/:table");
     expect(route!.method).toBe("POST");
     expect(route!.params).toEqual(["table"]);
   });
 
-  it("tables update → PUT /api/tables/:table/:id", () => {
-    const route = findRoute(["tables", "update"]);
+  it("rows update → PUT /api/tables/:table/:id", () => {
+    const route = findRoute(["rows", "update"]);
     expect(route).toBeDefined();
     expect(route!.path).toBe("/api/tables/:table/:id");
     expect(route!.method).toBe("PUT");
     expect(route!.params).toEqual(["table", "id"]);
   });
 
-  it("tables delete → DELETE /api/tables/:table/:id", () => {
-    const route = findRoute(["tables", "delete"]);
+  it("rows delete → DELETE /api/tables/:table/:id", () => {
+    const route = findRoute(["rows", "delete"]);
     expect(route).toBeDefined();
     expect(route!.path).toBe("/api/tables/:table/:id");
     expect(route!.method).toBe("DELETE");
@@ -105,13 +113,53 @@ describe("CLI route table", () => {
     expect(route!.method).toBe("GET");
   });
 
-  it("reports run → GET /api/reports/:name/results", () => {
+  it("reports run → GET /api/reports/:report/results", () => {
     const route = findRoute(["reports", "run"]);
     expect(route).toBeDefined();
-    expect(route!.path).toBe("/api/reports/:name/results");
+    expect(route!.path).toBe("/api/reports/:report/results");
     expect(route!.method).toBe("GET");
   });
 
+});
+
+describe("CLI route registration", () => {
+  function registeredProgram(handler: Parameters<typeof registerRoutes>[2] = async () => {}) {
+    const program = new Command("sapporta").exitOverride();
+    registerRoutes(program, ROUTES, handler);
+    return program;
+  }
+
+  async function parseCommand(args: string[]) {
+    const calls: Array<{
+      route: CliRoute;
+      params: Record<string, string>;
+      extraPositionals: string[];
+    }> = [];
+    const program = registeredProgram(async (route, params, extraPositionals) => {
+      calls.push({ route, params, extraPositionals });
+    });
+    await program.parseAsync(args, { from: "user" });
+    return calls;
+  }
+
+  it("routes bare tables to the table catalog command", async () => {
+    const calls = await parseCommand(["tables"]);
+    expect(calls).toHaveLength(1);
+    expect(calls[0].route.pattern).toEqual(["tables"]);
+    expect(calls[0].params).toEqual({});
+  });
+
+  it("routes rows <table> to row listing without hiding rows subcommands", async () => {
+    const listCalls = await parseCommand(["rows", "accounts"]);
+    expect(listCalls).toHaveLength(1);
+    expect(listCalls[0].route.pattern).toEqual(["rows", ":table"]);
+    expect(listCalls[0].params).toEqual({ table: "accounts" });
+
+    const getCalls = await parseCommand(["rows", "get", "accounts", "1"]);
+    expect(getCalls).toHaveLength(1);
+    expect(getCalls[0].route.pattern).toEqual(["rows", "get", ":table", ":id"]);
+    expect(getCalls[0].params).toEqual({ table: "accounts", id: "1" });
+  });
 });
 
 // ── CLI route → HTTP round-trip (single-project, no /p/:slug) ───────
@@ -121,8 +169,8 @@ describe("CLI route → HTTP round-trip", () => {
     await createIntegrationApp();
   });
 
-  it("meta tables → GET /api/meta/tables → 200 with table list", async () => {
-    const route = findRoute(["meta", "tables"]);
+  it("tables → GET /api/meta/tables → 200 with table list", async () => {
+    const route = findRoute(["tables"]);
     expect(route).toBeDefined();
 
     const res = await request(route!.path);
@@ -133,8 +181,8 @@ describe("CLI route → HTTP round-trip", () => {
     expect(body.tables.length).toBeGreaterThan(0);
   });
 
-  it("tables list accounts → GET /api/tables/accounts → 200 with rows", async () => {
-    const route = findRoute(["tables", "list"]);
+  it("rows accounts → GET /api/tables/accounts → 200 with rows", async () => {
+    const route = findRoute(["rows"]);
     expect(route).toBeDefined();
 
     const path = route!.path.replace(":table", "accounts");
