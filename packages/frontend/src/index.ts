@@ -1,3 +1,5 @@
+import "./index.css";
+
 export { getApiBase, API_ORIGIN, uiClient } from "@/platform/client";
 
 export { useSchemaStore } from "@/schema-catalog/state/schema-store";

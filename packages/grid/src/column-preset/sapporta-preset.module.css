@@ -1,5 +1,3 @@
-@reference "../index.css";
-
 .presetGrid {
   --grid-font-size: var(--text-sap-body);
   --grid-background: var(--sap-surface);
@@ -465,16 +463,25 @@
 }
 
 .textCell {
-  @apply block truncate;
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .identifierTextCell {
-  @apply block w-full truncate text-right text-sap-data text-sap-muted;
-
+  color: var(--sap-fg-muted);
+  display: block;
   font-family: var(--font-mono);
   font-feature-settings:
     "tnum" 1,
     "cv11" 1;
+  font-size: var(--text-sap-data);
+  overflow: hidden;
+  text-align: right;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  width: 100%;
 }
 
 .multiLineTextCell {

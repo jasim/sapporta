@@ -1,0 +1,11 @@
+/* Sapporta admin frontend Tailwind source hints.
+
+   This package renders shell, table, report, and form components whose
+   className strings live inside @sapporta/frontend rather than inside the
+   consuming app. Tailwind v4 excludes node_modules from automatic content
+   detection, so generated apps import this file to make their Tailwind
+   pipeline scan the package's compiled JS for those utilities.
+
+   This file intentionally does not import tailwindcss or emit base styles.
+   The consuming app owns the single Tailwind pipeline. */
+@source "./";

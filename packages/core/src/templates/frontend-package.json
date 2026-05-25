@@ -32,7 +32,8 @@
     "./layout": {
       "types": "./dist/shell/components/SidebarShell.d.ts",
       "import": "./dist/layout.js"
-    }
+    },
+    "./index.css": "./dist/index.css"
   },
   "scripts": {
     "dev": "vite",
