@@ -49,14 +49,12 @@ async function runApiCommand(
   const format = resolveOutputFormat(allFlags);
 
   const baseUrl = resolveBaseUrl(allFlags);
-  const token = allFlags.token ?? process.env.SAPPORTA_API_TOKEN;
 
   const req = buildRequest(route, params, allFlags);
 
   const result = await httpRequest(baseUrl, req.method, req.urlPath, {
     body: req.body,
     queryParams: req.queryParams,
-    token,
   });
 
   const exitCode = renderResult(route, params, result, format);
@@ -104,12 +102,11 @@ async function main() {
     const format = resolveOutputFormat(flags);
     try {
       const baseUrl = resolveBaseUrl(flags);
-      const token = flags.token ?? process.env.SAPPORTA_API_TOKEN;
       const positional = (flags._ as string[]) ?? [];
       const result =
         positional.length === 0
-          ? await describeAll(baseUrl, token)
-          : await describeOne(positional.join(" "), baseUrl, token);
+          ? await describeAll(baseUrl)
+          : await describeOne(positional.join(" "), baseUrl);
       emitResult(result, format);
     } catch (err: any) {
       handleError(err, format);
@@ -124,9 +121,11 @@ async function main() {
     // Declare global options so Commander doesn't confuse their values
     // with subcommand names
     .option("--output-format <format>", "Output format: table (default) or json")
-    .option("--input-body-json <json>", "Pass request body as JSON object")
-    .option("--api-url <url>", "Server URL")
-    .option("--token <token>", "Auth token")
+    .option(
+      "--input-body-json <json>",
+      "JSON object to send as the request body for commands that accept one",
+    )
+    .option("--api-url <url>", "Server URL (default: http://localhost:3000)")
     .option("--sapporta-project-dir <path>", "Project root directory (overrides auto-detection)");
 
   registerRoutes(program, ROUTES, async (route, params, extraPositionals) => {

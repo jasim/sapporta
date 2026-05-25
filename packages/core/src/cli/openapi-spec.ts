@@ -48,11 +48,8 @@ export type FindResult =
  * Thin I/O wrapper around httpRequest. ECONNREFUSED already surfaces as
  * the friendly "Is the server running?" error from http-client.
  */
-export async function fetchOpenApiSpec(
-  baseUrl: string,
-  token?: string,
-): Promise<OpenApiDoc> {
-  const res = await httpRequest(baseUrl, "GET", "/api/openapi.json", { token });
+export async function fetchOpenApiSpec(baseUrl: string): Promise<OpenApiDoc> {
+  const res = await httpRequest(baseUrl, "GET", "/api/openapi.json");
   return res.data as OpenApiDoc;
 }
 

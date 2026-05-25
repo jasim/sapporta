@@ -14,11 +14,8 @@ import {
   type EndpointDetail,
 } from "./openapi-spec.js";
 
-export async function describeAll(
-  baseUrl: string,
-  token?: string,
-): Promise<OperationResult> {
-  const spec = await fetchOpenApiSpec(baseUrl, token);
+export async function describeAll(baseUrl: string): Promise<OperationResult> {
+  const spec = await fetchOpenApiSpec(baseUrl);
   const endpoints = listEndpoints(spec);
   return {
     ok: true,
@@ -30,9 +27,8 @@ export async function describeAll(
 export async function describeOne(
   target: string,
   baseUrl: string,
-  token?: string,
 ): Promise<OperationResult> {
-  const spec = await fetchOpenApiSpec(baseUrl, token);
+  const spec = await fetchOpenApiSpec(baseUrl);
   const result = findEndpoint(spec, target);
 
   if (result.kind === "hit") {

@@ -16,7 +16,6 @@ const SYSTEM_FLAGS = new Set([
   "output-format",
   "input-body-json",
   "api-url",
-  "token",
   "sapporta-project-dir",
 ]);
 

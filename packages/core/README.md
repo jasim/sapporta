@@ -31,7 +31,6 @@ CLI commands that hit the API auto-detect the project by walking up from `cwd` l
 | `SAPPORTA_DATA_DIR` | Data directory. Default: `{projectDir}/data`. |
 | `SAPPORTA_CODE_DIR` | Code directory. Default: `{projectDir}/code`. |
 | `SAPPORTA_API_URL` | Server URL for CLI commands. Default: `http://localhost:3000`. |
-| `SAPPORTA_API_TOKEN` | Auth token for CLI commands (future). |
 | `SAPPORTA_OUTPUT_FORMAT` | Default CLI output format: `json` or `table`. |
 | `PORT` | Server port. Default: `3000`. |
 | `LOG_FORMAT` | Set to `json` for structured logging. |
@@ -60,7 +59,7 @@ The public CLI package is `sapporta`. `@sapporta/server` keeps the command imple
 
 ### CLI Architecture
 
-The CLI mirrors the API namespace structure and routes all data commands through the HTTP API server. This ensures a single authorization enforcement point — the CLI is a regular API consumer, not a privileged path.
+The CLI mirrors the API namespace structure and routes all data commands through the HTTP API server. The CLI is a regular API consumer, not a privileged path.
 
 **Requires a running server** (`pnpm dev` or `pnpm start` from the project) for all API commands, including project management (project list/add/remove). Local commands (init, check, describe) work without a server.
 
@@ -82,7 +81,7 @@ sapporta describe "tables add-row"
 ```bash
 --output-format json   # Structured JSON output (auto-detected when stdout is not a TTY)
 --output-format table  # Human-readable table output (default in terminal)
---input-body-json '{...}'  # Pass request body as a JSON object (agent-friendly)
+--input-body-json '{...}'  # JSON object to send as the request body for commands that accept one
 ```
 
 ### Meta Commands (schema introspection, DB inspection, SQL proxy)
