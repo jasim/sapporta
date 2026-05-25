@@ -1,6 +1,6 @@
 import { ChevronDown } from "lucide-react";
 import type { ReactNode } from "react";
-import { cn } from "@/ui/utils/cn";
+import { cn } from "../utils/cn";
 
 export interface ParamPillProps {
   /** Left cap — dim label (e.g., "account", "period"). */
