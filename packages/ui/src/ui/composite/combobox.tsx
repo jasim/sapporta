@@ -4,8 +4,8 @@ import {
   Popover,
   PopoverTrigger,
   PopoverContent,
-} from "@/ui/primitives/popover";
-import { Button } from "@/ui/primitives/button";
+} from "../primitives/popover";
+import { Button } from "../primitives/button";
 import {
   Command,
   CommandInput,
@@ -13,8 +13,8 @@ import {
   CommandList,
   CommandEmpty,
   CommandGroup,
-} from "@/ui/primitives/command";
-import { cn } from "@/ui/utils/cn";
+} from "../primitives/command";
+import { cn } from "../utils/cn";
 
 type ComboboxValue = string;
 
