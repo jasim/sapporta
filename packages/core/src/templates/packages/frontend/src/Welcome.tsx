@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useSchemaStore } from "@sapporta/ui";
+import { useSchemaStore } from "@sapporta/frontend";
 import { ApiError } from "@sapporta/shared/client";
 import { customApi } from "./api";
 

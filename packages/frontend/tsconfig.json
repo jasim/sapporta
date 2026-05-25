@@ -1,0 +1,26 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "jsx": "react-jsx",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "noEmit": true,
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./src/*"],
+      "@sapporta/grid": ["../grid/src/index.ts"],
+      "@sapporta/grid/column-preset": [
+        "../grid/src/column-preset/index.ts"
+      ],
+      "@sapporta/grid/lookup": ["../grid/src/lookup/index.ts"],
+      "@sapporta/ui": ["../ui/src/index.ts"]
+    }
+  },
+  "include": ["src", "vite.config.ts"]
+}

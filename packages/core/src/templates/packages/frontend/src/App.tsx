@@ -8,7 +8,7 @@ import {
   NewRecordRoute,
   ReportRoute,
   setNavigate,
-} from "@sapporta/ui";
+} from "@sapporta/frontend";
 import { Sidebar } from "./Sidebar";
 import { Welcome } from "./Welcome";
 
@@ -22,7 +22,7 @@ export function App() {
     <BootLoader>
       <Routes>
         <Route element={<AppShell sidebarContent={<Sidebar />} />}>
-          {/* Swap to `<HomeRedirect />` from @sapporta/ui once you want `/`
+          {/* Swap to `<HomeRedirect />` from @sapporta/frontend once you want `/`
               to jump to the first table instead of the Welcome view. */}
           <Route index element={<Navigate to="/welcome" replace />} />
           <Route path="welcome" element={<Welcome />} />

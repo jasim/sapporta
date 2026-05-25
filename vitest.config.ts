@@ -4,9 +4,19 @@ import path from "node:path";
 export default defineConfig({
   resolve: {
     alias: {
-      // Mirrors packages/ui/vite.config.ts so tests resolve `@/foo` the same
-      // way the production build does.
-      "@": path.resolve(__dirname, "./packages/ui/src"),
+      // Mirrors packages/frontend/vite.config.ts for moved admin/table/report
+      // tests. Lower-level packages should use relative imports or package
+      // entrypoints instead of the frontend-local alias.
+      "@": path.resolve(__dirname, "./packages/frontend/src"),
+      "@sapporta/grid/column-preset": path.resolve(
+        __dirname,
+        "./packages/grid/src/column-preset/index.ts",
+      ),
+      "@sapporta/grid/lookup": path.resolve(
+        __dirname,
+        "./packages/grid/src/lookup/index.ts",
+      ),
+      "@sapporta/grid": path.resolve(__dirname, "./packages/grid/src/index.ts"),
     },
   },
   test: {

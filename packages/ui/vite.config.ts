@@ -16,7 +16,6 @@ export default defineConfig({
       tsconfigPath: "./tsconfig.json",
       entryRoot: "src",
       include: ["src"],
-      exclude: ["src/main.tsx"],
       rollupTypes: false,
     }),
   ],
@@ -39,12 +38,6 @@ export default defineConfig({
     lib: {
       entry: {
         index: path.resolve(__dirname, "src/index.ts"),
-        grid: path.resolve(__dirname, "src/grid/index.ts"),
-        "column-preset": path.resolve(
-          __dirname,
-          "src/column-preset/index.ts",
-        ),
-        layout: path.resolve(__dirname, "src/shell/components/SidebarShell.tsx"),
       },
       formats: ["es"],
     },

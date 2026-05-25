@@ -1,0 +1,6 @@
+/* Dev-only wrapper for the admin harness (`pnpm --filter @sapporta/frontend dev`).
+   Consumers drive the Tailwind pipeline from their own app.css. */
+
+@import "tailwindcss";
+@import "@sapporta/ui/index.css";
+@import "@sapporta/grid/index.css";

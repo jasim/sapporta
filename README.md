@@ -28,7 +28,7 @@ npm exec sapporta -- check
 pnpm dev
 ```
 
-Rebuilds `@sapporta/server` and `@sapporta/ui` `dist/` output on every source change. `file:`-linked consumer projects pick up changes automatically.
+Rebuilds Sapporta package `dist/` output on every source change. `file:`-linked consumer projects pick up changes automatically.
 
 ## Other commands
 

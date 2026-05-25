@@ -2,16 +2,12 @@
   "name": "@sapporta/ui",
   "version": "0.2.1",
   "type": "module",
-  "description": "Sapporta UI — React admin interface for @sapporta/server. Auto-generated CRUD screens, report views, and a sidebar shell built on shadcn/ui and Tailwind.",
+  "description": "Sapporta UI primitives and reusable React utilities.",
   "keywords": [
     "sapporta",
     "react",
-    "admin",
-    "crud",
-    "dashboard",
     "tailwind",
     "shadcn",
-    "vite",
     "typescript"
   ],
   "author": "Jasim A Basheer <jasim@nuabase.com>",
@@ -26,14 +22,9 @@
   "main": "./dist/index.js",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
-  "bin": {
-    "sapporta-ui": "./bin/sapporta-ui.mjs"
-  },
   "files": [
-    "bin/",
     "dist/",
     "src/",
-    "index.html",
     "package.json"
   ],
   "publishConfig": {
@@ -43,18 +34,6 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
-    },
-    "./grid": {
-      "types": "./dist/grid/index.d.ts",
-      "import": "./dist/grid/index.js"
-    },
-    "./column-preset": {
-      "types": "./dist/column-preset/index.d.ts",
-      "import": "./dist/column-preset/index.js"
-    },
-    "./layout": {
-      "types": "./dist/shell/components/SidebarShell.d.ts",
-      "import": "./dist/layout.js"
     },
     "./index.css": "./dist/index.css"
   },
@@ -74,23 +53,17 @@
     "@radix-ui/react-select": "^2.2.5",
     "@radix-ui/react-slot": "^1.2.3",
     "@radix-ui/react-switch": "^1.2.6",
-    "@sapporta/shared": "workspace:*",
-    "@sapporta/rest-core": "3.52.2",
     "@tailwindcss/vite": "^4.1.10",
     "@vitejs/plugin-react": "^4.6.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",
-    "immer": "^10.1.1",
     "lucide-react": "^0.513.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
-    "react-router-dom": "^7.13.1",
     "tailwind-merge": "^3.3.1",
     "tailwindcss": "^4.1.10",
-    "vite": "^6.3.5",
-    "zod": "^4.3.6",
-    "zustand": "^5.0.5"
+    "vite": "^6.3.5"
   },
   "devDependencies": {
     "@types/react": "^19.1.0",

@@ -16,7 +16,9 @@
     { "path": "packages/shared" },
     { "path": "packages/honest" },
     { "path": "packages/core" },
-    { "path": "packages/ui" }
+    { "path": "packages/ui" },
+    { "path": "packages/grid" },
+    { "path": "packages/frontend" }
   ],
   "files": []
 }

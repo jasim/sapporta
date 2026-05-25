@@ -8,6 +8,8 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@sapporta/frontend": "__FRONTEND_SPEC__",
+    "@sapporta/grid": "__GRID_SPEC__",
     "@sapporta/shared": "__SHARED_SPEC__",
     "@sapporta/ui": "__UI_SPEC__",
     "__SLUG__-shared": "workspace:*",

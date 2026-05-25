@@ -2,7 +2,7 @@
 //
 // `createApiClient` lives in `@sapporta/shared/client` (browser-safe,
 // runtime-neutral). `getApiBase` is the dynamic-base getter the
-// framework UI uses for `/meta/*` and `/tables/*`; reusing it here
+// framework frontend uses for `/meta/*` and `/tables/*`; reusing it here
 // keeps this client pointed at the same base.
 //
 // Each method returns the 2xx body on success and throws `ApiError` on
@@ -14,7 +14,7 @@
 //   const { message } = await customApi.hello();
 
 import { createApiClient } from "@sapporta/shared/client";
-import { getApiBase } from "@sapporta/ui";
+import { getApiBase } from "@sapporta/frontend";
 import { helloContract } from "__SLUG__-shared";
 
 export const customApi = createApiClient(helloContract, { baseUrl: getApiBase });

@@ -1,0 +1,64 @@
+{
+  "name": "@sapporta/grid",
+  "version": "0.2.1",
+  "type": "module",
+  "description": "Sapporta grid runtime, React grid components, column presets, and lookup cache primitives.",
+  "keywords": ["sapporta", "grid", "react", "typescript"],
+  "author": "Jasim A Basheer <jasim@nuabase.com>",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jasim/sapporta.git",
+    "directory": "packages/grid"
+  },
+  "homepage": "https://github.com/jasim/sapporta/tree/master/packages/grid#readme",
+  "bugs": "https://github.com/jasim/sapporta/issues",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": ["dist/", "src/", "package.json"],
+  "publishConfig": {
+    "access": "public"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./grid": {
+      "types": "./dist/grid/index.d.ts",
+      "import": "./dist/grid.js"
+    },
+    "./column-preset": {
+      "types": "./dist/column-preset/index.d.ts",
+      "import": "./dist/column-preset.js"
+    },
+    "./lookup": {
+      "types": "./dist/lookup/index.d.ts",
+      "import": "./dist/lookup.js"
+    },
+    "./index.css": "./dist/index.css"
+  },
+  "scripts": {
+    "build": "vite build",
+    "build:watch": "vite build --watch",
+    "typecheck": "tsc --noEmit",
+    "typecheck:watch": "tsc --noEmit --watch --preserveWatchOutput",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@sapporta/ui": "workspace:*",
+    "lucide-react": "^0.513.0",
+    "react": "^19.1.0",
+    "zustand": "^5.0.5"
+  },
+  "devDependencies": {
+    "@types/react": "^19.1.0",
+    "@types/react-dom": "^19.1.0",
+    "@vitejs/plugin-react": "^4.6.0",
+    "typescript": "^5.7.3",
+    "vite": "^6.3.5",
+    "vite-plugin-dts": "^4.5.4",
+    "vitest": "^3.0.5"
+  }
+}
