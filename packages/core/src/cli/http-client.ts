@@ -17,7 +17,6 @@ export async function httpRequest(
   opts?: {
     body?: unknown;
     queryParams?: Record<string, string>;
-    token?: string;
   },
 ): Promise<HttpResult> {
   // Strip leading "/" so new URL() treats the path as relative to baseUrl's path.
@@ -37,7 +36,6 @@ export async function httpRequest(
       method,
       headers: {
         "Content-Type": "application/json",
-        ...(opts?.token ? { Authorization: `Bearer ${opts.token}` } : {}),
       },
       ...(opts?.body !== undefined ? { body: JSON.stringify(opts.body) } : {}),
     });
