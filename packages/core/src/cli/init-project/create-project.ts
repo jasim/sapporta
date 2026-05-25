@@ -1,5 +1,5 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { execSync } from "node:child_process";
 import { createRequire } from "node:module";
 import { fromProjectRoot } from "../../project-paths.js";
@@ -15,6 +15,11 @@ type PackageJson = {
   dependencies?: Record<string, string>;
   devDependencies?: Record<string, string>;
   version?: string;
+};
+
+type PackageMetadata = {
+  packageJsonPath: string;
+  packageJson: PackageJson;
 };
 
 type ScaffoldProject = {
@@ -39,6 +44,8 @@ type ScaffoldPackages = {
     grid: string;
     frontend: string;
     shared: string;
+    hono: string;
+    honoNodeServer: string;
   };
   pnpmOverrides?: Record<string, string>;
 };
@@ -164,11 +171,12 @@ function resolveScaffoldPackages(
   initPaths: ReturnType<typeof initProjectPackagePaths>,
   devModePackageRoot: string | undefined,
 ): ScaffoldPackages {
-  // Resolve @sapporta/server and frontend package dependency specifiers:
-  // - SAPPORTA_DEV_MODE_PACKAGE_ROOT set (dev/source tree) → link: symlink
-  // - SAPPORTA_DEV_MODE_PACKAGE_ROOT absent (published CLI) → use version from own package.json
-  const _require = createRequire(import.meta.url);
-
+  // Resolve the package metadata and dependency specifiers that the generated
+  // workspace writes into its package.json files. Sapporta packages are linked
+  // to source packages in dev mode and versioned from package metadata in
+  // published mode; third-party runtime packages follow the mode-specific
+  // rules below so the generated API and @sapporta/server share one runtime
+  // dependency graph.
   // Dev-mode overrides for transitive `workspace:*` dependencies inside
   // linked Sapporta packages. The scaffold links @sapporta/server at the
   // project root and @sapporta/frontend in packages/frontend/package.json via `link:` specs,
@@ -183,39 +191,40 @@ function resolveScaffoldPackages(
   // Published mode does not need this: pnpm rewrites `workspace:*` during
   // packing/publishing, so consumers resolve normal version ranges from npm.
   if (devModePackageRoot) {
-    const corePkgPath = devMode_sapportaSourcePackageJsonPath(
-      devModePackageRoot,
-      "core",
-    );
-    const core = readPackageJson(corePkgPath) as PackageJson & {
+    // Dev mode links the generated project directly to this source checkout.
+    // Source package metadata is read from the known monorepo package.json
+    // files, not through package entrypoints: the scaffold may run before a
+    // package has been built, so `exports` targets under dist/ are not a stable
+    // discovery mechanism for Sapporta source packages.
+    const coreMetadata = readDevModeSapportaPackage(devModePackageRoot, "core");
+    const core = coreMetadata.packageJson as PackageJson & {
       dependencies: Record<string, string>;
     };
-
-    const uiPkgPath = devMode_sapportaSourcePackageJsonPath(
-      devModePackageRoot,
-      "ui",
-    );
-    const ui = readPackageJson(uiPkgPath);
-
-    const gridPkgPath = devMode_sapportaSourcePackageJsonPath(
+    const ui = readDevModeSapportaPackage(devModePackageRoot, "ui").packageJson;
+    const grid = readDevModeSapportaPackage(
       devModePackageRoot,
       "grid",
-    );
-    const grid = readPackageJson(gridPkgPath);
-
-    const frontendPkgPath = devMode_sapportaSourcePackageJsonPath(
+    ).packageJson;
+    const frontend = readDevModeSapportaPackage(
       devModePackageRoot,
       "frontend",
-    );
-    const frontend = readPackageJson(frontendPkgPath);
-
-    const sharedPkgPath = devMode_sapportaSourcePackageJsonPath(
-      devModePackageRoot,
-      "shared",
-    );
-    const shared = readPackageJson(sharedPkgPath) as PackageJson & {
+    ).packageJson;
+    const shared = readDevModeSapportaPackage(devModePackageRoot, "shared")
+      .packageJson as PackageJson & {
       dependencies: Record<string, string>;
     };
+
+    // The API template imports Hono directly while @sapporta/server also
+    // exposes functions typed in terms of Hono. In dev mode both sides must
+    // resolve to the same installed package version, otherwise TypeScript sees
+    // two incompatible Hono class/type identities. Resolve from
+    // @sapporta/server's package context and use exact overrides so pnpm cannot
+    // float the generated app to a second Hono installation.
+    const hono = resolveInstalledPackage(coreMetadata.packageJsonPath, "hono");
+    const honoNodeServer = resolveInstalledPackage(
+      coreMetadata.packageJsonPath,
+      "@hono/node-server",
+    );
 
     return {
       core,
@@ -235,6 +244,8 @@ function resolveScaffoldPackages(
           devModePackageRoot,
           "shared",
         ),
+        hono: exactVersionSpec(hono),
+        honoNodeServer: exactVersionSpec(honoNodeServer),
       },
       pnpmOverrides: {
         "@sapporta/honest": devMode_sapportaSourcePackageLinkSpec(
@@ -253,20 +264,27 @@ function resolveScaffoldPackages(
           devModePackageRoot,
           "grid",
         ),
+        hono: exactVersionSpec(hono),
+        "@hono/node-server": exactVersionSpec(honoNodeServer),
       },
     };
   }
 
-  const corePkgPath = _require.resolve("@sapporta/server/package.json");
-  const core = readPackageJson(corePkgPath) as PackageJson & {
+  // Published mode runs from installed packages. Here package entrypoints are
+  // valid runtime anchors: package managers have materialized the package, and
+  // pnpm has already rewritten internal workspace specs during publishing.
+  // Using the package-root resolver keeps export-map packages and conventional
+  // packages on the same metadata path.
+  const coreMetadata = resolveInstalledPackage(
+    import.meta.url,
+    "@sapporta/server",
+  );
+  const core = coreMetadata.packageJson as PackageJson & {
     dependencies: Record<string, string>;
   };
   const ui = readVendoredSapportaPackage(initPaths, "@sapporta/ui");
   const grid = readVendoredSapportaPackage(initPaths, "@sapporta/grid");
-  const frontend = readVendoredSapportaPackage(
-    initPaths,
-    "@sapporta/frontend",
-  );
+  const frontend = readVendoredSapportaPackage(initPaths, "@sapporta/frontend");
   const shared = readVendoredSapportaPackage(
     initPaths,
     "@sapporta/shared",
@@ -291,12 +309,30 @@ function resolveScaffoldPackages(
       grid: sapportaPackageSpec(grid, "@sapporta/grid"),
       frontend: sapportaPackageSpec(frontend, "@sapporta/frontend"),
       shared: sapportaPackageSpec(shared, "@sapporta/shared"),
+      hono: requiredDependencySpec(core, "hono"),
+      honoNodeServer: requiredDependencySpec(core, "@hono/node-server"),
     },
   };
 }
 
 function readPackageJson(path: string): PackageJson {
   return JSON.parse(readFileSync(path, "utf-8"));
+}
+
+function readPackageMetadata(packageJsonPath: string): PackageMetadata {
+  return {
+    packageJsonPath,
+    packageJson: readPackageJson(packageJsonPath),
+  };
+}
+
+function readDevModeSapportaPackage(
+  devModePackageRoot: string,
+  packageName: Parameters<typeof devMode_sapportaSourcePackageJsonPath>[1],
+): PackageMetadata {
+  return readPackageMetadata(
+    devMode_sapportaSourcePackageJsonPath(devModePackageRoot, packageName),
+  );
 }
 
 function sapportaPackageSpec(
@@ -314,6 +350,64 @@ function sapportaPackageSpec(
     );
   }
   return `^${pkg.version}`;
+}
+
+function requiredDependencySpec(
+  pkg: PackageJson,
+  dependencyName: string,
+): string {
+  const spec = pkg.dependencies?.[dependencyName];
+  if (!spec) {
+    throw new Error(
+      `${pkg.name ?? "package"}'s package.json is missing "${dependencyName}" in dependencies — cannot pin scaffolded dependencies.`,
+    );
+  }
+  return spec;
+}
+
+function exactVersionSpec(pkg: PackageMetadata): string {
+  const version = pkg.packageJson.version;
+  if (!version) {
+    throw new Error(
+      `${pkg.packageJson.name ?? pkg.packageJsonPath}'s package.json is missing version — cannot pin scaffolded dependencies.`,
+    );
+  }
+  return version;
+}
+
+function resolveInstalledPackage(
+  fromPackageJsonPath: string,
+  packageName: string,
+): PackageMetadata {
+  const packageRequire = createRequire(fromPackageJsonPath);
+  const entrypoint = packageRequire.resolve(packageName);
+  const packageJsonPath = findPackageJsonForModule(entrypoint, packageName);
+  return readPackageMetadata(packageJsonPath);
+}
+
+function findPackageJsonForModule(
+  modulePath: string,
+  packageName: string,
+): string {
+  // Some dependencies, including Hono, intentionally do not export
+  // `./package.json`. Resolve the public entrypoint first, then walk upward to
+  // the owning package root. The package-name check is important under pnpm:
+  // entrypoints live below nested store paths, and the first package.json found
+  // while walking must be the package that owns the resolved module.
+  let dir = dirname(modulePath);
+  while (dir !== dirname(dir)) {
+    const packageJsonPath = join(dir, "package.json");
+    if (existsSync(packageJsonPath)) {
+      const pkg = readPackageJson(packageJsonPath);
+      if (pkg.name === packageName) {
+        return packageJsonPath;
+      }
+    }
+    dir = dirname(dir);
+  }
+  throw new Error(
+    `Could not find package.json for ${packageName} from ${modulePath}.`,
+  );
 }
 
 function readVendoredSapportaPackage(
@@ -366,6 +460,8 @@ function buildTemplateReplacements(
     __GRID_SPEC__: packages.specs.grid,
     __FRONTEND_SPEC__: packages.specs.frontend,
     __SHARED_SPEC__: packages.specs.shared,
+    __HONO_SPEC__: packages.specs.hono,
+    __HONO_NODE_SERVER_SPEC__: packages.specs.honoNodeServer,
     __DRIZZLE_VERSION__: drizzleVersion,
     __ZOD_VERSION__: zodVersion,
     __SAPPORTA_REST_CORE_VERSION__: sapportaRestCoreVersion,
