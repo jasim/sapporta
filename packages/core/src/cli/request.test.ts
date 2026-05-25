@@ -5,8 +5,8 @@ import type { CliRoute } from "./routes.js";
 
 describe("buildRequest", () => {
   const postRoute: CliRoute = {
-    pattern: ["meta", "sql"],
-    description: "Run SQL",
+    pattern: ["db", "exec-sql"],
+    description: "Execute raw SQL",
     method: "POST",
     path: "/api/meta/sql",
     params: [],
@@ -30,16 +30,16 @@ describe("buildRequest", () => {
 
   it("does not forward --output-format or --input-body-json as query params", () => {
     const getRoute: CliRoute = {
-      pattern: ["reports", "run", ":name"],
+      pattern: ["reports", "run", ":report"],
       description: "Run report",
       method: "GET",
-      path: "/api/reports/:name/results",
-      params: ["name"],
+      path: "/api/reports/:report/results",
+      params: ["report"],
       queryFlags: ["*"],
       extractData: () => [],
     };
 
-    const req = buildRequest(getRoute, { name: "trial-balance" }, {
+    const req = buildRequest(getRoute, { report: "trial-balance" }, {
       "output-format": "json",
       "input-body-json": '{"ignored":true}',
       period: "2026-05",

@@ -144,7 +144,7 @@ async function main() {
 Local commands (no server required):
   check                                Validate project definitions
   init <name>                          Create a new project directory
-  describe [command]                   List commands or describe one`);
+  describe [route]                     List endpoints or describe one`);
 
   if (!firstArg) {
     program.help();

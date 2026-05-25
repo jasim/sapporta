@@ -84,47 +84,47 @@ function tableDescribeRows(res: any) {
 // help generation, and missing-argument validation.
 
 export const ROUTES: CliRoute[] = [
-  // ── /meta ──────────────────────────────────────────────────────────────
+  // ── Table definitions ─────────────────────────────────────────────────
   {
-    pattern: ["meta", "tables"],
-    description: "List all tables with schema metadata and row counts",
+    pattern: ["tables"],
+    description: "List table definitions",
     method: "GET",
     path: "/api/meta/tables",
     params: [],
     extractData: (res) => (res.tables ?? []).map(tableListRow),
   },
   {
-    pattern: ["meta", "tables", "show", ":name"],
-    description: "Describe single table schema",
+    pattern: ["tables", "show", ":table"],
+    description: "Show table schema",
     method: "GET",
-    path: "/api/meta/tables/:name",
-    params: ["name"],
+    path: "/api/meta/tables/:table",
+    params: ["table"],
     extractData: tableDescribeRows,
     formatHeader: (res) => res.name ? `Table: ${res.name} (${res.label})` : undefined,
   },
   {
-    pattern: ["meta", "tables", "indexes", ":name"],
-    description: "Show indexes on a table",
+    pattern: ["tables", "indexes", ":table"],
+    description: "Show table indexes",
     method: "GET",
-    path: "/api/meta/tables/:name/indexes",
-    params: ["name"],
+    path: "/api/meta/tables/:table/indexes",
+    params: ["table"],
     extractData: (res) => res.data ?? res ?? [],
   },
   {
-    pattern: ["meta", "tables", "sample", ":name"],
-    description: "Show sample rows from a table",
+    pattern: ["tables", "sample", ":table"],
+    description: "Show sample rows for inspection",
     method: "GET",
-    path: "/api/meta/tables/:name/sample",
-    params: ["name"],
+    path: "/api/meta/tables/:table/sample",
+    params: ["table"],
     queryFlags: ["limit", "fields"],
     extractData: (res) => res.data ?? res ?? [],
   },
   {
-    pattern: ["meta", "tables", "update", ":name"],
-    description: "Update table properties (label, row_label_columns[], immutable, name)",
+    pattern: ["tables", "update", ":table"],
+    description: "Update table metadata",
     method: "PATCH",
-    path: "/api/meta/tables/:name",
-    params: ["name"],
+    path: "/api/meta/tables/:table",
+    params: ["table"],
     bodyField: "data",
     mutating: true,
     inputSchema: z.object({
@@ -137,27 +137,97 @@ export const ROUTES: CliRoute[] = [
     extractData: (res) => [res],
   },
   {
-    pattern: ["meta", "tables", "drop", ":name"],
+    pattern: ["tables", "drop", ":table"],
     description: "Drop a UI-managed table",
     method: "DELETE",
-    path: "/api/meta/tables/:name",
-    params: ["name"],
+    path: "/api/meta/tables/:table",
+    params: ["table"],
     queryFlags: ["confirm"],
     mutating: true,
     extractData: (res) => [res],
   },
+
+  // ── Row data ──────────────────────────────────────────────────────────
   {
-    pattern: ["meta", "enums"],
-    description: "List all Postgres enums and their allowed values",
+    pattern: ["rows", ":table"],
+    description: "List rows from a table",
+    method: "GET",
+    path: "/api/tables/:table",
+    params: ["table"],
+    queryFlags: ["limit", "page", "sort", "order"],
+    extractData: (res) => res.data ?? [],
+    formatHeader: (res) => {
+      const m = res.meta;
+      return m ? `Page ${m.page}/${m.pages} (${m.total} total rows)` : undefined;
+    },
+  },
+  {
+    pattern: ["rows", "get", ":table", ":id"],
+    description: "Get a single row by ID",
+    method: "GET",
+    path: "/api/tables/:table/:id",
+    params: ["table", "id"],
+    extractData: (res) => res.data ? [res.data] : [],
+  },
+  {
+    pattern: ["rows", "insert", ":table"],
+    description: "Insert one or more rows into a table",
+    method: "POST",
+    path: "/api/tables/:table",
+    params: ["table"],
+    bodyField: "data",
+    mutating: true,
+    extractData: (res) => {
+      const d = res.data;
+      return Array.isArray(d) ? d : d ? [d] : [];
+    },
+  },
+  {
+    pattern: ["rows", "update", ":table", ":id"],
+    description: "Update a row by ID",
+    method: "PUT",
+    path: "/api/tables/:table/:id",
+    params: ["table", "id"],
+    bodyField: "data",
+    mutating: true,
+    extractData: (res) => res.data ? [res.data] : [],
+  },
+  {
+    pattern: ["rows", "delete", ":table", ":id"],
+    description: "Delete a row by ID",
+    method: "DELETE",
+    path: "/api/tables/:table/:id",
+    params: ["table", "id"],
+    mutating: true,
+    extractData: (res) => res.data ? [res.data] : [],
+  },
+
+  // ── Enums ─────────────────────────────────────────────────────────────
+  {
+    pattern: ["enums"],
+    description: "List enum definitions",
     method: "GET",
     path: "/api/meta/enums",
     params: [],
     extractData: (res) => res.data ?? res ?? [],
   },
+
+  // ── Schema ────────────────────────────────────────────────────────────
   {
-    pattern: ["meta", "sql"],
+    pattern: ["schema", "sync"],
+    description: "Sync schema files to database",
+    method: "POST",
+    path: "/api/meta/schema/sync",
+    params: [],
+    mutating: true,
+    extractData: (res) => [res],
+  },
+
+  // ── Database ──────────────────────────────────────────────────────────
+  {
+    pattern: ["db", "exec-sql"],
     description:
-      "Run any SQL statement — reads return rows, writes report row counts",
+      "Execute raw SQL; reads return rows, writes report row counts",
     method: "POST",
     path: "/api/meta/sql",
     params: [],
@@ -176,74 +246,11 @@ export const ROUTES: CliRoute[] = [
     }),
     extractData: (res) => (Array.isArray(res) ? res : res.data ?? [res]),
   },
-  {
-    pattern: ["meta", "schema", "sync"],
-    description: "Sync schema files to database (apply migrations)",
-    method: "POST",
-    path: "/api/meta/schema/sync",
-    params: [],
-    mutating: true,
-    extractData: (res) => [res],
-  },
-  // ── /tables ────────────────────────────────────────────────────────────
-  {
-    pattern: ["tables", "list", ":table"],
-    description: "List rows from a table (with filters, sort, pagination)",
-    method: "GET",
-    path: "/api/tables/:table",
-    params: ["table"],
-    queryFlags: ["limit", "page", "sort", "order"],
-    extractData: (res) => res.data ?? [],
-    formatHeader: (res) => {
-      const m = res.meta;
-      return m ? `Page ${m.page}/${m.pages} (${m.total} total rows)` : undefined;
-    },
-  },
-  {
-    pattern: ["tables", "get", ":table", ":id"],
-    description: "Get a single row by ID",
-    method: "GET",
-    path: "/api/tables/:table/:id",
-    params: ["table", "id"],
-    extractData: (res) => res.data ? [res.data] : [],
-  },
-  {
-    pattern: ["tables", "add-row", ":table"],
-    description: "Insert one or more rows into a table",
-    method: "POST",
-    path: "/api/tables/:table",
-    params: ["table"],
-    bodyField: "data",
-    mutating: true,
-    extractData: (res) => {
-      const d = res.data;
-      return Array.isArray(d) ? d : d ? [d] : [];
-    },
-  },
-  {
-    pattern: ["tables", "update", ":table", ":id"],
-    description: "Update a row by ID",
-    method: "PUT",
-    path: "/api/tables/:table/:id",
-    params: ["table", "id"],
-    bodyField: "data",
-    mutating: true,
-    extractData: (res) => res.data ? [res.data] : [],
-  },
-  {
-    pattern: ["tables", "delete", ":table", ":id"],
-    description: "Delete a row by ID",
-    method: "DELETE",
-    path: "/api/tables/:table/:id",
-    params: ["table", "id"],
-    mutating: true,
-    extractData: (res) => res.data ? [res.data] : [],
-  },
 
   // ── /reports ───────────────────────────────────────────────────────────
   {
     pattern: ["reports"],
-    description: "List all report definitions",
+    description: "List report definitions",
     method: "GET",
     path: "/api/reports",
     params: [],
@@ -255,19 +262,19 @@ export const ROUTES: CliRoute[] = [
       })),
   },
   {
-    pattern: ["reports", "show", ":name"],
+    pattern: ["reports", "show", ":report"],
     description: "Get report metadata and parameters",
     method: "GET",
-    path: "/api/reports/:name",
-    params: ["name"],
+    path: "/api/reports/:report",
+    params: ["report"],
     extractData: (res) => [res],
   },
   {
-    pattern: ["reports", "run", ":name"],
+    pattern: ["reports", "run", ":report"],
     description: "Execute a report with parameters",
     method: "GET",
-    path: "/api/reports/:name/results",
-    params: ["name"],
+    path: "/api/reports/:report/results",
+    params: ["report"],
     queryFlags: ["*"],
     extractData: (res) => {
       if (res.nodes) return res.nodes;
@@ -279,6 +286,11 @@ export const ROUTES: CliRoute[] = [
 ];
 
 // ── Commander registration ──────────────────────────────────────────────────
+
+const COMMAND_GROUP_DESCRIPTIONS: Record<string, string> = {
+  schema: "Schema operations",
+  db: "Database operations",
+};
 
 export type RouteActionHandler = (
   route: CliRoute,
@@ -318,6 +330,8 @@ export function registerRoutes(
       let existing = parent.commands.find((c) => c.name() === fixed[i]);
       if (!existing) {
         existing = parent.command(fixed[i]);
+        const description = COMMAND_GROUP_DESCRIPTIONS[fixed[i]];
+        if (description) existing.description(description);
         existing.allowUnknownOption();
         existing.allowExcessArguments(true);
       }
@@ -338,7 +352,7 @@ export function registerRoutes(
       cmd.argument(`<${p}>`);
     }
 
-    // positionalArgs become optional arguments (e.g. [sql] for "meta sql")
+    // positionalArgs become optional arguments (e.g. [sql] for "db exec-sql")
     if (route.positionalArgs) {
       for (const pa of route.positionalArgs) {
         cmd.argument(`[${pa.field}]`);
