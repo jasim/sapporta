@@ -1,17 +1,15 @@
 # @sapporta/ui
 
-React admin UI for Sapporta projects.
+Reusable React UI primitives for Sapporta projects.
 
 ## Stack
 
-Vite + React 19 + Tailwind v4 + shadcn/ui + Zustand
+Vite + React 19 + Tailwind v4 + shadcn/ui
 
-## Custom Views — UI Routing
+## Package Boundary
 
-Custom views are routed at `/p/:projectId/views/:viewName`.
+`@sapporta/ui` owns generic primitives, composites, hooks, utilities, and the
+shared CSS token entry at `@sapporta/ui/index.css`.
 
-The view component (default export from the `.tsx` file) runs in the browser.
-
-## Vite Plugin: sapportaViews
-
-The `vite-plugin-sapporta-views.ts` plugin auto-discovers project `views/` directories from the registry at startup, generating a virtual module (`virtual:sapporta-views`) with lazy `import()` statements.
+Admin routes, table pages, reports, shell, and schema catalog code live in
+`@sapporta/frontend`. Grid runtime and column presets live in `@sapporta/grid`.

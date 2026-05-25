@@ -15,10 +15,11 @@ import {
   CommandGroup,
 } from "@/ui/primitives/command";
 import { cn } from "@/ui/utils/cn";
-import type { RowId } from "@sapporta/shared/row-id";
+
+type ComboboxValue = string;
 
 interface ComboboxListProps {
-  value: RowId | null;
+  value: ComboboxValue | null;
   options: Array<{ id: string; label: string }>;
   /** Called with the picked id. Empty string means "clear". */
   onPick: (id: string) => void;
@@ -84,8 +85,8 @@ export function ComboboxList({
 }
 
 interface ComboboxProps {
-  value: RowId | null;
-  onChange: (value: RowId | null) => void;
+  value: ComboboxValue | null;
+  onChange: (value: ComboboxValue | null) => void;
   /** id → display label. */
   options: Record<string, string>;
   placeholder?: string;

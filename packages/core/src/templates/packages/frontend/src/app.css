@@ -2,6 +2,7 @@
 
      1. @import "tailwindcss"        — Tailwind v4 defaults (preflight, theme).
      2. @import "@sapporta/ui/..."    — Sapporta tokens, @theme, and base rules.
+     3. @import "@sapporta/grid/..."  — Sapporta grid and column preset CSS.
      3. @source "./"                  — scan this project's src/ for utilities.
      4. Your own CSS below            — has the last word.
 
@@ -16,6 +17,7 @@
 
 @import "tailwindcss";
 @import "@sapporta/ui/index.css";
+@import "@sapporta/grid/index.css";
 @source "./";
 
 /* Add your own tokens, utilities, and overrides below. */

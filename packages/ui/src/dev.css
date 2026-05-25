@@ -1,8 +1,0 @@
-/* Dev-only wrapper: runs Tailwind v4 for the library's own harness
-   (`pnpm --filter @sapporta/ui dev`). The shipped theme in ./index.css
-   deliberately does NOT `@import "tailwindcss"` — consumers drive the
-   single Tailwind pipeline from their own app.css. This file exists so
-   the library itself has a pipeline when running outside a consumer. */
-
-@import "tailwindcss";
-@import "./index.css";

@@ -100,7 +100,7 @@ Relative requests would hit the CDN and 404. Set `VITE_API_URL` in `packages/fro
 VITE_API_URL=https://api.example.com
 ```
 
-That's the only change needed in the SPA — application code is untouched. `@sapporta/ui` reads `VITE_API_URL` at build time and exposes `${VITE_API_URL}/api` via `getApiBase()`; both the framework's `uiClient` and your project's client (`createApiClient(yourContract, { baseUrl: getApiBase })` in `packages/frontend/src/api.ts`) take `getApiBase` as their `baseUrl`, so every typed call becomes absolute automatically. Dev mode keeps using relative URLs through Vite's proxy (`packages/frontend/vite.config.ts`), so only the production bundle is affected.
+That's the only change needed in the SPA — application code is untouched. `@sapporta/frontend` reads `VITE_API_URL` at build time and exposes `${VITE_API_URL}/api` via `getApiBase()`; both the framework's `uiClient` and your project's client (`createApiClient(yourContract, { baseUrl: getApiBase })` in `packages/frontend/src/api.ts`) take `getApiBase` as their `baseUrl`, so every typed call becomes absolute automatically. Dev mode keeps using relative URLs through Vite's proxy (`packages/frontend/vite.config.ts`), so only the production bundle is affected.
 
 Only `VITE_`-prefixed env vars reach the client bundle — Vite's rule. Don't smuggle secrets through `VITE_*`; they ship in the JS.
 

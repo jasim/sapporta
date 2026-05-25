@@ -30,10 +30,14 @@ type ScaffoldProject = {
 type ScaffoldPackages = {
   core: PackageJson & { dependencies: Record<string, string> };
   ui: PackageJson;
+  grid: PackageJson;
+  frontend: PackageJson;
   shared: PackageJson & { dependencies: Record<string, string> };
   specs: {
     core: string;
     ui: string;
+    grid: string;
+    frontend: string;
     shared: string;
   };
   pnpmOverrides?: Record<string, string>;
@@ -160,17 +164,17 @@ function resolveScaffoldPackages(
   initPaths: ReturnType<typeof initProjectPackagePaths>,
   devModePackageRoot: string | undefined,
 ): ScaffoldPackages {
-  // Resolve @sapporta/server and @sapporta/ui dependency specifiers:
+  // Resolve @sapporta/server and frontend package dependency specifiers:
   // - SAPPORTA_DEV_MODE_PACKAGE_ROOT set (dev/source tree) → link: symlink
   // - SAPPORTA_DEV_MODE_PACKAGE_ROOT absent (published CLI) → use version from own package.json
   const _require = createRequire(import.meta.url);
 
   // Dev-mode overrides for transitive `workspace:*` dependencies inside
   // linked Sapporta packages. The scaffold links @sapporta/server at the
-  // project root and @sapporta/ui in packages/frontend/package.json via `link:` specs,
+  // project root and @sapporta/frontend in packages/frontend/package.json via `link:` specs,
   // but their own package.json files still point at monorepo siblings with
   // `workspace:*` (@sapporta/server -> @sapporta/honest/@sapporta/shared,
-  // @sapporta/ui -> @sapporta/shared). In the scaffolded workspace, pnpm
+  // @sapporta/frontend -> @sapporta/ui/@sapporta/grid/@sapporta/shared). In the scaffolded workspace, pnpm
   // would otherwise look for those packages beside the user's app packages,
   // then fail with ERR_PNPM_WORKSPACE_PKG_NOT_FOUND.
   // Pointing those package names back to the source checkout keeps dev installs
@@ -193,6 +197,18 @@ function resolveScaffoldPackages(
     );
     const ui = readPackageJson(uiPkgPath);
 
+    const gridPkgPath = devMode_sapportaSourcePackageJsonPath(
+      devModePackageRoot,
+      "grid",
+    );
+    const grid = readPackageJson(gridPkgPath);
+
+    const frontendPkgPath = devMode_sapportaSourcePackageJsonPath(
+      devModePackageRoot,
+      "frontend",
+    );
+    const frontend = readPackageJson(frontendPkgPath);
+
     const sharedPkgPath = devMode_sapportaSourcePackageJsonPath(
       devModePackageRoot,
       "shared",
@@ -204,10 +220,17 @@ function resolveScaffoldPackages(
     return {
       core,
       ui,
+      grid,
+      frontend,
       shared,
       specs: {
         core: devMode_sapportaSourcePackageLinkSpec(devModePackageRoot, "core"),
         ui: devMode_sapportaSourcePackageLinkSpec(devModePackageRoot, "ui"),
+        grid: devMode_sapportaSourcePackageLinkSpec(devModePackageRoot, "grid"),
+        frontend: devMode_sapportaSourcePackageLinkSpec(
+          devModePackageRoot,
+          "frontend",
+        ),
         shared: devMode_sapportaSourcePackageLinkSpec(
           devModePackageRoot,
           "shared",
@@ -222,6 +245,14 @@ function resolveScaffoldPackages(
           devModePackageRoot,
           "shared",
         ),
+        "@sapporta/ui": devMode_sapportaSourcePackageLinkSpec(
+          devModePackageRoot,
+          "ui",
+        ),
+        "@sapporta/grid": devMode_sapportaSourcePackageLinkSpec(
+          devModePackageRoot,
+          "grid",
+        ),
       },
     };
   }
@@ -231,6 +262,11 @@ function resolveScaffoldPackages(
     dependencies: Record<string, string>;
   };
   const ui = readVendoredSapportaPackage(initPaths, "@sapporta/ui");
+  const grid = readVendoredSapportaPackage(initPaths, "@sapporta/grid");
+  const frontend = readVendoredSapportaPackage(
+    initPaths,
+    "@sapporta/frontend",
+  );
   const shared = readVendoredSapportaPackage(
     initPaths,
     "@sapporta/shared",
@@ -246,10 +282,14 @@ function resolveScaffoldPackages(
   return {
     core,
     ui,
+    grid,
+    frontend,
     shared,
     specs: {
       core: sapportaPackageSpec(core, "@sapporta/server"),
       ui: sapportaPackageSpec(ui, "@sapporta/ui"),
+      grid: sapportaPackageSpec(grid, "@sapporta/grid"),
+      frontend: sapportaPackageSpec(frontend, "@sapporta/frontend"),
       shared: sapportaPackageSpec(shared, "@sapporta/shared"),
     },
   };
@@ -299,20 +339,20 @@ function buildTemplateReplacements(
     );
   }
 
-  // Peer-dep pins for the scaffolded frontend package. Sourced from the UI
-  // package's own package.json so they can't drift — whatever version of
-  // react/vite/tailwind @sapporta/ui was built against is what the scaffold
+  // Peer-dep pins for the scaffolded frontend package. Sourced from the
+  // admin frontend package's own package.json so they can't drift — whatever
+  // version of react/vite/tailwind @sapporta/frontend was built against is what the scaffold
   // writes. Some of these live in dependencies, some in devDependencies
   // (e.g. @types/react); pickVersion() checks both in order.
-  const uiDeps = {
-    ...(packages.ui.dependencies ?? {}),
-    ...(packages.ui.devDependencies ?? {}),
+  const frontendDeps = {
+    ...(packages.frontend.dependencies ?? {}),
+    ...(packages.frontend.devDependencies ?? {}),
   };
   function pickVersion(name: string): string {
-    const v = uiDeps[name];
+    const v = frontendDeps[name];
     if (!v) {
       throw new Error(
-        `@sapporta/ui's package.json is missing "${name}" in dependencies/devDependencies — cannot pin scaffolded frontend to a coherent version.`,
+        `@sapporta/frontend's package.json is missing "${name}" in dependencies/devDependencies — cannot pin scaffolded frontend to a coherent version.`,
       );
     }
     return v;
@@ -323,6 +363,8 @@ function buildTemplateReplacements(
     __NAME__: project.name,
     __CORE_SPEC__: packages.specs.core,
     __UI_SPEC__: packages.specs.ui,
+    __GRID_SPEC__: packages.specs.grid,
+    __FRONTEND_SPEC__: packages.specs.frontend,
     __SHARED_SPEC__: packages.specs.shared,
     __DRIZZLE_VERSION__: drizzleVersion,
     __ZOD_VERSION__: zodVersion,

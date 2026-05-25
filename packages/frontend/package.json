@@ -1,0 +1,68 @@
+{
+  "name": "@sapporta/frontend",
+  "version": "0.2.1",
+  "type": "module",
+  "description": "Sapporta default admin frontend: shell, routes, table pages, report pages, and app boot wiring.",
+  "keywords": ["sapporta", "admin", "crud", "react", "vite", "typescript"],
+  "author": "Jasim A Basheer <jasim@nuabase.com>",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jasim/sapporta.git",
+    "directory": "packages/frontend"
+  },
+  "homepage": "https://github.com/jasim/sapporta/tree/master/packages/frontend#readme",
+  "bugs": "https://github.com/jasim/sapporta/issues",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": ["dist/", "src/", "index.html", "package.json"],
+  "publishConfig": {
+    "access": "public"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./app": {
+      "types": "./dist/app/index.d.ts",
+      "import": "./dist/app/index.js"
+    },
+    "./layout": {
+      "types": "./dist/shell/components/SidebarShell.d.ts",
+      "import": "./dist/layout.js"
+    }
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "build:watch": "vite build --watch",
+    "typecheck": "tsc --noEmit",
+    "typecheck:watch": "tsc --noEmit --watch --preserveWatchOutput",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@sapporta/grid": "workspace:*",
+    "@sapporta/rest-core": "3.52.2",
+    "@sapporta/shared": "workspace:*",
+    "@sapporta/ui": "workspace:*",
+    "@tailwindcss/vite": "^4.1.10",
+    "@vitejs/plugin-react": "^4.6.0",
+    "immer": "^10.1.1",
+    "lucide-react": "^0.513.0",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "react-router-dom": "^7.13.1",
+    "tailwindcss": "^4.1.10",
+    "vite": "^6.3.5",
+    "zod": "^4.3.6",
+    "zustand": "^5.0.5"
+  },
+  "devDependencies": {
+    "@types/react": "^19.1.0",
+    "@types/react-dom": "^19.1.0",
+    "typescript": "^5.7.3",
+    "vite-plugin-dts": "^4.5.4"
+  }
+}

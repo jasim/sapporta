@@ -12,7 +12,7 @@ A Sapporta project.
 
 ```
 packages/api/       backend — boot.ts, app.ts, schema/, app/, reports/
-packages/frontend/  SPA — Vite + React, imports @sapporta/ui
+packages/frontend/  SPA — Vite + React, imports @sapporta/frontend and @sapporta/ui CSS
 packages/shared/    ts-rest contracts + types shared by backend and frontend
 ```
 

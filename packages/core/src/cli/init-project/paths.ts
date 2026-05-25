@@ -1,7 +1,13 @@
 import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
-type SapportaSourcePackage = "core" | "honest" | "shared" | "ui";
+type SapportaSourcePackage =
+  | "core"
+  | "frontend"
+  | "grid"
+  | "honest"
+  | "shared"
+  | "ui";
 
 const SAPPORTA_SOURCE_PACKAGES_DIR = "packages";
 
