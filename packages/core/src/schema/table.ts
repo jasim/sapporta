@@ -146,16 +146,16 @@ export interface TableOptions {
  */
 export function table(options: TableOptions): TableDef {
   const config = getTableConfig(options.drizzle);
-  // Drain factory-stamped meta for this table's columns. The pending queue
-  // is populated synchronously by factory calls inside the `sqliteTable`
-  // definition just above; `table()` is the first safe point to consume
-  // them. User-supplied `meta.columns` takes precedence — explicit beats
-  // implicit — but factory-stamped `kind`/`displayFormat` fill in where
-  // the user hasn't overridden.
+  // `table()` is the join point for the public API: it combines the user's
+  // separate Drizzle definition with their Sapporta metadata. It also drains
+  // factory metadata from `money()`, `date()`, etc. and folds that into
+  // ordinary `meta.columns` data on the returned TableDef.
   const drained = drainPendingColumnMeta(config.columns.map((c) => c.name));
   const userColumns = options.meta?.columns ?? {};
   const mergedColumns: Record<string, ColumnMeta> = { ...userColumns };
   for (const [name, factoryMeta] of drained) {
+    // Explicit user metadata wins; factory metadata supplies the default
+    // semantic kind and display format for Sapporta's downstream APIs.
     mergedColumns[name] = { ...factoryMeta, ...mergedColumns[name] };
   }
   return {

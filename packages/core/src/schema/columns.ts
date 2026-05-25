@@ -40,6 +40,12 @@ import {
   parsePlainDate,
 } from "@sapporta/shared/temporal";
 
+// The user-facing API keeps Drizzle schema and Sapporta metadata separate:
+// users write a real `sqliteTable(...)`, then pass it with Sapporta `meta` to
+// `table({ drizzle, meta })`. Column factories must therefore keep returning
+// plain Drizzle builders, while still carrying Sapporta-only semantics such as
+// `kind` and `displayFormat`. This queue is the temporary side channel that
+// lets `table()` combine those two authored pieces into one TableDef.
 const pending: Array<{ name: string; meta: ColumnMeta }> = [];
 
 function register(name: string, meta: ColumnMeta): void {
@@ -47,34 +53,27 @@ function register(name: string, meta: ColumnMeta): void {
 }
 
 /**
- * Drain factory-registered metadata for the given column names. Called by
- * `table()` when wrapping a Drizzle schema — it passes the set of column
- * names present on the drizzle config so registrations meant for *other*
- * tables stay in the queue.
+ * Move queued factory metadata into the table currently being wrapped.
+ * Column names keep metadata for later tables in the queue, so two tables
+ * declared before their `table()` wrappers still receive the right entries.
  *
- * Two-table patterns like
+ * Example:
  *
- *     const t1 = sqliteTable("a", { x: timestamp("x") });
- *     const t2 = sqliteTable("b", { y: timestamp("y") });
- *     const a = table({ drizzle: t1 });  // must only consume "x"
- *     const b = table({ drizzle: t2 });  // must still see "y"
+ *     const t1 = sqliteTable("a", { created_at: timestamp("created_at") });
+ *     const t2 = sqliteTable("b", { created_at: timestamp("created_at") });
+ *     const a = table({ drizzle: t1 });  // consumes only t1 metadata
+ *     const b = table({ drizzle: t2 });  // t2 metadata remains queued
  *
- * must route meta to the correct table. Keying the drain by the drizzle
- * table's own column names is what keeps that coupling local and avoids a
- * hidden dependency on declaration order.
+ * Factories run synchronously while `sqliteTable(...)` builds its columns, so
+ * a table's entries form a contiguous queue segment. The drain stops at the
+ * first unknown column name or repeated column name, because either condition
+ * means the next queued entry belongs to another table.
  */
 export function drainPendingColumnMeta(
   names: readonly string[],
 ): Map<string, ColumnMeta> {
   const want = new Set(names);
   const map = new Map<string, ColumnMeta>();
-  // Consume the leading prefix of the queue that belongs to this table.
-  // A factory call registers in the same JS turn as the `sqliteTable(...)`
-  // definition, so all of a table's factory entries land contiguously at
-  // the head of the queue before the next `table()` call drains them.
-  // Stop at the first non-match *or* the first duplicate name — a repeat
-  // means we've crossed into the next table's registrations (two tables
-  // both with a `created_at`, for instance).
   let consumed = 0;
   for (const entry of pending) {
     if (!want.has(entry.name) || map.has(entry.name)) break;
