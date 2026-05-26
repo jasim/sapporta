@@ -18,7 +18,7 @@
     "url": "git+https://github.com/jasim/sapporta.git",
     "directory": "packages/frontend"
   },
-  "homepage": "https://github.com/jasim/sapporta/tree/master/packages/frontend#readme",
+  "homepage": "https://github.com/jasim/sapporta/tree/main/packages/frontend#readme",
   "bugs": {
     "url": "https://github.com/jasim/sapporta/issues"
   },

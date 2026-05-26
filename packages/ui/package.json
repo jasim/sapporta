@@ -17,7 +17,7 @@
     "url": "git+https://github.com/jasim/sapporta.git",
     "directory": "packages/ui"
   },
-  "homepage": "https://github.com/jasim/sapporta/tree/master/packages/ui#readme",
+  "homepage": "https://github.com/jasim/sapporta/tree/main/packages/ui#readme",
   "bugs": {
     "url": "https://github.com/jasim/sapporta/issues"
   },
