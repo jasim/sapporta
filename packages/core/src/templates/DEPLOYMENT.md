@@ -10,6 +10,12 @@ Three production-valid deployment shapes. The code is identical; only SPA/API lo
 
 Start with (a) unless you have a reason not to.
 
+The generated `Dockerfile` implements shape (a): the image contains both
+`packages/api/dist/` and `packages/frontend/dist/`, then runs
+`node packages/api/dist/boot.js`. Hono serves `/api/*` and the built SPA from
+the same container port. There is no nginx/Caddy proxy inside the image; any
+proxy is outside the container for TLS, routing, or load balancing.
+
 ## Same-origin vs. cross-origin
 
 The shapes split on one question: does the browser see the SPA and API on the same origin?
@@ -45,6 +51,31 @@ The browser loads the SPA from `http://your-host:3000/`, and its relative `fetch
 
 - **Good for:** personal projects, small/medium deployments, Fly.io, Railway, a VPS, a single Docker container.
 - **Trade-off:** SPA and API tiers scale together. Rarely an issue; if it becomes one, promote to (b) or (c).
+
+### Docker image
+
+Scaffolded projects include a production `Dockerfile` for this same-origin
+shape. It builds the shared package, API, and frontend, installs production
+dependencies, copies the built SPA into `packages/frontend/dist/`, exposes
+`PORT` defaulting to `3000`, and health-checks `/api/openapi.json`.
+
+```bash
+docker build -t __SLUG__ .
+docker run --rm -p 3000:3000 -v __SLUG__-data:/app/data __SLUG__
+```
+
+Then open `http://localhost:3000/`. The SPA and API are same-origin: browser
+requests to `/api/*` go to the Hono process in the same container. `VITE_API_URL`
+and `FRONTEND_ORIGIN` are not needed for this Docker shape.
+
+Keep `/app/data` on a named volume or bind mount. Without that volume, SQLite
+data is tied to the container filesystem and disappears when the container is
+replaced.
+
+If you put nginx, Caddy, a platform router, or a load balancer in front of the
+container, proxy the public origin to the container port. That external proxy
+does not change the browser contract: `/` and `/api/*` still share one public
+origin, so frontend API calls remain relative.
 
 ## Shape (b) — Reverse proxy (nginx, Caddy, etc.)
 
