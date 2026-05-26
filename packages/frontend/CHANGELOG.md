@@ -1,5 +1,15 @@
 # @sapporta/frontend
 
+## 0.2.3
+
+### Patch Changes
+
+- Update sapporta cli install
+- Updated dependencies
+  - @sapporta/grid@0.2.3
+  - @sapporta/shared@0.1.3
+  - @sapporta/ui@0.2.3
+
 ## 0.2.2
 
 ### Patch Changes

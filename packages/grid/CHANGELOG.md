@@ -1,5 +1,13 @@
 # @sapporta/grid
 
+## 0.2.3
+
+### Patch Changes
+
+- Update sapporta cli install
+- Updated dependencies
+  - @sapporta/ui@0.2.3
+
 ## 0.2.2
 
 ### Patch Changes

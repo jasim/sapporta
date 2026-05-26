@@ -1,5 +1,13 @@
 # sapporta
 
+## 0.2.2
+
+### Patch Changes
+
+- Update sapporta cli install
+- Updated dependencies
+  - @sapporta/server@0.2.3
+
 ## 0.2.1
 
 ### Patch Changes
