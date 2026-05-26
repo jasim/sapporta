@@ -1,5 +1,11 @@
 # @sapporta/honest
 
+## 0.3.3
+
+### Patch Changes
+
+- Create Dockerfile based deployment
+
 ## 0.3.2
 
 ### Patch Changes

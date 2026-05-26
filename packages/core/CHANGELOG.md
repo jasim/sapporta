@@ -1,5 +1,14 @@
 # @sapporta/server
 
+## 0.2.4
+
+### Patch Changes
+
+- Create Dockerfile based deployment
+- Updated dependencies
+  - @sapporta/honest@0.3.3
+  - @sapporta/shared@0.1.4
+
 ## 0.2.3
 
 ### Patch Changes
