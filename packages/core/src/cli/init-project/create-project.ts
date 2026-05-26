@@ -2,6 +2,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { execSync } from "node:child_process";
 import { createRequire } from "node:module";
+import { fileURLToPath } from "node:url";
 import { fromProjectRoot } from "../../project-paths.js";
 import { ensureBetterSqlite3Loads } from "./sqlite-native-repair.js";
 import {
@@ -357,7 +358,7 @@ function resolveScaffoldPackages(
   // pnpm has already rewritten internal workspace specs during publishing.
   // Using the package-root resolver keeps export-map packages and conventional
   // packages on the same metadata path.
-  const coreMetadata = resolveInstalledPackage(
+  const coreMetadata = resolveOwningPackage(
     import.meta.url,
     "@sapporta/server",
   );
@@ -494,6 +495,19 @@ function resolveInstalledPackage(
   const entrypoint = packageRequire.resolve(packageName);
   const packageJsonPath = findPackageJsonForModule(entrypoint, packageName);
   return readPackageMetadata(packageJsonPath);
+}
+
+export function resolveOwningPackage(
+  moduleUrl: string,
+  packageName: string,
+): PackageMetadata {
+  // Init needs metadata for the package that owns the currently running file,
+  // not its public root export. Resolving "@sapporta/server" through
+  // createRequire would use CommonJS export conditions and fail for our
+  // ESM-only root export, even though the package owns this module.
+  return readPackageMetadata(
+    findPackageJsonForModule(fileURLToPath(moduleUrl), packageName),
+  );
 }
 
 function findPackageJsonForModule(
