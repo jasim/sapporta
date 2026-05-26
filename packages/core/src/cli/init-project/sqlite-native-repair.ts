@@ -11,6 +11,8 @@ db.prepare("select 1 as ok").get();
 db.close();
 `;
 
+type ProgressLogger = (message: string) => void;
+
 export type CommandResult = Pick<SpawnSyncReturns<string>, "status" | "signal" | "stdout" | "stderr" | "error">;
 
 function commandText(command: string, args: readonly string[]): string {
@@ -63,14 +65,19 @@ function smokeTestBetterSqlite3(packageDir: string): CommandResult {
   return runCommand(packageDir, process.execPath, ["-e", SQLITE_SMOKE_SCRIPT]);
 }
 
-function repairBetterSqlite3Binding(packageDir: string): void {
-  console.log("better-sqlite3 native binding is missing; repairing the install...");
+function repairBetterSqlite3Binding(
+  packageDir: string,
+  progress: ProgressLogger,
+): void {
+  progress("better-sqlite3 native binding is missing; repairing the install...");
 
   const approveArgs = ["approve-builds", BETTER_SQLITE3_PACKAGE];
+  progress("Approving better-sqlite3 build scripts...");
   const approveResult = runCommand(packageDir, "pnpm", approveArgs, "inherit");
   assertSuccessfulCommand(approveResult, "pnpm", approveArgs);
 
   const rebuildArgs = ["rebuild", BETTER_SQLITE3_PACKAGE];
+  progress("Rebuilding better-sqlite3 native bindings...");
   const rebuildResult = runCommand(packageDir, "pnpm", rebuildArgs, "inherit");
   assertSuccessfulCommand(rebuildResult, "pnpm", rebuildArgs);
 
@@ -83,26 +90,30 @@ function repairBetterSqlite3Binding(packageDir: string): void {
   }
 
   const installed = resolveBetterSqlite3Install(packageDir);
-  console.log(
+  progress(
     `pnpm rebuild did not produce a loadable binding; building ${BETTER_SQLITE3_PACKAGE}@${installed.version} directly...`,
   );
   const directBuildArgs = ["--yes", "node-gyp", "rebuild", "--release"];
   const directBuildResult = runCommand(installed.dir, "npx", directBuildArgs, "inherit");
   assertSuccessfulCommand(directBuildResult, "npx", directBuildArgs);
 
+  progress("Verifying repaired better-sqlite3 bindings...");
   smokeResult = smokeTestBetterSqlite3(packageDir);
   assertSuccessfulCommand(smokeResult, process.execPath, ["-e", SQLITE_SMOKE_SCRIPT]);
 }
 
-export function ensureBetterSqlite3Loads(packageDir: string): void {
-  console.log("Checking better-sqlite3 native bindings work...");
+export function ensureBetterSqlite3Loads(
+  packageDir: string,
+  progress: ProgressLogger = console.log,
+): void {
+  progress("Checking better-sqlite3 native bindings...");
   const smokeResult = smokeTestBetterSqlite3(packageDir);
   if (smokeResult.status === 0) {
-    console.log("better-sqlite3 loads");
+    progress("better-sqlite3 native bindings are ready.");
     return;
   }
   if (!isMissingBetterSqlite3Binding(smokeResult)) {
     assertSuccessfulCommand(smokeResult, process.execPath, ["-e", SQLITE_SMOKE_SCRIPT]);
   }
-  repairBetterSqlite3Binding(packageDir);
+  repairBetterSqlite3Binding(packageDir, progress);
 }

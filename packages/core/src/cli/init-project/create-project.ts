@@ -70,6 +70,10 @@ type ScaffoldPackages = {
   pnpmOverrides?: Record<string, string>;
 };
 
+type ProgressLogger = (message: string) => void;
+
+const noopProgress: ProgressLogger = () => {};
+
 const DEV_MODE_IDENTITY_PACKAGES = [
   "hono",
   "drizzle-orm",
@@ -126,6 +130,8 @@ export interface CreateProjectOptions {
   dir: string;
   /** Project name for package.json. Defaults to the directory basename. */
   name?: string;
+  /** Optional hook for CLI progress messages while long-running setup runs. */
+  progress?: ProgressLogger;
 }
 
 export interface CreateProjectResult {
@@ -145,12 +151,16 @@ export interface CreateProjectResult {
  * Throws if package.json already exists in the target directory.
  */
 export function createProject(opts: CreateProjectOptions): CreateProjectResult {
+  const progress = opts.progress ?? noopProgress;
   const project = projectFromOptions(opts);
   const initPaths = initProjectPackagePaths();
 
+  progress(`Preparing Sapporta project in ${project.root}...`);
   assertCanCreateProject(project);
+  progress("Checking pnpm is available...");
   assertPnpmAvailable();
 
+  progress("Resolving Sapporta package versions...");
   const packages = resolveScaffoldPackages(
     initPaths,
     process.env.SAPPORTA_DEV_MODE_PACKAGE_ROOT,
@@ -162,11 +172,13 @@ export function createProject(opts: CreateProjectOptions): CreateProjectResult {
     packages.pnpmOverrides,
   );
 
+  progress("Creating workspace directories...");
   createScaffoldDirectories(project);
+  progress("Writing project files...");
   writeScaffoldFiles(project.root, files);
 
-  installWorkspace(project.root);
-  ensureBetterSqlite3Loads(project.apiDir);
+  installWorkspace(project.root, progress);
+  ensureBetterSqlite3Loads(project.apiDir, progress);
 
   return { dir: project.root, name: project.name };
 }
@@ -637,8 +649,12 @@ function writeScaffoldFiles(
   }
 }
 
-function installWorkspace(projectRoot: string): void {
+function installWorkspace(
+  projectRoot: string,
+  progress: ProgressLogger,
+): void {
   // pnpm presence was verified at the top of this function, so this is
   // guaranteed to resolve. One pass installs the root workspace.
+  progress("Installing workspace dependencies with pnpm install...");
   execSync("pnpm install", { cwd: projectRoot, stdio: "inherit" });
 }
