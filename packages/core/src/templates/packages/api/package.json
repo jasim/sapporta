@@ -9,13 +9,15 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@sapporta/honest": "__HONEST_SPEC__",
+    "@sapporta/rest-core": "__SAPPORTA_REST_CORE_VERSION__",
     "@sapporta/server": "__CORE_SPEC__",
     "@sapporta/shared": "__SHARED_SPEC__",
     "__SLUG__-shared": "workspace:*",
     "@hono/node-server": "__HONO_NODE_SERVER_SPEC__",
     "hono": "__HONO_SPEC__",
     "drizzle-orm": "__DRIZZLE_VERSION__",
-    "better-sqlite3": "^12.x",
+    "better-sqlite3": "__BETTER_SQLITE3_VERSION__",
     "@js-temporal/polyfill": "__TEMPORAL_VERSION__",
     "zod": "__ZOD_VERSION__"
   },

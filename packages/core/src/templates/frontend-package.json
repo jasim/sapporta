@@ -45,25 +45,33 @@
   },
   "dependencies": {
     "@sapporta/grid": "workspace:*",
-    "@sapporta/rest-core": "3.52.2",
     "@sapporta/shared": "workspace:*",
     "@sapporta/ui": "workspace:*",
-    "@tailwindcss/vite": "^4.1.10",
-    "@vitejs/plugin-react": "^4.6.0",
     "immer": "^10.1.1",
-    "lucide-react": "^0.513.0",
+    "lucide-react": "^0.513.0"
+  },
+  "peerDependencies": {
+    "@sapporta/rest-core": "3.52.2",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "react-router-dom": "^7.13.1",
-    "tailwindcss": "^4.1.10",
-    "vite": "^6.3.5",
     "zod": "^4.3.6",
     "zustand": "^5.0.5"
   },
   "devDependencies": {
+    "@sapporta/rest-core": "3.52.2",
+    "@tailwindcss/vite": "^4.1.10",
     "@types/react": "^19.1.0",
     "@types/react-dom": "^19.1.0",
+    "@vitejs/plugin-react": "^4.6.0",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "react-router-dom": "^7.13.1",
+    "tailwindcss": "^4.1.10",
     "typescript": "^5.7.3",
-    "vite-plugin-dts": "^4.5.4"
+    "vite": "^6.3.5",
+    "vite-plugin-dts": "^4.5.4",
+    "zod": "^4.3.6",
+    "zustand": "^5.0.5"
   }
 }

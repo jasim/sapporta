@@ -10,6 +10,7 @@
   "dependencies": {
     "@sapporta/frontend": "__FRONTEND_SPEC__",
     "@sapporta/grid": "__GRID_SPEC__",
+    "@sapporta/rest-core": "__SAPPORTA_REST_CORE_VERSION__",
     "@sapporta/shared": "__SHARED_SPEC__",
     "@sapporta/ui": "__UI_SPEC__",
     "__SLUG__-shared": "workspace:*",
@@ -17,7 +18,9 @@
     "lucide-react": "__LUCIDE_REACT_VERSION__",
     "react": "__REACT_VERSION__",
     "react-dom": "__REACT_DOM_VERSION__",
-    "react-router-dom": "__REACT_ROUTER_VERSION__"
+    "react-router-dom": "__REACT_ROUTER_VERSION__",
+    "zod": "__ZOD_VERSION__",
+    "zustand": "__ZUSTAND_VERSION__"
   },
   "devDependencies": {
     "@types/react": "__TYPES_REACT_VERSION__",

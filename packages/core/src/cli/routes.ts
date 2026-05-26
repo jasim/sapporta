@@ -11,7 +11,6 @@
  * The action handler substitutes positional params into the URL and calls httpRequest().
  */
 import { z } from "zod";
-import { Command } from "commander";
 
 // ── Route Definition ────────────────────────────────────────────────────────
 
@@ -298,6 +297,17 @@ export type RouteActionHandler = (
   extraPositionals: string[],
 ) => Promise<void>;
 
+type CliCommand = {
+  commands: readonly CliCommand[];
+  name(): string;
+  command(name: string): CliCommand;
+  description(description: string): CliCommand;
+  allowUnknownOption(): CliCommand;
+  allowExcessArguments(allow: boolean): CliCommand;
+  argument(name: string): CliCommand;
+  action(handler: (...args: unknown[]) => void | Promise<void>): CliCommand;
+};
+
 /**
  * Register all CLI routes as Commander subcommands.
  *
@@ -310,7 +320,7 @@ export type RouteActionHandler = (
  * params, and any extra positional values (for positionalArgs fields).
  */
 export function registerRoutes(
-  program: Command,
+  program: CliCommand,
   routes: CliRoute[],
   handler: RouteActionHandler,
 ): void {
@@ -325,7 +335,7 @@ export function registerRoutes(
     if (fixed.length === 0) continue;
 
     // Navigate/create command hierarchy for fixed[0..len-2]
-    let parent: Command = program;
+    let parent: CliCommand = program;
     for (let i = 0; i < fixed.length - 1; i++) {
       let existing = parent.commands.find((c) => c.name() === fixed[i]);
       if (!existing) {
@@ -366,7 +376,7 @@ export function registerRoutes(
     const routeRef = route;
     const paramNames = params;
 
-    cmd.action(async (...actionArgs: any[]) => {
+    cmd.action(async (...actionArgs: unknown[]) => {
       actionArgs.pop(); // Command instance
       actionArgs.pop(); // Commander-parsed options (unused — we parse flags ourselves)
       const positionalValues = actionArgs as string[];

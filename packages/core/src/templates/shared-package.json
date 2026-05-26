@@ -70,12 +70,15 @@
     "typecheck": "tsc --noEmit",
     "prepublishOnly": "pnpm build"
   },
-  "devDependencies": {
-    "typescript": "^5.7.3"
-  },
-  "dependencies": {
+  "peerDependencies": {
     "@js-temporal/polyfill": "^0.5.1",
     "@sapporta/rest-core": "3.52.2",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@js-temporal/polyfill": "^0.5.1",
+    "@sapporta/rest-core": "3.52.2",
+    "typescript": "^5.7.3",
     "zod": "^4.3.6"
   }
 }
