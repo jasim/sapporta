@@ -14,6 +14,7 @@ type PackageJson = {
   name?: string;
   dependencies?: Record<string, string>;
   devDependencies?: Record<string, string>;
+  peerDependencies?: Record<string, string>;
   version?: string;
 };
 
@@ -33,22 +34,59 @@ type ScaffoldProject = {
 };
 
 type ScaffoldPackages = {
-  core: PackageJson & { dependencies: Record<string, string> };
+  core: PackageJson;
+  honest: PackageJson;
   ui: PackageJson;
   grid: PackageJson;
   frontend: PackageJson;
-  shared: PackageJson & { dependencies: Record<string, string> };
+  shared: PackageJson;
   specs: {
     core: string;
+    honest: string;
     ui: string;
     grid: string;
     frontend: string;
     shared: string;
+    betterSqlite3: string;
+    drizzle: string;
     hono: string;
     honoNodeServer: string;
+    restCore: string;
+    temporal: string;
+    zod: string;
+    react: string;
+    reactDom: string;
+    reactRouter: string;
+    lucideReact: string;
+    vite: string;
+    viteReact: string;
+    tailwindVite: string;
+    tailwind: string;
+    typesReact: string;
+    typesReactDom: string;
+    zustand: string;
   };
   pnpmOverrides?: Record<string, string>;
 };
+
+const DEV_MODE_IDENTITY_PACKAGES = [
+  "hono",
+  "drizzle-orm",
+  "better-sqlite3",
+  "zod",
+  "@sapporta/rest-core",
+  "@js-temporal/polyfill",
+  "react",
+  "react-dom",
+  "react-router-dom",
+  "zustand",
+  "@radix-ui/react-checkbox",
+  "@radix-ui/react-dialog",
+  "@radix-ui/react-label",
+  "@radix-ui/react-popover",
+  "@radix-ui/react-select",
+  "@radix-ui/react-switch",
+] as const;
 
 const SCAFFOLD_FILES: Array<{ src: string; dest: string } | string> = [
   "packages/api/boot.ts",
@@ -197,43 +235,71 @@ function resolveScaffoldPackages(
     // package has been built, so `exports` targets under dist/ are not a stable
     // discovery mechanism for Sapporta source packages.
     const coreMetadata = readDevModeSapportaPackage(devModePackageRoot, "core");
-    const core = coreMetadata.packageJson as PackageJson & {
-      dependencies: Record<string, string>;
-    };
-    const ui = readDevModeSapportaPackage(devModePackageRoot, "ui").packageJson;
-    const grid = readDevModeSapportaPackage(
+    const core = coreMetadata.packageJson;
+    const honest = readDevModeSapportaPackage(devModePackageRoot, "honest")
+      .packageJson;
+    const uiMetadata = readDevModeSapportaPackage(devModePackageRoot, "ui");
+    const ui = uiMetadata.packageJson;
+    const gridMetadata = readDevModeSapportaPackage(
       devModePackageRoot,
       "grid",
-    ).packageJson;
-    const frontend = readDevModeSapportaPackage(
+    );
+    const grid = gridMetadata.packageJson;
+    const frontendMetadata = readDevModeSapportaPackage(
       devModePackageRoot,
       "frontend",
-    ).packageJson;
-    const shared = readDevModeSapportaPackage(devModePackageRoot, "shared")
-      .packageJson as PackageJson & {
-      dependencies: Record<string, string>;
-    };
+    );
+    const frontend = frontendMetadata.packageJson;
+    const sharedMetadata = readDevModeSapportaPackage(
+      devModePackageRoot,
+      "shared",
+    );
+    const shared = sharedMetadata.packageJson;
 
-    // The API template imports Hono directly while @sapporta/server also
-    // exposes functions typed in terms of Hono. In dev mode both sides must
-    // resolve to the same installed package version, otherwise TypeScript sees
-    // two incompatible Hono class/type identities. Resolve from
-    // @sapporta/server's package context and use exact overrides so pnpm cannot
-    // float the generated app to a second Hono installation.
-    const hono = resolveInstalledPackage(coreMetadata.packageJsonPath, "hono");
-    const honoNodeServer = resolveInstalledPackage(
+    const coreInstalled = installedPackageSpecPicker(
       coreMetadata.packageJsonPath,
-      "@hono/node-server",
+    );
+    const sharedInstalled = installedPackageSpecPicker(
+      sharedMetadata.packageJsonPath,
+    );
+    const frontendInstalled = installedPackageSpecPicker(
+      frontendMetadata.packageJsonPath,
+    );
+    const frontendSpec = declaredPackageSpecPicker(frontend);
+    const devIdentityOverrides = Object.fromEntries(
+      DEV_MODE_IDENTITY_PACKAGES.map((name) => [
+        name,
+        exactVersionSpec(
+          resolveInstalledPackage(
+            name.startsWith("@radix-ui/")
+              ? uiMetadata.packageJsonPath
+              : name === "@js-temporal/polyfill"
+                ? sharedMetadata.packageJsonPath
+                : name === "react" ||
+                    name === "react-dom" ||
+                    name === "react-router-dom" ||
+                    name === "zustand"
+                  ? frontendMetadata.packageJsonPath
+                  : coreMetadata.packageJsonPath,
+            name,
+          ),
+        ),
+      ]),
     );
 
     return {
       core,
+      honest,
       ui,
       grid,
       frontend,
       shared,
       specs: {
         core: devMode_sapportaSourcePackageLinkSpec(devModePackageRoot, "core"),
+        honest: devMode_sapportaSourcePackageLinkSpec(
+          devModePackageRoot,
+          "honest",
+        ),
         ui: devMode_sapportaSourcePackageLinkSpec(devModePackageRoot, "ui"),
         grid: devMode_sapportaSourcePackageLinkSpec(devModePackageRoot, "grid"),
         frontend: devMode_sapportaSourcePackageLinkSpec(
@@ -244,8 +310,24 @@ function resolveScaffoldPackages(
           devModePackageRoot,
           "shared",
         ),
-        hono: exactVersionSpec(hono),
-        honoNodeServer: exactVersionSpec(honoNodeServer),
+        betterSqlite3: coreInstalled("better-sqlite3"),
+        drizzle: coreInstalled("drizzle-orm"),
+        hono: coreInstalled("hono"),
+        honoNodeServer: coreInstalled("@hono/node-server"),
+        restCore: coreInstalled("@sapporta/rest-core"),
+        temporal: sharedInstalled("@js-temporal/polyfill"),
+        zod: coreInstalled("zod"),
+        react: frontendInstalled("react"),
+        reactDom: frontendInstalled("react-dom"),
+        reactRouter: frontendInstalled("react-router-dom"),
+        lucideReact: frontendSpec("lucide-react"),
+        vite: frontendSpec("vite"),
+        viteReact: frontendSpec("@vitejs/plugin-react"),
+        tailwindVite: frontendSpec("@tailwindcss/vite"),
+        tailwind: frontendSpec("tailwindcss"),
+        typesReact: frontendSpec("@types/react"),
+        typesReactDom: frontendSpec("@types/react-dom"),
+        zustand: frontendInstalled("zustand"),
       },
       pnpmOverrides: {
         "@sapporta/honest": devMode_sapportaSourcePackageLinkSpec(
@@ -264,8 +346,8 @@ function resolveScaffoldPackages(
           devModePackageRoot,
           "grid",
         ),
-        hono: exactVersionSpec(hono),
-        "@hono/node-server": exactVersionSpec(honoNodeServer),
+        ...devIdentityOverrides,
+        "@hono/node-server": coreInstalled("@hono/node-server"),
       },
     };
   }
@@ -279,18 +361,18 @@ function resolveScaffoldPackages(
     import.meta.url,
     "@sapporta/server",
   );
-  const core = coreMetadata.packageJson as PackageJson & {
-    dependencies: Record<string, string>;
-  };
+  const core = coreMetadata.packageJson;
+  const honest = readVendoredSapportaPackage(initPaths, "@sapporta/honest");
   const ui = readVendoredSapportaPackage(initPaths, "@sapporta/ui");
   const grid = readVendoredSapportaPackage(initPaths, "@sapporta/grid");
   const frontend = readVendoredSapportaPackage(initPaths, "@sapporta/frontend");
   const shared = readVendoredSapportaPackage(
     initPaths,
     "@sapporta/shared",
-  ) as PackageJson & {
-    dependencies: Record<string, string>;
-  };
+  );
+  const coreSpec = declaredPackageSpecPicker(core);
+  const sharedSpec = declaredPackageSpecPicker(shared);
+  const frontendSpec = declaredPackageSpecPicker(frontend);
 
   // @sapporta packages used by the scaffold are pinned from vendored
   // package.json snapshots instead of dependency specifiers. Source-tree
@@ -299,18 +381,36 @@ function resolveScaffoldPackages(
   // independent of where the CLI is running from.
   return {
     core,
+    honest,
     ui,
     grid,
     frontend,
     shared,
     specs: {
       core: sapportaPackageSpec(core, "@sapporta/server"),
+      honest: sapportaPackageSpec(honest, "@sapporta/honest"),
       ui: sapportaPackageSpec(ui, "@sapporta/ui"),
       grid: sapportaPackageSpec(grid, "@sapporta/grid"),
       frontend: sapportaPackageSpec(frontend, "@sapporta/frontend"),
       shared: sapportaPackageSpec(shared, "@sapporta/shared"),
-      hono: requiredDependencySpec(core, "hono"),
-      honoNodeServer: requiredDependencySpec(core, "@hono/node-server"),
+      betterSqlite3: coreSpec("better-sqlite3"),
+      drizzle: coreSpec("drizzle-orm"),
+      hono: coreSpec("hono"),
+      honoNodeServer: coreSpec("@hono/node-server"),
+      restCore: coreSpec("@sapporta/rest-core"),
+      temporal: sharedSpec("@js-temporal/polyfill"),
+      zod: coreSpec("zod"),
+      react: frontendSpec("react"),
+      reactDom: frontendSpec("react-dom"),
+      reactRouter: frontendSpec("react-router-dom"),
+      lucideReact: frontendSpec("lucide-react"),
+      vite: frontendSpec("vite"),
+      viteReact: frontendSpec("@vitejs/plugin-react"),
+      tailwindVite: frontendSpec("@tailwindcss/vite"),
+      tailwind: frontendSpec("tailwindcss"),
+      typesReact: frontendSpec("@types/react"),
+      typesReactDom: frontendSpec("@types/react-dom"),
+      zustand: frontendSpec("zustand"),
     },
   };
 }
@@ -352,17 +452,28 @@ function sapportaPackageSpec(
   return `^${pkg.version}`;
 }
 
-function requiredDependencySpec(
-  pkg: PackageJson,
-  dependencyName: string,
-): string {
-  const spec = pkg.dependencies?.[dependencyName];
-  if (!spec) {
-    throw new Error(
-      `${pkg.name ?? "package"}'s package.json is missing "${dependencyName}" in dependencies — cannot pin scaffolded dependencies.`,
-    );
-  }
-  return spec;
+function declaredPackageSpecPicker(pkg: PackageJson): (packageName: string) => string {
+  const specs = {
+    ...(pkg.dependencies ?? {}),
+    ...(pkg.peerDependencies ?? {}),
+    ...(pkg.devDependencies ?? {}),
+  };
+  return (packageName) => {
+    const spec = specs[packageName];
+    if (!spec) {
+      throw new Error(
+        `${pkg.name ?? "package"}'s package.json is missing "${packageName}" in dependencies/peerDependencies/devDependencies — cannot pin scaffolded dependencies.`,
+      );
+    }
+    return spec;
+  };
+}
+
+function installedPackageSpecPicker(
+  fromPackageJsonPath: string,
+): (packageName: string) => string {
+  return (packageName) =>
+    exactVersionSpec(resolveInstalledPackage(fromPackageJsonPath, packageName));
 }
 
 function exactVersionSpec(pkg: PackageMetadata): string {
@@ -422,60 +533,33 @@ function buildTemplateReplacements(
   project: ScaffoldProject,
   packages: ScaffoldPackages,
 ): Record<string, string> {
-  const drizzleVersion = packages.core.dependencies["drizzle-orm"];
-  const zodVersion = packages.core.dependencies["zod"];
-  const sapportaRestCoreVersion =
-    packages.core.dependencies["@sapporta/rest-core"];
-  const temporalVersion = packages.shared.dependencies["@js-temporal/polyfill"];
-  if (!temporalVersion) {
-    throw new Error(
-      '@sapporta/shared\'s package.json is missing "@js-temporal/polyfill" in dependencies — cannot pin scaffolded Temporal dependency.',
-    );
-  }
-
-  // Peer-dep pins for the scaffolded frontend package. Sourced from the
-  // admin frontend package's own package.json so they can't drift — whatever
-  // version of react/vite/tailwind @sapporta/frontend was built against is what the scaffold
-  // writes. Some of these live in dependencies, some in devDependencies
-  // (e.g. @types/react); pickVersion() checks both in order.
-  const frontendDeps = {
-    ...(packages.frontend.dependencies ?? {}),
-    ...(packages.frontend.devDependencies ?? {}),
-  };
-  function pickVersion(name: string): string {
-    const v = frontendDeps[name];
-    if (!v) {
-      throw new Error(
-        `@sapporta/frontend's package.json is missing "${name}" in dependencies/devDependencies — cannot pin scaffolded frontend to a coherent version.`,
-      );
-    }
-    return v;
-  }
-
   return {
     __SLUG__: project.slug,
     __NAME__: project.name,
     __CORE_SPEC__: packages.specs.core,
+    __HONEST_SPEC__: packages.specs.honest,
     __UI_SPEC__: packages.specs.ui,
     __GRID_SPEC__: packages.specs.grid,
     __FRONTEND_SPEC__: packages.specs.frontend,
     __SHARED_SPEC__: packages.specs.shared,
     __HONO_SPEC__: packages.specs.hono,
     __HONO_NODE_SERVER_SPEC__: packages.specs.honoNodeServer,
-    __DRIZZLE_VERSION__: drizzleVersion,
-    __ZOD_VERSION__: zodVersion,
-    __SAPPORTA_REST_CORE_VERSION__: sapportaRestCoreVersion,
-    __TEMPORAL_VERSION__: temporalVersion,
-    __REACT_VERSION__: pickVersion("react"),
-    __REACT_DOM_VERSION__: pickVersion("react-dom"),
-    __REACT_ROUTER_VERSION__: pickVersion("react-router-dom"),
-    __LUCIDE_REACT_VERSION__: pickVersion("lucide-react"),
-    __VITE_VERSION__: pickVersion("vite"),
-    __VITE_REACT_VERSION__: pickVersion("@vitejs/plugin-react"),
-    __TAILWIND_VITE_VERSION__: pickVersion("@tailwindcss/vite"),
-    __TAILWIND_VERSION__: pickVersion("tailwindcss"),
-    __TYPES_REACT_VERSION__: pickVersion("@types/react"),
-    __TYPES_REACT_DOM_VERSION__: pickVersion("@types/react-dom"),
+    __BETTER_SQLITE3_VERSION__: packages.specs.betterSqlite3,
+    __DRIZZLE_VERSION__: packages.specs.drizzle,
+    __ZOD_VERSION__: packages.specs.zod,
+    __SAPPORTA_REST_CORE_VERSION__: packages.specs.restCore,
+    __TEMPORAL_VERSION__: packages.specs.temporal,
+    __REACT_VERSION__: packages.specs.react,
+    __REACT_DOM_VERSION__: packages.specs.reactDom,
+    __REACT_ROUTER_VERSION__: packages.specs.reactRouter,
+    __LUCIDE_REACT_VERSION__: packages.specs.lucideReact,
+    __VITE_VERSION__: packages.specs.vite,
+    __VITE_REACT_VERSION__: packages.specs.viteReact,
+    __TAILWIND_VITE_VERSION__: packages.specs.tailwindVite,
+    __TAILWIND_VERSION__: packages.specs.tailwind,
+    __TYPES_REACT_VERSION__: packages.specs.typesReact,
+    __TYPES_REACT_DOM_VERSION__: packages.specs.typesReactDom,
+    __ZUSTAND_VERSION__: packages.specs.zustand,
   };
 }
 

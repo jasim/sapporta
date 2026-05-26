@@ -3,6 +3,17 @@ import type { MiddlewareHandler } from "hono";
 
 const { combine, timestamp, printf, json } = winston.format;
 
+type LogFields = Record<string, unknown>;
+
+export type SapportaLogger = {
+  child(fields: LogFields): SapportaLogger;
+  debug(message: string, fields?: LogFields): void;
+  error(message: string, fields?: LogFields): void;
+  http(message: string, fields?: LogFields): void;
+  info(message: string, fields?: LogFields): void;
+  warn(message: string, fields?: LogFields): void;
+};
+
 /**
  * Human-readable format for development.
  *
@@ -23,7 +34,7 @@ const devFormat = printf(({ level, message, module, timestamp, ...rest }) => {
  * - `LOG_FORMAT` — `"json"` for structured JSON, anything else for human-readable (default)
  * - `LOG_LEVEL` — Winston level threshold. Default: `"debug"`
  */
-export function createLogger() {
+export function createLogger(): SapportaLogger {
   const isJson = process.env.LOG_FORMAT === "json";
   const level = process.env.LOG_LEVEL ?? "debug";
 
@@ -34,7 +45,7 @@ export function createLogger() {
       isJson ? json() : devFormat,
     ),
     transports: [new winston.transports.Console()],
-  });
+  }) as SapportaLogger;
 }
 
 /** Singleton logger instance. Modules use `logger.child({ module: "name" })`. */
