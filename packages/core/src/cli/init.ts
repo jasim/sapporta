@@ -7,6 +7,10 @@ import { ensureSapportaSkillInstalled } from "./init-project/sapporta-skill.js";
 
 const VALID_DIR_NAME = /^[a-zA-Z0-9_][a-zA-Z0-9._-]*$/;
 
+function progress(message: string): void {
+  console.error(message);
+}
+
 export async function init(args: string[]): Promise<OperationResult> {
   const projectName = args[0];
   if (!projectName) {
@@ -27,14 +31,17 @@ export async function init(args: string[]): Promise<OperationResult> {
 
   const { apiDir, dataDir, markerPath } = fromProjectRoot(projectDir);
 
+  progress(`Creating Sapporta project directory at ${projectDir}...`);
   mkdirSync(apiDir, { recursive: true });
   mkdirSync(dataDir, { recursive: true });
   if (!existsSync(markerPath)) {
+    progress("Writing sapporta.json project marker...");
     writeFileSync(markerPath, JSON.stringify({ name: projectName }, null, 2) + "\n");
   }
 
   try {
-    createProject({ dir: projectDir, name: projectName });
+    createProject({ dir: projectDir, name: projectName, progress });
+    progress("Installing Sapporta assistant skill...");
     const skillMessage = await ensureSapportaSkillInstalled(projectDir);
     return {
       ok: true,
@@ -51,6 +58,7 @@ export async function init(args: string[]): Promise<OperationResult> {
     };
   } catch (err: any) {
     if (err.message.startsWith("package.json already exists")) {
+      progress("Project files already exist; checking Sapporta assistant skill...");
       const skillMessage = await ensureSapportaSkillInstalled(projectDir);
       return {
         ok: true,
