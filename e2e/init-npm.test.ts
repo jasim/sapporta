@@ -1,12 +1,11 @@
 /**
- * End-to-end test for `sapporta init`.
+ * End-to-end test for the latest published `sapporta` CLI package.
  *
- * Exercises a real generated project: scaffold -> add schema -> install native
- * bindings -> production build -> boot server -> seed/read data through curl ->
- * serve the built frontend shell. Runs against a real temp directory with no
- * mocked Sapporta internals.
+ * Installs `sapporta` from npm into a temp parent directory, runs the installed
+ * bin from node_modules/.bin, then exercises the generated project with the
+ * same schema/build/server/curl assertions as the local source E2E.
  *
- * Run with: pnpm test:e2e
+ * Run with: pnpm test:e2e:npm
  */
 import { afterAll, beforeAll, describe, it } from "vitest";
 import {
@@ -16,7 +15,7 @@ import {
   cleanupProject,
   createTempProject,
   rebuildBetterSqlite,
-  scaffoldProject,
+  scaffoldProjectWithNpmCli,
   startBuiltServer,
   stopServer,
   writeTasksSchema,
@@ -24,22 +23,28 @@ import {
   type StartedServer,
 } from "./harness.js";
 
-describe("sapporta init - end-to-end", () => {
+const runNpm =
+  process.env.SAPPORTA_E2E_NPM === "1" ? describe : describe.skip;
+
+runNpm("sapporta init from latest npm package - end-to-end", () => {
   let project: E2eProject | undefined;
   let server: StartedServer | undefined;
 
   beforeAll(async () => {
     process.stderr.write(
-      "[e2e setup] scaffolding a full project on a real filesystem - expect ~90-150s\n",
+      "[e2e setup] installing latest npm sapporta and scaffolding a project - expect ~120-240s\n",
     );
 
-    project = createTempProject();
-    await scaffoldProject(project);
+    project = createTempProject({
+      devMode: false,
+      prefix: "sapporta-e2e-npm-",
+    });
+    await scaffoldProjectWithNpmCli(project);
     await rebuildBetterSqlite(project);
     writeTasksSchema(project.projectDir);
     await buildProject(project);
     server = await startBuiltServer(project);
-  }, 420_000);
+  }, 480_000);
 
   afterAll(() => {
     stopServer(server);
