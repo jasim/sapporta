@@ -1,5 +1,11 @@
 # @sapporta/ui
 
+## 0.2.3
+
+### Patch Changes
+
+- Update sapporta cli install
+
 ## 0.2.2
 
 ### Patch Changes

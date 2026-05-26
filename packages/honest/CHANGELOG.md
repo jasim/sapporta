@@ -1,5 +1,11 @@
 # @sapporta/honest
 
+## 0.3.2
+
+### Patch Changes
+
+- Update sapporta cli install
+
 ## 0.3.1
 
 ### Patch Changes
