@@ -21,6 +21,7 @@ const SAPPORTA_SOURCE_PACKAGES_DIR = "packages";
  * implementation only requires updating this one constant.
  */
 const TEMPLATES_DIR_FROM_INIT_PROJECT = ["..", "..", "templates"] as const;
+const DEPENDENCY_PACKAGE_SNAPSHOTS_DIR = "dependency-package-snapshots";
 
 /**
  * Absolute paths for assets shipped inside @sapporta/server's init-project
@@ -38,7 +39,12 @@ export function initProjectPackagePaths(
     templatesDir,
     templatePath: (filename: string) => join(templatesDir, filename),
     vendoredPackageJsonPath: (shortName: string) =>
-      join(templatesDir, `${shortName}-package.json`),
+      join(
+        templatesDir,
+        DEPENDENCY_PACKAGE_SNAPSHOTS_DIR,
+        shortName,
+        "package.json",
+      ),
   };
 }
 
