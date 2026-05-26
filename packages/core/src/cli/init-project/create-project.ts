@@ -97,6 +97,8 @@ const SCAFFOLD_FILES: Array<{ src: string; dest: string } | string> = [
   "packages/api/tsconfig.json",
   "package.json",
   "pnpm-workspace.yaml",
+  "Dockerfile",
+  ".dockerignore",
   "README.md",
   "DEPLOYMENT.md",
   { src: "gitignore", dest: ".gitignore" },

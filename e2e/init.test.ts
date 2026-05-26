@@ -9,7 +9,9 @@
  */
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import {
+  existsSync,
   mkdtempSync,
+  readFileSync,
   writeFileSync,
   mkdirSync,
   rmSync,
@@ -149,6 +151,17 @@ describe("sapporta init — end-to-end", () => {
         { cwd: parentDir, env, timeoutMs: 120_000 },
       ),
     );
+    expect(existsSync(join(projectDir, "Dockerfile"))).toBe(true);
+    expect(existsSync(join(projectDir, ".dockerignore"))).toBe(true);
+    expect(readFileSync(join(projectDir, "Dockerfile"), "utf-8")).toContain(
+      "CMD [\"node\", \"packages/api/dist/boot.js\"]",
+    );
+    const apiTsconfig = readFileSync(
+      join(projectDir, "packages", "api", "tsconfig.json"),
+      "utf-8",
+    );
+    expect(apiTsconfig).toContain('"test-project-shared": ["../shared/dist/index.d.ts"]');
+    expect(apiTsconfig).not.toContain("../shared/src/index.ts");
 
     // 2b. Ensure better-sqlite3 native bindings are built. pnpm's
     //     content-addressable store may reuse a cached package without

@@ -11,7 +11,7 @@
     "skipLibCheck": true,
     "baseUrl": ".",
     "paths": {
-      "__SLUG__-shared": ["../shared/dist/index.d.ts", "../shared/src/index.ts"]
+      "__SLUG__-shared": ["../shared/dist/index.d.ts"]
     }
   },
   "include": ["*.ts", "app", "schema", "reports"],

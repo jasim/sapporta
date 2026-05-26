@@ -3,9 +3,12 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "predev": "pnpm --filter __SLUG__-shared build",
     "dev": "tsc-watch --onFirstSuccess \"node --watch dist/boot.js\"",
+    "prebuild": "pnpm --filter __SLUG__-shared build",
     "build": "tsc",
     "start": "node dist/boot.js",
+    "pretypecheck": "pnpm --filter __SLUG__-shared build",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
