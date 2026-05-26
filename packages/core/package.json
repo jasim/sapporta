@@ -24,7 +24,9 @@
     "directory": "packages/core"
   },
   "homepage": "https://github.com/jasim/sapporta/tree/master/packages/core#readme",
-  "bugs": "https://github.com/jasim/sapporta/issues",
+  "bugs": {
+    "url": "https://github.com/jasim/sapporta/issues"
+  },
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "bin": {
@@ -36,7 +38,8 @@
     "package.json"
   ],
   "publishConfig": {
-    "access": "public"
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
   },
   "exports": {
     ".": {
