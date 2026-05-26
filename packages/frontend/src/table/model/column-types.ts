@@ -5,6 +5,7 @@ export type DisplayType =
   | "select"
   | "checkbox"
   | "date"
+  | "timestamp"
   | "number"
   | "currency"
   | "percentage"
@@ -24,7 +25,8 @@ export function inferDisplayType(col: ColumnSchema): DisplayType {
     if (col.displayFormat === "percentage") return "percentage";
     return "number";
   }
-  if (col.kind === "date" || col.kind === "timestamp") return "date";
+  if (col.kind === "date") return "date";
+  if (col.kind === "timestamp") return "timestamp";
   if (col.kind === "boolean") return "checkbox";
   return "text";
 }
@@ -41,6 +43,7 @@ const DEFAULT_WIDTHS: Partial<Record<DisplayType, number>> = {
   select: 14,
   checkbox: 5,
   date: 12,
+  timestamp: 18,
   number: 10,
   currency: 14,
   percentage: 10,

@@ -3,7 +3,11 @@ import {
   Temporal,
   canonicalizeInstantString,
   formatCanonicalInstant,
+  formatInstantForDateTimeLocalInput,
+  formatPlainDateForDateInput,
   parseCanonicalInstant,
+  parseDateInputToPlainDateString,
+  parseDateTimeLocalInputToCanonicalInstantString,
   parsePlainDate,
 } from "./temporal.js";
 
@@ -91,5 +95,41 @@ describe("formatCanonicalInstant — fixed-width UTC, no fractional seconds", ()
     // both to the same width.
     const canon = raw.map(canonicalizeInstantString).sort();
     expect(canon).toEqual(["2024-01-15T12:00:00Z", "2024-01-15T12:00:00Z"]);
+  });
+});
+
+describe("date input codecs", () => {
+  it("keeps date fields as canonical calendar dates", () => {
+    expect(formatPlainDateForDateInput("2024-01-15")).toBe("2024-01-15");
+    expect(parseDateInputToPlainDateString("2024-01-15")).toBe("2024-01-15");
+  });
+
+  it("does not reinterpret instants as date input values", () => {
+    expect(formatPlainDateForDateInput("2024-01-15T12:00:00Z")).toBe("");
+  });
+
+  it("clears empty date input values to null", () => {
+    expect(parseDateInputToPlainDateString("")).toBeNull();
+  });
+});
+
+describe("datetime-local input codecs", () => {
+  it("round-trips canonical instants through local datetime input values", () => {
+    const instant = "2024-01-15T12:34:56Z";
+    expect(
+      parseDateTimeLocalInputToCanonicalInstantString(
+        formatInstantForDateTimeLocalInput(instant),
+      ),
+    ).toBe(instant);
+  });
+
+  it("serializes datetime-local input back to canonical UTC whole seconds", () => {
+    const value =
+      parseDateTimeLocalInputToCanonicalInstantString("2024-01-15T12:34:56");
+    expect(value).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/);
+  });
+
+  it("clears empty datetime-local input values to null", () => {
+    expect(parseDateTimeLocalInputToCanonicalInstantString("")).toBeNull();
   });
 });

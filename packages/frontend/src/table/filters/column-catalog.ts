@@ -80,7 +80,7 @@ export function inferFilterColumnType(col: ColumnSchema): FilterColumnType {
   if (dt === "pk") return "number";
   if (dt === "select") return "enum";
   if (dt === "checkbox") return "boolean";
-  if (dt === "date") return "date";
+  if (dt === "date" || dt === "timestamp") return "date";
   if (dt === "number" || dt === "currency" || dt === "percentage") return "number";
   return "text";
 }

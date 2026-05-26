@@ -81,3 +81,57 @@ export function formatCanonicalInstant(i: Temporal.Instant): string {
 export function canonicalizeInstantString(s: string): string {
   return formatCanonicalInstant(parseCanonicalInstant(s));
 }
+
+/**
+ * Canonical date <-> browser date input codec.
+ *
+ * `<input type="date">` already speaks `YYYY-MM-DD`, so the only work here is
+ * strict Temporal validation before a value crosses into form state or onto the
+ * wire.
+ */
+export function formatPlainDateForDateInput(value: unknown): string {
+  if (typeof value !== "string" || value === "") return "";
+  try {
+    return formatPlainDate(parsePlainDate(value));
+  } catch {
+    return "";
+  }
+}
+
+export function parseDateInputToPlainDateString(value: string): string | null {
+  if (value === "") return null;
+  return formatPlainDate(parsePlainDate(value));
+}
+
+/**
+ * Canonical instant <-> browser datetime-local input codec.
+ *
+ * `datetime-local` is deliberately zone-less wall-clock text. Sapporta stores
+ * timestamps as instants, so callers must choose the local time zone at this
+ * boundary and immediately serialize back to canonical UTC.
+ */
+export function formatInstantForDateTimeLocalInput(value: unknown): string {
+  if (typeof value !== "string" || value === "") return "";
+  try {
+    return parseCanonicalInstant(value)
+      .toZonedDateTimeISO(Temporal.Now.timeZoneId())
+      .toPlainDateTime()
+      .toString({ smallestUnit: "second" });
+  } catch {
+    return "";
+  }
+}
+
+export function parseDateTimeLocalInputToCanonicalInstantString(
+  value: string,
+): string | null {
+  if (value === "") return null;
+  const localDateTime = Temporal.PlainDateTime.from(value, {
+    overflow: "reject",
+  });
+  return formatCanonicalInstant(
+    localDateTime
+      .toZonedDateTime(Temporal.Now.timeZoneId(), { disambiguation: "compatible" })
+      .toInstant(),
+  );
+}
