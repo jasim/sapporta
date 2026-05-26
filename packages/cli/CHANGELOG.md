@@ -1,5 +1,13 @@
 # sapporta
 
+## 0.2.3
+
+### Patch Changes
+
+- Create Dockerfile based deployment
+- Updated dependencies
+  - @sapporta/server@0.2.4
+
 ## 0.2.2
 
 ### Patch Changes
