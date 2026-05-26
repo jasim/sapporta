@@ -23,7 +23,7 @@
     "url": "git+https://github.com/jasim/sapporta.git",
     "directory": "packages/core"
   },
-  "homepage": "https://github.com/jasim/sapporta/tree/master/packages/core#readme",
+  "homepage": "https://github.com/jasim/sapporta/tree/main/packages/core#readme",
   "bugs": {
     "url": "https://github.com/jasim/sapporta/issues"
   },

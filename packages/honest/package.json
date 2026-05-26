@@ -21,7 +21,7 @@
     "url": "git+https://github.com/jasim/sapporta.git",
     "directory": "packages/honest"
   },
-  "homepage": "https://github.com/jasim/sapporta/tree/master/packages/honest#readme",
+  "homepage": "https://github.com/jasim/sapporta/tree/main/packages/honest#readme",
   "bugs": {
     "url": "https://github.com/jasim/sapporta/issues"
   },

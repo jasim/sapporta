@@ -18,7 +18,7 @@
     "url": "git+https://github.com/jasim/sapporta.git",
     "directory": "packages/shared"
   },
-  "homepage": "https://github.com/jasim/sapporta/tree/master/packages/shared#readme",
+  "homepage": "https://github.com/jasim/sapporta/tree/main/packages/shared#readme",
   "bugs": {
     "url": "https://github.com/jasim/sapporta/issues"
   },

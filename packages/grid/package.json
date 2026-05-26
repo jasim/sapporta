@@ -16,7 +16,7 @@
     "url": "git+https://github.com/jasim/sapporta.git",
     "directory": "packages/grid"
   },
-  "homepage": "https://github.com/jasim/sapporta/tree/master/packages/grid#readme",
+  "homepage": "https://github.com/jasim/sapporta/tree/main/packages/grid#readme",
   "bugs": {
     "url": "https://github.com/jasim/sapporta/issues"
   },
