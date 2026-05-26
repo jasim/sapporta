@@ -1,8 +1,9 @@
 # Dependency Package Snapshots
 
 These package directories contain vendored package.json snapshots of Sapporta
-library packages. `sapporta init` reads them to resolve scaffold dependency
-versions and peer dependency specs.
+packages. `sapporta init` reads the library snapshots to resolve scaffold
+dependency versions and peer dependency specs. The CLI reads the `cli` snapshot
+to report the canonical `sapporta` npm package version.
 
 They are refreshed by `pnpm vendor`. The core package's `pnpm build` and
 `pnpm build:watch` scripts run `pnpm vendor` first, so normal build/dev

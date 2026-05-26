@@ -16,7 +16,7 @@
     "rest",
     "api"
   ],
-  "author": "Jasim A Basheer <jasim@nuabase.com>",
+  "author": "Jasim A Basheer <jasim@protoship.io>",
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -85,7 +85,7 @@
     "./package.json": "./package.json"
   },
   "scripts": {
-    "vendor": "for p in ui grid frontend shared honest; do mkdir -p src/templates/dependency-package-snapshots/$p && cp ../$p/package.json src/templates/dependency-package-snapshots/$p/package.json; done",
+    "vendor": "for p in cli ui grid frontend shared honest; do mkdir -p src/templates/dependency-package-snapshots/$p && cp ../$p/package.json src/templates/dependency-package-snapshots/$p/package.json; done",
     "build": "pnpm vendor && rm -rf dist tsconfig.build.tsbuildinfo && tsc -p tsconfig.build.json && cp -R src/templates dist/templates",
     "build:watch": "pnpm vendor && rm -rf dist tsconfig.build.tsbuildinfo && mkdir -p dist && cp -R src/templates dist/templates && tsc -p tsconfig.build.json --watch --preserveWatchOutput",
     "typecheck": "tsc --noEmit && tsc --noEmit -p src/templates/tsconfig.json",

@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { Command } from "commander";
 import { check } from "./check.js";
 import { init } from "./init.js";
@@ -13,6 +15,39 @@ export { ROUTES } from "./routes.js";
 export type { CliRoute } from "./routes.js";
 export { buildRequest, renderResult } from "./request.js";
 export type { RequestSpec } from "./request.js";
+
+function readCliPackageVersion(): string {
+  const packageJsonPath = resolve(
+    import.meta.dirname,
+    "..",
+    "templates",
+    "dependency-package-snapshots",
+    "cli",
+    "package.json",
+  );
+  const parsedPackageJson = JSON.parse(
+    readFileSync(packageJsonPath, "utf-8"),
+  ) as unknown;
+
+  if (typeof parsedPackageJson !== "object" || parsedPackageJson === null) {
+    throw new Error(`${packageJsonPath} must contain a JSON object.`);
+  }
+
+  const packageJson = parsedPackageJson as Record<string, unknown>;
+  if (packageJson.name !== "sapporta") {
+    throw new Error(
+      `Expected vendored sapporta package metadata, got ${String(packageJson.name)}.`,
+    );
+  }
+  if (
+    typeof packageJson.version !== "string" ||
+    packageJson.version.length === 0
+  ) {
+    throw new Error(`${packageJsonPath} is missing a package version.`);
+  }
+
+  return packageJson.version;
+}
 
 /**
  * Emit an error and exit. In table mode, prints to stderr like before.
@@ -69,6 +104,11 @@ async function main() {
   const rawArgs = process.argv.slice(2);
   const firstArg = rawArgs[0];
 
+  if (firstArg === "-v" && rawArgs.length === 1) {
+    console.log(readCliPackageVersion());
+    return;
+  }
+
   // ── Local commands (no server needed) ────────────────────────────────
   // Intercepted before Commander runs — these handle their own flag parsing.
 
@@ -117,7 +157,7 @@ async function main() {
   // ── Commander program for API commands ──────────────────────────────
 
   const program = new Command("sapporta")
-    .version("0.1.0")
+    .version(readCliPackageVersion())
     // Declare global options so Commander doesn't confuse their values
     // with subcommand names
     .option("--output-format <format>", "Output format: table (default) or json")
