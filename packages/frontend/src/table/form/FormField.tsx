@@ -12,8 +12,10 @@ import { inferDisplayType } from "@/table/model/column-types";
 import type { ColumnSchema } from "@sapporta/shared/contracts";
 import type { KeyedValues } from "@/lookup/types";
 import {
-  parseCanonicalInstant,
-  parsePlainDate,
+  formatInstantForDateTimeLocalInput,
+  formatPlainDateForDateInput,
+  parseDateInputToPlainDateString,
+  parseDateTimeLocalInputToCanonicalInstantString,
 } from "@sapporta/shared/temporal";
 
 interface FormFieldProps {
@@ -72,9 +74,25 @@ export function FormField({
       {type === "date" && (
         <Input
           id={id}
+          type="date"
+          value={formatPlainDateForDateInput(value)}
+          onChange={(e) =>
+            onChange(parseDateInputToPlainDateString(e.target.value))
+          }
+        />
+      )}
+
+      {type === "timestamp" && (
+        <Input
+          id={id}
           type="datetime-local"
-          value={formatDateForInput(value)}
-          onChange={(e) => onChange(e.target.value || null)}
+          step="1"
+          value={formatInstantForDateTimeLocalInput(value)}
+          onChange={(e) =>
+            onChange(
+              parseDateTimeLocalInputToCanonicalInstantString(e.target.value),
+            )
+          }
         />
       )}
 
@@ -147,23 +165,4 @@ export function FormField({
         ))}
     </div>
   );
-}
-
-// Format a canonical date or timestamp string for an <input type="datetime-local">.
-// `datetime-local` wants `YYYY-MM-DDTHH:mm`. We parse through Temporal so an
-// invalid input surfaces as an empty field instead of a silent reinterpretation
-// — `new Date("2024-01-15")` would drop the value into local time, which is
-// exactly the trap DATA-TYPE-PRINCIPLES forbids.
-function formatDateForInput(value: unknown): string {
-  if (typeof value !== "string" || value === "") return "";
-  try {
-    return parseCanonicalInstant(value)
-      .toString({ smallestUnit: "minute" })
-      .slice(0, 16);
-  } catch {}
-  try {
-    return `${parsePlainDate(value).toString()}T00:00`;
-  } catch {
-    return "";
-  }
 }

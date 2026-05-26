@@ -97,7 +97,10 @@ function columnFor(
   const { tableName, column, immutable } = args;
   const displayType = inferDisplayType(column);
   const editable =
-    !immutable && displayType !== "pk" && displayType !== "date";
+    !immutable &&
+    displayType !== "pk" &&
+    displayType !== "date" &&
+    displayType !== "timestamp";
   const common = {
     id: column.name as ColId,
     name: column.header ?? column.name,
@@ -137,6 +140,7 @@ function columnFor(
     case "checkbox":
       return columnPreset.boolean(common);
     case "date":
+    case "timestamp":
       return columnPreset.date({
         ...common,
         editable: false,
