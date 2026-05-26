@@ -1,0 +1,13 @@
+.git
+.vite
+node_modules
+**/node_modules
+dist
+**/dist
+data
+*.log
+*.tsbuildinfo
+**/*.tsbuildinfo
+.env
+.env.local
+.env.*.local
