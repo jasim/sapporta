@@ -19,7 +19,9 @@
     "directory": "packages/shared"
   },
   "homepage": "https://github.com/jasim/sapporta/tree/master/packages/shared#readme",
-  "bugs": "https://github.com/jasim/sapporta/issues",
+  "bugs": {
+    "url": "https://github.com/jasim/sapporta/issues"
+  },
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "files": [
@@ -27,7 +29,8 @@
     "package.json"
   ],
   "publishConfig": {
-    "access": "public"
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
   },
   "exports": {
     ".": {

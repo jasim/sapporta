@@ -3,7 +3,12 @@
   "version": "0.2.1",
   "type": "module",
   "description": "Sapporta grid runtime, React grid components, column presets, and lookup cache primitives.",
-  "keywords": ["sapporta", "grid", "react", "typescript"],
+  "keywords": [
+    "sapporta",
+    "grid",
+    "react",
+    "typescript"
+  ],
   "author": "Jasim A Basheer <jasim@nuabase.com>",
   "license": "MIT",
   "repository": {
@@ -12,13 +17,20 @@
     "directory": "packages/grid"
   },
   "homepage": "https://github.com/jasim/sapporta/tree/master/packages/grid#readme",
-  "bugs": "https://github.com/jasim/sapporta/issues",
+  "bugs": {
+    "url": "https://github.com/jasim/sapporta/issues"
+  },
   "main": "./dist/index.js",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
-  "files": ["dist/", "src/", "package.json"],
+  "files": [
+    "dist/",
+    "src/",
+    "package.json"
+  ],
   "publishConfig": {
-    "access": "public"
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
   },
   "exports": {
     ".": {
@@ -44,7 +56,8 @@
     "build:watch": "vite build --watch",
     "typecheck": "tsc --noEmit",
     "typecheck:watch": "tsc --noEmit --watch --preserveWatchOutput",
-    "test": "vitest run"
+    "test": "vitest run",
+    "prepublishOnly": "pnpm build"
   },
   "dependencies": {
     "@sapporta/ui": "workspace:*",

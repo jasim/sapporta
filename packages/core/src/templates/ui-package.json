@@ -18,7 +18,9 @@
     "directory": "packages/ui"
   },
   "homepage": "https://github.com/jasim/sapporta/tree/master/packages/ui#readme",
-  "bugs": "https://github.com/jasim/sapporta/issues",
+  "bugs": {
+    "url": "https://github.com/jasim/sapporta/issues"
+  },
   "main": "./dist/index.js",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -28,7 +30,8 @@
     "package.json"
   ],
   "publishConfig": {
-    "access": "public"
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
   },
   "exports": {
     ".": {
@@ -43,7 +46,8 @@
     "build:watch": "vite build --watch",
     "typecheck:watch": "tsc --noEmit --watch --preserveWatchOutput",
     "preview": "vite preview",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "pnpm build"
   },
   "dependencies": {
     "@radix-ui/react-slot": "^1.2.3",
