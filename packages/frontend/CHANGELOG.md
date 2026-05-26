@@ -1,4 +1,4 @@
-# @sapporta/server
+# @sapporta/frontend
 
 ## 0.2.2
 
@@ -6,8 +6,6 @@
 
 - 3d53017: Extract sapporta grid into separate package
 - Updated dependencies [3d53017]
+  - @sapporta/grid@0.2.2
   - @sapporta/shared@0.1.2
-
-## 0.2.1
-
-Initial public release of `@sapporta/server` from the cleaned public repository history.
+  - @sapporta/ui@0.2.2
