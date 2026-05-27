@@ -173,11 +173,9 @@
 @theme inline {
   /* Fonts */
   --font-sans:
-    ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui,
+    ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
     sans-serif;
-  --font-mono:
-    "SFMono-Regular", "Cascadia Mono", "Liberation Mono", ui-monospace, Menlo,
-    monospace;
+  --font-mono: ui-monospace, monospace;
 
   /* Canonical tokens → utility classes */
   --color-sap-bg: var(--sap-bg);
@@ -304,12 +302,9 @@ body {
   box-sizing: border-box;
 }
 
-/* Monospace for tabular data. `tnum` lines up digit columns; `cv11` is
-   Geist Mono's single-storey alternate `a` — reads more code-like. */
+/* Monospace for tabular data. `tnum` lines up digit columns. */
 .mono,
 .font-mono {
   font-family: var(--font-mono);
-  font-feature-settings:
-    "tnum" 1,
-    "cv11" 1;
+  font-feature-settings: "tnum" 1;
 }

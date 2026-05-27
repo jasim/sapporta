@@ -433,6 +433,18 @@ export async function assertFrontendRoutes(baseUrl: string): Promise<void> {
   const tableRoute = await curlText(`${baseUrl}/tables/tasks`);
   expect(tableRoute).toContain('<div id="root">');
   expect(tableRoute).toContain("/assets/");
+
+  const assetPath = root.match(/\/assets\/[^"]+\.js/)?.[0];
+  if (!assetPath) {
+    expect.fail("Expected the built index.html to reference a JS asset");
+  }
+  const assetHeaders = await curlHeaders(`${baseUrl}${assetPath}`);
+  expect(assetHeaders).toContain(
+    "cache-control: public, max-age=31536000, immutable",
+  );
+
+  const rootHeaders = await curlHeaders(`${baseUrl}/`);
+  expect(rootHeaders).toContain("cache-control: no-cache");
 }
 
 export async function run(
@@ -512,6 +524,16 @@ export async function curlText(
     env: process.env,
     timeoutMs: 30_000,
   });
+}
+
+export async function curlHeaders(url: string): Promise<string> {
+  return (
+    await runText("curl", ["-fsSI", url], {
+      cwd: MONOREPO_ROOT,
+      env: process.env,
+      timeoutMs: 30_000,
+    })
+  ).toLowerCase();
 }
 
 async function waitForJson(url: string, timeoutMs = 30_000): Promise<void> {

@@ -96,11 +96,25 @@ server {
         proxy_set_header X-Forwarded-Proto $scheme;
     }
 
+    location /assets/ {
+        try_files $uri =404;
+        add_header Cache-Control "public, max-age=31536000, immutable";
+    }
+
+    location = /index.html {
+        add_header Cache-Control "no-cache";
+    }
+
     location / {
         try_files $uri /index.html;   # SPA fallback for deep links
+        add_header Cache-Control "no-cache";
     }
 }
 ```
+
+`/assets/*` is safe to cache immutably because Vite writes content hashes into
+asset filenames. `index.html` must revalidate because it points at the latest
+hashed JS and CSS files for the current deployment.
 
 - **Good for:** multi-site hosts, TLS via Let's Encrypt, HTTP/2, asset cache headers, gzip/brotli, standard ops hygiene.
 - **Trade-off:** extra config surface, but stock nginx carries over to any project.

@@ -63,6 +63,25 @@ mountOpenApi(app, sapporta, apiApp);
 // root is relative to process.cwd(); `|| "."` covers the corner case
 // where cwd is already inside packages/frontend/dist.
 const frontendDist = relative(process.cwd(), frontendDistDir) || ".";
+// Vite assets are content-hashed, so they can be cached for a year.
+app.use("/assets/*", async (c, next) => {
+  c.header("Cache-Control", "public, max-age=31536000, immutable");
+  await next();
+});
+app.use("/assets/*", serveStatic({ root: frontendDist }));
+
+// HTML must revalidate because it points at the latest asset hashes.
+app.get("/index.html", async (c, next) => {
+  c.header("Cache-Control", "no-cache");
+  await next();
+});
+app.get("/index.html", serveStatic({ root: frontendDist }));
+
+// Root files and SPA fallbacks stay fresh across deploys.
+app.use("/*", async (c, next) => {
+  c.header("Cache-Control", "no-cache");
+  await next();
+});
 app.use("/*", serveStatic({ root: frontendDist }));
 // GET-only - a stray POST to /wat must 404, not return index.html.
 app.get("/*", serveStatic({ root: frontendDist, path: "index.html" }));

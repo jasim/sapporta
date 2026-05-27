@@ -36,7 +36,16 @@ export default defineConfig({
       entry: {
         index: path.resolve(__dirname, "src/index.ts"),
         app: path.resolve(__dirname, "src/app/index.ts"),
-        layout: path.resolve(__dirname, "src/shell/components/SidebarShell.tsx"),
+        layout: path.resolve(
+          __dirname,
+          "src/shell/components/SidebarShell.tsx",
+        ),
+        "routes/table": path.resolve(__dirname, "src/routes/table.ts"),
+        "routes/new-record": path.resolve(
+          __dirname,
+          "src/routes/new-record.ts",
+        ),
+        "routes/report": path.resolve(__dirname, "src/routes/report.ts"),
       },
       formats: ["es"],
     },

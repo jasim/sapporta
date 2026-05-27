@@ -473,9 +473,7 @@
   color: var(--sap-fg-muted);
   display: block;
   font-family: var(--font-mono);
-  font-feature-settings:
-    "tnum" 1,
-    "cv11" 1;
+  font-feature-settings: "tnum" 1;
   font-size: var(--text-sap-data);
   overflow: hidden;
   text-align: right;

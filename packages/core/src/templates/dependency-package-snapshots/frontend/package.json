@@ -42,7 +42,19 @@
     },
     "./app": {
       "types": "./dist/app/index.d.ts",
-      "import": "./dist/app/index.js"
+      "import": "./dist/app.js"
+    },
+    "./routes/table": {
+      "types": "./dist/routes/table.d.ts",
+      "import": "./dist/routes/table.js"
+    },
+    "./routes/new-record": {
+      "types": "./dist/routes/new-record.d.ts",
+      "import": "./dist/routes/new-record.js"
+    },
+    "./routes/report": {
+      "types": "./dist/routes/report.d.ts",
+      "import": "./dist/routes/report.js"
     },
     "./layout": {
       "types": "./dist/shell/components/SidebarShell.d.ts",

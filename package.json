@@ -11,6 +11,7 @@
     "check:peer-compat:lock": "node scripts/check-peer-compat.mjs lock",
     "check:peer-compat:min": "node scripts/check-peer-compat.mjs minimum",
     "check:peer-compat:latest": "node scripts/check-peer-compat.mjs latest-in-range",
+    "check:scaffold-bundle": "node scripts/scaffold-bundle-report.mjs",
     "typecheck": "tsc --build",
     "pretest": "tsc -p packages/core/tsconfig.fixtures.json",
     "test": "vitest run",

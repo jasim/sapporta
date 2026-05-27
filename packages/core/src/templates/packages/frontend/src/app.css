@@ -9,8 +9,8 @@
 
    Sapporta ships its CSS as raw theme data (no `@import "tailwindcss"`
    inside), so your Tailwind pipeline is the only one in play. That means
-   you can redeclare any token (`--bg`, `--font-sans`, …) or drop in your
-   own `@theme` block below and it will win without fighting the library. */
+   you can redeclare tokens or drop in your own `@theme` block below and it
+   will win without fighting the library. */
 
 /* CSS modules are supported by Vite. If a module needs Tailwind `@apply`
    or Sapporta theme utilities, add `@reference` with a relative path to
