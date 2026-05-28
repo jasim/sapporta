@@ -46,42 +46,15 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
     },
-    "./table": {
-      "types": "./dist/schema/table.d.ts",
-      "import": "./dist/schema/table.js"
-    },
-    "./report": {
-      "types": "./dist/reports/report.d.ts",
-      "import": "./dist/reports/report.js"
-    },
-    "./errors": {
-      "types": "./dist/db/errors.d.ts",
-      "import": "./dist/db/errors.js"
-    },
-    "./create-project": {
-      "types": "./dist/create-project.d.ts",
-      "import": "./dist/create-project.js"
-    },
-    "./cli": {
-      "types": "./dist/cli/index.d.ts",
-      "import": "./dist/cli/index.js"
-    },
-    "./cli/routes": {
-      "types": "./dist/cli/routes.d.ts",
-      "import": "./dist/cli/routes.js"
-    },
-    "./cli/http-client": {
-      "types": "./dist/cli/http-client.d.ts",
-      "import": "./dist/cli/http-client.js"
-    },
-    "./cli/request": {
-      "types": "./dist/cli/request.d.ts",
-      "import": "./dist/cli/request.js"
-    },
-    "./cli/format": {
-      "types": "./dist/cli/format.d.ts",
-      "import": "./dist/cli/format.js"
-    },
+    "./table": "./dist/schema/table.js",
+    "./report": "./dist/reports/report.js",
+    "./errors": "./dist/db/errors.js",
+    "./create-project": "./dist/create-project.js",
+    "./cli": "./dist/cli/index.js",
+    "./cli/routes": "./dist/cli/routes.js",
+    "./cli/http-client": "./dist/cli/http-client.js",
+    "./cli/request": "./dist/cli/request.js",
+    "./cli/format": "./dist/cli/format.js",
     "./package.json": "./package.json"
   },
   "scripts": {

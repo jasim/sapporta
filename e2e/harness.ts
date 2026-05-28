@@ -3,6 +3,7 @@ import {
   existsSync,
   mkdirSync,
   mkdtempSync,
+  readdirSync,
   readFileSync,
   rmSync,
   writeFileSync,
@@ -79,6 +80,10 @@ type RowBody = {
 
 type RowsBody = {
   data: TaskRow[];
+};
+
+type SqliteTableColumn = {
+  name: string;
 };
 
 type PackageJson = {
@@ -252,6 +257,38 @@ export function writeTasksSchema(projectDir: string): void {
   );
 }
 
+export function writeProjectsSchema(projectDir: string): void {
+  mkdirSync(join(projectDir, "packages", "api", "schema"), { recursive: true });
+  writeFileSync(
+    join(projectDir, "packages", "api", "schema", "projects.ts"),
+    [
+      'import { table, timestamp } from "@sapporta/server/table";',
+      'import { sqliteTable, text, integer } from "drizzle-orm/sqlite-core";',
+      "",
+      'export const projectsTable = sqliteTable("projects", {',
+      '  id: integer("id").primaryKey({ autoIncrement: true }),',
+      '  name: text("name").notNull(),',
+      '  status: text("status").notNull(),',
+      '  created_at: timestamp("created_at"),',
+      '  updated_at: timestamp("updated_at"),',
+      "});",
+      "",
+      "export const projects = table({",
+      "  drizzle: projectsTable,",
+      "  meta: {",
+      '    label: "Projects",',
+      "    selects: [",
+      '      { type: "select", column: "status", options: ["active", "paused", "done"] },',
+      "    ],",
+      "  },",
+      "});",
+      "",
+      "export default projects;",
+      "",
+    ].join("\n"),
+  );
+}
+
 export async function rebuildBetterSqlite(project: E2eProject): Promise<void> {
   await step("pnpm rebuild better-sqlite3", () =>
     run("pnpm", ["rebuild", "better-sqlite3"], {
@@ -263,26 +300,106 @@ export async function rebuildBetterSqlite(project: E2eProject): Promise<void> {
 }
 
 export async function buildProject(project: E2eProject): Promise<void> {
-  await step("generate Drizzle migration", () =>
-    run("pnpm", ["--filter", "./packages/api", "db:generate", "--name", "init"], {
-      cwd: project.projectDir,
-      env: project.env,
-      timeoutMs: 60_000,
-    }),
-  );
-  await step("run Drizzle migration", () =>
+  await runDrizzleMigrationCycle(project, "init");
+  await buildGeneratedProject(project);
+}
+
+export async function runDrizzleMigrationCycle(
+  project: E2eProject,
+  name: string,
+): Promise<void> {
+  await step(`generate Drizzle migration (${name})`, async () => {
+    const before = listMigrationSqlFiles(project.projectDir);
+    const output = await runText(
+      "pnpm",
+      ["--filter", "./packages/api", "db:generate", "--name", name],
+      {
+        cwd: project.projectDir,
+        env: project.env,
+        timeoutMs: 60_000,
+      },
+    );
+    const after = listMigrationSqlFiles(project.projectDir);
+    expect(output).not.toContain("Error [");
+    expect(
+      after.length,
+      [
+        `Expected db:generate --name ${name} to create a SQL migration file.`,
+        "Output:",
+        output,
+      ].join("\n"),
+    ).toBeGreaterThan(before.length);
+  });
+  await step(`run Drizzle migration (${name})`, () =>
     run("pnpm", ["--filter", "./packages/api", "db:migrate"], {
       cwd: project.projectDir,
       env: project.env,
       timeoutMs: 60_000,
     }),
   );
+}
+
+function listMigrationSqlFiles(projectDir: string): string[] {
+  const migrationsDir = join(projectDir, "packages", "api", "migrations");
+  if (!existsSync(migrationsDir)) {
+    return [];
+  }
+  return readdirSync(migrationsDir).filter((entry) => entry.endsWith(".sql"));
+}
+
+export async function buildGeneratedProject(
+  project: E2eProject,
+): Promise<void> {
   await step("pnpm build (shared + api + frontend)", () =>
     run("pnpm", ["build"], {
       cwd: project.projectDir,
       env: project.env,
       timeoutMs: 120_000,
     }),
+  );
+}
+
+export async function assertSqliteTable(
+  project: E2eProject,
+  tableName: string,
+  expectedColumns: string[],
+): Promise<void> {
+  const databasePath = join(project.projectDir, "data", "sqlite.db");
+  const queryScript = [
+    'import Database from "better-sqlite3";',
+    `const db = new Database(${JSON.stringify(databasePath)}, { readonly: true });`,
+    `const tableName = ${JSON.stringify(tableName)};`,
+    'const table = db.prepare("SELECT name FROM sqlite_master WHERE type = ? AND name = ?").get("table", tableName);',
+    'const columns = db.prepare("SELECT name FROM pragma_table_info(?)").all(tableName);',
+    "db.close();",
+    "console.log(JSON.stringify({ exists: Boolean(table), columns }));",
+  ].join("\n");
+  const output = await runText(
+    "pnpm",
+    [
+      "--filter",
+      "./packages/api",
+      "exec",
+      "node",
+      "--input-type=module",
+      "-e",
+      queryScript,
+    ],
+    {
+      cwd: project.projectDir,
+      env: project.env,
+      timeoutMs: 30_000,
+    },
+  );
+  const result = JSON.parse(output) as {
+    exists: boolean;
+    columns: SqliteTableColumn[];
+  };
+  expect(result.exists, `Expected SQLite table ${tableName} to exist`).toBe(
+    true,
+  );
+  expect(result.columns.map((column) => column.name)).toEqual(
+    expect.arrayContaining(expectedColumns),
   );
 }
 

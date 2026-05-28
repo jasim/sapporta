@@ -43,8 +43,8 @@ describe("project scaffold migration conventions", () => {
       "utf-8",
     );
 
-    expect(config).toContain('schema: join(apiDir, "schema/**/*.ts")');
-    expect(config).toContain('out: join(apiDir, "migrations")');
+    expect(config).toContain('schema: "./schema/**/*.ts"');
+    expect(config).toContain('out: "./migrations"');
     expect(config).not.toContain("migrations:");
   });
 });

@@ -4,12 +4,11 @@ import { dirname, join } from "node:path";
 
 const projectRoot = findProjectRoot(process.cwd());
 const databasePath = join(projectRoot, "data", "sqlite.db");
-const apiDir = join(projectRoot, "packages", "api");
 
 export default defineConfig({
   dialect: "sqlite",
-  schema: join(apiDir, "schema/**/*.ts"),
-  out: join(apiDir, "migrations"),
+  schema: "./schema/**/*.ts",
+  out: "./migrations",
   dbCredentials: {
     url: databasePath,
   },
