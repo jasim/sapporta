@@ -14,6 +14,7 @@ import {
   createTempProject,
   prepareDockerReleaseProject,
   rebuildBetterSqlite,
+  runDrizzleMigrationCycle,
   scaffoldProject,
   writeTasksSchema,
   type E2eProject,
@@ -34,8 +35,14 @@ runDocker("sapporta init - Docker release", () => {
     await scaffoldProject(createdProject);
     await rebuildBetterSqlite(createdProject);
     writeTasksSchema(createdProject.projectDir);
+    // The Docker image applies migrations at boot, so the generated project
+    // must contain reviewed Drizzle SQL before the image is built.
+    await runDrizzleMigrationCycle(createdProject, "init");
     await prepareDockerReleaseProject(createdProject);
-    dockerProject = await buildAndRunDockerProject(createdProject, "sapporta-e2e");
+    dockerProject = await buildAndRunDockerProject(
+      createdProject,
+      "sapporta-e2e",
+    );
   }, 600_000);
 
   afterAll(async () => {

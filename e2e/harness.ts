@@ -1,5 +1,6 @@
 import { spawn, type ChildProcess } from "node:child_process";
 import {
+  copyFileSync,
   existsSync,
   mkdirSync,
   mkdtempSync,
@@ -406,15 +407,18 @@ export async function assertSqliteTable(
 export async function prepareDockerReleaseProject(
   project: E2eProject,
 ): Promise<void> {
-  const specs = sapportaPackageVersionSpecs();
-  rewritePackageJson(join(project.projectDir, "package.json"), specs);
+  // Exercise release-style installs without mixing current templates with
+  // already-published Sapporta packages from npm.
+  const specs = await packSapportaPackagesForProject(project);
+  makeDockerfileCopyPackedSapportaPackages(project.projectDir);
+  rewritePackageJson(join(project.projectDir, "package.json"), specs.root);
   rewritePackageJson(
     join(project.projectDir, "packages", "api", "package.json"),
-    specs,
+    specs.workspacePackage,
   );
   rewritePackageJson(
     join(project.projectDir, "packages", "frontend", "package.json"),
-    specs,
+    specs.workspacePackage,
   );
 
   await step("pnpm install after Docker release dependency rewrite", () =>
@@ -424,6 +428,202 @@ export async function prepareDockerReleaseProject(
       timeoutMs: 120_000,
     }),
   );
+}
+
+type PackedSapportaSpecs = {
+  root: Record<string, string>;
+  workspacePackage: Record<string, string>;
+};
+
+async function packSapportaPackagesForProject(
+  project: E2eProject,
+): Promise<PackedSapportaSpecs> {
+  // Pack every local Sapporta package into the generated project so Docker
+  // installs artifacts from this checkout, not stale registry versions.
+  const tempPackDir = mkdtempSync(join(tmpdir(), "sapporta-e2e-pack-"));
+  const projectPackDir = join(project.projectDir, ".sapporta-packages");
+  mkdirSync(projectPackDir, { recursive: true });
+
+  const entries: Array<readonly [string, string]> = [];
+  for (const packageName of Object.keys(SAPPORTA_PACKAGE_DIRS)) {
+    const before = new Set(readdirSync(tempPackDir));
+    await step(`pack ${packageName}`, () =>
+      run(
+        "pnpm",
+        ["--filter", packageName, "pack", "--pack-destination", tempPackDir],
+        {
+          cwd: MONOREPO_ROOT,
+          env: project.env,
+          timeoutMs: 60_000,
+        },
+      ),
+    );
+    const created = readdirSync(tempPackDir).filter(
+      (entry) => entry.endsWith(".tgz") && !before.has(entry),
+    );
+    if (created.length !== 1) {
+      throw new Error(
+        `Expected pnpm pack for ${packageName} to create one tarball, got ${created.length}`,
+      );
+    }
+    const tarball = created[0]!;
+    copyFileSync(join(tempPackDir, tarball), join(projectPackDir, tarball));
+    entries.push([packageName, tarball]);
+  }
+
+  rmSync(tempPackDir, { recursive: true, force: true });
+
+  return {
+    root: Object.fromEntries(
+      entries.map(([packageName, tarball]) => [
+        packageName,
+        `file:.sapporta-packages/${tarball}`,
+      ]),
+    ),
+    workspacePackage: Object.fromEntries(
+      entries.map(([packageName, tarball]) => [
+        packageName,
+        `file:../../.sapporta-packages/${tarball}`,
+      ]),
+    ),
+  };
+}
+
+function makeDockerfileCopyPackedSapportaPackages(projectDir: string): void {
+  // Local-source Docker E2E is a release-candidate test: it scaffolds from this
+  // checkout, then installs packed tarballs from this checkout inside Docker.
+  // The shipped Dockerfile normally installs from package manifests before it
+  // copies the full source tree, so those tarballs are not visible unless this
+  // test patches the generated Dockerfile.
+  //
+  // The patch is test-only and deliberately anchored to exact Dockerfile lines:
+  // if the template changes, fail here with context instead of silently building
+  // an image that falls back to registry packages or misses runtime files.
+  const dockerfilePath = join(projectDir, "Dockerfile");
+  let dockerfile = readFileSync(dockerfilePath, "utf-8");
+  const installStageManifestCopy =
+    "COPY packages/shared/package.json packages/shared/package.json\n";
+  const installStageManifestCopyWithTarballs =
+    installStageManifestCopy + "COPY .sapporta-packages .sapporta-packages\n";
+  const runtimeProjectFilesCopy =
+    "COPY --chown=node:node sapporta.json package.json pnpm-workspace.yaml ./\n";
+  const runtimeProjectFilesCopyWithTarballs =
+    runtimeProjectFilesCopy +
+    "COPY --chown=node:node .sapporta-packages ./.sapporta-packages\n";
+  const runtimeApiPackageCopy =
+    "COPY --from=build --chown=node:node /app/packages/api/package.json ./packages/api/package.json\n";
+  const runtimeApiPackageCopyWithDrizzleConfig =
+    runtimeApiPackageCopy +
+    "COPY --from=build --chown=node:node /app/packages/api/drizzle.config.ts ./packages/api/drizzle.config.ts\n";
+  const defaultRuntimeCommand =
+    'CMD ["sh", "-c", "pnpm --filter ./packages/api db:migrate && node packages/api/dist/boot.js"]';
+
+  // Avoid runtime `pnpm --filter`: with file: tarballs it may reinstall in a
+  // non-TTY container. The package-local bin uses the installed artifact.
+  const packedArtifactRuntimeCommand =
+    'CMD ["sh", "-c", "cd packages/api && ./node_modules/.bin/drizzle-kit migrate && node dist/boot.js"]';
+
+  dockerfile = replaceAllRequired(
+    dockerfile,
+    installStageManifestCopy,
+    installStageManifestCopyWithTarballs,
+    {
+      label: "install-stage package manifest copy",
+      expectedCount: 2,
+      dockerfilePath,
+    },
+  );
+  dockerfile = replaceRequired(
+    dockerfile,
+    runtimeProjectFilesCopy,
+    runtimeProjectFilesCopyWithTarballs,
+    {
+      label: "runtime project metadata copy",
+      dockerfilePath,
+    },
+  );
+  dockerfile = replaceRequired(
+    dockerfile,
+    runtimeApiPackageCopy,
+    runtimeApiPackageCopyWithDrizzleConfig,
+    {
+      label: "runtime API package copy",
+      dockerfilePath,
+    },
+  );
+  dockerfile = replaceRequired(
+    dockerfile,
+    defaultRuntimeCommand,
+    packedArtifactRuntimeCommand,
+    {
+      label: "runtime command",
+      dockerfilePath,
+    },
+  );
+
+  writeFileSync(dockerfilePath, dockerfile);
+}
+
+type DockerfileReplacementContext = {
+  label: string;
+  dockerfilePath: string;
+  expectedCount?: number;
+};
+
+function replaceRequired(
+  text: string,
+  marker: string,
+  replacement: string,
+  context: DockerfileReplacementContext,
+): string {
+  return replaceAllRequired(text, marker, replacement, {
+    ...context,
+    expectedCount: 1,
+  });
+}
+
+function replaceAllRequired(
+  text: string,
+  marker: string,
+  replacement: string,
+  context: DockerfileReplacementContext,
+): string {
+  const count = countOccurrences(text, marker);
+  if (count === 0) {
+    throw new Error(
+      [
+        `Could not patch generated Dockerfile: missing ${context.label}.`,
+        `Dockerfile: ${context.dockerfilePath}`,
+        "Expected exact marker:",
+        marker.trimEnd(),
+      ].join("\n"),
+    );
+  }
+  if (context.expectedCount !== undefined && count !== context.expectedCount) {
+    throw new Error(
+      [
+        `Could not patch generated Dockerfile: ${context.label} count changed.`,
+        `Dockerfile: ${context.dockerfilePath}`,
+        `Expected ${context.expectedCount}, found ${count}.`,
+        "Marker:",
+        marker.trimEnd(),
+      ].join("\n"),
+    );
+  }
+  return text.replaceAll(marker, replacement);
+}
+
+function countOccurrences(text: string, needle: string): number {
+  let count = 0;
+  let index = 0;
+  while (true) {
+    index = text.indexOf(needle, index);
+    if (index === -1) {
+      return count;
+    }
+    count += 1;
+    index += needle.length;
+  }
 }
 
 export async function startBuiltServer(
@@ -713,20 +913,6 @@ async function waitForDockerServer(baseUrl: string): Promise<void> {
   expect.fail(`Docker server at ${baseUrl} did not become ready`);
 }
 
-function sapportaPackageVersionSpecs(): Record<string, string> {
-  return Object.fromEntries(
-    Object.entries(SAPPORTA_PACKAGE_DIRS).map(([packageName, packageDir]) => {
-      const packageJson = readPackageJson(
-        join(MONOREPO_ROOT, "packages", packageDir, "package.json"),
-      );
-      if (!packageJson.version) {
-        throw new Error(`${packageName} is missing a package.json version`);
-      }
-      return [packageName, `^${packageJson.version}`];
-    }),
-  );
-}
-
 function rewritePackageJson(
   packageJsonPath: string,
   sapportaSpecs: Record<string, string>,
@@ -736,8 +922,8 @@ function rewritePackageJson(
   rewriteDependencySet(packageJson.devDependencies, sapportaSpecs);
 
   if (packageJson.pnpm?.overrides) {
-    for (const packageName of Object.keys(sapportaSpecs)) {
-      delete packageJson.pnpm.overrides[packageName];
+    for (const [packageName, spec] of Object.entries(sapportaSpecs)) {
+      packageJson.pnpm.overrides[packageName] = spec;
     }
   }
 
