@@ -15,7 +15,6 @@ import {
   getTableRoute,
   listTablesRoute,
   projectInfoRoute,
-  schemaSyncRoute,
   sqlRoute,
   tableIndexesRoute,
   tableSampleRoute,
@@ -28,7 +27,6 @@ export interface MetaHandlers<E extends Env> {
   tableIndexes: RouteHandler<typeof tableIndexesRoute, E>;
   tableSample: RouteHandler<typeof tableSampleRoute, E>;
   sql: RouteHandler<typeof sqlRoute, E>;
-  schemaSync: RouteHandler<typeof schemaSyncRoute, E>;
 }
 
 export function mountMeta<E extends Env, DocCtx>(
@@ -47,7 +45,6 @@ export function mountMeta<E extends Env, DocCtx>(
 
   api.register("metaListTables", listTablesRoute, handlers.listTables);
   api.register("metaSql", sqlRoute, handlers.sql);
-  api.register("metaSchemaSync", schemaSyncRoute, handlers.schemaSync);
 
   return api;
 }

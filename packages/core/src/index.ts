@@ -18,8 +18,8 @@ export type {
 export { loadSchemas } from "./schema/loader.js";
 export type { SchemaLoadResult } from "./schema/loader.js";
 
-// Schema diff / migration
-export { migrateSchemas } from "./schema/migrate.js";
+// Migration readiness
+export { assertMigrationsReady } from "./migrations/guard.js";
 
 // Validation
 export { buildZodSchema, validate } from "./data/validate.js";
@@ -75,7 +75,7 @@ export { executeReport } from "./reports/engine.js";
 export { loadReports } from "./reports/loader.js";
 
 // Framework boot for external projects that own their entry point.
-// loadSapporta() encapsulates schema loading, migration, and framework
+// loadSapporta() encapsulates schema loading, migration readiness, and framework
 // route mounting. mountOpenApi() is a separate, order-dependent step
 // that publishes /api/openapi.json once all routes are registered.
 export { loadSapporta, mountOpenApi } from "./load-sapporta.js";

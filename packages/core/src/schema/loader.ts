@@ -38,6 +38,7 @@ export async function loadSchemas(dir: string): Promise<SchemaLoadResult> {
     throw err;
   }
   const tables: TableDef[] = [];
+  const seen = new Set<TableDef>();
 
   for (const file of files) {
     if (!file.endsWith(".js")) continue;
@@ -48,7 +49,8 @@ export async function loadSchemas(dir: string): Promise<SchemaLoadResult> {
 
     for (const key of Object.keys(mod)) {
       const val = mod[key];
-      if (isTableDef(val)) {
+      if (isTableDef(val) && !seen.has(val)) {
+        seen.add(val);
         tables.push(val);
       }
       // No enum detection — SQLite enums are text({ enum }) columns,

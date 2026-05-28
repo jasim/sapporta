@@ -82,7 +82,6 @@ export {
   tableSampleRoute,
   tableIndexesRoute,
   sqlRoute,
-  schemaSyncRoute,
 } from "./meta-routes.js";
 
 export {

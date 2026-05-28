@@ -11,7 +11,6 @@ import {
   getTableRoute,
   listTablesRoute,
   projectInfoRoute,
-  schemaSyncRoute,
   sqlRoute,
   tableIndexesRoute,
   tableSampleRoute,
@@ -36,7 +35,6 @@ export const uiContract = c.router({
   tableSample: tableSampleRoute,
   tableIndexes: tableIndexesRoute,
   sql: sqlRoute,
-  schemaSync: schemaSyncRoute,
 
   listRows: listRowsRoute,
   getRow: getRowRoute,

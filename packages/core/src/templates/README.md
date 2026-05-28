@@ -7,6 +7,8 @@ A Sapporta project.
 - `pnpm dev` — start backend and frontend in watch mode
 - `pnpm build` — compile shared + backend (`tsc`) and bundle frontend (`vite build`)
 - `pnpm start` — run the production server (serves API and SPA on one port)
+- `pnpm --filter ./packages/api db:generate --name add_table` — generate Drizzle SQL migrations from schema changes
+- `pnpm --filter ./packages/api db:migrate` — apply pending Drizzle migrations
 
 ## Project layout
 
@@ -29,6 +31,17 @@ The starter `/api/hello` route shows the pattern. Each endpoint is a trio:
 Because both sides import the same contract, request and response types can never drift — change the contract once and both ends light up red until they match.
 
 Delete the `hello` trio (`packages/shared/src/contracts/hello.ts`, `packages/api/app/hello.ts`, `packages/frontend/src/api.ts` entry, sidebar/Welcome wiring) once your own routes take over.
+
+## Schema and migrations
+
+Schema files live in `packages/api/schema/`. Export both the raw Drizzle table object and the Sapporta wrapper:
+
+```ts
+export const accountsTable = sqliteTable("accounts", { ... });
+export const accounts = table({ drizzle: accountsTable, meta: { label: "Accounts" } });
+```
+
+Change schema, run Drizzle Kit generate, review SQL, run Drizzle Kit migrate, start server. The server checks migration readiness at boot but never applies migrations.
 
 ## Running multiple projects on one machine
 

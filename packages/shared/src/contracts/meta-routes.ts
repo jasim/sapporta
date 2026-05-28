@@ -97,15 +97,3 @@ export const sqlRoute = c.mutation({
     400: errorBodySchema,
   },
 });
-
-export const schemaSyncRoute = c.mutation({
-  method: "POST",
-  path: "/meta/schema/sync",
-  summary: "Reload file schemas and apply migrations",
-  metadata: { tags: ["meta"] },
-  body: c.noBody(),
-  responses: {
-    200: z.object({ ok: z.boolean(), tables: z.number() }),
-    400: errorBodySchema,
-  },
-});

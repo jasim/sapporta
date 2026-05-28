@@ -200,7 +200,9 @@ function assertScaffoldedProject(
     expect(existsSync(join(project.projectDir, ".dockerignore"))).toBe(true);
     expect(
       readFileSync(join(project.projectDir, "Dockerfile"), "utf-8"),
-    ).toContain('CMD ["node", "packages/api/dist/boot.js"]');
+    ).toContain(
+      'CMD ["sh", "-c", "pnpm --filter ./packages/api db:migrate && node packages/api/dist/boot.js"]',
+    );
     expect(
       readPackageJson(join(project.projectDir, "package.json")),
     ).toMatchObject({
@@ -225,15 +227,17 @@ export function writeTasksSchema(projectDir: string): void {
       'import { table, timestamp } from "@sapporta/server/table";',
       'import { sqliteTable, text, integer } from "drizzle-orm/sqlite-core";',
       "",
+      'export const tasksTable = sqliteTable("tasks", {',
+      '  id: integer("id").primaryKey({ autoIncrement: true }),',
+      '  title: text("title").notNull(),',
+      '  status: text("status").notNull(),',
+      '  priority: integer("priority").notNull(),',
+      '  created_at: timestamp("created_at"),',
+      '  updated_at: timestamp("updated_at"),',
+      "});",
+      "",
       "export const tasks = table({",
-      '  drizzle: sqliteTable("tasks", {',
-      '    id: integer("id").primaryKey({ autoIncrement: true }),',
-      '    title: text("title").notNull(),',
-      '    status: text("status").notNull(),',
-      '    priority: integer("priority").notNull(),',
-      '    created_at: timestamp("created_at"),',
-      '    updated_at: timestamp("updated_at"),',
-      "  }),",
+      "  drizzle: tasksTable,",
       "  meta: {",
       '    label: "Tasks",',
       "    selects: [",
@@ -259,6 +263,20 @@ export async function rebuildBetterSqlite(project: E2eProject): Promise<void> {
 }
 
 export async function buildProject(project: E2eProject): Promise<void> {
+  await step("generate Drizzle migration", () =>
+    run("pnpm", ["--filter", "./packages/api", "db:generate", "--name", "init"], {
+      cwd: project.projectDir,
+      env: project.env,
+      timeoutMs: 60_000,
+    }),
+  );
+  await step("run Drizzle migration", () =>
+    run("pnpm", ["--filter", "./packages/api", "db:migrate"], {
+      cwd: project.projectDir,
+      env: project.env,
+      timeoutMs: 60_000,
+    }),
+  );
   await step("pnpm build (shared + api + frontend)", () =>
     run("pnpm", ["build"], {
       cwd: project.projectDir,

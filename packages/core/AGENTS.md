@@ -16,7 +16,7 @@ sapporta init <name>  # Create a new Sapporta project in ./<name>/
 ## Principles
 
 ### Schema-as-Code
-Tables are defined as TypeScript files using Drizzle ORM + Sapporta's `table()` wrapper. Schema changes are applied by running `sapporta schema sync`, which uses Drizzle Kit's programmatic API. External projects must have their own `package.json` with dependencies installed (`sapporta init`) so that schema file imports resolve correctly.
+Tables are defined as TypeScript files using a top-level Drizzle `sqliteTable` export plus Sapporta's `table()` wrapper. Schema changes are applied with native Drizzle Kit: run `pnpm --filter ./packages/api db:generate --name <change>`, review the SQL in `packages/api/migrations/`, then run `pnpm --filter ./packages/api db:migrate`. The server never applies migrations at runtime.
 
 ### No Coercion
 Data is accepted as-is. Do not convert between types (e.g., no `"$95k"→9500`, no `"yes"→true`). Provide data in the exact type the column expects.

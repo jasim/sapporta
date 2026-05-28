@@ -1,12 +1,10 @@
 /**
  * Handler factory for the /meta namespace.
  *
- * Read-only introspection plus a SQL escape hatch and a schema-sync trigger
- * that reloads file schemas from disk and re-runs migrations.
+ * Read-only introspection plus a SQL escape hatch.
  */
 
 import type Database from "better-sqlite3";
-import type { BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
 import type { Context, Env } from "hono";
 import type { SchemaRegistry } from "../schema/registry.js";
 import { extractSchemas, extractSchema } from "../schema/extract.js";
@@ -14,9 +12,6 @@ import { dbRun } from "../introspect/run.js";
 import { dbIndexes } from "../introspect/indexes.js";
 import { dbSample } from "../introspect/sample.js";
 import { dbDescribeAll } from "../introspect/describe-all.js";
-import { loadSchemas } from "../schema/loader.js";
-import { migrateSchemas } from "../schema/migrate.js";
-import { fromApiCodeDir } from "../project-paths.js";
 import {
   OperationError,
   type OperationResult,
@@ -59,7 +54,6 @@ function withOperationError(
 export function makeMetaHandlers<E extends Env>(
   registry: SchemaRegistry,
   sqlite: Database.Database,
-  db: BetterSQLite3Database,
   project: { dir: string; slug: string },
 ): MetaHandlers<E> {
   return {
@@ -110,16 +104,5 @@ export function makeMetaHandlers<E extends Env>(
           dryRun: request.body.dryRun,
         }),
       ),
-
-    // ── Schema sync ──────────────────────────────────────────────────
-    schemaSync: async ({ c }) => {
-      const { schemaDir } = fromApiCodeDir(project.dir);
-      const { tables } = await loadSchemas(schemaDir);
-      for (const def of tables) {
-        registry.register(def);
-      }
-      await migrateSchemas(registry.all(), db, sqlite);
-      return c.json({ ok: true, tables: tables.length });
-    },
   };
 }

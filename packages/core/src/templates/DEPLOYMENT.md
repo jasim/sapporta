@@ -44,6 +44,7 @@ One Hono process serves `/api/*` and the built SPA on a single `PORT`; no proxy 
 
 ```bash
 pnpm build                 # tsc → packages/api/dist/, vite build → packages/frontend/dist/
+pnpm --filter ./packages/api db:migrate
 PORT=3000 pnpm start       # node packages/api/dist/boot.js
 ```
 

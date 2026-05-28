@@ -50,6 +50,7 @@ type ScaffoldPackages = {
     shared: string;
     betterSqlite3: string;
     drizzle: string;
+    drizzleKit: string;
     hono: string;
     honoNodeServer: string;
     restCore: string;
@@ -95,6 +96,7 @@ const DEV_MODE_IDENTITY_PACKAGES = [
 
 const SCAFFOLD_FILES: Array<{ src: string; dest: string } | string> = [
   "packages/api/boot.ts",
+  "packages/api/drizzle.config.ts",
   "packages/api/app.ts",
   "packages/api/app/hello.ts",
   "packages/api/package.json",
@@ -327,6 +329,7 @@ function resolveScaffoldPackages(
         ),
         betterSqlite3: coreInstalled("better-sqlite3"),
         drizzle: coreInstalled("drizzle-orm"),
+        drizzleKit: coreInstalled("drizzle-kit"),
         hono: coreInstalled("hono"),
         honoNodeServer: coreInstalled("@hono/node-server"),
         restCore: coreInstalled("@sapporta/rest-core"),
@@ -410,6 +413,7 @@ function resolveScaffoldPackages(
       shared: sapportaPackageSpec(shared, "@sapporta/shared"),
       betterSqlite3: coreSpec("better-sqlite3"),
       drizzle: coreSpec("drizzle-orm"),
+      drizzleKit: coreSpec("drizzle-kit"),
       hono: coreSpec("hono"),
       honoNodeServer: coreSpec("@hono/node-server"),
       restCore: coreSpec("@sapporta/rest-core"),
@@ -574,6 +578,7 @@ function buildTemplateReplacements(
     __HONO_NODE_SERVER_SPEC__: packages.specs.honoNodeServer,
     __BETTER_SQLITE3_VERSION__: packages.specs.betterSqlite3,
     __DRIZZLE_VERSION__: packages.specs.drizzle,
+    __DRIZZLE_KIT_VERSION__: packages.specs.drizzleKit,
     __ZOD_VERSION__: packages.specs.zod,
     __SAPPORTA_REST_CORE_VERSION__: packages.specs.restCore,
     __TEMPORAL_VERSION__: packages.specs.temporal,
@@ -595,6 +600,7 @@ function createScaffoldDirectories(project: ScaffoldProject): void {
   mkdirSync(project.apiDir, { recursive: true });
   mkdirSync(join(project.apiDir, "app"), { recursive: true });
   mkdirSync(join(project.apiDir, "schema"), { recursive: true });
+  mkdirSync(join(project.apiDir, "migrations"), { recursive: true });
   mkdirSync(join(project.apiDir, "reports"), { recursive: true });
   mkdirSync(join(project.frontendDir, "src"), { recursive: true });
   mkdirSync(join(project.sharedDir, "src", "contracts"), { recursive: true });

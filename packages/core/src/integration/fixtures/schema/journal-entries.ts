@@ -6,14 +6,16 @@ import { sqliteTable, text, integer } from "drizzle-orm/sqlite-core";
  * to keep the fixture simple — the FK is a logical relationship, not a DB constraint.
  * This matches many real-world Sapporta tables.
  */
+export const journalEntriesTable = sqliteTable("journal_entries", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  account_id: integer("account_id").notNull(),
+  description: text("description").notNull(),
+  amount: integer("amount").notNull(),
+  created_at: timestamp("created_at"),
+});
+
 export const journalEntries = table({
-  drizzle: sqliteTable("journal_entries", {
-    id: integer("id").primaryKey({ autoIncrement: true }),
-    account_id: integer("account_id").notNull(),
-    description: text("description").notNull(),
-    amount: integer("amount").notNull(),
-    created_at: timestamp("created_at"),
-  }),
+  drizzle: journalEntriesTable,
   meta: { label: "Journal Entries" },
 });
 

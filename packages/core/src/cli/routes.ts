@@ -211,17 +211,6 @@ export const ROUTES: CliRoute[] = [
     extractData: (res) => res.data ?? res ?? [],
   },
 
-  // ── Schema ────────────────────────────────────────────────────────────
-  {
-    pattern: ["schema", "sync"],
-    description: "Sync schema files to database",
-    method: "POST",
-    path: "/api/meta/schema/sync",
-    params: [],
-    mutating: true,
-    extractData: (res) => [res],
-  },
-
   // ── Database ──────────────────────────────────────────────────────────
   {
     pattern: ["db", "exec-sql"],

@@ -46,11 +46,11 @@ A Sapporta code project (created by `sapporta init`) has this structure:
   package.json          Dependencies (installed by sapporta init)
   data/
     sqlite.db           SQLite database
-  code/src/
+  packages/api/
     schema/             Table definitions (Drizzle + Sapporta wrapper)
-    actions/            Transactional operations
+    app/                App-owned API routes
     reports/            Report definitions
-    views/              Custom view definitions
+    migrations/         Drizzle SQL migrations
 ```
 
 ## CLI Commands
@@ -109,20 +109,36 @@ sapporta tables update <name> --data '{"name":"new_name"}'
 sapporta tables drop <name> --confirm true
 ```
 
-### Enum, Schema, and Database Commands
+### Enum and Database Commands
 
 ```bash
 # List enum definitions
 sapporta enums
-
-# Sync schema files to database
-sapporta schema sync
 
 # Run any SQL statement — reads return rows, writes report row counts
 sapporta db exec-sql "SELECT * FROM accounts"
 sapporta db exec-sql --input-body-json '{"sql": "SELECT * FROM accounts", "limit": 50}'
 sapporta db exec-sql --input-body-json '{"sql": "DELETE FROM accounts WHERE id = 5"}'
 ```
+
+### Schema Migrations
+
+Sapporta projects use native Drizzle Kit migrations directly:
+
+```bash
+pnpm --filter ./packages/api db:generate --name add_accounts
+pnpm --filter ./packages/api db:migrate
+pnpm --filter ./packages/api db:check
+```
+
+Each schema file should export the raw Drizzle table and the Sapporta wrapper:
+
+```ts
+export const accountsTable = sqliteTable("accounts", { ... });
+export const accounts = table({ drizzle: accountsTable, meta: { label: "Accounts" } });
+```
+
+Change schema, run Drizzle Kit generate, review SQL, run Drizzle Kit migrate, start server. The server only verifies migration readiness at boot.
 
 ### Row Commands (CRUD operations)
 
@@ -201,10 +217,8 @@ Each namespace has a distinct prefix — route ordering no longer matters.
 
 - **Schema introspection**: `GET /p/{slug}/api/meta/tables` — lists all tables with structure + UI metadata
 - **Single table schema**: `GET /p/{slug}/api/meta/tables/{name}` — one table's schema
-- **Schema mutations**: `POST/PATCH/DELETE /p/{slug}/api/meta/tables/...` — create/modify/drop UI-managed tables and columns
 - **DB introspection**: `GET /p/{slug}/api/meta/tables/{name}/indexes`, `.../api/meta/tables/{name}/sample`
 - **SQL proxy**: `POST /p/{slug}/api/meta/sql`
-- **Schema sync**: `POST /p/{slug}/api/meta/schema/sync`
 - **CRUD**: `GET/POST /p/{slug}/api/tables/{table}`, `GET/PUT/DELETE /p/{slug}/api/tables/{table}/{id}`
 - **Lookup**: `GET /p/{slug}/api/tables/{table}/_lookup`
 - **Reports**: `GET /p/{slug}/api/reports`, `GET /p/{slug}/api/reports/{name}/results?params`
@@ -215,8 +229,8 @@ Each namespace has a distinct prefix — route ordering no longer matters.
 
 - **Table definition**: `table()` in `src/schema/table.ts` wraps Drizzle `sqliteTable` with Sapporta metadata
 - **Schema loading**: `loadSchemas()` dynamically imports all `.ts` files from a schema directory
-- **Migrations**: `migrateSchemas()` uses `drizzle-kit/api` `pushSchema()` programmatically
-- **Meta API**: `meta-api.ts` is a thin composition layer that mounts schema introspection, DB introspection, schema mutations (from `metadata-api.ts`), SQL proxy, and schema sync
+- **Migrations**: native Drizzle Kit `generate` and `migrate`; Sapporta only checks readiness at boot
+- **Meta API**: `mount-meta.ts` mounts schema introspection, DB introspection, and the SQL proxy
 - **Tables API**: `tables-api.ts` — parametric `/:tableName` CRUD routing with runtime table registration
 - **Actions API**: `action-api.ts` — single parametric `/:name` route with Map lookup
 - **Enums**: SQLite has no native enum type. Use `text()` columns with `meta.selects` for dropdown/validation support.

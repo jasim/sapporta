@@ -33,9 +33,9 @@ const conn = connectProject(databasePath);
 // 2. Shared Hono app - framework and user routes mount onto it.
 const app = new Hono<SapportaEnv>();
 
-// 3. Framework: schemas, migrations, /api/meta + /api/tables + /api/reports.
+// 3. Framework: schemas, migration readiness, /api/meta + /api/tables + /api/reports.
 //    Order-agnostic relative to step 4.
-const sapporta = await loadSapporta(app, { slug: "__SLUG__", apiDistDir, conn });
+const sapporta = await loadSapporta(app, { slug: "__SLUG__", projectRoot, apiDistDir, conn });
 
 // 4. User routes. `loadApp()` registers project paths like "/bank";
 //    mounting apiApp under /api serves them at /api/bank.

@@ -2,7 +2,7 @@
  * Framework boot for projects that own their entry point.
  *
  * Two-step API:
- *   1. `loadSapporta(app, opts)` — middleware, schemas, migrations, and
+ *   1. `loadSapporta(app, opts)` — middleware, schemas, migration guard, and
  *      the framework REST API (/api/meta, /api/tables, /api/reports).
  *   2. `mountOpenApi(app, framework, ...userApis)` — publishes
  *      /api/openapi.json. Must run after every route is registered.
@@ -11,7 +11,7 @@
  * call time, so it has to come last; framework boot itself is order-
  * agnostic relative to user routes.
  *
- * To customize the framework slice (different migration strategy,
+ * To customize the framework slice (different migration readiness policy,
  * non-standard mount paths), inline `loadSapporta()` — every step it
  * runs is a public export of @sapporta/server.
  */
@@ -24,7 +24,7 @@ import type { TableDef } from "./schema/table.js";
 import { fromApiCodeDir } from "./project-paths.js";
 import { SchemaRegistry } from "./schema/registry.js";
 import { loadSchemas } from "./schema/loader.js";
-import { migrateSchemas } from "./schema/migrate.js";
+import { assertMigrationsReady } from "./migrations/guard.js";
 import { loadReports } from "./reports/loader.js";
 import {
   TsRestApi,
@@ -38,6 +38,8 @@ import {
 
 export interface LoadSapportaOptions {
   slug: string;
+  /** Absolute path to the project root containing sapporta.json. */
+  projectRoot: string;
   /**
    * Absolute path to the project's compiled `packages/api/dist/` (with
    * `schema/` and `reports/` subdirectories). Schemas and reports load from here at
@@ -82,7 +84,12 @@ export async function loadSapporta(
   const { tables } = await loadSchemas(dirs.schemaDir);
   for (const def of tables) registry.register(def);
 
-  await migrateSchemas(registry.all(), db, sqlite);
+  assertMigrationsReady({
+    projectRoot: opts.projectRoot,
+    apiDistDir,
+    sqlite,
+    tables: registry.all(),
+  });
 
   const reports = await loadReports(dirs.reportsDir, bustCache);
 
@@ -99,7 +106,7 @@ export async function loadSapporta(
   const api = new TsRestApi<SapportaEnv, FrameworkDocCtx>();
   mountMeta(
     api,
-    makeMetaHandlers(registry, sqlite, db, { dir: apiDistDir, slug }),
+    makeMetaHandlers(registry, sqlite, { dir: apiDistDir, slug }),
   );
   const tableResolver = {
     get: (name: string) => registry.get(name)?.def,

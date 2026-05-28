@@ -6,13 +6,15 @@ import { sqliteTable, text, integer } from "drizzle-orm/sqlite-core";
  * while POST still succeeds. The `immutable: true` flag is enforced by
  * the CRUD handlers in crud.ts (handleUpdate/handleDelete).
  */
+export const auditLogTable = sqliteTable("audit_log", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  event: text("event").notNull(),
+  detail: text("detail"),
+  created_at: timestamp("created_at"),
+});
+
 export const auditLog = table({
-  drizzle: sqliteTable("audit_log", {
-    id: integer("id").primaryKey({ autoIncrement: true }),
-    event: text("event").notNull(),
-    detail: text("detail"),
-    created_at: timestamp("created_at"),
-  }),
+  drizzle: auditLogTable,
   meta: { label: "Audit Log", immutable: true },
 });
 

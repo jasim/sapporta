@@ -95,14 +95,14 @@
     "@hono/node-server": "^1.14.1",
     "@sapporta/shared": "workspace:*",
     "commander": "^14.0.3",
-    "drizzle-kit": "^0.31.9",
+    "drizzle-kit": "^0.31.10",
     "winston": "^3.17.0"
   },
   "peerDependencies": {
     "@sapporta/honest": "^0.3.3",
     "@sapporta/rest-core": "3.52.2",
     "better-sqlite3": "^12.0.0",
-    "drizzle-orm": "^0.38.4",
+    "drizzle-orm": "^0.45.2",
     "hono": "^4.7.4",
     "zod": "^4.3.6"
   },
@@ -111,7 +111,7 @@
     "@sapporta/rest-core": "3.52.2",
     "@types/better-sqlite3": "^7.x",
     "better-sqlite3": "^12.0.0",
-    "drizzle-orm": "^0.38.4",
+    "drizzle-orm": "^0.45.2",
     "hono": "^4.7.4",
     "typescript": "^5.7.3",
     "zod": "^4.3.6"

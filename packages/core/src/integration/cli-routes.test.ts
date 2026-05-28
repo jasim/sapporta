@@ -67,11 +67,8 @@ describe("CLI route table", () => {
     expect(route!.method).toBe("POST");
   });
 
-  it("schema sync → POST /api/meta/schema/sync", () => {
-    const route = findRoute(["schema", "sync"]);
-    expect(route).toBeDefined();
-    expect(route!.path).toBe("/api/meta/schema/sync");
-    expect(route!.method).toBe("POST");
+  it("schema sync is not a Sapporta command", () => {
+    expect(findRoute(["schema", "sync"])).toBeUndefined();
   });
 
   it("rows → GET /api/tables/:table", () => {

@@ -74,20 +74,24 @@ export function Welcome() {
 import { table } from "@sapporta/server/table";
 import { sqliteTable, text, integer } from "drizzle-orm/sqlite-core";
 
-export default table({
-  drizzle: sqliteTable("invoices", {
-    id:       integer("id").primaryKey({ autoIncrement: true }),
-    customer: text("customer").notNull(),
-    amount:   integer("amount"),
-    due:      text("due"),
-  }),
+export const invoicesTable = sqliteTable("invoices", {
+  id:       integer("id").primaryKey({ autoIncrement: true }),
+  customer: text("customer").notNull(),
+  amount:   integer("amount"),
+  due:      text("due"),
+});
+
+export const invoices = table({
+  drizzle: invoicesTable,
   meta: { label: "Invoices" },
 });`}
           </pre>
           <p className="mt-3 text-sap-data text-sap-muted">
             Save, run{" "}
-            <code className="mono text-sap-fg">sapporta schema sync</code>, refresh
-            — it'll be in the sidebar with a working grid.
+            <code className="mono text-sap-fg">pnpm --filter ./packages/api db:generate --name add_invoices</code>,
+            review the SQL, then run{" "}
+            <code className="mono text-sap-fg">pnpm --filter ./packages/api db:migrate</code>.
+            Restart the server and it'll be in the sidebar with a working grid.
           </p>
         </section>
 

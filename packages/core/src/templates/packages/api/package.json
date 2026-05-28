@@ -8,6 +8,11 @@
     "prebuild": "pnpm --filter __SLUG__-shared build",
     "build": "tsc",
     "start": "node dist/boot.js",
+    "db:generate": "drizzle-kit generate",
+    "db:generate:custom": "drizzle-kit generate --custom",
+    "db:migrate": "drizzle-kit migrate",
+    "db:check": "drizzle-kit check",
+    "db:studio": "drizzle-kit studio",
     "pretypecheck": "pnpm --filter __SLUG__-shared build",
     "typecheck": "tsc --noEmit"
   },
@@ -27,6 +32,7 @@
   "devDependencies": {
     "typescript": "^5.7.0",
     "tsc-watch": "^7.2.0",
+    "drizzle-kit": "__DRIZZLE_KIT_VERSION__",
     "@types/better-sqlite3": "^7.6.0",
     "vitest": "^3.1.0"
   }

@@ -11,6 +11,7 @@ import { createTestDb } from "../testing/test-utils.js";
 import type { SapportaEnv } from "../api/server.js";
 import { TsRestApi } from "../api/index.js";
 import { resolve, join } from "node:path";
+import { migrate } from "drizzle-orm/better-sqlite3/migrator";
 
 // Compiled fixtures, rebuilt by the root `pretest` script. See
 // packages/core/tsconfig.fixtures.json for the output layout.
@@ -18,6 +19,7 @@ const FIXTURES_DIR = resolve(
   import.meta.dirname,
   "../../fixtures-dist/integration/fixtures",
 );
+const FIXTURES_SOURCE_DIR = resolve(import.meta.dirname, "fixtures");
 
 // Module-scoped so the request helpers below don't need to thread it.
 let app: Hono<SapportaEnv>;
@@ -26,6 +28,9 @@ export async function createIntegrationApp(): Promise<{
   app: Hono<SapportaEnv>;
 }> {
   const conn = createTestDb();
+  migrate(conn.db, {
+    migrationsFolder: join(FIXTURES_SOURCE_DIR, "packages/api/migrations"),
+  });
 
   app = new Hono<SapportaEnv>();
 
@@ -39,6 +44,7 @@ export async function createIntegrationApp(): Promise<{
 
   const sapporta = await loadSapporta(app, {
     slug: "test",
+    projectRoot: FIXTURES_SOURCE_DIR,
     apiDistDir: FIXTURES_DIR,
     conn,
   });
