@@ -34,11 +34,17 @@
   position: relative;
 }
 
-:where(.root) [data-grid-part="body"] > .root[data-grid-path],
+:where(.root) [data-grid-part="body"] > [data-grid-part="child-level"],
 :where(.root) [data-grid-part="body"] > [data-grid-part="level-status"],
 :where(.root) [data-grid-part="body"] > [data-grid-part="level-empty"] {
   grid-column: 1 / -1;
   min-width: 0;
+}
+
+:where(.root) [data-grid-part="body"] > [data-grid-part="child-level"] {
+  /* Child levels are nested grids. Containing the direct parent-body item keeps
+   * their intrinsic track sizing from changing the parent grid's columns. */
+  contain: inline-size;
 }
 
 :where(.root) [data-grid-part="cell"],

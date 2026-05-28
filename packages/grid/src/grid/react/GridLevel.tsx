@@ -131,6 +131,12 @@ function DisplayedRowsBody({
 // renders under the parent row — the heavy `<Grid>` markup stays unmounted
 // until the source resolves to `ready`. The status flip wakes this
 // component (via `useLevelSnapshot`) without re-rendering the parent.
+//
+// The wrapper is part of the layout contract. Expanded child grids are
+// visually interleaved with parent rows, but they must not be direct grid
+// items in the parent body. A nested grid root that spans the parent subgrid
+// can feed its intrinsic width back into the parent's track sizing; the
+// wrapper gives CSS a contained grid item to span instead.
 function ChildLevelMount({
   path,
   chrome,
@@ -139,7 +145,13 @@ function ChildLevelMount({
   chrome?: GridLevelChrome;
 }) {
   const snapshot = useLevelSnapshot(path);
-  if (snapshot.status === "ready")
-    return <GridLevel path={path} chrome={chrome} />;
-  return <LevelStatusBand path={path} />;
+  return (
+    <div data-grid-part="child-level">
+      {snapshot.status === "ready" ? (
+        <GridLevel path={path} chrome={chrome} />
+      ) : (
+        <LevelStatusBand path={path} />
+      )}
+    </div>
+  );
 }
