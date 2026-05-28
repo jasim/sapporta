@@ -8,7 +8,7 @@ import {
   useGridRuntime,
   useLevelSnapshot,
 } from "../../grid/react/GridRuntimeProvider";
-import { cn } from "@sapporta/ui";
+import { cn, Popover, PopoverContent, PopoverTrigger } from "@sapporta/ui";
 import { meta, preset, presetRuntime } from "../preset";
 import styles from "../sapporta-preset.module.css";
 import type {
@@ -159,30 +159,32 @@ function HeaderCell<TMeta = unknown, TFilter = unknown>({
       >
         {customHeader ?? defaultHeader(headerName, sort?.direction, sortRank)}
         {menu ? (
-          <button
-            type="button"
-            aria-label={`${column.column.name} menu`}
-            aria-expanded={open}
-            data-grid-part="header-menu-button"
-            onClick={(e) => {
-              e.stopPropagation();
-              setOpen((v) => !v);
-            }}
-          >
-            <ChevronDown aria-hidden="true" size={11} strokeWidth={1.8} />
-          </button>
+          <Popover open={open} onOpenChange={setOpen}>
+            <PopoverTrigger asChild>
+              <button
+                type="button"
+                aria-label={`${column.column.name} menu`}
+                aria-expanded={open}
+                data-grid-part="header-menu-button"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <ChevronDown aria-hidden="true" size={11} strokeWidth={1.8} />
+              </button>
+            </PopoverTrigger>
+            <PopoverContent
+              align="end"
+              sideOffset={4}
+              role="menu"
+              className={cn(styles.cellPopover, styles.headerPopover)}
+              data-grid-part="cell-popover"
+              style={{ zIndex: "var(--sap-z-grid-header-popover)" }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              {menu({ level, column, commands, close }) as ReactNode}
+            </PopoverContent>
+          </Popover>
         ) : null}
       </div>
-      {open && menu ? (
-        <div
-          role="menu"
-          className={styles.headerPopover}
-          data-grid-part="cell-popover"
-          onClick={(e) => e.stopPropagation()}
-        >
-          {menu({ level, column, commands, close }) as ReactNode}
-        </div>
-      ) : null}
     </div>
   );
 }

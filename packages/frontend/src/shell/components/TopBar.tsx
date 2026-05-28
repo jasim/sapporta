@@ -26,7 +26,7 @@ export function TopBar({
   actions?: ReactNode;
 }) {
   return (
-    <div className="sticky top-0 z-10 h-sap-topbar shrink-0 flex items-center px-5 gap-[14px] border-b border-sap-border-soft bg-sap-surface/90">
+    <div className="sticky top-0 z-[var(--sap-z-shell-sticky)] h-sap-topbar shrink-0 flex items-center px-5 gap-[14px] border-b border-sap-border-soft bg-sap-surface/90">
       {section && (
         <>
           <span className="text-sap-body text-sap-muted">{section}</span>

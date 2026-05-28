@@ -118,6 +118,16 @@
   --sidebar-border: var(--sap-border);
   --sidebar-accent: var(--sap-active-nav-bg);
   --sidebar-accent-foreground: var(--sap-fg);
+
+  --sap-z-grid-row-indicator: 1;
+  --sap-z-grid-cell-focus: 2;
+  --sap-z-grid-editor: 10;
+  --sap-z-grid-header: 20;
+  --sap-z-grid-header-popover: 30;
+  --sap-z-shell-sticky: 40;
+  --sap-z-popover: 50;
+  --sap-z-modal-overlay: 60;
+  --sap-z-modal-content: 70;
 }
 
 /* Terminal-inspired dark: warm-tinted near-blacks, amber emphasis, bright-

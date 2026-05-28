@@ -107,7 +107,7 @@ export function CellEditorOverlay({
         top: position.top,
         width: position.width,
         height: position.height,
-        zIndex: 10,
+        zIndex: "var(--sap-z-grid-editor)",
       }}
     >
       <Editor

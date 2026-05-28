@@ -89,7 +89,7 @@ export function LookupValueEditor(props: CellEditorProps) {
         allowClear={false}
         className="h-full rounded-none border-0 bg-transparent shadow-none"
         inputClassName="h-full py-0 text-sap-body"
-        listClassName="absolute left-0 top-full z-50 mt-1 max-h-64 min-w-full overflow-auto rounded-md border border-sap-border bg-sap-surface shadow-lg"
+        listClassName="absolute left-0 top-full z-[var(--sap-z-popover)] mt-1 max-h-64 min-w-full overflow-auto rounded-md border border-sap-border bg-sap-surface shadow-lg"
       />
     </div>
   );
