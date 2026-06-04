@@ -6,16 +6,13 @@
 
 import type Database from "better-sqlite3";
 import type { Context, Env } from "hono";
-import type { SchemaRegistry } from "../schema/registry.js";
+import type { TableCatalog } from "../schema/catalog.js";
 import { extractSchemas, extractSchema } from "../schema/extract.js";
 import { dbRun } from "../introspect/run.js";
 import { dbIndexes } from "../introspect/indexes.js";
 import { dbSample } from "../introspect/sample.js";
 import { dbDescribeAll } from "../introspect/describe-all.js";
-import {
-  OperationError,
-  type OperationResult,
-} from "../introspect/types.js";
+import { OperationError, type OperationResult } from "../introspect/types.js";
 import { ERROR_CODE_STATUS } from "./error-codes.js";
 import type { MetaHandlers } from "./mount-meta.js";
 
@@ -32,19 +29,24 @@ function jsonError(
 
 function resultToResponse(c: Context, result: OperationResult): Response {
   if (result.ok) return c.json(result.data);
-  const status = (ERROR_CODE_STATUS[result.code] ?? 500) as 400 | 404 | 422 | 500;
+  const status = (ERROR_CODE_STATUS[result.code] ?? 500) as
+    | 400
+    | 404
+    | 422
+    | 500;
   return c.json({ error: result.error }, status);
 }
 
-function withOperationError(
-  c: Context,
-  fn: () => OperationResult,
-): Response {
+function withOperationError(c: Context, fn: () => OperationResult): Response {
   try {
     return resultToResponse(c, fn());
   } catch (err) {
     if (err instanceof OperationError) {
-      const status = (ERROR_CODE_STATUS[err.code] ?? 500) as 400 | 404 | 422 | 500;
+      const status = (ERROR_CODE_STATUS[err.code] ?? 500) as
+        | 400
+        | 404
+        | 422
+        | 500;
       return c.json({ error: err.message, code: err.code }, status);
     }
     throw err;
@@ -52,7 +54,7 @@ function withOperationError(
 }
 
 export function makeMetaHandlers<E extends Env>(
-  registry: SchemaRegistry,
+  catalog: TableCatalog,
   sqlite: Database.Database,
   project: { dir: string; slug: string },
 ): MetaHandlers<E> {
@@ -65,7 +67,7 @@ export function makeMetaHandlers<E extends Env>(
       if (request.query?.detail === "full") {
         return withOperationError(c, () => dbDescribeAll(sqlite));
       }
-      const data = extractSchemas(registry);
+      const data = extractSchemas(catalog.tables);
       for (const table of data) {
         try {
           const row = sqlite
@@ -80,8 +82,9 @@ export function makeMetaHandlers<E extends Env>(
     },
 
     getTable: ({ c, request }) => {
-      const schema = extractSchema(registry, request.params.name);
-      if (!schema) return jsonError(c, `Table "${request.params.name}" not found`, 404);
+      const schema = extractSchema(catalog.tables, request.params.name);
+      if (!schema)
+        return jsonError(c, `Table "${request.params.name}" not found`, 404);
       return c.json(schema);
     },
 
@@ -89,7 +92,9 @@ export function makeMetaHandlers<E extends Env>(
       withOperationError(c, () => dbIndexes(sqlite, request.params.name)),
 
     tableSample: ({ c, request }) => {
-      const limit = request.query?.limit ? parseInt(request.query.limit) : undefined;
+      const limit = request.query?.limit
+        ? parseInt(request.query.limit)
+        : undefined;
       const fields = request.query?.fields?.split(",");
       return withOperationError(c, () =>
         dbSample(sqlite, request.params.name, limit, fields),

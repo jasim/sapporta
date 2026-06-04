@@ -10,12 +10,9 @@
 
 import type { Context, Env } from "hono";
 import type { AppRoute } from "@sapporta/rest-core";
+import type { TableCatalog } from "../schema/catalog.js";
 import type { TableDef } from "../schema/table.js";
-import type {
-  HttpMethod,
-  RouteHandler,
-  TsRestApi,
-} from "@sapporta/honest";
+import type { HttpMethod, RouteHandler, TsRestApi } from "@sapporta/honest";
 import { countRoute, lookupRoute } from "@sapporta/shared/contracts";
 import {
   createRoute,
@@ -25,10 +22,6 @@ import {
   listRoute,
   updateRoute,
 } from "./table-contracts.js";
-
-export interface TableResolver {
-  get(name: string): TableDef | undefined;
-}
 
 export interface TablesDocContext {
   tables: readonly TableDef[];
@@ -73,7 +66,7 @@ function asGenericHandler<R extends AppRoute, E extends Env>(
 /**
  * Register one `/tables/:tableName/...` family on `api`: fans out into
  * per-table OpenAPI entries keyed `${opName}_${sqlName}` and dispatches
- * at request time by looking the concrete table up in the resolver.
+ * at request time by looking the concrete table up in the catalog.
  */
 function registerTableFamily<
   R extends AppRoute,
@@ -81,8 +74,7 @@ function registerTableFamily<
   DocCtx extends TablesDocContext,
 >(
   api: TsRestApi<E, DocCtx>,
-  resolver: TableResolver,
-  tables: () => readonly TableDef[],
+  catalog: TableCatalog,
   opts: {
     opName: string;
     method: HttpMethod;
@@ -102,9 +94,9 @@ function registerTableFamily<
         ]),
       ),
     dispatch: (c) => {
-      const def = resolver.get(c.req.param("tableName") ?? "");
+      const def = catalog.get(c.req.param("tableName") ?? "");
       if (!def) return undefined;
-      const all = tables();
+      const all = catalog.tables;
       const route = opts.routeFor(def, all);
       return {
         route,
@@ -120,9 +112,8 @@ export function mountTables<
   DocCtx extends TablesDocContext = TablesDocContext,
 >(
   api: TsRestApi<E, DocCtx>,
-  resolver: TableResolver,
+  catalog: TableCatalog,
   handlers: TableHandlers<E>,
-  tables: () => readonly TableDef[],
 ): TsRestApi<E, DocCtx> {
   // Lookup and count are NOT family-specialized — their response schema is
   // passthrough regardless of table. One contract each, registered as a
@@ -134,42 +125,42 @@ export function mountTables<
   // distinct — the discriminated union collapses to `AppRoute` in an array
   // and TypeScript can no longer match the handler's route-specific
   // `request` type.
-  registerTableFamily(api, resolver, tables, {
+  registerTableFamily(api, catalog, {
     opName: "exportCsv",
     method: "get",
     genericPath: "/tables/:tableName/export.csv",
     routeFor: (d) => exportCsvRoute(d),
     handler: handlers.exportCsv,
   });
-  registerTableFamily(api, resolver, tables, {
+  registerTableFamily(api, catalog, {
     opName: "get",
     method: "get",
     genericPath: "/tables/:tableName/:id",
     routeFor: (d) => getRoute(d),
     handler: handlers.get,
   });
-  registerTableFamily(api, resolver, tables, {
+  registerTableFamily(api, catalog, {
     opName: "list",
     method: "get",
     genericPath: "/tables/:tableName",
     routeFor: (d) => listRoute(d),
     handler: handlers.list,
   });
-  registerTableFamily(api, resolver, tables, {
+  registerTableFamily(api, catalog, {
     opName: "create",
     method: "post",
     genericPath: "/tables/:tableName",
     routeFor: (d, all) => createRoute(d, all),
     handler: handlers.create,
   });
-  registerTableFamily(api, resolver, tables, {
+  registerTableFamily(api, catalog, {
     opName: "update",
     method: "put",
     genericPath: "/tables/:tableName/:id",
     routeFor: (d) => updateRoute(d),
     handler: handlers.update,
   });
-  registerTableFamily(api, resolver, tables, {
+  registerTableFamily(api, catalog, {
     opName: "delete",
     method: "delete",
     genericPath: "/tables/:tableName/:id",

@@ -3,8 +3,7 @@ import { getTableConfig } from "drizzle-orm/sqlite-core";
 import { normalizeDataType } from "./normalize-datatype.js";
 import { resolveColumnKind } from "./resolve-kind.js";
 import { findPkColumn } from "./pk.js";
-import type { TableDef } from "./table.js";
-import type { SchemaRegistry } from "./registry.js";
+import { isAutoManagedTimestampColumn, type TableDef } from "./table.js";
 import { logger } from "../db/logger.js";
 import type {
   ChildSchema,
@@ -18,12 +17,9 @@ const log = logger.child({ module: "schema" });
 /**
  * Extract schema metadata from loaded TableDefs.
  *
- * Accepts either a SchemaRegistry or a plain TableDef[] (the test path).
  * Used by GET /api/_schema and available for direct use in tests.
  */
-export function extractSchemas(source: SchemaRegistry | TableDef[]): TableSchema[] {
-  const defs: TableDef[] = Array.isArray(source) ? source : source.all();
-
+export function extractSchemas(defs: readonly TableDef[]): TableSchema[] {
   // Build a lookup by sqlName for resolving children
   const byName = new Map<string, TableDef>();
   for (const def of defs) byName.set(def.sqlName, def);
@@ -56,6 +52,7 @@ export function extractSchemas(source: SchemaRegistry | TableDef[]): TableSchema
     }
 
     const columns: ColumnSchema[] = config.columns.map((col) => {
+      const columnMeta = schema.meta.columns[col.name];
       const colSchema: ColumnSchema = {
         name: col.name,
         // Drizzle's internal dataType differs between dialects (e.g. Pg string-mode
@@ -75,18 +72,18 @@ export function extractSchemas(source: SchemaRegistry | TableDef[]): TableSchema
         // every extracted column has a `kind`, so downstream consumers
         // (UI display, operator applicability, parse) read a single field.
         kind: resolveColumnKind(schema, col.name),
-        displayFormat: schema.meta.columns?.[col.name]?.displayFormat,
-        textDisplay: schema.meta.columns?.[col.name]?.textDisplay,
-        header: schema.meta.columns?.[col.name]?.header,
-        width: schema.meta.columns?.[col.name]?.width,
-        minWidth: schema.meta.columns?.[col.name]?.minWidth,
-        maxWidth: schema.meta.columns?.[col.name]?.maxWidth,
-        colorRule: schema.meta.columns?.[col.name]?.colorRule,
-        zeroDisplay: schema.meta.columns?.[col.name]?.zeroDisplay,
-        strong: schema.meta.columns?.[col.name]?.strong,
-        notes: schema.meta.columns?.[col.name]?.notes,
-        visuallyHidden: schema.meta.columns?.[col.name]?.visuallyHidden ??
-          (col.name === "created_at" || col.name === "updated_at" ? true : undefined),
+        displayFormat: columnMeta?.displayFormat,
+        textDisplay: columnMeta?.textDisplay,
+        header: columnMeta?.header,
+        width: columnMeta?.width,
+        minWidth: columnMeta?.minWidth,
+        maxWidth: columnMeta?.maxWidth,
+        colorRule: columnMeta?.colorRule,
+        zeroDisplay: columnMeta?.zeroDisplay,
+        strong: columnMeta?.strong,
+        notes: columnMeta?.notes,
+        clientEditable: columnMeta?.clientEditable,
+        visuallyHidden: columnMeta?.visuallyHidden,
       };
 
       // Auto-synthesize a drill-up link for FK columns. Consumers (table &
@@ -112,33 +109,38 @@ export function extractSchemas(source: SchemaRegistry | TableDef[]): TableSchema
 
     // Resolve children
     const children: ChildSchema[] = [];
-    if (schema.meta.children) {
-      for (const childMeta of schema.meta.children) {
-        const childDef = byName.get(childMeta.table);
-        if (!childDef) {
-          log.warn("Child table not found, skipping", { parent: schema.sqlName, child: childMeta.table });
-          continue;
-        }
-
-        const childConfig = getTableConfig(childDef.drizzle);
-        const pkColName = findPkColumn(childDef).name;
-
-        // Default columns: all except PK, the FK column, created_at, updated_at
-        const excludeCols = new Set([pkColName, childMeta.foreignKey, "created_at", "updated_at"]);
-        const resolvedColumns = childMeta.columns ??
-          childConfig.columns
-            .map((c) => c.name)
-            .filter((name) => !excludeCols.has(name));
-
-        children.push({
-          table: childMeta.table,
-          foreignKey: childMeta.foreignKey,
-          label: childMeta.label ?? childDef.meta.label ?? childMeta.table,
-          columns: resolvedColumns,
-          defaultSort: childMeta.defaultSort ?? pkColName,
-          width: childMeta.width,
+    for (const childMeta of schema.meta.children) {
+      const childDef = byName.get(childMeta.table);
+      if (!childDef) {
+        log.warn("Child table not found, skipping", {
+          parent: schema.sqlName,
+          child: childMeta.table,
         });
+        continue;
       }
+
+      const childConfig = getTableConfig(childDef.drizzle);
+      const pkColName = findPkColumn(childDef).name;
+
+      // Default columns: all except PK, the FK column, and managed timestamps.
+      const excludeCols = new Set([pkColName, childMeta.foreignKey]);
+      const resolvedColumns =
+        childMeta.columns ??
+        childConfig.columns
+          .map((c) => c.name)
+          .filter(
+            (name) =>
+              !excludeCols.has(name) && !isAutoManagedTimestampColumn(name),
+          );
+
+      children.push({
+        table: childMeta.table,
+        foreignKey: childMeta.foreignKey,
+        label: childMeta.label ?? childDef.meta.label,
+        columns: resolvedColumns,
+        defaultSort: childMeta.defaultSort ?? pkColName,
+        width: childMeta.width,
+      });
     }
 
     // Auto-synthesize row-level drill-into links from children. One link per
@@ -153,8 +155,8 @@ export function extractSchemas(source: SchemaRegistry | TableDef[]): TableSchema
 
     return {
       name: schema.sqlName,
-      label: schema.meta.label ?? schema.sqlName,
-      immutable: schema.meta.immutable ?? false,
+      label: schema.meta.label,
+      immutable: schema.meta.immutable,
       columns,
       children,
       ...(rowLinks.length > 0 ? { rowLinks } : {}),
@@ -171,13 +173,13 @@ export function extractSchemas(source: SchemaRegistry | TableDef[]): TableSchema
  *
  * Used by GET /meta/tables/:name in metaApi(). Returns undefined if the table
  * is not found. Builds the full list internally (extractSchemas is pure and
- * fast — no I/O), then filters. For a registry with many tables this could
+ * fast — no I/O), then filters. For a project with many tables this could
  * be optimized to extract a single entry, but correctness is more important
  * here — the full extraction handles FK resolution and child references that
  * require the complete table set.
  */
 export function extractSchema(
-  source: SchemaRegistry | TableDef[],
+  source: readonly TableDef[],
   name: string,
 ): TableSchema | undefined {
   const all = extractSchemas(source);
@@ -191,21 +193,12 @@ export function extractSchema(
  * extractSchemas() directly. This schemaApi() function exists as a convenience
  * for tests that want a self-contained Hono app without the full /meta namespace.
  *
- * Accepts a SchemaRegistry (computes per-request so new tables appear
- * immediately) or a plain TableDef[] (static, for tests).
+ * Accepts loaded table definitions and computes schema metadata once.
  */
-export function schemaApi(source: SchemaRegistry | TableDef[]) {
+export function schemaApi(source: readonly TableDef[]) {
   const app = new Hono();
-
-  if (Array.isArray(source)) {
-    const data = extractSchemas(source);
-    app.get("/", (c) => c.json({ tables: data }));
-  } else {
-    app.get("/", (c) => {
-      const data = extractSchemas(source);
-      return c.json({ tables: data });
-    });
-  }
+  const data = extractSchemas(source);
+  app.get("/", (c) => c.json({ tables: data }));
 
   return app;
 }

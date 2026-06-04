@@ -82,6 +82,18 @@ describe("extractSchemas", () => {
     expect(result[0].immutable).toBe(false);
   });
 
+  it("normalizes table defaults without synthesizing column display hints", () => {
+    expect(ledger.meta).toMatchObject({
+      label: "ledger",
+      rowScope: "workspaceUserScoped",
+      selects: [],
+      immutable: true,
+      references: {},
+      children: [],
+    });
+    expect(ledger.meta.columns.description?.header).toBeUndefined();
+  });
+
   it("extracts column metadata", () => {
     const result = extractSchemas([accounts]);
     const cols = result[0].columns;
@@ -95,6 +107,7 @@ describe("extractSchemas", () => {
     expect(nameCol.notNull).toBe(true);
     expect(nameCol.dataType).toBe("string");
     expect(nameCol.primary).toBe(false);
+    expect(nameCol.header).toBeUndefined();
 
     const balanceCol = cols.find((c) => c.name === "balance")!;
     expect(balanceCol.notNull).toBe(false);
@@ -194,12 +207,13 @@ describe("extractSchemas", () => {
   });
 
   it("auto-hides created_at and updated_at columns", () => {
-    // Hidden by default so the UI table views don't show noisy timestamps.
+    // Hidden by default in table() so the UI table views don't show noisy timestamps.
     const result = extractSchemas([accounts]);
     const cols = result[0].columns;
 
     const createdAt = cols.find((c) => c.name === "created_at")!;
     expect(createdAt.visuallyHidden).toBe(true);
+    expect(accounts.meta.columns.created_at?.visuallyHidden).toBe(true);
 
     // Columns that aren't created_at/updated_at should not be auto-hidden
     const nameCol = cols.find((c) => c.name === "name")!;

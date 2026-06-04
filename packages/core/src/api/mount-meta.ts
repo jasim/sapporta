@@ -5,7 +5,7 @@
  * since the meta set is fixed at boot — no per-request dispatch needed.
  *
  * Handlers are passed in (not built here) so the runtime deps they need
- * — the Drizzle db, the raw sqlite handle, the SchemaRegistry — stay in
+ * — the Drizzle db, the raw sqlite handle, the loaded tables — stay in
  * the caller's scope instead of leaking into the contract layer.
  */
 
