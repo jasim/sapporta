@@ -143,7 +143,7 @@ app.use("/*", serveStatic({ root: frontendDist }));
 app.get("/*", serveStatic({ root: frontendDist, path: "index.html" }));
 
 // 9. Serve
-const port = parseInt(process.env.PORT ?? "3000", 10);
+const port = projectEnv.port;
 const server = serve({ fetch: app.fetch, port }, () => {
   console.log(`__SLUG__ API server ready (port ${port})`);
 });

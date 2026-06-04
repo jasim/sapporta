@@ -49,6 +49,7 @@ describe("project auth template", () => {
         SAPPORTA_MAIL_FROM: "Sapporta <no-reply@example.test>",
       }),
     ).toEqual({
+      port: 3000,
       betterAuthSecret: "secret",
       betterAuthUrl: "http://localhost:3000",
       trustedOrigins: [
@@ -73,6 +74,17 @@ describe("project auth template", () => {
         SAPPORTA_MAIL_FROM: "Sapporta <no-reply@example.test>",
       }).trustedOrigins,
     ).toEqual(["http://localhost:5173"]);
+  });
+
+  it("uses the configured API port", () => {
+    expect(
+      readProjectAuthEnv({
+        BETTER_AUTH_SECRET: "secret",
+        BETTER_AUTH_URL: "http://localhost:3001",
+        PORT: "3001",
+        SAPPORTA_MAIL_FROM: "Sapporta <no-reply@example.test>",
+      }).port,
+    ).toBe(3001);
   });
 
   it("rejects malformed auth env values", () => {
@@ -101,6 +113,24 @@ describe("project auth template", () => {
         SAPPORTA_MAIL_FROM: "Sapporta <no-reply@example.test>",
       }),
     ).toThrow(/FRONTEND_DEV_PORT/);
+
+    expect(() =>
+      readProjectAuthEnv({
+        BETTER_AUTH_SECRET: "secret",
+        BETTER_AUTH_URL: "http://localhost:3000",
+        PORT: "3001x",
+        SAPPORTA_MAIL_FROM: "Sapporta <no-reply@example.test>",
+      }),
+    ).toThrow(/PORT/);
+
+    expect(() =>
+      readProjectAuthEnv({
+        BETTER_AUTH_SECRET: "secret",
+        BETTER_AUTH_URL: "http://localhost:3000",
+        PORT: "abc",
+        SAPPORTA_MAIL_FROM: "Sapporta <no-reply@example.test>",
+      }),
+    ).toThrow(/PORT/);
   });
 
   it("returns null when better-auth has no session", async () => {

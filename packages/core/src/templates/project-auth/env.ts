@@ -3,6 +3,7 @@ import type { HealthPolicy } from "@sapporta/server";
 export type Origin = string & { readonly __origin: unique symbol };
 
 export interface ProjectAuthEnv {
+  port: number;
   betterAuthSecret: string;
   betterAuthUrl: Origin;
   trustedOrigins: Origin[];
@@ -37,6 +38,10 @@ export function readProjectAuthEnv(
   env: NodeJS.ProcessEnv = process.env,
 ): ProjectAuthEnv {
   return {
+    port:
+      env.PORT === undefined || env.PORT === ""
+        ? 3000
+        : parseIntegerEnv(env.PORT, "PORT"),
     betterAuthSecret: readRequiredEnv(env, "BETTER_AUTH_SECRET"),
     betterAuthUrl: readRequiredOrigin(env, "BETTER_AUTH_URL"),
     trustedOrigins: readTrustedOrigins(env),
@@ -158,11 +163,7 @@ function readOptionalIntegerEnv(
   name: string,
 ): number | undefined {
   if (value === undefined || value === "") return undefined;
-  const parsed = Number.parseInt(value, 10);
-  if (!Number.isInteger(parsed) || String(parsed) !== value) {
-    throw new Error(`${name} must be an integer.`);
-  }
-  return parsed;
+  return parseIntegerEnv(value, name);
 }
 
 function readRequiredIntegerEnv(
@@ -170,6 +171,10 @@ function readRequiredIntegerEnv(
   name: keyof NodeJS.ProcessEnv,
 ): number {
   const value = readRequiredEnv(env, name);
+  return parseIntegerEnv(value, String(name));
+}
+
+function parseIntegerEnv(value: string, name: string): number {
   const parsed = Number.parseInt(value, 10);
   if (!Number.isInteger(parsed) || String(parsed) !== value) {
     throw new Error(`${name} must be an integer.`);

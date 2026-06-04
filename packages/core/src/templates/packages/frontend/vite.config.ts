@@ -18,6 +18,8 @@ import tailwindcss from "@tailwindcss/vite";
 // __SLUG__-shared is aliased to its source so HMR works without rebuilding
 // the shared package's dist/ on every edit. Backend imports the same
 // package via the pnpm symlink and reads dist/ (Node can't run TS).
+const apiPort = parseIntegerEnv("PORT", 3000);
+
 export default defineConfig({
   plugins: [react(), tailwindcss()],
   resolve: {
@@ -29,7 +31,7 @@ export default defineConfig({
     port: parseIntegerEnv("FRONTEND_DEV_PORT", 5173),
     strictPort: true,
     proxy: {
-      "/api": `http://localhost:${process.env.PORT ?? "3000"}`,
+      "/api": `http://localhost:${apiPort}`,
     },
   },
   build: {
