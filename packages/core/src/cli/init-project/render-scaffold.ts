@@ -1,3 +1,4 @@
+import { randomBytes } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { createRequire } from "node:module";
@@ -132,14 +133,13 @@ export function resolveScaffoldPackages(
   if (devModePackageRoot) {
     const coreMetadata = readDevModeSapportaPackage(devModePackageRoot, "core");
     const core = coreMetadata.packageJson;
-    const honest = readDevModeSapportaPackage(devModePackageRoot, "honest")
-      .packageJson;
+    const honest = readDevModeSapportaPackage(
+      devModePackageRoot,
+      "honest",
+    ).packageJson;
     const uiMetadata = readDevModeSapportaPackage(devModePackageRoot, "ui");
     const ui = uiMetadata.packageJson;
-    const gridMetadata = readDevModeSapportaPackage(
-      devModePackageRoot,
-      "grid",
-    );
+    const gridMetadata = readDevModeSapportaPackage(devModePackageRoot, "grid");
     const grid = gridMetadata.packageJson;
     const frontendMetadata = readDevModeSapportaPackage(
       devModePackageRoot,
@@ -456,6 +456,7 @@ function buildTemplateReplacements(
   return {
     __SLUG__: project.slug,
     __NAME__: project.name,
+    __BETTER_AUTH_DEV_SECRET__: randomBytes(32).toString("base64url"),
     __CORE_SPEC__: packages.specs.core,
     __HONEST_SPEC__: packages.specs.honest,
     __UI_SPEC__: packages.specs.ui,

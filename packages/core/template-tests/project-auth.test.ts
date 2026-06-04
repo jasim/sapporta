@@ -19,6 +19,7 @@ import {
   requireWorkspaceOwner,
   requireWorkspaceUser,
 } from "../src/templates/project-auth/middleware.js";
+import { readProjectAuthEnv } from "../src/templates/project-auth/env.js";
 import {
   WorkspaceSwitchError,
   ensureActiveWorkspace,
@@ -34,6 +35,63 @@ describe("project auth template", () => {
   afterEach(() => {
     conn?.sqlite.close();
     conn = null;
+  });
+
+  it("parses project auth runtime config from env", () => {
+    expect(
+      readProjectAuthEnv({
+        BETTER_AUTH_SECRET: "secret",
+        BETTER_AUTH_URL: "http://localhost:3000",
+        SAPPORTA_FRONTEND_ORIGINS:
+          "http://localhost:5173, http://localhost:5174",
+        SAPPORTA_REQUIRE_VERIFIED_EMAIL: "false",
+        SAPPORTA_HEALTH_POLICY: "authenticated",
+      }),
+    ).toEqual({
+      betterAuthSecret: "secret",
+      betterAuthUrl: "http://localhost:3000",
+      trustedOrigins: [
+        "http://localhost:5173",
+        "http://localhost:5174",
+      ],
+      requireVerifiedEmail: false,
+      healthPolicy: "authenticated",
+    });
+  });
+
+  it("derives the dev trusted origin from FRONTEND_DEV_PORT", () => {
+    expect(
+      readProjectAuthEnv({
+        BETTER_AUTH_SECRET: "secret",
+        BETTER_AUTH_URL: "http://localhost:3000",
+        FRONTEND_DEV_PORT: "5173",
+      }).trustedOrigins,
+    ).toEqual(["http://localhost:5173"]);
+  });
+
+  it("rejects malformed auth env values", () => {
+    expect(() =>
+      readProjectAuthEnv({
+        BETTER_AUTH_SECRET: "secret",
+        BETTER_AUTH_URL: "http://localhost:3000/path",
+      }),
+    ).toThrow(/BETTER_AUTH_URL must contain origins only/);
+
+    expect(() =>
+      readProjectAuthEnv({
+        BETTER_AUTH_SECRET: "secret",
+        BETTER_AUTH_URL: "http://localhost:3000",
+        SAPPORTA_REQUIRE_VERIFIED_EMAIL: "no",
+      }),
+    ).toThrow(/SAPPORTA_REQUIRE_VERIFIED_EMAIL/);
+
+    expect(() =>
+      readProjectAuthEnv({
+        BETTER_AUTH_SECRET: "secret",
+        BETTER_AUTH_URL: "http://localhost:3000",
+        FRONTEND_DEV_PORT: "5173x",
+      }),
+    ).toThrow(/FRONTEND_DEV_PORT/);
   });
 
   it("returns null when better-auth has no session", async () => {

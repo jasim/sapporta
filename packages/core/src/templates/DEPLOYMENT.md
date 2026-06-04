@@ -25,10 +25,35 @@ The shapes split on one question: does the browser see the SPA and API on the sa
 
 Same-origin means:
 
-- **No CORS** — no preflight, middleware, or allowed-origin list.
 - **No frontend env var for the API location** — relative `fetch("/api/foo")` works.
+- **No cross-origin API URL** — the browser does not need to know a separate API host.
 
-Shape (c) loses both; its four configuration changes all follow from that.
+Shape (c) loses both; its extra configuration follows from that.
+
+## Environment files
+
+`sapporta init` creates two env files:
+
+- `.env.development` — loaded by `pnpm dev` with Node's built-in `--env-file`.
+  It contains local-only values, including a generated `BETTER_AUTH_SECRET`.
+- `.env.production.example` — placeholder production values. Copy the values
+  into your deployment environment; `pnpm start` does not load development env.
+
+`BETTER_AUTH_URL` is the public origin of the API/auth server. In same-origin
+deployments, that is also the SPA origin. In split deployments, it is the API
+origin.
+
+`SAPPORTA_FRONTEND_ORIGINS` is the list of browser origins allowed to make
+credentialed API/auth requests. In same-origin deployments, set it to the app's
+public origin. In split deployments, set it to the SPA origin.
+
+In development, `FRONTEND_DEV_PORT` is the single source for Vite's dev-server
+port and the API's trusted localhost origin. Set `SAPPORTA_FRONTEND_ORIGINS`
+only when you need additional browser origins.
+
+`VITE_API_URL` is different: it is baked into the browser bundle only when the
+SPA and API are deployed to different origins. It is not used in development or
+same-origin production.
 
 ## The `serveStatic` block
 
@@ -67,7 +92,7 @@ docker run --rm -p 3000:3000 -v __SLUG__-data:/app/data __SLUG__
 
 Then open `http://localhost:3000/`. The SPA and API are same-origin: browser
 requests to `/api/*` go to the Hono process in the same container. `VITE_API_URL`
-and `FRONTEND_ORIGIN` are not needed for this Docker shape.
+is not needed for this Docker shape.
 
 Keep `/app/data` on a named volume or bind mount. Without that volume, SQLite
 data is tied to the container filesystem and disappears when the container is
@@ -122,21 +147,18 @@ hashed JS and CSS files for the current deployment.
 
 ## Shape (c) — Split topology: SPA on a CDN, API on its own host
 
-The SPA ships to a CDN (Cloudflare Pages, Netlify, Vercel, S3 + CloudFront, …) and the Hono API runs on a separate host — e.g. `https://app.example.com` for the SPA and `https://api.example.com` for the API. Four configuration changes follow:
+The SPA ships to a CDN (Cloudflare Pages, Netlify, Vercel, S3 + CloudFront, …) and the Hono API runs on a separate host — e.g. `https://app.example.com` for the SPA and `https://api.example.com` for the API.
 
-### 1. CORS middleware on the API
+### 1. Trusted frontend origin on the API
 
-Set `FRONTEND_ORIGIN` on the API server and mount the middleware before the API routes in `packages/api/boot.ts`:
+Set `SAPPORTA_FRONTEND_ORIGINS` on the API server:
 
-```ts
-import { cors } from "hono/cors";
-
-app.use("/api/*", cors({
-  origin: process.env.FRONTEND_ORIGIN!,   // e.g. "https://app.example.com"
-}));
+```env
+SAPPORTA_FRONTEND_ORIGINS=https://app.example.com
 ```
 
-For cookie-based auth, also set `credentials: true` and make `FRONTEND_ORIGIN` an exact origin — browsers refuse credentialed requests against a wildcard `*`.
+Sapporta's generated `boot.ts` installs exact-origin credentialed CORS and
+passes the same list to Better Auth as `trustedOrigins`.
 
 ### 2. Absolute backend URL baked into the SPA
 
@@ -150,14 +172,22 @@ That's the only change needed in the SPA — application code is untouched. `@sa
 
 Only `VITE_`-prefixed env vars reach the client bundle — Vite's rule. Don't smuggle secrets through `VITE_*`; they ship in the JS.
 
-### 3. Delete the `serveStatic` block
+### 3. API/auth public URL
+
+Set Better Auth's public API origin on the API server:
+
+```env
+BETTER_AUTH_URL=https://api.example.com
+```
+
+### 4. Delete the `serveStatic` block
 
 Dead code in this shape (see the `serveStatic` section).
 
-### 4. Deploy in two halves
+### 5. Deploy in two halves
 
 - **SPA:** `vite build` → `packages/frontend/dist/`. Upload to the CDN and configure an SPA fallback (`/* → /index.html`) so React Router handles deep links on hard reload.
-- **API:** `tsc` → `packages/api/dist/`. Run `node packages/api/dist/boot.js` with `PORT` and `FRONTEND_ORIGIN` set.
+- **API:** `tsc` → `packages/api/dist/`. Run `node packages/api/dist/boot.js` with `PORT`, `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL`, and `SAPPORTA_FRONTEND_ORIGINS` set.
 
 Fit:
 
@@ -166,13 +196,16 @@ Fit:
 
 ## Environment variables, by shape
 
-| Variable          | Read from                  | (a) | (b) | (c) | Purpose                                          |
-| ----------------- | -------------------------- | --- | --- | --- | ------------------------------------------------ |
-| `PORT`            | API host process env       | yes | yes | yes | Port Hono binds to. Defaults to `3000`.          |
-| `FRONTEND_ORIGIN` | API host process env       | —   | —   | yes | Origin allowed by CORS middleware.               |
-| `VITE_API_URL`    | `packages/frontend/.env.production` | —   | —   | yes | Absolute API origin inlined into the SPA bundle. |
-
-In (a) and (b), `PORT` is the only variable needed.
+| Variable                          | Read from            | Dev | (a)      | (b)      | (c)      | Purpose                                                                       |
+| --------------------------------- | -------------------- | --- | -------- | -------- | -------- | ----------------------------------------------------------------------------- |
+| `PORT`                            | API host process env | yes | yes      | yes      | yes      | Port Hono binds to. Defaults to `3000`.                                       |
+| `FRONTEND_DEV_PORT`               | Dev process env      | yes | —        | —        | —        | Vite dev-server port and derived localhost trusted origin.                    |
+| `BETTER_AUTH_SECRET`              | API host process env | yes | yes      | yes      | yes      | Better Auth signing secret. Generated only for local development.             |
+| `BETTER_AUTH_URL`                 | API host process env | yes | yes      | yes      | yes      | Public API/auth origin.                                                       |
+| `SAPPORTA_FRONTEND_ORIGINS`       | API host process env | yes | yes      | yes      | yes      | Browser origins trusted for credentialed API/auth requests.                   |
+| `SAPPORTA_REQUIRE_VERIFIED_EMAIL` | API host process env | yes | optional | optional | optional | Whether email/password sign-up requires verified email.                       |
+| `SAPPORTA_HEALTH_POLICY`          | API host process env | yes | optional | optional | optional | Access policy for health endpoints: `public`, `authenticated`, or `disabled`. |
+| `VITE_API_URL`                    | Frontend build env   | —   | —        | —        | yes      | Absolute API origin inlined into the SPA bundle for split deployments.        |
 
 ## Operational concerns (shape-independent)
 

@@ -1,40 +1,116 @@
 import type { HealthPolicy } from "@sapporta/server";
 
+export type Origin = string & { readonly __origin: unique symbol };
+
 export interface ProjectAuthEnv {
-  secret: string;
+  betterAuthSecret: string;
+  betterAuthUrl: Origin;
+  trustedOrigins: Origin[];
   requireVerifiedEmail: boolean;
   healthPolicy: HealthPolicy;
-  frontendOrigins: string[];
 }
 
 export function readProjectAuthEnv(
   env: NodeJS.ProcessEnv = process.env,
 ): ProjectAuthEnv {
   return {
-    secret: readAuthSecret(env),
-    requireVerifiedEmail: env.SAPPORTA_REQUIRE_VERIFIED_EMAIL !== "false",
+    betterAuthSecret: readRequiredEnv(env, "BETTER_AUTH_SECRET"),
+    betterAuthUrl: readRequiredOrigin(env, "BETTER_AUTH_URL"),
+    trustedOrigins: readTrustedOrigins(env),
+    requireVerifiedEmail: readBooleanEnv(
+      env.SAPPORTA_REQUIRE_VERIFIED_EMAIL,
+      "SAPPORTA_REQUIRE_VERIFIED_EMAIL",
+      true,
+    ),
     healthPolicy: readHealthPolicy(env.SAPPORTA_HEALTH_POLICY),
-    frontendOrigins: readOrigins(env.SAPPORTA_FRONTEND_ORIGINS),
   };
 }
 
-function readAuthSecret(env: NodeJS.ProcessEnv): string {
-  const secret = env.BETTER_AUTH_SECRET ?? env.SAPPORTA_AUTH_SECRET;
-  if (secret) return secret;
-  throw new Error("Project auth requires BETTER_AUTH_SECRET or SAPPORTA_AUTH_SECRET.");
+function readRequiredEnv(
+  env: NodeJS.ProcessEnv,
+  name: keyof NodeJS.ProcessEnv,
+): string {
+  const value = env[name];
+  if (value) return value;
+  throw new Error(`Project auth requires ${name}.`);
+}
+
+function readRequiredOrigin(
+  env: NodeJS.ProcessEnv,
+  name: keyof NodeJS.ProcessEnv,
+): Origin {
+  return parseOrigin(readRequiredEnv(env, name), String(name));
+}
+
+function readBooleanEnv(
+  value: string | undefined,
+  name: string,
+  fallback: boolean,
+): boolean {
+  if (value === undefined || value === "") return fallback;
+  if (value === "true") return true;
+  if (value === "false") return false;
+  throw new Error(`${name} must be "true" or "false".`);
 }
 
 function readHealthPolicy(value: string | undefined): HealthPolicy {
+  if (value === undefined || value === "") return "public";
   if (value === "disabled" || value === "authenticated" || value === "public") {
     return value;
   }
-  return "public";
+  throw new Error(
+    'SAPPORTA_HEALTH_POLICY must be "public", "authenticated", or "disabled".',
+  );
 }
 
-function readOrigins(value: string | undefined): string[] {
-  if (!value) return [];
+function readTrustedOrigins(env: NodeJS.ProcessEnv): Origin[] {
+  const explicitOrigins = readOrigins(
+    env.SAPPORTA_FRONTEND_ORIGINS,
+    "SAPPORTA_FRONTEND_ORIGINS",
+  );
+  if (explicitOrigins.length > 0) return explicitOrigins;
+
+  const devPort = readOptionalIntegerEnv(
+    env.FRONTEND_DEV_PORT,
+    "FRONTEND_DEV_PORT",
+  );
+  if (devPort === undefined) return [];
+  return [parseOrigin(`http://localhost:${devPort}`, "FRONTEND_DEV_PORT")];
+}
+
+function readOrigins(value: string | undefined, name: string): Origin[] {
+  if (value === undefined || value === "") return [];
   return value
     .split(",")
     .map((origin) => origin.trim())
-    .filter(Boolean);
+    .filter(Boolean)
+    .map((origin) => parseOrigin(origin, name));
+}
+
+function readOptionalIntegerEnv(
+  value: string | undefined,
+  name: string,
+): number | undefined {
+  if (value === undefined || value === "") return undefined;
+  const parsed = Number.parseInt(value, 10);
+  if (!Number.isInteger(parsed) || String(parsed) !== value) {
+    throw new Error(`${name} must be an integer.`);
+  }
+  return parsed;
+}
+
+function parseOrigin(value: string, name: string): Origin {
+  let url: URL;
+  try {
+    url = new URL(value);
+  } catch {
+    throw new Error(`${name} must contain valid URL origins.`);
+  }
+
+  if (url.origin !== value || url.pathname !== "/" || url.search || url.hash) {
+    throw new Error(
+      `${name} must contain origins only, such as https://app.example.com.`,
+    );
+  }
+  return url.origin as Origin;
 }

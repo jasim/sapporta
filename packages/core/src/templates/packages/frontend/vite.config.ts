@@ -7,13 +7,13 @@ import tailwindcss from "@tailwindcss/vite";
 // /api/* to the Hono backend on PORT (default 3000) — frontend code uses
 // relative URLs and never sees the backend port. In prod, Hono alone
 // serves both the built SPA (packages/frontend/dist/) and the API from one origin,
-// so the same relative URLs keep working. No .env, no VITE_API_URL, no CORS.
+// so the same relative URLs keep working. No VITE_API_URL is needed unless
+// production splits the SPA and API across different origins.
 //
-// Multi-project on one machine: start each project with its own backend
-// port (e.g. `PORT=3001 pnpm dev`, `PORT=3002 pnpm dev`). boot.ts reads
-// PORT to bind Hono; this config reads the same var to point the proxy.
-// Vite's own dev port (5173) auto-increments on collision, so the frontend
-// side takes care of itself.
+// Multi-project on one machine: give each project its own PORT and
+// FRONTEND_DEV_PORT in .env.development. boot.ts reads PORT to bind Hono; this
+// config reads PORT as the API proxy target and FRONTEND_DEV_PORT as Vite's own
+// port. strictPort keeps the trusted dev origin exact.
 //
 // __SLUG__-shared is aliased to its source so HMR works without rebuilding
 // the shared package's dist/ on every edit. Backend imports the same
@@ -26,7 +26,8 @@ export default defineConfig({
     },
   },
   server: {
-    port: 5173,
+    port: parseIntegerEnv("FRONTEND_DEV_PORT", 5173),
+    strictPort: true,
     proxy: {
       "/api": `http://localhost:${process.env.PORT ?? "3000"}`,
     },
@@ -41,3 +42,13 @@ export default defineConfig({
     },
   },
 });
+
+function parseIntegerEnv(name: string, fallback: number): number {
+  const value = process.env[name];
+  if (value === undefined || value === "") return fallback;
+  const parsed = Number.parseInt(value, 10);
+  if (!Number.isInteger(parsed) || String(parsed) !== value) {
+    throw new Error(`${name} must be an integer.`);
+  }
+  return parsed;
+}

@@ -1,4 +1,4 @@
-#!/usr/bin/env zx
+#!/usr/bin/env node
 
 import { mkdir, rm } from "node:fs/promises";
 import { spawn } from "node:child_process";
@@ -86,7 +86,9 @@ await new Promise((resolve, reject) => {
       }
 
       if (code !== 0) {
-        finish(new Error(`A dev process exited with code ${code ?? "unknown"}`));
+        finish(
+          new Error(`A dev process exited with code ${code ?? "unknown"}`),
+        );
       }
     });
   }

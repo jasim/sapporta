@@ -10,6 +10,11 @@ A Sapporta project.
 - `pnpm --filter ./packages/api db:generate --name add_table` — generate Drizzle SQL migrations from schema changes
 - `pnpm --filter ./packages/api db:migrate` — apply pending Drizzle migrations
 
+`pnpm dev` loads `.env.development` with Node's built-in `--env-file` support.
+That file contains local-only auth defaults, including a generated
+`BETTER_AUTH_SECRET`, `BETTER_AUTH_URL=http://localhost:3000`, and
+`FRONTEND_DEV_PORT=5173`. It is ignored by git.
+
 ## Project layout
 
 ```
@@ -53,18 +58,21 @@ Change schema, run Drizzle Kit generate, review SQL, run Drizzle Kit migrate, st
 
 ## Running multiple projects on one machine
 
-Each backend binds to `PORT` (default `3000`). To run several Sapporta projects
-side-by-side, give each one its own port:
+Each backend binds to `PORT` from `.env.development` (default `3000`) and each
+Vite dev server binds to `FRONTEND_DEV_PORT` (default `5173`). To run several
+Sapporta projects side-by-side, give each project its own pair:
 
-```bash
-PORT=3001 pnpm dev   # project foo
-PORT=3002 pnpm dev   # project bar (in another terminal)
+```env
+PORT=3001
+BETTER_AUTH_URL=http://localhost:3001
+FRONTEND_DEV_PORT=5174
 ```
 
 `packages/frontend/vite.config.ts` reads the same `PORT` variable to point its `/api`
-proxy at the right backend. Vite's own dev-server port (`5173`) auto-increments
-on collision, so the frontend side takes care of itself. No `.env`, no
-`VITE_API_URL`, no CORS.
+proxy at the right backend, and reads `FRONTEND_DEV_PORT` for its own port. The
+API trusts `http://localhost:${FRONTEND_DEV_PORT}` in development. `VITE_API_URL`
+is not needed in development because frontend code calls relative `/api/*` URLs
+through Vite's proxy.
 
 ## Deployment
 

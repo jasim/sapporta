@@ -71,6 +71,8 @@ export const SCAFFOLD_FILES: ScaffoldFile[] = [
   scaffoldFile("packages/api/package.json", "workspace"),
   scaffoldFile("packages/api/tsconfig.json", "framework"),
   scaffoldFile("package.json", "workspace"),
+  scaffoldFile(".env.development", "workspace"),
+  scaffoldFile(".env.production.example", "workspace"),
   scaffoldFile("scripts/dev.mjs", "workspace"),
   scaffoldFile("pnpm-workspace.yaml", "workspace"),
   scaffoldFile("Dockerfile", "workspace"),

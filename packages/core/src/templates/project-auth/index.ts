@@ -46,8 +46,7 @@ export function createProjectAuth({
 }: CreateProjectAuthOptions): ProjectAuth {
   const auth = createBetterAuth({ conn, env });
   const isAuthRoute = (c: Context<SapportaEnv>) =>
-    c.req.path.startsWith("/api/auth/") ||
-    c.req.path === "/api/auth-bootstrap";
+    c.req.path.startsWith("/api/auth/") || c.req.path === "/api/auth-bootstrap";
   const resolveAuth = (c: Context<SapportaEnv>) =>
     resolveSapportaAuthContext(auth.api, conn, catalog, c.req.raw.headers);
 

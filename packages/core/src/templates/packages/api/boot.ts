@@ -66,7 +66,7 @@ const app = new Hono<SapportaEnv>();
 //    /api/auth/* before installing project-auth middleware.
 installRequestLogging(app);
 installExactOriginCors(app, {
-  origins: projectAuth.env.frontendOrigins,
+  origins: projectAuth.env.trustedOrigins,
   credentials: true,
 });
 installSapportaErrorHandler(app);
@@ -104,9 +104,8 @@ mountOpenApi(app, sapporta, sapportaApi, apiApp, projectAuth.routes);
 //   (a) same-origin via this Hono process (default; `pnpm start`)
 //   (b) same-origin behind nginx - nginx serves packages/frontend/dist directly
 //       and proxies /api/ here; this block becomes harmless dead code
-//   (c) split - SPA on a CDN, API here. Delete this block, set
-//       VITE_API_URL in packages/frontend/.env.production, and add CORS:
-//       `app.use("/api/*", cors({ origin: process.env.FRONTEND_ORIGIN! }))`
+//   (c) split - SPA on a CDN, API here. Delete this block, set VITE_API_URL
+//       for the SPA build, and set SAPPORTA_FRONTEND_ORIGINS on the API host.
 //
 // Mounted after /api so API routes match first; everything else falls
 // through to index.html for client-side routing on hard reload.
