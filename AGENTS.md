@@ -30,3 +30,5 @@ packages/ui/            @sapporta/ui — React admin UI, CRUD screens, report vi
 Always fix root causes, not symptoms. Do not apply workarounds or ad-hoc patches — trace the issue to its architectural source before proposing a fix.
 
 Do not use `any`. Use concrete types, generics, or `unknown`.
+
+Commit messages should follow COMMIT-CONVENTIONS.md.
