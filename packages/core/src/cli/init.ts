@@ -48,7 +48,7 @@ export async function init(args: string[]): Promise<OperationResult> {
       data: [],
       meta: {
         message: [
-          `Initialized project in ${projectDir}. Dependencies installed.`,
+          `Initialized project in ${projectDir}. Dependencies installed and initial database migration applied.`,
           skillMessage,
           `Your Sapporta project is now ready. Run:`,
           `  cd ${projectName}`,
