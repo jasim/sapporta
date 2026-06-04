@@ -39,17 +39,18 @@ Shape (c) loses both; its extra configuration follows from that.
 - `.env.production.example` — placeholder production values. Copy the values
   into your deployment environment; `pnpm start` does not load development env.
 
-`BETTER_AUTH_URL` is the public origin of the API/auth server. In same-origin
-deployments, that is also the SPA origin. In split deployments, it is the API
-origin.
+`SAPPORTA_PUBLIC_BASE_URL` is the public browser-facing app origin. Sapporta
+uses it as Better Auth's public base URL and as the server-owned return URL for
+auth emails. It must be an origin only, such as `https://app.example.com`, and
+`/api/auth/*` must be reachable from that origin.
 
 `SAPPORTA_FRONTEND_ORIGINS` is the list of browser origins allowed to make
-credentialed API/auth requests. In same-origin deployments, set it to the app's
-public origin. In split deployments, set it to the SPA origin.
+credentialed API/auth requests in addition to `SAPPORTA_PUBLIC_BASE_URL`.
 
-In development, `FRONTEND_DEV_PORT` is the single source for Vite's dev-server
-port and the API's trusted localhost origin. Set `SAPPORTA_FRONTEND_ORIGINS`
-only when you need additional browser origins.
+In development, set `SAPPORTA_PUBLIC_BASE_URL` to the Vite dev-server origin
+and `FRONTEND_DEV_PORT` to the same port. Vite proxies `/api/*` to Hono, so
+auth links like `/api/auth/verify-email` work from the public dev origin. Set
+`SAPPORTA_FRONTEND_ORIGINS` only when you need additional browser origins.
 
 `VITE_API_URL` is different: it is baked into the browser bundle only when the
 SPA and API are deployed to different origins. It is not used in development or
@@ -149,16 +150,24 @@ hashed JS and CSS files for the current deployment.
 
 The SPA ships to a CDN (Cloudflare Pages, Netlify, Vercel, S3 + CloudFront, …) and the Hono API runs on a separate host — e.g. `https://app.example.com` for the SPA and `https://api.example.com` for the API.
 
-### 1. Trusted frontend origin on the API
+### 1. Public app origin and trusted origins
 
-Set `SAPPORTA_FRONTEND_ORIGINS` on the API server:
+Set `SAPPORTA_PUBLIC_BASE_URL` on the API server:
 
 ```env
-SAPPORTA_FRONTEND_ORIGINS=https://app.example.com
+SAPPORTA_PUBLIC_BASE_URL=https://app.example.com
 ```
 
-Sapporta's generated `boot.ts` installs exact-origin credentialed CORS and
-passes the same list to Better Auth as `trustedOrigins`.
+Sapporta includes that origin in Better Auth `trustedOrigins` and uses it for
+verification/reset email return URLs. Set `SAPPORTA_FRONTEND_ORIGINS` only for
+additional browser origins:
+
+```env
+SAPPORTA_FRONTEND_ORIGINS=https://preview.example.com
+```
+
+Sapporta's generated `boot.ts` installs exact-origin credentialed CORS and passes
+the public origin plus any extra origins to Better Auth as `trustedOrigins`.
 
 ### 2. Absolute backend URL baked into the SPA
 
@@ -172,13 +181,13 @@ That's the only change needed in the SPA — application code is untouched. `@sa
 
 Only `VITE_`-prefixed env vars reach the client bundle — Vite's rule. Don't smuggle secrets through `VITE_*`; they ship in the JS.
 
-### 3. API/auth public URL
+### 3. Route auth callbacks from the public origin
 
-Set Better Auth's public API origin on the API server:
-
-```env
-BETTER_AUTH_URL=https://api.example.com
-```
+Auth email links are generated on `SAPPORTA_PUBLIC_BASE_URL`, for example
+`https://app.example.com/api/auth/verify-email`. In split topology, configure
+the CDN or frontend host to proxy `/api/auth/*` to the API host. This keeps
+email links and post-verification redirects on the app's public origin while the
+SPA can still call the full API at `VITE_API_URL`.
 
 ### 4. Delete the `serveStatic` block
 
@@ -187,7 +196,7 @@ Dead code in this shape (see the `serveStatic` section).
 ### 5. Deploy in two halves
 
 - **SPA:** `vite build` → `packages/frontend/dist/`. Upload to the CDN and configure an SPA fallback (`/* → /index.html`) so React Router handles deep links on hard reload.
-- **API:** `tsc` → `packages/api/dist/`. Run `node packages/api/dist/boot.js` with `PORT`, `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL`, and `SAPPORTA_FRONTEND_ORIGINS` set.
+- **API:** `tsc` → `packages/api/dist/`. Run `node packages/api/dist/boot.js` with `PORT`, `BETTER_AUTH_SECRET`, `SAPPORTA_PUBLIC_BASE_URL`, and any extra `SAPPORTA_FRONTEND_ORIGINS` set.
 
 Fit:
 
@@ -199,10 +208,10 @@ Fit:
 | Variable                          | Read from            | Dev | (a)      | (b)      | (c)      | Purpose                                                                       |
 | --------------------------------- | -------------------- | --- | -------- | -------- | -------- | ----------------------------------------------------------------------------- |
 | `PORT`                            | API host process env | yes | yes      | yes      | yes      | Port Hono binds to. Defaults to `3000`.                                       |
-| `FRONTEND_DEV_PORT`               | Dev process env      | yes | —        | —        | —        | Vite dev-server port and derived localhost trusted origin.                    |
+| `FRONTEND_DEV_PORT`               | Dev process env      | yes | —        | —        | —        | Vite dev-server port. Match it to `SAPPORTA_PUBLIC_BASE_URL` in dev.          |
 | `BETTER_AUTH_SECRET`              | API host process env | yes | yes      | yes      | yes      | Better Auth signing secret. Generated only for local development.             |
-| `BETTER_AUTH_URL`                 | API host process env | yes | yes      | yes      | yes      | Public API/auth origin.                                                       |
-| `SAPPORTA_FRONTEND_ORIGINS`       | API host process env | yes | yes      | yes      | yes      | Browser origins trusted for credentialed API/auth requests.                   |
+| `SAPPORTA_PUBLIC_BASE_URL`        | API host process env | yes | yes      | yes      | yes      | Public app origin used for Better Auth links, callbacks, and default trust.   |
+| `SAPPORTA_FRONTEND_ORIGINS`       | API host process env | yes | yes      | yes      | yes      | Extra browser origins trusted for credentialed API/auth requests.             |
 | `SAPPORTA_REQUIRE_VERIFIED_EMAIL` | API host process env | yes | optional | optional | optional | Whether email/password sign-up requires verified email.                       |
 | `SAPPORTA_HEALTH_POLICY`          | API host process env | yes | optional | optional | optional | Access policy for health endpoints: `public`, `authenticated`, or `disabled`. |
 | `SAPPORTA_MAIL_TRANSPORT`         | API host process env | yes | yes      | yes      | yes      | Mail transport: `stream`, `smtp`, or `disabled`.                              |

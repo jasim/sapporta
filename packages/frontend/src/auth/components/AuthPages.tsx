@@ -1,5 +1,5 @@
 import { useState, type FormEvent, type ReactNode } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { Button, Input, Label } from "@sapporta/ui";
 import { getApiBase } from "@/platform/base";
 import { useAuthStore } from "@/auth/state/auth-store";
@@ -7,7 +7,13 @@ import { useAuthStore } from "@/auth/state/auth-store";
 type AuthMode = "login" | "signup" | "forgot" | "reset";
 
 export function LoginPage() {
-  return <EmailPasswordPage mode="login" title="Log in" endpoint="/auth/sign-in/email" />;
+  return (
+    <EmailPasswordPage
+      mode="login"
+      title="Log in"
+      endpoint="/auth/sign-in/email"
+    />
+  );
 }
 
 export function SignupPage() {
@@ -22,11 +28,23 @@ export function SignupPage() {
 }
 
 export function ForgotPasswordPage() {
-  return <EmailPasswordPage mode="forgot" title="Reset password" endpoint="/auth/forget-password" />;
+  return (
+    <EmailPasswordPage
+      mode="forgot"
+      title="Reset password"
+      endpoint="/auth/request-password-reset"
+    />
+  );
 }
 
 export function ResetPasswordPage() {
-  return <EmailPasswordPage mode="reset" title="Set new password" endpoint="/auth/reset-password" />;
+  return (
+    <EmailPasswordPage
+      mode="reset"
+      title="Set new password"
+      endpoint="/auth/reset-password"
+    />
+  );
 }
 
 export function VerifyEmailPage() {
@@ -54,6 +72,7 @@ function EmailPasswordPage({
   note?: string;
 }) {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const refresh = useAuthStore((s) => s.refresh);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -66,11 +85,17 @@ function EmailPasswordPage({
     setSubmitting(true);
     setError(null);
     try {
+      const resetToken = searchParams.get("token");
+      if (mode === "reset" && !resetToken) {
+        throw new Error("Password reset link is missing a token.");
+      }
       const res = await fetch(`${getApiBase()}${endpoint}`, {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(bodyForMode(mode, { email, password, name })),
+        body: JSON.stringify(
+          bodyForMode(mode, { email, password, name, resetToken }),
+        ),
       });
       if (!res.ok) throw new Error(await responseMessage(res));
       if (mode === "forgot") {
@@ -125,7 +150,13 @@ function EmailPasswordPage({
   );
 }
 
-function AuthFrame({ title, children }: { title: string; children: ReactNode }) {
+function AuthFrame({
+  title,
+  children,
+}: {
+  title: string;
+  children: ReactNode;
+}) {
   return (
     <div className="flex min-h-screen items-center justify-center bg-sap-bg px-4">
       <div className="w-full max-w-[360px] space-y-5">
@@ -163,13 +194,27 @@ function AuthLinks({ mode }: { mode: AuthMode }) {
 
 function bodyForMode(
   mode: AuthMode,
-  fields: { email: string; password: string; name: string },
+  fields: {
+    email: string;
+    password: string;
+    name: string;
+    resetToken: string | null;
+  },
 ): Record<string, string> {
   if (mode === "signup") {
-    return { email: fields.email, password: fields.password, name: fields.name };
+    return {
+      email: fields.email,
+      password: fields.password,
+      name: fields.name,
+      callbackURL: "/",
+    };
   }
-  if (mode === "forgot") return { email: fields.email };
-  if (mode === "reset") return { password: fields.password };
+  if (mode === "forgot") {
+    return { email: fields.email, redirectTo: "/reset-password" };
+  }
+  if (mode === "reset") {
+    return { newPassword: fields.password, token: fields.resetToken ?? "" };
+  }
   return { email: fields.email, password: fields.password };
 }
 

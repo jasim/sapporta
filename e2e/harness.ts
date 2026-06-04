@@ -827,7 +827,8 @@ export async function startBuiltServer(
       env: {
         ...project.env,
         ...envOverrides,
-        BETTER_AUTH_URL: envOverrides.BETTER_AUTH_URL ?? baseUrl,
+        SAPPORTA_PUBLIC_BASE_URL:
+          envOverrides.SAPPORTA_PUBLIC_BASE_URL ?? baseUrl,
         PORT: String(port),
       },
       stdio: "pipe",
@@ -892,7 +893,7 @@ export async function buildAndRunDockerProject(
           "-e",
           `BETTER_AUTH_SECRET=${project.env.BETTER_AUTH_SECRET ?? "sapporta-e2e-generated-project-secret"}`,
           "-e",
-          `BETTER_AUTH_URL=${baseUrl}`,
+          `SAPPORTA_PUBLIC_BASE_URL=${baseUrl}`,
           "-e",
           `SAPPORTA_FRONTEND_ORIGINS=${baseUrl}`,
           "-e",

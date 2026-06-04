@@ -109,7 +109,8 @@ mountOpenApi(app, sapporta, sapportaApi, apiApp, projectAuth.routes);
 //   (b) same-origin behind nginx - nginx serves packages/frontend/dist directly
 //       and proxies /api/ here; this block becomes harmless dead code
 //   (c) split - SPA on a CDN, API here. Delete this block, set VITE_API_URL
-//       for the SPA build, and set SAPPORTA_FRONTEND_ORIGINS on the API host.
+//       for the SPA build, set SAPPORTA_PUBLIC_BASE_URL on the API host, and
+//       route public /api/auth/* requests to this API process.
 //
 // Mounted after /api so API routes match first; everything else falls
 // through to index.html for client-side routing on hard reload.

@@ -1,7 +1,4 @@
-import nodemailer, {
-  type SentMessageInfo,
-  type Transporter,
-} from "nodemailer";
+import nodemailer, { type SentMessageInfo, type Transporter } from "nodemailer";
 import type Mail from "nodemailer/lib/mailer/index.js";
 import type SMTPTransport from "nodemailer/lib/smtp-transport/index.js";
 import type {
@@ -48,13 +45,14 @@ export async function sendMailWith(
     return { accepted: [], rejected: [], response: "disabled" };
   }
 
-  const info = await transport.sendMail({
+  const sentMessage: Mail.Options = {
     from: defaults.from,
     ...message,
-  });
+  };
+  const info = await transport.sendMail(sentMessage);
 
   if (defaults.transport === "stream") {
-    logStreamMessage(info);
+    logStreamMessage(sentMessage);
   }
 
   return info;
@@ -87,20 +85,32 @@ export function readSmtpOptions(
   };
 }
 
-function logStreamMessage(info: SentMessageInfo): void {
-  const message = readGeneratedMessage(info);
-  if (message === undefined) return;
-  console.log("\n[sapporta mail] generated email\n" + message);
+function logStreamMessage(message: Mail.Options): void {
+  console.log(
+    [
+      "\n[sapporta mail] generated email",
+      `From: ${formatAddressLog(message.from)}`,
+      `To: ${formatAddressLog(message.to)}`,
+      message.subject ? `Subject: ${message.subject}` : undefined,
+      formatBodyPart("Text", message.text),
+      formatBodyPart("HTML", message.html),
+    ]
+      .filter((part): part is string => part !== undefined)
+      .join("\n\n"),
+  );
 }
 
-function readGeneratedMessage(info: SentMessageInfo): string | undefined {
-  if (typeof info !== "object" || info === null || !("message" in info)) {
-    return undefined;
-  }
+function formatBodyPart(
+  label: string,
+  value: Mail.Options["text"],
+): string | undefined {
+  const body = formatBodyValue(value);
+  return body === undefined ? undefined : `${label}:\n${body}`;
+}
 
-  const message = info.message;
-  if (Buffer.isBuffer(message)) return message.toString("utf8");
-  if (typeof message === "string") return message;
+function formatBodyValue(value: Mail.Options["text"]): string | undefined {
+  if (typeof value === "string") return value;
+  if (Buffer.isBuffer(value)) return value.toString("utf8");
   return undefined;
 }
 

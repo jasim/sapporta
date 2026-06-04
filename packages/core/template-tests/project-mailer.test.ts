@@ -1,10 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Transporter } from "nodemailer";
 import type Mail from "nodemailer/lib/mailer/index.js";
-import {
-  readSmtpOptions,
-  sendMailWith,
-} from "../src/templates/mailer.js";
+import { readSmtpOptions, sendMailWith } from "../src/templates/mailer.js";
 import { readProjectAuthEnv } from "../src/templates/project-auth/env.js";
 import {
   buildPasswordResetEmail,
@@ -132,7 +129,10 @@ describe("project mailer template", () => {
       {
         to: "owner@example.test",
         subject: "Custom domain email",
-        text: "This body came from a custom route.",
+        text: [
+          "This body came from a custom route.",
+          "http://localhost:5173/api/auth/verify-email?token=verify-token&callbackURL=http%3A%2F%2Flocalhost%3A5173%2F",
+        ].join("\n"),
       },
     );
 
@@ -142,10 +142,18 @@ describe("project mailer template", () => {
         from: "Sapporta <no-reply@example.test>",
         to: "owner@example.test",
         subject: "Custom domain email",
-        text: "This body came from a custom route.",
+        text: [
+          "This body came from a custom route.",
+          "http://localhost:5173/api/auth/verify-email?token=verify-token&callbackURL=http%3A%2F%2Flocalhost%3A5173%2F",
+        ].join("\n"),
       },
     ]);
     expect(consoleLog).toHaveBeenCalledWith(
+      expect.stringContaining(
+        "http://localhost:5173/api/auth/verify-email?token=verify-token&callbackURL=http%3A%2F%2Flocalhost%3A5173%2F",
+      ),
+    );
+    expect(consoleLog).not.toHaveBeenCalledWith(
       expect.stringContaining("raw generated email source"),
     );
   });
@@ -206,13 +214,10 @@ describe("project mailer template", () => {
   });
 });
 
-function authEnv(
-  overrides: NodeJS.ProcessEnv = {},
-): NodeJS.ProcessEnv {
+function authEnv(overrides: NodeJS.ProcessEnv = {}): NodeJS.ProcessEnv {
   return {
     BETTER_AUTH_SECRET: "secret",
-    BETTER_AUTH_URL: "http://localhost:3000",
-    FRONTEND_DEV_PORT: "5173",
+    SAPPORTA_PUBLIC_BASE_URL: "http://localhost:5173",
     SAPPORTA_MAIL_TRANSPORT: "stream",
     SAPPORTA_MAIL_FROM: "Sapporta <no-reply@example.test>",
     ...overrides,

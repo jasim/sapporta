@@ -12,7 +12,7 @@ A Sapporta project.
 
 `pnpm dev` loads `.env.development` with Node's built-in `--env-file` support.
 That file contains local-only auth defaults, including a generated
-`BETTER_AUTH_SECRET`, `BETTER_AUTH_URL=http://localhost:3000`, and
+`BETTER_AUTH_SECRET`, `SAPPORTA_PUBLIC_BASE_URL=http://localhost:5173`, and
 `FRONTEND_DEV_PORT=5173`. It also sets `SAPPORTA_MAIL_TRANSPORT=stream`,
 so Nodemailer prints the full generated email source to the API console instead
 of delivering it. It is ignored by git.
@@ -86,15 +86,16 @@ Sapporta projects side-by-side, give each project its own pair:
 
 ```env
 PORT=3001
-BETTER_AUTH_URL=http://localhost:3001
+SAPPORTA_PUBLIC_BASE_URL=http://localhost:5174
 FRONTEND_DEV_PORT=5174
 ```
 
 `packages/frontend/vite.config.ts` reads the same `PORT` variable to point its `/api`
 proxy at the right backend, and reads `FRONTEND_DEV_PORT` for its own port. The
-API trusts `http://localhost:${FRONTEND_DEV_PORT}` in development. `VITE_API_URL`
-is not needed in development because frontend code calls relative `/api/*` URLs
-through Vite's proxy.
+API trusts `SAPPORTA_PUBLIC_BASE_URL` and uses it for auth/email callback links,
+so those links also go through Vite's `/api/*` proxy in development.
+`VITE_API_URL` is not needed in development because frontend code calls relative
+`/api/*` URLs through Vite's proxy.
 
 ## Deployment
 

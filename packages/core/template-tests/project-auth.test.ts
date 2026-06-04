@@ -41,7 +41,7 @@ describe("project auth template", () => {
     expect(
       readProjectAuthEnv({
         BETTER_AUTH_SECRET: "secret",
-        BETTER_AUTH_URL: "http://localhost:3000",
+        SAPPORTA_PUBLIC_BASE_URL: "http://localhost:5173",
         SAPPORTA_FRONTEND_ORIGINS:
           "http://localhost:5173, http://localhost:5174",
         SAPPORTA_REQUIRE_VERIFIED_EMAIL: "false",
@@ -51,11 +51,8 @@ describe("project auth template", () => {
     ).toEqual({
       port: 3000,
       betterAuthSecret: "secret",
-      betterAuthUrl: "http://localhost:3000",
-      trustedOrigins: [
-        "http://localhost:5173",
-        "http://localhost:5174",
-      ],
+      publicBaseUrl: "http://localhost:5173",
+      trustedOrigins: ["http://localhost:5173", "http://localhost:5174"],
       requireVerifiedEmail: false,
       healthPolicy: "authenticated",
       mail: {
@@ -65,22 +62,33 @@ describe("project auth template", () => {
     });
   });
 
-  it("derives the dev trusted origin from FRONTEND_DEV_PORT", () => {
+  it("trusts the public base URL origin", () => {
     expect(
       readProjectAuthEnv({
         BETTER_AUTH_SECRET: "secret",
-        BETTER_AUTH_URL: "http://localhost:3000",
-        FRONTEND_DEV_PORT: "5173",
+        SAPPORTA_PUBLIC_BASE_URL: "http://localhost:5173",
         SAPPORTA_MAIL_FROM: "Sapporta <no-reply@example.test>",
       }).trustedOrigins,
     ).toEqual(["http://localhost:5173"]);
+  });
+
+  it("deduplicates the public base URL from extra frontend origins", () => {
+    expect(
+      readProjectAuthEnv({
+        BETTER_AUTH_SECRET: "secret",
+        SAPPORTA_PUBLIC_BASE_URL: "http://localhost:5173",
+        SAPPORTA_FRONTEND_ORIGINS:
+          "http://localhost:5174, http://localhost:5173",
+        SAPPORTA_MAIL_FROM: "Sapporta <no-reply@example.test>",
+      }).trustedOrigins,
+    ).toEqual(["http://localhost:5173", "http://localhost:5174"]);
   });
 
   it("uses the configured API port", () => {
     expect(
       readProjectAuthEnv({
         BETTER_AUTH_SECRET: "secret",
-        BETTER_AUTH_URL: "http://localhost:3001",
+        SAPPORTA_PUBLIC_BASE_URL: "http://localhost:5174",
         PORT: "3001",
         SAPPORTA_MAIL_FROM: "Sapporta <no-reply@example.test>",
       }).port,
@@ -91,15 +99,15 @@ describe("project auth template", () => {
     expect(() =>
       readProjectAuthEnv({
         BETTER_AUTH_SECRET: "secret",
-        BETTER_AUTH_URL: "http://localhost:3000/path",
+        SAPPORTA_PUBLIC_BASE_URL: "http://localhost:5173/path",
         SAPPORTA_MAIL_FROM: "Sapporta <no-reply@example.test>",
       }),
-    ).toThrow(/BETTER_AUTH_URL must contain origins only/);
+    ).toThrow(/SAPPORTA_PUBLIC_BASE_URL must contain origins only/);
 
     expect(() =>
       readProjectAuthEnv({
         BETTER_AUTH_SECRET: "secret",
-        BETTER_AUTH_URL: "http://localhost:3000",
+        SAPPORTA_PUBLIC_BASE_URL: "http://localhost:5173",
         SAPPORTA_REQUIRE_VERIFIED_EMAIL: "no",
         SAPPORTA_MAIL_FROM: "Sapporta <no-reply@example.test>",
       }),
@@ -108,16 +116,16 @@ describe("project auth template", () => {
     expect(() =>
       readProjectAuthEnv({
         BETTER_AUTH_SECRET: "secret",
-        BETTER_AUTH_URL: "http://localhost:3000",
-        FRONTEND_DEV_PORT: "5173x",
+        SAPPORTA_PUBLIC_BASE_URL: "http://localhost:5173",
+        SAPPORTA_FRONTEND_ORIGINS: "http://localhost:5173x",
         SAPPORTA_MAIL_FROM: "Sapporta <no-reply@example.test>",
       }),
-    ).toThrow(/FRONTEND_DEV_PORT/);
+    ).toThrow(/SAPPORTA_FRONTEND_ORIGINS/);
 
     expect(() =>
       readProjectAuthEnv({
         BETTER_AUTH_SECRET: "secret",
-        BETTER_AUTH_URL: "http://localhost:3000",
+        SAPPORTA_PUBLIC_BASE_URL: "http://localhost:5173",
         PORT: "3001x",
         SAPPORTA_MAIL_FROM: "Sapporta <no-reply@example.test>",
       }),
@@ -126,7 +134,7 @@ describe("project auth template", () => {
     expect(() =>
       readProjectAuthEnv({
         BETTER_AUTH_SECRET: "secret",
-        BETTER_AUTH_URL: "http://localhost:3000",
+        SAPPORTA_PUBLIC_BASE_URL: "http://localhost:5173",
         PORT: "abc",
         SAPPORTA_MAIL_FROM: "Sapporta <no-reply@example.test>",
       }),

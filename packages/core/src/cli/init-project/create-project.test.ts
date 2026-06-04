@@ -36,6 +36,9 @@ describe("renderScaffoldFiles", () => {
     expect(byDest.get(".env.development")).toMatch(
       /BETTER_AUTH_SECRET=[A-Za-z0-9_-]{43}/,
     );
+    expect(byDest.get(".env.development")).toContain(
+      "SAPPORTA_PUBLIC_BASE_URL=http://localhost:5173",
+    );
 
     for (const file of files) {
       expect(file.content, file.dest).not.toMatch(unresolvedToken);

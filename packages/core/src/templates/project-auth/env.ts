@@ -1,11 +1,14 @@
 import type { HealthPolicy } from "@sapporta/server";
 
 export type Origin = string & { readonly __origin: unique symbol };
+export type PublicBaseUrl = Origin & {
+  readonly __publicBaseUrl: unique symbol;
+};
 
 export interface ProjectAuthEnv {
   port: number;
   betterAuthSecret: string;
-  betterAuthUrl: Origin;
+  publicBaseUrl: PublicBaseUrl;
   trustedOrigins: Origin[];
   requireVerifiedEmail: boolean;
   healthPolicy: HealthPolicy;
@@ -37,14 +40,15 @@ export type ProjectSmtpConfig =
 export function readProjectAuthEnv(
   env: NodeJS.ProcessEnv = process.env,
 ): ProjectAuthEnv {
+  const publicBaseUrl = readRequiredPublicBaseUrl(env);
   return {
     port:
       env.PORT === undefined || env.PORT === ""
         ? 3000
         : parseIntegerEnv(env.PORT, "PORT"),
     betterAuthSecret: readRequiredEnv(env, "BETTER_AUTH_SECRET"),
-    betterAuthUrl: readRequiredOrigin(env, "BETTER_AUTH_URL"),
-    trustedOrigins: readTrustedOrigins(env),
+    publicBaseUrl,
+    trustedOrigins: readTrustedOrigins(env, publicBaseUrl),
     requireVerifiedEmail: readBooleanEnv(
       env.SAPPORTA_REQUIRE_VERIFIED_EMAIL,
       "SAPPORTA_REQUIRE_VERIFIED_EMAIL",
@@ -106,11 +110,8 @@ function readRequiredEnv(
   throw new Error(`Project auth requires ${name}.`);
 }
 
-function readRequiredOrigin(
-  env: NodeJS.ProcessEnv,
-  name: keyof NodeJS.ProcessEnv,
-): Origin {
-  return parseOrigin(readRequiredEnv(env, name), String(name));
+function readRequiredPublicBaseUrl(env: NodeJS.ProcessEnv): PublicBaseUrl {
+  return parsePublicBaseUrl(readRequiredEnv(env, "SAPPORTA_PUBLIC_BASE_URL"));
 }
 
 function readBooleanEnv(
@@ -134,19 +135,14 @@ function readHealthPolicy(value: string | undefined): HealthPolicy {
   );
 }
 
-function readTrustedOrigins(env: NodeJS.ProcessEnv): Origin[] {
-  const explicitOrigins = readOrigins(
-    env.SAPPORTA_FRONTEND_ORIGINS,
-    "SAPPORTA_FRONTEND_ORIGINS",
-  );
-  if (explicitOrigins.length > 0) return explicitOrigins;
-
-  const devPort = readOptionalIntegerEnv(
-    env.FRONTEND_DEV_PORT,
-    "FRONTEND_DEV_PORT",
-  );
-  if (devPort === undefined) return [];
-  return [parseOrigin(`http://localhost:${devPort}`, "FRONTEND_DEV_PORT")];
+function readTrustedOrigins(
+  env: NodeJS.ProcessEnv,
+  publicBaseUrl: PublicBaseUrl,
+): Origin[] {
+  return uniqueOrigins([
+    parseOrigin(publicBaseUrl, "SAPPORTA_PUBLIC_BASE_URL"),
+    ...readOrigins(env.SAPPORTA_FRONTEND_ORIGINS, "SAPPORTA_FRONTEND_ORIGINS"),
+  ]);
 }
 
 function readOrigins(value: string | undefined, name: string): Origin[] {
@@ -156,14 +152,6 @@ function readOrigins(value: string | undefined, name: string): Origin[] {
     .map((origin) => origin.trim())
     .filter(Boolean)
     .map((origin) => parseOrigin(origin, name));
-}
-
-function readOptionalIntegerEnv(
-  value: string | undefined,
-  name: string,
-): number | undefined {
-  if (value === undefined || value === "") return undefined;
-  return parseIntegerEnv(value, name);
 }
 
 function readRequiredIntegerEnv(
@@ -182,6 +170,10 @@ function parseIntegerEnv(value: string, name: string): number {
   return parsed;
 }
 
+function parsePublicBaseUrl(value: string): PublicBaseUrl {
+  return parseOrigin(value, "SAPPORTA_PUBLIC_BASE_URL") as PublicBaseUrl;
+}
+
 function parseOrigin(value: string, name: string): Origin {
   let url: URL;
   try {
@@ -196,4 +188,8 @@ function parseOrigin(value: string, name: string): Origin {
     );
   }
   return url.origin as Origin;
+}
+
+function uniqueOrigins(origins: Origin[]): Origin[] {
+  return Array.from(new Set(origins));
 }

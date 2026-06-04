@@ -3,10 +3,7 @@ import type { ProjectDbConnection } from "@sapporta/server";
 import { betterAuth } from "better-auth";
 import type { SapportaMailer } from "../mailer.js";
 import type { ProjectAuthEnv } from "./env.js";
-import {
-  sendPasswordResetEmail,
-  sendVerificationEmail,
-} from "./emails.js";
+import { sendPasswordResetEmail, sendVerificationEmail } from "./emails.js";
 import {
   createProjectAuthEmailAndPasswordOptions,
   createProjectAuthPlugins,
@@ -43,7 +40,7 @@ export function createBetterAuth({
 }: CreateBetterAuthOptions): ProjectBetterAuth {
   const auth: ProjectBetterAuth = betterAuth({
     basePath: projectAuthBasePath,
-    baseURL: env.betterAuthUrl,
+    baseURL: env.publicBaseUrl,
     secret: env.betterAuthSecret,
     trustedOrigins: env.trustedOrigins,
     database: drizzleAdapter(conn.db, {
