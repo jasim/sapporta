@@ -8,7 +8,30 @@ export interface ProjectAuthEnv {
   trustedOrigins: Origin[];
   requireVerifiedEmail: boolean;
   healthPolicy: HealthPolicy;
+  mail: ProjectMailConfig;
 }
+
+export type MailTransportKind = "stream" | "smtp" | "disabled";
+
+export type ProjectMailConfig =
+  | {
+      from: string;
+      transport: "stream" | "disabled";
+    }
+  | {
+      from: string;
+      transport: "smtp";
+      smtp: ProjectSmtpConfig;
+    };
+
+export type ProjectSmtpConfig =
+  | { url: string }
+  | {
+      host: string;
+      port: number;
+      secure: boolean;
+      auth?: { user: string; pass: string };
+    };
 
 export function readProjectAuthEnv(
   env: NodeJS.ProcessEnv = process.env,
@@ -23,6 +46,49 @@ export function readProjectAuthEnv(
       true,
     ),
     healthPolicy: readHealthPolicy(env.SAPPORTA_HEALTH_POLICY),
+    mail: readMailConfig(env),
+  };
+}
+
+function readMailConfig(env: NodeJS.ProcessEnv): ProjectMailConfig {
+  const from = readRequiredEnv(env, "SAPPORTA_MAIL_FROM");
+  const transport = readMailTransport(env.SAPPORTA_MAIL_TRANSPORT);
+
+  if (transport === "stream" || transport === "disabled") {
+    return { from, transport };
+  }
+
+  return {
+    from,
+    transport,
+    smtp: readSmtpConfig(env),
+  };
+}
+
+function readMailTransport(value: string | undefined): MailTransportKind {
+  if (value === undefined || value === "") return "stream";
+  if (value === "stream" || value === "smtp" || value === "disabled") {
+    return value;
+  }
+  throw new Error(
+    'SAPPORTA_MAIL_TRANSPORT must be "stream", "smtp", or "disabled".',
+  );
+}
+
+function readSmtpConfig(env: NodeJS.ProcessEnv): ProjectSmtpConfig {
+  if (env.SMTP_URL) return { url: env.SMTP_URL };
+
+  const host = readRequiredEnv(env, "SMTP_HOST");
+  const port = readRequiredIntegerEnv(env, "SMTP_PORT");
+  const secure = readBooleanEnv(env.SMTP_SECURE, "SMTP_SECURE", false);
+  const user = env.SMTP_USER;
+  const pass = env.SMTP_PASS;
+
+  return {
+    host,
+    port,
+    secure,
+    auth: user || pass ? { user: user ?? "", pass: pass ?? "" } : undefined,
   };
 }
 
@@ -92,6 +158,18 @@ function readOptionalIntegerEnv(
   name: string,
 ): number | undefined {
   if (value === undefined || value === "") return undefined;
+  const parsed = Number.parseInt(value, 10);
+  if (!Number.isInteger(parsed) || String(parsed) !== value) {
+    throw new Error(`${name} must be an integer.`);
+  }
+  return parsed;
+}
+
+function readRequiredIntegerEnv(
+  env: NodeJS.ProcessEnv,
+  name: keyof NodeJS.ProcessEnv,
+): number {
+  const value = readRequiredEnv(env, name);
   const parsed = Number.parseInt(value, 10);
   if (!Number.isInteger(parsed) || String(parsed) !== value) {
     throw new Error(`${name} must be an integer.`);

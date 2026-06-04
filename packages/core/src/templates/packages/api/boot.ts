@@ -28,6 +28,7 @@ import {
   type SapportaEnv,
 } from "@sapporta/server";
 import { loadApp } from "./app.js";
+import { createSapportaMailer } from "./mailer.js";
 import { createProjectAuth, readProjectAuthEnv } from "./project-auth/index.js";
 
 // 1. Paths + DB + Sapporta project metadata. Loading the Sapporta project reads
@@ -53,10 +54,13 @@ const sapporta = await loadSapportaProject({
 // 2. Auth can boot after loaded tables exist, so request auth contexts contain
 //    row-security guards from the start.
 assertAuthSchemaDefinitions(sapporta.catalog.tables);
+const projectEnv = readProjectAuthEnv();
+const mailer = createSapportaMailer(projectEnv.mail);
 const projectAuth = createProjectAuth({
   conn,
-  env: readProjectAuthEnv(),
+  env: projectEnv,
   catalog: sapporta.catalog,
+  mailer,
 });
 
 // 3. Shared Hono app - framework and user routes mount onto it.
@@ -92,7 +96,7 @@ const sapportaApi = mountSapportaFramework(app, sapporta, {
 // 6. User routes. `loadApp()` registers project paths like "/bank";
 //    mounting apiApp under /api serves them at /api/bank.
 const apiApp = new TsRestApi<SapportaEnv>();
-loadApp(apiApp, conn);
+loadApp(apiApp, { conn, mailer });
 app.route("/api", apiApp);
 app.route("/api", projectAuth.routes);
 

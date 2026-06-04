@@ -26,6 +26,7 @@
     "better-auth": "__BETTER_AUTH_VERSION__",
     "@hono/node-server": "__HONO_NODE_SERVER_SPEC__",
     "hono": "__HONO_SPEC__",
+    "nodemailer": "__NODEMAILER_VERSION__",
     "drizzle-orm": "__DRIZZLE_VERSION__",
     "better-sqlite3": "__BETTER_SQLITE3_VERSION__",
     "@js-temporal/polyfill": "__TEMPORAL_VERSION__",
@@ -36,6 +37,7 @@
     "tsc-watch": "^7.2.0",
     "drizzle-kit": "__DRIZZLE_KIT_VERSION__",
     "@types/better-sqlite3": "^7.6.0",
+    "@types/nodemailer": "__TYPES_NODEMAILER_VERSION__",
     "vitest": "^3.1.0"
   }
 }

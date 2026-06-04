@@ -10,6 +10,7 @@
     }
   },
   "include": [
+    "src/templates/mailer.ts",
     "src/templates/project-auth/**/*.ts",
     "template-tests/**/*.ts"
   ],

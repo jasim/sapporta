@@ -13,7 +13,9 @@ A Sapporta project.
 `pnpm dev` loads `.env.development` with Node's built-in `--env-file` support.
 That file contains local-only auth defaults, including a generated
 `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL=http://localhost:3000`, and
-`FRONTEND_DEV_PORT=5173`. It is ignored by git.
+`FRONTEND_DEV_PORT=5173`. It also sets `SAPPORTA_MAIL_TRANSPORT=stream`,
+so Nodemailer prints the full generated email source to the API console instead
+of delivering it. It is ignored by git.
 
 ## Project layout
 
@@ -36,6 +38,26 @@ The starter `/api/hello` route shows the pattern. Each endpoint is a trio:
 Because both sides import the same contract, request and response types can never drift — change the contract once and both ends light up red until they match.
 
 Delete the `hello` trio (`packages/shared/src/contracts/hello.ts`, `packages/api/app/hello.ts`, `packages/frontend/src/api.ts` entry, sidebar/Welcome wiring) once your own routes take over.
+
+## Email
+
+Generated projects use Nodemailer. `packages/api/mailer.ts` exports
+`createSapportaMailer()`, which returns a small project mailer object containing
+the raw Nodemailer `transport`, parsed defaults, and a `sendMail()` helper.
+`packages/api/app.ts` receives that mailer in `loadApp()` options, so routes can
+use it directly or pass it into domain modules without importing auth internals.
+
+In development, `SAPPORTA_MAIL_TRANSPORT=stream` uses Nodemailer's stream
+transport. Every call to `sendMail()` runs through Nodemailer's normal message
+pipeline and logs the complete generated email source to the API console,
+including Better Auth verification/reset messages and custom app messages.
+
+In production, set `SAPPORTA_MAIL_TRANSPORT=smtp`, `SAPPORTA_MAIL_FROM`, and
+either `SMTP_URL` or `SMTP_HOST`/`SMTP_PORT`/`SMTP_SECURE`/`SMTP_USER`/`SMTP_PASS`.
+Most providers, including SES, Postmark, Resend, SendGrid, Mailgun, and standard
+mail hosts, publish SMTP settings. If you prefer a provider SDK, edit
+`packages/api/mailer.ts`; Sapporta does not hide email delivery behind a
+framework abstraction.
 
 ## Schema and migrations
 

@@ -205,7 +205,27 @@ Fit:
 | `SAPPORTA_FRONTEND_ORIGINS`       | API host process env | yes | yes      | yes      | yes      | Browser origins trusted for credentialed API/auth requests.                   |
 | `SAPPORTA_REQUIRE_VERIFIED_EMAIL` | API host process env | yes | optional | optional | optional | Whether email/password sign-up requires verified email.                       |
 | `SAPPORTA_HEALTH_POLICY`          | API host process env | yes | optional | optional | optional | Access policy for health endpoints: `public`, `authenticated`, or `disabled`. |
+| `SAPPORTA_MAIL_TRANSPORT`         | API host process env | yes | yes      | yes      | yes      | Mail transport: `stream`, `smtp`, or `disabled`.                              |
+| `SAPPORTA_MAIL_FROM`              | API host process env | yes | yes      | yes      | yes      | Default sender address for Better Auth and custom app emails.                 |
+| `SMTP_URL`                        | API host process env | —   | optional | optional | optional | SMTP connection URL. Takes precedence over individual SMTP fields.            |
+| `SMTP_HOST`                       | API host process env | —   | optional | optional | optional | SMTP host when `SMTP_URL` is not set and mail transport is `smtp`.            |
+| `SMTP_PORT`                       | API host process env | —   | optional | optional | optional | SMTP port when `SMTP_URL` is not set and mail transport is `smtp`.            |
+| `SMTP_SECURE`                     | API host process env | —   | optional | optional | optional | Whether SMTP uses TLS from connection start. Must be `true` or `false`.       |
+| `SMTP_USER`                       | API host process env | —   | optional | optional | optional | SMTP username.                                                                |
+| `SMTP_PASS`                       | API host process env | —   | optional | optional | optional | SMTP password.                                                                |
 | `VITE_API_URL`                    | Frontend build env   | —   | —        | —        | yes      | Absolute API origin inlined into the SPA bundle for split deployments.        |
+
+### Email delivery
+
+Generated projects use Nodemailer from `packages/api/mailer.ts`. The development
+default is `SAPPORTA_MAIL_TRANSPORT=stream`, which does not deliver mail. It
+logs the complete generated email source to the API console for every message,
+including Better Auth verification/reset emails and custom app emails.
+
+Production should use `SAPPORTA_MAIL_TRANSPORT=smtp` with `SAPPORTA_MAIL_FROM`
+set to an address on a verified sending domain. Configure either `SMTP_URL` or
+the individual `SMTP_*` fields. Most providers expose SMTP settings; if you want
+a provider-specific SDK, edit `packages/api/mailer.ts` in the generated project.
 
 ## Operational concerns (shape-independent)
 

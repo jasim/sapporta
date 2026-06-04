@@ -53,6 +53,8 @@ export type ScaffoldPackages = {
     drizzleKit: string;
     hono: string;
     honoNodeServer: string;
+    nodemailer: string;
+    typesNodemailer: string;
     restCore: string;
     temporal: string;
     zod: string;
@@ -155,6 +157,7 @@ export function resolveScaffoldPackages(
     const coreInstalled = installedPackageSpecPicker(
       coreMetadata.packageJsonPath,
     );
+    const coreSpec = declaredPackageSpecPicker(core);
     const sharedInstalled = installedPackageSpecPicker(
       sharedMetadata.packageJsonPath,
     );
@@ -211,6 +214,8 @@ export function resolveScaffoldPackages(
         drizzleKit: coreInstalled("drizzle-kit"),
         hono: coreInstalled("hono"),
         honoNodeServer: coreInstalled("@hono/node-server"),
+        nodemailer: coreInstalled("nodemailer"),
+        typesNodemailer: coreSpec("@types/nodemailer"),
         restCore: coreInstalled("@sapporta/rest-core"),
         temporal: sharedInstalled("@js-temporal/polyfill"),
         zod: coreInstalled("zod"),
@@ -284,6 +289,8 @@ export function resolveScaffoldPackages(
       drizzleKit: coreSpec("drizzle-kit"),
       hono: coreSpec("hono"),
       honoNodeServer: coreSpec("@hono/node-server"),
+      nodemailer: coreSpec("nodemailer"),
+      typesNodemailer: coreSpec("@types/nodemailer"),
       restCore: coreSpec("@sapporta/rest-core"),
       temporal: sharedSpec("@js-temporal/polyfill"),
       zod: coreSpec("zod"),
@@ -465,6 +472,8 @@ function buildTemplateReplacements(
     __SHARED_SPEC__: packages.specs.shared,
     __HONO_SPEC__: packages.specs.hono,
     __HONO_NODE_SERVER_SPEC__: packages.specs.honoNodeServer,
+    __NODEMAILER_VERSION__: packages.specs.nodemailer,
+    __TYPES_NODEMAILER_VERSION__: packages.specs.typesNodemailer,
     __BETTER_SQLITE3_VERSION__: packages.specs.betterSqlite3,
     __DRIZZLE_VERSION__: packages.specs.drizzle,
     __DRIZZLE_KIT_VERSION__: packages.specs.drizzleKit,

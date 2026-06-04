@@ -16,6 +16,11 @@ function scaffoldFile(
 export const SCAFFOLD_FILES: ScaffoldFile[] = [
   scaffoldFile("packages/api/boot.ts", "framework"),
   scaffoldFile("packages/api/drizzle.config.ts", "framework"),
+  {
+    src: "mailer.ts",
+    dest: "packages/api/mailer.ts",
+    ownership: "framework",
+  },
   scaffoldFile("packages/api/app.ts", "example"),
   scaffoldFile("packages/api/app/hello.ts", "example"),
   {
@@ -26,6 +31,11 @@ export const SCAFFOLD_FILES: ScaffoldFile[] = [
   {
     src: "project-auth/better-auth.ts",
     dest: "packages/api/project-auth/better-auth.ts",
+    ownership: "framework",
+  },
+  {
+    src: "project-auth/emails.ts",
+    dest: "packages/api/project-auth/emails.ts",
     ownership: "framework",
   },
   {

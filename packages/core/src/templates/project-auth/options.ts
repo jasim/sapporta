@@ -9,10 +9,16 @@ export const projectAuthDrizzleAdapterConfig = {
 
 export function createProjectAuthEmailAndPasswordOptions(
   requireEmailVerification: boolean,
+  sendResetPassword: (data: {
+    user: { email: string; name?: string | null };
+    url: string;
+    token: string;
+  }) => Promise<void>,
 ) {
   return {
     enabled: true,
     requireEmailVerification,
+    sendResetPassword,
   };
 }
 

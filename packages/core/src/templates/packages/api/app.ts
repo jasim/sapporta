@@ -10,9 +10,19 @@
  * `boot.ts` owns the wiring, and this file is the one place where
  * project routes are declared.
  */
-import type { ProjectDbConnection, SapportaEnv, TsRestApi } from "@sapporta/server";
+import type {
+  ProjectDbConnection,
+  SapportaEnv,
+  TsRestApi,
+} from "@sapporta/server";
 import helloApi from "./app/hello.js";
+import type { SapportaMailer } from "./mailer.js";
 
-export function loadApp(app: TsRestApi<SapportaEnv>, _conn: ProjectDbConnection) {
+export interface LoadAppOptions {
+  conn: ProjectDbConnection;
+  mailer: SapportaMailer;
+}
+
+export function loadApp(app: TsRestApi<SapportaEnv>, _options: LoadAppOptions) {
   app.route("/", helloApi);
 }

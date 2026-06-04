@@ -46,6 +46,7 @@ describe("project auth template", () => {
           "http://localhost:5173, http://localhost:5174",
         SAPPORTA_REQUIRE_VERIFIED_EMAIL: "false",
         SAPPORTA_HEALTH_POLICY: "authenticated",
+        SAPPORTA_MAIL_FROM: "Sapporta <no-reply@example.test>",
       }),
     ).toEqual({
       betterAuthSecret: "secret",
@@ -56,6 +57,10 @@ describe("project auth template", () => {
       ],
       requireVerifiedEmail: false,
       healthPolicy: "authenticated",
+      mail: {
+        from: "Sapporta <no-reply@example.test>",
+        transport: "stream",
+      },
     });
   });
 
@@ -65,6 +70,7 @@ describe("project auth template", () => {
         BETTER_AUTH_SECRET: "secret",
         BETTER_AUTH_URL: "http://localhost:3000",
         FRONTEND_DEV_PORT: "5173",
+        SAPPORTA_MAIL_FROM: "Sapporta <no-reply@example.test>",
       }).trustedOrigins,
     ).toEqual(["http://localhost:5173"]);
   });
@@ -74,6 +80,7 @@ describe("project auth template", () => {
       readProjectAuthEnv({
         BETTER_AUTH_SECRET: "secret",
         BETTER_AUTH_URL: "http://localhost:3000/path",
+        SAPPORTA_MAIL_FROM: "Sapporta <no-reply@example.test>",
       }),
     ).toThrow(/BETTER_AUTH_URL must contain origins only/);
 
@@ -82,6 +89,7 @@ describe("project auth template", () => {
         BETTER_AUTH_SECRET: "secret",
         BETTER_AUTH_URL: "http://localhost:3000",
         SAPPORTA_REQUIRE_VERIFIED_EMAIL: "no",
+        SAPPORTA_MAIL_FROM: "Sapporta <no-reply@example.test>",
       }),
     ).toThrow(/SAPPORTA_REQUIRE_VERIFIED_EMAIL/);
 
@@ -90,6 +98,7 @@ describe("project auth template", () => {
         BETTER_AUTH_SECRET: "secret",
         BETTER_AUTH_URL: "http://localhost:3000",
         FRONTEND_DEV_PORT: "5173x",
+        SAPPORTA_MAIL_FROM: "Sapporta <no-reply@example.test>",
       }),
     ).toThrow(/FRONTEND_DEV_PORT/);
   });

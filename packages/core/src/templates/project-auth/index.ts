@@ -5,6 +5,7 @@ import type {
   SapportaEnv,
   TableCatalog,
 } from "@sapporta/server";
+import type { SapportaMailer } from "../mailer.js";
 import { createBetterAuth, type ProjectBetterAuth } from "./better-auth.js";
 import {
   resolveSapportaAuthContext,
@@ -22,6 +23,7 @@ export interface CreateProjectAuthOptions {
   conn: ProjectDbConnection;
   env: ProjectAuthEnv;
   catalog: TableCatalog;
+  mailer: SapportaMailer;
 }
 
 export interface ProjectAuth {
@@ -43,8 +45,9 @@ export function createProjectAuth({
   conn,
   env,
   catalog,
+  mailer,
 }: CreateProjectAuthOptions): ProjectAuth {
-  const auth = createBetterAuth({ conn, env });
+  const auth = createBetterAuth({ conn, env, mailer });
   const isAuthRoute = (c: Context<SapportaEnv>) =>
     c.req.path.startsWith("/api/auth/") || c.req.path === "/api/auth-bootstrap";
   const resolveAuth = (c: Context<SapportaEnv>) =>
@@ -90,7 +93,13 @@ export {
   switchActiveWorkspace,
   type BetterAuthSessionPayload,
 } from "./context.js";
-export { readProjectAuthEnv, type ProjectAuthEnv } from "./env.js";
+export {
+  readProjectAuthEnv,
+  type MailTransportKind,
+  type ProjectAuthEnv,
+  type ProjectMailConfig,
+  type ProjectSmtpConfig,
+} from "./env.js";
 export { createProjectAuthRoutes, authContextResponse } from "./routes.js";
 export {
   authErrorBody,

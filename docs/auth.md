@@ -17,6 +17,8 @@ A new Sapporta project includes:
 
 - Better Auth configured as the default sign-in system.
 - Email/password auth pages and `/api/auth/*` routes.
+- Better Auth verification/reset email callbacks wired to the generated project
+  mailer.
 - Session-backed auth middleware for API requests.
 - First-workspace provisioning.
 - Active workspace selection.
@@ -194,10 +196,12 @@ Generated projects own those files. They may customize workspace provisioning,
 role mapping, middleware behavior, guard policy, error responses, and auth
 routes without changing `@sapporta/server`.
 
-- `env.ts`: parses auth secrets, API base URL, frontend origins, email
-  behavior, and health policy.
+- `env.ts`: parses auth secrets, API base URL, frontend origins, verified-email
+  policy, mail delivery config, and health policy.
 - `better-auth.ts`: creates the Better Auth instance with email/password and
   the organization plugin.
+- `emails.ts`: composes Better Auth verification/reset emails and sends them
+  through `packages/api/mailer.ts`.
 - `schema.ts`: defines the Better Auth Drizzle schema.
 - `context.ts`: converts the Better Auth session and organization membership
   into `SapportaAuthContext`.
