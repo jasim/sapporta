@@ -2,14 +2,13 @@ import { type ReactNode } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { Database, FileText } from "lucide-react";
 import { useSchemaStore } from "@/schema-catalog/state/schema-store";
-import { cn } from "@sapporta/ui";
-import { Kbd } from "@sapporta/ui";
 import { SidebarShell } from "./SidebarShell";
 
 interface AppSidebarProps {
   /** Rendered ABOVE the Tables/Reports sections. Intended for app-chrome
    *  the host wants to inject (e.g. custom view links). */
   sidebarContent?: ReactNode;
+  showFrameworkNavigation?: boolean;
 }
 
 export function SapportaMark({ size = 17 }: { size?: number }) {
@@ -79,7 +78,7 @@ export function SidebarNavItem({
   return (
     <Link
       to={to}
-      className={cn(
+      className={cx(
         "flex items-center gap-2 h-[28px] rounded-[6px] px-2 text-sap-body no-underline",
         active
           ? "bg-sap-active-nav text-sap-fg font-[650]"
@@ -87,7 +86,7 @@ export function SidebarNavItem({
       )}
     >
       <span
-        className={cn(
+        className={cx(
           "w-[14px] h-[14px] inline-flex items-center justify-center shrink-0",
           active ? "text-sap-brand mono text-sap-data" : "text-sap-subtle",
         )}
@@ -104,13 +103,16 @@ export function SidebarNavItem({
   );
 }
 
-export function AppSidebar({ sidebarContent }: AppSidebarProps) {
+export function AppSidebar({
+  sidebarContent,
+  showFrameworkNavigation = true,
+}: AppSidebarProps) {
   const { tables, reports, loading } = useSchemaStore();
   const location = useLocation();
 
   const footer = (
     <div className="flex items-center gap-2">
-      <Kbd>⌘K</Kbd>
+      <SidebarKbd>⌘K</SidebarKbd>
       <span className="text-sap-menu text-sap-muted">Command menu</span>
     </div>
   );
@@ -119,48 +121,69 @@ export function AppSidebar({ sidebarContent }: AppSidebarProps) {
     <SidebarShell header={<SidebarHeader />} footer={footer}>
       {sidebarContent}
 
-      <SidebarSectionLabel>Tables</SidebarSectionLabel>
-
-      {loading && (
-        <div className="px-[14px] py-3 text-sap-data text-sap-muted">
-          Loading…
-        </div>
-      )}
-
-      {tables.map((table) => {
-        const tablePath = `/tables/${table.name}`;
-        const active = location.pathname.startsWith(tablePath);
-        return (
-          <SidebarNavItem
-            key={table.name}
-            to={tablePath}
-            icon={<Database className="h-[12px] w-[12px]" strokeWidth={1.5} />}
-            label={table.label}
-            active={active}
-          />
-        );
-      })}
-
-      {reports.length > 0 && (
+      {showFrameworkNavigation && (
         <>
-          <SidebarSectionLabel>Reports</SidebarSectionLabel>
-          {reports.map((report) => {
-            const reportPath = `/reports/${report.name}`;
-            const active = location.pathname.startsWith(reportPath);
+          <SidebarSectionLabel>Tables</SidebarSectionLabel>
+
+          {loading && (
+            <div className="px-[14px] py-3 text-sap-data text-sap-muted">
+              Loading…
+            </div>
+          )}
+
+          {tables.map((table) => {
+            const tablePath = `/tables/${table.name}`;
+            const active = location.pathname.startsWith(tablePath);
             return (
               <SidebarNavItem
-                key={report.name}
-                to={reportPath}
+                key={table.name}
+                to={tablePath}
                 icon={
-                  <FileText className="h-[12px] w-[12px]" strokeWidth={1.5} />
+                  <Database className="h-[12px] w-[12px]" strokeWidth={1.5} />
                 }
-                label={report.label}
+                label={table.label}
                 active={active}
               />
             );
           })}
+
+          {reports.length > 0 && (
+            <>
+              <SidebarSectionLabel>Reports</SidebarSectionLabel>
+              {reports.map((report) => {
+                const reportPath = `/reports/${report.name}`;
+                const active = location.pathname.startsWith(reportPath);
+                return (
+                  <SidebarNavItem
+                    key={report.name}
+                    to={reportPath}
+                    icon={
+                      <FileText
+                        className="h-[12px] w-[12px]"
+                        strokeWidth={1.5}
+                      />
+                    }
+                    label={report.label}
+                    active={active}
+                  />
+                );
+              })}
+            </>
+          )}
         </>
       )}
     </SidebarShell>
+  );
+}
+
+function cx(...classes: Array<string | false | null | undefined>): string {
+  return classes.filter(Boolean).join(" ");
+}
+
+function SidebarKbd({ children }: { children: ReactNode }) {
+  return (
+    <kbd className="mono text-sap-label font-normal rounded-[3px] px-[5px] py-[1px] inline-flex items-center justify-center border border-sap-border bg-sap-kbd text-sap-subtle">
+      {children}
+    </kbd>
   );
 }

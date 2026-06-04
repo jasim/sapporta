@@ -1,5 +1,6 @@
 import { createStore, type StoreApi } from "zustand/vanilla";
 import type { TableSchema } from "@sapporta/shared/contracts";
+import { isRecordFormEditableColumn } from "@/table/form/field-policy";
 
 export type RecordFormValues = Record<string, unknown>;
 
@@ -36,7 +37,7 @@ export function initialRecordFormValues(
 ): RecordFormValues {
   const initial: RecordFormValues = {};
   for (const col of tableSchema.columns) {
-    if (col.primary && col.hasDefault) continue;
+    if (!isRecordFormEditableColumn(col)) continue;
     initial[col.name] = null;
   }
   return initial;

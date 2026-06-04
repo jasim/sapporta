@@ -16,6 +16,9 @@ const PRODUCTS_SCHEMA: TableSchema = {
     { name: "sku", notNull: true },
     { name: "name", notNull: true },
     { name: "is_active" },
+    { name: "workspace_id", notNull: true },
+    { name: "scoped_to_user_id", notNull: true },
+    { name: "server_owned_id", clientEditable: false },
   ],
 };
 

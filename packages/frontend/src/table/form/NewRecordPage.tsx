@@ -11,6 +11,7 @@ import {
   compactRecordFormValues,
   createRecordFormStore,
 } from "@/table/form/record-form-store";
+import { isRecordFormEditableColumn } from "@/table/form/field-policy";
 import { createRecord } from "@/table/actions/record-actions";
 import { fetchLookupEntriesForSearch } from "@/lookup/api/lookup";
 import type { FkOptionsMap } from "@/lookup/types";
@@ -34,7 +35,9 @@ export function NewRecordPage({ tableSchema }: { tableSchema: TableSchema }) {
   }, [tableSchema]);
 
   useEffect(() => {
-    const fkColumns = tableSchema.columns.filter((c) => c.foreignKey != null);
+    const fkColumns = tableSchema.columns.filter(
+      (c) => isRecordFormEditableColumn(c) && c.foreignKey != null,
+    );
     if (fkColumns.length === 0) {
       setFkOptions(EMPTY_FK_OPTIONS);
       return;
@@ -77,11 +80,7 @@ export function NewRecordPage({ tableSchema }: { tableSchema: TableSchema }) {
 
   const formColumns = useMemo(
     () =>
-      tableSchema.columns.filter((col) => {
-        if (col.visuallyHidden) return false;
-        if (col.primary && col.hasDefault) return false;
-        return true;
-      }),
+      tableSchema.columns.filter(isRecordFormEditableColumn),
     [tableSchema],
   );
 

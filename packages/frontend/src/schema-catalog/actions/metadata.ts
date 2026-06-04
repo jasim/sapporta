@@ -1,4 +1,4 @@
-import { ApiError } from "@sapporta/shared/client";
+import { ApiError } from "@/platform/http";
 import { fetchReports } from "@/schema-catalog/api/report-metadata";
 import { fetchProjectInfo, fetchSchema } from "@/schema-catalog/api/schema";
 import { useSchemaStore } from "@/schema-catalog/state/schema-store";
