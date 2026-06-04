@@ -1,6 +1,6 @@
 /**
  * Reserved identifiers that cannot be used as table names.
- * These collide with static route segments mounted before the dynamic CRUD handler.
+ * These collide with static route segments mounted before dynamic table routes.
  */
 const RESERVED_TABLE_NAMES = new Set([
   // Static API route segments

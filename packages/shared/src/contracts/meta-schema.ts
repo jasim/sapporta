@@ -75,6 +75,7 @@ export const columnSchemaSchema = z.object({
   zeroDisplay: z.enum(["blank", "dot"]).optional(),
   strong: z.boolean().optional(),
   notes: z.string().optional(),
+  clientEditable: z.boolean().optional(),
   links: z.array(reportLinkSchema).optional(),
 });
 export type ColumnSchema = z.output<typeof columnSchemaSchema>;

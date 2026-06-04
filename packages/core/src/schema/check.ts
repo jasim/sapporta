@@ -72,7 +72,7 @@ export function checkSchemaDefinitions(tables: TableDef[]): SchemaIssue[] {
       if (!isNumeric || col.notNull) continue;
 
       // Skip columns explicitly marked as non-additive
-      if (table.meta.columns?.[col.name]?.additive === false) continue;
+      if (table.meta.columns[col.name]?.additive === false) continue;
 
       issues.push({
         table: config.name,

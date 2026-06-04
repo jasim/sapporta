@@ -1,8 +1,19 @@
 import type { SQL } from "drizzle-orm";
-import { type SQLiteTableWithColumns, getTableConfig } from "drizzle-orm/sqlite-core";
+import {
+  index,
+  integer,
+  sqliteTable,
+  type SQLiteTableWithColumns,
+  getTableConfig,
+  uniqueIndex,
+} from "drizzle-orm/sqlite-core";
 import type { z } from "zod";
 import { drainPendingColumnMeta } from "./columns.js";
-import type { ValueKind } from "@sapporta/shared/value-kind";
+import type {
+  ColumnMeta as FactoryColumnMeta,
+  ValueKind,
+} from "@sapporta/shared/value-kind";
+import type { ReferenceRule, RowScope } from "../auth/row-scope.js";
 
 /**
  * Column factories live in `./columns.ts` — importing them here so users
@@ -18,6 +29,7 @@ export {
   timestamp,
   text,
 } from "./columns.js";
+export { sqliteTable, integer, index, uniqueIndex };
 
 /** Metadata for a select/enum column */
 export interface SelectMeta {
@@ -82,12 +94,17 @@ export interface ColumnMeta {
   strong?: boolean;
   /** Freeform notes describing the column's meaning, conventions, or formula */
   notes?: string;
+  /** Whether clients may edit this column through generated table APIs. */
+  clientEditable?: boolean;
 }
 
-/** Sapporta-specific metadata attached to a table */
+/** Normalized Sapporta metadata attached to a TableDef.
+ *
+ * Public callers provide sparse `SapportaTableInputMeta`; `table()` fills the
+ * runtime defaults so downstream code can trust these table-level fields. */
 export interface SapportaMeta {
   /** Display label for the table */
-  label?: string;
+  label: string;
   /** Columns whose values build a row's human-readable label — used in FK
    *  dropdowns, lookup responses, and anywhere a row is referenced rather
    *  than displayed in full. Multiple columns are concatenated with a space.
@@ -95,25 +112,63 @@ export interface SapportaMeta {
    *  the PK nor an FK. */
   rowLabelColumns?: string[];
   /** Select/enum columns */
-  selects?: SelectMeta[];
+  selects: SelectMeta[];
   /** Whether records are immutable (no update/delete) */
-  immutable?: boolean;
+  immutable: boolean;
   /** User-provided Zod validation schema (overrides auto-inferred) */
-  validation?: z.ZodObject<any>;
-  /** Custom save function (overrides default insert/update) */
-  save?: (record: Record<string, unknown>, db: any) => Promise<any>;
+  validation?: z.ZodObject;
+  /**
+   * Declares the row isolation boundary used by built-in table operations and
+   * reference validation helpers.
+   */
+  rowScope: RowScope;
+  /**
+   * Explicit reference rules keyed by source SQL column name. Use this for
+   * logical FKs that do not have Drizzle .references() metadata, or to mark
+   * proven FK columns as server-managed with clientCanSet: false.
+   */
+  references: Record<string, ReferenceRule>;
   /** Default sort order applied when no explicit sort is requested.
    *  Accepts a Drizzle orderBy expression: `desc(myTable.date)` or `asc(myTable.name)`.
    *  Server-only — does not serialize to the UI schema API. */
   defaultSort?: SQL;
   /** Has-many child relationships for nested grid display */
-  children?: ChildMeta[];
+  children: ChildMeta[];
   /** Per-column metadata keyed by column name */
-  columns?: Record<string, ColumnMeta>;
+  columns: Record<string, ColumnMeta>;
   /** Cross-column search configuration for the `q` query parameter.
    *  Columns are matched with ILIKE and OR-ed together. */
   search?: { columns: string[] };
 }
+
+type SapportaMetaDefaultedField =
+  | "label"
+  | "selects"
+  | "immutable"
+  | "rowScope"
+  | "references"
+  | "children"
+  | "columns";
+
+/** Sparse public metadata accepted by `table()`.
+ *
+ * These fields are optional at the authoring boundary and normalized into
+ * `SapportaMeta` before the TableDef is returned. */
+export type SapportaTableInputMeta =
+  Omit<SapportaMeta, SapportaMetaDefaultedField> & {
+    label?: string;
+    selects?: SelectMeta[];
+    immutable?: boolean;
+    references?: Record<string, ReferenceRule>;
+    children?: ChildMeta[];
+    columns?: Record<string, ColumnMeta>;
+    /**
+     * Defaults to `workspaceUserScoped`, the strictest row boundary. Use
+     * `workspaceGlobal` or `systemGlobal` only for data that intentionally has a
+     * broader visibility boundary.
+     */
+    rowScope?: RowScope;
+  };
 
 /** A Sapporta table definition — wraps a Drizzle SQLite table with metadata */
 export interface TableDef {
@@ -130,7 +185,50 @@ export interface TableOptions {
   /** The Drizzle sqliteTable definition */
   drizzle: SQLiteTableWithColumns<any>;
   /** Optional sapporta metadata */
-  meta?: SapportaMeta;
+  meta?: SapportaTableInputMeta;
+}
+
+const AUTO_MANAGED_TIMESTAMP_COLUMN_NAMES = new Set([
+  "created_at",
+  "updated_at",
+]);
+
+export function isAutoManagedTimestampColumn(name: string): boolean {
+  return AUTO_MANAGED_TIMESTAMP_COLUMN_NAMES.has(name);
+}
+
+function normalizeSapportaMeta(
+  sqlName: string,
+  columnNames: readonly string[],
+  input: SapportaTableInputMeta | undefined,
+  factoryColumns: ReadonlyMap<string, FactoryColumnMeta>,
+): SapportaMeta {
+  const userColumns = input?.columns ?? {};
+  const columns: Record<string, ColumnMeta> = {};
+
+  for (const name of columnNames) {
+    columns[name] = {
+      ...(isAutoManagedTimestampColumn(name) ? { visuallyHidden: true } : {}),
+      ...factoryColumns.get(name),
+      ...userColumns[name],
+    };
+  }
+
+  for (const [name, meta] of Object.entries(userColumns)) {
+    if (name in columns) continue;
+    columns[name] = meta;
+  }
+
+  return {
+    ...input,
+    label: input?.label ?? sqlName,
+    selects: input?.selects ?? [],
+    immutable: input?.immutable ?? false,
+    rowScope: input?.rowScope ?? "workspaceUserScoped",
+    references: input?.references ?? {},
+    children: input?.children ?? [],
+    columns,
+  };
 }
 
 /**
@@ -150,20 +248,11 @@ export function table(options: TableOptions): TableDef {
   // separate Drizzle definition with their Sapporta metadata. It also drains
   // factory metadata from `money()`, `date()`, etc. and folds that into
   // ordinary `meta.columns` data on the returned TableDef.
-  const drained = drainPendingColumnMeta(config.columns.map((c) => c.name));
-  const userColumns = options.meta?.columns ?? {};
-  const mergedColumns: Record<string, ColumnMeta> = { ...userColumns };
-  for (const [name, factoryMeta] of drained) {
-    // Explicit user metadata wins; factory metadata supplies the default
-    // semantic kind and display format for Sapporta's downstream APIs.
-    mergedColumns[name] = { ...factoryMeta, ...mergedColumns[name] };
-  }
+  const columnNames = config.columns.map((c) => c.name);
+  const drained = drainPendingColumnMeta(columnNames);
   return {
     drizzle: options.drizzle,
     sqlName: config.name,
-    meta: {
-      ...options.meta,
-      ...(Object.keys(mergedColumns).length > 0 ? { columns: mergedColumns } : {}),
-    },
+    meta: normalizeSapportaMeta(config.name, columnNames, options.meta, drained),
   };
 }

@@ -15,7 +15,7 @@ export function resolveColumnKind(
   schema: TableDef,
   column: string,
 ): ValueKind | undefined {
-  const declared = schema.meta.columns?.[column]?.kind;
+  const declared = schema.meta.columns[column]?.kind;
   if (declared) return declared;
 
   const cols = schema.drizzle as unknown as Record<
