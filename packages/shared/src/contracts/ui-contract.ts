@@ -8,6 +8,11 @@
 
 import { initContract } from "@sapporta/rest-core";
 import {
+  getAuthBootstrapStatusRoute,
+  getAuthContextRoute,
+  switchActiveWorkspaceRoute,
+} from "./auth-routes.js";
+import {
   getTableRoute,
   listTablesRoute,
   projectInfoRoute,
@@ -29,6 +34,10 @@ import { listReportsRoute, runReportRoute } from "./report-routes.js";
 const c = initContract();
 
 export const uiContract = c.router({
+  getAuthBootstrapStatus: getAuthBootstrapStatusRoute,
+  getAuthContext: getAuthContextRoute,
+  switchActiveWorkspace: switchActiveWorkspaceRoute,
+
   projectInfo: projectInfoRoute,
   listTables: listTablesRoute,
   getTable: getTableRoute,

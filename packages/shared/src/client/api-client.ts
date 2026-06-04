@@ -79,6 +79,9 @@ export interface CreateApiClientOptions {
    *  call time without forcing client re-creation. */
   baseUrl: () => string;
   baseHeaders?: Record<string, string>;
+  /** Passed through to fetch for every request. Use "include" when the
+   *  API authenticates with cross-origin cookies. */
+  credentials?: InitClientArgs["credentials"];
   /** Run zod validation on response bodies before returning. Default
    *  true — contracts are tight enough that failures indicate
    *  contract/runtime drift worth surfacing. */
@@ -123,6 +126,7 @@ export function createApiClient<T extends AppRouter>(
   const raw = initClient(contract, {
     baseUrl: "",
     baseHeaders: options.baseHeaders ?? { "Content-Type": "application/json" },
+    credentials: options.credentials,
     api: dynamicBaseFetcher,
     validateResponse: options.validateResponse ?? true,
   });

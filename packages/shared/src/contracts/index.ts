@@ -12,6 +12,26 @@
 // ── Errors ──────────────────────────────────────────────────────────────────
 export { errorBodySchema, ApiError, type ErrorBody } from "./error.js";
 
+// ── Auth wire shapes ───────────────────────────────────────────────────────
+export {
+  authRoleSchema,
+  authCurrentUserSchema,
+  authWorkspaceSummarySchema,
+  authActiveWorkspaceSchema,
+  authMembershipSchema,
+  authBootstrapStatusSchema,
+  authContextResponseSchema,
+  switchActiveWorkspaceBodySchema,
+  type AuthRole,
+  type AuthCurrentUser,
+  type AuthWorkspaceSummary,
+  type AuthActiveWorkspace,
+  type AuthMembership,
+  type AuthBootstrapStatus,
+  type AuthContextResponse,
+  type SwitchActiveWorkspaceBody,
+} from "./auth-schema.js";
+
 // ── Meta wire shapes ────────────────────────────────────────────────────────
 export {
   columnSchemaSchema,
@@ -95,6 +115,12 @@ export {
 } from "./table-routes.js";
 
 export { listReportsRoute, runReportRoute } from "./report-routes.js";
+
+export {
+  getAuthBootstrapStatusRoute,
+  getAuthContextRoute,
+  switchActiveWorkspaceRoute,
+} from "./auth-routes.js";
 
 export { uiContract, type UiContract } from "./ui-contract.js";
 
