@@ -1,0 +1,22 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "baseUrl": ".",
+    "composite": true,
+    "rootDir": ".",
+    "noEmit": true,
+    "paths": {
+      "@sapporta/server": ["./src/index.ts"]
+    }
+  },
+  "include": [
+    "src/templates/project-auth/**/*.ts",
+    "template-tests/**/*.ts"
+  ],
+  "references": [
+    { "path": "." },
+    { "path": "../shared" },
+    { "path": "../honest" }
+  ],
+  "exclude": []
+}
