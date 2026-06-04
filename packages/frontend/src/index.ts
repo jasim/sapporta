@@ -23,6 +23,22 @@ export {
 } from "@/table/actions/record-actions";
 
 export { App } from "@/app/App";
+export {
+  AuthGate,
+  ForgotPasswordPage,
+  LoginPage,
+  PublicOnlyGate,
+  ResetPasswordPage,
+  SignupPage,
+  VerifyEmailPage,
+  fetchAuthBootstrapStatus,
+  fetchAuthContext,
+  signOut,
+  switchActiveWorkspace,
+  useAuthStore,
+  type AuthState,
+  type AuthStatus,
+} from "@/auth";
 export { BootLoader } from "@/app/boot/BootLoader";
 export { HomeRedirect } from "@/app/boot/HomeRedirect";
 export { NotFoundView } from "@/app/boot/NotFoundView";

@@ -13,13 +13,11 @@
 
 import { uiContract } from "@sapporta/shared/contracts";
 import { createApiClient } from "@sapporta/shared/client";
+import { API_ORIGIN, getApiBase } from "./base";
 
-export const API_ORIGIN = import.meta.env.VITE_API_URL ?? "";
+export const uiClient = createApiClient(uiContract, {
+  baseUrl: getApiBase,
+  credentials: "include",
+});
 
-const API_BASE = `${API_ORIGIN}/api`;
-
-export function getApiBase(): string {
-  return API_BASE;
-}
-
-export const uiClient = createApiClient(uiContract, { baseUrl: getApiBase });
+export { API_ORIGIN, getApiBase };

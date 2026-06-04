@@ -44,6 +44,26 @@
       "types": "./dist/app/index.d.ts",
       "import": "./dist/app.js"
     },
+    "./platform": {
+      "types": "./dist/platform/index.d.ts",
+      "import": "./dist/platform.js"
+    },
+    "./schema": {
+      "types": "./dist/schema-catalog/index.d.ts",
+      "import": "./dist/schema.js"
+    },
+    "./auth": {
+      "types": "./dist/auth/index.d.ts",
+      "import": "./dist/auth.js"
+    },
+    "./auth/runtime": {
+      "types": "./dist/auth/runtime.d.ts",
+      "import": "./dist/auth/runtime.js"
+    },
+    "./auth/pages": {
+      "types": "./dist/auth/pages.d.ts",
+      "import": "./dist/auth/pages.js"
+    },
     "./routes/table": {
       "types": "./dist/routes/table.d.ts",
       "import": "./dist/routes/table.js"
@@ -59,6 +79,10 @@
     "./layout": {
       "types": "./dist/shell/components/SidebarShell.d.ts",
       "import": "./dist/layout.js"
+    },
+    "./shell": {
+      "types": "./dist/shell.d.ts",
+      "import": "./dist/shell.js"
     },
     "./index.css": "./dist/index.css"
   },
