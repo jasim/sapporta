@@ -83,6 +83,10 @@ type RowsBody = {
   data: TaskRow[];
 };
 
+type AuthCookieOptions = {
+  cookieFile?: string;
+};
+
 type SqliteTableColumn = {
   name: string;
 };
@@ -124,6 +128,8 @@ export function createTempProject(opts: TempProjectOptions = {}): E2eProject {
   const parentDir = mkdtempSync(join(tmpdir(), opts.prefix ?? "sapporta-e2e-"));
   const projectDir = join(parentDir, PROJECT_NAME);
   const env = { ...process.env };
+  env.BETTER_AUTH_SECRET = "sapporta-e2e-generated-project-secret";
+  env.SAPPORTA_REQUIRE_VERIFIED_EMAIL = "false";
   if (opts.devMode ?? true) {
     env.SAPPORTA_DEV_MODE_PACKAGE_ROOT = MONOREPO_ROOT;
   } else {
@@ -230,14 +236,14 @@ export function writeTasksSchema(projectDir: string): void {
   writeFileSync(
     join(projectDir, "packages", "api", "schema", "tasks.ts"),
     [
-      'import { table, timestamp } from "@sapporta/server/table";',
-      'import { sqliteTable, text, integer } from "drizzle-orm/sqlite-core";',
+      'import { table, timestamp, sqliteTable, text, integer } from "@sapporta/server/table";',
       "",
       'export const tasksTable = sqliteTable("tasks", {',
       '  id: integer("id").primaryKey({ autoIncrement: true }),',
       '  title: text("title").notNull(),',
       '  status: text("status").notNull(),',
       '  priority: integer("priority").notNull(),',
+      '  workspace_id: text("workspace_id").notNull(),',
       '  created_at: timestamp("created_at"),',
       '  updated_at: timestamp("updated_at"),',
       "});",
@@ -246,6 +252,39 @@ export function writeTasksSchema(projectDir: string): void {
       "  drizzle: tasksTable,",
       "  meta: {",
       '    label: "Tasks",',
+      '    rowScope: "workspaceGlobal",',
+      "    selects: [",
+      '      { type: "select", column: "status", options: ["todo", "in_progress", "done"] },',
+      "    ],",
+      "  },",
+      "});",
+      "",
+      "export default tasks;",
+      "",
+    ].join("\n"),
+  );
+}
+
+export function writeAuthScopedTasksSchema(projectDir: string): void {
+  mkdirSync(join(projectDir, "packages", "api", "schema"), { recursive: true });
+  writeFileSync(
+    join(projectDir, "packages", "api", "schema", "tasks.ts"),
+    [
+      'import { table, sqliteTable, text, integer } from "@sapporta/server/table";',
+      "",
+      'export const tasksTable = sqliteTable("tasks", {',
+      '  id: integer("id").primaryKey({ autoIncrement: true }),',
+      '  title: text("title").notNull(),',
+      '  status: text("status").notNull(),',
+      '  priority: integer("priority").notNull(),',
+      '  workspace_id: text("workspace_id").notNull(),',
+      "});",
+      "",
+      "export const tasks = table({",
+      "  drizzle: tasksTable,",
+      "  meta: {",
+      '    label: "Tasks",',
+      '    rowScope: "workspaceGlobal",',
       "    selects: [",
       '      { type: "select", column: "status", options: ["todo", "in_progress", "done"] },',
       "    ],",
@@ -263,13 +302,13 @@ export function writeProjectsSchema(projectDir: string): void {
   writeFileSync(
     join(projectDir, "packages", "api", "schema", "projects.ts"),
     [
-      'import { table, timestamp } from "@sapporta/server/table";',
-      'import { sqliteTable, text, integer } from "drizzle-orm/sqlite-core";',
+      'import { table, timestamp, sqliteTable, text, integer } from "@sapporta/server/table";',
       "",
       'export const projectsTable = sqliteTable("projects", {',
       '  id: integer("id").primaryKey({ autoIncrement: true }),',
       '  name: text("name").notNull(),',
       '  status: text("status").notNull(),',
+      '  workspace_id: text("workspace_id").notNull(),',
       '  created_at: timestamp("created_at"),',
       '  updated_at: timestamp("updated_at"),',
       "});",
@@ -278,6 +317,7 @@ export function writeProjectsSchema(projectDir: string): void {
       "  drizzle: projectsTable,",
       "  meta: {",
       '    label: "Projects",',
+      '    rowScope: "workspaceGlobal",',
       "    selects: [",
       '      { type: "select", column: "status", options: ["active", "paused", "done"] },',
       "    ],",
@@ -355,7 +395,7 @@ export async function buildGeneratedProject(
     run("pnpm", ["build"], {
       cwd: project.projectDir,
       env: project.env,
-      timeoutMs: 120_000,
+      timeoutMs: 300_000,
     }),
   );
 }
@@ -628,6 +668,7 @@ function countOccurrences(text: string, needle: string): number {
 
 export async function startBuiltServer(
   project: E2eProject,
+  envOverrides: NodeJS.ProcessEnv = {},
 ): Promise<StartedServer> {
   const port = await getFreePort();
   const baseUrl = `http://127.0.0.1:${port}`;
@@ -636,7 +677,12 @@ export async function startBuiltServer(
   const serverProcess = await step("boot scaffolded server", async () => {
     const child = spawn("node", ["packages/api/dist/boot.js"], {
       cwd: project.projectDir,
-      env: { ...project.env, PORT: String(port) },
+      env: {
+        ...project.env,
+        ...envOverrides,
+        BETTER_AUTH_URL: envOverrides.BETTER_AUTH_URL ?? baseUrl,
+        PORT: String(port),
+      },
       stdio: "pipe",
     });
 
@@ -644,7 +690,7 @@ export async function startBuiltServer(
     child.stderr?.on("data", (chunk: Buffer) => output.push(chunk.toString()));
 
     try {
-      await waitForJson(`${baseUrl}/api/openapi.json`);
+      await waitForJson(`${baseUrl}/health`);
     } catch (err) {
       console.error("Server failed to start. Output:\n" + output.join(""));
       child.kill("SIGTERM");
@@ -728,11 +774,20 @@ export async function cleanupDockerProject(
   }).catch(() => undefined);
 }
 
-export async function assertProjectHttpApi(baseUrl: string): Promise<void> {
-  const tables = await curlJson<TablesBody>(`${baseUrl}/api/meta/tables`);
+export async function assertProjectHttpApi(
+  baseUrl: string,
+  serverOutput: readonly string[] = [],
+): Promise<void> {
+  const cookieFile = await signInProjectOwner(baseUrl);
+  const auth = { cookieFile };
+  const tables = await withServerOutput(
+    () => curlJson<TablesBody>(`${baseUrl}/api/meta/tables`, auth),
+    serverOutput,
+  );
   expect(tables.tables.map((table) => table.name)).toContain("tasks");
 
   const first = await curlJson<RowBody>(`${baseUrl}/api/tables/tasks`, {
+    ...auth,
     method: "POST",
     body: TASK_ONE,
   });
@@ -740,24 +795,65 @@ export async function assertProjectHttpApi(baseUrl: string): Promise<void> {
   expect(first.data.id).toBeGreaterThan(0);
 
   const second = await curlJson<RowBody>(`${baseUrl}/api/tables/tasks`, {
+    ...auth,
     method: "POST",
     body: TASK_TWO,
   });
   expect(second.data).toMatchObject(TASK_TWO);
   expect(second.data.id).toBeGreaterThan(0);
 
-  const listed = await curlJson<RowsBody>(`${baseUrl}/api/tables/tasks`);
+  const listed = await curlJson<RowsBody>(`${baseUrl}/api/tables/tasks`, auth);
   expect(listed.data.map((row) => row.title)).toEqual(
     expect.arrayContaining([TASK_ONE.title, TASK_TWO.title]),
   );
 
   const found = await curlJson<RowBody>(
     `${baseUrl}/api/tables/tasks/${first.data.id}`,
+    auth,
   );
   expect(found.data).toMatchObject(TASK_ONE);
 
-  const hello = await curlJson<{ message: string }>(`${baseUrl}/api/hello`);
+  const hello = await curlJson<{ message: string }>(`${baseUrl}/api/hello`, auth);
   expect(hello.message).toBe(`Hello from ${PROJECT_NAME}`);
+}
+
+async function signInProjectOwner(baseUrl: string): Promise<string> {
+  const cookieFile = join(tmpdir(), `sapporta-e2e-cookies-${Date.now()}-${Math.random()}.txt`);
+  const credentials = {
+    name: "Init Owner",
+    email: `owner-${Date.now()}@example.com`,
+    password: "SapportaAuthE2ePassword1!",
+  };
+  await curlJson<unknown>(`${baseUrl}/api/auth/sign-up/email`, {
+    cookieFile,
+    method: "POST",
+    body: credentials,
+  });
+  await curlJson<unknown>(`${baseUrl}/api/auth/sign-in/email`, {
+    cookieFile,
+    method: "POST",
+    body: {
+      email: credentials.email,
+      password: credentials.password,
+    },
+  });
+  await curlJson<unknown>(`${baseUrl}/api/auth-context`, { cookieFile });
+  return cookieFile;
+}
+
+async function withServerOutput<T>(
+  fn: () => Promise<T>,
+  serverOutput: readonly string[],
+): Promise<T> {
+  try {
+    return await fn();
+  } catch (err) {
+    if (serverOutput.length === 0) throw err;
+    const message = err instanceof Error ? err.message : String(err);
+    throw new Error(
+      [message, "Server output:", ...serverOutput].join("\n"),
+    );
+  }
 }
 
 export async function assertFrontendRoutes(baseUrl: string): Promise<void> {
@@ -835,7 +931,7 @@ export async function runText(
 
 export async function curlJson<T>(
   url: string,
-  opts: { method?: string; body?: unknown } = {},
+  opts: { method?: string; body?: unknown } & AuthCookieOptions = {},
 ): Promise<T> {
   const text = await curlText(url, opts);
   return JSON.parse(text) as T;
@@ -843,9 +939,12 @@ export async function curlJson<T>(
 
 export async function curlText(
   url: string,
-  opts: { method?: string; body?: unknown } = {},
+  opts: { method?: string; body?: unknown } & AuthCookieOptions = {},
 ): Promise<string> {
   const args = ["-fsS"];
+  if (opts.cookieFile) {
+    args.push("-b", opts.cookieFile, "-c", opts.cookieFile);
+  }
   if (opts.method) {
     args.push("-X", opts.method);
   }

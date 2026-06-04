@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { mkdtempSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { sqliteTable, integer } from "drizzle-orm/sqlite-core";
+import { readMigrationFiles } from "drizzle-orm/migrator";
 import { createTestDb } from "../testing/test-utils.js";
 import { table } from "../schema/table.js";
 import { assertMigrationsReady } from "./guard.js";
@@ -31,6 +32,7 @@ describe("assertMigrationsReady", () => {
 
   it("reports applied ledger entries missing from disk", () => {
     const projectRoot = projectWithJournal([{ tag: "0000_initial", when: 1760000000000 }]);
+    const hash = migrationHash(projectRoot, 1760000000000);
     const conn = createTestDb();
     conn.sqlite.exec(`
       CREATE TABLE "__drizzle_migrations" (
@@ -38,9 +40,10 @@ describe("assertMigrationsReady", () => {
         hash text NOT NULL,
         created_at numeric
       );
-      INSERT INTO "__drizzle_migrations" (hash, created_at)
-      VALUES ('abc', 1760000000000), ('def', 1760000001000);
     `);
+    conn.sqlite
+      .prepare('INSERT INTO "__drizzle_migrations" (hash, created_at) VALUES (?, ?), (?, ?)')
+      .run(hash, 1760000000000, "def", 1760000001000);
 
     expect(() =>
       assertMigrationsReady({
@@ -52,7 +55,7 @@ describe("assertMigrationsReady", () => {
     ).toThrow(/Applied migration missing from disk:\n  created_at=1760000001000 hash=def/);
   });
 
-  it("passes when journal entries and ledger rows match", () => {
+  it("reports modified migration files after they have been applied", () => {
     const projectRoot = projectWithJournal([{ tag: "0000_initial", when: 1760000000000 }]);
     const conn = createTestDb();
     conn.sqlite.exec(`
@@ -62,8 +65,33 @@ describe("assertMigrationsReady", () => {
         created_at numeric
       );
       INSERT INTO "__drizzle_migrations" (hash, created_at)
-      VALUES ('abc', 1760000000000);
+      VALUES ('stale-hash', 1760000000000);
     `);
+
+    expect(() =>
+      assertMigrationsReady({
+        projectRoot,
+        apiDistDir: join(projectRoot, "packages/api/dist"),
+        sqlite: conn.sqlite,
+        tables: [sampleTable],
+      }),
+    ).toThrow(/Applied migration hash differs from disk:\n  created_at=1760000000000 hash=stale-hash/);
+  });
+
+  it("passes when journal entries and ledger rows match", () => {
+    const projectRoot = projectWithJournal([{ tag: "0000_initial", when: 1760000000000 }]);
+    const hash = migrationHash(projectRoot, 1760000000000);
+    const conn = createTestDb();
+    conn.sqlite.exec(`
+      CREATE TABLE "__drizzle_migrations" (
+        id SERIAL PRIMARY KEY,
+        hash text NOT NULL,
+        created_at numeric
+      );
+    `);
+    conn.sqlite
+      .prepare('INSERT INTO "__drizzle_migrations" (hash, created_at) VALUES (?, ?)')
+      .run(hash, 1760000000000);
 
     expect(() =>
       assertMigrationsReady({
@@ -102,4 +130,14 @@ function projectWithJournal(entries: Array<{ tag: string; when: number }>): stri
     ),
   );
   return projectRoot;
+}
+
+function migrationHash(projectRoot: string, folderMillis: number): string {
+  const migration = readMigrationFiles({
+    migrationsFolder: join(projectRoot, "packages/api/migrations"),
+  }).find((candidate) => candidate.folderMillis === folderMillis);
+  if (!migration) {
+    throw new Error(`Missing test migration for ${folderMillis}`);
+  }
+  return migration.hash;
 }

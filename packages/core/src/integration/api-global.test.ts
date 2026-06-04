@@ -19,3 +19,11 @@ describe("GET /health", () => {
     expect(body).toEqual({ status: "ok" });
   });
 });
+
+describe("project-owned defaults", () => {
+  it("does not install default health route unless the caller wires defaults", async () => {
+    const { app } = await createIntegrationApp({ installDefaults: false });
+    const res = await app.request("/health");
+    expect(res.status).toBe(404);
+  });
+});

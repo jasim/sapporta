@@ -3,13 +3,15 @@ CREATE TABLE `accounts` (
   `name` text NOT NULL,
   `type` text NOT NULL,
   `balance` integer,
+  `workspace_id` text NOT NULL,
   `created_at` text,
   `updated_at` text
 );
 --> statement-breakpoint
 CREATE TABLE `agents` (
   `id` text PRIMARY KEY NOT NULL,
-  `name` text NOT NULL
+  `name` text NOT NULL,
+  `workspace_id` text NOT NULL
 );
 --> statement-breakpoint
 CREATE TABLE `articles` (
@@ -17,6 +19,8 @@ CREATE TABLE `articles` (
   `title` text NOT NULL,
   `body` text NOT NULL,
   `status` text NOT NULL,
+  `workspace_id` text NOT NULL,
+  `scoped_to_user_id` text NOT NULL,
   `created_at` text,
   `updated_at` text
 );
@@ -33,5 +37,7 @@ CREATE TABLE `journal_entries` (
   `account_id` integer NOT NULL,
   `description` text NOT NULL,
   `amount` integer NOT NULL,
+  `workspace_id` text NOT NULL,
+  `scoped_to_user_id` text NOT NULL,
   `created_at` text
 );

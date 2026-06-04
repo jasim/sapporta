@@ -20,7 +20,7 @@ export class ActionError extends Error {
 }
 
 /** Closed taxonomy of parseQuery() failures. Every code maps to HTTP 400 at
- *  the CRUD handler — silent-ignore is rejected as a class, so typos and
+ *  the table handler — silent-ignore is rejected as a class, so typos and
  *  malformed query strings surface as client errors rather than returning
  *  "all rows". */
 export type QueryParseErrorCode =

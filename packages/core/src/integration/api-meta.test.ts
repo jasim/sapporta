@@ -108,7 +108,7 @@ describe("/api/meta", () => {
 
     it("POST /api/meta/sql runs an INSERT and a follow-up SELECT sees it", async () => {
       const res = await postJson("/api/meta/sql", {
-        sql: "INSERT INTO accounts (name, type) VALUES ('ExecTest', 'liability')",
+        sql: "INSERT INTO accounts (name, type, workspace_id) VALUES ('ExecTest', 'liability', 'workspace-1')",
       });
       expect(res.status).toBe(200);
 

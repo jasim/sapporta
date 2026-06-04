@@ -47,6 +47,7 @@ describe("sapporta init - end-to-end", () => {
       "title",
       "status",
       "priority",
+      "workspace_id",
       "created_at",
       "updated_at",
     ]);
@@ -56,6 +57,7 @@ describe("sapporta init - end-to-end", () => {
       "id",
       "name",
       "status",
+      "workspace_id",
       "created_at",
       "updated_at",
     ]);
@@ -69,25 +71,7 @@ describe("sapporta init - end-to-end", () => {
   });
 
   it("serves schema metadata and CRUD data through curl", async () => {
-    await assertProjectHttpApi(server!.baseUrl);
-  });
-
-  it("applies generated Drizzle migrations to the SQLite database", async () => {
-    await assertSqliteTable(project!, "tasks", [
-      "id",
-      "title",
-      "status",
-      "priority",
-      "created_at",
-      "updated_at",
-    ]);
-    await assertSqliteTable(project!, "projects", [
-      "id",
-      "name",
-      "status",
-      "created_at",
-      "updated_at",
-    ]);
+    await assertProjectHttpApi(server!.baseUrl, server!.output);
   });
 
   it("serves the built frontend shell for app routes", async () => {

@@ -1,21 +1,21 @@
 /**
- * Integration tests for the /api/tables namespace (CRUD operations, single-project mode).
+ * Integration tests for the /api/tables namespace (table operations, single-project mode).
  *
  * Tests the full create → read → update → delete cycle against real
  * fixture schemas backed by in-memory SQLite. Tests within this file are
  * ordered intentionally — later tests depend on rows created by earlier tests.
  */
 import { describe, it, expect, beforeAll } from "vitest";
-import { createIntegrationApp, request, postJson, putJson, del } from "./setup.js";
+import { asAuth, createIntegrationApp, request, postJson, putJson, del } from "./setup.js";
 
 beforeAll(async () => {
   await createIntegrationApp();
 });
 
-describe("/api/tables CRUD", () => {
+describe("/api/tables table operations", () => {
   // ── Create → Read → Update → Delete cycle ──────────────────────────
 
-  describe("accounts CRUD cycle", () => {
+  describe("accounts table-operation cycle", () => {
     let createdId: number;
 
     it("POST /api/tables/accounts creates a row", async () => {
@@ -291,11 +291,11 @@ describe("/api/tables CRUD", () => {
   // ── UUID / text primary keys ────────────────────────────────────────
   //
   // The `agents` fixture has a bare `text` PK with no DB-side default, so the
-  // client must supply the id (a UUID). This cycle exercises the full CRUD
+  // client must supply the id (a UUID). This cycle exercises the full table
   // path with a non-numeric id end-to-end so a future regression that
   // re-introduces `Number(id)` somewhere in the stack will fail here.
 
-  describe("agents (UUID PK) CRUD cycle", () => {
+  describe("agents (UUID PK) table-operation cycle", () => {
     const uuid1 = "550e8400-e29b-41d4-a716-446655440001";
     const uuid2 = "550e8400-e29b-41d4-a716-446655440002";
 
@@ -347,6 +347,158 @@ describe("/api/tables CRUD", () => {
       expect(res.status).toBe(200);
       const check = await request(`/api/tables/agents/${uuid1}`);
       expect(check.status).toBe(404);
+    });
+  });
+
+  describe("auth row scopes", () => {
+    it("stamps workspace-global rows and hides them from other workspaces", async () => {
+      const workspaceTwo = asAuth({ workspaceId: "workspace-2" });
+      const createRes = await workspaceTwo.postJson("/api/tables/accounts", {
+        name: "Workspace Two Cash",
+        type: "asset",
+        balance: 200,
+      });
+      expect(createRes.status).toBe(201);
+      const created = (await createRes.json()) as {
+        data: { id: number; name: string; workspace_id: string };
+      };
+      expect(created.data.workspace_id).toBe("workspace-2");
+
+      const defaultWorkspaceGet = await request(`/api/tables/accounts/${created.data.id}`);
+      expect(defaultWorkspaceGet.status).toBe(404);
+
+      const workspaceTwoList = await workspaceTwo.request("/api/tables/accounts");
+      expect(workspaceTwoList.status).toBe(200);
+      const workspaceTwoBody = (await workspaceTwoList.json()) as {
+        data: Array<{ name: string; workspace_id: string }>;
+      };
+      expect(workspaceTwoBody.data).toContainEqual(
+        expect.objectContaining({
+          name: "Workspace Two Cash",
+          workspace_id: "workspace-2",
+        }),
+      );
+    });
+
+    it("rejects client-submitted ownership fields", async () => {
+      const res = await postJson("/api/tables/articles", {
+        title: "Tamper",
+        body: "Client attempted to set ownership",
+        status: "draft",
+        workspace_id: "workspace-2",
+        scoped_to_user_id: "user-2",
+      });
+      expect(res.status).toBe(422);
+
+      const body = (await res.json()) as {
+        code: string;
+        details: Array<{ field: string }>;
+      };
+      expect(body.code).toBe("validation_failed");
+      expect(body.details.map((detail) => detail.field)).toEqual(
+        expect.arrayContaining(["workspace_id", "scoped_to_user_id"]),
+      );
+    });
+
+    it("stamps user-scoped rows without widening owner route visibility", async () => {
+      const userOneCreate = await postJson("/api/tables/articles", {
+        title: "User One Draft",
+        body: "Visible in workspace one",
+        status: "draft",
+      });
+      expect(userOneCreate.status).toBe(201);
+      const userOneArticle = (await userOneCreate.json()) as {
+        data: { title: string; workspace_id: string; scoped_to_user_id: string };
+      };
+      expect(userOneArticle.data.workspace_id).toBe("workspace-1");
+      expect(userOneArticle.data.scoped_to_user_id).toBe("user-1");
+
+      const userTwo = asAuth({ userId: "user-2" });
+      const userTwoCreate = await userTwo.postJson("/api/tables/articles", {
+        title: "User Two Draft",
+        body: "Same workspace, different user",
+        status: "draft",
+      });
+      expect(userTwoCreate.status).toBe(201);
+      const userTwoArticle = (await userTwoCreate.json()) as {
+        data: { title: string; workspace_id: string; scoped_to_user_id: string };
+      };
+      expect(userTwoArticle.data.workspace_id).toBe("workspace-1");
+      expect(userTwoArticle.data.scoped_to_user_id).toBe("user-2");
+
+      const defaultList = await request("/api/tables/articles?filter[status][eq]=draft");
+      expect(defaultList.status).toBe(200);
+      const defaultBody = (await defaultList.json()) as {
+        data: Array<{ title: string }>;
+      };
+      const defaultTitles = defaultBody.data.map((row) => row.title);
+      expect(defaultTitles).toContain("User One Draft");
+      expect(defaultTitles).not.toContain("User Two Draft");
+
+      const userTwoMemberList = await userTwo.request("/api/tables/articles?filter[status][eq]=draft");
+      expect(userTwoMemberList.status).toBe(200);
+      const userTwoMemberBody = (await userTwoMemberList.json()) as {
+        data: Array<{ title: string }>;
+      };
+      const userTwoTitles = userTwoMemberBody.data.map((row) => row.title);
+      expect(userTwoTitles).toContain("User Two Draft");
+      expect(userTwoTitles).not.toContain("User One Draft");
+
+      const otherWorkspace = asAuth({ workspaceId: "workspace-2" });
+      const otherWorkspaceList = await otherWorkspace.request("/api/tables/articles");
+      expect(otherWorkspaceList.status).toBe(200);
+      const otherWorkspaceBody = (await otherWorkspaceList.json()) as {
+        data: Array<{ title: string }>;
+      };
+      expect(otherWorkspaceBody.data.map((row) => row.title)).not.toEqual(
+        expect.arrayContaining(["User One Draft", "User Two Draft"]),
+      );
+    });
+
+    it("validates references inside the active auth boundary", async () => {
+      const accountRes = await postJson("/api/tables/accounts", {
+        name: "Journal Boundary Account",
+        type: "asset",
+      });
+      expect(accountRes.status).toBe(201);
+      const account = (await accountRes.json()) as { data: { id: number } };
+
+      const sameWorkspaceJournal = await postJson("/api/tables/journal_entries", {
+        account_id: account.data.id,
+        description: "Visible account reference",
+        amount: 50,
+      });
+      expect(sameWorkspaceJournal.status).toBe(201);
+      const journal = (await sameWorkspaceJournal.json()) as {
+        data: {
+          account_id: number;
+          workspace_id: string;
+          scoped_to_user_id: string;
+        };
+      };
+      expect(journal.data.account_id).toBe(account.data.id);
+      expect(journal.data.workspace_id).toBe("workspace-1");
+      expect(journal.data.scoped_to_user_id).toBe("user-1");
+
+      const crossWorkspaceJournal = await postJson(
+        "/api/tables/journal_entries",
+        {
+          account_id: account.data.id,
+          description: "Hidden account reference",
+          amount: 75,
+        },
+        { workspaceId: "workspace-2" },
+      );
+      expect(crossWorkspaceJournal.status).toBe(422);
+      const error = (await crossWorkspaceJournal.json()) as {
+        details: Array<{ field: string; message: string }>;
+      };
+      expect(error.details).toContainEqual(
+        expect.objectContaining({
+          field: "account_id",
+          message: "Referenced row does not exist or is not visible in the active auth boundary.",
+        }),
+      );
     });
   });
 });

@@ -25,11 +25,16 @@ export function assertMigrationsReady(options: {
   projectRoot: string;
   apiDistDir: string;
   sqlite: Database.Database;
-  tables: TableDef[];
+  tables: readonly TableDef[];
 }): void {
   if (options.tables.length === 0) return;
 
-  const migrationsDir = join(options.projectRoot, "packages", "api", "migrations");
+  const migrationsDir = join(
+    options.projectRoot,
+    "packages",
+    "api",
+    "migrations",
+  );
   if (!existsSync(migrationsDir)) {
     throw migrationError([
       "Migration directory is missing.",
@@ -44,22 +49,43 @@ export function assertMigrationsReady(options: {
 
   const diskMigrations = readDrizzleMigrationFiles(migrationsDir);
   const journalTags = readJournalTags(migrationsDir);
-  const diskByWhen = new Map(diskMigrations.map((migration) => [migration.folderMillis, migration]));
+  const diskByWhen = new Map(
+    diskMigrations.map((migration) => [migration.folderMillis, migration]),
+  );
   const applied = readLedger(options.sqlite);
-  const appliedTimes = new Set(applied.map((row) => normalizeCreatedAt(row.created_at)));
-  const pending = diskMigrations.filter((migration) => !appliedTimes.has(migration.folderMillis));
+  const appliedTimes = new Set(
+    applied.map((row) => normalizeCreatedAt(row.created_at)),
+  );
+  const pending = diskMigrations.filter(
+    (migration) => !appliedTimes.has(migration.folderMillis),
+  );
   const missingOnDisk = applied.filter((row) => {
     const createdAt = normalizeCreatedAt(row.created_at);
     return createdAt !== null && !diskByWhen.has(createdAt);
   });
+  const changedOnDisk = applied.filter((row) => {
+    const createdAt = normalizeCreatedAt(row.created_at);
+    if (createdAt === null) return false;
+    const diskMigration = diskByWhen.get(createdAt);
+    return diskMigration !== undefined && diskMigration.hash !== row.hash;
+  });
 
-  if (pending.length === 0 && missingOnDisk.length === 0) return;
+  if (
+    pending.length === 0 &&
+    missingOnDisk.length === 0 &&
+    changedOnDisk.length === 0
+  )
+    return;
 
   const lines = ["Sapporta migrations are not ready.", ""];
   if (pending.length > 0) {
-    lines.push(pending.length === 1 ? "Pending migration:" : "Pending migrations:");
+    lines.push(
+      pending.length === 1 ? "Pending migration:" : "Pending migrations:",
+    );
     for (const migration of pending) {
-      lines.push(`  ${journalTags.get(migration.folderMillis) ?? migration.folderMillis}`);
+      lines.push(
+        `  ${journalTags.get(migration.folderMillis) ?? migration.folderMillis}`,
+      );
     }
     lines.push("");
   }
@@ -70,6 +96,17 @@ export function assertMigrationsReady(options: {
         : "Applied migrations missing from disk:",
     );
     for (const row of missingOnDisk) {
+      lines.push(`  created_at=${String(row.created_at)} hash=${row.hash}`);
+    }
+    lines.push("");
+  }
+  if (changedOnDisk.length > 0) {
+    lines.push(
+      changedOnDisk.length === 1
+        ? "Applied migration hash differs from disk:"
+        : "Applied migration hashes differ from disk:",
+    );
+    for (const row of changedOnDisk) {
       lines.push(`  created_at=${String(row.created_at)} hash=${row.hash}`);
     }
     lines.push("");
@@ -115,7 +152,9 @@ function readLedger(sqlite: Database.Database): LedgerRow[] {
     .get(DRIZZLE_LEDGER_TABLE);
   if (!exists) return [];
   return sqlite
-    .prepare(`SELECT hash, created_at FROM "${DRIZZLE_LEDGER_TABLE}" ORDER BY created_at ASC`)
+    .prepare(
+      `SELECT hash, created_at FROM "${DRIZZLE_LEDGER_TABLE}" ORDER BY created_at ASC`,
+    )
     .all() as LedgerRow[];
 }
 
@@ -136,7 +175,9 @@ function isJournal(value: unknown): value is Journal {
     entries.every((entry) => {
       if (typeof entry !== "object" || entry === null) return false;
       const candidate = entry as { tag?: unknown; when?: unknown };
-      return typeof candidate.tag === "string" && typeof candidate.when === "number";
+      return (
+        typeof candidate.tag === "string" && typeof candidate.when === "number"
+      );
     })
   );
 }

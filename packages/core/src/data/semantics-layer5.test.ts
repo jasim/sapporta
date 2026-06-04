@@ -14,13 +14,14 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { Hono } from "hono";
 import { sqliteTable, integer, text as drizzleText } from "drizzle-orm/sqlite-core";
 import { table } from "../schema/table.js";
+import type { TableDef } from "../schema/table.js";
 import { timestamp, date } from "../schema/columns.js";
-import { crud } from "./crud.js";
 import { parseQuery } from "./query-parser.js";
+import { scopedRows } from "./scoped-rows.js";
 import { createTestDb } from "../testing/test-utils.js";
+import { createTestAuthContext } from "../testing/auth-context.js";
 import { parsePlainDate, parseCanonicalInstant } from "@sapporta/shared/temporal";
 import { QueryParseError } from "../db/errors.js";
 
@@ -39,7 +40,10 @@ describe("strict calendar validity", () => {
       id: integer("id").primaryKey({ autoIncrement: true }),
       occurred_on: date("occurred_on").notNull(),
     });
-    const events_def = table({ drizzle: events });
+    const events_def = table({
+      drizzle: events,
+      meta: { rowScope: "systemGlobal" },
+    });
 
     // Impossible date routed through the server's filter parse → 400.
     expect(() =>
@@ -84,50 +88,45 @@ describe("LIKE escaping — user wildcards match literally", () => {
     id: integer("id").primaryKey({ autoIncrement: true }),
     name: drizzleText("name").notNull(),
   });
-  const promos_def = table({ drizzle: promos });
+  const promos_def = table({
+    drizzle: promos,
+    meta: { rowScope: "systemGlobal" },
+  });
 
   async function setup() {
     const { db, sqlite } = createTestDb();
     sqlite.exec(
       `CREATE TABLE promos (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL)`,
     );
-    const app = new Hono();
-    app.route("/promos", crud(promos_def, db));
-    const insert = async (name: string) => {
-      const res = await app.request("/promos", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name }),
-      });
-      expect(res.status).toBe(201);
-    };
-    await insert("50% off");
-    await insert("50X off");
-    await insert("a_b");
-    await insert("aXb");
-    return app;
+    const rows = rowsFor(db, promos_def);
+    await rows.create({ name: "50% off" });
+    await rows.create({ name: "50X off" });
+    await rows.create({ name: "a_b" });
+    await rows.create({ name: "aXb" });
+    return rows;
   }
 
-  async function fetchNames(app: Hono, query: string): Promise<string[]> {
-    const res = await app.request(`/promos?${query}`);
-    expect(res.status).toBe(200);
-    const body = (await res.json()) as { data: Array<{ name: string }> };
-    return body.data.map((r) => r.name);
+  async function fetchNames(
+    rows: ReturnType<typeof rowsFor>,
+    query: string,
+  ): Promise<string[]> {
+    const body = await rows.list(Object.fromEntries(new URLSearchParams(query)));
+    return body.data.map((row) => String(row.name));
   }
 
   it("contains `50%` matches only the literal '%' row", async () => {
-    const app = await setup();
+    const rows = await setup();
     const names = await fetchNames(
-      app,
+      rows,
       "filter[name][contains]=" + encodeURIComponent("50%"),
     );
     expect(names).toEqual(["50% off"]);
   });
 
   it("contains `a_b` matches only the literal '_' row", async () => {
-    const app = await setup();
+    const rows = await setup();
     const names = await fetchNames(
-      app,
+      rows,
       "filter[name][contains]=" + encodeURIComponent("a_b"),
     );
     expect(names).toEqual(["a_b"]);
@@ -142,7 +141,10 @@ describe("timestamp precision normalization", () => {
       description: drizzleText("description").notNull(),
       occurred_at: timestamp("occurred_at").notNull(),
     });
-    const events_def = table({ drizzle: events });
+    const events_def = table({
+      drizzle: events,
+      meta: { rowScope: "systemGlobal" },
+    });
 
     const { db, sqlite } = createTestDb();
     sqlite.exec(`
@@ -153,8 +155,7 @@ describe("timestamp precision normalization", () => {
       )
     `);
 
-    const app = new Hono();
-    app.route("/events", crud(events_def, db));
+    const eventRows = rowsFor(db, events_def);
 
     const forms = [
       { description: "whole-second-Z", occurred_at: "2024-01-15T12:00:00Z" },
@@ -163,21 +164,23 @@ describe("timestamp precision normalization", () => {
     ];
 
     for (const body of forms) {
-      const res = await app.request("/events", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
-      expect(res.status).toBe(201);
+      await eventRows.create(body);
     }
 
-    const rows = sqlite
+    const storedRows = sqlite
       .prepare(`SELECT description, occurred_at FROM events`)
       .all() as Array<{ description: string; occurred_at: string }>;
 
-    for (const row of rows) {
+    for (const row of storedRows) {
       expect(row.occurred_at).toBe("2024-01-15T12:00:00Z");
     }
   });
 });
 
+function rowsFor(db: ReturnType<typeof createTestDb>["db"], tableDef: TableDef) {
+  return scopedRows(
+    db,
+    createTestAuthContext({ tables: [tableDef] }),
+    tableDef,
+  );
+}

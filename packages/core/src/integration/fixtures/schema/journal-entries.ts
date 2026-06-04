@@ -11,12 +11,20 @@ export const journalEntriesTable = sqliteTable("journal_entries", {
   account_id: integer("account_id").notNull(),
   description: text("description").notNull(),
   amount: integer("amount").notNull(),
+  workspace_id: text("workspace_id").notNull(),
+  scoped_to_user_id: text("scoped_to_user_id").notNull(),
   created_at: timestamp("created_at"),
 });
 
 export const journalEntries = table({
   drizzle: journalEntriesTable,
-  meta: { label: "Journal Entries" },
+  meta: {
+    label: "Journal Entries",
+    rowScope: "workspaceUserScoped",
+    references: {
+      account_id: { table: "accounts", column: "id" },
+    },
+  },
 });
 
 export default journalEntries;

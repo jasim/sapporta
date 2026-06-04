@@ -6,12 +6,25 @@
  * isolation.
  */
 import { Hono } from "hono";
-import { loadSapporta, mountOpenApi } from "../load-sapporta.js";
+import {
+  installSapportaRequestContext,
+  loadSapportaProject,
+  mountOpenApi,
+  mountSapportaFramework,
+} from "../load-sapporta.js";
+import {
+  createRowSecurity,
+  assertAuthSchemaDefinitions,
+  type SapportaAuthContext,
+  type SapportaAuthIdentity,
+  type SapportaAuthRole,
+} from "../auth/index.js";
 import { createTestDb } from "../testing/test-utils.js";
-import type { SapportaEnv } from "../api/server.js";
+import { installSapportaDefaults, type SapportaEnv } from "../api/server.js";
 import { TsRestApi } from "../api/index.js";
 import { resolve, join } from "node:path";
 import { migrate } from "drizzle-orm/better-sqlite3/migrator";
+import type { TableCatalog } from "../schema/catalog.js";
 
 // Compiled fixtures, rebuilt by the root `pretest` script. See
 // packages/core/tsconfig.fixtures.json for the output layout.
@@ -24,7 +37,29 @@ const FIXTURES_SOURCE_DIR = resolve(import.meta.dirname, "fixtures");
 // Module-scoped so the request helpers below don't need to thread it.
 let app: Hono<SapportaEnv>;
 
-export async function createIntegrationApp(): Promise<{
+const TEST_AUTH_HEADER = "x-sapporta-test-auth";
+
+export interface TestAuthOverrides {
+  sessionId?: string;
+  userId?: string;
+  userName?: string | null;
+  userEmail?: string;
+  emailVerified?: boolean;
+  workspaceId?: string;
+  workspaceName?: string;
+  workspaceSlug?: string;
+  isOwner?: boolean;
+  memberId?: string;
+  role?: SapportaAuthRole;
+}
+
+export type TestRequestInit = RequestInit & {
+  auth?: TestAuthOverrides;
+};
+
+export async function createIntegrationApp(
+  options: { installDefaults?: boolean } = {},
+): Promise<{
   app: Hono<SapportaEnv>;
 }> {
   const conn = createTestDb();
@@ -33,6 +68,9 @@ export async function createIntegrationApp(): Promise<{
   });
 
   app = new Hono<SapportaEnv>();
+  if (options.installDefaults !== false) {
+    installSapportaDefaults(app);
+  }
 
   // accountsApi comes from the compiled fixture bundle — a separate
   // module instance than this file's `TsRestApi`. All merging goes
@@ -42,52 +80,168 @@ export async function createIntegrationApp(): Promise<{
   apiApp.route("/", accountsModule.default);
   apiApp.extend(accountsModule.default);
 
-  const sapporta = await loadSapporta(app, {
+  const sapporta = await loadSapportaProject({
     slug: "test",
     projectRoot: FIXTURES_SOURCE_DIR,
     apiDistDir: FIXTURES_DIR,
     conn,
   });
+  assertAuthSchemaDefinitions(sapporta.catalog.tables);
+
+  installSapportaRequestContext(app, conn);
+  app.use("/api/*", async (c, next) => {
+    c.set(
+      "auth",
+      createTestAuth(readAuthOverrides(c.req.raw), sapporta.catalog),
+    );
+    return next();
+  });
+  const sapportaApi = mountSapportaFramework(app, sapporta, {
+    conn,
+    auth: {
+      requireFrameworkAccess: (c) => c.get("auth"),
+    },
+  });
   app.route("/api", apiApp);
-  mountOpenApi(app, sapporta, apiApp);
+  mountOpenApi(app, sapporta, sapportaApi, apiApp);
 
   return { app };
 }
 
 /** Make a GET request to the test app. */
-export function request(path: string, init?: RequestInit) {
-  return app.request(path, init);
+export function request(path: string, init: TestRequestInit = {}) {
+  return app.request(path, requestInitWithAuth(init));
 }
 
 /** POST JSON body to the test app. */
-export function postJson(path: string, body: unknown) {
-  return app.request(path, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
+export function postJson(
+  path: string,
+  body: unknown,
+  auth?: TestAuthOverrides,
+) {
+  return app.request(
+    path,
+    requestInitWithAuth({
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+      auth,
+    }),
+  );
 }
 
 /** PUT JSON body to the test app. */
-export function putJson(path: string, body: unknown) {
-  return app.request(path, {
-    method: "PUT",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
+export function putJson(path: string, body: unknown, auth?: TestAuthOverrides) {
+  return app.request(
+    path,
+    requestInitWithAuth({
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+      auth,
+    }),
+  );
 }
 
 /** PATCH JSON body to the test app. */
-export function patchJson(path: string, body: unknown) {
-  return app.request(path, {
-    method: "PATCH",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
+export function patchJson(
+  path: string,
+  body: unknown,
+  auth?: TestAuthOverrides,
+) {
+  return app.request(
+    path,
+    requestInitWithAuth({
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+      auth,
+    }),
+  );
 }
 
 /** DELETE request to the test app. Optionally appends a query string. */
-export function del(path: string, query?: string) {
+export function del(path: string, query?: string, auth?: TestAuthOverrides) {
   const url = query ? `${path}?${query}` : path;
-  return app.request(url, { method: "DELETE" });
+  return app.request(url, requestInitWithAuth({ method: "DELETE", auth }));
+}
+
+export function asAuth(auth: TestAuthOverrides): {
+  request: (path: string, init?: RequestInit) => Response | Promise<Response>;
+  postJson: (path: string, body: unknown) => Response | Promise<Response>;
+  putJson: (path: string, body: unknown) => Response | Promise<Response>;
+  patchJson: (path: string, body: unknown) => Response | Promise<Response>;
+  del: (path: string, query?: string) => Response | Promise<Response>;
+} {
+  return {
+    request: (path, init = {}) => request(path, { ...init, auth }),
+    postJson: (path, body) => postJson(path, body, auth),
+    putJson: (path, body) => putJson(path, body, auth),
+    patchJson: (path, body) => patchJson(path, body, auth),
+    del: (path, query) => del(path, query, auth),
+  };
+}
+
+function createTestAuth(
+  overrides: TestAuthOverrides,
+  catalog: TableCatalog,
+): SapportaAuthContext {
+  const identity = createTestIdentity(overrides);
+  return {
+    ...identity,
+    rowSecurity: createRowSecurity(identity, { catalog }),
+  };
+}
+
+function createTestIdentity(
+  overrides: TestAuthOverrides = {},
+): SapportaAuthIdentity {
+  const userId = overrides.userId ?? "user-1";
+  const workspaceId = overrides.workspaceId ?? "workspace-1";
+  return {
+    session: {
+      id: overrides.sessionId ?? `session-${userId}-${workspaceId}`,
+      userId,
+      activeWorkspaceId: workspaceId,
+    },
+    user: {
+      id: userId,
+      name: overrides.userName ?? "Test User",
+      email: overrides.userEmail ?? `${userId}@example.com`,
+      emailVerified: overrides.emailVerified ?? true,
+    },
+    workspace: {
+      id: workspaceId,
+      name: overrides.workspaceName ?? `Workspace ${workspaceId}`,
+      slug: overrides.workspaceSlug ?? workspaceId,
+      isOwner: overrides.isOwner ?? true,
+    },
+    member: {
+      id: overrides.memberId ?? `member-${userId}-${workspaceId}`,
+      role: overrides.role ?? "owner",
+    },
+  };
+}
+
+function requestInitWithAuth(init: TestRequestInit): RequestInit {
+  const { auth, ...requestInit } = init;
+  if (!auth) return requestInit;
+
+  const headers = new Headers(requestInit.headers);
+  headers.set(TEST_AUTH_HEADER, JSON.stringify(auth));
+  return { ...requestInit, headers };
+}
+
+function readAuthOverrides(request: Request): TestAuthOverrides {
+  const raw = request.headers.get(TEST_AUTH_HEADER);
+  if (!raw) return {};
+  const parsed = JSON.parse(raw) as unknown;
+  if (!isRecord(parsed)) {
+    throw new Error(`${TEST_AUTH_HEADER} must contain a JSON object.`);
+  }
+  return parsed;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }

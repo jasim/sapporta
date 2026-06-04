@@ -6,6 +6,7 @@ export const accountsTable = sqliteTable("accounts", {
   name: text("name").notNull(),
   type: text("type").notNull(),
   balance: integer("balance"),
+  workspace_id: text("workspace_id").notNull(),
   created_at: timestamp("created_at"),
   updated_at: timestamp("updated_at"),
 });
@@ -14,6 +15,7 @@ export const accounts = table({
   drizzle: accountsTable,
   meta: {
     label: "Accounts",
+    rowScope: "workspaceGlobal",
     selects: [
       { type: "select", column: "type", options: ["asset", "liability", "equity", "revenue", "expense"] },
     ],

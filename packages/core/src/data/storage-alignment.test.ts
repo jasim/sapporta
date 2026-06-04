@@ -12,9 +12,9 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { Hono } from "hono";
 import { integer, sqliteTable } from "drizzle-orm/sqlite-core";
 import { table } from "../schema/table.js";
+import type { TableDef } from "../schema/table.js";
 import {
   bool,
   date,
@@ -23,7 +23,9 @@ import {
   text,
   timestamp,
 } from "../schema/columns.js";
-import { crud } from "./crud.js";
+import { scopedRows } from "./scoped-rows.js";
+import { ValidationError } from "../db/errors.js";
+import { createTestAuthContext } from "../testing/auth-context.js";
 import { createTestDb } from "../testing/test-utils.js";
 
 // ── Numbers: REAL storage, numeric compare/sort ─────────────────────────
@@ -33,24 +35,21 @@ describe("storage alignment — numbers", () => {
     id: integer("id").primaryKey({ autoIncrement: true }),
     balance: money("balance").notNull(),
   });
-  const accounts_def = table({ drizzle: accounts });
+  const accounts_def = table({
+    drizzle: accounts,
+    meta: { rowScope: "systemGlobal" },
+  });
 
   async function setup() {
     const { db, sqlite } = createTestDb();
     sqlite.exec(
       `CREATE TABLE accounts (id INTEGER PRIMARY KEY AUTOINCREMENT, balance REAL NOT NULL)`,
     );
-    const app = new Hono();
-    app.route("/accounts", crud(accounts_def, db));
+    const rows = rowsFor(db, accounts_def);
     for (const balance of [3000, 100000, 9500, 25000]) {
-      const res = await app.request("/accounts", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ balance }),
-      });
-      expect(res.status).toBe(201);
+      await rows.create({ balance });
     }
-    return { app, sqlite };
+    return { rows, sqlite };
   }
 
   it("ORDER BY ASC returns numeric (not lexicographic) order", async () => {
@@ -62,11 +61,12 @@ describe("storage alignment — numbers", () => {
   });
 
   it("gt filter matches numerically, not lexicographically", async () => {
-    const { app } = await setup();
-    const res = await app.request("/accounts?filter[balance][gt]=10000&sort=balance");
-    expect(res.status).toBe(200);
-    const body = (await res.json()) as { data: Array<{ balance: number }> };
-    expect(body.data.map((r) => r.balance)).toEqual([25000, 100000]);
+    const { rows } = await setup();
+    const body = await rows.list({
+      "filter[balance][gt]": "10000",
+      sort: "balance",
+    });
+    expect(body.data.map((row) => row.balance)).toEqual([25000, 100000]);
   });
 });
 
@@ -77,24 +77,21 @@ describe("storage alignment — dates", () => {
     id: integer("id").primaryKey({ autoIncrement: true }),
     occurred_on: date("occurred_on").notNull(),
   });
-  const events_def = table({ drizzle: events });
+  const events_def = table({
+    drizzle: events,
+    meta: { rowScope: "systemGlobal" },
+  });
 
   async function setup() {
     const { db, sqlite } = createTestDb();
     sqlite.exec(
       `CREATE TABLE events (id INTEGER PRIMARY KEY AUTOINCREMENT, occurred_on TEXT NOT NULL)`,
     );
-    const app = new Hono();
-    app.route("/events", crud(events_def, db));
+    const rows = rowsFor(db, events_def);
     for (const d of ["2024-10-01", "2024-01-15", "2024-02-03"]) {
-      const res = await app.request("/events", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ occurred_on: d }),
-      });
-      expect(res.status).toBe(201);
+      await rows.create({ occurred_on: d });
     }
-    return { app, sqlite };
+    return { rows, sqlite };
   }
 
   it("ISO dates sort lex-equal to calendar order", async () => {
@@ -110,26 +107,18 @@ describe("storage alignment — dates", () => {
   });
 
   it("rejects US-format date inputs at the boundary", async () => {
-    const { app } = await setup();
-    const res = await app.request("/events", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ occurred_on: "1/15/2024" }),
-    });
-    // Validation rejects with 422 (Unprocessable Entity) before storage.
-    expect(res.status).toBe(422);
+    const { rows } = await setup();
+    await expect(rows.create({ occurred_on: "1/15/2024" }))
+      .rejects.toBeInstanceOf(ValidationError);
   });
 
   it("gt filter matches calendrically", async () => {
-    const { app } = await setup();
-    const res = await app.request(
-      "/events?filter[occurred_on][gt]=2024-02-01&sort=occurred_on",
-    );
-    expect(res.status).toBe(200);
-    const body = (await res.json()) as {
-      data: Array<{ occurred_on: string }>;
-    };
-    expect(body.data.map((r) => r.occurred_on)).toEqual([
+    const { rows } = await setup();
+    const body = await rows.list({
+      "filter[occurred_on][gt]": "2024-02-01",
+      sort: "occurred_on",
+    });
+    expect(body.data.map((row) => String(row.occurred_on))).toEqual([
       "2024-02-03",
       "2024-10-01",
     ]);
@@ -143,15 +132,17 @@ describe("storage alignment — timestamps", () => {
     id: integer("id").primaryKey({ autoIncrement: true }),
     at: timestamp("at").notNull(),
   });
-  const audits_def = table({ drizzle: audits });
+  const audits_def = table({
+    drizzle: audits,
+    meta: { rowScope: "systemGlobal" },
+  });
 
   it("canonicalized timestamps sort chronologically", async () => {
     const { db, sqlite } = createTestDb();
     sqlite.exec(
       `CREATE TABLE audits (id INTEGER PRIMARY KEY AUTOINCREMENT, at TEXT NOT NULL)`,
     );
-    const app = new Hono();
-    app.route("/audits", crud(audits_def, db));
+    const auditRows = rowsFor(db, audits_def);
     // Mixed input encodings of three distinct instants. Canonicalization
     // folds them into fixed-width UTC, and lex order then matches chronology.
     const inputs = [
@@ -160,17 +151,12 @@ describe("storage alignment — timestamps", () => {
       "2024-01-15T08:00:00Z",
     ];
     for (const at of inputs) {
-      const res = await app.request("/audits", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ at }),
-      });
-      expect(res.status).toBe(201);
+      await auditRows.create({ at });
     }
-    const rows = sqlite
+    const storedRows = sqlite
       .prepare("SELECT at FROM audits ORDER BY at ASC")
       .all() as Array<{ at: string }>;
-    expect(rows.map((r) => r.at)).toEqual([
+    expect(storedRows.map((row) => row.at)).toEqual([
       "2024-01-15T08:00:00Z",
       "2024-01-15T10:00:00Z",
       "2024-01-15T12:00:00Z",
@@ -185,23 +171,20 @@ describe("storage alignment — booleans", () => {
     id: integer("id").primaryKey({ autoIncrement: true }),
     is_active: bool("is_active").notNull(),
   });
-  const toggles_def = table({ drizzle: toggles });
+  const toggles_def = table({
+    drizzle: toggles,
+    meta: { rowScope: "systemGlobal" },
+  });
 
   it("true/false round-trip through INTEGER 0/1", async () => {
     const { db, sqlite } = createTestDb();
     sqlite.exec(
       `CREATE TABLE toggles (id INTEGER PRIMARY KEY AUTOINCREMENT, is_active INTEGER NOT NULL)`,
     );
-    const app = new Hono();
-    app.route("/toggles", crud(toggles_def, db));
+    const rows = rowsFor(db, toggles_def);
 
     for (const is_active of [true, false, true]) {
-      const res = await app.request("/toggles", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ is_active }),
-      });
-      expect(res.status).toBe(201);
+      await rows.create({ is_active });
     }
 
     // Storage is 0/1, not 'true'/'false' strings.
@@ -211,10 +194,7 @@ describe("storage alignment — booleans", () => {
     expect(rawRows.map((r) => r.is_active)).toEqual([1, 0, 1]);
 
     // The API roundtrips as booleans.
-    const res = await app.request("/toggles?filter[is_active][eq]=true");
-    const body = (await res.json()) as {
-      data: Array<{ is_active: boolean }>;
-    };
+    const body = await rows.list({ "filter[is_active][eq]": "true" });
     expect(body.data).toHaveLength(2);
     for (const row of body.data) expect(row.is_active).toBe(true);
   });
@@ -227,23 +207,20 @@ describe("storage alignment — null vs empty string", () => {
     id: integer("id").primaryKey({ autoIncrement: true }),
     body: text("body"),
   });
-  const notes_def = table({ drizzle: notes });
+  const notes_def = table({
+    drizzle: notes,
+    meta: { rowScope: "systemGlobal" },
+  });
 
   it("'' and null are distinct; no silent coercion between them", async () => {
     const { db, sqlite } = createTestDb();
     sqlite.exec(
       `CREATE TABLE notes (id INTEGER PRIMARY KEY AUTOINCREMENT, body TEXT)`,
     );
-    const app = new Hono();
-    app.route("/notes", crud(notes_def, db));
+    const rows = rowsFor(db, notes_def);
 
     for (const body of [{ body: "" }, { body: null }, { body: "hello" }]) {
-      const res = await app.request("/notes", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
-      expect(res.status).toBe(201);
+      await rows.create(body);
     }
 
     const byIsNull = sqlite
@@ -266,7 +243,10 @@ describe("URL round-trip — encoded filters execute and match", () => {
     balance: money("balance").notNull(),
     opened_on: date("opened_on").notNull(),
   });
-  const accounts_def = table({ drizzle: accounts });
+  const accounts_def = table({
+    drizzle: accounts,
+    meta: { rowScope: "systemGlobal" },
+  });
 
   it("UI-encoded filters flow through decodeFilters + parseFilters into rows", async () => {
     const { db, sqlite } = createTestDb();
@@ -277,8 +257,7 @@ describe("URL round-trip — encoded filters execute and match", () => {
         opened_on TEXT NOT NULL
       )
     `);
-    const app = new Hono();
-    app.route("/accounts", crud(accounts_def, db));
+    const rows = rowsFor(db, accounts_def);
 
     const seed = [
       { balance: 500, opened_on: "2024-01-15" },
@@ -286,12 +265,7 @@ describe("URL round-trip — encoded filters execute and match", () => {
       { balance: 120000, opened_on: "2023-12-20" },
     ];
     for (const body of seed) {
-      const res = await app.request("/accounts", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
-      expect(res.status).toBe(201);
+      await rows.create(body);
     }
 
     // Simulate the UI building a URL via encodeFilters-shaped params.
@@ -300,12 +274,15 @@ describe("URL round-trip — encoded filters execute and match", () => {
     qs.append("filter[opened_on][lt]", "2024-07-01");
     qs.append("sort", "balance");
 
-    const res = await app.request(`/accounts?${qs.toString()}`);
-    expect(res.status).toBe(200);
-    const body = (await res.json()) as {
-      data: Array<{ balance: number; opened_on: string }>;
-    };
-    expect(body.data.map((r) => r.balance)).toEqual([15000, 120000]);
+    const body = await rows.list(Object.fromEntries(qs));
+    expect(body.data.map((row) => row.balance)).toEqual([15000, 120000]);
   });
 });
 
+function rowsFor(db: ReturnType<typeof createTestDb>["db"], tableDef: TableDef) {
+  return scopedRows(
+    db,
+    createTestAuthContext({ tables: [tableDef] }),
+    tableDef,
+  );
+}

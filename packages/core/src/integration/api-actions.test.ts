@@ -22,6 +22,7 @@ describe("user-defined app routes", () => {
     expect(body.data.name).toBe("Action Cash");
     expect(body.data.type).toBe("asset");
     expect(body.data.balance).toBe(5000);
+    expect(body.data.workspace_id).toBe("workspace-1");
     expect(body.data.id).toBeGreaterThan(0);
   });
 

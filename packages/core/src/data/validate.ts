@@ -45,14 +45,11 @@ export function buildZodSchema(
     }
     let fieldSchema: z.ZodTypeAny = zodForKind(kind);
 
-    // Validate select options if defined
-    if (schema.meta.selects) {
-      const selectMeta = schema.meta.selects.find(
-        (s) => s.column === col.name,
-      );
-      if (selectMeta) {
-        fieldSchema = z.enum(selectMeta.options as [string, ...string[]]);
-      }
+    const selectMeta = schema.meta.selects.find(
+      (s) => s.column === col.name,
+    );
+    if (selectMeta) {
+      fieldSchema = z.enum(selectMeta.options as [string, ...string[]]);
     }
 
     // Make nullable + optional if column allows null
