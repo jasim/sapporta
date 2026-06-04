@@ -478,10 +478,21 @@ export async function assertSqliteTable(
 export async function prepareDockerReleaseProject(
   project: E2eProject,
 ): Promise<void> {
-  // Exercise release-style installs without mixing current templates with
-  // already-published Sapporta packages from npm.
+  // This path is deliberately more complicated than the ordinary init e2e.
+  //
+  // The generated project is a release-candidate probe for this checkout: it
+  // should build a Docker image that installs Sapporta exactly as an end user
+  // would, but using tarballs produced from the local monorepo. If any
+  // @sapporta/* package resolves from npm, the test can accidentally combine
+  // current templates with already-published framework packages. That is not a
+  // release test; it is registry roulette, and TypeScript can make it worse by
+  // merging same-name package IDs from stale registry copies.
   const specs = await packSapportaPackagesForProject(project);
   makeDockerfileCopyPackedSapportaPackages(project.projectDir);
+  writePnpmfileForPackedSapportaPackages(
+    project.projectDir,
+    specs.workspacePackage,
+  );
   rewritePackageJson(join(project.projectDir, "package.json"), specs.root);
   rewritePackageJson(
     join(project.projectDir, "packages", "api", "package.json"),
@@ -499,10 +510,13 @@ export async function prepareDockerReleaseProject(
       timeoutMs: 120_000,
     }),
   );
+  assertNoRegistrySapportaPackages(project.projectDir);
 }
 
 type PackedSapportaSpecs = {
+  /** Specs resolved from the generated project root, e.g. root package.json. */
   root: Record<string, string>;
+  /** Specs resolved from packages/api or packages/frontend package.json. */
   workspacePackage: Record<string, string>;
 };
 
@@ -567,11 +581,20 @@ function makeDockerfileCopyPackedSapportaPackages(projectDir: string): void {
   // copies the full source tree, so those tarballs are not visible unless this
   // test patches the generated Dockerfile.
   //
+  // The .pnpmfile.cjs matters for the same reason. Docker rebuilds dependencies
+  // from the lockfile with --frozen-lockfile; if the pnpmfile was present when
+  // the lockfile was generated but absent in the image install layers, pnpm may
+  // reject the lockfile or reinstall a different graph.
+  //
   // The patch is test-only and deliberately anchored to exact Dockerfile lines:
   // if the template changes, fail here with context instead of silently building
   // an image that falls back to registry packages or misses runtime files.
   const dockerfilePath = join(projectDir, "Dockerfile");
   let dockerfile = readFileSync(dockerfilePath, "utf-8");
+  const rootManifestCopy =
+    "COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./\n";
+  const rootManifestCopyWithPnpmfile =
+    rootManifestCopy + "COPY .pnpmfile.cjs .pnpmfile.cjs\n";
   const installStageManifestCopy =
     "COPY packages/shared/package.json packages/shared/package.json\n";
   const installStageManifestCopyWithTarballs =
@@ -589,11 +612,22 @@ function makeDockerfileCopyPackedSapportaPackages(projectDir: string): void {
   const defaultRuntimeCommand =
     'CMD ["sh", "-c", "pnpm --filter ./packages/api db:migrate && node packages/api/dist/boot.js"]';
 
-  // Avoid runtime `pnpm --filter`: with file: tarballs it may reinstall in a
-  // non-TTY container. The package-local bin uses the installed artifact.
+  // Avoid runtime `pnpm --filter`: with file: tarballs it may try to resolve or
+  // relink workspace state in a non-TTY container. The package-local Drizzle
+  // binary is already installed and exercises the same migration command.
   const packedArtifactRuntimeCommand =
     'CMD ["sh", "-c", "cd packages/api && ./node_modules/.bin/drizzle-kit migrate && node dist/boot.js"]';
 
+  dockerfile = replaceAllRequired(
+    dockerfile,
+    rootManifestCopy,
+    rootManifestCopyWithPnpmfile,
+    {
+      label: "install-stage root manifest copy",
+      expectedCount: 2,
+      dockerfilePath,
+    },
+  );
   dockerfile = replaceAllRequired(
     dockerfile,
     installStageManifestCopy,
@@ -633,6 +667,88 @@ function makeDockerfileCopyPackedSapportaPackages(projectDir: string): void {
   );
 
   writeFileSync(dockerfilePath, dockerfile);
+}
+
+function writePnpmfileForPackedSapportaPackages(
+  projectDir: string,
+  sapportaSpecs: Record<string, string>,
+): void {
+  // Rewriting direct generated-package dependencies is not enough. The packed
+  // @sapporta/server tarball still declares @sapporta/shared, and the packed
+  // frontend/grid packages declare their own @sapporta/* dependencies. pnpm
+  // will happily satisfy those transitive edges from the registry unless a
+  // readPackage hook rewrites the package manifests as they are resolved.
+  //
+  // The specs passed here are relative to generated workspace packages
+  // (`packages/api`, `packages/frontend`) because pnpm resolves file: specs in
+  // dependency manifests from the importer that is installing the dependency.
+  // Root-relative specs would point at packages/api/.sapporta-packages and fail.
+  writeFileSync(
+    join(projectDir, ".pnpmfile.cjs"),
+    [
+      '"use strict";',
+      "",
+      [
+        "// Test-only release-candidate wiring.",
+        "// Force packed Sapporta tarballs to depend on this checkout instead",
+        "// of published @sapporta/* packages from npm.",
+      ].join("\n"),
+      `const sapportaSpecs = ${JSON.stringify(sapportaSpecs, null, 2)};`,
+      "",
+      "function rewrite(dependencies) {",
+      "  if (!dependencies) return;",
+      "  for (const [packageName, spec] of Object.entries(sapportaSpecs)) {",
+      "    if (dependencies[packageName]) dependencies[packageName] = spec;",
+      "  }",
+      "}",
+      "",
+      "module.exports = {",
+      "  hooks: {",
+      "    readPackage(pkg) {",
+      [
+        "      // Do not rewrite the generated app packages themselves: their",
+        "      // package.json files already use importer-relative tarball specs.",
+      ].join("\n"),
+      '      if (!pkg.name || !pkg.name.startsWith("@sapporta/")) return pkg;',
+      "      rewrite(pkg.dependencies);",
+      "      rewrite(pkg.optionalDependencies);",
+      "      rewrite(pkg.devDependencies);",
+      "      return pkg;",
+      "    },",
+      "  },",
+      "};",
+      "",
+    ].join("\n"),
+  );
+}
+
+function assertNoRegistrySapportaPackages(projectDir: string): void {
+  // This assertion is intentionally narrow: @sapporta/rest-core and
+  // @sapporta/rest-open-api are third-party ts-rest packages that are expected
+  // to come from the registry. Only the Sapporta packages produced by this
+  // monorepo must be closed over local tarballs.
+  const lockfilePath = join(projectDir, "pnpm-lock.yaml");
+  const lockfile = readFileSync(lockfilePath, "utf-8");
+  const registryPackageEntries = Object.keys(SAPPORTA_PACKAGE_DIRS).flatMap(
+    (packageName) =>
+      lockfile.match(
+        new RegExp(`^ {2}'${escapeRegExp(packageName)}@(?!file:)`, "gm"),
+      ) ?? [],
+  );
+  expect(
+    registryPackageEntries.length === 0 ? null : registryPackageEntries,
+    [
+      "Expected Docker release lockfile to use only packed Sapporta tarballs.",
+      `Lockfile: ${lockfilePath}`,
+    ].join("\n"),
+  ).toBeNull();
+  for (const packageName of Object.keys(SAPPORTA_PACKAGE_DIRS)) {
+    expect(lockfile).not.toContain(`registry.npmjs.org/${packageName}/`);
+  }
+}
+
+function escapeRegExp(text: string): string {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 type DockerfileReplacementContext = {
@@ -769,6 +885,18 @@ export async function buildAndRunDockerProject(
           "-d",
           "-p",
           `127.0.0.1:${port}:3000`,
+          // The generated auth template is production-shaped even in tests: it
+          // refuses to boot without a Better Auth secret/public URL, and Better
+          // Auth checks request origins on credentialed auth routes. Use the
+          // externally mapped localhost URL because that is what curl sees.
+          "-e",
+          `BETTER_AUTH_SECRET=${project.env.BETTER_AUTH_SECRET ?? "sapporta-e2e-generated-project-secret"}`,
+          "-e",
+          `BETTER_AUTH_URL=${baseUrl}`,
+          "-e",
+          `SAPPORTA_FRONTEND_ORIGINS=${baseUrl}`,
+          "-e",
+          `SAPPORTA_REQUIRE_VERIFIED_EMAIL=${project.env.SAPPORTA_REQUIRE_VERIFIED_EMAIL ?? "false"}`,
           "--name",
           `${tagPrefix}-${Date.now()}`,
           imageTag,
@@ -976,7 +1104,7 @@ export async function curlText(
   url: string,
   opts: { method?: string; body?: unknown } & AuthCookieOptions = {},
 ): Promise<string> {
-  const args = ["-fsS"];
+  const args = ["-sS"];
   if (opts.cookieFile) {
     args.push("-b", opts.cookieFile, "-c", opts.cookieFile);
   }
@@ -985,14 +1113,26 @@ export async function curlText(
   }
   if (opts.body !== undefined) {
     args.push("-H", "Content-Type: application/json");
+    // Better Auth rejects mutating auth requests without an Origin header.
+    // Browser clients always send one; curl does not, so the e2e harness adds
+    // the same-origin value explicitly.
+    args.push("-H", `Origin: ${new URL(url).origin}`);
     args.push("--data", JSON.stringify(opts.body));
   }
+  args.push("-w", "\n%{http_code}");
   args.push(url);
-  return runText("curl", args, {
+  const output = await runText("curl", args, {
     cwd: MONOREPO_ROOT,
     env: process.env,
     timeoutMs: 30_000,
   });
+  const separator = output.lastIndexOf("\n");
+  const body = separator === -1 ? output : output.slice(0, separator);
+  const status = Number(separator === -1 ? "0" : output.slice(separator + 1));
+  if (status < 200 || status >= 300) {
+    throw new Error(`HTTP ${status}: ${body}`);
+  }
+  return body;
 }
 
 export async function curlHeaders(url: string): Promise<string> {
