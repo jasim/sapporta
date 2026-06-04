@@ -9,12 +9,12 @@
  */
 import { afterAll, beforeAll, describe, it } from "vitest";
 import {
+  assertBetterSqliteLoads,
   assertFrontendRoutes,
   assertProjectHttpApi,
   buildProject,
   cleanupProject,
   createTempProject,
-  rebuildBetterSqlite,
   scaffoldProjectWithNpmCli,
   startBuiltServer,
   stopServer,
@@ -23,8 +23,7 @@ import {
   type StartedServer,
 } from "./harness.js";
 
-const runNpm =
-  process.env.SAPPORTA_E2E_NPM === "1" ? describe : describe.skip;
+const runNpm = process.env.SAPPORTA_E2E_NPM === "1" ? describe : describe.skip;
 
 runNpm("sapporta init from latest npm package - end-to-end", () => {
   let project: E2eProject | undefined;
@@ -40,9 +39,9 @@ runNpm("sapporta init from latest npm package - end-to-end", () => {
       prefix: "sapporta-e2e-npm-",
     });
     await scaffoldProjectWithNpmCli(project);
-    await rebuildBetterSqlite(project);
+    await assertBetterSqliteLoads(project);
     writeTasksSchema(project.projectDir);
-    await buildProject(project);
+    await buildProject(project, "add_tasks");
     server = await startBuiltServer(project);
   }, 480_000);
 

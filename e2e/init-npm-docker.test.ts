@@ -7,13 +7,14 @@
  */
 import { afterAll, beforeAll, describe, it } from "vitest";
 import {
+  assertBetterSqliteLoads,
   assertFrontendRoutes,
   assertProjectHttpApi,
   buildAndRunDockerProject,
   cleanupDockerProject,
   cleanupProject,
   createTempProject,
-  rebuildBetterSqlite,
+  generateDrizzleMigration,
   scaffoldProjectWithNpmCli,
   writeTasksSchema,
   type E2eProject,
@@ -34,12 +35,10 @@ runNpmDocker("sapporta init from latest npm package - Docker release", () => {
     });
 
     await scaffoldProjectWithNpmCli(project);
-    await rebuildBetterSqlite(project);
+    await assertBetterSqliteLoads(project);
     writeTasksSchema(project.projectDir);
-    dockerProject = await buildAndRunDockerProject(
-      project,
-      "sapporta-e2e-npm",
-    );
+    await generateDrizzleMigration(project, "add_tasks");
+    dockerProject = await buildAndRunDockerProject(project, "sapporta-e2e-npm");
   }, 720_000);
 
   afterAll(async () => {

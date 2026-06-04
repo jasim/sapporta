@@ -11,13 +11,13 @@
 import { afterAll, beforeAll, describe, it } from "vitest";
 import {
   assertSqliteTable,
+  assertBetterSqliteLoads,
   assertFrontendRoutes,
   assertProjectHttpApi,
   buildGeneratedProject,
   buildProject,
   cleanupProject,
   createTempProject,
-  rebuildBetterSqlite,
   runDrizzleMigrationCycle,
   scaffoldProject,
   startBuiltServer,
@@ -39,9 +39,9 @@ describe("sapporta init - end-to-end", () => {
 
     project = createTempProject();
     await scaffoldProject(project);
-    await rebuildBetterSqlite(project);
+    await assertBetterSqliteLoads(project);
     writeTasksSchema(project.projectDir);
-    await buildProject(project);
+    await buildProject(project, "add_tasks");
     await assertSqliteTable(project, "tasks", [
       "id",
       "title",

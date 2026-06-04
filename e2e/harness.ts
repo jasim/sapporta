@@ -112,10 +112,7 @@ const SAPPORTA_PACKAGE_DIRS = {
   "@sapporta/ui": "ui",
 } as const;
 
-export async function step<T>(
-  label: string,
-  fn: () => Promise<T>,
-): Promise<T> {
+export async function step<T>(label: string, fn: () => Promise<T>): Promise<T> {
   process.stderr.write(`[e2e setup] ${label}...\n`);
   const t0 = Date.now();
   const result = await fn();
@@ -179,7 +176,9 @@ export async function scaffoldProjectWithLocalCli(
 export async function scaffoldProjectWithNpmCli(
   project: E2eProject,
 ): Promise<void> {
-  process.stderr.write(`[e2e path] npm CLI install dir: ${project.parentDir}\n`);
+  process.stderr.write(
+    `[e2e path] npm CLI install dir: ${project.parentDir}\n`,
+  );
   await step("npm install sapporta", () =>
     run("npm", ["install", "sapporta"], {
       cwd: project.parentDir,
@@ -204,7 +203,9 @@ function assertScaffoldedProject(
 ): void {
   expect(existsSync(join(project.projectDir, "package.json"))).toBe(true);
   expect(existsSync(join(project.projectDir, "packages", "api"))).toBe(true);
-  expect(existsSync(join(project.projectDir, "packages", "frontend"))).toBe(true);
+  expect(existsSync(join(project.projectDir, "packages", "frontend"))).toBe(
+    true,
+  );
   expect(existsSync(join(project.projectDir, "packages", "shared"))).toBe(true);
 
   if (assertions.strictTemplateChecks) {
@@ -330,22 +331,46 @@ export function writeProjectsSchema(projectDir: string): void {
   );
 }
 
-export async function rebuildBetterSqlite(project: E2eProject): Promise<void> {
-  await step("pnpm rebuild better-sqlite3", () =>
-    run("pnpm", ["rebuild", "better-sqlite3"], {
-      cwd: project.projectDir,
-      env: project.env,
-      timeoutMs: 60_000,
-    }),
+export async function assertBetterSqliteLoads(
+  project: E2eProject,
+): Promise<void> {
+  await step("verify better-sqlite3 native bindings", () =>
+    run(
+      "pnpm",
+      [
+        "--filter",
+        "./packages/api",
+        "exec",
+        "node",
+        "-e",
+        'const Database = require("better-sqlite3"); const db = new Database(":memory:"); db.prepare("select 1").get(); db.close();',
+      ],
+      {
+        cwd: project.projectDir,
+        env: project.env,
+        timeoutMs: 60_000,
+      },
+    ),
   );
 }
 
-export async function buildProject(project: E2eProject): Promise<void> {
-  await runDrizzleMigrationCycle(project, "init");
+export async function buildProject(
+  project: E2eProject,
+  migrationName: string,
+): Promise<void> {
+  await runDrizzleMigrationCycle(project, migrationName);
   await buildGeneratedProject(project);
 }
 
 export async function runDrizzleMigrationCycle(
+  project: E2eProject,
+  name: string,
+): Promise<void> {
+  await generateDrizzleMigration(project, name);
+  await runDrizzleMigrations(project, name);
+}
+
+export async function generateDrizzleMigration(
   project: E2eProject,
   name: string,
 ): Promise<void> {
@@ -371,6 +396,12 @@ export async function runDrizzleMigrationCycle(
       ].join("\n"),
     ).toBeGreaterThan(before.length);
   });
+}
+
+async function runDrizzleMigrations(
+  project: E2eProject,
+  name: string,
+): Promise<void> {
   await step(`run Drizzle migration (${name})`, () =>
     run("pnpm", ["--filter", "./packages/api", "db:migrate"], {
       cwd: project.projectDir,
@@ -813,12 +844,18 @@ export async function assertProjectHttpApi(
   );
   expect(found.data).toMatchObject(TASK_ONE);
 
-  const hello = await curlJson<{ message: string }>(`${baseUrl}/api/hello`, auth);
+  const hello = await curlJson<{ message: string }>(
+    `${baseUrl}/api/hello`,
+    auth,
+  );
   expect(hello.message).toBe(`Hello from ${PROJECT_NAME}`);
 }
 
 async function signInProjectOwner(baseUrl: string): Promise<string> {
-  const cookieFile = join(tmpdir(), `sapporta-e2e-cookies-${Date.now()}-${Math.random()}.txt`);
+  const cookieFile = join(
+    tmpdir(),
+    `sapporta-e2e-cookies-${Date.now()}-${Math.random()}.txt`,
+  );
   const credentials = {
     name: "Init Owner",
     email: `owner-${Date.now()}@example.com`,
@@ -850,9 +887,7 @@ async function withServerOutput<T>(
   } catch (err) {
     if (serverOutput.length === 0) throw err;
     const message = err instanceof Error ? err.message : String(err);
-    throw new Error(
-      [message, "Server output:", ...serverOutput].join("\n"),
-    );
+    throw new Error([message, "Server output:", ...serverOutput].join("\n"));
   }
 }
 
@@ -980,7 +1015,9 @@ async function waitForJson(url: string, timeoutMs = 30_000): Promise<void> {
       await new Promise((r) => setTimeout(r, 200));
     }
   }
-  throw new Error(`Server at ${url} did not become ready within ${timeoutMs}ms`);
+  throw new Error(
+    `Server at ${url} did not become ready within ${timeoutMs}ms`,
+  );
 }
 
 export function getFreePort(): Promise<number> {

@@ -12,9 +12,9 @@ import {
   cleanupDockerProject,
   cleanupProject,
   createTempProject,
+  generateDrizzleMigration,
   prepareDockerReleaseProject,
-  rebuildBetterSqlite,
-  runDrizzleMigrationCycle,
+  assertBetterSqliteLoads,
   scaffoldProject,
   writeTasksSchema,
   type E2eProject,
@@ -33,11 +33,11 @@ runDocker("sapporta init - Docker release", () => {
     project = createdProject;
 
     await scaffoldProject(createdProject);
-    await rebuildBetterSqlite(createdProject);
+    await assertBetterSqliteLoads(createdProject);
     writeTasksSchema(createdProject.projectDir);
-    // The Docker image applies migrations at boot, so the generated project
-    // must contain reviewed Drizzle SQL before the image is built.
-    await runDrizzleMigrationCycle(createdProject, "init");
+    // The Docker image applies migrations at boot; before building it, only
+    // generate the SQL file for the schema added by this test.
+    await generateDrizzleMigration(createdProject, "add_tasks");
     await prepareDockerReleaseProject(createdProject);
     dockerProject = await buildAndRunDockerProject(
       createdProject,

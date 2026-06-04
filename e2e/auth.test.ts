@@ -3,11 +3,11 @@ import { join } from "node:path";
 import {
   TASK_ONE,
   TASK_TWO,
+  assertBetterSqliteLoads,
   assertSqliteTable,
   buildGeneratedProject,
   cleanupProject,
   createTempProject,
-  rebuildBetterSqlite,
   runDrizzleMigrationCycle,
   runText,
   scaffoldProject,
@@ -51,14 +51,10 @@ describe("sapporta init auth template - end-to-end", () => {
     project = createTempProject({ prefix: "sapporta-auth-e2e-" });
     cookieJar = join(project.parentDir, "cookies.txt");
     await scaffoldProject(project);
-    await rebuildBetterSqlite(project);
+    await assertBetterSqliteLoads(project);
     writeAuthScopedTasksSchema(project.projectDir);
     await runDrizzleMigrationCycle(project, "auth_scoped_tasks");
-    await assertSqliteTable(project, "user", [
-      "id",
-      "email",
-      "emailVerified",
-    ]);
+    await assertSqliteTable(project, "user", ["id", "email", "emailVerified"]);
     await assertSqliteTable(project, "session", [
       "id",
       "token",
@@ -131,10 +127,14 @@ describe("sapporta init auth template - end-to-end", () => {
       }),
     ).rejects.toThrow(/HTTP 422/);
 
-    const firstTask = await authCurlJson<RowBody>(baseUrl, "/api/tables/tasks", {
-      method: "POST",
-      body: TASK_ONE,
-    });
+    const firstTask = await authCurlJson<RowBody>(
+      baseUrl,
+      "/api/tables/tasks",
+      {
+        method: "POST",
+        body: TASK_ONE,
+      },
+    );
     expect(firstTask.data.title).toBe(TASK_ONE.title);
     expect(firstTask.data.workspace_id).toBe(firstContext.workspace.id);
 
@@ -178,7 +178,10 @@ describe("sapporta init auth template - end-to-end", () => {
       },
     );
 
-    const firstList = await authCurlJson<RowsBody>(baseUrl, "/api/tables/tasks");
+    const firstList = await authCurlJson<RowsBody>(
+      baseUrl,
+      "/api/tables/tasks",
+    );
     expect(firstList.data.map((row) => row.title)).toEqual([TASK_ONE.title]);
   });
 
