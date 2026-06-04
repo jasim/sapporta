@@ -55,6 +55,10 @@ export function createBetterAuth({
       sendVerificationEmail: (data) => sendVerificationEmail(mailer, data),
       sendOnSignUp: true,
       sendOnSignIn: true,
+      autoSignInAfterVerification: true,
+    },
+    rateLimit: {
+      enabled: true,
     },
     plugins: createProjectAuthPlugins(),
   });

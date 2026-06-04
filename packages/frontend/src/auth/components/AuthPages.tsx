@@ -1,10 +1,16 @@
-import { useState, type FormEvent, type ReactNode } from "react";
-import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { useEffect, useState, type FormEvent, type ReactNode } from "react";
+import {
+  Link,
+  useLocation,
+  useNavigate,
+  useSearchParams,
+} from "react-router-dom";
 import { Button, Input, Label } from "@sapporta/ui";
 import { getApiBase } from "@/platform/base";
 import { useAuthStore } from "@/auth/state/auth-store";
 
 type AuthMode = "login" | "signup" | "forgot" | "reset";
+type VerifyEmailLocationState = { email?: string };
 
 export function LoginPage() {
   return (
@@ -48,14 +54,122 @@ export function ResetPasswordPage() {
 }
 
 export function VerifyEmailPage() {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const refresh = useAuthStore((s) => s.refresh);
+  const contextEmail = useAuthStore((s) => s.context?.user.email);
+  const stateEmail = readVerifyEmailState(location.state).email;
+  const token = searchParams.get("token");
+  const next = safeRedirectPath(searchParams.get("next"));
+  const isResend = searchParams.get("resend") === "1";
+  const [email, setEmail] = useState(stateEmail ?? contextEmail ?? "");
+  const [message, setMessage] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (!token) return;
+    let cancelled = false;
+
+    async function verify() {
+      setSubmitting(true);
+      setMessage(null);
+      setError(null);
+      try {
+        const params = new URLSearchParams({ token: token ?? "" });
+        const res = await fetch(`${getApiBase()}/auth/verify-email?${params}`, {
+          credentials: "include",
+        });
+        if (!res.ok) throw new Error(await responseMessage(res));
+        await refresh();
+        if (cancelled) return;
+        setMessage("Email verified. Taking you back...");
+        window.setTimeout(() => {
+          if (!cancelled) navigate(next, { replace: true });
+        }, 1200);
+      } catch (err) {
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : String(err));
+        }
+      } finally {
+        if (!cancelled) setSubmitting(false);
+      }
+    }
+
+    void verify();
+    return () => {
+      cancelled = true;
+    };
+  }, [navigate, next, refresh, token]);
+
+  async function resend(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setSubmitting(true);
+    setMessage(null);
+    setError(null);
+    try {
+      const res = await fetch(`${getApiBase()}/auth/send-verification-email`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, callbackURL: next }),
+      });
+      if (!res.ok) throw new Error(await responseMessage(res));
+      setMessage("Verification email sent.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
   return (
     <AuthFrame title="Verify email">
       <p className="text-sm text-sap-muted">
-        Check your email for a verification link, then return here.
+        {token
+          ? "Confirming your email address."
+          : "We've sent a confirmation link to your email. Click it to verify your account and continue."}
       </p>
-      <Button onClick={() => void useAuthStore.getState().refresh()}>
-        I verified my email
-      </Button>
+      {message && <div className="text-sm text-sap-positive">{message}</div>}
+      {error && <div className="text-sm text-sap-negative">{error}</div>}
+      {!token && !isResend && (
+        <div className="flex flex-col gap-3">
+          <Link
+            className="text-sm"
+            to="/verify-email?resend=1"
+            state={{ email }}
+          >
+            Didn't get a verification email?
+          </Link>
+          <Link className="text-sm" to="/login">
+            Back to login
+          </Link>
+        </div>
+      )}
+      {!token && isResend && (
+        <>
+          <p className="text-sm text-sap-muted">
+            Enter your email address and we'll send another confirmation link.
+          </p>
+          <form onSubmit={resend} className="space-y-4">
+            <Field label="Email">
+              <Input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+              />
+            </Field>
+            <Button type="submit" disabled={submitting}>
+              {submitting ? "Sending..." : "Resend verification email"}
+            </Button>
+          </form>
+          <Link className="text-sm" to="/verify-email" state={{ email }}>
+            Back
+          </Link>
+        </>
+      )}
     </AuthFrame>
   );
 }
@@ -97,12 +211,23 @@ function EmailPasswordPage({
           bodyForMode(mode, { email, password, name, resetToken }),
         ),
       });
-      if (!res.ok) throw new Error(await responseMessage(res));
+      if (!res.ok) {
+        const failure = await responseFailure(res);
+        if (mode === "login" && failure.code === "EMAIL_NOT_VERIFIED") {
+          navigate("/verify-email", { replace: true, state: { email } });
+          return;
+        }
+        throw new Error(failure.message);
+      }
       if (mode === "forgot") {
         navigate("/login", { replace: true });
         return;
       }
       await refresh();
+      if (mode === "signup") {
+        navigate("/verify-email", { replace: true, state: { email } });
+        return;
+      }
       navigate("/", { replace: true });
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -176,6 +301,17 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
   );
 }
 
+function readVerifyEmailState(value: unknown): VerifyEmailLocationState {
+  if (!value || typeof value !== "object") return {};
+  const email = "email" in value ? value.email : undefined;
+  return typeof email === "string" ? { email } : {};
+}
+
+function safeRedirectPath(value: string | null): string {
+  if (!value || !value.startsWith("/") || value.startsWith("//")) return "/";
+  return value;
+}
+
 function AuthLinks({ mode }: { mode: AuthMode }) {
   if (mode === "login") {
     return (
@@ -219,10 +355,23 @@ function bodyForMode(
 }
 
 async function responseMessage(res: Response): Promise<string> {
+  return (await responseFailure(res)).message;
+}
+
+async function responseFailure(
+  res: Response,
+): Promise<{ message: string; code?: string }> {
   try {
-    const body = (await res.json()) as { error?: string; message?: string };
-    return body.error ?? body.message ?? res.statusText;
+    const body = (await res.json()) as {
+      code?: string;
+      error?: string;
+      message?: string;
+    };
+    return {
+      code: body.code,
+      message: body.error ?? body.message ?? res.statusText,
+    };
   } catch {
-    return res.statusText;
+    return { message: res.statusText };
   }
 }

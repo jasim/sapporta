@@ -24,6 +24,7 @@ export function buildVerificationEmail(
   from: string,
 ): Mail.Options {
   const displayName = data.user.name ?? data.user.email;
+  const verificationUrl = frontendVerificationUrl(data.url);
   return {
     from,
     to: data.user.email,
@@ -32,14 +33,14 @@ export function buildVerificationEmail(
       `Hi ${displayName},`,
       "",
       "Verify your email address to finish setting up your account:",
-      data.url,
+      verificationUrl,
       "",
       "If you did not request this, you can ignore this email.",
     ].join("\n"),
     html: [
       `<p>Hi ${escapeHtml(displayName)},</p>`,
       "<p>Verify your email address to finish setting up your account.</p>",
-      `<p><a href="${escapeHtml(data.url)}">Verify email</a></p>`,
+      `<p><a href="${escapeHtml(verificationUrl)}">Verify email</a></p>`,
       "<p>If you did not request this, you can ignore this email.</p>",
     ].join("\n"),
   };
@@ -85,4 +86,22 @@ function escapeHtml(value: string): string {
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#39;");
+}
+
+function frontendVerificationUrl(rawUrl: string): string {
+  try {
+    const url = new URL(rawUrl);
+    const token = url.searchParams.get("token");
+    if (!token) return rawUrl;
+
+    const frontendUrl = new URL("/verify-email", url.origin);
+    frontendUrl.searchParams.set("token", token);
+    frontendUrl.searchParams.set(
+      "next",
+      url.searchParams.get("callbackURL") ?? "/",
+    );
+    return frontendUrl.toString();
+  } catch {
+    return rawUrl;
+  }
 }

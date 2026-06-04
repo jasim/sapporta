@@ -184,7 +184,7 @@ describe("project mailer template", () => {
     const verification = buildVerificationEmail(
       {
         user: { email: "owner@example.test", name: "<Owner & Co>" },
-        url: "http://localhost:3000/api/auth/verify-email?token=verify-token",
+        url: "http://localhost:3000/api/auth/verify-email?token=verify-token&callbackURL=%2F",
         token: "verify-token",
       },
       "Sapporta <no-reply@example.test>",
@@ -203,7 +203,9 @@ describe("project mailer template", () => {
       to: "owner@example.test",
       subject: "Verify your email",
     });
-    expect(verification.text).toContain("verify-token");
+    expect(verification.text).toContain(
+      "http://localhost:3000/verify-email?token=verify-token&next=%2F",
+    );
     expect(verification.html).toContain("&lt;Owner &amp; Co&gt;");
     expect(verification.html).not.toContain("<Owner & Co>");
     expect(reset).toMatchObject({
