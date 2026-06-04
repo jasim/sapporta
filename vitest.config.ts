@@ -17,10 +17,22 @@ export default defineConfig({
         "./packages/grid/src/lookup/index.ts",
       ),
       "@sapporta/grid": path.resolve(__dirname, "./packages/grid/src/index.ts"),
+      "@sapporta/server/table": path.resolve(
+        __dirname,
+        "./packages/core/src/schema/table.ts",
+      ),
+      "@sapporta/server/report": path.resolve(
+        __dirname,
+        "./packages/core/src/reports/report.ts",
+      ),
+      "@sapporta/server": path.resolve(__dirname, "./packages/core/src/index.ts"),
     },
   },
   test: {
     globals: true,
-    include: ["packages/*/src/**/*.test.ts"],
+    include: [
+      "packages/*/src/**/*.test.ts",
+      "packages/core/template-tests/**/*.test.ts",
+    ],
   },
 });

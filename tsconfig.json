@@ -16,6 +16,7 @@
     { "path": "packages/shared" },
     { "path": "packages/honest" },
     { "path": "packages/core" },
+    { "path": "packages/core/tsconfig.project-auth.json" },
     { "path": "packages/ui" },
     { "path": "packages/grid" },
     { "path": "packages/frontend" }
