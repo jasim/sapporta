@@ -41,7 +41,7 @@ function selectOptionsFor(
   def: TableDef,
   columnName: string,
 ): string[] | undefined {
-  return def.meta.selects?.find((s) => s.column === columnName)?.options;
+  return def.meta.selects.find((s) => s.column === columnName)?.options;
 }
 
 function baseColumnSchema(
@@ -153,7 +153,7 @@ export function tableCreateBodySchemaFor(
     z.array(masterInsert).meta({ id: `${pascal(master.sqlName)}InsertArray` }),
   ];
 
-  for (const child of master.meta.children ?? []) {
+  for (const child of master.meta.children) {
     const childDef = findChild(master, tables, child.table);
     const childRows = z
       .array(
@@ -197,7 +197,7 @@ export function tableCreateResultSchemaFor(
     z.array(row).meta({ id: `${pascal(master.sqlName)}RowArray` }),
   ];
 
-  for (const child of master.meta.children ?? []) {
+  for (const child of master.meta.children) {
     const childDef = findChild(master, tables, child.table);
     branches.push(
       z

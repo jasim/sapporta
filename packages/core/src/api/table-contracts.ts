@@ -5,8 +5,8 @@
  * lives in `table-schemas.ts`; those helpers produce plain Zod schemas,
  * which ts-rest accepts directly.
  *
- * Response bodies use the `{ data, meta? }` envelope the CRUD handlers
- * in `data/crud.ts` return. Tests and CLI
+ * Response bodies use the `{ data, meta? }` envelope the generated table
+ * handlers return. Tests and CLI
  * consumers depend on `body.data` being the row (or row array) and
  * `body.meta` being the paging envelope.
  *
@@ -55,7 +55,6 @@ export function listRoute(def: TableDef) {
       200: z.object({ data: z.array(row), meta: listMetaSchema }),
       400: errorBodySchema,
       404: errorBodySchema,
-      410: errorBodySchema,
     },
   });
 }
@@ -70,7 +69,6 @@ export function getRoute(def: TableDef) {
     responses: {
       200: z.object({ data: tableRowSchemaFor(def) }),
       404: errorBodySchema,
-      410: errorBodySchema,
     },
   });
 }
@@ -80,20 +78,19 @@ export function createRoute(def: TableDef, tables: readonly TableDef[]) {
     method: "POST",
     path: `/tables/${def.sqlName}`,
     summary: `Create row(s) in ${def.sqlName}`,
-    description: def.meta.children?.length
+    description: def.meta.children.length
       ? `Object, array, or master-with-$details payload for ${def.sqlName}.`
       : `Object or array of rows for ${def.sqlName}.`,
     // `skipBodyValidation` is a Sapporta-specific route-metadata flag
-    // consumed by `ts-rest-hono.ts::execute`. The CRUD handler
-    // (`savePipeline` in `data/crud.ts`) does its own validation and
-    // returns 422 on failure; validating again at the adapter would
+    // consumed by `ts-rest-hono.ts::execute`. The generated table handler
+    // calls `scopedRows()`; its writes go through `savePipeline()` and
+    // return 422 on failure. Validating again at the adapter would
     // short-circuit with a 400 and lose the canonical envelope.
     metadata: { tags: ["tables"], skipBodyValidation: true },
     body: tableCreateBodySchemaFor(def, tables),
     responses: {
       201: tableCreateResultSchemaFor(def, tables),
       404: errorBodySchema,
-      410: errorBodySchema,
       422: errorBodySchema,
       500: errorBodySchema,
     },
@@ -112,7 +109,6 @@ export function updateRoute(def: TableDef) {
       200: z.object({ data: tableRowSchemaFor(def) }),
       403: errorBodySchema,
       404: errorBodySchema,
-      410: errorBodySchema,
       422: errorBodySchema,
     },
   });
@@ -130,7 +126,6 @@ export function deleteRoute(def: TableDef) {
       200: z.object({ data: tableRowSchemaFor(def) }),
       403: errorBodySchema,
       404: errorBodySchema,
-      410: errorBodySchema,
     },
   });
 }
@@ -143,7 +138,6 @@ export function exportCsvRoute(def: TableDef) {
     metadata: { tags: ["tables"] },
     responses: {
       200: c.otherResponse({ contentType: "text/csv", body: z.string() }),
-      410: errorBodySchema,
     },
   });
 }

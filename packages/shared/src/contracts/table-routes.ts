@@ -45,7 +45,6 @@ export const listRowsRoute = c.query({
     200: paginatedRowsSchema,
     400: errorBodySchema,
     404: errorBodySchema,
-    410: errorBodySchema,
   },
 });
 
@@ -58,7 +57,6 @@ export const getRowRoute = c.query({
   responses: {
     200: singleRowSchema,
     404: errorBodySchema,
-    410: errorBodySchema,
   },
 });
 
@@ -72,7 +70,6 @@ export const createRowRoute = c.mutation({
   responses: {
     201: z.object({ data: z.union([rowSchema, z.array(rowSchema)]) }),
     404: errorBodySchema,
-    410: errorBodySchema,
     422: errorBodySchema,
     500: errorBodySchema,
   },
@@ -89,7 +86,6 @@ export const updateRowRoute = c.mutation({
     200: singleRowSchema,
     403: errorBodySchema,
     404: errorBodySchema,
-    410: errorBodySchema,
     422: errorBodySchema,
   },
 });
@@ -105,7 +101,6 @@ export const deleteRowRoute = c.mutation({
     200: singleRowSchema,
     403: errorBodySchema,
     404: errorBodySchema,
-    410: errorBodySchema,
   },
 });
 
@@ -119,7 +114,6 @@ export const lookupRoute = c.query({
   responses: {
     200: lookupResponseSchema,
     404: errorBodySchema,
-    410: errorBodySchema,
   },
 });
 
@@ -134,6 +128,5 @@ export const countRoute = c.query({
     200: countResponseSchema,
     400: errorBodySchema,
     404: errorBodySchema,
-    410: errorBodySchema,
   },
 });
