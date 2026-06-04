@@ -2,8 +2,8 @@ import nodemailer, {
   type SentMessageInfo,
   type Transporter,
 } from "nodemailer";
-import type Mail from "nodemailer/lib/mailer";
-import type SMTPTransport from "nodemailer/lib/smtp-transport";
+import type Mail from "nodemailer/lib/mailer/index.js";
+import type SMTPTransport from "nodemailer/lib/smtp-transport/index.js";
 import type {
   MailTransportKind,
   ProjectMailConfig,

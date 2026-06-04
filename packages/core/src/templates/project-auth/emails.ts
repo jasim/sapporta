@@ -1,5 +1,5 @@
 import type { SapportaMailer } from "../mailer.js";
-import type Mail from "nodemailer/lib/mailer";
+import type Mail from "nodemailer/lib/mailer/index.js";
 
 interface AuthEmailUser {
   email: string;
