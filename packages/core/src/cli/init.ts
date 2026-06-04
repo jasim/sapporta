@@ -4,19 +4,25 @@ import type { OperationResult } from "../introspect/types.js";
 import { createProject } from "./init-project/create-project.js";
 import { fromProjectRoot } from "../project-paths.js";
 import { ensureSapportaSkillInstalled } from "./init-project/sapporta-skill.js";
+import {
+  logInitDetail,
+  logInitSection,
+  type ProgressLogger,
+} from "./init-project/init-progress.js";
 
 const VALID_DIR_NAME = /^[a-zA-Z0-9_][a-zA-Z0-9._-]*$/;
 
-function progress(message: string): void {
+const progress: ProgressLogger = (message) => {
   console.error(message);
-}
+};
 
 export async function init(args: string[]): Promise<OperationResult> {
   const projectName = args[0];
   if (!projectName) {
     return {
       ok: false,
-      error: "Usage: sapporta init <name>\n\n  <name> is the project directory to create.",
+      error:
+        "Usage: sapporta init <name>\n\n  <name> is the project directory to create.",
       code: "MISSING_NAME",
     };
   }
@@ -31,34 +37,57 @@ export async function init(args: string[]): Promise<OperationResult> {
 
   const { apiDir, dataDir, markerPath } = fromProjectRoot(projectDir);
 
-  progress(`Creating Sapporta project directory at ${projectDir}...`);
+  logInitSection(progress, "Creating the Sapporta project directory");
+  logInitDetail(progress, `Project directory: ${projectDir}`);
   mkdirSync(apiDir, { recursive: true });
   mkdirSync(dataDir, { recursive: true });
   if (!existsSync(markerPath)) {
-    progress("Writing sapporta.json project marker...");
-    writeFileSync(markerPath, JSON.stringify({ name: projectName }, null, 2) + "\n");
+    logInitDetail(
+      progress,
+      "Writing sapporta.json so Sapporta tools can recognize the project root",
+    );
+    writeFileSync(
+      markerPath,
+      JSON.stringify({ name: projectName }, null, 2) + "\n",
+    );
   }
 
   try {
     createProject({ dir: projectDir, name: projectName, progress });
-    progress("Installing Sapporta assistant skill...");
+    logInitSection(progress, "Preparing the Sapporta assistant skill");
+    logInitDetail(
+      progress,
+      "Checking whether the local coding-agent skill is installed",
+    );
     const skillMessage = await ensureSapportaSkillInstalled(projectDir);
     return {
       ok: true,
       data: [],
       meta: {
         message: [
-          `Initialized project in ${projectDir}. Dependencies installed and initial database migration applied.`,
+          "Done.",
+          `Project: ${projectDir}`,
           skillMessage,
-          `Your Sapporta project is now ready. Run:`,
+          "",
+          "*** Ready!",
+          "",
+          "Your Sapporta project is now ready. Run:",
           `  cd ${projectName}`,
           "  pnpm dev",
+          "",
         ].join("\n"),
       },
     };
-  } catch (err: any) {
-    if (err.message.startsWith("package.json already exists")) {
-      progress("Project files already exist; checking Sapporta assistant skill...");
+  } catch (err: unknown) {
+    if (
+      err instanceof Error &&
+      err.message.startsWith("package.json already exists")
+    ) {
+      logInitSection(progress, "Preparing the Sapporta assistant skill");
+      logInitDetail(
+        progress,
+        "Project files already exist, so only the assistant skill check will run",
+      );
       const skillMessage = await ensureSapportaSkillInstalled(projectDir);
       return {
         ok: true,
@@ -67,9 +96,13 @@ export async function init(args: string[]): Promise<OperationResult> {
           message: [
             `${err.message}. Skipping.`,
             skillMessage,
-            `Your Sapporta project is now ready. Run:`,
+            "",
+            "*** Ready!",
+            "",
+            "Your Sapporta project is now ready. Run:",
             `  cd ${projectName}`,
             "  pnpm dev",
+            "",
           ].join("\n"),
         },
       };

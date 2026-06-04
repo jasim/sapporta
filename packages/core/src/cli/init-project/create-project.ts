@@ -3,6 +3,12 @@ import { join } from "node:path";
 import { execSync } from "node:child_process";
 import { ensureBetterSqlite3Loads } from "./sqlite-native-repair.js";
 import {
+  logInitDetail,
+  logInitSection,
+  noopProgress,
+  type ProgressLogger,
+} from "./init-progress.js";
+import {
   renderScaffoldFiles,
   resolveScaffoldPackages,
   resolveOwningPackage,
@@ -12,10 +18,6 @@ import {
 
 export { resolveOwningPackage, resolveScaffoldPackages };
 export type { ScaffoldPackages };
-
-type ProgressLogger = (message: string) => void;
-
-const noopProgress: ProgressLogger = () => {};
 
 export interface CreateProjectOptions {
   /** Absolute path to the project root (containing sapporta.json). */
@@ -46,24 +48,36 @@ export function createProject(opts: CreateProjectOptions): CreateProjectResult {
   const progress = opts.progress ?? noopProgress;
   const project = scaffoldProjectFromOptions(opts);
 
-  progress(`Preparing Sapporta project in ${project.root}...`);
+  logInitSection(progress, "Preparing the generated workspace scaffold");
   assertCanCreateProject(project);
-  progress("Checking pnpm is available...");
+  logInitDetail(progress, "Checking pnpm is available for workspace installs");
   assertPnpmAvailable();
 
-  progress("Resolving Sapporta package versions...");
+  logInitDetail(
+    progress,
+    "Resolving Sapporta package versions for the new project's package.json files",
+  );
   const files = renderScaffoldFiles(
     project,
     process.env.SAPPORTA_DEV_MODE_PACKAGE_ROOT,
   );
 
-  progress("Creating workspace directories...");
+  logInitDetail(
+    progress,
+    "Creating packages/api, packages/frontend, packages/shared, and support directories",
+  );
   createScaffoldDirectories(project);
-  progress("Writing project files...");
+  logInitDetail(
+    progress,
+    "Writing TypeScript, Vite, Drizzle, auth, and package configuration files",
+  );
   writeScaffoldFiles(project.root, files);
 
   installWorkspace(project.root, progress);
-  ensureBetterSqlite3Loads(project.apiDir, progress);
+  logInitSection(progress, "Verifying SQLite native bindings");
+  ensureBetterSqlite3Loads(project.apiDir, (message) =>
+    logInitDetail(progress, message),
+  );
   generateInitialMigration(project.root, progress);
   runInitialMigration(project.root, progress);
 
@@ -119,13 +133,14 @@ function writeScaffoldFiles(
   }
 }
 
-function installWorkspace(
-  projectRoot: string,
-  progress: ProgressLogger,
-): void {
+function installWorkspace(projectRoot: string, progress: ProgressLogger): void {
   // pnpm presence was verified at the top of this function, so this is
   // guaranteed to resolve. One pass installs the root workspace.
-  progress("Installing workspace dependencies with pnpm install...");
+  logInitSection(progress, "Installing the generated workspace dependencies");
+  logInitDetail(
+    progress,
+    "Running pnpm install so the API, frontend, and shared packages can build",
+  );
   execSync("pnpm install", { cwd: projectRoot, stdio: "inherit" });
 }
 
@@ -133,7 +148,11 @@ function generateInitialMigration(
   projectRoot: string,
   progress: ProgressLogger,
 ): void {
-  progress("Generating initial database migration...");
+  logInitSection(progress, "Generating the initial auth database migration");
+  logInitDetail(
+    progress,
+    "Running pnpm --filter ./packages/api db:generate --name initial_auth to create SQL from the generated API schema",
+  );
   execSync("pnpm --filter ./packages/api db:generate --name initial_auth", {
     cwd: projectRoot,
     stdio: "inherit",
@@ -144,7 +163,11 @@ function runInitialMigration(
   projectRoot: string,
   progress: ProgressLogger,
 ): void {
-  progress("Applying initial database migration...");
+  logInitSection(progress, "Applying the initial auth database migration");
+  logInitDetail(
+    progress,
+    "Running pnpm --filter ./packages/api db:migrate so the development SQLite database matches the generated schema",
+  );
   execSync("pnpm --filter ./packages/api db:migrate", {
     cwd: projectRoot,
     stdio: "inherit",

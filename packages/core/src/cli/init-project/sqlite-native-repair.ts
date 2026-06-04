@@ -13,7 +13,10 @@ db.close();
 
 type ProgressLogger = (message: string) => void;
 
-export type CommandResult = Pick<SpawnSyncReturns<string>, "status" | "signal" | "stdout" | "stderr" | "error">;
+export type CommandResult = Pick<
+  SpawnSyncReturns<string>,
+  "status" | "signal" | "stdout" | "stderr" | "error"
+>;
 
 function commandText(command: string, args: readonly string[]): string {
   return [command, ...args].join(" ");
@@ -32,12 +35,19 @@ function runCommand(
   });
 }
 
-function assertSuccessfulCommand(result: CommandResult, command: string, args: readonly string[]): void {
+function assertSuccessfulCommand(
+  result: CommandResult,
+  command: string,
+  args: readonly string[],
+): void {
   if (result.error) {
     throw result.error;
   }
   if (result.status !== 0) {
-    const output = [result.stdout, result.stderr].filter(Boolean).join("\n").trim();
+    const output = [result.stdout, result.stderr]
+      .filter(Boolean)
+      .join("\n")
+      .trim();
     throw new Error(
       `${commandText(command, args)} failed with status ${result.status ?? `signal ${result.signal}`}${
         output ? `:\n${output}` : ""
@@ -47,16 +57,31 @@ function assertSuccessfulCommand(result: CommandResult, command: string, args: r
 }
 
 export function isMissingBetterSqlite3Binding(result: CommandResult): boolean {
-  const output = [result.stdout, result.stderr, result.error?.message].filter(Boolean).join("\n");
-  return output.includes("Could not locate the bindings file") || output.includes("better_sqlite3.node");
+  const output = [result.stdout, result.stderr, result.error?.message]
+    .filter(Boolean)
+    .join("\n");
+  return (
+    output.includes("Could not locate the bindings file") ||
+    output.includes("better_sqlite3.node")
+  );
 }
 
-export function resolveBetterSqlite3Install(packageDir: string): { dir: string; version: string } {
+export function resolveBetterSqlite3Install(packageDir: string): {
+  dir: string;
+  version: string;
+} {
   const projectRequire = createRequire(join(packageDir, "package.json"));
-  const packageJsonPath = projectRequire.resolve(`${BETTER_SQLITE3_PACKAGE}/package.json`);
-  const pkg = JSON.parse(readFileSync(packageJsonPath, "utf-8")) as { name?: string; version?: string };
+  const packageJsonPath = projectRequire.resolve(
+    `${BETTER_SQLITE3_PACKAGE}/package.json`,
+  );
+  const pkg = JSON.parse(readFileSync(packageJsonPath, "utf-8")) as {
+    name?: string;
+    version?: string;
+  };
   if (pkg.name !== BETTER_SQLITE3_PACKAGE || !pkg.version) {
-    throw new Error(`Resolved ${packageJsonPath}, but it is not a valid ${BETTER_SQLITE3_PACKAGE} package.json.`);
+    throw new Error(
+      `Resolved ${packageJsonPath}, but it is not a valid ${BETTER_SQLITE3_PACKAGE} package.json.`,
+    );
   }
   return { dir: dirname(packageJsonPath), version: pkg.version };
 }
@@ -69,15 +94,17 @@ function repairBetterSqlite3Binding(
   packageDir: string,
   progress: ProgressLogger,
 ): void {
-  progress("better-sqlite3 native binding is missing; repairing the install...");
+  progress(
+    "better-sqlite3 could not load its native binding from the generated API package; repairing the install",
+  );
 
   const approveArgs = ["approve-builds", BETTER_SQLITE3_PACKAGE];
-  progress("Approving better-sqlite3 build scripts...");
+  progress("Approving better-sqlite3 build scripts with pnpm approve-builds");
   const approveResult = runCommand(packageDir, "pnpm", approveArgs, "inherit");
   assertSuccessfulCommand(approveResult, "pnpm", approveArgs);
 
   const rebuildArgs = ["rebuild", BETTER_SQLITE3_PACKAGE];
-  progress("Rebuilding better-sqlite3 native bindings...");
+  progress("Rebuilding better-sqlite3 native bindings with pnpm rebuild");
   const rebuildResult = runCommand(packageDir, "pnpm", rebuildArgs, "inherit");
   assertSuccessfulCommand(rebuildResult, "pnpm", rebuildArgs);
 
@@ -86,34 +113,50 @@ function repairBetterSqlite3Binding(
     return;
   }
   if (!isMissingBetterSqlite3Binding(smokeResult)) {
-    assertSuccessfulCommand(smokeResult, process.execPath, ["-e", SQLITE_SMOKE_SCRIPT]);
+    assertSuccessfulCommand(smokeResult, process.execPath, [
+      "-e",
+      SQLITE_SMOKE_SCRIPT,
+    ]);
   }
 
   const installed = resolveBetterSqlite3Install(packageDir);
   progress(
-    `pnpm rebuild did not produce a loadable binding; building ${BETTER_SQLITE3_PACKAGE}@${installed.version} directly...`,
+    `pnpm rebuild did not produce a loadable binding; building ${BETTER_SQLITE3_PACKAGE}@${installed.version} directly with node-gyp`,
   );
   const directBuildArgs = ["--yes", "node-gyp", "rebuild", "--release"];
-  const directBuildResult = runCommand(installed.dir, "npx", directBuildArgs, "inherit");
+  const directBuildResult = runCommand(
+    installed.dir,
+    "npx",
+    directBuildArgs,
+    "inherit",
+  );
   assertSuccessfulCommand(directBuildResult, "npx", directBuildArgs);
 
-  progress("Verifying repaired better-sqlite3 bindings...");
+  progress("Verifying the repaired better-sqlite3 binding can load");
   smokeResult = smokeTestBetterSqlite3(packageDir);
-  assertSuccessfulCommand(smokeResult, process.execPath, ["-e", SQLITE_SMOKE_SCRIPT]);
+  assertSuccessfulCommand(smokeResult, process.execPath, [
+    "-e",
+    SQLITE_SMOKE_SCRIPT,
+  ]);
 }
 
 export function ensureBetterSqlite3Loads(
   packageDir: string,
   progress: ProgressLogger = console.log,
 ): void {
-  progress("Checking better-sqlite3 native bindings...");
+  progress(
+    "Checking better-sqlite3 can open an in-memory SQLite database from the generated API package",
+  );
   const smokeResult = smokeTestBetterSqlite3(packageDir);
   if (smokeResult.status === 0) {
-    progress("better-sqlite3 native bindings are ready.");
+    progress("better-sqlite3 loaded successfully; migrations can use SQLite");
     return;
   }
   if (!isMissingBetterSqlite3Binding(smokeResult)) {
-    assertSuccessfulCommand(smokeResult, process.execPath, ["-e", SQLITE_SMOKE_SCRIPT]);
+    assertSuccessfulCommand(smokeResult, process.execPath, [
+      "-e",
+      SQLITE_SMOKE_SCRIPT,
+    ]);
   }
   repairBetterSqlite3Binding(packageDir, progress);
 }
