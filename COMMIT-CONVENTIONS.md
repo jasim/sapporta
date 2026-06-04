@@ -2,9 +2,9 @@ Observe Linux kernel commit conventions, plus:
 
 Subject line —  within 75 chars. subsystem: prefix, imperative mood, lowercase after colon (unless proper noun), no trailing period.
 
-Body —  two sections: Problem (current behavior, why wrong: user-visible symptoms; paste logs verbatim, or what needs to be improved, why, its value etc) and Solution (approach taken, why over alternatives, side effects/impacts). Wrap at 72 cols. Do not add labels like "Problem:" or "Solution:".
+Body —  two sections: Problem (current behavior, why wrong: user-visible symptoms; paste logs verbatim, or what needs to be improved, why, its value etc) and Solution (approach taken, why over alternatives, side effects/impacts). Do not add labels like "Problem:" or "Solution:".
 
-Do not wrap —  quoted output (errors, panics), long URLs, trailer lines.
+Wrap the lines in subject to 72 cols by using explicit line breaks in the commit message body. But do not wrap things like quoted output (errors, panics), long URLs, or trailer lines.
 
 eg:
 ```
