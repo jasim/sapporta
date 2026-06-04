@@ -1,8 +1,23 @@
 // @sapporta/server - public API
 
+// Auth
+export * from "./auth/index.js";
+
 // Server
-export { installSapportaDefaults } from "./api/server.js";
-export type { SapportaEnv } from "./api/server.js";
+export {
+  installExactOriginCors,
+  installFrameworkRoutePolicy,
+  installRequestLogging,
+  installSapportaDefaults,
+  installSapportaErrorHandler,
+  mountHealth,
+} from "./api/server.js";
+export type {
+  ExactOriginCorsOptions,
+  HealthPolicy,
+  SapportaAuthGuard,
+  SapportaEnv,
+} from "./api/server.js";
 
 // Table definition
 export { table } from "./schema/table.js";
@@ -10,6 +25,8 @@ export type {
   TableDef,
   TableOptions,
   SapportaMeta,
+  SapportaTableInputMeta,
+  ColumnMeta,
   SelectMeta,
   ChildMeta,
 } from "./schema/table.js";
@@ -28,29 +45,34 @@ export type { ValidationErrorDetail } from "./data/validate.js";
 // Save pipeline
 export { savePipeline, insertRow, updateRow } from "./data/save-pipeline.js";
 
+// Row-scoped table operations
+export {
+  ImmutableTableOperationError,
+  RowNotFoundError,
+  scopedRows,
+} from "./data/scoped-rows.js";
+export type {
+  ListRowsInput,
+  ListRowsResult,
+  ScopedRows,
+} from "./data/scoped-rows.js";
+
 // Query parser
 export { parseQuery } from "./data/query-parser.js";
 export type { ParsedQuery } from "./data/query-parser.js";
-
-// CRUD
-export { crud, handleList, handleGet, handleCreate, handleUpdate, handleDelete } from "./data/crud.js";
 
 // Schema API. Wire-shape types (`TableSchema`, `ColumnSchema`,
 // `ChildSchema`) live in `@sapporta/shared/contracts` — import from
 // there, not via this re-export.
 export { schemaApi, extractSchemas, extractSchema } from "./schema/extract.js";
 
-// Lookup
-export { lookupEndpoint, handleLookup } from "./data/lookup.js";
+// Row labels
 export { findRowLabelColumns, rowLabeller } from "./data/row-label.js";
 export type { RowLabeller } from "./data/row-label.js";
 
-// Count
-export { countEndpoint, handleCount } from "./data/count.js";
-
-// Schema registry
-export { SchemaRegistry } from "./schema/registry.js";
-export type { RegistryEntry } from "./schema/registry.js";
+// Table catalog
+export { createTableCatalog } from "./schema/catalog.js";
+export type { TableCatalog } from "./schema/catalog.js";
 
 // Name validation
 export { validateTableName, validateColumnName } from "./schema/reserved.js";
@@ -75,11 +97,18 @@ export { executeReport } from "./reports/engine.js";
 export { loadReports } from "./reports/loader.js";
 
 // Framework boot for external projects that own their entry point.
-// loadSapporta() encapsulates schema loading, migration readiness, and framework
-// route mounting. mountOpenApi() is a separate, order-dependent step
-// that publishes /api/openapi.json once all routes are registered.
-export { loadSapporta, mountOpenApi } from "./load-sapporta.js";
-export type { LoadSapportaOptions, LoadSapportaResult } from "./load-sapporta.js";
+export {
+  installSapportaRequestContext,
+  loadSapportaProject,
+  mountOpenApi,
+  mountSapportaFramework,
+} from "./load-sapporta.js";
+export type {
+  LoadSapportaProjectOptions,
+  MountSapportaFrameworkOptions,
+  SapportaFrameworkApi,
+  SapportaProject,
+} from "./load-sapporta.js";
 
 // SQLite connection
 export { connectProject } from "./db/sqlite-connection.js";

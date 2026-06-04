@@ -5,7 +5,12 @@
 import { describe, it, expect } from "vitest";
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
-import { installSapportaDefaults, type SapportaEnv } from "./server.js";
+import {
+  installExactOriginCors,
+  installFrameworkRoutePolicy,
+  installSapportaDefaults,
+  type SapportaEnv,
+} from "./server.js";
 import { OperationError } from "../introspect/types.js";
 
 function appThatThrows(err: unknown) {
@@ -73,5 +78,44 @@ describe("installSapportaDefaults", () => {
     });
     expect(res.status).toBe(500);
     expect(res.headers.get("content-type")).toMatch(/application\/json/);
+  });
+});
+
+describe("framework route policy", () => {
+  it("uses the project-supplied framework guard", async () => {
+    const app = installSapportaDefaults(new Hono<SapportaEnv>());
+    installFrameworkRoutePolicy(app, () => {
+      throw new HTTPException(403, {
+        res: Response.json({ error: "Project guard rejected" }, { status: 403 }),
+      });
+    });
+    app.get("/api/meta/project", (c) => c.json({ ok: true }));
+
+    const res = await app.request("/api/meta/project");
+    expect(res.status).toBe(403);
+    expect(await res.json()).toEqual({ error: "Project guard rejected" });
+  });
+});
+
+describe("CORS", () => {
+  it("rejects wildcard origins for credentialed CORS", () => {
+    expect(() =>
+      installExactOriginCors(new Hono<SapportaEnv>(), {
+        credentials: true,
+        origins: ["*"],
+      }),
+    ).toThrow(/wildcard origins/);
+  });
+
+  it("does not reflect unconfigured origins for credentialed CORS", async () => {
+    const app = new Hono<SapportaEnv>();
+    installExactOriginCors(app, { credentials: true });
+    app.get("/cors", (c) => c.json({ ok: true }));
+
+    const res = await app.request("/cors", {
+      headers: { Origin: "https://example.com" },
+    });
+
+    expect(res.headers.get("access-control-allow-origin")).toBeNull();
   });
 });

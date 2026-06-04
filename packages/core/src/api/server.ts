@@ -1,8 +1,9 @@
 import { cors } from "hono/cors";
 import { HTTPException } from "hono/http-exception";
-import type { Env, Hono } from "hono";
+import type { Context, Env, Hono } from "hono";
 import type { BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
 import type Database from "better-sqlite3";
+import type { SapportaAuthContext } from "../auth/index.js";
 import { logger, requestLogger } from "../db/logger.js";
 import { OperationError } from "../introspect/types.js";
 import { ERROR_CODE_STATUS } from "./error-codes.js";
@@ -16,8 +17,8 @@ import { ERROR_CODE_STATUS } from "./error-codes.js";
  * the base (Sapporta runs on Node and uses no platform bindings).
  *
  *   - `Variables` — request-scoped values set via `c.set(k, v)` and
- *      retrieved via `c.get(k)`. loadSapporta()'s middleware sets `db`
- *      and `sqlite` so user route handlers can read them with full
+ *      retrieved via `c.get(k)`. installSapportaRequestContext() sets
+ *      `db` and `sqlite` so user route handlers can read them with full
  *      type inference (no `any` casts on the Context).
  *
  * Threading this through `Hono<SapportaEnv>` (or `TsRestApi<SapportaEnv>`)
@@ -28,6 +29,7 @@ export interface SapportaEnv extends Env {
   Variables: {
     db: BetterSQLite3Database;
     sqlite: Database.Database;
+    auth: SapportaAuthContext;
   };
 }
 
@@ -37,28 +39,66 @@ function statusForCode(code: string): HttpErrorStatus {
   return (ERROR_CODE_STATUS[code] ?? 500) as HttpErrorStatus;
 }
 
-/**
- * Install Sapporta's default middleware, health endpoint, and error handler
- * on a Hono app.
- *
- * The template's `boot.ts` does `new Hono<SapportaEnv>()` itself and calls
- * this before `loadSapporta(...)`. `load-sapporta.ts` also calls it so
- * tests don't have to.
- *
- *   - `requestLogger()` / CORS — always-on concerns for an HTTP app.
- *   - `GET /health` — liveness probe outside every project scope.
- *   - `onError` — translates `HTTPException` / `OperationError` / unknown
- *     errors into a `{ error, code? }` JSON envelope so an API or agent
- *     client can always parse a response body.
- */
-export function installSapportaDefaults<E extends SapportaEnv>(
-  app: Hono<E>,
-): Hono<E> {
+export function installRequestLogging<E extends SapportaEnv>(app: Hono<E>): Hono<E> {
   app.use("*", requestLogger());
-  app.use("*", cors());
+  return app;
+}
 
+export interface ExactOriginCorsOptions {
+  origins?: readonly string[];
+  sameOrigin?: boolean;
+  credentials?: boolean;
+}
+
+export function installExactOriginCors<E extends SapportaEnv>(
+  app: Hono<E>,
+  options: ExactOriginCorsOptions = {},
+): Hono<E> {
+  if (options.credentials === true && options.origins?.includes("*")) {
+    throw new Error("Credentialed CORS requires exact origins; wildcard origins are not allowed.");
+  }
+
+  app.use(
+    "*",
+    cors({
+      credentials: options.credentials,
+      origin: (origin) => {
+        if (!origin) return options.sameOrigin === true ? "" : origin;
+        if (!options.origins || options.origins.length === 0) {
+          return options.credentials === true ? "" : origin;
+        }
+        return options.origins.includes(origin) ? origin : "";
+      },
+    }),
+  );
+  return app;
+}
+
+export type HealthPolicy = "disabled" | "public" | "authenticated";
+export type SapportaAuthGuard<E extends SapportaEnv = SapportaEnv> = (
+  c: Context<E>,
+) => SapportaAuthContext;
+
+export function mountHealth<E extends SapportaEnv>(
+  app: Hono<E>,
+  policy: HealthPolicy = "public",
+  guard?: SapportaAuthGuard<E>,
+): Hono<E> {
+  if (policy === "disabled") return app;
   app.get("/health", (c) => c.json({ status: "ok" }));
+  if (policy === "authenticated") {
+    if (!guard) {
+      throw new Error("Authenticated health policy requires a project auth guard.");
+    }
+    app.use("/health", async (c, next) => {
+      guard(c);
+      return next();
+    });
+  }
+  return app;
+}
 
+export function installSapportaErrorHandler<E extends SapportaEnv>(app: Hono<E>): Hono<E> {
   app.onError((err, c) => {
     const log = logger.child({ module: "http" });
 
@@ -83,5 +123,43 @@ export function installSapportaDefaults<E extends SapportaEnv>(
     return c.json({ error: message, code }, 500);
   });
 
+  return app;
+}
+
+export function installFrameworkRoutePolicy<E extends SapportaEnv>(
+  app: Hono<E>,
+  guard: SapportaAuthGuard<E>,
+): Hono<E> {
+  const ownerOnly = async (c: Context<E>, next: () => Promise<void>) => {
+    guard(c);
+    return next();
+  };
+  app.use("/api/openapi.json", ownerOnly);
+  app.use("/api/meta/*", ownerOnly);
+  app.use("/api/tables/*", ownerOnly);
+  app.use("/api/reports/*", ownerOnly);
+  return app;
+}
+
+/**
+ * Install Sapporta's default middleware, health endpoint, and error handler
+ * on a Hono app.
+ *
+ * Projects own their entry point and choose whether to call this bundled helper
+ * or wire the individual primitives themselves before mounting routes.
+ *
+ *   - `requestLogger()` / CORS — always-on concerns for an HTTP app.
+ *   - `GET /health` — liveness probe outside every project scope.
+ *   - `onError` — translates `HTTPException` / `OperationError` / unknown
+ *     errors into a `{ error, code? }` JSON envelope so an API or agent
+ *     client can always parse a response body.
+ */
+export function installSapportaDefaults<E extends SapportaEnv>(
+  app: Hono<E>,
+): Hono<E> {
+  installRequestLogging(app);
+  installExactOriginCors(app);
+  mountHealth(app, "public");
+  installSapportaErrorHandler(app);
   return app;
 }
