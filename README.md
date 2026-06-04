@@ -30,6 +30,13 @@ pnpm dev
 
 Rebuilds Sapporta package `dist/` output on every source change. `file:`-linked consumer projects pick up changes automatically.
 
+## Auth
+
+Sapporta's auth model is documented in [docs/auth.md](./docs/auth.md). Core
+owns schema and row-access safety. Generated `project-auth` code owns Better
+Auth configuration, request middleware, route guards, and adaptation into
+Sapporta auth context.
+
 ## Other commands
 
 ```bash

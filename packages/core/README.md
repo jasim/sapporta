@@ -22,6 +22,25 @@ pnpm start    # production: node dist/boot.js
 
 CLI commands that hit the API auto-detect the project by walking up from `cwd` looking for `sapporta.json`. Use `--sapporta-project-dir <path>` to override, or set `SAPPORTA_API_URL` to point at a non-default host/port.
 
+## Row-scoped table operations
+
+Use `scopedRows()` for ordinary custom table operations. It is the trust-boundary constructor: pass the request database handle, the authenticated Sapporta auth context, and one table definition. The returned operations all compose reads and writes through `auth.rowSecurity.forTable(table)`.
+
+```ts
+import { scopedRows } from "@sapporta/server";
+import { invoices } from "../schema/invoices.js";
+
+api.register("createInvoice", contract.createInvoice, async ({ c, request }) => {
+  const auth = projectAuth.requireWorkspaceUser(c);
+  const rows = scopedRows(c.get("db"), auth, invoices);
+
+  const created = await rows.create(request.body);
+  return { status: 201, body: { data: created } };
+});
+```
+
+Use `auth.rowSecurity.forTable(table)` directly for advanced Drizzle workflows such as joins, transactions, multi-table state transitions, aggregates, custom SQL, and domain-specific invariants.
+
 ## Environment variables
 
 | Variable | Purpose |
@@ -140,7 +159,7 @@ export const accounts = table({ drizzle: accountsTable, meta: { label: "Accounts
 
 Change schema, run Drizzle Kit generate, review SQL, run Drizzle Kit migrate, start server. The server only verifies migration readiness at boot.
 
-### Row Commands (CRUD operations)
+### Row Commands (table operations)
 
 ```bash
 # List rows (with filters, sort, pagination)
@@ -205,7 +224,7 @@ Routes are organized into five namespaces per project under the prefix `/p/{slug
 
 ```
 /p/{slug}/api/meta/...                 System metadata, introspection, admin
-/p/{slug}/api/tables/...               CRUD operations on table data
+/p/{slug}/api/tables/...               Table operations on row data
 /p/{slug}/api/reports/...              Report listing and execution
 /p/{slug}/api/actions/...              Transactional operations
 /p/{slug}/api/views/...                Custom view metadata
@@ -219,7 +238,7 @@ Each namespace has a distinct prefix — route ordering no longer matters.
 - **Single table schema**: `GET /p/{slug}/api/meta/tables/{name}` — one table's schema
 - **DB introspection**: `GET /p/{slug}/api/meta/tables/{name}/indexes`, `.../api/meta/tables/{name}/sample`
 - **SQL proxy**: `POST /p/{slug}/api/meta/sql`
-- **CRUD**: `GET/POST /p/{slug}/api/tables/{table}`, `GET/PUT/DELETE /p/{slug}/api/tables/{table}/{id}`
+- **Table operations**: `GET/POST /p/{slug}/api/tables/{table}`, `GET/PUT/DELETE /p/{slug}/api/tables/{table}/{id}`
 - **Lookup**: `GET /p/{slug}/api/tables/{table}/_lookup`
 - **Reports**: `GET /p/{slug}/api/reports`, `GET /p/{slug}/api/reports/{name}/results?params`
 - **Actions**: `GET /p/{slug}/api/actions`, `POST /p/{slug}/api/actions/{name}`
@@ -231,7 +250,7 @@ Each namespace has a distinct prefix — route ordering no longer matters.
 - **Schema loading**: `loadSchemas()` dynamically imports all `.ts` files from a schema directory
 - **Migrations**: native Drizzle Kit `generate` and `migrate`; Sapporta only checks readiness at boot
 - **Meta API**: `mount-meta.ts` mounts schema introspection, DB introspection, and the SQL proxy
-- **Tables API**: `tables-api.ts` — parametric `/:tableName` CRUD routing with runtime table registration
+- **Tables API**: `tables-api.ts` — parametric `/:tableName` table-operation routing with runtime table registration
 - **Actions API**: `action-api.ts` — single parametric `/:name` route with Map lookup
 - **Enums**: SQLite has no native enum type. Use `text()` columns with `meta.selects` for dropdown/validation support.
 - **Imports**: `@sapporta/server/table`, `@sapporta/server/runtime`, `@sapporta/server/view`, etc. (via package.json exports)

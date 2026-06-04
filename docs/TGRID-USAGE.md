@@ -10,6 +10,10 @@ workflow needs a custom table experience: nested rows, computed columns,
 workflow-specific editors, a custom toolbar, or save behavior that has to call
 application services.
 
+In Sapporta projects, custom TGrid views should follow the same field policy
+as generated forms: omit system-managed scope fields and use lookup controls
+only for resolved references. See [Sapporta Auth](auth.md).
+
 ## The Shape
 
 A TGrid has four public pieces:
