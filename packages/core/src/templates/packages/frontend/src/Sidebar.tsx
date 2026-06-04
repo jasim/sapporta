@@ -1,5 +1,5 @@
 import { useLocation } from "react-router-dom";
-import { SidebarSectionLabel, SidebarNavItem } from "@sapporta/frontend";
+import { SidebarSectionLabel, SidebarNavItem } from "@sapporta/frontend/shell";
 import { Sparkles } from "lucide-react";
 
 // Custom sidebar entries. Rendered ABOVE the library's Tables/Reports

@@ -1,7 +1,5 @@
 import { useEffect, useState } from "react";
-import { useSchemaStore } from "@sapporta/frontend";
-import { ApiError } from "@sapporta/shared/client";
-import { customApi } from "./api";
+import { useSchemaStore } from "@sapporta/frontend/schema";
 
 // Starter view wired from Sidebar.tsx and App.tsx. Delete all three entries
 // (this file, the sidebar item, and the route) once your own views take over.
@@ -16,11 +14,16 @@ export function Welcome() {
   const [hello, setHello] = useState<HelloState>({ kind: "loading" });
 
   useEffect(() => {
-    customApi.hello().then(
+    import("./api").then(({ customApi }) => customApi.hello()).then(
       (body) => setHello({ kind: "ok", message: body.message }),
       (err: unknown) => {
-        if (err instanceof ApiError) {
-          setHello({ kind: "error", status: err.status, body: err.body });
+        const apiError = readApiError(err);
+        if (apiError) {
+          setHello({
+            kind: "error",
+            status: apiError.status,
+            body: apiError.body,
+          });
         } else {
           setHello({ kind: "error", status: 0, body: err });
         }
@@ -71,11 +74,12 @@ export function Welcome() {
           </div>
           <pre className="mono text-sap-data bg-sap-sidebar border border-sap-border rounded-md p-4 overflow-x-auto leading-relaxed">
             {`// packages/api/schema/invoices.ts
-import { table } from "@sapporta/server/table";
-import { sqliteTable, text, integer } from "drizzle-orm/sqlite-core";
+import { table, sqliteTable, text, integer } from "@sapporta/server/table";
 
 export const invoicesTable = sqliteTable("invoices", {
   id:       integer("id").primaryKey({ autoIncrement: true }),
+  workspace_id: text("workspace_id").notNull(),
+  scoped_to_user_id: text("scoped_to_user_id").notNull(),
   customer: text("customer").notNull(),
   amount:   integer("amount"),
   due:      text("due"),
@@ -147,6 +151,13 @@ function formatError(body: unknown): string {
   } catch {
     return String(body);
   }
+}
+
+function readApiError(value: unknown): { status: number; body: unknown } | null {
+  if (!value || typeof value !== "object") return null;
+  const status = "status" in value ? value.status : undefined;
+  if (typeof status !== "number") return null;
+  return { status, body: "body" in value ? value.body : undefined };
 }
 
 function Stat({ label, value }: { label: string; value: number }) {

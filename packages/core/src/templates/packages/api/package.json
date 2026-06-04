@@ -22,6 +22,8 @@
     "@sapporta/server": "__CORE_SPEC__",
     "@sapporta/shared": "__SHARED_SPEC__",
     "__SLUG__-shared": "workspace:*",
+    "@better-auth/drizzle-adapter": "__BETTER_AUTH_VERSION__",
+    "better-auth": "__BETTER_AUTH_VERSION__",
     "@hono/node-server": "__HONO_NODE_SERVER_SPEC__",
     "hono": "__HONO_SPEC__",
     "drizzle-orm": "__DRIZZLE_VERSION__",

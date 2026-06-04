@@ -14,6 +14,7 @@
     "@sapporta/shared": "__SHARED_SPEC__",
     "@sapporta/ui": "__UI_SPEC__",
     "__SLUG__-shared": "workspace:*",
+    "better-auth": "^1.6.13",
     "@js-temporal/polyfill": "__TEMPORAL_VERSION__",
     "lucide-react": "__LUCIDE_REACT_VERSION__",
     "react": "__REACT_VERSION__",

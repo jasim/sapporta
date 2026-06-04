@@ -7,7 +7,7 @@ const databasePath = join(projectRoot, "data", "sqlite.db");
 
 export default defineConfig({
   dialect: "sqlite",
-  schema: "./schema/**/*.ts",
+  schema: ["./schema/**/*.ts", "./project-auth/schema.ts"],
   out: "./migrations",
   dbCredentials: {
     url: databasePath,

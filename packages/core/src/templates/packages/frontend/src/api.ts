@@ -14,7 +14,7 @@
 //   const { message } = await customApi.hello();
 
 import { createApiClient } from "@sapporta/shared/client";
-import { getApiBase } from "@sapporta/frontend";
+import { getApiBase } from "@sapporta/frontend/platform";
 import { helloContract } from "__SLUG__-shared";
 
 export const customApi = createApiClient(helloContract, { baseUrl: getApiBase });

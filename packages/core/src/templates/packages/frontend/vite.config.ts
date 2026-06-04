@@ -31,4 +31,13 @@ export default defineConfig({
       "/api": `http://localhost:${process.env.PORT ?? "3000"}`,
     },
   },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (id.includes("@js-temporal/polyfill")) return "temporal";
+        },
+      },
+    },
+  },
 });

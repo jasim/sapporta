@@ -1,9 +1,10 @@
 /**
  * Application entry point.
  *
- * Sequence: paths -> DB -> Hono app -> framework -> user routes -> OpenAPI ->
- * static assets -> serve. Each step is a plain function call; read the
- * source if you need to customize.
+ * Sequence: paths -> DB -> Sapporta project metadata -> auth -> Hono app ->
+ * middleware -> framework routes -> user routes -> OpenAPI -> static assets ->
+ * serve. Each step is a plain function call; read the source if you need to
+ * customize.
  */
 import { relative } from "node:path";
 import { serve } from "@hono/node-server";
@@ -14,40 +15,92 @@ import {
   findProjectRootFrom,
   fromProjectRoot,
   setProjectRoot,
-  loadSapporta,
+  installExactOriginCors,
+  installRequestLogging,
+  installSapportaRequestContext,
+  installSapportaErrorHandler,
+  assertAuthSchemaDefinitions,
+  loadSapportaProject,
+  mountHealth,
   mountOpenApi,
+  mountSapportaFramework,
   TsRestApi,
   type SapportaEnv,
 } from "@sapporta/server";
 import { loadApp } from "./app.js";
+import { createProjectAuth, readProjectAuthEnv } from "./project-auth/index.js";
 
-// 1. Paths + DB
+// 1. Paths + DB + Sapporta project metadata. Loading the Sapporta project reads
+//    schema/report modules and checks migration readiness; it does not mutate
+//    the Hono app.
 const projectRoot = findProjectRootFrom(import.meta.dirname);
 if (!projectRoot) {
-  throw new Error(`Could not find sapporta.json walking up from ${import.meta.dirname}`);
+  throw new Error(
+    `Could not find sapporta.json walking up from ${import.meta.dirname}`,
+  );
 }
 setProjectRoot(projectRoot);
-const { apiDistDir, frontendDistDir, databasePath } = fromProjectRoot(projectRoot);
+const { apiDistDir, frontendDistDir, databasePath } =
+  fromProjectRoot(projectRoot);
 const conn = connectProject(databasePath);
+const sapporta = await loadSapportaProject({
+  slug: "__SLUG__",
+  projectRoot,
+  apiDistDir,
+  conn,
+});
 
-// 2. Shared Hono app - framework and user routes mount onto it.
+// 2. Auth can boot after loaded tables exist, so request auth contexts contain
+//    row-security guards from the start.
+assertAuthSchemaDefinitions(sapporta.catalog.tables);
+const projectAuth = createProjectAuth({
+  conn,
+  env: readProjectAuthEnv(),
+  catalog: sapporta.catalog,
+});
+
+// 3. Shared Hono app - framework and user routes mount onto it.
 const app = new Hono<SapportaEnv>();
 
-// 3. Framework: schemas, migration readiness, /api/meta + /api/tables + /api/reports.
-//    Order-agnostic relative to step 4.
-const sapporta = await loadSapporta(app, { slug: "__SLUG__", projectRoot, apiDistDir, conn });
+// 4. Request middleware and public health. Auth projects mount Better Auth at
+//    /api/auth/* before installing project-auth middleware.
+installRequestLogging(app);
+installExactOriginCors(app, {
+  origins: projectAuth.env.frontendOrigins,
+  credentials: true,
+});
+installSapportaErrorHandler(app);
+mountHealth(
+  app,
+  projectAuth.env.healthPolicy,
+  projectAuth.requireWorkspaceUser,
+);
+app.on(["GET", "POST"], "/api/auth/*", (c) =>
+  projectAuth.auth.handler(c.req.raw),
+);
+installSapportaRequestContext(app, conn);
+app.use("/api/*", projectAuth.middleware);
 
-// 4. User routes. `loadApp()` registers project paths like "/bank";
+// 5. Framework: /api/meta + /api/tables + /api/reports.
+const sapportaApi = mountSapportaFramework(app, sapporta, {
+  conn,
+  auth: {
+    requireFrameworkAccess: projectAuth.requireWorkspaceOwner,
+  },
+});
+
+// 6. User routes. `loadApp()` registers project paths like "/bank";
 //    mounting apiApp under /api serves them at /api/bank.
 const apiApp = new TsRestApi<SapportaEnv>();
 loadApp(apiApp, conn);
 app.route("/api", apiApp);
+app.route("/api", projectAuth.routes);
 
-// 5. /api/openapi.json. Must follow steps 3 and 4 - emitters are
+// 7. /api/openapi.json. Must follow framework and user routes - emitters are
 //    snapshotted at this call.
-mountOpenApi(app, sapporta, apiApp);
+mountOpenApi(app, sapporta, sapportaApi, apiApp, projectAuth.routes);
 
-// 6. Static assets + SPA fallback. Three deployment shapes work:
+// 8. Static assets + SPA fallback. Three deployment shapes work:
 //   (a) same-origin via this Hono process (default; `pnpm start`)
 //   (b) same-origin behind nginx - nginx serves packages/frontend/dist directly
 //       and proxies /api/ here; this block becomes harmless dead code
@@ -86,7 +139,7 @@ app.use("/*", serveStatic({ root: frontendDist }));
 // GET-only - a stray POST to /wat must 404, not return index.html.
 app.get("/*", serveStatic({ root: frontendDist, path: "index.html" }));
 
-// 7. Serve
+// 9. Serve
 const port = parseInt(process.env.PORT ?? "3000", 10);
 const server = serve({ fetch: app.fetch, port }, () => {
   console.log(`__SLUG__ API server ready (port ${port})`);

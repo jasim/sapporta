@@ -37,8 +37,16 @@ Delete the `hello` trio (`packages/shared/src/contracts/hello.ts`, `packages/api
 Schema files live in `packages/api/schema/`. Export both the raw Drizzle table object and the Sapporta wrapper:
 
 ```ts
-export const accountsTable = sqliteTable("accounts", { ... });
-export const accounts = table({ drizzle: accountsTable, meta: { label: "Accounts" } });
+export const accountsTable = sqliteTable("accounts", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  workspace_id: text("workspace_id").notNull(),
+  scoped_to_user_id: text("scoped_to_user_id").notNull(),
+  name: text("name").notNull(),
+});
+export const accounts = table({
+  drizzle: accountsTable,
+  meta: { label: "Accounts" },
+});
 ```
 
 Change schema, run Drizzle Kit generate, review SQL, run Drizzle Kit migrate, start server. The server checks migration readiness at boot but never applies migrations.

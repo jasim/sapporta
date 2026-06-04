@@ -2,12 +2,43 @@ import { lazy, Suspense, useEffect } from "react";
 import { Routes, Route, Navigate, useNavigate } from "react-router-dom";
 import {
   AppShell,
-  BootLoader,
   NotFoundView,
   setNavigate,
 } from "@sapporta/frontend/app";
+import { BootLoader } from "@sapporta/frontend/app";
+import {
+  AuthGate,
+  PublicOnlyGate,
+  useAuthStore,
+} from "@sapporta/frontend/auth/runtime";
 import { Sidebar } from "./Sidebar";
 import { Welcome } from "./Welcome";
+
+const LoginPage = lazy(() =>
+  import("@sapporta/frontend/auth/pages").then((m) => ({
+    default: m.LoginPage,
+  })),
+);
+const SignupPage = lazy(() =>
+  import("@sapporta/frontend/auth/pages").then((m) => ({
+    default: m.SignupPage,
+  })),
+);
+const VerifyEmailPage = lazy(() =>
+  import("@sapporta/frontend/auth/pages").then((m) => ({
+    default: m.VerifyEmailPage,
+  })),
+);
+const ForgotPasswordPage = lazy(() =>
+  import("@sapporta/frontend/auth/pages").then((m) => ({
+    default: m.ForgotPasswordPage,
+  })),
+);
+const ResetPasswordPage = lazy(() =>
+  import("@sapporta/frontend/auth/pages").then((m) => ({
+    default: m.ResetPasswordPage,
+  })),
+);
 
 // Keep table/report code out of the startup chunk until a matching route opens.
 const TableRoute = lazy(() =>
@@ -35,14 +66,70 @@ function RouteFallback() {
 
 export function App() {
   const navigate = useNavigate();
+  const isOwner = useAuthStore((s) => s.context?.isOwner ?? false);
   useEffect(() => {
     setNavigate(navigate);
   }, [navigate]);
 
   return (
-    <BootLoader>
-      <Routes>
-        <Route element={<AppShell sidebarContent={<Sidebar />} />}>
+    <Routes>
+      <Route
+        path="login"
+        element={
+          <PublicOnlyGate>
+            <Suspense fallback={<RouteFallback />}>
+              <LoginPage />
+            </Suspense>
+          </PublicOnlyGate>
+        }
+      />
+      <Route
+        path="signup"
+        element={
+          <PublicOnlyGate>
+            <Suspense fallback={<RouteFallback />}>
+              <SignupPage />
+            </Suspense>
+          </PublicOnlyGate>
+        }
+      />
+      <Route
+        path="verify-email"
+        element={
+          <Suspense fallback={<RouteFallback />}>
+            <VerifyEmailPage />
+          </Suspense>
+        }
+      />
+      <Route
+        path="forgot-password"
+        element={
+          <Suspense fallback={<RouteFallback />}>
+            <ForgotPasswordPage />
+          </Suspense>
+        }
+      />
+      <Route
+        path="reset-password"
+        element={
+          <Suspense fallback={<RouteFallback />}>
+            <ResetPasswordPage />
+          </Suspense>
+        }
+      />
+
+      <Route
+        element={
+          <AuthGate>
+            <BootLoader>
+              <AppShell
+                sidebarContent={<Sidebar />}
+                showFrameworkNavigation={isOwner}
+              />
+            </BootLoader>
+          </AuthGate>
+        }
+      >
           {/* Swap to `<HomeRedirect />` from @sapporta/frontend once you want `/`
               to jump to the first table instead of the Welcome view. */}
           <Route index element={<Navigate to="/welcome" replace />} />
@@ -74,8 +161,7 @@ export function App() {
           {/* Add custom view routes here, e.g.:
               <Route path="views/imports" element={<Imports />} /> */}
           <Route path="*" element={<NotFoundView />} />
-        </Route>
-      </Routes>
-    </BootLoader>
+      </Route>
+    </Routes>
   );
 }

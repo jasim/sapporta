@@ -14,6 +14,6 @@
       "__SLUG__-shared": ["../shared/dist/index.d.ts"]
     }
   },
-  "include": ["*.ts", "app", "schema", "reports"],
+  "include": ["*.ts", "app", "project-auth", "schema", "reports"],
   "exclude": ["dist"]
 }
