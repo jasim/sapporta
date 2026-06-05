@@ -35,7 +35,7 @@ export function EffectRunner({
 function runEffect(e: GridEffect, container: HTMLDivElement | null) {
   switch (e.type) {
     case "focusContainer": {
-      container?.focus();
+      container?.focus({ preventScroll: true });
       return;
     }
     case "focusCellEditor": {

@@ -104,9 +104,9 @@ function transitionFor(
   }
 }
 
-// Edit-lifecycle effects only. Cursor-motion effects (focusContainer +
-// scrollFocusIntoView for cursor moves) are queued by the cursor manager,
-// not derived here.
+// Edit-lifecycle effects only. Cursor focus effects are queued by the cursor
+// manager, and keyboard navigation requests reveal effects after resolving a
+// movement target.
 function deriveEffects(prev: ControllerState, next: Next): GridEffect[] {
   // Entered an edit: cursor placement inside the editor.
   if (next.editing && !prev.editing) {

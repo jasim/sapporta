@@ -29,10 +29,9 @@
 // mount/unmount).
 //
 // A sibling `effects` store carries pure reducer outputs out to
-// EffectRunner for DOM work — see `types/effects.ts`. The cursor manager
-// also queues onto this channel directly via `queueEffect`, since
-// `focusContainer` and `scrollFocusIntoView` are keyed off the global
-// cursor diff (not any per-store equality).
+// EffectRunner for DOM work — see `types/effects.ts`. Cursor moves use it for
+// focus, and navigation explicitly requests reveal effects after it resolves a
+// target.
 //
 // Selection changes never invalidate displayed rows. The displayed-rows store
 // is the only source of body render input; it invalidates only on source,
@@ -80,6 +79,12 @@ export interface GridControllerPublicVerbs {
   // host I/O — stable; bound once to DOM by Grid.tsx. Returns true if the
   // event was consumed (caller should preventDefault), false otherwise.
   handleKey: (e: KeyboardEvent) => boolean;
+  // Explicit viewport reveal. This is deliberately not part of cursor
+  // placement: pointer clicks should be able to move focus without moving
+  // visible content, while keyboard-style navigation can reveal its resolved
+  // destination after choosing a target.
+  revealCell: (coord: Coord) => void;
+  revealRow: (rowId: RowId) => void;
   flushEffects: () => void;
   // Sibling channel for queued effects. EffectRunner subscribes to this and
   // calls flushEffects() after running them.
@@ -221,6 +226,12 @@ export function createGridController(
     args.clearCellRange?.(args.path);
   };
   store.clearRowSelection = () => args.clearRowSelection?.(args.path);
+  store.revealCell = (coord) => {
+    store.queueEffect({ type: "scrollFocusIntoView", coord });
+  };
+  store.revealRow = (rowId) => {
+    store.queueEffect({ type: "scrollRowIntoView", rowId });
+  };
 
   function applyCellIntent(intent: CellNavigationIntent): boolean {
     const focus = store.getState().liveCellFocus;

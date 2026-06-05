@@ -42,6 +42,10 @@ export function ExpandCell({
       {showChevron ? (
         <button
           type="button"
+          onMouseDown={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+          }}
           onClick={toggle}
           aria-label={isExpanded ? "Collapse" : "Expand"}
           aria-expanded={isExpanded}

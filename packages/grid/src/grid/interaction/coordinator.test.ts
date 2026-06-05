@@ -6,6 +6,7 @@ import { childPath, makeRowId, rootPath } from "../types/identity";
 import type { GridPath, RowId } from "../types/identity";
 import type { TreeNode } from "../types/level-row";
 import type { GridSchema } from "../types/schema";
+import { ROW_MULTISELECT_LIST } from "../types/interaction";
 
 const TestEditor = () => null;
 const testColumn = (id: string, name: string) => ({
@@ -72,6 +73,21 @@ function setupExpanded() {
   return rt;
 }
 
+function setupRowList() {
+  return createGridRuntime({
+    schema: reportSchema,
+    dataSource: inMemoryGridDataSource({
+      schema: reportSchema,
+      tree,
+      levels: {
+        cat: { sortMode: "none", filterMode: "none", paginationMode: "none" },
+        items: { sortMode: "none", filterMode: "none", paginationMode: "none" },
+      },
+    }),
+    interaction: ROW_MULTISELECT_LIST,
+  });
+}
+
 function focusCell(
   rt: GridRuntime,
   path: GridPath,
@@ -107,6 +123,103 @@ describe("GridCoordinator", () => {
     });
 
     expect(rt.controllerFor(root).getState().cellSelection).toBe(null);
+  });
+
+  it("direct cursor moves update focus without requesting scroll", () => {
+    const cellGrid = setupExpanded();
+    const cellTarget = {
+      path: root,
+      rowId: makeRowId(root, "Fruit"),
+      colId: "name" as const,
+    };
+
+    cellGrid.cursorManager.moveCellCursorTo(cellTarget);
+
+    expect(cellGrid.coordinator.getState().cellCursor).toEqual(cellTarget);
+    expect(cellGrid.controllerFor(root).getState().liveCellFocus).toEqual({
+      rowId: cellTarget.rowId,
+      colId: cellTarget.colId,
+    });
+    expect(
+      cellGrid
+        .controllerFor(root)
+        .effects.getState()
+        .map((e) => e.type),
+    ).not.toContain("scrollFocusIntoView");
+
+    const rowList = setupRowList();
+    const rowTarget = {
+      path: root,
+      rowId: makeRowId(root, "Fruit"),
+    };
+
+    rowList.cursorManager.moveRowCursorTo(rowTarget);
+
+    expect(rowList.coordinator.getState().rowCursor).toEqual(rowTarget);
+    expect(rowList.controllerFor(root).getState().liveRowFocus).toBe(
+      rowTarget.rowId,
+    );
+    expect(
+      rowList
+        .controllerFor(root)
+        .effects.getState()
+        .map((e) => e.type),
+    ).not.toContain("scrollRowIntoView");
+  });
+
+  it("keyboard navigation reveals the moved cursor", () => {
+    const cellGrid = setupExpanded();
+    const firstCell = {
+      path: root,
+      rowId: makeRowId(root, "Fruit"),
+      colId: "name" as const,
+    };
+    cellGrid.cursorManager.moveCellCursorTo(firstCell);
+    cellGrid.controllerFor(root).flushEffects();
+
+    cellGrid.controllerFor(root).handleKey({
+      key: "ArrowRight",
+      ctrlKey: false,
+      metaKey: false,
+      shiftKey: false,
+      altKey: false,
+    } as KeyboardEvent);
+
+    expect(cellGrid.coordinator.getState().cellCursor).toEqual({
+      path: root,
+      rowId: firstCell.rowId,
+      colId: "qty",
+    });
+    expect(cellGrid.controllerFor(root).effects.getState()).toContainEqual({
+      type: "scrollFocusIntoView",
+      coord: { rowId: firstCell.rowId, colId: "qty" },
+    });
+
+    const rowList = setupRowList();
+    const firstRow = {
+      path: root,
+      rowId: makeRowId(root, "Fruit"),
+    };
+    const secondRowId = makeRowId(root, "Veg");
+    rowList.cursorManager.moveRowCursorTo(firstRow);
+    rowList.controllerFor(root).flushEffects();
+
+    rowList.controllerFor(root).handleKey({
+      key: "ArrowDown",
+      ctrlKey: false,
+      metaKey: false,
+      shiftKey: false,
+      altKey: false,
+    } as KeyboardEvent);
+
+    expect(rowList.coordinator.getState().rowCursor).toEqual({
+      path: root,
+      rowId: secondRowId,
+    });
+    expect(rowList.controllerFor(root).effects.getState()).toContainEqual({
+      type: "scrollRowIntoView",
+      rowId: secondRowId,
+    });
   });
 
   it("cursorManager.moveTo clears remembered ranges across paths", () => {

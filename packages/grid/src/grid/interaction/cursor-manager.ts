@@ -82,10 +82,6 @@ export function createCursorManager(deps: CursorManagerDeps): CursorManager {
       const ctrl = deps.controllerCursorPortFor(target.path);
       ctrl.setLiveCellFocus({ rowId: target.rowId, colId: target.colId });
       ctrl.queueEffect({ type: "focusContainer" });
-      ctrl.queueEffect({
-        type: "scrollFocusIntoView",
-        coord: { rowId: target.rowId, colId: target.colId },
-      });
     }
   }
 
@@ -152,7 +148,6 @@ export function createCursorManager(deps: CursorManagerDeps): CursorManager {
       const ctrl = deps.controllerCursorPortFor(target.path);
       ctrl.setLiveRowFocus(target.rowId);
       ctrl.queueEffect({ type: "focusContainer" });
-      ctrl.queueEffect({ type: "scrollRowIntoView", rowId: target.rowId });
     }
   }
 

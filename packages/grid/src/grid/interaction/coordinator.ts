@@ -383,6 +383,10 @@ export function createGridCoordinator(
     } else {
       cursorManager.moveCellCursorTo(target);
     }
+    // Navigation may resolve to a cell outside the current viewport. Reveal is
+    // requested here, not by the cursor manager, so pointer-originated cursor
+    // placement can update focus without unexpectedly moving visible content.
+    runtime.controllerFor(target.path).revealCell({ rowId: target.rowId, colId: target.colId });
   };
 
   function resolveRowMovement(
@@ -439,6 +443,10 @@ export function createGridCoordinator(
     } else {
       cursorManager.moveRowCursorTo(target);
     }
+    // Same rule as cell navigation: resolved navigation targets should be
+    // brought into view, while direct pointer cursor placement remains
+    // focus-only.
+    runtime.controllerFor(target.path).revealRow(target.rowId);
   };
 
   return store;
