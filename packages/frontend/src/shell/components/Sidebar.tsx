@@ -2,9 +2,10 @@ import { type ReactNode } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { Database, FileText } from "lucide-react";
 import { useSchemaStore } from "@/schema-catalog/state/schema-store";
+import { AuthAccountMenu } from "./AuthAccountMenu";
 import { SidebarShell } from "./SidebarShell";
 
-interface AppSidebarProps {
+export interface AppSidebarProps {
   /** Rendered ABOVE the Tables/Reports sections. Intended for app-chrome
    *  the host wants to inject (e.g. custom view links). */
   sidebarContent?: ReactNode;
@@ -110,15 +111,8 @@ export function AppSidebar({
   const { tables, reports, loading } = useSchemaStore();
   const location = useLocation();
 
-  const footer = (
-    <div className="flex items-center gap-2">
-      <SidebarKbd>⌘K</SidebarKbd>
-      <span className="text-sap-menu text-sap-muted">Command menu</span>
-    </div>
-  );
-
   return (
-    <SidebarShell header={<SidebarHeader />} footer={footer}>
+    <SidebarShell header={<SidebarHeader />} footer={<DefaultSidebarFooter />}>
       {sidebarContent}
 
       {showFrameworkNavigation && (
@@ -185,5 +179,17 @@ function SidebarKbd({ children }: { children: ReactNode }) {
     <kbd className="mono text-sap-label font-normal rounded-[3px] px-[5px] py-[1px] inline-flex items-center justify-center border border-sap-border bg-sap-kbd text-sap-subtle">
       {children}
     </kbd>
+  );
+}
+
+function DefaultSidebarFooter() {
+  return (
+    <div className="space-y-2">
+      <AuthAccountMenu />
+      <div className="flex items-center gap-2">
+        <SidebarKbd>⌘K</SidebarKbd>
+        <span className="text-sap-menu text-sap-muted">Command menu</span>
+      </div>
+    </div>
   );
 }

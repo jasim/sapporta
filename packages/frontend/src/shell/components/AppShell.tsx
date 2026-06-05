@@ -4,7 +4,7 @@ import { AppSidebar } from "./Sidebar";
 import { StatusBar } from "./StatusBar";
 import { useSchemaStore } from "@/schema-catalog/state/schema-store";
 
-interface AppShellProps {
+export interface AppShellProps {
   sidebarContent?: ReactNode;
   showFrameworkNavigation?: boolean;
 }

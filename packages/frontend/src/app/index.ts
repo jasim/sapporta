@@ -5,4 +5,4 @@ export { BootLoader } from "./boot/BootLoader";
 export { HomeRedirect } from "./boot/HomeRedirect";
 export { NotFoundView } from "./boot/NotFoundView";
 export { getNavigate, setNavigate } from "./router/router-bridge";
-export { AppShell } from "@/shell/components/AppShell";
+export { AppShell, type AppShellProps } from "@/shell/components/AppShell";

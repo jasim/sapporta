@@ -21,5 +21,9 @@ export async function switchActiveWorkspace(
 }
 
 export async function signOut(): Promise<void> {
-  await fetchApi("/auth/sign-out", { method: "POST" });
+  await fetchApi("/auth/sign-out", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({}),
+  });
 }

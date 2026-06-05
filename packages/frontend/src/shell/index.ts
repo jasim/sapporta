@@ -1,9 +1,25 @@
-export { AppShell } from "./components/AppShell";
+export { AppShell, type AppShellProps } from "./components/AppShell";
+export {
+  AccountMenu,
+  formatAuthRole,
+  getAccountDisplayName,
+  getAccountInitials,
+  getAccountSecondaryLabel,
+  type AccountMenuAction,
+  type AccountMenuProps,
+  type AccountMenuSection,
+  type AccountMenuTriggerRenderProps,
+} from "./components/AccountMenu";
+export {
+  AuthAccountMenu,
+  type AuthAccountMenuProps,
+} from "./components/AuthAccountMenu";
 export {
   AppSidebar,
   SapportaMark,
   SidebarNavItem,
   SidebarSectionLabel,
+  type AppSidebarProps,
 } from "./components/Sidebar";
 export { SidebarShell } from "./components/SidebarShell";
 export { StatusBar } from "./components/StatusBar";

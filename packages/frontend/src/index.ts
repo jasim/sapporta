@@ -70,12 +70,28 @@ export {
   type ReportSummaryStatsProps,
 } from "@/report/components/ReportSummaryStats";
 
-export { AppShell } from "@/shell/components/AppShell";
+export { AppShell, type AppShellProps } from "@/shell/components/AppShell";
+export {
+  AccountMenu,
+  formatAuthRole,
+  getAccountDisplayName,
+  getAccountInitials,
+  getAccountSecondaryLabel,
+  type AccountMenuAction,
+  type AccountMenuProps,
+  type AccountMenuSection,
+  type AccountMenuTriggerRenderProps,
+} from "@/shell/components/AccountMenu";
+export {
+  AuthAccountMenu,
+  type AuthAccountMenuProps,
+} from "@/shell/components/AuthAccountMenu";
 export {
   AppSidebar,
   SapportaMark,
   SidebarSectionLabel,
   SidebarNavItem,
+  type AppSidebarProps,
 } from "@/shell/components/Sidebar";
 export { SidebarShell } from "@/shell/components/SidebarShell";
 export { TopBar } from "@/shell/components/TopBar";
