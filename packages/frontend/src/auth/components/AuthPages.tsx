@@ -8,49 +8,65 @@ import {
 import { Button, Input, Label } from "@sapporta/ui";
 import { getApiBase } from "@/platform/base";
 import { useAuthStore } from "@/auth/state/auth-store";
+import { loadProjectInfo } from "@/schema-catalog/actions/metadata";
+import { useSchemaStore } from "@/schema-catalog/state/schema-store";
 
 type AuthMode = "login" | "signup" | "forgot" | "reset";
 type VerifyEmailLocationState = { email?: string };
+type ModeContent = {
+  title: string;
+  intro: string;
+  submit: string;
+  submitting: string;
+  endpoint: string;
+};
+
+const MODE_CONTENT: Record<AuthMode, ModeContent> = {
+  login: {
+    title: "Sign in",
+    intro: "Use your email and password to continue.",
+    submit: "Sign in",
+    submitting: "Signing in...",
+    endpoint: "/auth/sign-in/email",
+  },
+  signup: {
+    title: "Create your account",
+    intro: "Enter your details to get started.",
+    submit: "Create account",
+    submitting: "Creating account...",
+    endpoint: "/auth/sign-up/email",
+  },
+  forgot: {
+    title: "Reset your password",
+    intro:
+      "Enter your email and we'll send a reset link if there is an account for it.",
+    submit: "Send reset link",
+    submitting: "Sending...",
+    endpoint: "/auth/request-password-reset",
+  },
+  reset: {
+    title: "Choose a new password",
+    intro: "Enter a new password for your account.",
+    submit: "Update password",
+    submitting: "Updating...",
+    endpoint: "/auth/reset-password",
+  },
+};
 
 export function LoginPage() {
-  return (
-    <EmailPasswordPage
-      mode="login"
-      title="Log in"
-      endpoint="/auth/sign-in/email"
-    />
-  );
+  return <EmailPasswordPage mode="login" />;
 }
 
 export function SignupPage() {
-  return (
-    <EmailPasswordPage
-      mode="signup"
-      title="Sign up"
-      endpoint="/auth/sign-up/email"
-      note="You are creating a new workspace and will be its owner."
-    />
-  );
+  return <EmailPasswordPage mode="signup" />;
 }
 
 export function ForgotPasswordPage() {
-  return (
-    <EmailPasswordPage
-      mode="forgot"
-      title="Reset password"
-      endpoint="/auth/request-password-reset"
-    />
-  );
+  return <EmailPasswordPage mode="forgot" />;
 }
 
 export function ResetPasswordPage() {
-  return (
-    <EmailPasswordPage
-      mode="reset"
-      title="Set new password"
-      endpoint="/auth/reset-password"
-    />
-  );
+  return <EmailPasswordPage mode="reset" />;
 }
 
 export function VerifyEmailPage() {
@@ -116,7 +132,7 @@ export function VerifyEmailPage() {
         body: JSON.stringify({ email, callbackURL: next }),
       });
       if (!res.ok) throw new Error(await responseMessage(res));
-      setMessage("Verification email sent.");
+      setMessage("Verification email sent. Check your inbox for the new link.");
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -125,11 +141,11 @@ export function VerifyEmailPage() {
   }
 
   return (
-    <AuthFrame title="Verify email">
+    <AuthFrame title="Verify your email">
       <p className="text-sm text-sap-muted">
         {token
           ? "Confirming your email address."
-          : "We've sent a confirmation link to your email. Click it to verify your account and continue."}
+          : "Check your inbox for a verification link. The link will sign you in, so you can close this tab."}
       </p>
       {message && <div className="text-sm text-sap-positive">{message}</div>}
       {error && <div className="text-sm text-sap-negative">{error}</div>}
@@ -143,14 +159,14 @@ export function VerifyEmailPage() {
             Didn't get a verification email?
           </Link>
           <Link className="text-sm" to="/login">
-            Back to login
+            Back to sign in
           </Link>
         </div>
       )}
       {!token && isResend && (
         <>
           <p className="text-sm text-sap-muted">
-            Enter your email address and we'll send another confirmation link.
+            Enter your email and we'll send another verification link.
           </p>
           <form onSubmit={resend} className="space-y-4">
             <Field label="Email">
@@ -174,36 +190,29 @@ export function VerifyEmailPage() {
   );
 }
 
-function EmailPasswordPage({
-  mode,
-  title,
-  endpoint,
-  note,
-}: {
-  mode: AuthMode;
-  title: string;
-  endpoint: string;
-  note?: string;
-}) {
+function EmailPasswordPage({ mode }: { mode: AuthMode }) {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const refresh = useAuthStore((s) => s.refresh);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
+  const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const content = MODE_CONTENT[mode];
 
   async function submit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setSubmitting(true);
+    setMessage(null);
     setError(null);
     try {
       const resetToken = searchParams.get("token");
       if (mode === "reset" && !resetToken) {
         throw new Error("Password reset link is missing a token.");
       }
-      const res = await fetch(`${getApiBase()}${endpoint}`, {
+      const res = await fetch(`${getApiBase()}${content.endpoint}`, {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
@@ -220,12 +229,19 @@ function EmailPasswordPage({
         throw new Error(failure.message);
       }
       if (mode === "forgot") {
-        navigate("/login", { replace: true });
+        setMessage(
+          "If an account exists for that email, a reset link is on the way.",
+        );
         return;
       }
       await refresh();
       if (mode === "signup") {
         navigate("/verify-email", { replace: true, state: { email } });
+        return;
+      }
+      if (mode === "reset") {
+        setMessage("Password updated. Taking you to sign in...");
+        window.setTimeout(() => navigate("/login", { replace: true }), 900);
         return;
       }
       navigate("/", { replace: true });
@@ -237,9 +253,9 @@ function EmailPasswordPage({
   }
 
   return (
-    <AuthFrame title={title}>
+    <AuthFrame title={content.title}>
+      <p className="text-sm text-sap-muted">{content.intro}</p>
       <form onSubmit={submit} className="space-y-4">
-        {note && <p className="text-sm text-sap-muted">{note}</p>}
         {mode === "signup" && (
           <Field label="Name">
             <Input value={name} onChange={(e) => setName(e.target.value)} />
@@ -265,9 +281,10 @@ function EmailPasswordPage({
             />
           </Field>
         )}
+        {message && <div className="text-sm text-sap-positive">{message}</div>}
         {error && <div className="text-sm text-sap-negative">{error}</div>}
         <Button type="submit" disabled={submitting}>
-          {submitting ? "Working..." : title}
+          {submitting ? content.submitting : content.submit}
         </Button>
       </form>
       <AuthLinks mode={mode} />
@@ -282,10 +299,17 @@ function AuthFrame({
   title: string;
   children: ReactNode;
 }) {
+  const name = useProjectName();
+
   return (
     <div className="flex min-h-screen items-center justify-center bg-sap-bg px-4">
       <div className="w-full max-w-[360px] space-y-5">
-        <h1 className="text-xl font-semibold text-sap-fg">{title}</h1>
+        <div className="space-y-1">
+          <div className="text-sm font-medium text-sap-muted">
+            {name ?? ""}
+          </div>
+          <h1 className="text-xl font-semibold text-sap-fg">{title}</h1>
+        </div>
         {children}
       </div>
     </div>
@@ -316,16 +340,27 @@ function AuthLinks({ mode }: { mode: AuthMode }) {
   if (mode === "login") {
     return (
       <div className="flex justify-between text-sm">
-        <Link to="/signup">Sign up</Link>
-        <Link to="/forgot-password">Forgot password</Link>
+        <Link to="/signup">Create account</Link>
+        <Link to="/forgot-password">Reset password</Link>
       </div>
     );
   }
   return (
     <div className="text-sm">
-      <Link to="/login">Back to login</Link>
+      <Link to="/login">Back to sign in</Link>
     </div>
   );
+}
+
+function useProjectName(): string | null {
+  const name = useSchemaStore((s) => s.name);
+
+  useEffect(() => {
+    if (name) return;
+    void loadProjectInfo().catch(() => undefined);
+  }, [name]);
+
+  return name;
 }
 
 function bodyForMode(
