@@ -54,6 +54,8 @@
   "scripts": {
     "build": "vite build",
     "build:watch": "vite build --watch",
+    "bench:runtime": "tsx bench/runtime-bench.ts",
+    "bench:runtime:gc": "tsx --expose-gc bench/runtime-bench.ts",
     "typecheck": "tsc --noEmit",
     "typecheck:watch": "tsc --noEmit --watch --preserveWatchOutput",
     "test": "vitest run",
