@@ -27,6 +27,30 @@ A new Sapporta project includes:
 - Frontend auth context APIs and an `AuthGate`.
 - Generated table operations that protect rows by workspace and user scope.
 
+## Environment
+
+Local development uses `.env.development`, created by `sapporta init` and
+ignored by git. It includes local defaults such as:
+
+```env
+BETTER_AUTH_SECRET=...
+SAPPORTA_PUBLIC_BASE_URL=http://localhost:5173
+FRONTEND_DEV_PORT=5173
+SAPPORTA_MAIL_TRANSPORT=stream
+```
+
+For production, set at least:
+
+- `BETTER_AUTH_SECRET`: a real signing secret.
+- `SAPPORTA_PUBLIC_BASE_URL`: the browser-facing app origin, used for auth
+  links, callbacks, and trusted credentialed requests.
+- Mail settings such as `SAPPORTA_MAIL_TRANSPORT`, `SAPPORTA_MAIL_FROM`, and
+  SMTP configuration if the app sends verification or reset emails.
+- Any database path, storage, or app-specific secrets your project adds.
+
+Credentialed auth requests need exact origins. Do not deploy with wildcard CORS
+for authenticated browser traffic.
+
 For ordinary table work, use the row-scoped table API exported by
 `@sapporta/server`:
 

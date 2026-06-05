@@ -1,5 +1,15 @@
 # Development
 
+## Monorepo Layout
+
+```text
+packages/cli/     sapporta CLI package
+packages/core/    @sapporta/server
+packages/honest/  Hono + ts-rest adapter
+packages/shared/  browser/server-safe shared utilities
+packages/ui/      React admin UI
+```
+
 ## Commands
 
 ```bash
@@ -8,6 +18,12 @@ pnpm build            # Build all packages
 pnpm test             # Run all tests
 pnpm test:watch       # Run tests in watch mode
 pnpm typecheck        # TypeScript type checking
+```
+
+Create a local app from the current checkout when testing library changes:
+
+```bash
+pnpm sapporta init ../my-app
 ```
 
 ## Scaffold Refresh
