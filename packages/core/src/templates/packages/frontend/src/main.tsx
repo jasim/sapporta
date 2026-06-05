@@ -4,12 +4,12 @@ import { BrowserRouter } from "react-router-dom";
 // Single CSS entrypoint. app.css runs Tailwind and pulls in
 // @sapporta/ui's tokens and base rules — edit it to customize.
 import "./app.css";
-import { App } from "./App";
+import { SapportaApp } from "./SapportaApp";
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <BrowserRouter>
-      <App />
+      <SapportaApp />
     </BrowserRouter>
   </StrictMode>,
 );

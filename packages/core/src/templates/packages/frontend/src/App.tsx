@@ -1,55 +1,36 @@
-import { useEffect } from "react";
-import { Route, Navigate, Routes, useNavigate } from "react-router-dom";
-import {
-  AccountProfilePage,
-  AppShell,
-  setNavigate,
-} from "@sapporta/frontend/app";
-import { BootLoader } from "@sapporta/frontend/app";
-import { AuthGate, useAuthStore } from "@sapporta/frontend/auth/runtime";
-import {
-  sapportaNotFoundRoute,
-  sapportaProtectedRoutes,
-  sapportaPublicRoutes,
-} from "./SapportaRoutes";
-import { Sidebar } from "./Sidebar";
+import { Route, Navigate, useLocation } from "react-router-dom";
+import { SidebarSectionLabel, SidebarNavItem } from "@sapporta/frontend/shell";
+import { Sparkles } from "lucide-react";
 import { Welcome } from "./Welcome";
 
-// This file is project-owned; scaffold refresh skips it so custom routes stay.
-export function App() {
-  const navigate = useNavigate();
-  const isOwner = useAuthStore((s) => s.context?.isOwner ?? false);
-  useEffect(() => {
-    setNavigate(navigate);
-  }, [navigate]);
+const welcomePath = "/welcome";
 
+// Add each domain screen here with its sidebar link and route.
+export function AppSidebar() {
+  const { pathname } = useLocation();
   return (
-    <Routes>
-      {sapportaPublicRoutes}
-
-      <Route
-        element={
-          <AuthGate>
-            <BootLoader>
-              <AppShell
-                sidebarContent={<Sidebar />}
-                showFrameworkNavigation={isOwner}
-              />
-            </BootLoader>
-          </AuthGate>
-        }
-      >
-        {/* Swap to `<HomeRedirect />` from @sapporta/frontend once you want `/`
-            to jump to the first table instead of the Welcome view. */}
-        <Route index element={<Navigate to="/welcome" replace />} />
-        <Route path="account/profile" element={<AccountProfilePage />} />
-        <Route path="welcome" element={<Welcome />} />
-
-        {/* Add custom view routes here, e.g.:
-            <Route path="views/imports" element={<Imports />} /> */}
-        {sapportaProtectedRoutes}
-        {sapportaNotFoundRoute}
-      </Route>
-    </Routes>
+    <>
+      <SidebarSectionLabel>Views</SidebarSectionLabel>
+      <SidebarNavItem
+        to={welcomePath}
+        label="Welcome"
+        icon={<Sparkles className="h-[12px] w-[12px]" strokeWidth={1.5} />}
+        active={pathname.startsWith(welcomePath)}
+      />
+    </>
   );
 }
+
+// Change this when you want `/` to open a different screen.
+export const appHomeRoute = (
+  <Route index element={<Navigate to={welcomePath} replace />} />
+);
+
+export const appRoutes = (
+  <>
+    <Route path="welcome" element={<Welcome />} />
+
+    {/* Add app routes here, e.g.:
+        <Route path="views/imports" element={<Imports />} /> */}
+  </>
+);

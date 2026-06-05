@@ -3,8 +3,7 @@ import { Route } from "react-router-dom";
 import { AccountProfilePage, NotFoundView } from "@sapporta/frontend/app";
 import { PublicOnlyGate } from "@sapporta/frontend/auth/runtime";
 
-// These routes live in Sapporta packages, so lazy loading keeps each generated
-// project from bundling framework screens the user may never open.
+// Load screens on demand so the app starts quickly.
 const LoginPage = lazy(() =>
   import("@sapporta/frontend/auth/pages").then((m) => ({
     default: m.LoginPage,
@@ -47,7 +46,6 @@ const ReportRoute = lazy(() =>
 );
 
 function RouteFallback() {
-  // Local fallback keeps lazy route loading independent of extra UI imports.
   return (
     <div className="p-[18px] text-sap-data text-sap-muted">Loading...</div>
   );

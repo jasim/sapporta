@@ -1,14 +1,8 @@
 import { useEffect, useState } from "react";
 import { useSchemaStore } from "@sapporta/frontend/schema";
 
-// Starter view wired from Sidebar.tsx and App.tsx. Delete all three entries
-// (this file, the sidebar item, and the route) once your own views take over.
-//
-// The "Hello from server" panel below proves the typed-client roundtrip:
-// `customApi.hello()` calls `/api/hello`, registered on the backend in
-// `packages/api/app/hello.ts` against the same `helloContract` exported from
-// `__SLUG__-shared`. Errors are shown verbatim — never reinterpreted —
-// so the panel is also a smoke test for the contract wiring.
+// Replace this screen with the first dashboard, workflow, or form your app
+// needs. The server check shows how a screen calls your typed API client.
 export function Welcome() {
   const { tables, reports } = useSchemaStore();
   const [hello, setHello] = useState<HelloState>({ kind: "loading" });
@@ -63,7 +57,7 @@ export function Welcome() {
           </div>
           <HelloPanel state={hello} />
           <p className="mt-3 text-sap-data text-sap-muted">
-            This calls{" "}
+            This screen calls{" "}
             <code className="mono text-sap-fg">customApi.hello()</code>. The
             contract is in{" "}
             <code className="mono text-sap-fg">
@@ -74,7 +68,8 @@ export function Welcome() {
             and the client is in{" "}
             <code className="mono text-sap-fg">
               packages/frontend/src/api.ts
-            </code>.
+            </code>
+            {"."}
           </p>
         </section>
 
@@ -114,12 +109,11 @@ export const invoices = table({
         </section>
 
         <footer className="pt-6 border-t border-sap-border text-sap-data text-sap-subtle">
-          When your own views are in place, remove{" "}
+          When your own screens are in place, remove{" "}
           <code className="mono text-sap-fg">
             packages/frontend/src/Welcome.tsx
           </code>{" "}
-          and its entries in{" "}
-          <code className="mono text-sap-fg">Sidebar.tsx</code> /{" "}
+          and update the sidebar entry and route in{" "}
           <code className="mono text-sap-fg">App.tsx</code>.
         </footer>
       </div>

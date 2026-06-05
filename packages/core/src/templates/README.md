@@ -29,7 +29,7 @@ packages/shared/    ts-rest contracts + types shared by backend and frontend
 
 ## Adding an API endpoint
 
-The starter `/api/hello` route shows the pattern. Each endpoint is a trio:
+The `/api/hello` example shows the pattern. Each endpoint is a trio:
 
 1. **`packages/shared/src/contracts/foo.ts`** — declare a ts-rest contract router (request/response schemas, path, method). One source of truth for the wire shape; re-export it from `packages/shared/src/contracts/index.ts` (which `packages/shared/src/index.ts` barrels through).
 2. **`packages/api/app/foo.ts`** — `api.register("foo", contract.foo, handler)`, default-exported. Mount it in `packages/api/app.ts`'s `loadApp()` with `app.route("/", fooApi)`; it's served under `/api`.
@@ -37,11 +37,11 @@ The starter `/api/hello` route shows the pattern. Each endpoint is a trio:
 
 Because both sides import the same contract, request and response types can never drift — change the contract once and both ends light up red until they match.
 
-Delete the `hello` trio (`packages/shared/src/contracts/hello.ts`, `packages/api/app/hello.ts`, `packages/frontend/src/api.ts` entry, sidebar/Welcome wiring) once your own routes take over.
+When your own API calls are in place, replace the `hello` contract, handler, client entry, and `Welcome` screen with your app's real feature.
 
 ## Email
 
-Generated projects use Nodemailer. `packages/api/mailer.ts` exports
+This project uses Nodemailer. `packages/api/mailer.ts` exports
 `createSapportaMailer()`, which returns a small project mailer object containing
 the raw Nodemailer `transport`, parsed defaults, and a `sendMail()` helper.
 `packages/api/app.ts` receives that mailer in `loadApp()` options, so routes can
@@ -56,8 +56,7 @@ In production, set `SAPPORTA_MAIL_TRANSPORT=smtp`, `SAPPORTA_MAIL_FROM`, and
 either `SMTP_URL` or `SMTP_HOST`/`SMTP_PORT`/`SMTP_SECURE`/`SMTP_USER`/`SMTP_PASS`.
 Most providers, including SES, Postmark, Resend, SendGrid, Mailgun, and standard
 mail hosts, publish SMTP settings. If you prefer a provider SDK, edit
-`packages/api/mailer.ts`; Sapporta does not hide email delivery behind a
-framework abstraction.
+`packages/api/mailer.ts` directly.
 
 ## Schema and migrations
 

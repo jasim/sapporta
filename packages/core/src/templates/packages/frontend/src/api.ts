@@ -1,13 +1,11 @@
 // Typed client for this project's own contracts.
 //
-// `createApiClient` lives in `@sapporta/shared/client` (browser-safe,
-// runtime-neutral). `getApiBase` is the dynamic-base getter the
-// framework frontend uses for `/meta/*` and `/tables/*`; reusing it here
-// keeps this client pointed at the same base.
+// Use `getApiBase` so calls work in development through the Vite proxy and in
+// production against the deployed API URL.
 //
 // Each method returns the 2xx body on success and throws `ApiError` on
-// non-2xx. Add one entry to the router each time you ship a new
-// contract in `__SLUG__-shared`.
+// non-2xx. Add a client entry each time you ship a new contract in
+// `__SLUG__-shared`.
 //
 // Usage:
 //   import { customApi } from "./api";
@@ -17,4 +15,6 @@ import { createApiClient } from "@sapporta/shared/client";
 import { getApiBase } from "@sapporta/frontend/platform";
 import { helloContract } from "__SLUG__-shared";
 
-export const customApi = createApiClient(helloContract, { baseUrl: getApiBase });
+export const customApi = createApiClient(helloContract, {
+  baseUrl: getApiBase,
+});

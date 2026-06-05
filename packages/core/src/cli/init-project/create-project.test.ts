@@ -39,6 +39,14 @@ describe("renderScaffoldFiles", () => {
     expect(byDest.get(".env.development")).toContain(
       "SAPPORTA_PUBLIC_BASE_URL=http://localhost:5173",
     );
+    expect(byDest.has("packages/frontend/src/SapportaApp.tsx")).toBe(true);
+    expect(byDest.has("packages/frontend/src/Sidebar.tsx")).toBe(false);
+    expect(byDest.get("packages/frontend/src/main.tsx")).toContain(
+      'import { SapportaApp } from "./SapportaApp";',
+    );
+    expect(byDest.get("packages/frontend/src/App.tsx")).toContain(
+      "export const appRoutes",
+    );
 
     for (const file of files) {
       expect(file.content, file.dest).not.toMatch(unresolvedToken);

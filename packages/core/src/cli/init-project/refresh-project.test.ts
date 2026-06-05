@@ -89,6 +89,10 @@ describe("refreshScaffoldProject", () => {
       join(target, "packages/frontend/src/SapportaRoutes.tsx"),
       "custom framework ui\n",
     );
+    writeFileSync(
+      join(target, "packages/frontend/src/SapportaApp.tsx"),
+      "custom framework app host\n",
+    );
     writeFileSync(join(target, "packages/api/schema/accounts.ts"), "schema\n");
     writeFileSync(join(target, "packages/api/reports/ledger.ts"), "report\n");
 
@@ -102,6 +106,9 @@ describe("refreshScaffoldProject", () => {
     expect(summary.overwritten).toContain("packages/api/app.ts");
     expect(summary.overwritten).toContain(
       "packages/frontend/src/SapportaRoutes.tsx",
+    );
+    expect(summary.overwritten).toContain(
+      "packages/frontend/src/SapportaApp.tsx",
     );
     expect(summary.skipped).toContain(
       "packages/frontend/src/App.tsx (workspace)",
@@ -123,6 +130,12 @@ describe("refreshScaffoldProject", () => {
         "utf-8",
       ),
     ).toContain("sapportaProtectedRoutes");
+    expect(
+      readFileSync(
+        join(target, "packages/frontend/src/SapportaApp.tsx"),
+        "utf-8",
+      ),
+    ).toContain("export function SapportaApp");
     expect(
       readFileSync(join(target, "packages/api/schema/accounts.ts"), "utf-8"),
     ).toBe("schema\n");

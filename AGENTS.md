@@ -32,3 +32,16 @@ Always fix root causes, not symptoms. Do not apply workarounds or ad-hoc patches
 Do not use `any`. Use concrete types, generics, or `unknown`.
 
 Commit messages should follow COMMIT-CONVENTIONS.md.
+
+## User-Facing Writing
+
+Apply this section only when editing or reviewing generated code, starter code,
+examples, public documentation, comments intended for app programmers, or
+user-facing messages.
+
+Write from the application builder's perspective, not from the implementation's
+perspective. Avoid exposing internal machinery, ownership models, generation
+processes, or architecture taxonomy unless that is the explicit subject. Prefer
+language that names the user's goal and what they can do next. Generated code
+should read like ordinary intentional app code, not like an artifact explaining
+how it was produced.
