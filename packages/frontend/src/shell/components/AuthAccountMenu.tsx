@@ -1,6 +1,8 @@
 import type { ComponentProps } from "react";
+import { UserRound } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { useAuthStore } from "@/auth/state/auth-store";
-import { AccountMenu } from "./AccountMenu";
+import { AccountMenu, type AccountMenuSection } from "./AccountMenu";
 
 export interface AuthAccountMenuProps
   extends Omit<ComponentProps<typeof AccountMenu>, "context" | "onLogout"> {
@@ -8,16 +10,34 @@ export interface AuthAccountMenuProps
 }
 
 export function AuthAccountMenu(props: AuthAccountMenuProps) {
+  const { sections = [], ...accountMenuProps } = props;
   const context = useAuthStore((s) => s.context);
   const logout = useAuthStore((s) => s.logout);
+  const navigate = useNavigate();
 
   if (!context) return null;
 
+  const profileSection: AccountMenuSection = {
+    id: "account",
+    actions: [
+      {
+        id: "profile",
+        label: "Profile",
+        description: "Account and workspace details",
+        icon: <UserRound className="h-[13px] w-[13px]" strokeWidth={1.7} />,
+        onSelect: () => {
+          navigate("/account/profile");
+        },
+      },
+    ],
+  };
+
   return (
     <AccountMenu
-      {...props}
+      {...accountMenuProps}
       context={context}
       onLogout={props.onLogout ?? logout}
+      sections={[profileSection, ...sections]}
     />
   );
 }

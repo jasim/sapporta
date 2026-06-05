@@ -1,3 +1,4 @@
+export { AccountProfilePage } from "./components/AccountProfilePage";
 export {
   ForgotPasswordPage,
   LoginPage,

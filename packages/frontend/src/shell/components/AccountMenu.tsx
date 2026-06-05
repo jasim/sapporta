@@ -20,6 +20,7 @@ export interface AccountMenuAction {
   icon?: ReactNode;
   disabled?: boolean;
   variant?: "default" | "danger";
+  pendingLabel?: string;
   onSelect: () => void | Promise<void>;
 }
 
@@ -55,6 +56,7 @@ export function AccountMenu({
 }: AccountMenuProps) {
   const [open, setOpen] = useState(false);
   const [pendingActionId, setPendingActionId] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
   const displayName = getAccountDisplayName(context.user);
   const secondaryLabel = getAccountSecondaryLabel(context);
   const initials = getAccountInitials(context.user);
@@ -67,6 +69,7 @@ export function AccountMenu({
             label: "Log out",
             icon: <LogOut className="h-[13px] w-[13px]" strokeWidth={1.7} />,
             variant: "danger",
+            pendingLabel: "Logging out...",
             onSelect: onLogout,
           },
         ],
@@ -79,11 +82,13 @@ export function AccountMenu({
   async function runAction(action: AccountMenuAction) {
     if (action.disabled || pendingActionId) return;
     setPendingActionId(action.id);
+    setActionError(null);
     try {
       await action.onSelect();
       setOpen(false);
     } catch (err) {
       console.error("Account menu action failed", err);
+      setActionError(errorMessage(err));
     } finally {
       setPendingActionId(null);
     }
@@ -142,6 +147,7 @@ export function AccountMenu({
                 key={action.id}
                 type="button"
                 disabled={action.disabled || pendingActionId !== null}
+                aria-busy={pendingActionId === action.id}
                 onClick={() => void runAction(action)}
                 className={cx(
                   "flex w-full items-center gap-2 rounded-[5px] px-2 py-[7px] text-left text-sap-data disabled:cursor-not-allowed disabled:opacity-60",
@@ -155,7 +161,9 @@ export function AccountMenu({
                 </span>
                 <span className="min-w-0 flex-1">
                   <span className="block truncate font-medium">
-                    {action.label}
+                    {pendingActionId === action.id
+                      ? action.pendingLabel ?? `${action.label}...`
+                      : action.label}
                   </span>
                   {action.description && (
                     <span className="block truncate text-sap-menu text-sap-muted">
@@ -167,6 +175,15 @@ export function AccountMenu({
             ))}
           </div>
         ))}
+
+        {actionError && (
+          <div
+            role="alert"
+            className="border-t border-sap-border-soft px-3 py-2 text-sap-menu text-sap-negative"
+          >
+            {actionError}
+          </div>
+        )}
 
         {footer && (
           <div className="border-t border-sap-border-soft px-3 py-2">
@@ -264,6 +281,10 @@ function AccountAvatar({ initials }: { initials: string }) {
       )}
     </span>
   );
+}
+
+function errorMessage(err: unknown): string {
+  return err instanceof Error ? err.message : "Could not complete action.";
 }
 
 function cx(...classes: Array<string | false | null | undefined>): string {

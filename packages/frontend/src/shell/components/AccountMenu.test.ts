@@ -120,4 +120,92 @@ describe("account menu trigger", () => {
 
     expect(document.body.textContent).toContain("Log out");
   });
+
+  it("shows a pending label while an action is running", async () => {
+    let finishAction: () => void = () => {};
+    await act(async () => {
+      root.render(
+        createElement(AccountMenu, {
+          context: AUTH_CONTEXT,
+          sections: [
+            {
+              id: "profile",
+              actions: [
+                {
+                  id: "save",
+                  label: "Save",
+                  pendingLabel: "Saving...",
+                  onSelect: () =>
+                    new Promise<void>((resolve) => {
+                      finishAction = resolve;
+                    }),
+                },
+              ],
+            },
+          ],
+        }),
+      );
+    });
+
+    await openMenu();
+    await clickButton("Save");
+
+    expect(document.body.textContent).toContain("Saving...");
+
+    await act(async () => {
+      finishAction();
+    });
+  });
+
+  it("keeps the menu open and reports action failures", async () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    await act(async () => {
+      root.render(
+        createElement(AccountMenu, {
+          context: AUTH_CONTEXT,
+          sections: [
+            {
+              id: "profile",
+              actions: [
+                {
+                  id: "save",
+                  label: "Save",
+                  onSelect: () => {
+                    throw new Error("Could not save profile.");
+                  },
+                },
+              ],
+            },
+          ],
+        }),
+      );
+    });
+
+    await openMenu();
+    await clickButton("Save");
+
+    expect(document.body.textContent).toContain("Could not save profile.");
+    expect(document.body.textContent).toContain("Save");
+    consoleError.mockRestore();
+  });
 });
+
+async function openMenu() {
+  const trigger = host.querySelector<HTMLButtonElement>(
+    'button[aria-label="Open account menu for Ada Lovelace"]',
+  );
+  expect(trigger).not.toBeNull();
+  await act(async () => {
+    trigger?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+  });
+}
+
+async function clickButton(label: string) {
+  const button = Array.from(document.body.querySelectorAll("button")).find(
+    (candidate) => candidate.textContent?.includes(label),
+  );
+  expect(button).not.toBeUndefined();
+  await act(async () => {
+    button?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+  });
+}

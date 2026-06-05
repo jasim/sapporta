@@ -23,6 +23,7 @@ export {
 } from "@/table/actions/record-actions";
 
 export { App } from "@/app/App";
+export { AccountProfilePage } from "@/auth/components/AccountProfilePage";
 export {
   AuthGate,
   ForgotPasswordPage,

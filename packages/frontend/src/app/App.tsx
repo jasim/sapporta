@@ -4,6 +4,7 @@ import { BootLoader } from "@/app/boot/BootLoader";
 import { HomeRedirect } from "@/app/boot/HomeRedirect";
 import { NotFoundView } from "@/app/boot/NotFoundView";
 import { setNavigate } from "@/app/router/router-bridge";
+import { AccountProfilePage } from "@/auth/components/AccountProfilePage";
 import { AppShell } from "@/shell/components/AppShell";
 import { TableRoute } from "@/table/route/TableRoute";
 import { NewRecordRoute } from "@/table/route/NewRecordRoute";
@@ -25,6 +26,7 @@ export function App() {
       <Routes>
         <Route element={<AppShell />}>
           <Route index element={<HomeRedirect />} />
+          <Route path="account/profile" element={<AccountProfilePage />} />
           <Route path="tables/:tableName/new" element={<NewRecordRoute />} />
           <Route path="tables/:tableName" element={<TableRoute />} />
           <Route path="reports/:reportName" element={<ReportRoute />} />
