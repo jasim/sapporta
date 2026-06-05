@@ -95,6 +95,25 @@ describe("framework route policy", () => {
     expect(res.status).toBe(403);
     expect(await res.json()).toEqual({ error: "Project guard rejected" });
   });
+
+  it("keeps project identity public", async () => {
+    const app = installSapportaDefaults(new Hono<SapportaEnv>());
+    installFrameworkRoutePolicy(app, () => {
+      throw new HTTPException(403, {
+        res: Response.json({ error: "Project guard rejected" }, { status: 403 }),
+      });
+    });
+    app.get("/api/meta/info", (c) =>
+      c.json({ name: "Acme Ledger", slug: "acme-ledger" }),
+    );
+
+    const res = await app.request("/api/meta/info");
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({
+      name: "Acme Ledger",
+      slug: "acme-ledger",
+    });
+  });
 });
 
 describe("CORS", () => {

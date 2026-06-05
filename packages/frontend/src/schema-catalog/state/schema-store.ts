@@ -3,6 +3,7 @@ import type { TableSchema, ReportMeta } from "@sapporta/shared/contracts";
 export interface SchemaState {
   tables: TableSchema[];
   reports: ReportMeta[];
+  name: string | null;
   slug: string | null;
   loading: boolean;
   loaded: boolean;
@@ -14,7 +15,7 @@ export interface SchemaState {
 export interface SchemaActions {
   setTables: (tables: TableSchema[]) => void;
   setReports: (reports: ReportMeta[]) => void;
-  setSlug: (slug: string) => void;
+  setProjectInfo: (info: { name: string; slug: string }) => void;
   setLoading: (loading: boolean) => void;
   setError: (error: string | null) => void;
   setActiveTable: (name: string | null) => void;
@@ -25,6 +26,7 @@ export interface SchemaActions {
 export const useSchemaStore = create<SchemaState & SchemaActions>((set) => ({
   tables: [],
   reports: [],
+  name: null,
   slug: null,
   loading: false,
   loaded: false,
@@ -34,7 +36,7 @@ export const useSchemaStore = create<SchemaState & SchemaActions>((set) => ({
 
   setTables: (tables) => set({ tables, loaded: true, loading: false, error: null }),
   setReports: (reports) => set({ reports }),
-  setSlug: (slug) => set({ slug }),
+  setProjectInfo: (info) => set({ name: info.name, slug: info.slug }),
   setLoading: (loading) => set({ loading }),
   setError: (error) => set({ error, loading: false }),
   // Mutual exclusion: only one entity type can be "active" at a time.
@@ -46,6 +48,7 @@ export const useSchemaStore = create<SchemaState & SchemaActions>((set) => ({
     set({
       tables: [],
       reports: [],
+      name: null,
       slug: null,
       loading: false,
       loaded: false,

@@ -28,12 +28,12 @@ export function SapportaMark({ size = 17 }: { size?: number }) {
 }
 
 function SidebarHeader() {
-  const slug = useSchemaStore((s) => s.slug);
+  const name = useSchemaStore((s) => s.name);
   return (
     <>
       <SapportaMark size={18} />
       <span className="text-sap-body font-bold tracking-sap-display truncate">
-        {slug ?? ""}
+        {name ?? ""}
       </span>
     </>
   );

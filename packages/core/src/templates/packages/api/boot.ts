@@ -45,6 +45,7 @@ const { apiDistDir, frontendDistDir, databasePath } =
   fromProjectRoot(projectRoot);
 const conn = connectProject(databasePath);
 const sapporta = await loadSapportaProject({
+  name: "__NAME__",
   slug: "__SLUG__",
   projectRoot,
   apiDistDir,

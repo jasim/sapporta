@@ -134,8 +134,15 @@ export function installFrameworkRoutePolicy<E extends SapportaEnv>(
     guard(c);
     return next();
   };
+  const ownerOnlyMeta = async (c: Context<E>, next: () => Promise<void>) => {
+    if (c.req.method === "GET" && c.req.path === "/api/meta/info") {
+      return next();
+    }
+    guard(c);
+    return next();
+  };
   app.use("/api/openapi.json", ownerOnly);
-  app.use("/api/meta/*", ownerOnly);
+  app.use("/api/meta/*", ownerOnlyMeta);
   app.use("/api/tables/*", ownerOnly);
   app.use("/api/reports/*", ownerOnly);
   return app;

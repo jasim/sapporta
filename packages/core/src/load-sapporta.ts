@@ -40,6 +40,8 @@ import {
 } from "./api/index.js";
 
 export interface LoadSapportaProjectOptions {
+  /** Human-readable project name shown in the frontend chrome and auth pages. */
+  name: string;
   slug: string;
   /** Absolute path to the project root containing sapporta.json. */
   projectRoot: string;
@@ -58,6 +60,8 @@ export interface LoadSapportaProjectOptions {
 }
 
 export interface SapportaProject {
+  /** Human-readable project name shown in the frontend chrome and auth pages. */
+  name: string;
   /** Project slug used for framework metadata and OpenAPI title generation. */
   slug: string;
   /** Compiled API directory used by metadata handlers to serve live schema info. */
@@ -110,6 +114,7 @@ export async function loadSapportaProject(
   const reports = await loadReports(dirs.reportsDir, bustCache);
 
   return {
+    name: opts.name,
     slug,
     apiDistDir,
     catalog,
@@ -149,14 +154,17 @@ export function mountSapportaFramework(
 ): SapportaFrameworkApi {
   const { conn } = options;
   const { sqlite, db } = conn;
-  const { slug, apiDistDir, catalog, reports } = project;
+  const { name, slug, apiDistDir, catalog, reports } = project;
 
   installFrameworkRoutePolicy(app, options.auth.requireFrameworkAccess);
 
   // Contract paths already carry the /meta, /tables, /reports prefix, so
   // mounting at /api yields the full URLs.
   const api = new TsRestApi<SapportaEnv, FrameworkDocCtx>();
-  mountMeta(api, makeMetaHandlers(catalog, sqlite, { dir: apiDistDir, slug }));
+  mountMeta(
+    api,
+    makeMetaHandlers(catalog, sqlite, { dir: apiDistDir, name, slug }),
+  );
   mountTables(
     api,
     catalog,

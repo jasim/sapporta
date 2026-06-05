@@ -81,6 +81,7 @@ export async function createIntegrationApp(
   apiApp.extend(accountsModule.default);
 
   const sapporta = await loadSapportaProject({
+    name: "Test",
     slug: "test",
     projectRoot: FIXTURES_SOURCE_DIR,
     apiDistDir: FIXTURES_DIR,

@@ -104,6 +104,7 @@ export const tableSchemaSchema = z.object({
 export type TableSchema = z.output<typeof tableSchemaSchema>;
 
 export const projectInfoSchema = z.object({
+  name: z.string(),
   slug: z.string(),
 });
 export type ProjectInfo = z.output<typeof projectInfoSchema>;

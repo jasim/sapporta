@@ -56,11 +56,11 @@ function withOperationError(c: Context, fn: () => OperationResult): Response {
 export function makeMetaHandlers<E extends Env>(
   catalog: TableCatalog,
   sqlite: Database.Database,
-  project: { dir: string; slug: string },
+  project: { dir: string; name: string; slug: string },
 ): MetaHandlers<E> {
   return {
     // ── Project identity ─────────────────────────────────────────────
-    projectInfo: ({ c }) => c.json({ slug: project.slug }),
+    projectInfo: ({ c }) => c.json({ name: project.name, slug: project.slug }),
 
     // ── Introspection ────────────────────────────────────────────────
     listTables: ({ c, request }) => {

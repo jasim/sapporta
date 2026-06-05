@@ -41,5 +41,5 @@ export async function loadReports() {
 
 export async function loadProjectInfo() {
   const info = await fetchProjectInfo();
-  useSchemaStore.getState().setSlug(info.slug);
+  useSchemaStore.getState().setProjectInfo(info);
 }

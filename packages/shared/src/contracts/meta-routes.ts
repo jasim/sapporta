@@ -21,7 +21,7 @@ const sqlBodySchema = z.object({
 export const projectInfoRoute = c.query({
   method: "GET",
   path: "/meta/info",
-  summary: "Project identity (slug)",
+  summary: "Project identity",
   metadata: { tags: ["meta"] },
   responses: {
     200: projectInfoSchema,
