@@ -127,6 +127,7 @@ export function createTempProject(opts: TempProjectOptions = {}): E2eProject {
   const env = { ...process.env };
   env.BETTER_AUTH_SECRET = "sapporta-e2e-generated-project-secret";
   env.SAPPORTA_REQUIRE_VERIFIED_EMAIL = "false";
+  env.SAPPORTA_MAIL_FROM = "Sapporta <no-reply@example.test>";
   if (opts.devMode ?? true) {
     env.SAPPORTA_DEV_MODE_PACKAGE_ROOT = MONOREPO_ROOT;
   } else {
@@ -898,6 +899,8 @@ export async function buildAndRunDockerProject(
           `SAPPORTA_FRONTEND_ORIGINS=${baseUrl}`,
           "-e",
           `SAPPORTA_REQUIRE_VERIFIED_EMAIL=${project.env.SAPPORTA_REQUIRE_VERIFIED_EMAIL ?? "false"}`,
+          "-e",
+          `SAPPORTA_MAIL_FROM=${project.env.SAPPORTA_MAIL_FROM ?? "Sapporta <no-reply@example.test>"}`,
           "--name",
           `${tagPrefix}-${Date.now()}`,
           imageTag,
