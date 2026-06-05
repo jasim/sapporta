@@ -15,7 +15,7 @@ export function HomeRedirect() {
 
   return (
     <div className="flex items-center justify-center h-full text-sap-muted">
-      No tables or reports available
+      No tables or reports are available yet.
     </div>
   );
 }

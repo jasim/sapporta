@@ -44,7 +44,7 @@ export function EntitySelectField({
 
   const stringValue = value ? String(value) : null;
   const placeholder = loading
-    ? "Loading..."
+    ? "Loading options..."
     : `Select ${param.label ?? param.name}`;
 
   return (

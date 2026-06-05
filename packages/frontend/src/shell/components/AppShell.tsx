@@ -25,7 +25,7 @@ export function AppShell({
         <main className="flex-1 flex flex-col min-w-0 bg-sap-surface overflow-y-auto">
           {error && (
             <div className="p-8 text-destructive">
-              Failed to load schema: {error}
+              Could not load the app schema: {error}
             </div>
           )}
           {!loaded && !error && (

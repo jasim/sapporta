@@ -125,7 +125,7 @@ export function ReportView({
         setResult(res);
       } catch (err) {
         setError(
-          err instanceof Error ? err.message : "Failed to execute report",
+          err instanceof Error ? err.message : "Could not run this report.",
         );
       } finally {
         setLoading(false);
@@ -190,7 +190,7 @@ export function ReportView({
   if (!report) {
     return (
       <div className="flex items-center justify-center h-full text-sap-muted">
-        Report not found
+        We could not find that report.
       </div>
     );
   }

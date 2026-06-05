@@ -39,7 +39,7 @@ export function ReportRoute() {
   if (!reportName || !report) {
     return (
       <div className="flex items-center justify-center h-full text-sap-muted">
-        Report not found
+        We could not find that report.
       </div>
     );
   }

@@ -14,21 +14,23 @@ export function Welcome() {
   const [hello, setHello] = useState<HelloState>({ kind: "loading" });
 
   useEffect(() => {
-    import("./api").then(({ customApi }) => customApi.hello()).then(
-      (body) => setHello({ kind: "ok", message: body.message }),
-      (err: unknown) => {
-        const apiError = readApiError(err);
-        if (apiError) {
-          setHello({
-            kind: "error",
-            status: apiError.status,
-            body: apiError.body,
-          });
-        } else {
-          setHello({ kind: "error", status: 0, body: err });
-        }
-      },
-    );
+    import("./api")
+      .then(({ customApi }) => customApi.hello())
+      .then(
+        (body) => setHello({ kind: "ok", message: body.message }),
+        (err: unknown) => {
+          const apiError = readApiError(err);
+          if (apiError) {
+            setHello({
+              kind: "error",
+              status: apiError.status,
+              body: apiError.body,
+            });
+          } else {
+            setHello({ kind: "error", status: 0, body: err });
+          }
+        },
+      );
   }, []);
 
   return (
@@ -36,16 +38,17 @@ export function Welcome() {
       <div className="max-w-[640px] mx-auto px-10 py-14 space-y-10">
         <header>
           <div className="text-sap-label font-semibold uppercase tracking-sap-section text-sap-subtle">
-            Sapporta is running
+            Ready to build
           </div>
           <h1 className="mt-3 text-[32px] leading-tight font-semibold tracking-sap-display text-sap-fg">
-            Hello.
+            Welcome.
           </h1>
           <p className="mt-3 text-sap-body text-sap-muted">
-            This admin UI reads your project's schema live. Add a file to{" "}
-            <code className="mono text-sap-emph text-sap-fg">packages/api/schema/</code> and
-            it shows up in the sidebar with CRUD, validation, and a grid — no
-            glue code.
+            This admin UI reads your project's schema live. Add a table file to{" "}
+            <code className="mono text-sap-emph text-sap-fg">
+              packages/api/schema/
+            </code>{" "}
+            and it appears in the sidebar with CRUD, validation, and a grid.
           </p>
         </header>
 
@@ -56,21 +59,28 @@ export function Welcome() {
 
         <section>
           <div className="text-sap-label font-semibold uppercase tracking-sap-section text-sap-subtle mb-3">
-            Hello from server
+            Server check
           </div>
           <HelloPanel state={hello} />
           <p className="mt-3 text-sap-data text-sap-muted">
-            Round trip via{" "}
-            <code className="mono text-sap-fg">customApi.hello()</code> — the
-            contract lives in <code className="mono text-sap-fg">packages/shared/src/contracts/hello.ts</code>,
-            handler in <code className="mono text-sap-fg">packages/api/app/hello.ts</code>,
-            client in <code className="mono text-sap-fg">packages/frontend/src/api.ts</code>.
+            This calls{" "}
+            <code className="mono text-sap-fg">customApi.hello()</code>. The
+            contract is in{" "}
+            <code className="mono text-sap-fg">
+              packages/shared/src/contracts/hello.ts
+            </code>
+            ; the handler is in{" "}
+            <code className="mono text-sap-fg">packages/api/app/hello.ts</code>,
+            and the client is in{" "}
+            <code className="mono text-sap-fg">
+              packages/frontend/src/api.ts
+            </code>.
           </p>
         </section>
 
         <section>
           <div className="text-sap-label font-semibold uppercase tracking-sap-section text-sap-subtle mb-3">
-            Your first table
+            Add your first table
           </div>
           <pre className="mono text-sap-data bg-sap-sidebar border border-sap-border rounded-md p-4 overflow-x-auto leading-relaxed">
             {`// packages/api/schema/invoices.ts
@@ -92,19 +102,25 @@ export const invoices = table({
           </pre>
           <p className="mt-3 text-sap-data text-sap-muted">
             Save, run{" "}
-            <code className="mono text-sap-fg">pnpm --filter ./packages/api db:generate --name add_invoices</code>,
-            review the SQL, then run{" "}
-            <code className="mono text-sap-fg">pnpm --filter ./packages/api db:migrate</code>.
-            Restart the server and it'll be in the sidebar with a working grid.
+            <code className="mono text-sap-fg">
+              pnpm --filter ./packages/api db:generate --name add_invoices
+            </code>
+            , review the SQL, and run{" "}
+            <code className="mono text-sap-fg">
+              pnpm --filter ./packages/api db:migrate
+            </code>
+            . After the server restarts, the table will be ready in the sidebar.
           </p>
         </section>
 
         <footer className="pt-6 border-t border-sap-border text-sap-data text-sap-subtle">
-          Delete{" "}
-          <code className="mono text-sap-fg">packages/frontend/src/Welcome.tsx</code> and
-          its entries in{" "}
+          When your own views are in place, remove{" "}
+          <code className="mono text-sap-fg">
+            packages/frontend/src/Welcome.tsx
+          </code>{" "}
+          and its entries in{" "}
           <code className="mono text-sap-fg">Sidebar.tsx</code> /{" "}
-          <code className="mono text-sap-fg">App.tsx</code> when you're ready.
+          <code className="mono text-sap-fg">App.tsx</code>.
         </footer>
       </div>
     </div>
@@ -120,7 +136,7 @@ function HelloPanel({ state }: { state: HelloState }) {
   if (state.kind === "loading") {
     return (
       <div className="border border-sap-border rounded-md px-4 py-3 bg-sap-sidebar text-sap-data text-sap-subtle">
-        Calling /api/hello…
+        Checking /api/hello…
       </div>
     );
   }
@@ -134,7 +150,8 @@ function HelloPanel({ state }: { state: HelloState }) {
   return (
     <div className="border border-sap-border rounded-md px-4 py-3 bg-sap-sidebar text-sap-data">
       <div className="text-sap-fg font-medium mb-1">
-        GET /api/hello failed{state.status ? ` with status ${state.status}` : ""}
+        GET /api/hello failed
+        {state.status ? ` with status ${state.status}` : ""}
       </div>
       <pre className="mono text-sap-micro text-sap-muted whitespace-pre-wrap break-words">
         {formatError(state.body)}
@@ -153,7 +170,9 @@ function formatError(body: unknown): string {
   }
 }
 
-function readApiError(value: unknown): { status: number; body: unknown } | null {
+function readApiError(
+  value: unknown,
+): { status: number; body: unknown } | null {
   if (!value || typeof value !== "object") return null;
   const status = "status" in value ? value.status : undefined;
   if (typeof status !== "number") return null;

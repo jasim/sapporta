@@ -22,14 +22,14 @@ export function BootLoader({ children }: { children: ReactNode }) {
       <div className="flex items-center justify-center h-screen bg-sap-bg">
         <div className="max-w-lg text-center space-y-4">
           <div className="text-lg font-medium text-sap-negative">
-            Could not load schema
+            Could not load the app schema
           </div>
           <p className="text-sm text-sap-muted">
-            Fetched{" "}
+            We asked the server for{" "}
             <code className="text-xs bg-sap-nested px-1 py-0.5 rounded mono">
               GET /api/meta/tables
             </code>{" "}
-            and the server responded with an error.
+            and it returned an error.
           </p>
           <pre className="text-sm text-left bg-sap-nested rounded-md p-3 whitespace-pre-wrap break-words mono">
             {error}
@@ -52,7 +52,7 @@ export function BootLoader({ children }: { children: ReactNode }) {
       <div className="flex items-center justify-center h-screen bg-sap-bg">
         <div className="text-center space-y-3">
           <Loader2 className="h-6 w-6 animate-spin text-sap-muted mx-auto" />
-          <p className="text-sm text-sap-muted">Loading schema</p>
+          <p className="text-sm text-sap-muted">Loading your app</p>
         </div>
       </div>
     );

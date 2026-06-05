@@ -1,8 +1,4 @@
-import {
-  useEffect,
-  useMemo,
-  useSyncExternalStore,
-} from "react";
+import { useEffect, useMemo, useSyncExternalStore } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useStore } from "zustand";
 import { Loader2 } from "lucide-react";
@@ -67,7 +63,7 @@ export function TablePage({ tableName }: { tableName: string }) {
   if (!tableSchema) {
     return (
       <div className="flex items-center justify-center h-full text-sap-muted">
-        Schema for table '{tableName}' not loaded.
+        We could not find the schema for "{tableName}".
       </div>
     );
   }
@@ -98,8 +94,7 @@ function TablePageWithSession({
   );
 
   const validColIds = useMemo<ReadonlySet<ColId>>(
-    () =>
-      new Set((tableSchema?.columns ?? []).map((c) => c.name as ColId)),
+    () => new Set((tableSchema?.columns ?? []).map((c) => c.name as ColId)),
     [tableSchema],
   );
 
@@ -222,7 +217,7 @@ function TablePageInner({
     status === "error"
       ? errorObj instanceof Error
         ? errorObj.message
-        : "Failed to load rows"
+        : "Could not load rows."
       : null;
 
   return (
@@ -277,7 +272,7 @@ function TablePageInner({
 
       {errorMessage && (
         <div className="flex-1 flex items-center justify-center text-sap-negative px-6 text-center">
-          {`Failed to load ${tableSchema.label ?? tableSchema.name}: ${errorMessage}`}
+          {`Could not load ${tableSchema.label ?? tableSchema.name}: ${errorMessage}`}
         </div>
       )}
 
@@ -305,7 +300,9 @@ function TablePageInner({
 // not the cell tree.
 function useSourceField<RowsByLevel extends SchemaDrivenRowsByLevel, T>(
   session: TGridSession<RowsByLevel>,
-  pick: (snap: ReturnType<TGridSession<RowsByLevel>["rootSource"]["snapshot"]>) => T,
+  pick: (
+    snap: ReturnType<TGridSession<RowsByLevel>["rootSource"]["snapshot"]>,
+  ) => T,
 ): T {
   return useSyncExternalStore(
     (cb) => session.rootSource.subscribe(cb),

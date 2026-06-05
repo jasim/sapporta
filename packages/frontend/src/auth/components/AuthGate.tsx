@@ -35,7 +35,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
   if (status === "error") {
     return (
       <div className="flex h-screen items-center justify-center bg-sap-bg text-sap-negative">
-        Could not load auth context
+        Could not load your session.
       </div>
     );
   }
@@ -61,10 +61,7 @@ export function PublicOnlyGate({ children }: { children: ReactNode }) {
       </div>
     );
   }
-  if (
-    location.pathname === "/login" &&
-    bootstrapStatus?.isEmpty === true
-  ) {
+  if (location.pathname === "/login" && bootstrapStatus?.isEmpty === true) {
     return <Navigate to="/signup" replace />;
   }
   return <>{children}</>;

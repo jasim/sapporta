@@ -79,8 +79,7 @@ export function NewRecordPage({ tableSchema }: { tableSchema: TableSchema }) {
   }, [tableSchema]);
 
   const formColumns = useMemo(
-    () =>
-      tableSchema.columns.filter(isRecordFormEditableColumn),
+    () => tableSchema.columns.filter(isRecordFormEditableColumn),
     [tableSchema],
   );
 
@@ -105,7 +104,7 @@ export function NewRecordPage({ tableSchema }: { tableSchema: TableSchema }) {
     <div className="flex h-full flex-col bg-sap-surface">
       <TopBar
         section={`Tables / ${tableLabel}`}
-        title="New Record"
+        title="New record"
         actions={
           <TopBarButton
             tone="ghost"
@@ -160,9 +159,9 @@ export function NewRecordPage({ tableSchema }: { tableSchema: TableSchema }) {
 }
 
 function createErrorMessage(err: unknown): string {
-  if (!(err instanceof ApiError)) return "Failed to save";
+  if (!(err instanceof ApiError)) return "Could not save this record.";
   const body = err.body;
-  if (!body || typeof body !== "object") return "Failed to save";
+  if (!body || typeof body !== "object") return "Could not save this record.";
 
   const details = "details" in body ? body.details : undefined;
   if (Array.isArray(details)) {
@@ -177,5 +176,5 @@ function createErrorMessage(err: unknown): string {
   }
 
   const error = "error" in body ? body.error : undefined;
-  return typeof error === "string" ? error : "Failed to save";
+  return typeof error === "string" ? error : "Could not save this record.";
 }
