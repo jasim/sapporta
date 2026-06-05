@@ -14,6 +14,8 @@ This is what Sapporta provides to make building database applications easy:
 
 Together these make up a working surface that covers a large area of what database applications require.
 
+![Sapporta generated Customers grid](./docs/media/readme/sapporta-hero-customers-grid.png)
+
 The project owns its entry points. Sapporta supplies library primitives and a scaffold, but the application remains ordinary TypeScript. The underlying stack — Hono, Drizzle, Better Auth, React, Vite — is used directly, with Sapporta layering in conventions and guard-rails.
 
 Sapporta is a poor fit for static sites, content-first marketing sites, or apps whose main complexity is outside the database.
@@ -68,7 +70,17 @@ pnpm --filter ./packages/api db:migrate
 
 The table is immediately available through Sapporta's table API and UI. Each table gets a grid with filtering, search, sorting, lookups, relationship navigation, exports, and keyboard-friendly data entry. Table routes and views are scoped to the logged-in user's workspace and row permissions, so you can use them directly in product workflows instead of treating them only as an internal admin surface.
 
-## Add Product Logic
+![Generated table grid with search and export controls](./docs/media/readme/sapporta-customers-search-grid.png)
+
+![Generated invoice form with a customer relationship lookup](./docs/media/readme/sapporta-invoice-form-relationship-lookup.png)
+
+Relationship metadata also gives users a way to move through related records without leaving the generated UI.
+
+![Customer row expanded to related invoices](./docs/media/readme/sapporta-customer-invoices-expanded.png)
+
+![Account row expanded to related transactions](./docs/media/readme/sapporta-account-transactions-drilldown.png)
+
+## Adding Product Logic
 
 Sapporta table routes handle standard list, create, update, delete, lookup, count, and export work. When you need product-specific behavior, add a typed route beside them.
 
