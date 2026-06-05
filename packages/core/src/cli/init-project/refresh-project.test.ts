@@ -80,7 +80,7 @@ describe("refreshScaffoldProject", () => {
     expect(readFileSync(join(target, "package.json"), "utf-8")).toBe("{}\n");
   });
 
-  it("refreshes only framework files and package dependencies", () => {
+  it("refreshes framework and example files plus package dependencies", () => {
     const target = createTargetProject();
     writeFileSync(join(target, "packages/api/boot.ts"), "custom boot\n");
     writeFileSync(join(target, "packages/api/app.ts"), "custom app mount\n");
@@ -98,18 +98,19 @@ describe("refreshScaffoldProject", () => {
     });
 
     expect(summary.overwritten).toContain("packages/api/boot.ts");
+    expect(summary.overwritten).toContain("packages/api/app.ts");
+    expect(summary.overwritten).toContain("packages/frontend/src/App.tsx");
     expect(summary.created).toContain("packages/frontend/src/api.ts");
     expect(summary.merged).toContain("packages/api/package.json");
-    expect(summary.skipped).toContain("packages/api/app.ts (example)");
     expect(
       readFileSync(join(target, "packages/api/boot.ts"), "utf-8"),
     ).toContain("Application entry point.");
-    expect(readFileSync(join(target, "packages/api/app.ts"), "utf-8")).toBe(
-      "custom app mount\n",
+    expect(readFileSync(join(target, "packages/api/app.ts"), "utf-8")).toContain(
+      "app.route(\"/\", helloApi)",
     );
     expect(
       readFileSync(join(target, "packages/frontend/src/App.tsx"), "utf-8"),
-    ).toBe("custom app ui\n");
+    ).toContain("Welcome");
     expect(
       readFileSync(join(target, "packages/api/schema/accounts.ts"), "utf-8"),
     ).toBe("schema\n");

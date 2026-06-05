@@ -137,11 +137,6 @@ function applyRefreshFile(
   mode: RefreshScaffoldMode,
   summary: RefreshScaffoldSummary,
 ): void {
-  if (file.ownership === "example") {
-    summary.skipped.push(`${file.dest} (example)`);
-    return;
-  }
-
   if (file.ownership === "workspace" && !PACKAGE_JSON_FILES.has(file.dest)) {
     summary.skipped.push(`${file.dest} (workspace)`);
     return;
