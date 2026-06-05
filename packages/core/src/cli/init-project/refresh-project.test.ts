@@ -9,10 +9,7 @@ import {
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import {
-  mergePackageJson,
-  refreshScaffoldProject,
-} from "./refresh-project.js";
+import { mergePackageJson, refreshScaffoldProject } from "./refresh-project.js";
 
 const tempRoots: string[] = [];
 
@@ -88,6 +85,10 @@ describe("refreshScaffoldProject", () => {
       join(target, "packages/frontend/src/App.tsx"),
       "custom app ui\n",
     );
+    writeFileSync(
+      join(target, "packages/frontend/src/SapportaRoutes.tsx"),
+      "custom framework ui\n",
+    );
     writeFileSync(join(target, "packages/api/schema/accounts.ts"), "schema\n");
     writeFileSync(join(target, "packages/api/reports/ledger.ts"), "report\n");
 
@@ -99,18 +100,29 @@ describe("refreshScaffoldProject", () => {
 
     expect(summary.overwritten).toContain("packages/api/boot.ts");
     expect(summary.overwritten).toContain("packages/api/app.ts");
-    expect(summary.overwritten).toContain("packages/frontend/src/App.tsx");
+    expect(summary.overwritten).toContain(
+      "packages/frontend/src/SapportaRoutes.tsx",
+    );
+    expect(summary.skipped).toContain(
+      "packages/frontend/src/App.tsx (workspace)",
+    );
     expect(summary.created).toContain("packages/frontend/src/api.ts");
     expect(summary.merged).toContain("packages/api/package.json");
     expect(
       readFileSync(join(target, "packages/api/boot.ts"), "utf-8"),
     ).toContain("Application entry point.");
-    expect(readFileSync(join(target, "packages/api/app.ts"), "utf-8")).toContain(
-      "app.route(\"/\", helloApi)",
-    );
+    expect(
+      readFileSync(join(target, "packages/api/app.ts"), "utf-8"),
+    ).toContain('app.route("/", helloApi)');
     expect(
       readFileSync(join(target, "packages/frontend/src/App.tsx"), "utf-8"),
-    ).toContain("Welcome");
+    ).toBe("custom app ui\n");
+    expect(
+      readFileSync(
+        join(target, "packages/frontend/src/SapportaRoutes.tsx"),
+        "utf-8",
+      ),
+    ).toContain("sapportaProtectedRoutes");
     expect(
       readFileSync(join(target, "packages/api/schema/accounts.ts"), "utf-8"),
     ).toBe("schema\n");
@@ -146,7 +158,9 @@ describe("refreshScaffoldProject", () => {
     expect(readFileSync(join(target, "packages/api/boot.ts"), "utf-8")).toBe(
       "custom boot\n",
     );
-    expect(existsSync(join(target, "packages/frontend/src/api.ts"))).toBe(false);
+    expect(existsSync(join(target, "packages/frontend/src/api.ts"))).toBe(
+      false,
+    );
   });
 });
 
