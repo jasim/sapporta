@@ -5,7 +5,7 @@
 //
 // Each method returns the 2xx body on success and throws `ApiError` on
 // non-2xx. Add a client entry each time you ship a new contract in
-// `__SLUG__-shared`.
+// `%%SAPPORTA:SLUG%%-shared`.
 //
 // Usage:
 //   import { customApi } from "./api";
@@ -13,7 +13,7 @@
 
 import { createApiClient } from "@sapporta/shared/client";
 import { getApiBase } from "@sapporta/frontend/platform";
-import { helloContract } from "__SLUG__-shared";
+import { helloContract } from "%%SAPPORTA:SLUG%%-shared";
 
 export const customApi = createApiClient(helloContract, {
   baseUrl: getApiBase,

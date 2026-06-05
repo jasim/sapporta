@@ -1,8 +1,8 @@
-# __SLUG__-shared — AI Instructions
+# %%SAPPORTA:SLUG%%-shared — AI Instructions
 
 ## This is a leaf package
 
-`__SLUG__-shared` MUST NOT depend on the backend (`packages/api/`) or the
+`%%SAPPORTA:SLUG%%-shared` MUST NOT depend on the backend (`packages/api/`) or the
 frontend (`packages/frontend/`). It sits below both of them in the dependency
 graph so they can import from it without creating cycles.
 

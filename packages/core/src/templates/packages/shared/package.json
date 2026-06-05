@@ -1,5 +1,5 @@
 {
-  "name": "__SLUG__-shared",
+  "name": "%%SAPPORTA:SLUG%%-shared",
   "private": true,
   "type": "module",
   "main": "dist/index.js",
@@ -17,9 +17,9 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@js-temporal/polyfill": "__TEMPORAL_VERSION__",
-    "@sapporta/rest-core": "__SAPPORTA_REST_CORE_VERSION__",
-    "zod": "__ZOD_VERSION__"
+    "@js-temporal/polyfill": "%%SAPPORTA:TEMPORAL_VERSION%%",
+    "@sapporta/rest-core": "%%SAPPORTA:SAPPORTA_REST_CORE_VERSION%%",
+    "zod": "%%SAPPORTA:ZOD_VERSION%%"
   },
   "devDependencies": {
     "typescript": "^5.7.0"

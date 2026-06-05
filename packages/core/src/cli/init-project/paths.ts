@@ -16,7 +16,7 @@ const SAPPORTA_SOURCE_PACKAGES_DIR = "packages";
  * directory shipped with @sapporta/server.
  *
  * Templates are real TypeScript/JSON files with placeholder tokens
- * (__SLUG__, __NAME__, etc.) that get replaced at scaffold time via
+ * (%%SAPPORTA:SLUG%%, %%SAPPORTA:NAME%%, etc.) that get replaced at scaffold time via
  * replaceAll(). Keep this relative layout here so moving the init-project
  * implementation only requires updating this one constant.
  */

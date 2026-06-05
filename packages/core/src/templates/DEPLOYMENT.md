@@ -87,8 +87,8 @@ dependencies, copies the built SPA into `packages/frontend/dist/`, exposes
 `PORT` defaulting to `3000`, and health-checks `/api/openapi.json`.
 
 ```bash
-docker build -t __SLUG__ .
-docker run --rm -p 3000:3000 -v __SLUG__-data:/app/data __SLUG__
+docker build -t %%SAPPORTA:SLUG%% .
+docker run --rm -p 3000:3000 -v %%SAPPORTA:SLUG%%-data:/app/data %%SAPPORTA:SLUG%%
 ```
 
 Then open `http://localhost:3000/`. The SPA and API are same-origin: browser
@@ -112,7 +112,7 @@ A reverse proxy serves `packages/frontend/dist/` directly and proxies `/api/` to
 server {
     listen 80;
     server_name example.com;
-    root /var/www/__SLUG__/packages/frontend/dist;
+    root /var/www/%%SAPPORTA:SLUG%%/packages/frontend/dist;
 
     location /api/ {
         proxy_pass http://127.0.0.1:3000;

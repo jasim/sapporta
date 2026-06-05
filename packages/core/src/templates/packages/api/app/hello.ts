@@ -9,7 +9,7 @@
  * `/api/openapi.json` spec.
  *
  * The contract (`helloContract`) and the `APP_NAME` constant live in the
- * `__SLUG__-shared` workspace package. The frontend imports the same
+ * `%%SAPPORTA:SLUG%%-shared` workspace package. The frontend imports the same
  * contract via `createApiClient(helloContract)` (see
  * `packages/frontend/src/api.ts`) so request and response shapes can never
  * drift between the two sides.
@@ -20,7 +20,7 @@
  * template.
  */
 import { TsRestApi, type SapportaEnv } from "@sapporta/server";
-import { APP_NAME, helloContract } from "__SLUG__-shared";
+import { APP_NAME, helloContract } from "%%SAPPORTA:SLUG%%-shared";
 
 const api = new TsRestApi<SapportaEnv>();
 

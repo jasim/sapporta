@@ -45,8 +45,8 @@ const { apiDistDir, frontendDistDir, databasePath } =
   fromProjectRoot(projectRoot);
 const conn = connectProject(databasePath);
 const sapporta = await loadSapportaProject({
-  name: "__NAME__",
-  slug: "__SLUG__",
+  name: "%%SAPPORTA:NAME%%",
+  slug: "%%SAPPORTA:SLUG%%",
   projectRoot,
   apiDistDir,
   conn,
@@ -147,7 +147,7 @@ app.get("/*", serveStatic({ root: frontendDist, path: "index.html" }));
 // 9. Serve
 const port = projectEnv.port;
 const server = serve({ fetch: app.fetch, port }, () => {
-  console.log(`__SLUG__ API server ready (port ${port})`);
+  console.log(`%%SAPPORTA:SLUG%% API server ready (port ${port})`);
 });
 
 // Re-raise the signal after closing so the process exits with the

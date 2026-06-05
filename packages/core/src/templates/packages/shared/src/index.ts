@@ -4,6 +4,6 @@
 // re-declared on both sides of the client/server boundary and drift
 // silently when one side changes.
 
-export const APP_NAME = "__SLUG__";
+export const APP_NAME = "%%SAPPORTA:SLUG%%";
 
 export * from "./contracts/index.js";

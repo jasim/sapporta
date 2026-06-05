@@ -29,7 +29,7 @@ describe("renderScaffoldFiles", () => {
     });
     const files = renderScaffoldFiles(project, undefined);
     const byDest = new Map(files.map((file) => [file.dest, file.content]));
-    const unresolvedToken = /__(?!PURE__)[A-Z0-9_]+__/;
+    const unresolvedToken = /%%SAPPORTA:[A-Z0-9_]+%%/;
 
     expect(byDest.get("README.md")).toContain("# Acme App");
     expect(byDest.get("package.json")).toContain('"name": "Acme App"');

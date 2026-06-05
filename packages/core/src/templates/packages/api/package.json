@@ -1,11 +1,11 @@
 {
-  "name": "__SLUG__-api",
+  "name": "%%SAPPORTA:SLUG%%-api",
   "private": true,
   "type": "module",
   "scripts": {
-    "predev": "pnpm --filter __SLUG__-shared build",
+    "predev": "pnpm --filter %%SAPPORTA:SLUG%%-shared build",
     "dev": "tsc-watch --onFirstSuccess \"node --env-file=../../.env.development --watch dist/boot.js\"",
-    "prebuild": "pnpm --filter __SLUG__-shared build",
+    "prebuild": "pnpm --filter %%SAPPORTA:SLUG%%-shared build",
     "build": "tsc",
     "start": "node dist/boot.js",
     "db:generate": "drizzle-kit generate",
@@ -13,31 +13,31 @@
     "db:migrate": "drizzle-kit migrate",
     "db:check": "drizzle-kit check",
     "db:studio": "drizzle-kit studio",
-    "pretypecheck": "pnpm --filter __SLUG__-shared build",
+    "pretypecheck": "pnpm --filter %%SAPPORTA:SLUG%%-shared build",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@sapporta/honest": "__HONEST_SPEC__",
-    "@sapporta/rest-core": "__SAPPORTA_REST_CORE_VERSION__",
-    "@sapporta/server": "__CORE_SPEC__",
-    "@sapporta/shared": "__SHARED_SPEC__",
-    "__SLUG__-shared": "workspace:*",
-    "@better-auth/drizzle-adapter": "__BETTER_AUTH_VERSION__",
-    "better-auth": "__BETTER_AUTH_VERSION__",
-    "@hono/node-server": "__HONO_NODE_SERVER_SPEC__",
-    "hono": "__HONO_SPEC__",
-    "nodemailer": "__NODEMAILER_VERSION__",
-    "drizzle-orm": "__DRIZZLE_VERSION__",
-    "better-sqlite3": "__BETTER_SQLITE3_VERSION__",
-    "@js-temporal/polyfill": "__TEMPORAL_VERSION__",
-    "zod": "__ZOD_VERSION__"
+    "@sapporta/honest": "%%SAPPORTA:HONEST_SPEC%%",
+    "@sapporta/rest-core": "%%SAPPORTA:SAPPORTA_REST_CORE_VERSION%%",
+    "@sapporta/server": "%%SAPPORTA:CORE_SPEC%%",
+    "@sapporta/shared": "%%SAPPORTA:SHARED_SPEC%%",
+    "%%SAPPORTA:SLUG%%-shared": "workspace:*",
+    "@better-auth/drizzle-adapter": "%%SAPPORTA:BETTER_AUTH_VERSION%%",
+    "better-auth": "%%SAPPORTA:BETTER_AUTH_VERSION%%",
+    "@hono/node-server": "%%SAPPORTA:HONO_NODE_SERVER_SPEC%%",
+    "hono": "%%SAPPORTA:HONO_SPEC%%",
+    "nodemailer": "%%SAPPORTA:NODEMAILER_VERSION%%",
+    "drizzle-orm": "%%SAPPORTA:DRIZZLE_VERSION%%",
+    "better-sqlite3": "%%SAPPORTA:BETTER_SQLITE3_VERSION%%",
+    "@js-temporal/polyfill": "%%SAPPORTA:TEMPORAL_VERSION%%",
+    "zod": "%%SAPPORTA:ZOD_VERSION%%"
   },
   "devDependencies": {
     "typescript": "^5.7.0",
     "tsc-watch": "^7.2.0",
-    "drizzle-kit": "__DRIZZLE_KIT_VERSION__",
+    "drizzle-kit": "%%SAPPORTA:DRIZZLE_KIT_VERSION%%",
     "@types/better-sqlite3": "^7.6.0",
-    "@types/nodemailer": "__TYPES_NODEMAILER_VERSION__",
+    "@types/nodemailer": "%%SAPPORTA:TYPES_NODEMAILER_VERSION%%",
     "vitest": "^3.1.0"
   }
 }

@@ -12,7 +12,7 @@
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "baseUrl": ".",
     "paths": {
-      "__SLUG__-shared": ["../shared/src/index.ts"]
+      "%%SAPPORTA:SLUG%%-shared": ["../shared/src/index.ts"]
     }
   },
   "include": ["src"]

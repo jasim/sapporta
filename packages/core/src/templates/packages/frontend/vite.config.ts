@@ -15,7 +15,7 @@ import tailwindcss from "@tailwindcss/vite";
 // config reads PORT as the API proxy target and FRONTEND_DEV_PORT as Vite's own
 // port. strictPort keeps the trusted dev origin exact.
 //
-// __SLUG__-shared is aliased to its source so HMR works without rebuilding
+// %%SAPPORTA:SLUG%%-shared is aliased to its source so HMR works without rebuilding
 // the shared package's dist/ on every edit. Backend imports the same
 // package via the pnpm symlink and reads dist/ (Node can't run TS).
 const apiPort = parseIntegerEnv("PORT", 3000);
@@ -24,7 +24,10 @@ export default defineConfig({
   plugins: [react(), tailwindcss()],
   resolve: {
     alias: {
-      "__SLUG__-shared": path.resolve(__dirname, "../shared/src/index.ts"),
+      "%%SAPPORTA:SLUG%%-shared": path.resolve(
+        __dirname,
+        "../shared/src/index.ts",
+      ),
     },
   },
   server: {

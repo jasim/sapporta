@@ -1,5 +1,5 @@
 {
-  "name": "__SLUG__-frontend",
+  "name": "%%SAPPORTA:SLUG%%-frontend",
   "private": true,
   "type": "module",
   "scripts": {
@@ -8,28 +8,28 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@sapporta/frontend": "__FRONTEND_SPEC__",
-    "@sapporta/grid": "__GRID_SPEC__",
-    "@sapporta/rest-core": "__SAPPORTA_REST_CORE_VERSION__",
-    "@sapporta/shared": "__SHARED_SPEC__",
-    "@sapporta/ui": "__UI_SPEC__",
-    "__SLUG__-shared": "workspace:*",
+    "@sapporta/frontend": "%%SAPPORTA:FRONTEND_SPEC%%",
+    "@sapporta/grid": "%%SAPPORTA:GRID_SPEC%%",
+    "@sapporta/rest-core": "%%SAPPORTA:SAPPORTA_REST_CORE_VERSION%%",
+    "@sapporta/shared": "%%SAPPORTA:SHARED_SPEC%%",
+    "@sapporta/ui": "%%SAPPORTA:UI_SPEC%%",
+    "%%SAPPORTA:SLUG%%-shared": "workspace:*",
     "better-auth": "^1.6.13",
-    "@js-temporal/polyfill": "__TEMPORAL_VERSION__",
-    "lucide-react": "__LUCIDE_REACT_VERSION__",
-    "react": "__REACT_VERSION__",
-    "react-dom": "__REACT_DOM_VERSION__",
-    "react-router-dom": "__REACT_ROUTER_VERSION__",
-    "zod": "__ZOD_VERSION__",
-    "zustand": "__ZUSTAND_VERSION__"
+    "@js-temporal/polyfill": "%%SAPPORTA:TEMPORAL_VERSION%%",
+    "lucide-react": "%%SAPPORTA:LUCIDE_REACT_VERSION%%",
+    "react": "%%SAPPORTA:REACT_VERSION%%",
+    "react-dom": "%%SAPPORTA:REACT_DOM_VERSION%%",
+    "react-router-dom": "%%SAPPORTA:REACT_ROUTER_VERSION%%",
+    "zod": "%%SAPPORTA:ZOD_VERSION%%",
+    "zustand": "%%SAPPORTA:ZUSTAND_VERSION%%"
   },
   "devDependencies": {
-    "@types/react": "__TYPES_REACT_VERSION__",
-    "@types/react-dom": "__TYPES_REACT_DOM_VERSION__",
+    "@types/react": "%%SAPPORTA:TYPES_REACT_VERSION%%",
+    "@types/react-dom": "%%SAPPORTA:TYPES_REACT_DOM_VERSION%%",
     "typescript": "^5.7.0",
-    "vite": "__VITE_VERSION__",
-    "@vitejs/plugin-react": "__VITE_REACT_VERSION__",
-    "@tailwindcss/vite": "__TAILWIND_VITE_VERSION__",
-    "tailwindcss": "__TAILWIND_VERSION__"
+    "vite": "%%SAPPORTA:VITE_VERSION%%",
+    "@vitejs/plugin-react": "%%SAPPORTA:VITE_REACT_VERSION%%",
+    "@tailwindcss/vite": "%%SAPPORTA:TAILWIND_VITE_VERSION%%",
+    "tailwindcss": "%%SAPPORTA:TAILWIND_VERSION%%"
   }
 }

@@ -1,4 +1,4 @@
-# __NAME__
+# %%SAPPORTA:NAME%%
 
 A Sapporta project.
 
@@ -25,7 +25,7 @@ packages/frontend/  SPA — Vite + React, imports @sapporta/frontend and @sappor
 packages/shared/    ts-rest contracts + types shared by backend and frontend
 ```
 
-`packages/shared/` is a workspace package (`__SLUG__-shared`). Both `packages/api/` and `packages/frontend/src/` depend on it; it depends on neither. See [`packages/shared/CLAUDE.md`](./packages/shared/CLAUDE.md) for what belongs there.
+`packages/shared/` is a workspace package (`%%SAPPORTA:SLUG%%-shared`). Both `packages/api/` and `packages/frontend/src/` depend on it; it depends on neither. See [`packages/shared/CLAUDE.md`](./packages/shared/CLAUDE.md) for what belongs there.
 
 ## Adding an API endpoint
 
