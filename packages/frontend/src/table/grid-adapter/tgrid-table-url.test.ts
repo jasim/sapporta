@@ -2,6 +2,7 @@ import { describe, expect, test } from "vitest";
 import {
   buildTableSearchParams,
   parseTableSearchParams,
+  sanitizeSortDescriptors,
 } from "./tgrid-table-url";
 import type { ColId } from "@sapporta/grid";
 
@@ -101,5 +102,38 @@ describe("buildTableSearchParams - sort", () => {
       search: null,
     });
     expect(sp.get("sort")).toBe("name,-created_at");
+  });
+});
+
+describe("sanitizeSortDescriptors", () => {
+  test("keeps valid persisted sort descriptors", () => {
+    expect(
+      sanitizeSortDescriptors(
+        [
+          { colId: "name", direction: "asc" },
+          { colId: "created_at", direction: "desc" },
+        ],
+        COLS,
+      ),
+    ).toEqual([
+      { colId: "name", direction: "asc" },
+      { colId: "created_at", direction: "desc" },
+    ]);
+  });
+
+  test("drops stale, malformed, and duplicate persisted sort descriptors", () => {
+    expect(
+      sanitizeSortDescriptors(
+        [
+          { colId: "kind", direction: "asc" },
+          { colId: "name", direction: "sideways" },
+          null,
+          "name",
+          { colId: "name", direction: "asc" },
+          { colId: "name", direction: "desc" },
+        ],
+        COLS,
+      ),
+    ).toEqual([{ colId: "name", direction: "asc" }]);
   });
 });

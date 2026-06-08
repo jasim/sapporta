@@ -17,6 +17,33 @@ export interface TableUrlState {
   search: string | null;
 }
 
+// localStorage can outlive table schema changes, so persisted sort preferences
+// are treated as best-effort UI state rather than invalid query input.
+// Keeps only valid, unique sort descriptors for columns in the current table.
+export function sanitizeSortDescriptors(
+  value: readonly unknown[],
+  validColIds: ReadonlySet<ColId>,
+): SortDescriptor[] {
+  const clean: SortDescriptor[] = [];
+  const seen = new Set<ColId>();
+
+  for (const item of value) {
+    if (typeof item !== "object" || item === null) continue;
+    const colIdValue = "colId" in item ? item.colId : null;
+    const direction = "direction" in item ? item.direction : null;
+    if (typeof colIdValue !== "string") continue;
+    if (direction !== "asc" && direction !== "desc") continue;
+    if (!validColIds.has(colIdValue as ColId)) continue;
+
+    const colId = colIdValue as ColId;
+    if (seen.has(colId)) continue;
+    seen.add(colId);
+    clean.push({ colId, direction });
+  }
+
+  return clean;
+}
+
 export function buildTableSearchParams(state: TableUrlState): URLSearchParams {
   const params = encodeFilters(state.filters);
 

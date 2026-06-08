@@ -248,6 +248,45 @@ describe("compileTGridRuntimeConfig", () => {
     });
   });
 
+  it("rejects array default sorts that reference unknown columns", () => {
+    const lookupResolver: TGridLookupResolver = {
+      bundleFor: () => undefined,
+    };
+
+    expect(() =>
+      compileTGridRuntimeConfig<RowsByLevel>({
+        rootLevel: "orders",
+        levels: {
+          orders: {
+            table: orderSchema,
+            childLevels: ["orders.lines"],
+            query: { owner: "host" },
+          },
+          "orders.lines": {
+            table: lineSchema,
+            parent: {
+              level: "orders",
+              foreignKey: "order_id",
+              defaultSort: [{ colId: "kind" as never, direction: "asc" }],
+            },
+            childLevels: ["orders.lines.allocations"],
+            query: { owner: "source", pageSize: 10 },
+          },
+          "orders.lines.allocations": {
+            table: allocationSchema,
+            parent: {
+              level: "orders.lines",
+              foreignKey: "line_id",
+            },
+            childLevels: [],
+            query: { owner: "source", pageSize: 10 },
+          },
+        },
+        columnMapper: createTGridColumnMapper(lookupResolver),
+      }),
+    ).toThrow("unknown column id 'kind'");
+  });
+
   it("source-owned endpoints honor initialPage", async () => {
     const fetch = vi.fn(async () => ({
       data: [],

@@ -3,6 +3,7 @@ import { useSearchParams } from "react-router-dom";
 import { useStore } from "zustand";
 import { Loader2 } from "lucide-react";
 import type { TableSchema } from "@sapporta/shared/contracts";
+import { ApiError } from "@sapporta/shared/client";
 import { TGrid } from "./TGrid";
 import { TableToolbar } from "./TableToolbar";
 import { Pagination } from "@/table/grid-adapter/Pagination";
@@ -11,6 +12,7 @@ import { navigateToNewRecord } from "@/table/actions/record-actions";
 import {
   buildTableSearchParams,
   parseTableSearchParams,
+  sanitizeSortDescriptors,
 } from "@/table/grid-adapter/tgrid-table-url";
 import { getNavigate } from "@/app/router/router-bridge";
 import { loadPref, savePref } from "@/platform/prefs";
@@ -106,8 +108,8 @@ function TablePageWithSession({
   const initialSort: SortDescriptor[] = useMemo(
     () =>
       initial.sort ??
-      (loadPref<PersistedSort>(sortPrefKey(tableName), []) as SortDescriptor[]),
-    [initial.sort, tableName],
+      loadSortPref(sortPrefKey(tableName), validColIds),
+    [initial.sort, tableName, validColIds],
   );
 
   const definition = useMemo(() => {
@@ -214,11 +216,7 @@ function TablePageInner({
   const exportUrl = session.csvExportUrl();
   const showSpinner = status === "loading" && totalCount === 0;
   const errorMessage =
-    status === "error"
-      ? errorObj instanceof Error
-        ? errorObj.message
-        : "Could not load rows."
-      : null;
+    status === "error" ? tableLoadErrorMessage(errorObj) : null;
 
   return (
     <div className="flex flex-col h-full bg-sap-surface">
@@ -291,6 +289,35 @@ function TablePageInner({
         hrefForPage={(nextPage) => session.tablePageUrl(nextPage)}
       />
     </div>
+  );
+}
+
+function tableLoadErrorMessage(err: unknown): string {
+  if (err instanceof ApiError && isErrorBody(err.body)) {
+    return err.body.error;
+  }
+  return err instanceof Error ? err.message : "Could not load rows.";
+}
+
+function loadSortPref(
+  key: string,
+  validColIds: ReadonlySet<ColId>,
+): SortDescriptor[] {
+  const stored = loadPref<PersistedSort>(key, []);
+  if (!Array.isArray(stored)) return [];
+  return sanitizeSortDescriptors(stored, validColIds);
+}
+
+function isErrorBody(value: unknown): value is {
+  error: string;
+  code?: string;
+  details?: unknown;
+} {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "error" in value &&
+    typeof value.error === "string"
   );
 }
 

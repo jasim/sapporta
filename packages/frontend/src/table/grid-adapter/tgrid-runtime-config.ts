@@ -7,7 +7,7 @@ import type {
 import { eqCondition, type FilterCondition } from "@sapporta/shared/filter";
 import { childPath, rootPath, type GridInteractionConfig } from "@sapporta/grid";
 import type { ColId, GridPath, GridSchema, LevelSchema, PatchCellResponse, RestEndpointFactory, RowKey, SortDescriptor, TreeNode } from "@sapporta/grid";
-import { parseSortString } from "@sapporta/grid";
+import { parseSortString, stringifySortOrder } from "@sapporta/grid";
 import {
   fetchTableRows,
   createTableRow,
@@ -294,7 +294,7 @@ function resolveSortDescriptor(
   if (typeof value === "string") {
     return parseSortString(value, validColIds);
   }
-  return [...value];
+  return parseSortString(stringifySortOrder([...value]), validColIds);
 }
 
 function defaultPageSize(
