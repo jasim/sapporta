@@ -1,7 +1,6 @@
 // Public table tools for app pages.
-// Start with `TablePage` for the built-in table route, `TableGridView` for a
-// reusable table-like page, or the smaller TGrid hooks/components when a custom
-// view needs to choose its own controls.
+// Start with `SchemaTableGridView` for a standard table route. Use
+// `buildSchemaTGridConfig` or `defineTGrid` when a page needs a custom grid.
 export { createRecord, navigateToNewRecord } from "./actions/record-actions";
 export * from "./api/rows";
 export { FormField } from "./form/FormField";
@@ -21,18 +20,19 @@ export {
   type RecordFormStore,
   type RecordFormValues,
 } from "./form/record-form-store";
-export * from "./grid-adapter/tgrid-filter";
-export * from "./grid-adapter/tgrid-level-config";
+export * from "./grid-adapter/schema-tgrid";
 export {
   defineTGrid,
   type TGridDefinition,
 } from "./grid-adapter/tgrid-runtime-config";
+export * from "./grid-adapter/tgrid-cell-context";
+export * from "./grid-adapter/tgrid-column-spec";
+
+export * from "./grid-adapter/tgrid-filter";
+export * from "./grid-adapter/tgrid-level-config";
 export * from "./grid-adapter/tgrid-column-mapper";
 export * from "./grid-adapter/tgrid-lookup-resolver";
-export * from "./grid-adapter/tgrid-cell-context";
 export * from "./grid-adapter/tgrid-column-builder";
-export * from "./grid-adapter/tgrid-column-spec";
-export * from "./grid-adapter/schema-tgrid";
 export * from "./grid-adapter/tgrid-binding";
 export * from "./grid-adapter/tgrid-types";
 export * from "./grid-adapter/tgrid-table-url";
@@ -49,6 +49,11 @@ export type {
   ViewRelatedRowsOption,
 } from "./page/TGrid";
 export { TablePage } from "./page/TablePage";
+export {
+  SchemaTableGridView,
+  type SchemaTableGridViewSource,
+  type SchemaTableGridViewProps,
+} from "./page/SchemaTableGridView";
 export {
   TableGridSurface,
   type TableGridSurfaceProps,

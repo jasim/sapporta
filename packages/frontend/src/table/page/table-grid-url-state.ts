@@ -30,14 +30,18 @@ export type TableGridNavigate = (
   options?: { replace?: boolean },
 ) => void;
 
+export type TableGridRoute = {
+  path: string;
+  searchParams: URLSearchParams;
+  navigate: TableGridNavigate;
+};
+
 // Connect one visible table level to the current URL.
 export type UseTableGridUrlStateArgs<RowsByLevel extends TGridRowsByLevel> = {
   tableName: string;
   columns: readonly ColumnSchema[];
-  searchParams: URLSearchParams;
-  navigate: TableGridNavigate;
+  route: TableGridRoute;
   level?: TGridLevelId<RowsByLevel>;
-  routePath?: string;
   sortPreferenceKey?: string;
 };
 
@@ -62,14 +66,12 @@ export type TableGridUrlStateBinding<RowsByLevel extends TGridRowsByLevel> = {
 export function useTableGridUrlState<RowsByLevel extends TGridRowsByLevel>({
   tableName,
   columns,
-  searchParams,
-  navigate,
+  route,
   level,
-  routePath,
   sortPreferenceKey,
 }: UseTableGridUrlStateArgs<RowsByLevel>): TableGridUrlStateBinding<RowsByLevel> {
+  const { path, searchParams, navigate } = route;
   const levelId = level ?? (tableName as TGridLevelId<RowsByLevel>);
-  const effectiveRoutePath = routePath ?? `/tables/${tableName}`;
   const validColIds = useMemo<ReadonlySet<ColId>>(
     () => new Set(columns.map((column) => column.name as ColId)),
     [columns],
@@ -112,14 +114,11 @@ export function useTableGridUrlState<RowsByLevel extends TGridRowsByLevel>({
     (state) => {
       if (state.level !== levelId) return;
       savePref<PersistedSort>(prefKey, state.sort);
-      navigate(
-        tableGridUrlForQueryState(effectiveRoutePath, state.page, state),
-        {
-          replace: true,
-        },
-      );
+      navigate(tableGridUrlForQueryState(path, state.page, state), {
+        replace: true,
+      });
     },
-    [effectiveRoutePath, levelId, navigate, prefKey],
+    [levelId, navigate, path, prefKey],
   );
 
   const syncSessionFromUrl = useCallback(
@@ -140,19 +139,13 @@ export function useTableGridUrlState<RowsByLevel extends TGridRowsByLevel>({
 
   return useMemo(
     () => ({
-      routePath: effectiveRoutePath,
+      routePath: path,
       level: levelId,
       routeQuerySeeds,
       onQueryUrlChange,
       syncSessionFromUrl,
     }),
-    [
-      effectiveRoutePath,
-      routeQuerySeeds,
-      levelId,
-      onQueryUrlChange,
-      syncSessionFromUrl,
-    ],
+    [path, routeQuerySeeds, levelId, onQueryUrlChange, syncSessionFromUrl],
   );
 }
 

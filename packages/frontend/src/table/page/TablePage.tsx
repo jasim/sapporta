@@ -3,10 +3,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import type { TableSchema } from "@sapporta/shared/contracts";
 import { useSchemaStore } from "@/schema-catalog/state/schema-store";
 import { navigateToNewRecord } from "@/table/actions/record-actions";
-import { defineSchemaTGrid } from "@/table/grid-adapter/schema-tgrid";
-import { TableGridView } from "./TableGridView";
-
-type SchemaDrivenRowsByLevel = Record<string, Record<string, unknown>>;
+import { SchemaTableGridView } from "./SchemaTableGridView";
 
 // Built-in table route for `/tables/:tableName`.
 // It is intentionally small: the route supplies schema, URL state, navigation,
@@ -46,27 +43,26 @@ function TablePageWithSession({
 }) {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  // The schema helper needs quick access to every table because child rows are
-  // declared by table name in `table.children`.
   const tablesByName = useMemo(
     () => Object.fromEntries(tables.map((table) => [table.name, table])),
     [tables],
   );
-
-  const definition = useMemo(() => {
-    return defineSchemaTGrid({
-      rootTableName: tableSchema.name,
-      tablesByName,
-      rootLevelQuery: { urlSync: true },
-    });
-  }, [tableSchema.name, tablesByName]);
+  const route = useMemo(
+    () => ({
+      path: `/tables/${tableName}`,
+      searchParams,
+      navigate,
+    }),
+    [navigate, searchParams, tableName],
+  );
 
   return (
-    <TableGridView<SchemaDrivenRowsByLevel>
-      definition={definition}
-      table={tableSchema}
-      searchParams={searchParams}
-      navigate={navigate}
+    <SchemaTableGridView
+      source={{
+        table: tableSchema,
+        tablesByName,
+      }}
+      route={route}
       registerAs={tableName}
       onNewRecord={
         tableSchema.immutable

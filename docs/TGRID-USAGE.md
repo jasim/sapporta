@@ -88,7 +88,7 @@ const invoicesGrid = defineTGrid<RowsByLevel>({
 
 export function InvoiceGridView() {
   const session = useTGridSession(invoicesGrid, {
-    hostQuerySeeds: {
+    routeQuerySeeds: {
       invoices: {
         sort: [{ colId: "invoice_date", direction: "desc" }],
       },
@@ -253,7 +253,7 @@ export function InvoiceGridView() {
     onQueryUrlChange: (state) => {
       updateInvoiceUrl(state);
     },
-    hostQuerySeeds: {
+    routeQuerySeeds: {
       invoices: {
         sort: [{ colId: "invoice_date", direction: "desc" }],
       },
@@ -433,11 +433,11 @@ query: {
 If `owner` is omitted, the root level defaults to `host` and child levels default
 to `source`.
 
-Host-owned initial values are session seeds, not definition data:
+Route-owned initial values are session seeds, not definition data:
 
 ```ts
 const session = useTGridSession(ordersGrid, {
-  hostQuerySeeds: {
+  routeQuerySeeds: {
     orders: {
       page: 1,
       sort: [{ colId: "customer", direction: "asc" }],
@@ -463,7 +463,7 @@ unmounts.
 const session = useTGridSession(ordersGrid, {
   services,
   onQueryUrlChange,
-  hostQuerySeeds,
+  routeQuerySeeds,
 });
 
 if (!session) return <Spinner />;
@@ -476,7 +476,7 @@ Outside React, dispose manually:
 ```ts
 const session = createTGridSession(ordersGrid, {
   services,
-  hostQuerySeeds,
+  routeQuerySeeds,
 });
 
 try {
@@ -486,7 +486,7 @@ try {
 }
 ```
 
-`services`, `onQueryUrlChange`, and `hostQuerySeeds` are passed as live inputs to
+`services`, `onQueryUrlChange`, and `routeQuerySeeds` are passed as live inputs to
 `useTGridSession`. Updating `services` or callbacks does not rebuild the session;
 the hook keeps the latest values available through a ref. Changing the definition
 object does rebuild the session.
@@ -507,7 +507,7 @@ columns: (columns) => [
     renderCell: BalanceStatusCell,
   }),
   columns.remainingTable({ exclude: ["id", "customer_id"] }),
-]
+];
 ```
 
 Use `columns.table(...)` for real table fields. Use `columns.client(...)` for
@@ -560,7 +560,8 @@ import type { TableRowsClient } from "@sapporta/ui";
 const rowsClient = {
   fetch: async (params) => fetchInvoiceRows(params),
   create: async (tableName, row) => createInvoiceRow(tableName, row),
-  update: async (tableName, id, patch) => updateInvoiceRow(tableName, id, patch),
+  update: async (tableName, id, patch) =>
+    updateInvoiceRow(tableName, id, patch),
   remove: async (tableName, id) => deleteInvoiceRow(tableName, id),
 } satisfies TableRowsClient;
 
@@ -581,57 +582,71 @@ For child inserts, TGrid adds the parent foreign-key value before calling
 
 ## Schema-Driven Table Pages
 
-The built-in table page uses the same TGrid pipeline. It converts
-`TableSchema.children` into an explicit level graph, creates a definition, seeds
-the root query store from URL/search preferences, then keeps URL and store state
-in sync.
+For app-owned routes that should render a schema table with Sapporta's standard
+toolbar, pagination, URL sync, lookup labels, nested rows, and CSV export, start
+with `SchemaTableGridView`. The route supplies the table schema, all loaded
+schemas, router state, and its own route path.
 
 ```tsx
-const definition = useMemo(() => {
-  const sessionConfig = buildSessionLevelsFromTableGridGraph({
-    graph: buildTableGridGraphFromSchema({
-      rootTableName: tableSchema.name,
-      tablesByName,
-    }),
-    rootLevelQuery: {
-      urlSync: true,
-    },
-  });
-  return defineTGrid<SchemaDrivenRowsByLevel>(sessionConfig);
-}, [tableSchema, tablesByName]);
-
-const session = useTGridSession(definition, {
-  onQueryUrlChange,
-  hostQuerySeeds: {
-    [tableName]: {
-      sort: initialSort,
-      filters: initial.filters,
-      search: initial.search,
-      page: initial.page,
-    },
-  },
-});
-
-useEffect(() => {
-  if (!session) return;
-  session.queryStore.getState().syncFromUrl(parseUrl(searchParams));
-}, [session, searchParams]);
+<SchemaTableGridView
+  source={{ table: tableSchema, tablesByName }}
+  route={{ path: "/invoices", searchParams, navigate }}
+  registerAs="invoices"
+  onNewRecord={() => navigate("/invoices/new")}
+/>
 ```
 
-URL-derived seeds do not belong in the definition. Changing the URL updates the
-existing query store. Changing the definition creates a new session.
+Use `buildSchemaTGridConfig` when a schema table needs definition-level
+customization before rendering with `TableGridView`.
+
+```tsx
+const config = buildSchemaTGridConfig({
+  source: {
+    rootTableName: "invoices",
+    tablesByName,
+  },
+  rootRows: {
+    fixedFilters: [eqCondition("status", "draft")],
+    initialSort: [{ colId: "invoice_date", direction: "desc" }],
+  },
+  relatedRows: { pageSize: 25 },
+});
+
+config.levels.invoices.columns = (columns) => [
+  columns.table("customer_id", { header: "Customer" }),
+  columns.remainingTable({ exclude: ["id", "customer_id"] }),
+];
+
+const definition = defineTGrid(config);
+```
+
+The config uses the same level declarations as `defineTGrid`, so the page can
+customize columns, query defaults, or row clients in ordinary TypeScript. Use
+`defineTGrid` directly when the page should show a different set of expandable
+tables.
+
+Keep route state in the view. `TableGridView` reads the current URL when the page
+loads and keeps browser back/forward navigation in sync with the visible table.
 
 ## Public Helpers
 
 These helpers are exported from `@sapporta/ui`:
 
-- `createColumnsBuilder(levelId)` creates a typed column builder.
-- `defineTableSchema(name, input)` builds a named table schema value.
-- `applySchemaOverrides(levelId, schema, overrides)` applies typed schema
-  overlays.
-- `buildTableGridGraphFromSchema(...)` and
-  `buildSessionLevelsFromTableGridGraph(...)` create schema-driven definitions.
-- `buildTableSearchParams(...)`, `parseTableSearchParams(...)`, and
-  `tableFilteredByUrl(...)` handle table URL state.
+- `SchemaTableGridView` renders a schema table as a standard app-owned grid
+  route.
+- `defineSchemaTGrid(...)` creates the default schema-derived grid definition.
+- `buildSchemaTGridConfig(...)` creates schema-derived level declarations that a
+  page can customize before calling `defineTGrid(...)`.
+- `TableGridView` renders a standard table surface from a `TGridDefinition`.
+- `defineTGrid(...)` declares a fully custom typed level graph.
+- `useTGridCell(...)`, `useTGridCellEditor(...)`, and related context types
+  support custom renderers, editors, and save handlers.
+- `useTGridSession`, `useTGridLifecycle`, `useTGridSourceStatus`,
+  `useTableGridUrlState`, `useTableToolbarProps`, `useTablePaginationProps`,
+  `TableGridSurface`, `TableToolbar`, `Pagination`, and `TGrid` are advanced
+  composition tools for pages that need their own surface.
+- `buildTableSearchParams(...)`, `parseTableSearchParams(...)`,
+  `tableGridUrlForQueryState(...)`, and `tableQuerySeedFromUrlState(...)`
+  handle table URL state.
 - `startTGridLookupLoading(session)` starts FK label cache loading for a live
   session.

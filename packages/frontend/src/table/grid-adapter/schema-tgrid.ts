@@ -1,4 +1,5 @@
 import type { TableSchema } from "@sapporta/shared/contracts";
+import type { GridInteractionConfig } from "@sapporta/grid";
 import { defineTGrid, type TGridDefinition } from "./tgrid-runtime-config";
 import type {
   TGridLevelQueryConfig,
@@ -10,57 +11,60 @@ import {
   type RootLevelQueryConfig,
 } from "./tgrid-schema-compiler";
 
-// Row shape used by schema-driven tables.
+// Row shape used by schema table grids.
 // The exact columns come from the loaded table schema, so each row is a plain
 // record keyed by column name.
-export type SchemaDrivenRowsByLevel = Record<string, Record<string, unknown>>;
+export type SchemaTableRowsByLevel = Record<string, Record<string, unknown>>;
 
-// Inputs for building a table grid directly from Sapporta table schemas.
-// Use this when a custom page wants the same columns, child rows, and default
-// row transport as the built-in table page, with optional query defaults.
-export type SchemaTGridConfigInput = {
+export type SchemaTableGridSource = {
   rootTableName: string;
   tablesByName: Record<string, TableSchema>;
-  rootLevelQuery?: RootLevelQueryConfig;
-  childLevelQuery?: Omit<TGridLevelQueryConfig, "owner">;
 };
 
-// Build the level map for a schema-driven table without creating a definition
-// yet. This is the customization point for pages that want schema-derived
-// levels but need to override columns, editors, renderers, row clients, or
-// services before calling `defineTGrid`.
-export function buildSchemaTGridConfig({
-  rootTableName,
-  tablesByName,
-  rootLevelQuery,
-  childLevelQuery,
+export type SchemaTableRootRowsOptions = RootLevelQueryConfig;
+export type SchemaTableRelatedRowsOptions = Omit<TGridLevelQueryConfig, "owner">;
+
+export type SchemaTGridConfigInput = {
+  source: SchemaTableGridSource;
+  rootRows?: SchemaTableRootRowsOptions;
+  relatedRows?: SchemaTableRelatedRowsOptions;
+};
+
+export type DefineSchemaTGridArgs = SchemaTGridConfigInput & {
+  interaction?: GridInteractionConfig;
+};
+
+export function buildSchemaTGridConfig<AppServices = unknown>({
+  source,
+  rootRows,
+  relatedRows,
 }: SchemaTGridConfigInput): {
   rootLevel: string;
-  levels: TGridLevelsConfigMap<SchemaDrivenRowsByLevel, unknown>;
+  levels: TGridLevelsConfigMap<SchemaTableRowsByLevel, AppServices>;
 } {
-  const config = buildSessionLevelsFromTableGridGraph({
-    graph: buildTableGridGraphFromSchema({
-      rootTableName,
-      tablesByName,
-    }),
-    rootLevelQuery: rootLevelQuery ?? {},
-    childLevelQuery,
+  const schemaGraph = buildTableGridGraphFromSchema(source);
+  const generated = buildSessionLevelsFromTableGridGraph({
+    graph: schemaGraph,
+    rootLevelQuery: rootRows ?? {},
+    childLevelQuery: relatedRows,
   });
-  const levels = config.levels as TGridLevelsConfigMap<
-    SchemaDrivenRowsByLevel,
-    unknown
+  const levels = generated.levels as TGridLevelsConfigMap<
+    SchemaTableRowsByLevel,
+    AppServices
   >;
 
   return {
-    rootLevel: config.rootLevel,
+    rootLevel: generated.rootLevel,
     levels,
   };
 }
 
-// Define the standard schema-driven table grid.
-// This is the shortest path for pages that want the default Sapporta table UI.
-export function defineSchemaTGrid(
-  args: SchemaTGridConfigInput,
-): TGridDefinition<SchemaDrivenRowsByLevel, unknown> {
-  return defineTGrid<SchemaDrivenRowsByLevel>(buildSchemaTGridConfig(args));
+export function defineSchemaTGrid({
+  interaction,
+  ...config
+}: DefineSchemaTGridArgs): TGridDefinition<SchemaTableRowsByLevel> {
+  return defineTGrid<SchemaTableRowsByLevel>({
+    ...buildSchemaTGridConfig(config),
+    interaction,
+  });
 }

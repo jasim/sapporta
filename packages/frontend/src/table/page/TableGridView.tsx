@@ -17,7 +17,7 @@ import { TableGridSurface } from "./TableGridSurface";
 import { TableToolbar, type TableToolbarProps } from "./TableToolbar";
 import {
   useTableGridUrlState,
-  type TableGridNavigate,
+  type TableGridRoute,
   type TableGridUrlStateBinding,
 } from "./table-grid-url-state";
 import { useTablePaginationProps } from "./table-pagination-binding";
@@ -52,18 +52,16 @@ export type TableGridPaginationRenderArgs<
 // the caller's route, show the standard toolbar/grid/pagination layout, and let
 // the caller replace any visible control with props they can inspect.
 //
-// The route stays outside this component. Pass `searchParams` and `navigate`
-// from your router so custom pages can live anywhere in the app.
+// The route stays outside this component so custom pages can live anywhere in
+// the app while table controls update that page's URL.
 export type TableGridViewProps<
   RowsByLevel extends TGridRowsByLevel,
   AppServices = unknown,
 > = {
   definition: TGridDefinition<RowsByLevel, AppServices>;
   table: TableSchema;
-  searchParams: URLSearchParams;
-  navigate: TableGridNavigate;
+  route: TableGridRoute;
   services?: AppServices;
-  routePath?: string;
   registerAs?: string;
   loadLookups?: boolean;
   onNewRecord?: () => void;
@@ -92,10 +90,8 @@ export function TableGridView<
 >({
   definition,
   table,
-  searchParams,
-  navigate,
+  route,
   services,
-  routePath,
   registerAs,
   loadLookups,
   onNewRecord,
@@ -108,10 +104,8 @@ export function TableGridView<
   const urlState = useTableGridUrlState<RowsByLevel>({
     tableName: table.name,
     columns: table.columns,
-    searchParams,
-    navigate,
+    route,
     level: definition.rootLevel,
-    routePath,
   });
 
   const session = useTGridSession(definition, {

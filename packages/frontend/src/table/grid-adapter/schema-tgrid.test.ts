@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { TableSchema } from "@sapporta/shared/contracts";
+import { defineTGrid } from "./tgrid-runtime-config";
 import { buildSchemaTGridConfig, defineSchemaTGrid } from "./schema-tgrid";
 
 const ordersTable: TableSchema = {
@@ -34,44 +35,95 @@ const linesTable: TableSchema = {
 };
 
 describe("schema TGrid helpers", () => {
-  it("builds the same explicit level config used by schema-driven table pages", () => {
-    const config = buildSchemaTGridConfig({
-      rootTableName: "orders",
-      tablesByName: {
-        orders: ordersTable,
-        order_lines: linesTable,
+  it("returns a definition for default schema-driven tables", () => {
+    const definition = defineSchemaTGrid({
+      source: {
+        rootTableName: "orders",
+        tablesByName: {
+          orders: ordersTable,
+          order_lines: linesTable,
+        },
       },
-      rootLevelQuery: { urlSync: true },
     });
 
-    expect(config.rootLevel).toBe("orders");
-    expect(Object.keys(config.levels)).toEqual([
+    expect(definition.rootLevel).toBe("orders");
+    expect(Object.keys(definition.levels)).toEqual([
       "orders.order_lines",
       "orders",
     ]);
-    expect(config.levels.orders.query).toMatchObject({
-      owner: "host",
-      urlSync: true,
-    });
-    expect(config.levels["orders.order_lines"].parent).toEqual({
+    expect(definition.levels.orders.childLevels).toEqual([
+      "orders.order_lines",
+    ]);
+    expect(definition.levels["orders.order_lines"].parent).toEqual({
       level: "orders",
       foreignKey: "order_id",
       defaultSort: "line_no",
     });
   });
 
-  it("returns a defineTGrid definition for default schema-driven tables", () => {
+  it("applies root query defaults", () => {
     const definition = defineSchemaTGrid({
-      rootTableName: "orders",
-      tablesByName: {
-        orders: ordersTable,
-        order_lines: linesTable,
+      source: {
+        rootTableName: "orders",
+        tablesByName: {
+          orders: ordersTable,
+          order_lines: linesTable,
+        },
+      },
+      rootRows: {
+        urlSync: true,
+        initialPage: 2,
+        initialSearch: "open",
       },
     });
 
-    expect(definition.rootLevel).toBe("orders");
-    expect(definition.levels.orders.childLevels).toEqual([
-      "orders.order_lines",
-    ]);
+    expect(definition.levels.orders.query).toMatchObject({
+      owner: "host",
+      urlSync: true,
+      initialPage: 2,
+      initialSearch: "open",
+    });
+  });
+
+  it("applies child query defaults", () => {
+    const definition = defineSchemaTGrid({
+      source: {
+        rootTableName: "orders",
+        tablesByName: {
+          orders: ordersTable,
+          order_lines: linesTable,
+        },
+      },
+      relatedRows: {
+        pageSize: 25,
+        initialPage: 3,
+      },
+    });
+
+    expect(definition.levels["orders.order_lines"].query).toMatchObject({
+      owner: "source",
+      pageSize: 25,
+      initialPage: 3,
+    });
+  });
+
+  it("returns level config callers can customize before defining a grid", () => {
+    const columns = [
+      { kind: "table" as const, columnName: "customer" as const },
+    ];
+    const config = buildSchemaTGridConfig({
+      source: {
+        rootTableName: "orders",
+        tablesByName: {
+          orders: ordersTable,
+          order_lines: linesTable,
+        },
+      },
+    });
+
+    config.levels.orders.columns = columns;
+    const definition = defineTGrid(config);
+
+    expect(definition.levels.orders.columns).toBe(columns);
   });
 });
