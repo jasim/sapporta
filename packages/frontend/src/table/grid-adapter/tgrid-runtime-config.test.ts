@@ -510,7 +510,6 @@ describe("compileTGridRuntimeConfig", () => {
             }),
             columns.client("status", {
               header: "Status",
-              readsRowFields: ["customer"],
               renderCell: () => "ok",
             }),
             columns.remainingTable({ exclude: ["id"] }),

@@ -28,8 +28,6 @@ export type TableColumnOptions<
   editor?: ComponentType<
     TGridCellEditorContext<RowsByLevel, AppServices, LevelId, K>
   >;
-  readsRowFields?: readonly RowFieldName<RowsByLevel[LevelId]>[];
-  invalidatedBy?: readonly RowFieldName<RowsByLevel[LevelId]>[];
   saveCellValue?: TGridCellWriteHandler<RowsByLevel, AppServices, LevelId, K>;
 };
 
@@ -53,8 +51,6 @@ export type ClientColumnOptions<
       RowFieldName<RowsByLevel[LevelId]>
     >
   >;
-  readsRowFields?: readonly RowFieldName<RowsByLevel[LevelId]>[];
-  invalidatedBy?: readonly RowFieldName<RowsByLevel[LevelId]>[];
 };
 
 // Spec that binds a real table field to a level's column list.

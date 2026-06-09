@@ -146,8 +146,6 @@ function buildOrderItemColumns(
     columns.client("stock_hold", {
       header: "Hold",
       width: 120,
-      readsRowFields: ["stock_hold_expires_at"],
-      invalidatedBy: ["stock_hold_expires_at"],
       renderCell: StockHoldCell,
     }),
   ];
@@ -172,14 +170,10 @@ describe("TGRID-USAGE examples", () => {
             columns.table("status", {
               header: "Payment",
               renderCell: PaymentStatusCell,
-              readsRowFields: ["status"],
-              invalidatedBy: ["status"],
             }),
             columns.client("overdue_days", {
               header: "Overdue",
               width: 96,
-              readsRowFields: ["due_date", "status"],
-              invalidatedBy: ["due_date", "status"],
               renderCell: OverdueDaysCell,
             }),
             columns.remainingTable({ exclude: ["id", "customer_id"] }),

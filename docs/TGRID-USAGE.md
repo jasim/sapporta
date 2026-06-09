@@ -77,8 +77,6 @@ const invoicesGrid = defineTGrid<RowsByLevel>({
         invoiceColumns.table("status", {
           header: "Payment",
           renderCell: PaymentStatusCell,
-          readsRowFields: ["status"],
-          invalidatedBy: ["status"],
         }),
         invoiceColumns.remainingTable({ exclude: ["id", "customer_id"] }),
       ],
@@ -237,8 +235,6 @@ const invoicesGrid = defineTGrid<RowsByLevel, AppServices>({
         itemColumns.client("stock_hold", {
           header: "Hold",
           width: 120,
-          readsRowFields: ["stock_hold_expires_at"],
-          invalidatedBy: ["stock_hold_expires_at"],
           renderCell: StockHoldCell,
         }),
       ],
@@ -502,8 +498,6 @@ columns: (columns) => [
   columns.table("customer_id", { header: "Customer" }),
   columns.client("balance_status", {
     header: "Status",
-    readsRowFields: ["balance"],
-    invalidatedBy: ["balance"],
     renderCell: BalanceStatusCell,
   }),
   columns.remainingTable({ exclude: ["id", "customer_id"] }),

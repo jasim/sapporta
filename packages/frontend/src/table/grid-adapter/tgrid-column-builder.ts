@@ -298,8 +298,6 @@ function clientColumnFor<
     meta: {
       kind: "client",
       id: spec.id,
-      readsRowFields: spec.options.readsRowFields,
-      invalidatedBy: spec.options.invalidatedBy,
     },
   });
   const columnContext: TGridColumnContext<RowsByLevel[LevelId]> = {
