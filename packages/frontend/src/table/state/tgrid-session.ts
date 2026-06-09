@@ -43,7 +43,6 @@ import {
 } from "@/table/lookup/table-lookup-registry";
 import { buildTableRowsQuery } from "@/table/api/rows";
 import { getApiBase } from "@/platform/client";
-import { buildTableSearchParams } from "@/table/grid-adapter/tgrid-table-url";
 import type {
   TGridLevelId,
   TGridRowsByLevel,
@@ -51,15 +50,10 @@ import type {
 } from "@/table/grid-adapter/tgrid-types";
 import type { TGridLevelQueryState } from "./tgrid-level-query-state";
 
-// Session constructor and runtime façade for typed TGrid behavior.
-// This is the user-facing edge after level config has been declared.
-// A TGrid session converts declarative config into live query state + runtime.
-// A TGrid session is a typed bridge between level config and runtime behavior.
-// It owns one level graph, one runtime, host query stores, and row/CSV helpers.
-// IMPORTANT: getVisibleRows/getLoadedRow are memory snapshots, not DB-wide queries.
-
-// Input shape required to create one concrete TGrid session.
-// Supplies root, level graph, optional app services, and optional URL sync callback.
+// Inputs that stay live while a table view is mounted.
+// `services` is available to custom cells/editors, `hostQuerySeeds` provides
+// the first page/sort/filter/search values, and `onQueryUrlChange` lets the
+// page update its own route when the user changes the query.
 export type CreateTGridSessionArgs<
   RowsByLevel extends TGridRowsByLevel = TGridRowsByLevel,
   AppServices = unknown,
@@ -77,6 +71,9 @@ export type CreateTGridSessionArgs<
   >;
 };
 
+// Initial query values for a page-controlled level.
+// These are seeds only; after the session is running, the query store is the
+// current source of truth.
 export type TGridHostQuerySeeds = {
   page?: number;
   sort?: readonly SortDescriptor[];
@@ -84,6 +81,8 @@ export type TGridHostQuerySeeds = {
   search?: string | null;
 };
 
+// Mutable session inputs used by React hooks that keep the same session object
+// while router state or app services change.
 export type TGridLiveInputs<
   RowsByLevel extends TGridRowsByLevel = TGridRowsByLevel,
   AppServices = unknown,
@@ -96,14 +95,21 @@ export type TGridLiveInputsRef<
   current: TGridLiveInputs<RowsByLevel, AppServices>;
 };
 
-// Public session contract returned to app code.
-// Gives immediate access to runtime, query stores, row helpers, and CSV/export URLs.
+// Live table grid for one mounted view.
+// A session owns the rendered row tree, query stores for page-controlled levels,
+// lookup data for FK/display labels, and helper methods custom cells can call.
+//
+// `getVisibleRows` and `getLoadedRow` read rows already loaded into the grid.
+// They are not database queries; use a row client or endpoint when you need data
+// that may not be visible on the current page.
 export type TGridSession<
   RowsByLevel extends TGridRowsByLevel = TGridRowsByLevel,
   AppServices = unknown,
 > = TGridSessionContext<RowsByLevel, AppServices> & {
   rootTableName: string;
-  queryStore: StoreApi<TGridLevelQueryState<RowsByLevel[TGridLevelId<RowsByLevel>]>>;
+  queryStore: StoreApi<
+    TGridLevelQueryState<RowsByLevel[TGridLevelId<RowsByLevel>]>
+  >;
   rootSource: RuntimeLevelDataSource;
   columnMapper: TGridColumnMapper;
   levelInfoById: Record<TGridLevelId<RowsByLevel>, TGridLevelInfo>;
@@ -119,16 +125,14 @@ export type TGridSession<
   getQueryState<LevelId extends TGridLevelId<RowsByLevel>>(
     levelId?: LevelId,
   ): TGridLevelQueryState<RowsByLevel[LevelId]>;
-  // The session registry narrows full sessions to this one method when
-  // app-level actions only need to refetch a mounted table page.
   reloadRows(levelId?: TGridLevelId<RowsByLevel>, path?: GridPath): void;
   csvExportUrl(levelId?: TGridLevelId<RowsByLevel>): string;
-  tablePageUrl(page: number, levelId?: TGridLevelId<RowsByLevel>): string;
   dispose(): void;
 };
 
-// Primary user entry point for session creation.
-// Call this from views/feature code when you already have fully declared level config.
+// Create a live table session from a TGrid definition.
+// React pages usually call `useTGridSession`; call this directly for tests or
+// non-React mounting code.
 export function createTGridSession<
   RowsByLevel extends TGridRowsByLevel = TGridRowsByLevel,
   AppServices = unknown,
@@ -139,6 +143,9 @@ export function createTGridSession<
   return createTGridSessionWithRef(definition, { current: args });
 }
 
+// Create a session whose inputs can be updated through a ref.
+// This keeps long-lived cell renderers pointed at the latest app services and
+// route callback without recreating the whole grid.
 export function createTGridSessionWithRef<
   RowsByLevel extends TGridRowsByLevel = TGridRowsByLevel,
   AppServices = unknown,
@@ -162,7 +169,9 @@ class DefaultTGridSession<
     StoreApi<TGridLevelQueryState<TGridTableRow>>
   >();
 
-  readonly queryStore: StoreApi<TGridLevelQueryState<RowsByLevel[TGridLevelId<RowsByLevel>]>>;
+  readonly queryStore: StoreApi<
+    TGridLevelQueryState<RowsByLevel[TGridLevelId<RowsByLevel>]>
+  >;
   readonly runtime: GridRuntime;
   readonly rootSource: RuntimeLevelDataSource;
   readonly lookupRegistry: TableLookupRegistry;
@@ -182,12 +191,15 @@ class DefaultTGridSession<
     const lookupResolver = createTGridLookupResolver(this.lookupRegistry);
     this.columnMapper = createTGridColumnMapper(lookupResolver);
 
-    // Only levels that own host query state get local stores.
-    // This is usually root + explicitly host-owned descendants.
+    // Page-controlled levels get query stores because a toolbar or pagination
+    // control can change their sort, filters, search, or page.
     for (const [levelId, level] of Object.entries(definition.levels) as Array<
       [TGridLevelId<RowsByLevel>, TGridLevelConfig<RowsByLevel, AppServices>]
     >) {
-      if (((level.query?.owner ?? (levelId === definition.rootLevel ? "host" : "source")) === "host")) {
+      if (
+        (level.query?.owner ??
+          (levelId === definition.rootLevel ? "host" : "source")) === "host"
+      ) {
         this.queryStoresByLevel.set(
           levelId,
           this.createQueryStore(levelId, level),
@@ -257,8 +269,6 @@ class DefaultTGridSession<
     path: GridPath = this.rootGridPath,
   ): readonly Readonly<RowsByLevel[LevelId]>[] {
     void levelId;
-    // "Visible" refers to rows already materialized for this path, not
-    // every row in the database.
     return this.runtime
       .displayedRowsFor(path)
       .rows.filter((row) => row.kind === "data")
@@ -271,8 +281,6 @@ class DefaultTGridSession<
     path: GridPath = this.rootGridPath,
   ): Readonly<RowsByLevel[LevelId]> | undefined {
     void levelId;
-    // Return only a loaded row by RowKey. If the row is not in the current
-    // displayed-page cache, this returns undefined even if it exists in DB.
     const row = this.runtime.displayedRowFor(
       path,
       makeRowId(path, rowKey as RowKey),
@@ -299,22 +307,6 @@ class DefaultTGridSession<
   csvExportUrl(levelId: TGridLevelId<RowsByLevel> = this.rootLevel): string {
     const runtimeLevel = this.levels[levelId];
     return runtimeLevel.csvExportUrl();
-  }
-
-  tablePageUrl(
-    page: number,
-    levelId: TGridLevelId<RowsByLevel> = this.rootLevel,
-  ): string {
-    const level = this.levels[levelId];
-    const s = this.getQueryStore(levelId).getState();
-    const params = buildTableSearchParams({
-      page,
-      sort: s.sort,
-      filters: s.filters,
-      search: s.search,
-    });
-    const queryString = params.toString();
-    return `/tables/${level.table.name}${queryString ? `?${queryString}` : ""}`;
   }
 
   dispose(): void {
@@ -350,11 +342,17 @@ class DefaultTGridSession<
     const level = this.levels[levelId];
     const store = this.queryStoresByLevel.get(levelId);
     const s = store?.getState();
+    const query = level.config.query ?? {};
+    // Exports use the same constraints as visible rows. Fixed filters stay
+    // included even though the toolbar does not show them as removable filters.
     const queryString = new URLSearchParams(
       buildTableRowsQuery({
-        sort: s?.sort ?? [],
-        filters: s ? [...s.filters] : [],
-        search: s?.search ?? undefined,
+        sort: [...(s?.sort ?? query.initialSort ?? [])],
+        filters: [
+          ...(query.fixedFilters ?? []),
+          ...(s?.filters ?? query.initialFilters ?? []),
+        ],
+        search: s?.search ?? query.initialSearch ?? undefined,
       }),
     ).toString();
     return `${getApiBase()}/tables/${level.table.name}/export.csv${queryString ? `?${queryString}` : ""}`;
@@ -368,12 +366,14 @@ class DefaultTGridSession<
     const pageSize =
       typeof query.pageSize === "function"
         ? query.pageSize()
-        : query.pageSize ?? 50;
+        : (query.pageSize ?? 50);
 
     return createStore<TGridLevelQueryState<TGridTableRow>>()((set, get) => ({
       level: levelId,
       sort: [...(this.hostQuerySeed(levelId)?.sort ?? [])],
-      filters: normalizeFilters([...(this.hostQuerySeed(levelId)?.filters ?? [])]),
+      filters: normalizeFilters([
+        ...(this.hostQuerySeed(levelId)?.filters ?? []),
+      ]),
       search: this.hostQuerySeed(levelId)?.search ?? null,
       page: this.hostQuerySeed(levelId)?.page ?? 1,
       pageSize,
@@ -454,6 +454,8 @@ class DefaultTGridSession<
       setErrorBanner: (msg) => set({ errorBanner: msg }),
 
       syncFromUrl: (params) => {
+        // Browser back/forward should update the table without pushing another
+        // URL entry. User actions use the setters above, which reload and push.
         const cur = get();
         const patch: Partial<TGridLevelQueryState<TGridTableRow>> = {};
         if (cur.page !== params.page) patch.page = params.page;
@@ -476,7 +478,8 @@ class DefaultTGridSession<
 
   private pushUrl(levelId: TGridLevelId<RowsByLevel>): void {
     const runtimeLevel = this.levels[levelId];
-    const syncEnabled = runtimeLevel.config.query?.urlSync ?? levelId === this.rootLevel;
+    const syncEnabled =
+      runtimeLevel.config.query?.urlSync ?? levelId === this.rootLevel;
     const onQueryUrlChange = this.liveInputsRef.current.onQueryUrlChange;
     if (!syncEnabled || !onQueryUrlChange) return;
     const s = this.getQueryStore(levelId).getState();

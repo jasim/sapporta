@@ -1,12 +1,26 @@
 import type { SortDescriptor } from "@sapporta/grid";
 import type { ChildSchema, TableSchema } from "@sapporta/shared/contracts";
 import type { FilterCondition } from "@sapporta/shared/filter";
-import type { fetchTableRows, createTableRow, updateTableRow, deleteTableRow } from "@/table/api/rows";
-import type { RowFieldName, TableColumnName, TGridLevelId, TGridRowsByLevel } from "./tgrid-types";
-import type { TGridColumnSpec, TGridColumnSpecBuilder } from "./tgrid-column-spec";
+import type {
+  fetchTableRows,
+  createTableRow,
+  updateTableRow,
+  deleteTableRow,
+} from "@/table/api/rows";
+import type {
+  RowFieldName,
+  TableColumnName,
+  TGridLevelId,
+  TGridRowsByLevel,
+} from "./tgrid-types";
+import type {
+  TGridColumnSpec,
+  TGridColumnSpecBuilder,
+} from "./tgrid-column-spec";
 
-// TGrid sessions use an explicit, typed level graph as their only source of truth.
-// Root and child levels share one declaration shape, with root differing only by policy.
+// Current query values for a page-controlled level.
+// Toolbars, pagination, CSV export, and row fetches all read this same shape, so
+// a filter or search change is applied consistently.
 export type TGridHostQueryState = {
   sort: SortDescriptor[];
   filters: FilterCondition[];
@@ -15,22 +29,25 @@ export type TGridHostQueryState = {
   pageSize: number;
 };
 
-// Query state held in host-owned controls and optionally persisted to URL.
-// This is the exact model used by toolbar controls for a visible, user-driven level.
+// Query behavior for one table level.
+// Use `host` when the page shows controls for this level. Use `source` when the
+// level is loaded from a parent row expansion and should only use defaults.
 export type TGridLevelQueryConfig = {
-  // owner "host" means level query is controlled from UI state.
-  // owner "source" means query is driven by expansion path and defaults only.
   owner?: "host" | "source";
   pageSize?: number | (() => number);
   initialPage?: number;
   initialSort?: readonly SortDescriptor[];
   initialFilters?: readonly FilterCondition[];
   initialSearch?: string | null;
+  // Always applied to row fetches and CSV exports, but not shown as editable
+  // toolbar filters. Use this for constraints the page promises to keep.
+  fixedFilters?: readonly FilterCondition[];
   urlSync?: boolean;
 };
 
-// Compact metadata describing a level's graph placement.
-// Used by runtime services and editor context without changing rendering behavior.
+// Read-only placement information for a level.
+// Cell renderers and editors can use this to understand which table they are in
+// and how that table relates to its parent.
 export type TGridLevelInfo = {
   levelId: string;
   tableName: string;
@@ -41,8 +58,9 @@ export type TGridLevelInfo = {
   childSchemas: ChildSchema[];
 };
 
-// CRUD client contract required by one level's row endpoints.
-// Replace these to route reads/writes to custom transports.
+// Row transport for one level.
+// Override this when a table-like view should read or save rows through a
+// custom API instead of Sapporta's default table endpoints.
 export type TableRowsClient = {
   fetch: typeof fetchTableRows;
   create: typeof createTableRow;
@@ -50,8 +68,9 @@ export type TableRowsClient = {
   remove: typeof deleteTableRow;
 };
 
-// Core typed declaration for one level in the explicit TGrid graph.
-// table + parent + childLevels define traversal, while columns/query define behavior.
+// Declaration for one table level in a TGrid definition.
+// `table`, `parent`, and `childLevels` describe the rows a user can expand
+// through. `columns`, `query`, and `rowsClient` describe how this level behaves.
 export type TGridLevelConfig<
   RowsByLevel extends TGridRowsByLevel,
   AppServices = unknown,
@@ -71,11 +90,16 @@ export type TGridLevelConfig<
   rowsClient?: TableRowsClient;
 };
 
-// Canonical input map for session creation.
-// Every key is an explicit level id, and every value is a full level contract.
+// Complete table graph keyed by level id.
+// Each key must have a matching level declaration so the grid can validate
+// parent/child links before rendering.
 export type TGridLevelsConfigMap<
   RowsByLevel extends TGridRowsByLevel,
   AppServices = unknown,
 > = {
-  [LevelId in TGridLevelId<RowsByLevel>]: TGridLevelConfig<RowsByLevel, AppServices, LevelId>;
+  [LevelId in TGridLevelId<RowsByLevel>]: TGridLevelConfig<
+    RowsByLevel,
+    AppServices,
+    LevelId
+  >;
 };

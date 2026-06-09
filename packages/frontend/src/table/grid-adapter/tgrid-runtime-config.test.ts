@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { isValidElement } from "react";
 import type { Row, TableSchema } from "@sapporta/shared/contracts";
+import { eqCondition } from "@sapporta/shared/filter";
 import type { GridRuntime, RestEndpointFactory } from "@sapporta/grid";
 import { ExpandCell } from "@sapporta/grid";
 import { preset } from "@sapporta/grid/column-preset";
@@ -248,6 +249,64 @@ describe("compileTGridRuntimeConfig", () => {
     });
   });
 
+  it("applies fixed query filters without adding them to host query state", async () => {
+    const fetch = vi.fn(async () => ({
+      data: [{ id: 1, customer: "ACME" }],
+      meta: { total: 1, page: 1, limit: 25, pages: 1 },
+    }));
+    const lookupResolver: TGridLookupResolver = {
+      bundleFor: () => undefined,
+    };
+    const userFilter = eqCondition("customer", "ACME");
+    const fixedFilter = eqCondition("status", "open");
+    const config = compileTGridRuntimeConfig<RowsByLevel>({
+      rootLevel: "orders",
+      levels: {
+        orders: {
+          table: {
+            ...orderSchema,
+            columns: [...orderSchema.columns, { name: "status", kind: "text" }],
+          },
+          childLevels: [],
+          query: { owner: "host", fixedFilters: [fixedFilter] },
+          rowsClient: {
+            fetch,
+            create: vi.fn(),
+            update: vi.fn(),
+            remove: vi.fn(),
+          } as TableRowsClient,
+        },
+        "orders.lines": {
+          table: lineSchema,
+          parent: { level: "orders", foreignKey: "order_id" },
+          childLevels: [],
+        },
+        "orders.lines.allocations": {
+          table: allocationSchema,
+          parent: { level: "orders.lines", foreignKey: "line_id" },
+          childLevels: [],
+        },
+      },
+      columnMapper: createTGridColumnMapper(lookupResolver),
+      hostQueryState: () => ({
+        page: 1,
+        pageSize: 25,
+        sort: [],
+        filters: [userFilter],
+        search: null,
+      }),
+    });
+
+    const endpoint = config.endpointFactoriesByLevel.orders({ ancestors: [] });
+    await endpoint.fetchPage(endpoint.query!());
+
+    expect(fetch).toHaveBeenCalledWith(
+      expect.objectContaining({
+        filters: [fixedFilter, userFilter],
+      }),
+    );
+  });
+
   it("rejects array default sorts that reference unknown columns", () => {
     const lookupResolver: TGridLookupResolver = {
       bundleFor: () => undefined,
@@ -374,7 +433,10 @@ describe("compileTGridRuntimeConfig", () => {
       runtime: {} as unknown as GridRuntime,
       appServices: { suffix: "saved" },
       lookupRegistry: {} as unknown as TableLookupRegistry,
-      levels: {} as unknown as TGridSessionContext<RowsByLevel, Services>["levels"],
+      levels: {} as unknown as TGridSessionContext<
+        RowsByLevel,
+        Services
+      >["levels"],
     };
     const lookupResolver: TGridLookupResolver = {
       bundleFor: () => undefined,

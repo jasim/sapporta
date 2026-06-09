@@ -9,11 +9,26 @@ import type {
 } from "@sapporta/shared/filter";
 import type { ColumnSchema } from "@sapporta/shared/contracts";
 
-// Toolbar for the table path. Deliberately decoupled from
-// `TableController` — every value is a plain prop. Multi-row delete UI is
-// not wired here yet; that requires runtime selection plumbing the new
-// grid does not expose, and the goal is parity with what the new path
-// actually supports today.
+export type TableToolbarProps = {
+  tableLabel: string;
+  totalCount: number;
+  columns: readonly ColumnSchema[];
+  filters: readonly FilterCondition[];
+  search: string | null;
+  searchable: boolean;
+  exportUrl: string;
+  hasSort: boolean;
+  onAddFilter: (cond: NewFilterCondition) => void;
+  onUpdateFilter: (id: string, patch: NewFilterCondition) => void;
+  onRemoveFilter: (id: string) => void;
+  onSearchChange: (q: string | null) => void;
+  onClearSort: () => void;
+  onNewRecord?: () => void;
+};
+
+// Standard table controls as plain props.
+// Use this component directly when your page already has toolbar props, or use
+// `useTableToolbarProps` to bind it to a live table session.
 export function TableToolbar({
   tableLabel,
   totalCount,
@@ -29,22 +44,7 @@ export function TableToolbar({
   onSearchChange,
   onClearSort,
   onNewRecord,
-}: {
-  tableLabel: string;
-  totalCount: number;
-  columns: ColumnSchema[];
-  filters: FilterCondition[];
-  search: string | null;
-  searchable: boolean;
-  exportUrl: string;
-  hasSort: boolean;
-  onAddFilter: (cond: NewFilterCondition) => void;
-  onUpdateFilter: (id: string, patch: NewFilterCondition) => void;
-  onRemoveFilter: (id: string) => void;
-  onSearchChange: (q: string | null) => void;
-  onClearSort: () => void;
-  onNewRecord?: () => void;
-}) {
+}: TableToolbarProps) {
   return (
     <>
       <TopBar
@@ -88,8 +88,8 @@ export function TableToolbar({
         }
       />
       <FilterCardsBar
-        columns={columns}
-        filters={filters}
+        columns={[...columns]}
+        filters={[...filters]}
         onAdd={onAddFilter}
         onUpdate={onUpdateFilter}
         onRemove={onRemoveFilter}
@@ -105,8 +105,7 @@ function SearchInput({
   value: string | null;
   onChange: (v: string | null) => void;
 }) {
-  // Local state drives the input so keystrokes feel instant; the debounced
-  // value is what we push up to the store.
+  // Keep typing instant, then publish the settled search term to the table.
   const [input, setInput] = useState(value ?? "");
   const debounced = useDebounce(input, 250);
 

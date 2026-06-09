@@ -27,7 +27,7 @@ const ordersTable: TableSchema = {
 };
 
 describe("TGridSession", () => {
-  it("builds table page links from host query state", () => {
+  it("includes fixed query filters in CSV export links", () => {
     const definition = defineTGrid<RowsByLevel>({
       rootLevel: "orders",
       levels: {
@@ -36,6 +36,7 @@ describe("TGridSession", () => {
           childLevels: [],
           query: {
             owner: "host",
+            fixedFilters: [eqCondition("status", "open")],
           },
         },
       },
@@ -43,20 +44,16 @@ describe("TGridSession", () => {
     const session = createTGridSession<RowsByLevel>(definition, {
       hostQuerySeeds: {
         orders: {
-          sort: [{ colId: "customer", direction: "asc" }],
-          filters: [eqCondition("status", "open")],
-          search: "acme",
+          filters: [eqCondition("customer", "ACME")],
         },
       },
     });
 
     try {
-      expect(session.tablePageUrl(3)).toBe(
-        "/tables/orders?filter%5Bstatus%5D%5Beq%5D=open&page=3&sort=customer&q=acme",
-      );
-      expect(session.tablePageUrl(1)).toBe(
-        "/tables/orders?filter%5Bstatus%5D%5Beq%5D=open&sort=customer&q=acme",
-      );
+      const url = new URL(session.csvExportUrl(), "http://localhost");
+      expect(url.pathname).toBe("/api/tables/orders/export.csv");
+      expect(url.searchParams.get("filter[status][eq]")).toBe("open");
+      expect(url.searchParams.get("filter[customer][eq]")).toBe("ACME");
     } finally {
       session.dispose();
     }

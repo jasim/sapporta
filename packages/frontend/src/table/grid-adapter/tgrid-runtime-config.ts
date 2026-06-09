@@ -5,8 +5,22 @@ import type {
   TableSchema,
 } from "@sapporta/shared/contracts";
 import { eqCondition, type FilterCondition } from "@sapporta/shared/filter";
-import { childPath, rootPath, type GridInteractionConfig } from "@sapporta/grid";
-import type { ColId, GridPath, GridSchema, LevelSchema, PatchCellResponse, RestEndpointFactory, RowKey, SortDescriptor, TreeNode } from "@sapporta/grid";
+import {
+  childPath,
+  rootPath,
+  type GridInteractionConfig,
+} from "@sapporta/grid";
+import type {
+  ColId,
+  GridPath,
+  GridSchema,
+  LevelSchema,
+  PatchCellResponse,
+  RestEndpointFactory,
+  RowKey,
+  SortDescriptor,
+  TreeNode,
+} from "@sapporta/grid";
 import { parseSortString, stringifySortOrder } from "@sapporta/grid";
 import {
   fetchTableRows,
@@ -55,21 +69,25 @@ export type TGridDefinition<
   readonly levels: TGridLevelsConfigMap<RowsByLevel, AppServices>;
 };
 
+// Declare the table grid a page wants to mount.
+// This is the main customization surface: choose levels, columns, editors,
+// renderers, query defaults, row transport, and app services in one typed value.
 export function defineTGrid<
   RowsByLevel extends TGridRowsByLevel = TGridRowsByLevel,
   AppServices = unknown,
 >(
   definition: TGridDefinition<RowsByLevel, AppServices>,
 ): TGridDefinition<RowsByLevel, AppServices> {
-  validateTGridDefinition(definition.rootLevel, definition.levels, "defineTGrid");
+  validateTGridDefinition(
+    definition.rootLevel,
+    definition.levels,
+    "defineTGrid",
+  );
   return definition;
 }
 
-// Final adapter from typed level contracts to base-grid runtime inputs.
-// After this stage the generic runtime sees only `GridSchema`, endpoints, and metadata.
-
-// Input contract used by the session constructor to build runtime assets.
-// Every runtime behavior (queries, sorting, endpoints) is derived from these fields.
+// Inputs needed to turn an app-facing TGrid definition into the lower-level grid
+// schema and row endpoints used while the page is live.
 type CompileTGridRuntimeConfigArgs<
   RowsByLevel extends TGridRowsByLevel = TGridRowsByLevel,
   AppServices = unknown,
@@ -83,18 +101,23 @@ type CompileTGridRuntimeConfigArgs<
   sessionContext?: () => TGridSessionContext<RowsByLevel, AppServices>;
 };
 
-// Runtime bundle emitted for one session.
-// Contains grid schema, per-level endpoint factories, and compiled level metadata.
+// Runtime assets for one live table session.
+// The session uses these to render rows, fetch child data, save cell edits, and
+// give cells metadata about the level they belong to.
 export type CompiledTGridRuntimeConfig<
   RowsByLevel extends TGridRowsByLevel = TGridRowsByLevel,
 > = {
   gridSchema: GridSchema;
-  endpointFactoriesByLevel: Record<TGridLevelId<RowsByLevel>, RestEndpointFactory<TGridFilter>>;
+  endpointFactoriesByLevel: Record<
+    TGridLevelId<RowsByLevel>,
+    RestEndpointFactory<TGridFilter>
+  >;
   levelInfoById: Record<TGridLevelId<RowsByLevel>, TGridLevelInfo>;
 };
 
-// Internal session compiler. `defineTGrid` is the public structural API; this
-// function turns one definition plus session resources into live runtime inputs.
+// Compile a TGrid definition into renderable grid schema and row endpoints.
+// Most pages call `useTGridSession` instead; use this directly only when testing
+// or building a custom session wrapper.
 export function compileTGridRuntimeConfig<
   RowsByLevel extends TGridRowsByLevel = TGridRowsByLevel,
   AppServices = unknown,
@@ -162,8 +185,9 @@ export function compileTGridRuntimeConfig<
       childSchemas,
     };
 
-    // Runtime rule: only one level starts "host owned" by default.
-    // Every child level uses source-owned defaults unless caller overrides.
+    // By default the root table is page-controlled because it has toolbar and
+    // pagination controls. Child levels use source defaults because each child
+    // request is scoped by the row the user expanded.
     const queryConfig: TGridLevelQueryConfig = {
       owner: levelId === rootLevel ? "host" : "source",
       ...(config.query ?? {}),
@@ -239,7 +263,9 @@ function validateTGridDefinition<
         );
       }
     } else if (levelId !== rootLevel) {
-      throw new Error(`${label}: non-root level '${String(levelId)}' has no parent`);
+      throw new Error(
+        `${label}: non-root level '${String(levelId)}' has no parent`,
+      );
     }
 
     for (const childLevelId of config.childLevels) {
@@ -267,13 +293,12 @@ function resolveColumns<
 ): readonly TGridColumnSpec<RowsByLevel, AppServices, LevelId>[] | undefined {
   if (!cols) return undefined;
   if (typeof cols !== "function") return cols;
-  return cols(createTGridColumnsBuilder<RowsByLevel, AppServices, LevelId>(levelId));
+  return cols(
+    createTGridColumnsBuilder<RowsByLevel, AppServices, LevelId>(levelId),
+  );
 }
 
-function primaryKeyOf(
-  table: TableSchema,
-  levelId: string,
-): TableColumnSchema {
+function primaryKeyOf(table: TableSchema, levelId: string): TableColumnSchema {
   const pk = table.columns.find((c) => c.primary);
   if (!pk) {
     throw new Error(
@@ -346,7 +371,9 @@ function makeEndpointFactory(args: {
         args,
         ctx,
         parentRowKey,
-        args.parent ? eqCondition(args.parent.foreignKey, String(parentRowKey)) : null,
+        args.parent
+          ? eqCondition(args.parent.foreignKey, String(parentRowKey))
+          : null,
       ),
       fetchPage: async (req) => {
         const res = await args.rowsClient.fetch({
@@ -395,12 +422,18 @@ function makeEndpointFactory(args: {
         const columns = args.parent
           ? { ...req.node.columns, [args.parent.foreignKey]: parentRowKey }
           : req.node.columns;
-        const result = await args.rowsClient.create(args.table.name, columns as Row);
+        const result = await args.rowsClient.create(
+          args.table.name,
+          columns as Row,
+        );
         const row = Array.isArray(result.data) ? result.data[0] : result.data;
         return { levelName: args.levelId, columns: row };
       },
       removeNode: async (req) => {
-        await args.rowsClient.remove(args.table.name, String(req.rowKey) as RowId);
+        await args.rowsClient.remove(
+          args.table.name,
+          String(req.rowKey) as RowId,
+        );
       },
     };
   };
@@ -422,12 +455,17 @@ function makeQuery(
   },
   parentRowKey: string | null,
   parentConstraint: FilterCondition | null,
-): (() => { page: number; pageSize: number; sort: SortDescriptor[]; filter: TGridFilter }) | undefined {
+):
+  | (() => {
+      page: number;
+      pageSize: number;
+      sort: SortDescriptor[];
+      filter: TGridFilter;
+    })
+  | undefined {
   const queryConfig = args.queryConfig;
   const hasParent = Boolean(args.parent);
-  const parentFilter = parentConstraint
-    ? [parentConstraint]
-    : [];
+  const parentFilter = parentConstraint ? [parentConstraint] : [];
 
   // Host-owned levels use current URL/query-store state. Source-owned levels use
   // static defaults from config so pagination and sort remain deterministic without
@@ -446,7 +484,11 @@ function makeQuery(
           pageSize: q.pageSize,
           sort: [...q.sort],
           filter: {
-            conditions: [...parentFilter, ...q.filters],
+            conditions: [
+              ...parentFilter,
+              ...(queryConfig.fixedFilters ?? []),
+              ...q.filters,
+            ],
             search: q.search,
           },
         };
@@ -458,12 +500,13 @@ function makeQuery(
       const search = queryConfig.initialSearch ?? null;
       const filters: FilterCondition[] = [
         ...parentFilter,
+        ...(queryConfig.fixedFilters ?? []),
         ...defaults.map((condition) => ({ ...condition })),
       ];
       return {
         page: queryConfig.initialPage ?? 1,
         pageSize: defaultPageSize(queryConfig.pageSize),
-        sort: [...args.parent?.defaultSort ?? []],
+        sort: [...(args.parent?.defaultSort ?? [])],
         filter: {
           conditions: filters,
           search,

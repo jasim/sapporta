@@ -1,5 +1,7 @@
-// Package entrypoint for Sapporta table runtime, grid, and session APIs.
-// Keep this file as the narrative map: route-level entry points plus typed TGrid primitives.
+// Public table tools for app pages.
+// Start with `TablePage` for the built-in table route, `TableGridView` for a
+// reusable table-like page, or the smaller TGrid hooks/components when a custom
+// view needs to choose its own controls.
 export { createRecord, navigateToNewRecord } from "./actions/record-actions";
 export * from "./api/rows";
 export { FormField } from "./form/FormField";
@@ -30,7 +32,7 @@ export * from "./grid-adapter/tgrid-lookup-resolver";
 export * from "./grid-adapter/tgrid-cell-context";
 export * from "./grid-adapter/tgrid-column-builder";
 export * from "./grid-adapter/tgrid-column-spec";
-export * from "./grid-adapter/tgrid-schema-compiler";
+export * from "./grid-adapter/schema-tgrid";
 export * from "./grid-adapter/tgrid-binding";
 export * from "./grid-adapter/tgrid-types";
 export * from "./grid-adapter/tgrid-table-url";
@@ -43,7 +45,22 @@ export * from "./lookup/tgrid-lookup-loading";
 export * from "./lookup/table-lookup-registry";
 export { TGrid } from "./page/TGrid";
 export { TablePage } from "./page/TablePage";
-export { TableToolbar } from "./page/TableToolbar";
+export {
+  TableGridSurface,
+  type TableGridSurfaceProps,
+} from "./page/TableGridSurface";
+export {
+  TableGridView,
+  type TableGridPaginationRenderArgs,
+  type TableGridViewProps,
+  type TableGridToolbarRenderArgs,
+} from "./page/TableGridView";
+export { TableToolbar, type TableToolbarProps } from "./page/TableToolbar";
+export * from "./page/table-grid-url-state";
+export * from "./page/table-pagination-binding";
+export * from "./page/table-toolbar-binding";
+export * from "./page/tgrid-lifecycle";
+export * from "./page/tgrid-source-status";
 export { NewRecordRoute } from "./route/NewRecordRoute";
 export { TableRoute } from "./route/TableRoute";
 export * from "./state/tgrid-level-query-state";
