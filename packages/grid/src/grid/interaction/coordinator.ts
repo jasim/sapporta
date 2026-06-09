@@ -423,6 +423,21 @@ export function createGridCoordinator(
   store.navigateRow = (fromPath, intent) => {
     const runtime = args.getRuntime();
     const cursorManager = args.getCursorManager();
+    if (
+      intent.type === "expandActiveRow" ||
+      intent.type === "collapseActiveRow" ||
+      intent.type === "toggleActiveRowExpansion"
+    ) {
+      const active = runtime.activeRowFor(fromPath);
+      if (!active) return;
+      if (runtime.schemaAt(active.path).childLevels.length === 0) return;
+      const expanded =
+        store.getState().expansion.get(active.path)?.has(active.rowId) ?? false;
+      if (intent.type === "expandActiveRow" && expanded) return;
+      if (intent.type === "collapseActiveRow" && !expanded) return;
+      store.toggleExpand(active.path, active.rowId);
+      return;
+    }
     if (intent.type === "toggleActiveRowSelection") {
       const active = runtime.activeRowFor(fromPath);
       if (active) runtime.rowInteraction.toggleRowSelection(active.path, active.rowId);

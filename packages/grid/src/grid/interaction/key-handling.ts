@@ -28,6 +28,7 @@ import { triggerAllowed } from "../types/schema";
 const PAGE_SIZE = 10;
 
 type CapabilitiesFn = (kind: LevelRowKind) => RowCapabilities;
+export type CellKeyboardPresentation = "tabular" | "cards";
 export type KeyEventLike = Pick<
   KeyboardEvent,
   "key" | "ctrlKey" | "metaKey" | "shiftKey" | "altKey"
@@ -90,6 +91,7 @@ export function keyEventToCellIntent(
   displayed: DisplayedRows,
   schema: ColumnSchema[],
   capabilities: CapabilitiesFn,
+  presentation: CellKeyboardPresentation = "tabular",
 ): CellNavigationIntent | null {
   if (state.editing) return null;
 
@@ -110,6 +112,22 @@ export function keyEventToCellIntent(
   const focus = state.liveCellFocus;
 
   if (direction) {
+    if (
+      config.activeCell.keyboard.arrows[presentation] === "field-list" &&
+      !e.ctrlKey &&
+      !e.metaKey &&
+      (e.key === "ArrowUp" ||
+        e.key === "ArrowDown" ||
+        e.key === "ArrowLeft" ||
+        e.key === "ArrowRight")
+    ) {
+      return {
+        type: "commitMove",
+        target:
+          e.key === "ArrowUp" || e.key === "ArrowLeft" ? "prev" : "next",
+      };
+    }
+
     // Shift+movement only creates a cell range when this cell-grid actually has
     // selected cells. In "no cell selection" presets, Shift+arrows still move
     // the cell cursor but do not write a remembered range.
@@ -200,6 +218,11 @@ export function keyEventToRowIntent(
     if (!direction) return null;
     return { type: "focusFirstRow" };
   }
+  if (e.key === "Enter" && !e.shiftKey) {
+    return config.activeRow.keyboard.expansion === "left-right-enter"
+      ? { type: "toggleActiveRowExpansion" }
+      : null;
+  }
   if (!direction) return null;
 
   const extend =
@@ -209,6 +232,14 @@ export function keyEventToRowIntent(
     config.selectedRows.sync.kind === "independent";
 
   switch (direction) {
+    case "right":
+      return config.activeRow.keyboard.expansion === "left-right-enter"
+        ? { type: "expandActiveRow" }
+        : null;
+    case "left":
+      return config.activeRow.keyboard.expansion === "left-right-enter"
+        ? { type: "collapseActiveRow" }
+        : null;
     case "up":
     case "down":
       return { type: "moveActiveRow", direction, extend };

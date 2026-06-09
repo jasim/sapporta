@@ -1,0 +1,148 @@
+:where(.sapporta-table-grid[data-grid-presentation="cards"]) {
+  --grid-card-background: color-mix(
+    in oklab,
+    var(--sap-surface-muted) 36%,
+    var(--sap-surface)
+  );
+  --grid-cards-row-gap: 10px;
+}
+
+:where(
+  .sapporta-table-grid[data-grid-presentation="cards"][data-grid-depth]:not(
+      [data-grid-depth="0"]
+    )
+) {
+  --grid-cards-row-gap: 7px;
+}
+
+:where(.sapporta-table-grid[data-grid-presentation="cards"] [data-grid-part="body"]) {
+  gap: var(--grid-cards-row-gap);
+}
+
+:where(.sapporta-table-grid[data-grid-presentation="cards"] [data-grid-part="row"]) {
+  --grid-row-base-background: var(--grid-card-background);
+  --grid-cell-border-inline-end: none;
+  --grid-cell-min-height: 28px;
+  --grid-cell-padding: 0;
+
+  border: 0;
+  border-radius: 6px;
+  gap: 0;
+  overflow: visible;
+}
+
+:where(.sapporta-table-grid[data-grid-presentation="cards"])
+  [data-grid-part="body"]
+  > [data-grid-part="row"]
+  + [data-grid-part="row"]::before {
+  border-top: 1px solid
+    var(
+      --grid-card-separator,
+      color-mix(in oklab, var(--sap-border, hsl(214 20% 88%)) 54%, transparent)
+    );
+  content: "";
+  left: 0;
+  position: absolute;
+  right: 0;
+  top: calc(var(--grid-cards-row-gap) / -2);
+}
+
+:where(
+  .sapporta-table-grid[data-grid-presentation="cards"]
+    [data-grid-part="row-field"]
+) {
+  align-items: baseline;
+  border-bottom: 0;
+  gap: 12px;
+  grid-template-columns: minmax(8rem, 0.18fr) minmax(0, 1fr);
+  padding: 3px 12px;
+}
+
+:where(
+  .sapporta-table-grid[data-grid-presentation="cards"][data-grid-depth]:not(
+      [data-grid-depth="0"]
+    )
+    [data-grid-part="row-field"]
+) {
+  padding: 2px 10px;
+}
+
+:where(
+  .sapporta-table-grid[data-grid-presentation="cards"]
+    [data-grid-part="row-field-label"]
+) {
+  color: var(--sap-muted, hsl(215 14% 45%));
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.45;
+}
+
+:where(
+  .sapporta-table-grid[data-grid-presentation="cards"]
+    [data-grid-part="row-field"][data-display-type="pk"],
+  .sapporta-table-grid[data-grid-presentation="cards"]
+    [data-grid-part="row-field"][data-display-type="pk"]
+    [data-grid-part="row-field-label"]
+) {
+  color: var(--sap-fg-subtle, hsl(215 14% 45%));
+}
+
+:where(
+  .sapporta-table-grid[data-grid-presentation="cards"] [data-grid-part="cell"],
+  .sapporta-table-grid[data-grid-presentation="cards"]
+    [data-grid-part="cell"]:last-child
+) {
+  border-right: 0;
+}
+
+:where(
+  .sapporta-table-grid[data-grid-presentation="cards"]
+    [data-grid-part="cell-content"]
+) {
+  align-items: flex-start;
+  line-height: 1.45;
+}
+
+:where(
+  .sapporta-table-grid[data-grid-presentation="cards"]
+    [data-grid-part="cell-frame-content"]
+) {
+  overflow: visible;
+  text-overflow: clip;
+  white-space: normal;
+}
+
+:where(
+  .sapporta-table-grid[data-grid-presentation="cards"]
+    [data-grid-part="child-level"]
+) {
+  border-left: 0;
+  margin-left: 12px;
+  padding-left: 14px;
+}
+
+:where(
+  .sapporta-table-grid[data-grid-presentation="cards"]
+    [data-grid-part="cards-level-header"]
+) {
+  margin-bottom: 10px;
+}
+
+@media (max-width: 640px) {
+  :where(
+    .sapporta-table-grid[data-grid-presentation="cards"]
+      [data-grid-part="row-field"]
+  ) {
+    gap: 3px;
+    grid-template-columns: 1fr;
+    padding: 5px 10px;
+  }
+
+  :where(
+    .sapporta-table-grid[data-grid-presentation="cards"]
+      [data-grid-part="child-level"]
+  ) {
+    margin-left: 4px;
+    padding-left: 10px;
+  }
+}

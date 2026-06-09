@@ -82,6 +82,16 @@ describe("extractSchemas", () => {
     expect(result[0].immutable).toBe(false);
   });
 
+  it("exports resolved row-label columns", () => {
+    const result = extractSchemas([accounts]);
+    expect(result[0].rowLabelColumns).toEqual(["name"]);
+  });
+
+  it("falls back to the primary key for row labels without text columns", () => {
+    const result = extractSchemas([invoices]);
+    expect(result[0].rowLabelColumns).toEqual(["id"]);
+  });
+
   it("normalizes table defaults without synthesizing column display hints", () => {
     expect(ledger.meta).toMatchObject({
       label: "ledger",

@@ -1,7 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { keyEventToCellIntent as parseCellIntent } from "./key-handling";
+import {
+  keyEventToCellIntent as parseCellIntent,
+  keyEventToRowIntent as parseRowIntent,
+} from "./key-handling";
 import { capabilitiesFor } from "../types/capabilities";
-import { CELL_EDITING_GRID } from "../types/interaction";
+import {
+  CELL_EDITING_GRID,
+  ROW_MULTISELECT_LIST,
+  ROW_PRIMARY_MASTER_DETAIL,
+} from "../types/interaction";
 import { rootPath, makeRowId } from "../types/identity";
 import type { ControllerState } from "../types/controller-state";
 import type { ColumnSchema } from "../types/schema";
@@ -74,6 +81,15 @@ function keyEventToCellIntent(
   caps: typeof capabilitiesFor,
 ) {
   return parseCellIntent(e, CELL_EDITING_GRID, state, displayed, schema, caps);
+}
+
+function keyEventToRowIntent(e: KeyboardEvent, state: ControllerState) {
+  return parseRowIntent(
+    e,
+    ROW_PRIMARY_MASTER_DETAIL,
+    state,
+    makeRows([{ key: "r0", kind: "data" }]),
+  );
 }
 
 function ev(key: string, mods: Partial<KeyboardEvent> = {}): KeyboardEvent {
@@ -168,6 +184,56 @@ describe("keyEventToCellIntent", () => {
       colPolicy: "preserve",
       extend: false,
     });
+  });
+
+  it("uses the configured cards arrow policy for visual field order", () => {
+    expect(
+      parseCellIntent(
+        ev("ArrowDown"),
+        CELL_EDITING_GRID,
+        focusAt("r0", "a"),
+        displayed,
+        cols,
+        capabilitiesFor,
+        "cards",
+      ),
+    ).toEqual({ type: "commitMove", target: "next" });
+    expect(
+      parseCellIntent(
+        ev("ArrowUp"),
+        CELL_EDITING_GRID,
+        focusAt("r0", "b"),
+        displayed,
+        cols,
+        capabilitiesFor,
+        "cards",
+      ),
+    ).toEqual({ type: "commitMove", target: "prev" });
+  });
+
+  it("uses the configured cards arrow policy for left and right fields", () => {
+    expect(
+      parseCellIntent(
+        ev("ArrowRight"),
+        CELL_EDITING_GRID,
+        focusAt("r0", "a"),
+        displayed,
+        cols,
+        capabilitiesFor,
+        "cards",
+      ),
+    ).toEqual({ type: "commitMove", target: "next" });
+    expect(
+      parseCellIntent(
+        ev("ArrowLeft"),
+        CELL_EDITING_GRID,
+        focusAt("r0", "b"),
+        displayed,
+        cols,
+        capabilitiesFor,
+        "cards",
+      ),
+    ).toEqual({ type: "commitMove", target: "prev" });
   });
 
   it("Shift+ArrowDown sets extend on moveRow", () => {
@@ -385,5 +451,49 @@ describe("keyEventToCellIntent", () => {
       colPolicy: "preserve",
       extend: false,
     });
+  });
+});
+
+describe("keyEventToRowIntent", () => {
+  const rowFocused: ControllerState = {
+    liveCellFocus: null,
+    cellSelection: null,
+    editing: null,
+    liveRowFocus: makeRowId(path, "r0"),
+    rowSelection: null,
+  };
+
+  it("maps right and left arrows to active-row expansion intents", () => {
+    expect(keyEventToRowIntent(ev("ArrowRight"), rowFocused)).toEqual({
+      type: "expandActiveRow",
+    });
+    expect(keyEventToRowIntent(ev("ArrowLeft"), rowFocused)).toEqual({
+      type: "collapseActiveRow",
+    });
+  });
+
+  it("maps Enter to active-row expansion toggle", () => {
+    expect(keyEventToRowIntent(ev("Enter"), rowFocused)).toEqual({
+      type: "toggleActiveRowExpansion",
+    });
+  });
+
+  it("ignores expansion keys when row expansion is not configured", () => {
+    expect(
+      parseRowIntent(
+        ev("ArrowRight"),
+        ROW_MULTISELECT_LIST,
+        rowFocused,
+        makeRows([{ key: "r0", kind: "data" }]),
+      ),
+    ).toBe(null);
+    expect(
+      parseRowIntent(
+        ev("Enter"),
+        ROW_MULTISELECT_LIST,
+        rowFocused,
+        makeRows([{ key: "r0", kind: "data" }]),
+      ),
+    ).toBe(null);
   });
 });

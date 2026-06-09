@@ -5,6 +5,7 @@ import { resolveColumnKind } from "./resolve-kind.js";
 import { findPkColumn } from "./pk.js";
 import { isAutoManagedTimestampColumn, type TableDef } from "./table.js";
 import { logger } from "../db/logger.js";
+import { findRowLabelColumns } from "../data/row-label.js";
 import type {
   ChildSchema,
   ColumnSchema,
@@ -104,8 +105,10 @@ export function extractSchemas(defs: readonly TableDef[]): TableSchema[] {
       return colSchema;
     });
 
-    // Parent PK — needed to synthesize row-level drill-into links below.
+    // Parent PK — needed to synthesize row-level drill-into links and as the
+    // guaranteed row-label fallback for tables without a text label column.
     const parentPkName = findPkColumn(schema).name;
+    const rowLabelColumns = findRowLabelColumns(schema) ?? [parentPkName];
 
     // Resolve children
     const children: ChildSchema[] = [];
@@ -160,7 +163,7 @@ export function extractSchemas(defs: readonly TableDef[]): TableSchema[] {
       columns,
       children,
       ...(rowLinks.length > 0 ? { rowLinks } : {}),
-      rowLabelColumns: schema.meta.rowLabelColumns,
+      rowLabelColumns,
       ...(schema.meta.search
         ? { search: { columns: schema.meta.search.columns } }
         : {}),

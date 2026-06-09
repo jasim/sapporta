@@ -13,8 +13,11 @@ import { cn } from "@sapporta/ui";
 export type GridChromeContext = {
   path: GridPath;
   levelName: string;
+  presentation: GridPresentation;
   schema: ColumnSchema[];
 };
+
+export type GridPresentation = "tabular" | "cards";
 
 // Paint-only chrome wrapper. Body composition belongs to GridLevel — Grid
 // renders whatever `children` it is handed inside its container so the
@@ -52,11 +55,13 @@ export function Grid({
   renderLevelHeader,
   levelContainerClassName,
   levelContainerStyle,
+  presentation = "tabular",
   children,
 }: {
   path: GridPath;
   schema: ColumnSchema[];
   controller: GridControllerPublic;
+  presentation?: GridPresentation;
   renderLevelHeader?: (ctx: GridChromeContext) => ReactNode;
   levelContainerClassName?: (ctx: GridChromeContext) => string | undefined;
   levelContainerStyle?: (ctx: GridChromeContext) => CSSProperties | undefined;
@@ -69,7 +74,12 @@ export function Grid({
       ? s.cellCursor?.path === path
       : s.rowCursor?.path === path,
   );
-  const chromeContext = { path, levelName: levelNameFromPath(path), schema };
+  const chromeContext = {
+    path,
+    levelName: levelNameFromPath(path),
+    presentation,
+    schema,
+  };
   const header = renderLevelHeader?.(chromeContext);
   const className = levelContainerClassName?.(chromeContext);
   const style = levelContainerStyle?.(chromeContext);
@@ -87,13 +97,15 @@ export function Grid({
       if (closest !== node) return;
       // handleKey returns true iff it consumed the event — that's the only
       // signal we need to decide whether to suppress browser defaults.
-      if (controller.handleKey(e)) e.preventDefault();
+      if (controller.handleKey(e, presentation)) {
+        e.preventDefault();
+      }
     }
     node.addEventListener("keydown", onKeyDown);
     return () => {
       node.removeEventListener("keydown", onKeyDown);
     };
-  }, [controller]);
+  }, [controller, presentation]);
 
   return (
     <div
@@ -102,12 +114,13 @@ export function Grid({
       tabIndex={0}
       role="grid"
       data-grid-part="root"
+      data-grid-presentation={presentation}
       data-grid-path={path}
       data-grid-depth={depth}
       data-active={String(isActive)}
       style={{ position: "relative", outline: "none", ...style }}
     >
-      {header ?? <GridHeader schema={schema} />}
+      {header ?? (presentation === "tabular" ? <GridHeader schema={schema} /> : null)}
       {children}
       <CellEditorOverlay
         containerRef={containerRef}

@@ -1,4 +1,4 @@
-import { useMemo, type CSSProperties } from "react";
+import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import {
   trailingEdge,
   GridLevel,
@@ -6,6 +6,7 @@ import {
   rootPath,
   type GridChromeContext,
   type GridLevelChrome,
+  type GridPresentation,
   type GridRuntime,
 } from "@sapporta/grid";
 import { columnPreset } from "@sapporta/grid/column-preset";
@@ -23,6 +24,10 @@ import type { TGridRowsByLevel } from "@/table/grid-adapter/tgrid-types";
 import type { TGridLevelQueryState } from "@/table/state/tgrid-level-query-state";
 import type { TGridSession } from "@/table/state/tgrid-session";
 import type { TGridLevelInfo } from "@/table/grid-adapter/tgrid-level-config";
+
+export type TGridView = GridPresentation | "auto";
+export type TGridViewMode = TGridView;
+type TGridViewportBand = "compact" | "expanded";
 
 export type ViewRelatedRowsOption =
   | boolean
@@ -66,11 +71,13 @@ export function TGrid<
   className,
   style,
   viewRelatedRows,
+  view = "auto",
 }: {
   session: TGridSession<RowsByLevel, AppServices>;
   className?: string;
   style?: CSSProperties;
   viewRelatedRows?: ViewRelatedRowsOption;
+  view?: TGridView;
 }) {
   const runtime = session.runtime;
   const sessionContext = session as TGridRenderableSessionContext;
@@ -101,6 +108,8 @@ export function TGrid<
       viewRelatedRows,
     });
   }, [className, root, sessionContext, style, viewRelatedRows]);
+  const viewport = useTGridViewportBand();
+  const presentation = resolveTGridPresentation(view, viewport);
 
   return (
     <GridRuntimeProvider runtime={runtime}>
@@ -109,10 +118,39 @@ export function TGrid<
           TGridRowsByLevel,
           unknown
         >,
-        <GridLevel path={root} chrome={chrome} />,
+        <GridLevel path={root} chrome={chrome} presentation={presentation} />,
       )}
     </GridRuntimeProvider>
   );
+}
+
+function resolveTGridPresentation(
+  view: TGridView,
+  viewport: TGridViewportBand,
+): GridPresentation {
+  if (view !== "auto") return view;
+  return viewport === "compact" ? "cards" : "tabular";
+}
+
+function useTGridViewportBand(): TGridViewportBand {
+  const [band, setBand] = useState<TGridViewportBand>(() =>
+    viewportBandForWidth(
+      typeof window === "undefined" ? 1024 : window.innerWidth,
+    ),
+  );
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const onResize = () => setBand(viewportBandForWidth(window.innerWidth));
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
+
+  return band;
+}
+
+function viewportBandForWidth(width: number): TGridViewportBand {
+  return width < 768 ? "compact" : "expanded";
 }
 
 function mergeTGridChrome({
@@ -131,12 +169,15 @@ function mergeTGridChrome({
   viewRelatedRows: ViewRelatedRowsOption | undefined;
 }): GridLevelChrome {
   return {
-    renderLevelHeader: (ctx) => (
-      <>
-        {chrome.renderLevelHeader?.(ctx)}
-        {renderRelatedRowsLink(session, ctx, root, viewRelatedRows)}
-      </>
-    ),
+    renderLevelHeader: (ctx) =>
+      ctx.presentation === "cards" ? (
+        renderCardsLevelHeader(session, ctx, root, viewRelatedRows)
+      ) : (
+        <>
+          {chrome.renderLevelHeader?.(ctx)}
+          {renderRelatedRowsLink(session, ctx, root, viewRelatedRows)}
+        </>
+      ),
     levelContainerClassName: (ctx) =>
       cn(chrome.levelContainerClassName?.(ctx), ctx.path === root && className),
     levelContainerStyle: (ctx) => ({
@@ -144,6 +185,42 @@ function mergeTGridChrome({
       ...(ctx.path === root ? style : undefined),
     }),
   };
+}
+
+function renderCardsLevelHeader(
+  session: TGridRenderableSessionContext,
+  ctx: GridChromeContext,
+  root: string,
+  option: ViewRelatedRowsOption | undefined,
+) {
+  if (ctx.path === root) return null;
+  const link = option ? resolveRelatedRowsLink(session, ctx, option) : null;
+
+  return (
+    <div
+      className="flex min-h-8 items-center justify-between gap-3 border-b border-sap-border/70 px-1 pb-2 pt-1"
+      data-grid-part="cards-level-header"
+    >
+      <div
+        className="min-w-0 truncate text-[11px] font-bold uppercase tracking-sap-head text-sap-soft"
+        data-grid-part="cards-level-title"
+        title={ctx.levelName}
+      >
+        {compactLevelName(ctx.levelName)}
+      </div>
+      {link ? (
+        <a
+          href={link.href}
+          target={link.target}
+          rel={link.target === "_blank" ? "noreferrer" : undefined}
+          className="shrink-0 text-xs font-medium text-sap-accent hover:underline"
+          data-grid-part="cards-level-link"
+        >
+          {link.label}
+        </a>
+      ) : null}
+    </div>
+  );
 }
 
 function renderRelatedRowsLink(
@@ -216,4 +293,9 @@ function resolveRelatedRowsLink(
     label: config.label ?? "View in table",
     target: config.target ?? "_self",
   };
+}
+
+function compactLevelName(levelName: string): string {
+  const dot = levelName.lastIndexOf(".");
+  return dot >= 0 ? levelName.slice(dot + 1) : levelName;
 }

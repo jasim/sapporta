@@ -15,6 +15,7 @@ import type { TGridSession } from "@/table/state/tgrid-session";
 import { TGrid, type ViewRelatedRowsOption } from "./TGrid";
 import { TableGridSurface } from "./TableGridSurface";
 import { TableToolbar, type TableToolbarProps } from "./TableToolbar";
+import { TableViewSwitch } from "./TableViewSwitch";
 import {
   useTableGridUrlState,
   type TableGridRoute,
@@ -27,6 +28,7 @@ import {
   tableLoadErrorMessage,
   useTGridSourceStatus,
 } from "./tgrid-source-status";
+import { useTableViewPreference } from "./table-view-pref";
 
 // A custom toolbar receives the same ready-to-render props as the default
 // toolbar, plus the live session for advanced actions such as row reloads.
@@ -209,6 +211,10 @@ function TableGridViewWithSession<
     session.queryStore,
     (state) => state.errorBanner,
   );
+  const tableView = useTableViewPreference(table.name);
+  const viewControl = (
+    <TableViewSwitch value={tableView.view} onChange={tableView.setView} />
+  );
 
   return (
     <TableGridSurface
@@ -224,13 +230,14 @@ function TableGridViewWithSession<
           session={session}
           className={gridClassName}
           viewRelatedRows={viewRelatedRows}
+          view={tableView.view}
         />
       }
       toolbar={
         toolbar === false ? null : toolbar ? (
-          toolbar({ session, props: toolbarProps })
+          toolbar({ session, props: { ...toolbarProps, viewControl } })
         ) : (
-          <TableToolbar {...toolbarProps} />
+          <TableToolbar {...toolbarProps} viewControl={viewControl} />
         )
       }
       pagination={

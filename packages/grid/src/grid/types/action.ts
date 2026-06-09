@@ -88,4 +88,7 @@ export type RowNavigationIntent =
   | { type: "moveActiveRowEdge"; edge: "first" | "last"; extend: boolean }
   | { type: "focusFirstRow" }
   | { type: "toggleActiveRowSelection" }
-  | { type: "clearRowSelection" };
+  | { type: "clearRowSelection" }
+  | { type: "expandActiveRow" }
+  | { type: "collapseActiveRow" }
+  | { type: "toggleActiveRowExpansion" };

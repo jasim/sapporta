@@ -15,6 +15,12 @@
   outline: none;
 }
 
+.root[data-grid-presentation="cards"] {
+  display: block;
+  min-width: 0;
+  padding-inline: 0;
+}
+
 :where(.root) [data-grid-part="header"],
 :where(.root) [data-grid-part="body"] {
   display: grid;
@@ -32,6 +38,45 @@
 
 :where(.root) [data-grid-part="row"] {
   position: relative;
+}
+
+:where(.root[data-grid-presentation="cards"]) [data-grid-part="body"] {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+:where(.root[data-grid-presentation="cards"]) [data-grid-part="row"] {
+  display: flex;
+  flex-direction: column;
+  grid-column: auto;
+  min-width: 0;
+}
+
+:where(.root[data-grid-presentation="cards"]) [data-grid-part="row-field"] {
+  box-sizing: border-box;
+  display: grid;
+  min-width: 0;
+}
+
+:where(.root[data-grid-presentation="cards"]) [data-grid-part="row-field-label"] {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+:where(.root[data-grid-presentation="cards"]) [data-grid-part="row-field-cell"] {
+  min-width: 0;
+}
+
+:where(.root[data-grid-presentation="cards"]) [data-grid-part="row-field-cell"]
+  > [data-grid-part="cell"] {
+  min-height: 0;
+}
+
+:where(.root[data-grid-presentation="cards"]) [data-grid-part="child-level"] {
+  min-width: 0;
 }
 
 :where(.root) [data-grid-part="body"] > [data-grid-part="child-level"],

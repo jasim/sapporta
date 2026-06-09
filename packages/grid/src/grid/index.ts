@@ -397,6 +397,7 @@ export {
   ExpandCell,
   type GridChromeContext,
   type GridLevelChrome,
+  type GridPresentation,
 } from "./react";
 
 export { inMemoryGridDataSource, restGridDataSource } from "./data-sources";

@@ -3,7 +3,11 @@ import { useStore } from "zustand";
 import type { ColId, GridPath } from "../types/identity";
 import type { ColumnSchema } from "../types/schema";
 import { EmptyLevel } from "./EmptyLevel";
-import { Grid, type GridChromeContext } from "./Grid";
+import {
+  Grid,
+  type GridChromeContext,
+  type GridPresentation,
+} from "./Grid";
 import { GridRow } from "./cells/GridRow";
 import { LevelStatusBand } from "./LevelStatusBand";
 import {
@@ -47,9 +51,11 @@ export type GridLevelChrome = {
 export function GridLevel({
   path,
   chrome,
+  presentation = "tabular",
 }: {
   path: GridPath;
   chrome?: GridLevelChrome;
+  presentation?: GridPresentation;
 }) {
   const runtime = useGridRuntime();
   const controller = runtime.controllerFor(path);
@@ -64,6 +70,7 @@ export function GridLevel({
         path={path}
         schema={schema}
         controller={controller}
+        presentation={presentation}
         renderLevelHeader={chrome?.renderLevelHeader}
         levelContainerClassName={chrome?.levelContainerClassName}
         levelContainerStyle={chrome?.levelContainerStyle}
@@ -73,6 +80,7 @@ export function GridLevel({
           schema={schema}
           colOrder={colOrder}
           chrome={chrome}
+          presentation={presentation}
         />
       </Grid>
       <EmptyLevel path={path} />
@@ -85,11 +93,13 @@ function DisplayedRowsBody({
   schema,
   colOrder,
   chrome,
+  presentation,
 }: {
   path: GridPath;
   schema: ColumnSchema[];
   colOrder: readonly ColId[];
   chrome?: GridLevelChrome;
+  presentation: GridPresentation;
 }) {
   const runtime = useGridRuntime();
   // Body mapping subscribes to row refs, not `LevelRow` objects. A cell edit
@@ -111,13 +121,19 @@ function DisplayedRowsBody({
               schema={schema}
               path={path}
               colOrder={colOrder}
+              presentation={presentation}
               rowInteractionStatus={rowInteractionStatusFor(
                 rowRef.id,
                 rowInteraction,
               )}
             />
             {childPaths?.map((cp) => (
-              <ChildLevelMount key={cp} path={cp} chrome={chrome} />
+              <ChildLevelMount
+                key={cp}
+                path={cp}
+                chrome={chrome}
+                presentation={presentation}
+              />
             ))}
           </Fragment>
         );
@@ -140,15 +156,17 @@ function DisplayedRowsBody({
 function ChildLevelMount({
   path,
   chrome,
+  presentation,
 }: {
   path: GridPath;
   chrome?: GridLevelChrome;
+  presentation: GridPresentation;
 }) {
   const snapshot = useLevelSnapshot(path);
   return (
     <div data-grid-part="child-level">
       {snapshot.status === "ready" ? (
-        <GridLevel path={path} chrome={chrome} />
+        <GridLevel path={path} chrome={chrome} presentation={presentation} />
       ) : (
         <LevelStatusBand path={path} />
       )}

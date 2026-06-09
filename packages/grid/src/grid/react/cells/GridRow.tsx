@@ -1,9 +1,10 @@
 import { createContext, memo, useContext, type ReactNode } from "react";
-import type { GridPath, ColId, RowId } from "../../types/identity";
+import type { ColId, GridPath, RowId } from "../../types/identity";
 import type { RowInteractionStatus } from "../../types/row-selection";
 import type { ColumnSchema } from "../../types/schema";
 import { capabilitiesFor } from "../../types/capabilities";
 import { useDisplayedRow, useGridRuntime } from "../GridRuntimeProvider";
+import type { GridPresentation } from "../Grid";
 import { GridDataCell } from "./GridDataCell";
 
 export type RowChromeState = {
@@ -33,12 +34,14 @@ export const GridRow = memo(function GridRow({
   schema,
   path,
   colOrder,
+  presentation = "tabular",
   rowInteractionStatus,
 }: {
   rowId: RowId;
   schema: ColumnSchema[];
   path: GridPath;
   colOrder: readonly ColId[];
+  presentation?: GridPresentation;
   rowInteractionStatus: RowInteractionStatus;
 }) {
   const runtime = useGridRuntime();
@@ -53,6 +56,7 @@ export const GridRow = memo(function GridRow({
       data-row-kind={row.kind}
       data-row-active={active ? "true" : undefined}
       data-row-selected={selected ? "true" : undefined}
+      data-row-presentation={presentation}
       data-row-interaction-status={rowInteractionStatus}
       data-row-selectable={String(capabilitiesFor(row.kind).rowSelectable)}
       aria-selected={selected ? true : undefined}
@@ -77,18 +81,57 @@ export const GridRow = memo(function GridRow({
     >
       <RowInteractionStatusProvider status={rowInteractionStatus}>
         {schema.map((col) => (
-          <GridDataCell
+          <RowCellSlot
             key={col.id}
-            row={row}
             column={col}
-            path={path}
-            colOrder={colOrder}
-          />
+            presentation={presentation}
+          >
+            <GridDataCell
+              row={row}
+              column={col}
+              path={path}
+              colOrder={colOrder}
+            />
+          </RowCellSlot>
         ))}
       </RowInteractionStatusProvider>
     </div>
   );
 });
+
+function RowCellSlot({
+  column,
+  presentation,
+  children,
+}: {
+  column: ColumnSchema;
+  presentation: GridPresentation;
+  children: ReactNode;
+}) {
+  if (presentation === "tabular") return children;
+  const displayType = displayTypeOf(column);
+  return (
+    <div
+      data-grid-part="row-field"
+      data-col-id={column.id}
+      data-col-name={column.name}
+      data-display-type={displayType}
+    >
+      <div data-grid-part="row-field-label">{column.name}</div>
+      <div data-grid-part="row-field-cell">{children}</div>
+    </div>
+  );
+}
+
+function displayTypeOf(column: ColumnSchema): string | undefined {
+  if (!isRecord(column.meta)) return undefined;
+  const value = column.meta.displayType;
+  return typeof value === "string" ? value : undefined;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
 
 const CurrentRowInteractionStatusContext =
   createContext<RowInteractionStatus>("idle");

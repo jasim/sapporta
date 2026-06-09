@@ -9,15 +9,16 @@ export function chrome<TMeta = unknown, TFilter = unknown>(
   options: PresetChromeOptions<TMeta, TFilter> = {},
 ): GridLevelChrome {
   return {
-    renderLevelHeader: ({ path, levelName, schema }) => (
-      <ColumnPresetHeader
-        path={path}
-        levelName={levelName}
-        schema={schema}
-        options={options}
-      />
-    ),
-    levelContainerClassName: () => styles.presetGrid,
+    renderLevelHeader: ({ path, levelName, presentation, schema }) =>
+      presentation === "tabular" ? (
+        <ColumnPresetHeader
+          path={path}
+          levelName={levelName}
+          schema={schema}
+          options={options}
+        />
+      ) : null,
+    levelContainerClassName: () => `${styles.presetGrid} sapporta-table-grid`,
     levelContainerStyle: ({ schema }) => {
       return {
         "--grid-template-columns": templateColumns(schema),

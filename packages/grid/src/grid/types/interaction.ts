@@ -47,6 +47,15 @@ export type SelectedCellsConfig =
   | { kind: "none" }
   | { kind: "range" };
 
+export type CellArrowKeyBehavior = "grid" | "field-list";
+
+export type ActiveCellKeyboardConfig = {
+  arrows: {
+    tabular: CellArrowKeyBehavior;
+    cards: CellArrowKeyBehavior;
+  };
+};
+
 export type CellGridActiveRowConfig =
   | { kind: "none" }
   // Active row is a derived view of the active cell's row. No row cursor is
@@ -56,6 +65,7 @@ export type CellGridActiveRowConfig =
 export type ActiveRowKeyboardConfig = {
   arrows: "move-active-row";
   shiftArrows: "extend-selected-rows" | "move-active-row";
+  expansion: "left-right-enter" | "none";
 };
 
 export type RowListActiveRowConfig = {
@@ -68,7 +78,7 @@ export type RowListActiveRowConfig = {
 
 export type CellGridInteractionConfig = {
   mode: "cell-grid";
-  activeCell: { kind: "enabled" };
+  activeCell: { kind: "enabled"; keyboard: ActiveCellKeyboardConfig };
   selectedCells: SelectedCellsConfig;
   activeRow: CellGridActiveRowConfig;
   selectedRows: SelectedRowsConfig;
@@ -88,7 +98,10 @@ export type GridInteractionConfig =
 
 export const CELL_EDITING_GRID = {
   mode: "cell-grid",
-  activeCell: { kind: "enabled" },
+  activeCell: {
+    kind: "enabled",
+    keyboard: { arrows: { tabular: "grid", cards: "field-list" } },
+  },
   selectedCells: { kind: "range" },
   activeRow: { kind: "none" },
   selectedRows: { kind: "none" },
@@ -96,7 +109,10 @@ export const CELL_EDITING_GRID = {
 
 export const CELL_EDITING_NO_SELECTION_GRID = {
   mode: "cell-grid",
-  activeCell: { kind: "enabled" },
+  activeCell: {
+    kind: "enabled",
+    keyboard: { arrows: { tabular: "grid", cards: "field-list" } },
+  },
   selectedCells: { kind: "none" },
   activeRow: { kind: "none" },
   selectedRows: { kind: "none" },
@@ -104,7 +120,10 @@ export const CELL_EDITING_NO_SELECTION_GRID = {
 
 export const CELL_GRID_WITH_ACTIVE_ROW = {
   mode: "cell-grid",
-  activeCell: { kind: "enabled" },
+  activeCell: {
+    kind: "enabled",
+    keyboard: { arrows: { tabular: "grid", cards: "field-list" } },
+  },
   selectedCells: { kind: "range" },
   activeRow: { kind: "from-active-cell" },
   selectedRows: { kind: "none" },
@@ -112,7 +131,10 @@ export const CELL_GRID_WITH_ACTIVE_ROW = {
 
 export const CELL_GRID_WITH_INDEPENDENT_ROW_SELECTION = {
   mode: "cell-grid",
-  activeCell: { kind: "enabled" },
+  activeCell: {
+    kind: "enabled",
+    keyboard: { arrows: { tabular: "grid", cards: "field-list" } },
+  },
   selectedCells: { kind: "range" },
   activeRow: { kind: "from-active-cell" },
   selectedRows: {
@@ -125,7 +147,10 @@ export const CELL_GRID_WITH_INDEPENDENT_ROW_SELECTION = {
 
 export const CELL_PRIMARY_WITH_SIDE_PANEL_ROW = {
   mode: "cell-grid",
-  activeCell: { kind: "enabled" },
+  activeCell: {
+    kind: "enabled",
+    keyboard: { arrows: { tabular: "grid", cards: "field-list" } },
+  },
   selectedCells: { kind: "range" },
   activeRow: { kind: "from-active-cell" },
   selectedRows: {
@@ -138,7 +163,10 @@ export const CELL_PRIMARY_WITH_SIDE_PANEL_ROW = {
 
 export const CELL_PRIMARY_WITH_SELECTED_SIDE_PANEL_ROW = {
   mode: "cell-grid",
-  activeCell: { kind: "enabled" },
+  activeCell: {
+    kind: "enabled",
+    keyboard: { arrows: { tabular: "grid", cards: "field-list" } },
+  },
   selectedCells: { kind: "range" },
   activeRow: { kind: "from-active-cell" },
   selectedRows: {
@@ -155,7 +183,11 @@ export const ROW_PRIMARY_MASTER_DETAIL = {
   selectedCells: { kind: "none" },
   activeRow: {
     kind: "from-row-cursor",
-    keyboard: { arrows: "move-active-row", shiftArrows: "move-active-row" },
+    keyboard: {
+      arrows: "move-active-row",
+      shiftArrows: "move-active-row",
+      expansion: "left-right-enter",
+    },
   },
   selectedRows: {
     kind: "enabled",
@@ -174,6 +206,7 @@ export const ROW_MULTISELECT_LIST = {
     keyboard: {
       arrows: "move-active-row",
       shiftArrows: "extend-selected-rows",
+      expansion: "none",
     },
   },
   selectedRows: {

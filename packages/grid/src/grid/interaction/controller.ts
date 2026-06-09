@@ -41,7 +41,11 @@
 // For the four-channel invariant this wires into, see `index.ts`.
 
 import { createStore, type StoreApi } from "zustand/vanilla";
-import { keyEventToCellIntent, keyEventToRowIntent } from "./key-handling";
+import {
+  keyEventToCellIntent,
+  keyEventToRowIntent,
+  type CellKeyboardPresentation,
+} from "./key-handling";
 import type {
   ColumnSchema,
   EditTrigger,
@@ -78,7 +82,7 @@ export interface GridControllerPublicVerbs {
   clearRowSelection: () => void;
   // host I/O — stable; bound once to DOM by Grid.tsx. Returns true if the
   // event was consumed (caller should preventDefault), false otherwise.
-  handleKey: (e: KeyboardEvent) => boolean;
+  handleKey: (e: KeyboardEvent, presentation?: CellKeyboardPresentation) => boolean;
   // Explicit viewport reveal. This is deliberately not part of cursor
   // placement: pointer clicks should be able to move focus without moving
   // visible content, while keyboard-style navigation can reveal its resolved
@@ -285,6 +289,9 @@ export function createGridController(
       case "moveActiveRowDelta":
       case "moveActiveRowEdge":
       case "toggleActiveRowSelection":
+      case "expandActiveRow":
+      case "collapseActiveRow":
+      case "toggleActiveRowExpansion":
         args.onNavigateRow?.(intent);
         return !!args.onNavigateRow;
     }
@@ -307,7 +314,7 @@ export function createGridController(
     }
   };
 
-  store.handleKey = (e) => {
+  store.handleKey = (e, presentation) => {
     const state = store.getState();
     const displayed = args.getDisplayed();
     // Mode owns keyboard routing. The controller does not ask which UI element
@@ -322,6 +329,7 @@ export function createGridController(
             displayed,
             args.getSchema(),
             args.capabilitiesFor,
+            presentation,
           )
         : keyEventToRowIntent(e, args.interaction, state, displayed);
     if (!intent) return false;

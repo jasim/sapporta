@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { Plus, Download, Search, X } from "lucide-react";
 import { TopBar, TopBarButton } from "@/shell/components/TopBar";
 import { FilterCardsBar } from "@/table/filters/FilterCardsBar";
@@ -24,6 +24,7 @@ export type TableToolbarProps = {
   onSearchChange: (q: string | null) => void;
   onClearSort: () => void;
   onNewRecord?: () => void;
+  viewControl?: ReactNode;
 };
 
 // Standard table controls as plain props.
@@ -44,6 +45,7 @@ export function TableToolbar({
   onSearchChange,
   onClearSort,
   onNewRecord,
+  viewControl,
 }: TableToolbarProps) {
   return (
     <>
@@ -53,6 +55,7 @@ export function TableToolbar({
         subtitle={`${totalCount} record${totalCount !== 1 ? "s" : ""}`}
         actions={
           <>
+            {viewControl}
             {searchable && (
               <SearchInput value={search} onChange={onSearchChange} />
             )}

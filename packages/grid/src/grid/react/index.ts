@@ -15,7 +15,12 @@ export {
 } from "./GridRuntimeProvider";
 
 export { GridLevel, type GridLevelChrome } from "./GridLevel";
-export { Grid, levelNameFromPath, type GridChromeContext } from "./Grid";
+export {
+  Grid,
+  levelNameFromPath,
+  type GridChromeContext,
+  type GridPresentation,
+} from "./Grid";
 export { GridHeader } from "./GridHeader";
 export { LevelStatusBand } from "./LevelStatusBand";
 export { EmptyLevel } from "./EmptyLevel";
