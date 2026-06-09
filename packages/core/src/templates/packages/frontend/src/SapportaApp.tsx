@@ -3,7 +3,7 @@ import { Route, Routes, useNavigate } from "react-router-dom";
 import { AppShell, setNavigate } from "@sapporta/frontend/app";
 import { BootLoader } from "@sapporta/frontend/app";
 import { AuthGate, useAuthStore } from "@sapporta/frontend/auth/runtime";
-import { AppSidebar, appHomeRoute, appRoutes } from "./App";
+import { appHomeRoute, appNavigation, appRoutes } from "./App";
 import {
   sapportaNotFoundRoute,
   sapportaProtectedRoutes,
@@ -26,7 +26,7 @@ export function SapportaApp() {
           <AuthGate>
             <BootLoader>
               <AppShell
-                sidebarContent={<AppSidebar />}
+                navigation={appNavigation}
                 showFrameworkNavigation={isOwner}
               />
             </BootLoader>

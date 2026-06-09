@@ -1,15 +1,18 @@
-import { type ReactNode } from "react";
+import { type ReactNode, useMemo, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { Database, FileText } from "lucide-react";
+import { ListFilter, Search } from "lucide-react";
 import { useSchemaStore } from "@/schema-catalog/state/schema-store";
 import { AuthAccountMenu } from "./AuthAccountMenu";
 import { SidebarShell } from "./SidebarShell";
+import {
+  isNavigationItemActive,
+  navigationItems,
+  type Navigation,
+  type NavigationItem,
+} from "../navigation";
 
-export interface AppSidebarProps {
-  /** Rendered ABOVE the Tables/Reports sections. Intended for app-chrome
-   *  the host wants to inject (e.g. custom view links). */
-  sidebarContent?: ReactNode;
-  showFrameworkNavigation?: boolean;
+export interface NavigationShellProps {
+  navigation: Navigation;
 }
 
 export function SapportaMark({ size = 17 }: { size?: number }) {
@@ -40,47 +43,44 @@ function SidebarHeader() {
   );
 }
 
-/** Section label for the sidebar (`VIEWS` / `TABLES` / `REPORTS`). Exported
- *  so host projects injecting content via `sidebarContent` can render a
- *  matching label above their own nav items. */
-export function SidebarSectionLabel({
+export function NavSection({
+  label,
   children,
-  action,
 }: {
+  label: ReactNode;
   children: ReactNode;
-  action?: ReactNode;
 }) {
   return (
-    <div className="mt-[18px] mb-[6px] px-[2px] flex items-center justify-between text-sap-label font-bold uppercase tracking-sap-section text-sap-subtle">
-      <span>{children}</span>
-      {action}
-    </div>
+    <section>
+      <div className="mt-[18px] mb-[6px] px-[2px] flex items-center justify-between text-sap-label font-bold uppercase tracking-sap-section text-sap-subtle">
+        <span>{label}</span>
+      </div>
+      <div>{children}</div>
+    </section>
   );
 }
 
-/** Sidebar navigation row. Active state: rounded active-nav background and
- *  the icon is replaced by a ▸ caret.
- *
- *  Exported so host projects can render Views-section entries that match
- *  the library's Tables/Reports items pixel-for-pixel. */
-export function SidebarNavItem({
-  to,
-  icon,
-  label,
+export function NavItem({
+  item,
   active,
-  count,
+  compact = false,
 }: {
-  to: string;
-  icon: ReactNode;
-  label: string;
+  item: NavigationItem;
   active: boolean;
-  count?: number;
+  compact?: boolean;
 }) {
+  const Icon = item.icon;
+
   return (
     <Link
-      to={to}
+      to={item.to}
+      title={compact ? item.label : undefined}
+      aria-label={compact ? item.label : undefined}
       className={cx(
-        "flex items-center gap-2 h-[28px] rounded-[6px] px-2 text-sap-body no-underline",
+        "flex items-center rounded-[6px] text-sap-body no-underline",
+        compact
+          ? "h-10 w-10 justify-center"
+          : "gap-2 h-[28px] px-2",
         active
           ? "bg-sap-active-nav text-sap-fg font-[650]"
           : "text-sap-soft hover:bg-sap-row-hover",
@@ -88,90 +88,214 @@ export function SidebarNavItem({
     >
       <span
         className={cx(
-          "w-[14px] h-[14px] inline-flex items-center justify-center shrink-0",
+          "inline-flex items-center justify-center shrink-0",
+          compact ? "h-5 w-5" : "w-[14px] h-[14px]",
           active ? "text-sap-brand mono text-sap-data" : "text-sap-subtle",
         )}
       >
-        {active ? "▸" : icon}
+        {active && !compact ? (
+          "▸"
+        ) : Icon ? (
+          <Icon
+            className={compact ? "h-[17px] w-[17px]" : "h-[12px] w-[12px]"}
+            strokeWidth={1.5}
+          />
+        ) : (
+          <span className="h-[6px] w-[6px] rounded-full bg-current" />
+        )}
       </span>
-      <span className="flex-1 min-w-0 truncate">{label}</span>
-      {count != null && (
-        <span className="text-sap-label font-medium text-sap-subtle bg-sap-nav-count rounded-[4px] px-[5px] py-[1px]">
-          {count}
-        </span>
+      {!compact && (
+        <span className="flex-1 min-w-0 truncate">{item.label}</span>
       )}
     </Link>
   );
 }
 
-export function AppSidebar({
-  sidebarContent,
-  showFrameworkNavigation = true,
-}: AppSidebarProps) {
-  const { tables, reports, loading } = useSchemaStore();
+export function DesktopSidebar({ navigation }: NavigationShellProps) {
   const location = useLocation();
 
   return (
     <SidebarShell header={<SidebarHeader />} footer={<DefaultSidebarFooter />}>
-      {sidebarContent}
-
-      {showFrameworkNavigation && (
-        <>
-          <SidebarSectionLabel>Tables</SidebarSectionLabel>
-
-          {loading && (
-            <div className="px-[14px] py-3 text-sap-data text-sap-muted">
-              Loading…
-            </div>
-          )}
-
-          {tables.map((table) => {
-            const tablePath = `/tables/${table.name}`;
-            const active = location.pathname.startsWith(tablePath);
-            return (
-              <SidebarNavItem
-                key={table.name}
-                to={tablePath}
-                icon={
-                  <Database className="h-[12px] w-[12px]" strokeWidth={1.5} />
-                }
-                label={table.label}
-                active={active}
-              />
-            );
-          })}
-
-          {reports.length > 0 && (
-            <>
-              <SidebarSectionLabel>Reports</SidebarSectionLabel>
-              {reports.map((report) => {
-                const reportPath = `/reports/${report.name}`;
-                const active = location.pathname.startsWith(reportPath);
-                return (
-                  <SidebarNavItem
-                    key={report.name}
-                    to={reportPath}
-                    icon={
-                      <FileText
-                        className="h-[12px] w-[12px]"
-                        strokeWidth={1.5}
-                      />
-                    }
-                    label={report.label}
-                    active={active}
-                  />
-                );
-              })}
-            </>
-          )}
-        </>
-      )}
+      {navigation.map((section) => (
+        <NavSection key={section.label} label={section.label}>
+          {section.items.map((item) => (
+            <NavItem
+              key={item.to}
+              item={item}
+              active={isNavigationItemActive(item, location)}
+            />
+          ))}
+        </NavSection>
+      ))}
     </SidebarShell>
+  );
+}
+
+export function NavigationRail({ navigation }: NavigationShellProps) {
+  const location = useLocation();
+  const allItems = navigationItems(navigation);
+  const activeItem = allItems.find((item) =>
+    isNavigationItemActive(item, location),
+  );
+  const items = activeItem
+    ? includeActiveRailItem(allItems.slice(0, 8), activeItem)
+    : allItems.slice(0, 8);
+
+  return (
+    <aside className="hidden md:flex lg:hidden w-[64px] shrink-0 border-r border-sap-border-soft bg-sap-sidebar text-sap-fg flex-col items-center h-full py-4">
+      <SapportaMark size={20} />
+      <nav className="mt-6 flex flex-col gap-1">
+        {items.map((item) => (
+          <NavItem
+            key={item.to}
+            item={item}
+            active={isNavigationItemActive(item, location)}
+            compact
+          />
+        ))}
+      </nav>
+      <div className="flex-1" />
+      <NavigationPicker navigation={navigation} trigger="rail" />
+    </aside>
+  );
+}
+
+export function MobileBottomNav({
+  navigation,
+  pickerNavigation,
+}: NavigationShellProps & { pickerNavigation: Navigation }) {
+  const location = useLocation();
+  const stableItems = navigationItems(navigation).slice(0, 3);
+
+  return (
+    <nav className="md:hidden fixed inset-x-0 bottom-[var(--height-sap-bar)] z-[var(--sap-z-shell-sticky)] h-[56px] border-t border-sap-border bg-sap-sidebar px-2 flex items-center justify-around">
+      {stableItems.map((item) => {
+        const active = isNavigationItemActive(item, location);
+        const Icon = item.icon;
+        return (
+          <Link
+            key={item.to}
+            to={item.to}
+            className={cx(
+              "min-w-[56px] h-12 px-2 rounded-[6px] flex flex-col items-center justify-center gap-1 text-sap-label no-underline",
+              active
+                ? "text-sap-fg bg-sap-active-nav font-[650]"
+                : "text-sap-soft",
+            )}
+          >
+            {Icon ? (
+              <Icon className="h-[16px] w-[16px]" strokeWidth={1.5} />
+            ) : (
+              <span className="h-[6px] w-[6px] rounded-full bg-current" />
+            )}
+            <span className="max-w-[72px] truncate">{item.label}</span>
+          </Link>
+        );
+      })}
+      <NavigationPicker navigation={pickerNavigation} trigger="mobile" />
+    </nav>
+  );
+}
+
+export function NavigationPicker({
+  navigation,
+  trigger,
+}: NavigationShellProps & { trigger: "rail" | "mobile" }) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const location = useLocation();
+  const items = useMemo(() => {
+    const normalized = query.trim().toLowerCase();
+    return navigationItems(navigation).filter((item) => {
+      if (normalized.length === 0) {
+        return true;
+      }
+      return item.label.toLowerCase().includes(normalized);
+    });
+  }, [navigation, query]);
+
+  const buttonClass =
+    trigger === "rail"
+      ? "h-10 w-10 rounded-[6px] inline-flex items-center justify-center text-sap-soft hover:bg-sap-row-hover"
+      : "min-w-[56px] h-12 px-2 rounded-[6px] flex flex-col items-center justify-center gap-1 text-sap-label text-sap-soft";
+
+  return (
+    <div className="relative">
+      <button
+        type="button"
+        className={buttonClass}
+        title="Open navigation"
+        aria-label="Open navigation"
+        onClick={() => setOpen((value) => !value)}
+      >
+        <ListFilter className="h-[17px] w-[17px]" strokeWidth={1.5} />
+        {trigger === "mobile" && <span>Browse</span>}
+      </button>
+      {open && (
+        <div
+          className={cx(
+            "fixed z-[calc(var(--sap-z-shell-sticky)+1)] w-[min(360px,calc(100vw-24px))] rounded-[8px] border border-sap-border bg-sap-surface shadow-lg",
+            trigger === "rail"
+              ? "left-[76px] bottom-[44px]"
+              : "left-3 right-3 bottom-[calc(var(--height-sap-bar)+68px)]",
+          )}
+        >
+          <div className="p-2 border-b border-sap-border-soft flex items-center gap-2">
+            <Search className="h-[14px] w-[14px] text-sap-subtle" />
+            <input
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              autoFocus
+              placeholder="Find a table, report, or view"
+              className="min-w-0 flex-1 bg-transparent outline-none text-sap-body text-sap-fg placeholder:text-sap-muted"
+            />
+          </div>
+          <div className="max-h-[320px] overflow-y-auto p-2">
+            {items.map((item) => (
+              <Link
+                key={item.to}
+                to={item.to}
+                onClick={() => setOpen(false)}
+                className={cx(
+                  "flex items-center gap-2 h-9 rounded-[6px] px-2 text-sap-body no-underline",
+                  isNavigationItemActive(item, location)
+                    ? "bg-sap-active-nav text-sap-fg font-[650]"
+                    : "text-sap-soft hover:bg-sap-row-hover",
+                )}
+              >
+                {item.icon && (
+                  <item.icon className="h-[14px] w-[14px]" strokeWidth={1.5} />
+                )}
+                <span className="min-w-0 flex-1 truncate">{item.label}</span>
+              </Link>
+            ))}
+            {items.length === 0 && (
+              <div className="px-2 py-6 text-center text-sap-muted text-sap-body">
+                No matches
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
 
 function cx(...classes: Array<string | false | null | undefined>): string {
   return classes.filter(Boolean).join(" ");
+}
+
+function includeActiveRailItem(
+  visibleItems: NavigationItem[],
+  activeItem: NavigationItem,
+): NavigationItem[] {
+  if (visibleItems.some((item) => item.to === activeItem.to)) {
+    return visibleItems;
+  }
+  if (visibleItems.length < 8) {
+    return [...visibleItems, activeItem];
+  }
+  return [...visibleItems.slice(0, 7), activeItem];
 }
 
 function SidebarKbd({ children }: { children: ReactNode }) {

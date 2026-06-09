@@ -88,12 +88,16 @@ export {
   type AuthAccountMenuProps,
 } from "@/shell/components/AuthAccountMenu";
 export {
-  AppSidebar,
   SapportaMark,
-  SidebarSectionLabel,
-  SidebarNavItem,
-  type AppSidebarProps,
 } from "@/shell/components/Sidebar";
 export { SidebarShell } from "@/shell/components/SidebarShell";
 export { TopBar } from "@/shell/components/TopBar";
 export { StatusBar } from "@/shell/components/StatusBar";
+export {
+  isNavigationItemActive,
+  navigationItems,
+  type Navigation,
+  type NavigationIcon,
+  type NavigationItem,
+  type NavigationSection,
+} from "@/shell/navigation";

@@ -1,25 +1,23 @@
-import { Route, Navigate, useLocation } from "react-router-dom";
-import { SidebarSectionLabel, SidebarNavItem } from "@sapporta/frontend/shell";
+import { Route, Navigate } from "react-router-dom";
+import type { Navigation } from "@sapporta/frontend/shell";
 import { Sparkles } from "lucide-react";
 import { Welcome } from "./Welcome";
 
 const welcomePath = "/welcome";
 
-// Add each domain screen here with its sidebar link and route.
-export function AppSidebar() {
-  const { pathname } = useLocation();
-  return (
-    <>
-      <SidebarSectionLabel>Views</SidebarSectionLabel>
-      <SidebarNavItem
-        to={welcomePath}
-        label="Welcome"
-        icon={<Sparkles className="h-[12px] w-[12px]" strokeWidth={1.5} />}
-        active={pathname.startsWith(welcomePath)}
-      />
-    </>
-  );
-}
+// Add each domain screen here with its navigation item and route.
+export const appNavigation: Navigation = [
+  {
+    label: "Views",
+    items: [
+      {
+        label: "Welcome",
+        icon: Sparkles,
+        to: welcomePath,
+      },
+    ],
+  },
+];
 
 // Change this when you want `/` to open a different screen.
 export const appHomeRoute = (

@@ -15,15 +15,19 @@ export {
   type AuthAccountMenuProps,
 } from "./components/AuthAccountMenu";
 export {
-  AppSidebar,
   SapportaMark,
-  SidebarNavItem,
-  SidebarSectionLabel,
-  type AppSidebarProps,
 } from "./components/Sidebar";
 export { SidebarShell } from "./components/SidebarShell";
 export { StatusBar } from "./components/StatusBar";
 export { TopBar, TopBarButton } from "./components/TopBar";
+export {
+  isNavigationItemActive,
+  navigationItems,
+  type Navigation,
+  type NavigationIcon,
+  type NavigationItem,
+  type NavigationSection,
+} from "./navigation";
 export {
   useHintsStore,
   useKeyHints,
