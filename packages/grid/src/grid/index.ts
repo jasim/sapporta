@@ -395,6 +395,7 @@ export {
   useRowInteractionSnapshot,
   GridLevel,
   ExpandCell,
+  type GridChromeContext,
   type GridLevelChrome,
 } from "./react";
 
@@ -487,6 +488,7 @@ export {
   ROW_PRIMARY_MASTER_DETAIL,
   rootPath,
   childPath,
+  trailingEdge,
   parseChildPath,
   makeRowId,
   pathOfRowId,

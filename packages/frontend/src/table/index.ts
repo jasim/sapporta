@@ -44,6 +44,10 @@ export {
 export * from "./lookup/tgrid-lookup-loading";
 export * from "./lookup/table-lookup-registry";
 export { TGrid } from "./page/TGrid";
+export type {
+  ViewRelatedRowsContext,
+  ViewRelatedRowsOption,
+} from "./page/TGrid";
 export { TablePage } from "./page/TablePage";
 export {
   TableGridSurface,

@@ -73,6 +73,7 @@ function TablePageWithSession({
           ? undefined
           : () => navigateToNewRecord(tableSchema.name)
       }
+      viewRelatedRows
     />
   );
 }

@@ -11,6 +11,7 @@ export type {
 export {
   rootPath,
   childPath,
+  trailingEdge,
   parseChildPath,
   makeRowId,
   pathOfRowId,

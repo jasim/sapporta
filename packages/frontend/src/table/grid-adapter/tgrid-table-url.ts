@@ -98,6 +98,29 @@ export function tableFilteredByUrl(
   return `/tables/${table}?${params.toString()}`;
 }
 
+export type RelatedRowsTableHrefInput = {
+  tableName: string;
+  foreignKey: string;
+  parentRowId: string;
+  routePath?: string;
+};
+
+export function relatedRowsTableHref({
+  tableName,
+  foreignKey,
+  parentRowId,
+  routePath = `/tables/${tableName}`,
+}: RelatedRowsTableHrefInput): string {
+  const params = buildTableSearchParams({
+    page: 1,
+    sort: undefined,
+    filters: [eqCondition(foreignKey, parentRowId)],
+    search: null,
+  });
+  const queryString = params.toString();
+  return `${routePath}${queryString ? `?${queryString}` : ""}`;
+}
+
 export function parseTableSearchParams(
   searchParams: URLSearchParams,
   validColIds: ReadonlySet<ColId>,

@@ -12,7 +12,7 @@ import type {
   TGridRowsByLevel,
 } from "@/table/grid-adapter/tgrid-types";
 import type { TGridSession } from "@/table/state/tgrid-session";
-import { TGrid } from "./TGrid";
+import { TGrid, type ViewRelatedRowsOption } from "./TGrid";
 import { TableGridSurface } from "./TableGridSurface";
 import { TableToolbar, type TableToolbarProps } from "./TableToolbar";
 import {
@@ -63,11 +63,11 @@ export type TableGridViewProps<
   searchParams: URLSearchParams;
   navigate: TableGridNavigate;
   services?: AppServices;
-  level?: TGridLevelId<RowsByLevel>;
   routePath?: string;
   registerAs?: string;
   loadLookups?: boolean;
   onNewRecord?: () => void;
+  viewRelatedRows?: ViewRelatedRowsOption;
   toolbar?:
     | false
     | ((
@@ -95,11 +95,11 @@ export function TableGridView<
   searchParams,
   navigate,
   services,
-  level,
   routePath,
   registerAs,
   loadLookups,
   onNewRecord,
+  viewRelatedRows,
   toolbar,
   pagination,
   className,
@@ -110,7 +110,7 @@ export function TableGridView<
     columns: table.columns,
     searchParams,
     navigate,
-    level: level ?? definition.rootLevel,
+    level: definition.rootLevel,
     routePath,
   });
 
@@ -142,6 +142,7 @@ export function TableGridView<
       routePath={urlState.routePath}
       urlState={urlState}
       onNewRecord={onNewRecord}
+      viewRelatedRows={viewRelatedRows}
       toolbar={toolbar}
       pagination={pagination}
       className={className}
@@ -162,6 +163,7 @@ function TableGridViewWithSession<
   routePath,
   urlState,
   onNewRecord,
+  viewRelatedRows,
   toolbar,
   pagination,
   className,
@@ -173,6 +175,7 @@ function TableGridViewWithSession<
   routePath: string;
   urlState: TableGridUrlStateBinding<RowsByLevel>;
   onNewRecord?: () => void;
+  viewRelatedRows?: ViewRelatedRowsOption;
   toolbar?:
     | false
     | ((
@@ -222,7 +225,13 @@ function TableGridViewWithSession<
       onDismissErrorBanner={() =>
         session.queryStore.getState().setErrorBanner(null)
       }
-      grid={<TGrid session={session} className={gridClassName} />}
+      grid={
+        <TGrid
+          session={session}
+          className={gridClassName}
+          viewRelatedRows={viewRelatedRows}
+        />
+      }
       toolbar={
         toolbar === false ? null : toolbar ? (
           toolbar({ session, props: toolbarProps })

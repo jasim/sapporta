@@ -2,6 +2,7 @@ import { describe, expect, test } from "vitest";
 import {
   buildTableSearchParams,
   parseTableSearchParams,
+  relatedRowsTableHref,
   sanitizeSortDescriptors,
 } from "./tgrid-table-url";
 import type { ColId } from "@sapporta/grid";
@@ -102,6 +103,29 @@ describe("buildTableSearchParams - sort", () => {
       search: null,
     });
     expect(sp.get("sort")).toBe("name,-created_at");
+  });
+});
+
+describe("relatedRowsTableHref", () => {
+  test("builds the default table route with a parent foreign-key filter", () => {
+    expect(
+      relatedRowsTableHref({
+        tableName: "order_lines",
+        foreignKey: "order_id",
+        parentRowId: "1001",
+      }),
+    ).toBe("/tables/order_lines?filter%5Border_id%5D%5Beq%5D=1001");
+  });
+
+  test("uses a custom route path with the same filter encoding", () => {
+    expect(
+      relatedRowsTableHref({
+        tableName: "order_lines",
+        foreignKey: "order_id",
+        parentRowId: "A&B",
+        routePath: "/orders/lines",
+      }),
+    ).toBe("/orders/lines?filter%5Border_id%5D%5Beq%5D=A%26B");
   });
 });
 
