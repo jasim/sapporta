@@ -71,7 +71,7 @@ export * from "./state/tgrid-level-query-state";
 export {
   createTGridSession,
   type CreateTGridSessionArgs,
-  type TGridHostQuerySeeds,
+  type TGridRouteQuerySeed,
   type TGridSession,
 } from "./state/tgrid-session";
 export {

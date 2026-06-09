@@ -57,7 +57,11 @@ const invoicesTable: TableSchema = {
     { name: "customer_id", kind: "text" },
     { name: "invoice_date", kind: "date" },
     { name: "due_date", kind: "date" },
-    { name: "status", kind: "text", select: { options: ["draft", "sent", "paid"] } },
+    {
+      name: "status",
+      kind: "text",
+      select: { options: ["draft", "sent", "paid"] },
+    },
   ],
   children: [],
   search: { columns: ["customer_id"] },
@@ -202,14 +206,16 @@ describe("TGRID-USAGE examples", () => {
           holdExpiresAt: "2026-05-23T10:30:00.000Z",
         }),
       },
-      hostQuerySeeds: {
+      routeQuerySeeds: {
         invoices: {
           sort: [{ colId: "invoice_date", direction: "desc" }],
         },
       },
     });
 
-    expect(session.runtime.schema.levels.invoices.columns.map((c) => c.id)).toEqual([
+    expect(
+      session.runtime.schema.levels.invoices.columns.map((c) => c.id),
+    ).toEqual([
       "customer_id",
       "invoice_date",
       "status",
@@ -224,7 +230,10 @@ describe("TGRID-USAGE examples", () => {
   });
 
   it("passes interaction presets from a TGrid definition into the runtime", () => {
-    const rowPrimaryDefinition = defineTGrid<InvoiceOnlyRowsByLevel, AppServices>({
+    const rowPrimaryDefinition = defineTGrid<
+      InvoiceOnlyRowsByLevel,
+      AppServices
+    >({
       rootLevel: "invoices",
       interaction: ROW_PRIMARY_MASTER_DETAIL,
       levels: {

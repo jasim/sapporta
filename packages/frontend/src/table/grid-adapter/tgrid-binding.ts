@@ -24,20 +24,18 @@ import type {
   TGridTableRow,
 } from "./tgrid-types";
 
-// Table schema constructor input without hardcoding `name`.
-// Lets callers pass shared table metadata and inject a runtime name separately.
+// Table metadata for callers that choose the table name at the use site.
 export type TGridTableSchemaInput = Omit<TableSchema, "name">;
 
-// Per-level optional schema overlay keyed by row fields.
-// Useful for lightweight customization of labels/metadata while keeping source schema.
+// Per-level schema overrides keyed by row fields. Use this to adjust labels or
+// display metadata for one grid without changing the shared table definition.
 export type TGridTableSchemaOverrides<RowShape extends TGridTableRow> = Partial<
   Omit<TableSchema, "name" | "columns">
 > & {
   columns?: Partial<Record<RowFieldName<RowShape>, Partial<TableColumnSchema>>>;
-  };
+};
 
-// Input shape for reading host query stores in UI-level code.
-// Used by toolbar views to read and mutate a specific level's controls.
+// Identifies the level whose toolbar or pagination controls should be read.
 export type UseTGridQueryStateArgs<
   RowsByLevel extends TGridRowsByLevel,
   AppServices,
@@ -47,15 +45,13 @@ export type UseTGridQueryStateArgs<
   level: LevelId;
 };
 
-// Session hook args alias used by `useSession`.
-// Keeps the hook signature aligned with `createSession` construction options.
+// Options accepted when a React page creates a table session.
 export type UseTGridSessionArgs<
   RowsByLevel extends TGridRowsByLevel,
   AppServices,
 > = CreateTGridSessionArgs<RowsByLevel, AppServices>;
 
-// User-facing hook to get host query state for a specific level.
-// Useful in toolbar-like UI that edits sorting, filtering, and search.
+// Read and update the query controls for one page-controlled level.
 export function useTGridQueryState<
   RowsByLevel extends TGridRowsByLevel,
   AppServices,
@@ -75,8 +71,7 @@ export function useTGridQueryState<
   );
 }
 
-// User-facing hook to build or recreate a typed session in components.
-// Returns a live `TGridSession` and manages disposal on unmount.
+// Create a table session for a React page and dispose it when the page unmounts.
 export function useTGridSession<
   RowsByLevel extends TGridRowsByLevel,
   AppServices,
@@ -88,12 +83,13 @@ export function useTGridSession<
   liveInputsRef.current = {
     services: args.services,
     onQueryUrlChange: args.onQueryUrlChange,
-    hostQuerySeeds: args.hostQuerySeeds,
+    routeQuerySeeds: args.routeQuerySeeds,
   };
 
-  const [session, setSession] = useState<
-    TGridSession<RowsByLevel, AppServices> | null
-  >(null);
+  const [session, setSession] = useState<TGridSession<
+    RowsByLevel,
+    AppServices
+  > | null>(null);
 
   useEffect(() => {
     const next = createTGridSessionWithRef(definition, liveInputsRef);

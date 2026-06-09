@@ -48,12 +48,15 @@ import type {
   TGridRowsByLevel,
   TGridTableRow,
 } from "@/table/grid-adapter/tgrid-types";
-import type { TGridLevelQueryState } from "./tgrid-level-query-state";
+import type {
+  TGridRouteQuerySeed,
+  TGridLevelQueryState,
+} from "./tgrid-level-query-state";
+export type { TGridRouteQuerySeed } from "./tgrid-level-query-state";
 
-// Inputs that stay live while a table view is mounted.
-// `services` is available to custom cells/editors, `hostQuerySeeds` provides
-// the first page/sort/filter/search values, and `onQueryUrlChange` lets the
-// page update its own route when the user changes the query.
+// Options for a table page. Pass `services` for custom cells/editors,
+// `routeQuerySeeds` for route-provided starting controls, and `onQueryUrlChange`
+// when the page should keep its URL in sync with table controls.
 export type CreateTGridSessionArgs<
   RowsByLevel extends TGridRowsByLevel = TGridRowsByLevel,
   AppServices = unknown,
@@ -66,23 +69,12 @@ export type CreateTGridSessionArgs<
     filters: FilterCondition[];
     search: string | null;
   }) => void;
-  hostQuerySeeds?: Partial<
-    Record<TGridLevelId<RowsByLevel>, TGridHostQuerySeeds>
+  routeQuerySeeds?: Partial<
+    Record<TGridLevelId<RowsByLevel>, TGridRouteQuerySeed>
   >;
 };
 
-// Initial query values for a page-controlled level.
-// These are seeds only; after the session is running, the query store is the
-// current source of truth.
-export type TGridHostQuerySeeds = {
-  page?: number;
-  sort?: readonly SortDescriptor[];
-  filters?: readonly FilterCondition[];
-  search?: string | null;
-};
-
-// Mutable session inputs used by React hooks that keep the same session object
-// while router state or app services change.
+// Values a mounted React page can update without recreating the table session.
 export type TGridLiveInputs<
   RowsByLevel extends TGridRowsByLevel = TGridRowsByLevel,
   AppServices = unknown,
@@ -95,9 +87,8 @@ export type TGridLiveInputsRef<
   current: TGridLiveInputs<RowsByLevel, AppServices>;
 };
 
-// Live table grid for one mounted view.
-// A session owns the rendered row tree, query stores for page-controlled levels,
-// lookup data for FK/display labels, and helper methods custom cells can call.
+// A live table view. Use it to read loaded rows, reload data, build export URLs,
+// and give custom cells access to app services and level metadata.
 //
 // `getVisibleRows` and `getLoadedRow` read rows already loaded into the grid.
 // They are not database queries; use a row client or endpoint when you need data
@@ -130,9 +121,7 @@ export type TGridSession<
   dispose(): void;
 };
 
-// Create a live table session from a TGrid definition.
-// React pages usually call `useTGridSession`; call this directly for tests or
-// non-React mounting code.
+// Create a table session outside React, such as in tests or custom mounting code.
 export function createTGridSession<
   RowsByLevel extends TGridRowsByLevel = TGridRowsByLevel,
   AppServices = unknown,
@@ -143,9 +132,8 @@ export function createTGridSession<
   return createTGridSessionWithRef(definition, { current: args });
 }
 
-// Create a session whose inputs can be updated through a ref.
-// This keeps long-lived cell renderers pointed at the latest app services and
-// route callback without recreating the whole grid.
+// Create a session whose app services and route callback can change while the
+// table stays mounted.
 export function createTGridSessionWithRef<
   RowsByLevel extends TGridRowsByLevel = TGridRowsByLevel,
   AppServices = unknown,
@@ -191,8 +179,8 @@ class DefaultTGridSession<
     const lookupResolver = createTGridLookupResolver(this.lookupRegistry);
     this.columnMapper = createTGridColumnMapper(lookupResolver);
 
-    // Page-controlled levels get query stores because a toolbar or pagination
-    // control can change their sort, filters, search, or page.
+    // Levels with visible table controls need query stores so their toolbar,
+    // pagination, export links, and row fetches all use the same state.
     for (const [levelId, level] of Object.entries(definition.levels) as Array<
       [TGridLevelId<RowsByLevel>, TGridLevelConfig<RowsByLevel, AppServices>]
     >) {
@@ -340,19 +328,20 @@ class DefaultTGridSession<
 
   private csvExportUrlFor(levelId: TGridLevelId<RowsByLevel>): string {
     const level = this.levels[levelId];
-    const store = this.queryStoresByLevel.get(levelId);
-    const s = store?.getState();
+    const state = this.queryStoresByLevel.get(levelId)?.getState();
     const query = level.config.query ?? {};
-    // Exports use the same constraints as visible rows. Fixed filters stay
-    // included even though the toolbar does not show them as removable filters.
+    const hasQueryState = state !== undefined;
+    const sort = hasQueryState ? state.sort : (query.initialSort ?? []);
+    const filters = [
+      ...(query.fixedFilters ?? []),
+      ...(hasQueryState ? state.filters : (query.initialFilters ?? [])),
+    ];
+    const search = hasQueryState ? state.search : (query.initialSearch ?? null);
     const queryString = new URLSearchParams(
       buildTableRowsQuery({
-        sort: [...(s?.sort ?? query.initialSort ?? [])],
-        filters: [
-          ...(query.fixedFilters ?? []),
-          ...(s?.filters ?? query.initialFilters ?? []),
-        ],
-        search: s?.search ?? query.initialSearch ?? undefined,
+        sort: [...sort],
+        filters: [...filters],
+        search: search ?? undefined,
       }),
     ).toString();
     return `${getApiBase()}/tables/${level.table.name}/export.csv${queryString ? `?${queryString}` : ""}`;
@@ -362,21 +351,18 @@ class DefaultTGridSession<
     levelId: LevelId,
     level: TGridLevelConfig<RowsByLevel, AppServices, LevelId>,
   ): StoreApi<TGridLevelQueryState<TGridTableRow>> {
-    const query = level.query ?? {};
-    const pageSize =
-      typeof query.pageSize === "function"
-        ? query.pageSize()
-        : (query.pageSize ?? 50);
+    const initial = initialQueryState(
+      level.query,
+      this.routeQuerySeed(levelId),
+    );
 
     return createStore<TGridLevelQueryState<TGridTableRow>>()((set, get) => ({
       level: levelId,
-      sort: [...(this.hostQuerySeed(levelId)?.sort ?? [])],
-      filters: normalizeFilters([
-        ...(this.hostQuerySeed(levelId)?.filters ?? []),
-      ]),
-      search: this.hostQuerySeed(levelId)?.search ?? null,
-      page: this.hostQuerySeed(levelId)?.page ?? 1,
-      pageSize,
+      sort: [...initial.sort],
+      filters: normalizeFilters([...initial.filters]),
+      search: initial.search,
+      page: initial.page,
+      pageSize: initial.pageSize,
       errorBanner: null,
 
       setSort: (sort) => {
@@ -453,21 +439,19 @@ class DefaultTGridSession<
 
       setErrorBanner: (msg) => set({ errorBanner: msg }),
 
-      syncFromUrl: (params) => {
-        // Browser back/forward should update the table without pushing another
-        // URL entry. User actions use the setters above, which reload and push.
+      syncFromUrl: (seed) => {
+        // Browser back/forward restores the table from the URL without pushing a
+        // new history entry. Direct table-control changes update the URL instead.
+        const next = initialQueryState(level.query, seed);
         const cur = get();
         const patch: Partial<TGridLevelQueryState<TGridTableRow>> = {};
-        if (cur.page !== params.page) patch.page = params.page;
-        if (cur.search !== params.search) patch.search = params.search;
-        if (!filtersEqual(cur.filters, params.filters)) {
-          patch.filters = params.filters;
+        if (cur.page !== next.page) patch.page = next.page;
+        if (cur.search !== next.search) patch.search = next.search;
+        if (!filtersEqual(cur.filters, next.filters)) {
+          patch.filters = next.filters;
         }
-        if (
-          params.sort !== undefined &&
-          !sortOrderEqual(cur.sort, params.sort)
-        ) {
-          patch.sort = params.sort;
+        if (!sortOrderEqual(cur.sort, next.sort)) {
+          patch.sort = next.sort;
         }
         if (Object.keys(patch).length === 0) return;
         set(patch);
@@ -492,10 +476,10 @@ class DefaultTGridSession<
     });
   }
 
-  private hostQuerySeed(
+  private routeQuerySeed(
     levelId: TGridLevelId<RowsByLevel>,
-  ): TGridHostQuerySeeds | undefined {
-    return this.liveInputsRef.current.hostQuerySeeds?.[levelId];
+  ): TGridRouteQuerySeed | undefined {
+    return this.liveInputsRef.current.routeQuerySeeds?.[levelId];
   }
 
   private getQueryStore<LevelId extends TGridLevelId<RowsByLevel>>(
@@ -514,4 +498,38 @@ class DefaultTGridSession<
     RowsByLevel,
     AppServices
   > => this;
+}
+
+function initialQueryState(
+  query: TGridLevelConfig<TGridRowsByLevel>["query"] | undefined,
+  seed: TGridRouteQuerySeed | undefined,
+): Pick<
+  TGridLevelQueryState<TGridTableRow>,
+  "sort" | "filters" | "search" | "page" | "pageSize"
+> {
+  // A missing route value means "use the table default"; an explicit empty
+  // value means the user or URL intentionally cleared that default.
+  return {
+    sort: [...(seed?.sort ?? query?.initialSort ?? [])],
+    filters: normalizeFilters([
+      ...(seed?.filters ?? query?.initialFilters ?? []),
+    ]),
+    search: normalizeSearch(
+      seed && "search" in seed ? (seed.search ?? null) : query?.initialSearch,
+    ),
+    page: seed?.page ?? query?.initialPage ?? 1,
+    pageSize: defaultPageSize(query?.pageSize),
+  };
+}
+
+function defaultPageSize(
+  pageSize: number | (() => number) | undefined,
+  fallback = 50,
+): number {
+  if (typeof pageSize === "function") return pageSize();
+  return pageSize ?? fallback;
+}
+
+function normalizeSearch(search: string | null | undefined): string | null {
+  return search && search.trim() !== "" ? search : null;
 }

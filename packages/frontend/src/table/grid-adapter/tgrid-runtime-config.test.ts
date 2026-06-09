@@ -400,6 +400,55 @@ describe("compileTGridRuntimeConfig", () => {
     );
   });
 
+  it("uses a child level initialSort before falling back to parent defaultSort", () => {
+    const lookupResolver: TGridLookupResolver = {
+      bundleFor: () => undefined,
+    };
+    const config = compileTGridRuntimeConfig<RowsByLevel>({
+      rootLevel: "orders",
+      levels: {
+        orders: {
+          table: orderSchema,
+          childLevels: ["orders.lines"],
+        },
+        "orders.lines": {
+          table: lineSchema,
+          parent: {
+            level: "orders",
+            foreignKey: "order_id",
+            defaultSort: "line_no",
+          },
+          childLevels: [],
+          query: {
+            owner: "source",
+            initialSort: [{ colId: "sku", direction: "desc" }],
+          },
+        },
+        "orders.lines.allocations": {
+          table: allocationSchema,
+          parent: { level: "orders.lines", foreignKey: "line_id" },
+          childLevels: [],
+        },
+      },
+      columnMapper: createTGridColumnMapper(lookupResolver),
+      hostQueryState: () => ({
+        page: 1,
+        pageSize: 25,
+        sort: [],
+        filters: [],
+        search: null,
+      }),
+    });
+
+    const endpoint = config.endpointFactoriesByLevel["orders.lines"]({
+      ancestors: [{ levelName: "orders", rowKey: "7" as never }],
+    });
+
+    expect(endpoint.query!().sort).toEqual([
+      { colId: "sku", direction: "desc" },
+    ]);
+  });
+
   it("child insert seeds the parent FK at the adapter boundary", async () => {
     const create = vi.fn(async (_table: string, data: Row) => ({
       data: { id: 99, ...data },

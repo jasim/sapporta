@@ -1,9 +1,23 @@
 import type { SortDescriptor } from "@sapporta/grid";
-import type { FilterCondition, NewFilterCondition } from "@sapporta/shared/filter";
+import type {
+  FilterCondition,
+  NewFilterCondition,
+} from "@sapporta/shared/filter";
 import type { TGridFilter } from "@/table/grid-adapter/tgrid-filter";
 import type { TGridTableRow } from "@/table/grid-adapter/tgrid-types";
 
-export type TGridLevelQueryState<RowShape extends TGridTableRow = TGridTableRow> = {
+// Query values supplied by the current route. Omitted fields keep the level's
+// configured defaults; present empty arrays/nulls intentionally clear defaults.
+export type TGridRouteQuerySeed = Partial<{
+  page: number;
+  sort: readonly SortDescriptor[];
+  filters: readonly FilterCondition[];
+  search: string | null;
+}>;
+
+export type TGridLevelQueryState<
+  RowShape extends TGridTableRow = TGridTableRow,
+> = {
   level: string;
   sort: SortDescriptor[];
   filters: FilterCondition[];
@@ -23,12 +37,7 @@ export type TGridLevelQueryState<RowShape extends TGridTableRow = TGridTableRow>
   setPage: (page: number) => void;
   setErrorBanner: (msg: string | null) => void;
 
-  syncFromUrl: (params: {
-    page: number;
-    sort: SortDescriptor[] | undefined;
-    filters: FilterCondition[];
-    search: string | null;
-  }) => void;
+  syncFromUrl: (seed: TGridRouteQuerySeed) => void;
 };
 
 export type TGridQueryState<RowShape extends TGridTableRow = TGridTableRow> =

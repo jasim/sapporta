@@ -52,7 +52,6 @@ import {
 import type { TGridSessionContext } from "./tgrid-cell-context";
 import type { TGridFilter } from "./tgrid-filter";
 import type {
-  TGridHostQueryState,
   TGridLevelQueryConfig,
   TGridLevelInfo,
   TableRowsClient,
@@ -69,9 +68,8 @@ export type TGridDefinition<
   readonly levels: TGridLevelsConfigMap<RowsByLevel, AppServices>;
 };
 
-// Declare the table grid a page wants to mount.
-// This is the main customization surface: choose levels, columns, editors,
-// renderers, query defaults, row transport, and app services in one typed value.
+// Declare the table experience a page wants to show: levels, columns, editors,
+// renderers, query defaults, row transport, and interaction behavior.
 export function defineTGrid<
   RowsByLevel extends TGridRowsByLevel = TGridRowsByLevel,
   AppServices = unknown,
@@ -86,8 +84,7 @@ export function defineTGrid<
   return definition;
 }
 
-// Inputs needed to turn an app-facing TGrid definition into the lower-level grid
-// schema and row endpoints used while the page is live.
+// Inputs needed to prepare a TGrid definition for a mounted table view.
 type CompileTGridRuntimeConfigArgs<
   RowsByLevel extends TGridRowsByLevel = TGridRowsByLevel,
   AppServices = unknown,
@@ -97,13 +94,19 @@ type CompileTGridRuntimeConfigArgs<
   columnMapper: TGridColumnMapper;
   hostQueryState?: (
     levelId: TGridLevelId<RowsByLevel>,
-  ) => TGridHostQueryState | undefined;
+  ) => TGridRowQueryState | undefined;
   sessionContext?: () => TGridSessionContext<RowsByLevel, AppServices>;
 };
 
-// Runtime assets for one live table session.
-// The session uses these to render rows, fetch child data, save cell edits, and
-// give cells metadata about the level they belong to.
+type TGridRowQueryState = {
+  page: number;
+  pageSize: number;
+  sort: readonly SortDescriptor[];
+  filters: readonly FilterCondition[];
+  search: string | null;
+};
+
+// Prepared table view data: row loading, cell editing, and level metadata.
 export type CompiledTGridRuntimeConfig<
   RowsByLevel extends TGridRowsByLevel = TGridRowsByLevel,
 > = {
@@ -115,9 +118,8 @@ export type CompiledTGridRuntimeConfig<
   levelInfoById: Record<TGridLevelId<RowsByLevel>, TGridLevelInfo>;
 };
 
-// Compile a TGrid definition into renderable grid schema and row endpoints.
-// Most pages call `useTGridSession` instead; use this directly only when testing
-// or building a custom session wrapper.
+// Prepare a TGrid definition for use by a table session. Most React pages call
+// `useTGridSession`; use this directly for tests or custom session wrappers.
 export function compileTGridRuntimeConfig<
   RowsByLevel extends TGridRowsByLevel = TGridRowsByLevel,
   AppServices = unknown,
@@ -185,9 +187,8 @@ export function compileTGridRuntimeConfig<
       childSchemas,
     };
 
-    // By default the root table is page-controlled because it has toolbar and
-    // pagination controls. Child levels use source defaults because each child
-    // request is scoped by the row the user expanded.
+    // The root level normally follows visible table controls. Child levels use
+    // their configured defaults unless the app explicitly gives them controls.
     const queryConfig: TGridLevelQueryConfig = {
       owner: levelId === rootLevel ? "host" : "source",
       ...(config.query ?? {}),
@@ -200,7 +201,7 @@ export function compileTGridRuntimeConfig<
     };
 
     const defaultSort = resolveSortDescriptor(
-      config.parent?.defaultSort ?? queryConfig.initialSort,
+      queryConfig.initialSort ?? config.parent?.defaultSort,
       table,
     );
 
@@ -345,7 +346,7 @@ function makeEndpointFactory(args: {
     defaultSort: SortDescriptor[];
   };
   queryConfig: TGridLevelQueryConfig;
-  rowQueryState?: () => TGridHostQueryState | undefined;
+  rowQueryState?: () => TGridRowQueryState | undefined;
   rowsClient: TableRowsClient;
   saveCellValueByColumn: ReadonlyMap<
     ColId,
@@ -360,8 +361,7 @@ function makeEndpointFactory(args: {
   );
 
   return (ctx) => {
-    // Child requests are always scoped by ancestor row key when parent metadata is
-    // present. This turns one endpoint factory into a tree-aware source.
+    // Expanded child rows are always filtered to the parent row that opened them.
     const parentRowKey = args.parent
       ? parentKeyFor(args.levelId, args.parent.parentLevelId, ctx.ancestors)
       : null;
@@ -418,7 +418,7 @@ function makeEndpointFactory(args: {
         return { value: (result.data as Row)[req.colId] };
       },
       insertNode: async (req) => {
-        // For child insertions, auto-populate FK before calling the table create API.
+        // Creating a child row should attach it to the expanded parent row.
         const columns = args.parent
           ? { ...req.node.columns, [args.parent.foreignKey]: parentRowKey }
           : req.node.columns;
@@ -448,7 +448,7 @@ function makeQuery(
       defaultSort: SortDescriptor[];
     };
     queryConfig: TGridLevelQueryConfig;
-    rowQueryState?: () => TGridHostQueryState | undefined;
+    rowQueryState?: () => TGridRowQueryState | undefined;
   },
   ctx: {
     ancestors: Parameters<RestEndpointFactory<TGridFilter>>[0]["ancestors"];
@@ -467,9 +467,8 @@ function makeQuery(
   const hasParent = Boolean(args.parent);
   const parentFilter = parentConstraint ? [parentConstraint] : [];
 
-  // Host-owned levels use current URL/query-store state. Source-owned levels use
-  // static defaults from config so pagination and sort remain deterministic without
-  // UI controls.
+  // Levels with visible controls use the current query state. Levels loaded from
+  // an expanded parent row use configured defaults plus the parent-row filter.
   if (queryConfig.owner === "host" || hasParent) {
     if (queryConfig.owner === "host") {
       return () => {
@@ -496,20 +495,17 @@ function makeQuery(
     }
 
     return () => {
-      const defaults = queryConfig.initialFilters ?? [];
-      const search = queryConfig.initialSearch ?? null;
-      const filters: FilterCondition[] = [
-        ...parentFilter,
-        ...(queryConfig.fixedFilters ?? []),
-        ...defaults.map((condition) => ({ ...condition })),
-      ];
       return {
         page: queryConfig.initialPage ?? 1,
         pageSize: defaultPageSize(queryConfig.pageSize),
         sort: [...(args.parent?.defaultSort ?? [])],
         filter: {
-          conditions: filters,
-          search,
+          conditions: [
+            ...parentFilter,
+            ...(queryConfig.fixedFilters ?? []),
+            ...(queryConfig.initialFilters ?? []),
+          ],
+          search: queryConfig.initialSearch ?? null,
         },
       };
     };

@@ -116,7 +116,7 @@ export function TableGridView<
 
   const session = useTGridSession(definition, {
     services,
-    hostQuerySeeds: urlState.hostQuerySeeds,
+    routeQuerySeeds: urlState.routeQuerySeeds,
     onQueryUrlChange: urlState.onQueryUrlChange,
   });
 

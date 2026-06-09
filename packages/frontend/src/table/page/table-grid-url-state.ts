@@ -2,6 +2,7 @@ import { useCallback, useMemo } from "react";
 import type { StoreApi } from "zustand/vanilla";
 import type { ColId, SortDescriptor } from "@sapporta/grid";
 import type { ColumnSchema } from "@sapporta/shared/contracts";
+import type { FilterCondition } from "@sapporta/shared/filter";
 import { loadPref, savePref } from "@/platform/prefs";
 import {
   buildTableSearchParams,
@@ -16,23 +17,20 @@ import type {
 import type { TGridLevelQueryState } from "@/table/state/tgrid-level-query-state";
 import type {
   CreateTGridSessionArgs,
-  TGridHostQuerySeeds,
+  TGridRouteQuerySeed,
   TGridSession,
 } from "@/table/state/tgrid-session";
 
 type PersistedSort = Array<{ colId: string; direction: string }>;
 
-// A table-like view owns its route. Pass the router's navigate function here so
-// the grid can update links without knowing whether the page lives at
-// `/tables/orders`, `/orders`, or a custom app route.
+// A table view can live at any route. Pass the page's navigate function so
+// paging, sorting, filtering, and search update that same route.
 export type TableGridNavigate = (
   url: string,
   options?: { replace?: boolean },
 ) => void;
 
-// Inputs needed to connect one visible table level to a URL.
-// `searchParams` is read from the current route, while `navigate` writes the
-// next URL after the user pages, sorts, filters, or searches.
+// Connect one visible table level to the current URL.
 export type UseTableGridUrlStateArgs<RowsByLevel extends TGridRowsByLevel> = {
   tableName: string;
   columns: readonly ColumnSchema[];
@@ -43,17 +41,14 @@ export type UseTableGridUrlStateArgs<RowsByLevel extends TGridRowsByLevel> = {
   sortPreferenceKey?: string;
 };
 
-// The URL binding has two jobs:
-// - seed the session from the current URL when the grid first mounts
-// - keep the session and the URL in sync after user actions or back/forward
-//
-// The returned values are plain session inputs so a custom page can create its
-// own layout while still using Sapporta's table URL behavior.
+// Values a custom table page passes into `useTGridSession`.
+// Use `syncSessionFromUrl` after router navigation so browser back/forward
+// restores the table controls without remounting the page.
 export type TableGridUrlStateBinding<RowsByLevel extends TGridRowsByLevel> = {
   routePath: string;
   level: TGridLevelId<RowsByLevel>;
-  hostQuerySeeds: Partial<
-    Record<TGridLevelId<RowsByLevel>, TGridHostQuerySeeds>
+  routeQuerySeeds: Partial<
+    Record<TGridLevelId<RowsByLevel>, TGridRouteQuerySeed>
   >;
   onQueryUrlChange: CreateTGridSessionArgs<RowsByLevel>["onQueryUrlChange"];
   syncSessionFromUrl<AppServices>(
@@ -61,10 +56,9 @@ export type TableGridUrlStateBinding<RowsByLevel extends TGridRowsByLevel> = {
   ): void;
 };
 
-// Bind a host-owned table query to the caller's route.
-// URL sort always wins. If the URL is silent about sort, the saved sort
-// preference is used as a convenience default. Filters, search, and page come
-// only from the URL so shared links open the same view for everyone.
+// Bind table controls to the page URL. URL sort wins; if the URL has no sort,
+// the saved sort preference becomes the starting sort. Page, filters, and search
+// only come from the URL so shared links open the same view for everyone.
 export function useTableGridUrlState<RowsByLevel extends TGridRowsByLevel>({
   tableName,
   columns,
@@ -90,20 +84,27 @@ export function useTableGridUrlState<RowsByLevel extends TGridRowsByLevel>({
     [parsed.sort, prefKey, validColIds],
   );
 
-  const hostQuerySeeds = useMemo(
-    () =>
-      ({
-        [levelId]: {
-          sort: initialSort,
-          filters: parsed.filters,
-          search: parsed.search,
-          page: parsed.page,
-        },
-      }) as unknown as Partial<
-        Record<TGridLevelId<RowsByLevel>, TGridHostQuerySeeds>
-      >,
-    [initialSort, levelId, parsed.filters, parsed.page, parsed.search],
-  );
+  const routeQuerySeeds = useMemo(() => {
+    const seed = tableQuerySeedFromUrlState({
+      searchParams,
+      parsed,
+      sort: initialSort,
+    });
+    return {
+      [levelId]: {
+        ...seed,
+      },
+    } as unknown as Partial<
+      Record<TGridLevelId<RowsByLevel>, TGridRouteQuerySeed>
+    >;
+  }, [
+    initialSort,
+    levelId,
+    parsed.filters,
+    parsed.page,
+    parsed.search,
+    searchParams,
+  ]);
 
   const onQueryUrlChange = useCallback<
     NonNullable<CreateTGridSessionArgs<RowsByLevel>["onQueryUrlChange"]>
@@ -124,25 +125,30 @@ export function useTableGridUrlState<RowsByLevel extends TGridRowsByLevel>({
   const syncSessionFromUrl = useCallback(
     <AppServices>(session: TGridSession<RowsByLevel, AppServices>) => {
       const params = parseTableSearchParams(searchParams, validColIds);
+      const seed = tableQuerySeedFromUrlState({
+        searchParams,
+        parsed: params,
+        sort: params.sort ?? loadSortPref(prefKey, validColIds),
+      });
       const store = session.levels[levelId].queryStore as
         | StoreApi<TGridLevelQueryState<TGridTableRow>>
         | undefined;
-      store?.getState().syncFromUrl(params);
+      store?.getState().syncFromUrl(seed);
     },
-    [levelId, searchParams, validColIds],
+    [levelId, prefKey, searchParams, validColIds],
   );
 
   return useMemo(
     () => ({
       routePath: effectiveRoutePath,
       level: levelId,
-      hostQuerySeeds,
+      routeQuerySeeds,
       onQueryUrlChange,
       syncSessionFromUrl,
     }),
     [
       effectiveRoutePath,
-      hostQuerySeeds,
+      routeQuerySeeds,
       levelId,
       onQueryUrlChange,
       syncSessionFromUrl,
@@ -150,9 +156,7 @@ export function useTableGridUrlState<RowsByLevel extends TGridRowsByLevel>({
   );
 }
 
-// Build a link for the same table view with a different page number.
-// The caller supplies `routePath` so built-in table pages and custom app pages
-// use the same query string rules without sharing a route shape.
+// Build a URL for the same table view with a different page number.
 export function tableGridUrlForQueryState(
   routePath: string,
   page: number,
@@ -174,8 +178,39 @@ export function tableGridUrlForQueryState(
 function loadSortPref(
   key: string,
   validColIds: ReadonlySet<ColId>,
-): SortDescriptor[] {
-  const stored = loadPref<PersistedSort>(key, []);
+): SortDescriptor[] | undefined {
+  const stored = loadPref<PersistedSort | null>(key, null);
+  if (stored === null) return undefined;
   if (!Array.isArray(stored)) return [];
   return sanitizeSortDescriptors(stored, validColIds);
+}
+
+export function tableQuerySeedFromUrlState(args: {
+  searchParams: URLSearchParams;
+  parsed: {
+    page: number;
+    filters: FilterCondition[];
+    search: string | null;
+  };
+  sort: SortDescriptor[] | undefined;
+}): TGridRouteQuerySeed {
+  // Only include values the route actually supplied. This lets a clean URL use
+  // the level's configured defaults, while `?sort=` or `q=` can still clear them.
+  const seed: TGridRouteQuerySeed = {};
+  if (args.sort !== undefined) seed.sort = args.sort;
+  if (hasPageParam(args.searchParams)) seed.page = args.parsed.page;
+  if (hasFilterParams(args.searchParams)) seed.filters = args.parsed.filters;
+  if (args.searchParams.has("q")) seed.search = args.parsed.search;
+  return seed;
+}
+
+function hasPageParam(searchParams: URLSearchParams): boolean {
+  return searchParams.has("page");
+}
+
+function hasFilterParams(searchParams: URLSearchParams): boolean {
+  for (const key of searchParams.keys()) {
+    if (key.startsWith("filter[")) return true;
+  }
+  return false;
 }

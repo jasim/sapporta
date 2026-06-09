@@ -18,17 +18,6 @@ import type {
   TGridColumnSpecBuilder,
 } from "./tgrid-column-spec";
 
-// Current query values for a page-controlled level.
-// Toolbars, pagination, CSV export, and row fetches all read this same shape, so
-// a filter or search change is applied consistently.
-export type TGridHostQueryState = {
-  sort: SortDescriptor[];
-  filters: FilterCondition[];
-  search: string | null;
-  page: number;
-  pageSize: number;
-};
-
 // Query behavior for one table level.
 // Use `host` when the page shows controls for this level. Use `source` when the
 // level is loaded from a parent row expansion and should only use defaults.

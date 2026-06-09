@@ -15,8 +15,9 @@ import { useTGridSession } from "./tgrid-binding";
 import type { TGridSession } from "@/table/state/tgrid-session";
 import type { TableRowsClient } from "./tgrid-level-config";
 
-(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean })
-  .IS_REACT_ACT_ENVIRONMENT = true;
+(
+  globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
+).IS_REACT_ACT_ENVIRONMENT = true;
 
 vi.mock("@/table/api/rows", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/table/api/rows")>();
@@ -73,7 +74,7 @@ const OrdersTGrid = TGrid as (props: {
 
 function CustomGridView() {
   const session = useTGridSession(definition, {
-    hostQuerySeeds: {
+    routeQuerySeeds: {
       orders: {
         sort: [{ colId: "customer", direction: "asc" }],
       },
@@ -110,7 +111,9 @@ async function waitForText(
     });
     if (container.textContent?.includes(text)) return;
   }
-  throw new Error(`Expected rendered text "${text}", got "${container.textContent}"`);
+  throw new Error(
+    `Expected rendered text "${text}", got "${container.textContent}"`,
+  );
 }
 
 async function unmount(root: Root, container: HTMLElement): Promise<void> {
@@ -133,7 +136,9 @@ describe("TGrid StrictMode lifecycle", () => {
   });
 
   it("keeps a custom hook-owned session live after StrictMode remount", async () => {
-    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    const consoleError = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => {});
     try {
       mounted = await renderStrict(createElement(CustomGridView));
 
@@ -149,7 +154,9 @@ describe("TGrid StrictMode lifecycle", () => {
   });
 
   it("keeps TablePage subscribed to the current StrictMode session", async () => {
-    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    const consoleError = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => {});
     useSchemaStore.getState().setTables([ordersTable]);
 
     try {
