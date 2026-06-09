@@ -1,6 +1,12 @@
 import { type ReactNode, useMemo, useState } from "react";
-import { Link, useLocation } from "react-router-dom";
-import { ListFilter, Search } from "lucide-react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
+import { ListFilter } from "lucide-react";
+import {
+  ComboboxList,
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@sapporta/ui";
 import { useSchemaStore } from "@/schema-catalog/state/schema-store";
 import { AuthAccountMenu } from "./AuthAccountMenu";
 import { SidebarShell } from "./SidebarShell";
@@ -78,9 +84,7 @@ export function NavItem({
       aria-label={compact ? item.label : undefined}
       className={cx(
         "flex items-center rounded-[6px] text-sap-body no-underline",
-        compact
-          ? "h-10 w-10 justify-center"
-          : "gap-2 h-[28px] px-2",
+        compact ? "h-10 w-10 justify-center" : "gap-2 h-[28px] px-2",
         active
           ? "bg-sap-active-nav text-sap-fg font-[650]"
           : "text-sap-soft hover:bg-sap-row-hover",
@@ -202,17 +206,16 @@ export function NavigationPicker({
   trigger,
 }: NavigationShellProps & { trigger: "rail" | "mobile" }) {
   const [open, setOpen] = useState(false);
-  const [query, setQuery] = useState("");
   const location = useLocation();
-  const items = useMemo(() => {
-    const normalized = query.trim().toLowerCase();
-    return navigationItems(navigation).filter((item) => {
-      if (normalized.length === 0) {
-        return true;
-      }
-      return item.label.toLowerCase().includes(normalized);
-    });
-  }, [navigation, query]);
+  const navigate = useNavigate();
+  const items = useMemo(() => navigationItems(navigation), [navigation]);
+  const options = useMemo(
+    () => items.map((item) => ({ id: item.to, label: item.label })),
+    [items],
+  );
+  const activeItem = items.find((item) =>
+    isNavigationItemActive(item, location),
+  );
 
   const buttonClass =
     trigger === "rail"
@@ -220,64 +223,38 @@ export function NavigationPicker({
       : "min-w-[56px] h-12 px-2 rounded-[6px] flex flex-col items-center justify-center gap-1 text-sap-label text-sap-soft";
 
   return (
-    <div className="relative">
-      <button
-        type="button"
-        className={buttonClass}
-        title="Open navigation"
-        aria-label="Open navigation"
-        onClick={() => setOpen((value) => !value)}
-      >
-        <ListFilter className="h-[17px] w-[17px]" strokeWidth={1.5} />
-        {trigger === "mobile" && <span>Browse</span>}
-      </button>
-      {open && (
-        <div
-          className={cx(
-            "fixed z-[calc(var(--sap-z-shell-sticky)+1)] w-[min(360px,calc(100vw-24px))] rounded-[8px] border border-sap-border bg-sap-surface shadow-lg",
-            trigger === "rail"
-              ? "left-[76px] bottom-[44px]"
-              : "left-3 right-3 bottom-[calc(var(--height-sap-bar)+68px)]",
-          )}
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          className={buttonClass}
+          title="Open navigation"
+          aria-label="Open navigation"
         >
-          <div className="p-2 border-b border-sap-border-soft flex items-center gap-2">
-            <Search className="h-[14px] w-[14px] text-sap-subtle" />
-            <input
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              autoFocus
-              placeholder="Find a table, report, or view"
-              className="min-w-0 flex-1 bg-transparent outline-none text-sap-body text-sap-fg placeholder:text-sap-muted"
-            />
-          </div>
-          <div className="max-h-[320px] overflow-y-auto p-2">
-            {items.map((item) => (
-              <Link
-                key={item.to}
-                to={item.to}
-                onClick={() => setOpen(false)}
-                className={cx(
-                  "flex items-center gap-2 h-9 rounded-[6px] px-2 text-sap-body no-underline",
-                  isNavigationItemActive(item, location)
-                    ? "bg-sap-active-nav text-sap-fg font-[650]"
-                    : "text-sap-soft hover:bg-sap-row-hover",
-                )}
-              >
-                {item.icon && (
-                  <item.icon className="h-[14px] w-[14px]" strokeWidth={1.5} />
-                )}
-                <span className="min-w-0 flex-1 truncate">{item.label}</span>
-              </Link>
-            ))}
-            {items.length === 0 && (
-              <div className="px-2 py-6 text-center text-sap-muted text-sap-body">
-                No matches
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-    </div>
+          <ListFilter className="h-[17px] w-[17px]" strokeWidth={1.5} />
+          {trigger === "mobile" && <span>Browse</span>}
+        </button>
+      </PopoverTrigger>
+      <PopoverContent
+        align={trigger === "rail" ? "end" : "center"}
+        side={trigger === "rail" ? "right" : "top"}
+        sideOffset={trigger === "rail" ? 12 : 8}
+        className="w-[min(360px,calc(100vw-24px))] p-0"
+      >
+        <ComboboxList
+          value={activeItem?.to ?? null}
+          options={options}
+          onPick={(path) => {
+            if (path) {
+              navigate(path);
+            }
+            setOpen(false);
+          }}
+          allowClear={false}
+          listClassName="max-h-[320px]"
+        />
+      </PopoverContent>
+    </Popover>
   );
 }
 

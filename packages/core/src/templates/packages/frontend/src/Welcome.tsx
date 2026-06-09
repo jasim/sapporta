@@ -113,7 +113,7 @@ export const invoices = table({
           <code className="mono text-sap-fg">
             packages/frontend/src/Welcome.tsx
           </code>{" "}
-          and update the sidebar entry and route in{" "}
+          and update the navigation item and route in{" "}
           <code className="mono text-sap-fg">App.tsx</code>.
         </footer>
       </div>
