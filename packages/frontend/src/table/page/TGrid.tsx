@@ -24,6 +24,7 @@ import type { TGridRowsByLevel } from "@/table/grid-adapter/tgrid-types";
 import type { TGridLevelQueryState } from "@/table/state/tgrid-level-query-state";
 import type { TGridSession } from "@/table/state/tgrid-session";
 import type { TGridLevelInfo } from "@/table/grid-adapter/tgrid-level-config";
+import "./table-card.css";
 
 export type TGridView = GridPresentation | "auto";
 export type TGridViewMode = TGridView;

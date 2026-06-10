@@ -12,19 +12,12 @@ export default defineConfig({
       tsconfigPath: "./tsconfig.json",
       entryRoot: "src",
       include: ["src"],
-      exclude: ["src/main.tsx"],
       rollupTypes: false,
     }),
   ],
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
-    },
-  },
-  server: {
-    port: 5173,
-    proxy: {
-      "/api": "http://localhost:3000",
     },
   },
   build: {

@@ -28,7 +28,6 @@
   "files": [
     "dist/",
     "src/",
-    "index.html",
     "package.json"
   ],
   "publishConfig": {
@@ -87,12 +86,10 @@
     "./index.css": "./dist/index.css"
   },
   "scripts": {
-    "dev": "vite",
     "build": "vite build",
     "build:watch": "vite build --watch",
     "typecheck": "tsc --noEmit",
     "typecheck:watch": "tsc --noEmit --watch --preserveWatchOutput",
-    "preview": "vite preview",
     "prepublishOnly": "pnpm build"
   },
   "dependencies": {

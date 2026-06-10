@@ -6,6 +6,11 @@
    detection, so generated apps import this file to make their Tailwind
    pipeline scan the package's compiled JS for those utilities.
 
+   Keep component CSS colocated with the React module that emits the markup.
+   Do not add component stylesheet imports here just to get them into the
+   package CSS output; Vite will extract side-effect CSS imports from the
+   owning module into the built CSS asset.
+
    This file intentionally does not import tailwindcss or emit base styles.
    The consuming app owns the single Tailwind pipeline. */
 @source "./";
