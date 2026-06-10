@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { spawn, type ChildProcess } from "node:child_process";
 import {
   copyFileSync,
@@ -54,6 +55,18 @@ export type StartedServer = {
   output: string[];
 };
 
+export type StartServerOptions = {
+  env?: NodeJS.ProcessEnv;
+  readyPath?: string;
+};
+
+export type BootFailure = {
+  baseUrl: string;
+  code: number | null;
+  signal: string | null;
+  output: string[];
+};
+
 export type StartedDockerProject = {
   baseUrl: string;
   containerId: string;
@@ -85,6 +98,84 @@ type RowsBody = {
 
 type AuthCookieOptions = {
   cookieFile?: string;
+};
+
+export type RequestHeaders = Record<string, string>;
+
+export type JsonRequestOptions = {
+  method?: string;
+  body?: unknown;
+  headers?: RequestHeaders;
+  origin?: string | null;
+  cookieFile?: string;
+  expectedStatus?: number | readonly number[];
+  expectedSuccess?: boolean;
+  cwd?: string;
+  env?: NodeJS.ProcessEnv;
+  serverOutput?: readonly string[];
+  timeoutMs?: number;
+};
+
+export type JsonResponse<T> = {
+  status: number;
+  body: T;
+  rawBody: string;
+  headers: RequestHeaders;
+};
+
+export type EmailUserCredentials = {
+  email: string;
+  password: string;
+  name?: string;
+  cookieFile?: string;
+};
+
+export type EmailAuthResult<T> = {
+  requestBody: EmailUserCredentials;
+  cookieFile: string;
+  response: JsonResponse<T>;
+};
+
+export type SignOutResult<T> = {
+  requestBody: Record<string, never>;
+  cookieFile: string;
+  response: JsonResponse<T>;
+};
+
+export type SignedInEmailUser = {
+  email: string;
+  password: string;
+  cookieFile: string;
+};
+
+export type WorkspaceMemberRole = "owner" | "admin" | "member";
+
+export type AuthContextBody = {
+  user: { id: string; email: string; emailVerified: boolean };
+  workspace: { id: string; name: string; slug: string; isOwner?: boolean };
+  memberships: Array<{
+    workspace: { id: string; name: string; slug: string };
+    role: string;
+    isOwner: boolean;
+  }>;
+  role?: string;
+  isOwner?: boolean;
+};
+
+export type AuthContextExpectation = {
+  email?: string;
+  workspaceId?: string;
+  workspaceName?: string;
+  workspaceSlug?: string;
+  role?: string;
+  isOwner?: boolean;
+};
+
+export type SqliteValue = string | number | boolean | null;
+
+export type SqliteStatementResult = {
+  changes: number;
+  lastInsertRowid: number | string;
 };
 
 type SqliteTableColumn = {
@@ -299,6 +390,710 @@ export function writeAuthScopedTasksSchema(projectDir: string): void {
   );
 }
 
+export function writeAuthzCustomRouteFixtures(projectDir: string): void {
+  const apiDir = join(projectDir, "packages", "api");
+  const appDir = join(apiDir, "app");
+  mkdirSync(appDir, { recursive: true });
+
+  writeFileSync(
+    join(appDir, "authz-public.ts"),
+    [
+      'import { z } from "zod";',
+      'import { forbidUnless, initContract, TsRestApi, type SapportaEnv } from "@sapporta/server";',
+      "",
+      "const c = initContract();",
+      "",
+      "const authzPublicRoute = c.query({",
+      '  method: "GET",',
+      '  path: "/authz/public",',
+      '  summary: "Read a public authz sample",',
+      "  responses: {",
+      "    200: z.object({",
+      '      kind: z.enum(["anonymous", "user"]),',
+      "      email: z.string().optional(),",
+      "    }),",
+      "  },",
+      "});",
+      "",
+      "const authzDeniedPublicRoute = c.query({",
+      '  method: "GET",',
+      '  path: "/authz/public-denied",',
+      '  summary: "Read a denied public authz sample",',
+      "  responses: { 200: z.object({ ok: z.literal(true) }) },",
+      "});",
+      "",
+      "const api = new TsRestApi<SapportaEnv>();",
+      "",
+      'api.register("authzPublic", authzPublicRoute, ({ c }) => {',
+      '  const auth = c.get("auth");',
+      '  forbidUnless(c, auth.ability.can("read", "authz_public"));',
+      "  const principal = auth.principal;",
+      "  return {",
+      "    status: 200,",
+      "    body:",
+      '      principal.kind === "user"',
+      '        ? { kind: "user" as const, email: principal.user.email }',
+      '        : { kind: "anonymous" as const },',
+      "  };",
+      "});",
+      "",
+      'api.register("authzDeniedPublic", authzDeniedPublicRoute, ({ c }) => {',
+      '  const auth = c.get("auth");',
+      '  forbidUnless(c, auth.ability.can("read", "authz_denied_public"));',
+      "  return { status: 200, body: { ok: true as const } };",
+      "});",
+      "",
+      "export default api;",
+      "",
+    ].join("\n"),
+  );
+
+  writeFileSync(
+    join(appDir, "authz-private.ts"),
+    [
+      'import { z } from "zod";',
+      'import { forbidUnless, initContract, TsRestApi, type SapportaEnv } from "@sapporta/server";',
+      'import { requirePrincipalUser } from "../project-auth/index.js";',
+      "",
+      "const c = initContract();",
+      "",
+      "const authzPrivateRoute = c.query({",
+      '  method: "GET",',
+      '  path: "/authz/private",',
+      '  summary: "Read a signed-in authz sample",',
+      "  responses: { 200: z.object({ email: z.string() }) },",
+      "});",
+      "",
+      "const api = new TsRestApi<SapportaEnv>();",
+      "",
+      'api.register("authzPrivate", authzPrivateRoute, ({ c }) => {',
+      '  const auth = c.get("auth");',
+      "  const principal = requirePrincipalUser(c);",
+      '  forbidUnless(c, auth.ability.can("read", "authz_private"));',
+      "  return { status: 200, body: { email: principal.user.email } };",
+      "});",
+      "",
+      "export default api;",
+      "",
+    ].join("\n"),
+  );
+
+  writeFileSync(
+    join(appDir, "authz-workspace.ts"),
+    [
+      'import { z } from "zod";',
+      'import { forbidUnless, initContract, TsRestApi, type SapportaEnv } from "@sapporta/server";',
+      'import { requireWorkspaceRowsAllowed } from "../project-auth/index.js";',
+      "",
+      "const c = initContract();",
+      "",
+      "const authzWorkspaceRoute = c.query({",
+      '  method: "GET",',
+      '  path: "/authz/workspace",',
+      '  summary: "Read a workspace authz sample",',
+      "  responses: {",
+      "    200: z.object({",
+      "      workspaceId: z.string(),",
+      '      role: z.enum(["owner", "member"]),',
+      "    }),",
+      "  },",
+      "});",
+      "",
+      "const api = new TsRestApi<SapportaEnv>();",
+      "",
+      'api.register("authzWorkspace", authzWorkspaceRoute, ({ c }) => {',
+      "  const auth = requireWorkspaceRowsAllowed(c);",
+      '  forbidUnless(c, auth.ability.can("run", "authz_workspace"));',
+      '  if (auth.principal.kind !== "user") {',
+      '    throw new Error("Workspace user required.");',
+      "  }",
+      '  const role = auth.principal.membership.roles.includes("owner")',
+      '    ? "owner" as const',
+      '    : "member" as const;',
+      "  return {",
+      "    status: 200,",
+      "    body: {",
+      "      workspaceId: auth.rowsAllowedForRequest.workspace.id,",
+      "      role,",
+      "    },",
+      "  };",
+      "});",
+      "",
+      "export default api;",
+      "",
+    ].join("\n"),
+  );
+
+  writeFileSync(
+    join(appDir, "authz-owner.ts"),
+    [
+      'import { z } from "zod";',
+      'import { forbidUnless, initContract, TsRestApi, type SapportaEnv } from "@sapporta/server";',
+      'import { requireWorkspaceOwner } from "../project-auth/index.js";',
+      "",
+      "const c = initContract();",
+      "",
+      "const authzOwnerRoute = c.query({",
+      '  method: "GET",',
+      '  path: "/authz/owner",',
+      '  summary: "Read an owner authz sample",',
+      "  responses: { 200: z.object({ workspaceId: z.string() }) },",
+      "});",
+      "",
+      "const api = new TsRestApi<SapportaEnv>();",
+      "",
+      'api.register("authzOwner", authzOwnerRoute, ({ c }) => {',
+      "  const auth = requireWorkspaceOwner(c);",
+      '  forbidUnless(c, auth.ability.can("run", "authz_owner"));',
+      "  return {",
+      "    status: 200,",
+      "    body: { workspaceId: auth.rowsAllowedForRequest.workspace.id },",
+      "  };",
+      "});",
+      "",
+      "export default api;",
+      "",
+    ].join("\n"),
+  );
+
+  writeFileSync(
+    join(appDir, "authz-custom-table.ts"),
+    [
+      'import { eq } from "drizzle-orm";',
+      'import { z } from "zod";',
+      "import {",
+      "  AuthPayloadPolicyError,",
+      "  forbidUnless,",
+      "  initContract,",
+      "  TsRestApi,",
+      "  ValidationError,",
+      "  type SapportaEnv,",
+      '} from "@sapporta/server";',
+      'import { requireWorkspaceOwner } from "../project-auth/index.js";',
+      'import { tasks, tasksTable } from "../schema/auth_matrix.js";',
+      "",
+      "const c = initContract();",
+      "",
+      "const taskRowSchema = z.object({",
+      "  id: z.number(),",
+      "  title: z.string(),",
+      "  status: z.string(),",
+      "  priority: z.number(),",
+      "  workspace_id: z.string(),",
+      "});",
+      "",
+      "const taskInputSchema = z.object({",
+      "  title: z.string().min(1),",
+      '  status: z.enum(["todo", "in_progress", "done"]),',
+      "  priority: z.number().int(),",
+      "  workspace_id: z.string().optional(),",
+      "});",
+      "",
+      "const taskPatchSchema = z.object({",
+      "  title: z.string().min(1).optional(),",
+      '  status: z.enum(["todo", "in_progress", "done"]).optional(),',
+      "  priority: z.number().int().optional(),",
+      "  workspace_id: z.string().optional(),",
+      "});",
+      "",
+      "const errorSchema = z.object({",
+      "  error: z.string(),",
+      "  code: z.string().optional(),",
+      "  details: z.array(z.unknown()).optional(),",
+      "});",
+      "",
+      "const listTasksRoute = c.query({",
+      '  method: "GET",',
+      '  path: "/authz/custom-tasks",',
+      '  summary: "List visible custom task rows",',
+      "  responses: { 200: z.object({ data: z.array(taskRowSchema) }) },",
+      "});",
+      "",
+      "const createTaskRoute = c.mutation({",
+      '  method: "POST",',
+      '  path: "/authz/custom-tasks",',
+      '  summary: "Create a custom task row",',
+      "  body: taskInputSchema,",
+      "  responses: { 200: z.object({ data: taskRowSchema }), 422: errorSchema },",
+      "});",
+      "",
+      "const updateTaskRoute = c.mutation({",
+      '  method: "PATCH",',
+      '  path: "/authz/custom-tasks/:id",',
+      '  summary: "Update a visible custom task row",',
+      "  pathParams: z.object({ id: z.coerce.number().int().positive() }),",
+      "  body: taskPatchSchema,",
+      "  responses: {",
+      "    200: z.object({ data: taskRowSchema }),",
+      "    404: errorSchema,",
+      "    422: errorSchema,",
+      "  },",
+      "});",
+      "",
+      "const api = new TsRestApi<SapportaEnv>();",
+      "",
+      'api.register("authzListCustomTasks", listTasksRoute, async ({ c }) => {',
+      "  const auth = requireWorkspaceOwner(c);",
+      '  forbidUnless(c, auth.ability.can("run", "authz_custom_tasks"));',
+      "  const access = auth.rowSecurity.forTable(tasks);",
+      '  const db = c.get("db");',
+      "  const rows = await db",
+      "    .select()",
+      "    .from(tasksTable)",
+      "    .where(access.ownedRows())",
+      "    .orderBy(tasksTable.id);",
+      "  return { status: 200, body: { data: rows } };",
+      "});",
+      "",
+      'api.register("authzCreateCustomTask", createTaskRoute, async ({ c, request }) => {',
+      "  const auth = requireWorkspaceOwner(c);",
+      '  forbidUnless(c, auth.ability.can("run", "authz_custom_tasks"));',
+      '  const db = c.get("db");',
+      "  try {",
+      "    const input = (await auth.rowSecurity",
+      "      .forTable(tasks)",
+      "      .insertValues(db, request.body)) as typeof tasksTable.$inferInsert;",
+      "    const rows = await db.insert(tasksTable).values(input).returning();",
+      "    return { status: 200, body: { data: rows[0]! } };",
+      "  } catch (err) {",
+      "    return validationError(err);",
+      "  }",
+      "});",
+      "",
+      'api.register("authzUpdateCustomTask", updateTaskRoute, async ({ c, request }) => {',
+      "  const auth = requireWorkspaceOwner(c);",
+      '  forbidUnless(c, auth.ability.can("run", "authz_custom_tasks"));',
+      '  const db = c.get("db");',
+      "  const access = auth.rowSecurity.forTable(tasks);",
+      "  try {",
+      "    const patch = (await access.patchValues(",
+      "      db,",
+      "      request.body,",
+      "    )) as Partial<typeof tasksTable.$inferInsert>;",
+      "    const rows = await db",
+      "      .update(tasksTable)",
+      "      .set(patch)",
+      "      .where(access.ownedRows(eq(tasksTable.id, request.params.id)))",
+      "      .returning();",
+      "    if (!rows[0]) {",
+      '      return { status: 404, body: { error: "Not found", code: "not_found" } };',
+      "    }",
+      "    return { status: 200, body: { data: rows[0] } };",
+      "  } catch (err) {",
+      "    return validationError(err);",
+      "  }",
+      "});",
+      "",
+      "function validationError(err: unknown) {",
+      "  if (err instanceof AuthPayloadPolicyError) {",
+      "    return {",
+      "      status: 422 as const,",
+      "      body: {",
+      '        error: "Validation failed",',
+      '        code: "validation_failed",',
+      "        details: [...err.errors],",
+      "      },",
+      "    };",
+      "  }",
+      "  if (err instanceof ValidationError) {",
+      "    return {",
+      "      status: 422 as const,",
+      "      body: {",
+      '        error: "Validation failed",',
+      '        code: "validation_failed",',
+      "        details: err.errors,",
+      "      },",
+      "    };",
+      "  }",
+      "  throw err;",
+      "}",
+      "",
+      "export default api;",
+      "",
+    ].join("\n"),
+  );
+
+  const appPath = join(apiDir, "app.ts");
+  const appSource = readFileSync(appPath, "utf-8")
+    .replace(
+      'import helloApi from "./app/hello.js";\nimport publicApiSample from "./app/public-api-sample.js";',
+      [
+        'import helloApi from "./app/hello.js";',
+        'import publicApiSample from "./app/public-api-sample.js";',
+        'import authzPublicApi from "./app/authz-public.js";',
+        'import authzPrivateApi from "./app/authz-private.js";',
+        'import authzWorkspaceApi from "./app/authz-workspace.js";',
+        'import authzOwnerApi from "./app/authz-owner.js";',
+        'import authzCustomTableApi from "./app/authz-custom-table.js";',
+      ].join("\n"),
+    )
+    .replace(
+      '  app.route("/", helloApi);\n  app.route("/", publicApiSample);',
+      [
+        '  app.route("/", helloApi);',
+        '  app.route("/", publicApiSample);',
+        '  app.route("/", authzPublicApi);',
+        '  app.route("/", authzPrivateApi);',
+        '  app.route("/", authzWorkspaceApi);',
+        '  app.route("/", authzOwnerApi);',
+        '  app.route("/", authzCustomTableApi);',
+      ].join("\n"),
+    )
+    .replace(
+      '  { method: "GET", path: "/api/public-api-sample" },',
+      [
+        '  { method: "GET", path: "/api/public-api-sample" },',
+        '  { method: "GET", path: "/api/authz/public" },',
+        '  { method: "GET", path: "/api/authz/public-denied" },',
+      ].join("\n"),
+    );
+  writeFileSync(appPath, appSource);
+
+  const abilityPath = join(apiDir, "authz", "ability.ts");
+  const abilitySource = readFileSync(abilityPath, "utf-8")
+    .replace(
+      '  can("read", "public_api_sample");',
+      '  can("read", "public_api_sample");\n  can("read", "authz_public");',
+    )
+    .replace(
+      '    can("read", "hello");',
+      [
+        '    can("read", "hello");',
+        '    can("read", "authz_private");',
+        '    can("run", "authz_workspace");',
+      ].join("\n"),
+    )
+    .replace(
+      '    can("manage", "all");',
+      [
+        '    can("manage", "all");',
+        '    can("run", "authz_owner");',
+        '    can("run", "authz_custom_tasks");',
+      ].join("\n"),
+    );
+  writeFileSync(abilityPath, abilitySource);
+}
+
+export function writeAuthMatrixSchema(projectDir: string): void {
+  mkdirSync(join(projectDir, "packages", "api", "schema"), { recursive: true });
+  writeFileSync(
+    join(projectDir, "packages", "api", "schema", "auth_matrix.ts"),
+    [
+      'import { table, sqliteTable, text, integer } from "@sapporta/server/table";',
+      "",
+      'export const tasksTable = sqliteTable("tasks", {',
+      '  id: integer("id").primaryKey({ autoIncrement: true }),',
+      '  title: text("title").notNull(),',
+      '  status: text("status").notNull(),',
+      '  priority: integer("priority").notNull(),',
+      '  workspace_id: text("workspace_id").notNull(),',
+      "});",
+      "",
+      "export const tasks = table({",
+      "  drizzle: tasksTable,",
+      "  meta: {",
+      '    label: "Tasks",',
+      '    rowScope: "workspaceGlobal",',
+      '    search: { columns: ["title", "status"] },',
+      "    selects: [",
+      '      { type: "select", column: "status", options: ["todo", "in_progress", "done"] },',
+      "    ],",
+      "  },",
+      "});",
+      "",
+      'export const notesTable = sqliteTable("notes", {',
+      '  id: integer("id").primaryKey({ autoIncrement: true }),',
+      '  title: text("title").notNull(),',
+      '  body: text("body").notNull(),',
+      '  category: text("category").notNull(),',
+      '  workspace_id: text("workspace_id").notNull(),',
+      '  scoped_to_user_id: text("scoped_to_user_id").notNull(),',
+      "});",
+      "",
+      "export const notes = table({",
+      "  drizzle: notesTable,",
+      "  meta: {",
+      '    label: "Notes",',
+      '    rowScope: "workspaceUserScoped",',
+      '    search: { columns: ["title", "body", "category"] },',
+      "    selects: [",
+      '      { type: "select", column: "category", options: ["personal", "shared", "archive"] },',
+      "    ],",
+      "  },",
+      "});",
+      "",
+      'export const countriesTable = sqliteTable("countries", {',
+      '  id: integer("id").primaryKey({ autoIncrement: true }),',
+      '  code: text("code").notNull(),',
+      '  name: text("name").notNull(),',
+      "});",
+      "",
+      "export const countries = table({",
+      "  drizzle: countriesTable,",
+      "  meta: {",
+      '    label: "Countries",',
+      "    immutable: true,",
+      '    rowScope: "systemGlobal",',
+      '    search: { columns: ["code", "name"] },',
+      "  },",
+      "});",
+      "",
+      'export const customersTable = sqliteTable("customers", {',
+      '  id: integer("id").primaryKey({ autoIncrement: true }),',
+      '  name: text("name").notNull(),',
+      '  tier: text("tier").notNull(),',
+      '  workspace_id: text("workspace_id").notNull(),',
+      "});",
+      "",
+      "export const customers = table({",
+      "  drizzle: customersTable,",
+      "  meta: {",
+      '    label: "Customers",',
+      '    rowScope: "workspaceGlobal",',
+      '    search: { columns: ["name", "tier"] },',
+      "    selects: [",
+      '      { type: "select", column: "tier", options: ["standard", "priority"] },',
+      "    ],",
+      "  },",
+      "});",
+      "",
+      'export const productsTable = sqliteTable("products", {',
+      '  id: integer("id").primaryKey({ autoIncrement: true }),',
+      '  sku: text("sku").notNull(),',
+      '  name: text("name").notNull(),',
+      '  workspace_id: text("workspace_id").notNull(),',
+      "});",
+      "",
+      "export const products = table({",
+      "  drizzle: productsTable,",
+      "  meta: {",
+      '    label: "Products",',
+      '    rowScope: "workspaceGlobal",',
+      '    rowLabelColumns: ["sku", "name"],',
+      '    search: { columns: ["sku", "name"] },',
+      "  },",
+      "});",
+      "",
+      'export const invoicesTable = sqliteTable("invoices", {',
+      '  id: integer("id").primaryKey({ autoIncrement: true }),',
+      '  invoice_number: text("invoice_number").notNull(),',
+      '  status: text("status").notNull(),',
+      '  customer_id: integer("customer_id")',
+      "    .notNull()",
+      "    .references(() => customersTable.id),",
+      '  workspace_id: text("workspace_id").notNull(),',
+      '  scoped_to_user_id: text("scoped_to_user_id").notNull(),',
+      "});",
+      "",
+      "export const invoices = table({",
+      "  drizzle: invoicesTable,",
+      "  meta: {",
+      '    label: "Invoices",',
+      '    rowScope: "workspaceUserScoped",',
+      '    search: { columns: ["invoice_number"] },',
+      "    selects: [",
+      '      { type: "select", column: "status", options: ["draft", "sent", "paid"] },',
+      "    ],",
+      '    references: { customer_id: { table: "customers", column: "id" } },',
+      "    children: [",
+      '      { table: "invoice_lines", foreignKey: "invoice_id", label: "Lines" },',
+      "    ],",
+      "  },",
+      "});",
+      "",
+      'export const invoiceLinesTable = sqliteTable("invoice_lines", {',
+      '  id: integer("id").primaryKey({ autoIncrement: true }),',
+      '  invoice_id: integer("invoice_id")',
+      "    .notNull()",
+      "    .references(() => invoicesTable.id),",
+      '  product_id: integer("product_id")',
+      "    .notNull()",
+      "    .references(() => productsTable.id),",
+      '  description: text("description").notNull(),',
+      '  amount_cents: integer("amount_cents").notNull(),',
+      '  workspace_id: text("workspace_id").notNull(),',
+      '  scoped_to_user_id: text("scoped_to_user_id").notNull(),',
+      "});",
+      "",
+      "export const invoiceLines = table({",
+      "  drizzle: invoiceLinesTable,",
+      "  meta: {",
+      '    label: "Invoice lines",',
+      '    rowScope: "workspaceUserScoped",',
+      "    references: {",
+      '      invoice_id: { table: "invoices", column: "id", clientCanSet: false },',
+      '      product_id: { table: "products", column: "id" },',
+      "    },",
+      "  },",
+      "});",
+      "",
+    ].join("\n"),
+  );
+}
+
+export function patchAuthMatrixAbility(projectDir: string): void {
+  const abilityPath = join(
+    projectDir,
+    "packages",
+    "api",
+    "authz",
+    "ability.ts",
+  );
+  writeFileSync(
+    abilityPath,
+    [
+      'import { AbilityBuilder, createMongoAbility } from "@casl/ability";',
+      'import type { AppAbility, AppAuthFacts } from "./types.js";',
+      "",
+      "const memberTables = [",
+      '  "tasks",',
+      '  "notes",',
+      '  "customers",',
+      '  "products",',
+      '  "invoices",',
+      '  "invoice_lines",',
+      "] as const;",
+      "",
+      "const memberActions = [",
+      '  "read",',
+      '  "create",',
+      '  "update",',
+      '  "delete",',
+      '  "export",',
+      "] as const;",
+      "",
+      "export function buildAbility(ctx: AppAuthFacts): AppAbility {",
+      "  const { can, build } = new AbilityBuilder<AppAbility>(createMongoAbility);",
+      "",
+      '  can("read", "public_api_sample");',
+      "",
+      '  if (ctx.principal.kind === "user") {',
+      '    can("read", "hello");',
+      '    can("read", "auth_matrix_member_route");',
+      "    for (const subject of memberTables) {",
+      "      for (const action of memberActions) {",
+      "        can(action, subject);",
+      "      }",
+      "    }",
+      "  }",
+      "",
+      "  if (",
+      '    ctx.principal.kind === "user" &&',
+      '    ctx.principal.membership.roles.includes("owner")',
+      "  ) {",
+      '    can("read", "auth_matrix_owner_route");',
+      '    can("manage", "all");',
+      "  }",
+      "",
+      "  return build();",
+      "}",
+      "",
+    ].join("\n"),
+  );
+}
+
+export function writeAuthMatrixAppRoutes(projectDir: string): void {
+  const appDir = join(projectDir, "packages", "api", "app");
+  mkdirSync(appDir, { recursive: true });
+  writeFileSync(
+    join(appDir, "auth-matrix.ts"),
+    [
+      'import { forbidUnless, TsRestApi, type SapportaEnv } from "@sapporta/server";',
+      "",
+      "const api = new TsRestApi<SapportaEnv>();",
+      "",
+      'api.get("/auth-matrix/member", (c) => {',
+      '  const auth = c.get("auth");',
+      '  forbidUnless(c, auth.ability.can("read", "auth_matrix_member_route"));',
+      "  return c.json({",
+      "    ok: true,",
+      "    principal: auth.principal.kind,",
+      "  });",
+      "});",
+      "",
+      'api.get("/auth-matrix/owner", (c) => {',
+      '  const auth = c.get("auth");',
+      '  forbidUnless(c, auth.ability.can("read", "auth_matrix_owner_route"));',
+      "  return c.json({",
+      "    ok: true,",
+      "    principal: auth.principal.kind,",
+      "  });",
+      "});",
+      "",
+      "export default api;",
+      "",
+    ].join("\n"),
+  );
+  patchGeneratedAppRoute(projectDir, {
+    importMarker: 'import publicApiSample from "./app/public-api-sample.js";',
+    importReplacement: [
+      'import publicApiSample from "./app/public-api-sample.js";',
+      'import authMatrixTestApi from "./app/auth-matrix.js";',
+    ].join("\n"),
+    routeMarker: '  app.route("/", publicApiSample);',
+    routeReplacement: [
+      '  app.route("/", publicApiSample);',
+      '  app.route("/", authMatrixTestApi);',
+    ].join("\n"),
+  });
+}
+
+function patchGeneratedAppRoute(
+  projectDir: string,
+  patch: {
+    importMarker: string;
+    importReplacement: string;
+    routeMarker: string;
+    routeReplacement: string;
+  },
+): void {
+  const appPath = join(projectDir, "packages", "api", "app.ts");
+  let appSource = readFileSync(appPath, "utf-8");
+  appSource = replaceProjectSourceOnce(
+    appSource,
+    patch.importMarker,
+    patch.importReplacement,
+    {
+      filePath: appPath,
+      label: "auth matrix route import",
+    },
+  );
+  appSource = replaceProjectSourceOnce(
+    appSource,
+    patch.routeMarker,
+    patch.routeReplacement,
+    {
+      filePath: appPath,
+      label: "auth matrix route mount",
+    },
+  );
+  writeFileSync(appPath, appSource);
+}
+
+function replaceProjectSourceOnce(
+  source: string,
+  marker: string,
+  replacement: string,
+  context: { filePath: string; label: string },
+): string {
+  if (source.includes(replacement)) {
+    return source;
+  }
+  const count = countOccurrences(source, marker);
+  if (count !== 1) {
+    throw new Error(
+      [
+        `Could not patch generated project file: ${context.label}.`,
+        `File: ${context.filePath}`,
+        `Expected one marker, found ${count}.`,
+        "Marker:",
+        marker,
+      ].join("\n"),
+    );
+  }
+  return source.replace(marker, replacement);
+}
+
 export function writeProjectsSchema(projectDir: string): void {
   mkdirSync(join(projectDir, "packages", "api", "schema"), { recursive: true });
   writeFileSync(
@@ -399,7 +1194,7 @@ export async function generateDrizzleMigration(
   });
 }
 
-async function runDrizzleMigrations(
+export async function runDrizzleMigrations(
   project: E2eProject,
   name: string,
 ): Promise<void> {
@@ -428,6 +1223,18 @@ export async function buildGeneratedProject(
       cwd: project.projectDir,
       env: project.env,
       timeoutMs: 300_000,
+    }),
+  );
+}
+
+export async function buildGeneratedApiProject(
+  project: E2eProject,
+): Promise<void> {
+  await step("pnpm build (api)", () =>
+    run("pnpm", ["--filter", "./packages/api", "build"], {
+      cwd: project.projectDir,
+      env: project.env,
+      timeoutMs: 120_000,
     }),
   );
 }
@@ -474,6 +1281,247 @@ export async function assertSqliteTable(
   expect(result.columns.map((column) => column.name)).toEqual(
     expect.arrayContaining(expectedColumns),
   );
+}
+
+export async function assertSqliteTableMissing(
+  project: E2eProject,
+  tableName: string,
+): Promise<void> {
+  const databasePath = join(project.projectDir, "data", "sqlite.db");
+  const queryScript = [
+    'import Database from "better-sqlite3";',
+    `const db = new Database(${JSON.stringify(databasePath)}, { readonly: true });`,
+    `const tableName = ${JSON.stringify(tableName)};`,
+    'const table = db.prepare("SELECT name FROM sqlite_master WHERE type = ? AND name = ?").get("table", tableName);',
+    "db.close();",
+    "console.log(JSON.stringify({ exists: Boolean(table) }));",
+  ].join("\n");
+  const output = await runText(
+    "pnpm",
+    [
+      "--filter",
+      "./packages/api",
+      "exec",
+      "node",
+      "--input-type=module",
+      "-e",
+      queryScript,
+    ],
+    {
+      cwd: project.projectDir,
+      env: project.env,
+      timeoutMs: 30_000,
+    },
+  );
+  const result = JSON.parse(output) as { exists: boolean };
+  expect(result.exists, `Expected SQLite table ${tableName} not to exist`).toBe(
+    false,
+  );
+}
+
+export function makeCookieJar(project: E2eProject, name: string): string {
+  const safeName = name.replace(/[^a-zA-Z0-9_.-]+/g, "-");
+  return join(project.parentDir, `${safeName}.cookies.txt`);
+}
+
+export function signUpEmailUser(
+  baseUrl: string,
+  credentials: EmailUserCredentials,
+): Promise<SignedInEmailUser>;
+export function signUpEmailUser(
+  project: E2eProject,
+  baseUrl: string,
+  credentials: EmailUserCredentials,
+): Promise<SignedInEmailUser>;
+export async function signUpEmailUser(
+  projectOrBaseUrl: E2eProject | string,
+  baseUrlOrCredentials: string | EmailUserCredentials,
+  maybeCredentials?: EmailUserCredentials,
+): Promise<SignedInEmailUser> {
+  const project =
+    typeof projectOrBaseUrl === "string" ? undefined : projectOrBaseUrl;
+  const baseUrl =
+    typeof projectOrBaseUrl === "string"
+      ? projectOrBaseUrl
+      : String(baseUrlOrCredentials);
+  const credentials =
+    typeof baseUrlOrCredentials === "string"
+      ? maybeCredentials
+      : baseUrlOrCredentials;
+  if (!credentials) {
+    throw new Error("Email credentials are required.");
+  }
+  const cookieFile =
+    credentials.cookieFile ??
+    (project ? makeCookieJar(project, credentials.email) : undefined);
+  if (!cookieFile) {
+    throw new Error("A cookie file is required when no project is provided.");
+  }
+  const body = {
+    email: credentials.email,
+    password: credentials.password,
+    ...(credentials.name === undefined ? {} : { name: credentials.name }),
+  };
+  await requestJson<unknown>(baseUrl, "/api/auth/sign-up/email", {
+    cookieFile,
+    method: "POST",
+    body,
+    expectedSuccess: true,
+  });
+  return {
+    email: credentials.email,
+    password: credentials.password,
+    cookieFile,
+  };
+}
+
+export function signInEmailUser(
+  baseUrl: string,
+  credentials: Pick<EmailUserCredentials, "email" | "password" | "cookieFile">,
+): Promise<SignedInEmailUser>;
+export function signInEmailUser(
+  project: E2eProject,
+  baseUrl: string,
+  credentials: Pick<EmailUserCredentials, "email" | "password" | "cookieFile">,
+): Promise<SignedInEmailUser>;
+export async function signInEmailUser(
+  projectOrBaseUrl: E2eProject | string,
+  baseUrlOrCredentials:
+    | string
+    | Pick<EmailUserCredentials, "email" | "password" | "cookieFile">,
+  maybeCredentials?: Pick<
+    EmailUserCredentials,
+    "email" | "password" | "cookieFile"
+  >,
+): Promise<SignedInEmailUser> {
+  const project =
+    typeof projectOrBaseUrl === "string" ? undefined : projectOrBaseUrl;
+  const baseUrl =
+    typeof projectOrBaseUrl === "string"
+      ? projectOrBaseUrl
+      : String(baseUrlOrCredentials);
+  const credentials =
+    typeof baseUrlOrCredentials === "string"
+      ? maybeCredentials
+      : baseUrlOrCredentials;
+  if (!credentials) {
+    throw new Error("Email credentials are required.");
+  }
+  const cookieFile =
+    credentials.cookieFile ??
+    (project ? makeCookieJar(project, credentials.email) : undefined);
+  if (!cookieFile) {
+    throw new Error("A cookie file is required when no project is provided.");
+  }
+  await requestJson<unknown>(baseUrl, "/api/auth/sign-in/email", {
+    cookieFile,
+    method: "POST",
+    body: {
+      email: credentials.email,
+      password: credentials.password,
+    },
+    expectedSuccess: true,
+  });
+  return {
+    email: credentials.email,
+    password: credentials.password,
+    cookieFile,
+  };
+}
+
+export async function signOutUser(
+  baseUrl: string,
+  cookieFile: string,
+): Promise<void> {
+  await requestJson<unknown>(baseUrl, "/api/auth/sign-out", {
+    cookieFile,
+    method: "POST",
+    body: {},
+    expectedSuccess: true,
+  });
+}
+
+export async function readSqliteRows<T extends Record<string, unknown>>(
+  project: E2eProject,
+  sql: string,
+  params: readonly SqliteValue[] = [],
+): Promise<T[]> {
+  const databasePath = join(project.projectDir, "data", "sqlite.db");
+  const queryScript = [
+    'import Database from "better-sqlite3";',
+    `const db = new Database(${JSON.stringify(databasePath)}, { readonly: true });`,
+    `const rows = db.prepare(${JSON.stringify(sql)}).all(...${JSON.stringify(params)});`,
+    "db.close();",
+    "console.log(JSON.stringify(rows));",
+  ].join("\n");
+  const output = await runText(
+    "pnpm",
+    [
+      "--filter",
+      "./packages/api",
+      "exec",
+      "node",
+      "--input-type=module",
+      "-e",
+      queryScript,
+    ],
+    {
+      cwd: project.projectDir,
+      env: project.env,
+      timeoutMs: 30_000,
+    },
+  );
+  return JSON.parse(output) as T[];
+}
+
+export async function runSqliteStatement(
+  project: E2eProject,
+  sql: string,
+  params: readonly SqliteValue[] = [],
+): Promise<SqliteStatementResult> {
+  const databasePath = join(project.projectDir, "data", "sqlite.db");
+  const queryScript = [
+    'import Database from "better-sqlite3";',
+    `const db = new Database(${JSON.stringify(databasePath)});`,
+    `const result = db.prepare(${JSON.stringify(sql)}).run(...${JSON.stringify(params)});`,
+    "db.close();",
+    "console.log(JSON.stringify({ changes: result.changes, lastInsertRowid: result.lastInsertRowid }));",
+  ].join("\n");
+  const output = await runText(
+    "pnpm",
+    [
+      "--filter",
+      "./packages/api",
+      "exec",
+      "node",
+      "--input-type=module",
+      "-e",
+      queryScript,
+    ],
+    {
+      cwd: project.projectDir,
+      env: project.env,
+      timeoutMs: 30_000,
+    },
+  );
+  return JSON.parse(output) as SqliteStatementResult;
+}
+
+export async function addWorkspaceMember(
+  project: E2eProject,
+  input: {
+    workspaceId: string;
+    userId: string;
+    role: WorkspaceMemberRole;
+  },
+): Promise<string> {
+  const memberId = randomUUID();
+  await runSqliteStatement(
+    project,
+    "INSERT INTO member (id, organizationId, userId, role, createdAt) VALUES (?, ?, ?, ?, ?)",
+    [memberId, input.workspaceId, input.userId, input.role, Date.now()],
+  );
+  return memberId;
 }
 
 export async function prepareDockerReleaseProject(
@@ -817,6 +1865,7 @@ function countOccurrences(text: string, needle: string): number {
 export async function startBuiltServer(
   project: E2eProject,
   envOverrides: NodeJS.ProcessEnv = {},
+  options: StartServerOptions = {},
 ): Promise<StartedServer> {
   const port = await getFreePort();
   const baseUrl = `http://127.0.0.1:${port}`;
@@ -830,6 +1879,8 @@ export async function startBuiltServer(
         ...envOverrides,
         SAPPORTA_PUBLIC_BASE_URL:
           envOverrides.SAPPORTA_PUBLIC_BASE_URL ?? baseUrl,
+        SAPPORTA_REQUIRE_VERIFIED_EMAIL:
+          envOverrides.SAPPORTA_REQUIRE_VERIFIED_EMAIL ?? "false",
         PORT: String(port),
       },
       stdio: "pipe",
@@ -839,7 +1890,7 @@ export async function startBuiltServer(
     child.stderr?.on("data", (chunk: Buffer) => output.push(chunk.toString()));
 
     try {
-      await waitForJson(`${baseUrl}/health`);
+      await waitForJson(`${baseUrl}${options.readyPath ?? "/health"}`);
     } catch (err) {
       console.error("Server failed to start. Output:\n" + output.join(""));
       child.kill("SIGTERM");
@@ -850,6 +1901,68 @@ export async function startBuiltServer(
   });
 
   return { process: serverProcess, baseUrl, output };
+}
+
+export async function expectBuiltServerBootFailure(
+  project: E2eProject,
+  envOverrides: NodeJS.ProcessEnv = {},
+  timeoutMs = 15_000,
+): Promise<BootFailure> {
+  const port = await getFreePort();
+  const baseUrl = `http://127.0.0.1:${port}`;
+  const output: string[] = [];
+  const child = spawn("node", ["packages/api/dist/boot.js"], {
+    cwd: project.projectDir,
+    env: {
+      ...project.env,
+      ...envOverrides,
+      SAPPORTA_PUBLIC_BASE_URL:
+        envOverrides.SAPPORTA_PUBLIC_BASE_URL ?? baseUrl,
+      SAPPORTA_REQUIRE_VERIFIED_EMAIL:
+        envOverrides.SAPPORTA_REQUIRE_VERIFIED_EMAIL ?? "false",
+      PORT: String(port),
+    },
+    stdio: "pipe",
+  });
+
+  child.stdout?.on("data", (chunk: Buffer) => output.push(chunk.toString()));
+  child.stderr?.on("data", (chunk: Buffer) => output.push(chunk.toString()));
+
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      child.kill("SIGTERM");
+      reject(
+        new Error(
+          [
+            `Expected scaffolded server boot to fail within ${timeoutMs}ms.`,
+            "Output:",
+            output.join(""),
+          ].join("\n"),
+        ),
+      );
+    }, timeoutMs);
+
+    child.on("error", (err) => {
+      clearTimeout(timer);
+      reject(err);
+    });
+    child.on("exit", (code, signal) => {
+      clearTimeout(timer);
+      if (code === 0) {
+        reject(
+          new Error(
+            [
+              "Expected scaffolded server boot to fail, but it exited cleanly.",
+              "Output:",
+              output.join(""),
+            ].join("\n"),
+          ),
+        );
+        return;
+      }
+      resolve({ baseUrl, code, signal, output });
+    });
+  });
 }
 
 export function stopServer(server: StartedServer | undefined): void {
@@ -1104,11 +2217,266 @@ export async function curlJson<T>(
   return JSON.parse(text) as T;
 }
 
+export function requestJson<T>(
+  url: string,
+  opts?: JsonRequestOptions,
+): Promise<JsonResponse<T>>;
+export function requestJson<T>(
+  baseUrl: string,
+  path: string,
+  opts?: JsonRequestOptions,
+): Promise<JsonResponse<T>>;
+export async function requestJson<T>(
+  urlOrBaseUrl: string,
+  pathOrOpts: string | JsonRequestOptions = {},
+  maybeOpts: JsonRequestOptions = {},
+): Promise<JsonResponse<T>> {
+  const url =
+    typeof pathOrOpts === "string"
+      ? `${urlOrBaseUrl}${pathOrOpts}`
+      : urlOrBaseUrl;
+  const opts = typeof pathOrOpts === "string" ? maybeOpts : pathOrOpts;
+  const headersFile = join(
+    tmpdir(),
+    `sapporta-e2e-headers-${Date.now()}-${Math.random()}.txt`,
+  );
+  const args = ["-g", "-sS", "-D", headersFile];
+  if (opts.cookieFile) {
+    args.push("-b", opts.cookieFile, "-c", opts.cookieFile);
+  }
+  if (opts.method) {
+    args.push("-X", opts.method);
+  }
+
+  const requestHeaders = new Map<string, string>();
+  for (const [name, value] of Object.entries(opts.headers ?? {})) {
+    requestHeaders.set(name.toLowerCase(), value);
+  }
+  if (
+    new URL(url).pathname.startsWith("/api/auth/") &&
+    !requestHeaders.has("x-forwarded-for")
+  ) {
+    requestHeaders.set("x-forwarded-for", authRequestIp(url, opts));
+  }
+  if (opts.body !== undefined && !requestHeaders.has("content-type")) {
+    requestHeaders.set("content-type", "application/json");
+  }
+  if (opts.origin !== undefined && opts.origin !== null) {
+    requestHeaders.set("origin", opts.origin);
+  } else if (opts.body !== undefined && opts.origin !== null) {
+    requestHeaders.set("origin", new URL(url).origin);
+  }
+  for (const [name, value] of requestHeaders) {
+    args.push("-H", `${name}: ${value}`);
+  }
+
+  if (opts.body !== undefined) {
+    args.push("--data", JSON.stringify(opts.body));
+  }
+  args.push("-w", "\n%{http_code}");
+  args.push(url);
+
+  try {
+    const output = await runText("curl", args, {
+      cwd: opts.cwd ?? MONOREPO_ROOT,
+      env: opts.env ?? process.env,
+      timeoutMs: opts.timeoutMs ?? 30_000,
+    });
+    const separator = output.lastIndexOf("\n");
+    const rawBody = separator === -1 ? output : output.slice(0, separator);
+    const status = Number(separator === -1 ? "0" : output.slice(separator + 1));
+    const response: JsonResponse<T> = {
+      status,
+      body: parseJsonBody<T>(rawBody),
+      rawBody,
+      headers: parseResponseHeaders(readFileSync(headersFile, "utf-8")),
+    };
+    if (opts.expectedStatus !== undefined) {
+      const statuses =
+        typeof opts.expectedStatus === "number"
+          ? [opts.expectedStatus]
+          : [...opts.expectedStatus];
+      expect(
+        statuses,
+        formatHttpExpectationMessage(statuses, response, opts.serverOutput),
+      ).toContain(status);
+    }
+    if (opts.expectedSuccess === true && (status < 200 || status >= 300)) {
+      throw new Error(
+        formatHttpExpectationMessage([200, 299], response, opts.serverOutput),
+      );
+    }
+    return response;
+  } finally {
+    rmSync(headersFile, { force: true });
+  }
+}
+
+function parseJsonBody<T>(rawBody: string): T {
+  if (rawBody.length === 0) return undefined as T;
+  try {
+    return JSON.parse(rawBody) as T;
+  } catch {
+    return rawBody as T;
+  }
+}
+
+function authRequestIp(url: string, opts: JsonRequestOptions): string {
+  const seed = `${opts.cookieFile ?? ""}:${requestBodyEmail(opts.body) ?? ""}:${url}`;
+  const hash = positiveHash(seed);
+  const second = 64 + (hash % 64);
+  const third = (hash >>> 8) % 256;
+  const fourth = 1 + ((hash >>> 16) % 254);
+  return `10.${second}.${third}.${fourth}`;
+}
+
+function requestBodyEmail(body: unknown): string | undefined {
+  if (typeof body !== "object" || body === null || !("email" in body)) {
+    return undefined;
+  }
+  const email = body.email;
+  return typeof email === "string" ? email : undefined;
+}
+
+function positiveHash(input: string): number {
+  let hash = 0;
+  for (let i = 0; i < input.length; i += 1) {
+    hash = (hash * 31 + input.charCodeAt(i)) >>> 0;
+  }
+  return hash;
+}
+
+function parseResponseHeaders(rawHeaders: string): RequestHeaders {
+  const headers: RequestHeaders = {};
+  for (const line of rawHeaders.split(/\r?\n/)) {
+    const separator = line.indexOf(":");
+    if (separator === -1) continue;
+    const name = line.slice(0, separator).trim().toLowerCase();
+    const value = line.slice(separator + 1).trim();
+    if (!name) continue;
+    headers[name] = headers[name] ? `${headers[name]}, ${value}` : value;
+  }
+  return headers;
+}
+
+function formatHttpExpectationMessage<T>(
+  expectedStatuses: readonly number[],
+  response: JsonResponse<T>,
+  serverOutput: readonly string[] = [],
+): string {
+  return [
+    `Expected HTTP ${expectedStatuses.join(" or ")}, got ${response.status}: ${response.rawBody}`,
+    ...(serverOutput.length === 0 ? [] : ["Server output:", ...serverOutput]),
+  ].join("\n");
+}
+
+export function expectHttpError(
+  response: JsonResponse<unknown>,
+  expectedStatus: number,
+  expectedBody: { code?: string; error?: string | RegExp } = {},
+): void {
+  expect(response.status).toBe(expectedStatus);
+  const body = response.body;
+  expect(body).toEqual(expect.any(Object));
+  const objectBody = body as Record<string, unknown>;
+  if (expectedBody.code !== undefined) {
+    expect(objectBody.code).toBe(expectedBody.code);
+  }
+  if (expectedBody.error !== undefined) {
+    if (expectedBody.error instanceof RegExp) {
+      expect(String(objectBody.error ?? "")).toMatch(expectedBody.error);
+    } else {
+      expect(objectBody.error).toBe(expectedBody.error);
+    }
+  }
+}
+
+export function expectAuthContext(
+  context: AuthContextBody,
+  expected: AuthContextExpectation,
+): void {
+  if (expected.email !== undefined) {
+    expect(context.user.email).toBe(expected.email);
+  }
+  if (expected.workspaceId !== undefined) {
+    expect(context.workspace.id).toBe(expected.workspaceId);
+  }
+  if (expected.workspaceName !== undefined) {
+    expect(context.workspace.name).toBe(expected.workspaceName);
+  }
+  if (expected.workspaceSlug !== undefined) {
+    expect(context.workspace.slug).toBe(expected.workspaceSlug);
+  }
+  if (expected.role !== undefined) {
+    expect(context.role ?? context.memberships[0]?.role).toBe(expected.role);
+  }
+  if (expected.isOwner !== undefined) {
+    expect(context.isOwner ?? context.memberships[0]?.isOwner).toBe(
+      expected.isOwner,
+    );
+  }
+}
+
+export function expectVisibleTitles<T extends { title?: unknown }>(
+  rowsOrBody: readonly T[] | { data: readonly T[] },
+  expectedTitles: readonly string[],
+): void {
+  const rows: readonly T[] =
+    "data" in rowsOrBody ? rowsOrBody.data : rowsOrBody;
+  expect(rows.map((row) => row.title)).toEqual(expectedTitles);
+}
+
+export function expectNoScopeLeak<T extends Record<string, unknown>>(
+  rowsOrBody: readonly T[] | { data: readonly T[] },
+  expectedScope: { workspaceId?: string; scopedToUserId?: string },
+): void {
+  const rows: readonly T[] =
+    "data" in rowsOrBody ? rowsOrBody.data : rowsOrBody;
+  for (const row of rows) {
+    if ("workspace_id" in row && expectedScope.workspaceId !== undefined) {
+      expect(row.workspace_id).toBe(expectedScope.workspaceId);
+    }
+    if (
+      "scoped_to_user_id" in row &&
+      expectedScope.scopedToUserId !== undefined
+    ) {
+      expect(row.scoped_to_user_id).toBe(expectedScope.scopedToUserId);
+    }
+  }
+}
+
+export async function expectTableRowCount(
+  project: E2eProject,
+  tableName: string,
+  expectedCount: number,
+  whereSql?: string,
+  params: readonly SqliteValue[] = [],
+): Promise<void> {
+  assertSqlIdentifier(tableName);
+  const rows = await readSqliteRows<{ count: number }>(
+    project,
+    [
+      `SELECT COUNT(*) AS count FROM "${tableName}"`,
+      whereSql === undefined ? "" : `WHERE ${whereSql}`,
+    ]
+      .filter(Boolean)
+      .join(" "),
+    params,
+  );
+  expect(rows[0]?.count).toBe(expectedCount);
+}
+
+function assertSqlIdentifier(identifier: string): void {
+  if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(identifier)) {
+    throw new Error(`Invalid SQLite identifier: ${identifier}`);
+  }
+}
+
 export async function curlText(
   url: string,
   opts: { method?: string; body?: unknown } & AuthCookieOptions = {},
 ): Promise<string> {
-  const args = ["-sS"];
+  const args = ["-g", "-sS"];
   if (opts.cookieFile) {
     args.push("-b", opts.cookieFile, "-c", opts.cookieFile);
   }
