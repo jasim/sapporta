@@ -1,4 +1,12 @@
-import { useEffect, useState, type FormEvent, type ReactNode } from "react";
+import {
+  cloneElement,
+  useEffect,
+  useId,
+  useState,
+  type FormEvent,
+  type ReactElement,
+  type ReactNode,
+} from "react";
 import {
   Link,
   useLocation,
@@ -305,9 +313,7 @@ function AuthFrame({
     <div className="flex min-h-screen items-center justify-center bg-sap-bg px-4">
       <div className="w-full max-w-[360px] space-y-5">
         <div className="space-y-1">
-          <div className="text-sm font-medium text-sap-muted">
-            {name ?? ""}
-          </div>
+          <div className="text-sm font-medium text-sap-muted">{name ?? ""}</div>
           <h1 className="text-xl font-semibold text-sap-fg">{title}</h1>
         </div>
         {children}
@@ -316,11 +322,20 @@ function AuthFrame({
   );
 }
 
-function Field({ label, children }: { label: string; children: ReactNode }) {
+function Field({
+  label,
+  children,
+}: {
+  label: string;
+  children: ReactElement<{ id?: string }>;
+}) {
+  const generatedId = useId();
+  const id = children.props.id ?? generatedId;
+
   return (
     <div className="space-y-2">
-      <Label>{label}</Label>
-      {children}
+      <Label htmlFor={id}>{label}</Label>
+      {cloneElement(children, { id })}
     </div>
   );
 }

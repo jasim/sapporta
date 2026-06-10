@@ -50,8 +50,10 @@ export function PublicOnlyGate({ children }: { children: ReactNode }) {
   const loadBootstrapStatus = useAuthStore((s) => s.loadBootstrapStatus);
 
   useEffect(() => {
-    if (!bootstrapStatus) void loadBootstrapStatus();
-  }, [bootstrapStatus, loadBootstrapStatus]);
+    if (status !== "authenticated" && !bootstrapStatus) {
+      void loadBootstrapStatus();
+    }
+  }, [bootstrapStatus, loadBootstrapStatus, status]);
 
   if (status === "authenticated") return <Navigate to="/" replace />;
   if (location.pathname === "/login" && !bootstrapStatus) {
