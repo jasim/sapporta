@@ -216,7 +216,7 @@ export function getAccountSecondaryLabel(context: AuthContextResponse): string {
 }
 
 export function formatAuthRole(role: AuthRole): string {
-  return role === "owner" ? "Owner" : "User";
+  return role === "owner" ? "Owner" : "Member";
 }
 
 interface DefaultAccountMenuTriggerProps

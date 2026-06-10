@@ -17,6 +17,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@casl/ability": "%%SAPPORTA:CASL_ABILITY_VERSION%%",
     "@sapporta/honest": "%%SAPPORTA:HONEST_SPEC%%",
     "@sapporta/rest-core": "%%SAPPORTA:SAPPORTA_REST_CORE_VERSION%%",
     "@sapporta/server": "%%SAPPORTA:CORE_SPEC%%",

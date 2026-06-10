@@ -13,11 +13,11 @@ import {
   mountSapportaFramework,
 } from "../load-sapporta.js";
 import {
-  createRowSecurity,
+  createAuthContext,
   assertAuthSchemaDefinitions,
   type SapportaAuthContext,
-  type SapportaAuthIdentity,
-  type SapportaAuthRole,
+  type SapportaAbility,
+  type WorkspaceRole,
 } from "../auth/index.js";
 import { createTestDb } from "../testing/test-utils.js";
 import { installSapportaDefaults, type SapportaEnv } from "../api/server.js";
@@ -50,7 +50,7 @@ export interface TestAuthOverrides {
   workspaceSlug?: string;
   isOwner?: boolean;
   memberId?: string;
-  role?: SapportaAuthRole;
+  role?: WorkspaceRole;
 }
 
 export type TestRequestInit = RequestInit & {
@@ -187,41 +187,41 @@ function createTestAuth(
   overrides: TestAuthOverrides,
   catalog: TableCatalog,
 ): SapportaAuthContext {
-  const identity = createTestIdentity(overrides);
-  return {
-    ...identity,
-    rowSecurity: createRowSecurity(identity, { catalog }),
-  };
-}
-
-function createTestIdentity(
-  overrides: TestAuthOverrides = {},
-): SapportaAuthIdentity {
   const userId = overrides.userId ?? "user-1";
   const workspaceId = overrides.workspaceId ?? "workspace-1";
-  return {
-    session: {
-      id: overrides.sessionId ?? `session-${userId}-${workspaceId}`,
-      userId,
-      activeWorkspaceId: workspaceId,
-    },
-    user: {
-      id: userId,
-      name: overrides.userName ?? "Test User",
-      email: overrides.userEmail ?? `${userId}@example.com`,
-      emailVerified: overrides.emailVerified ?? true,
-    },
-    workspace: {
-      id: workspaceId,
-      name: overrides.workspaceName ?? `Workspace ${workspaceId}`,
-      slug: overrides.workspaceSlug ?? workspaceId,
-      isOwner: overrides.isOwner ?? true,
-    },
-    member: {
-      id: overrides.memberId ?? `member-${userId}-${workspaceId}`,
-      role: overrides.role ?? "owner",
-    },
+  const user = {
+    id: userId,
+    name: overrides.userName ?? "Test User",
+    email: overrides.userEmail ?? `${userId}@example.com`,
+    emailVerified: overrides.emailVerified ?? true,
   };
+  const workspace = {
+    id: workspaceId,
+    name: overrides.workspaceName ?? `Workspace ${workspaceId}`,
+    slug: overrides.workspaceSlug ?? workspaceId,
+  };
+
+  return createAuthContext({
+    principal: {
+      kind: "user",
+      user,
+      membership: {
+        id: overrides.memberId ?? `member-${userId}-${workspaceId}`,
+        roles: [overrides.role ?? (overrides.isOwner === false ? "member" : "owner")],
+      },
+    },
+    rowsAllowedForRequest: {
+      kind: "allowWorkspaceUserRows",
+      workspace,
+      user,
+    },
+    ability: allowAllAbility(),
+    catalog,
+  });
+}
+
+function allowAllAbility(): SapportaAbility {
+  return { can: () => true };
 }
 
 function requestInitWithAuth(init: TestRequestInit): RequestInit {

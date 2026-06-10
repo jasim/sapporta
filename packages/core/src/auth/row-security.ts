@@ -2,12 +2,12 @@ import { and, type SQL } from "drizzle-orm";
 import type { BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
 import type { TableCatalog } from "../schema/catalog.js";
 import type { TableDef } from "../schema/table.js";
-import type { SapportaAuthIdentity } from "./context.js";
+import type { RowsAllowedForRequest } from "./rows-allowed-for-request.js";
 import {
   AuthPayloadPolicyError,
   clientPayloadPolicyIssues,
   requireResolvedTableReferences,
-  trustedScopeInsertValues,
+  trustedInsertValuesForAllowedRows,
 } from "./schema-validation.js";
 import {
   selectRowAccessPredicate,
@@ -18,8 +18,13 @@ import {
  * Request-bound security helpers for one table.
  *
  * Build these from `auth.rowSecurity.forTable(tableDef)` inside a handler.
- * Every method uses the active user/workspace plus the loaded table catalog,
- * so callers do not pass ownership fields or table sets around by hand.
+ * Every method uses the rows allowed for the request plus the loaded table
+ * catalog, so callers do not pass ownership fields or table sets around by
+ * hand.
+ *
+ * CASL is intentionally outside this interface. Routes decide whether a
+ * principal may use a feature; these helpers decide which rows that feature may
+ * safely read, write, or reference.
  */
 export interface TableRowSecurity {
   /**
@@ -44,8 +49,8 @@ export interface TableRowSecurity {
    *
    * The helper rejects client ownership tampering, rejects client-submitted
    * `clientCanSet: false` references, merges trusted `serverValues`, validates
-   * final FK visibility inside the active auth boundary, and stamps trusted
-   * ownership fields from auth.
+   * final FK visibility inside the rows allowed for the request, and stamps
+   * trusted ownership fields from auth.
    */
   insertValues<T extends Record<string, unknown>>(
     db: BetterSQLite3Database,
@@ -70,7 +75,7 @@ export interface TableRowSecurity {
   ): Promise<Array<T & Record<string, unknown>>>;
 
   /**
-   * Returns the table visibility predicate for the active auth boundary.
+   * Returns the table visibility predicate for the rows allowed for the request.
    * When `predicate` is supplied, it is AND-composed with the ownership
    * predicate for safe reads, updates, and deletes.
    */
@@ -132,12 +137,16 @@ export interface CreateRowSecurityOptions {
 }
 
 /**
- * Creates request-bound row security from the authenticated identity and the
- * loaded table catalog. Project auth constructs this once per request and
+ * Creates request-bound row security from the rows allowed for the request and
+ * the loaded table catalog. Project auth constructs this once per request and
  * exposes it as `auth.rowSecurity`.
+ *
+ * `rowsAllowedForRequest` is the only source for trusted ownership values. Do
+ * not pass user ids or workspace ids separately into table workflows; doing so
+ * would create a second row-access model for callers to reconcile.
  */
 export function createRowSecurity(
-  auth: SapportaAuthIdentity,
+  rowsAllowedForRequest: RowsAllowedForRequest,
   options: CreateRowSecurityOptions,
 ): RowSecurity {
   return {
@@ -178,7 +187,7 @@ export function createRowSecurity(
         await validateReferences(db, merged);
         return {
           ...merged,
-          ...trustedScopeInsertValues(auth, tableDef).sql,
+          ...trustedInsertValuesForAllowedRows(rowsAllowedForRequest, tableDef).sql,
         };
       }
 
@@ -188,7 +197,7 @@ export function createRowSecurity(
       ): Promise<void> {
         await validateForeignKeyReferences(
           db,
-          auth,
+          rowsAllowedForRequest,
           tableDef,
           payload,
           options.catalog.tables,
@@ -203,7 +212,7 @@ export function createRowSecurity(
         addOwnershipFields(input) {
           return {
             ...input,
-            ...trustedScopeInsertValues(auth, tableDef).sql,
+            ...trustedInsertValuesForAllowedRows(rowsAllowedForRequest, tableDef).sql,
           };
         },
 
@@ -235,7 +244,7 @@ export function createRowSecurity(
 
         ownedRows(predicate) {
           const ownershipPredicate = selectRowAccessPredicate(
-            auth,
+            rowsAllowedForRequest,
             tableDef,
           );
           return predicate

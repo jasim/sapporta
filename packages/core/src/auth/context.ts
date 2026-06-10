@@ -1,45 +1,28 @@
 import type { RowSecurity } from "./row-security.js";
+import type { SapportaAbility } from "./ability.js";
+import type { Principal, WorkspaceMembership } from "./principal.js";
+import type { RowsAllowedForRequest } from "./rows-allowed-for-request.js";
 
-export type SapportaAuthRole = "owner" | "user";
-
-export const sapportaAuthRoles = ["owner", "user"] as const satisfies readonly SapportaAuthRole[];
-
-export interface SapportaAuthSession {
-  id: string;
-  userId: string;
-  activeWorkspaceId: string;
-}
-
-export interface SapportaAuthUser {
-  id: string;
-  name: string | null;
-  email: string;
-  emailVerified: boolean;
-}
-
-export interface SapportaAuthWorkspace {
-  id: string;
-  name: string;
-  slug: string;
-  isOwner: boolean;
-}
-
-export interface SapportaAuthMember {
-  id: string;
-  role: SapportaAuthRole;
-}
-
-export interface SapportaAuthIdentity {
-  session: SapportaAuthSession;
-  user: SapportaAuthUser;
-  workspace: SapportaAuthWorkspace;
-  member: SapportaAuthMember;
-}
-
-export interface SapportaAuthContext extends SapportaAuthIdentity {
+/**
+ * The authorization facts available to one request.
+ *
+ * Read this as four separate questions:
+ * - who is asking (`principal`);
+ * - which trusted row facts may database helpers use (`rowsAllowedForRequest`);
+ * - what actions may the requester perform (`ability`);
+ * - how those row facts become SQL predicates and trusted insert values
+ *   (`rowSecurity`).
+ *
+ * Keeping those questions separate is the main invariant. A CASL permission can
+ * allow an action without widening row predicates, and anonymous public routes
+ * can use row security without pretending to be signed-in users.
+ */
+export interface SapportaAuthContext<
+  AppAbility = SapportaAbility,
+  Membership extends WorkspaceMembership = WorkspaceMembership,
+> {
+  principal: Principal<Membership>;
+  rowsAllowedForRequest: RowsAllowedForRequest;
+  ability: AppAbility;
   rowSecurity: RowSecurity;
-}
-
-export function ownsActiveWorkspace(auth: SapportaAuthIdentity): boolean {
-  return auth.workspace.isOwner;
 }

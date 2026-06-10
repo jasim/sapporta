@@ -3,3 +3,4 @@
 // can pick everything up in one place.
 
 export { helloContract } from "./hello.js";
+export { publicApiSampleContract } from "./public-api-sample.js";

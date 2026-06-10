@@ -5,6 +5,7 @@ import {
   type SapportaAuthContext,
   type SapportaEnv,
 } from "@sapporta/server";
+import type { AppAbility, AppWorkspaceMembership } from "../authz/types.js";
 import {
   getAuthBootstrapStatusRoute,
   getAuthContextRoute,
@@ -13,7 +14,7 @@ import {
   type AuthContextResponse,
 } from "@sapporta/shared/contracts";
 import { authFailure } from "./errors.js";
-import { requireOnlyBareLoggedInUser } from "./middleware.js";
+import { requireAuthContext } from "./middleware.js";
 import { WorkspaceSwitchError } from "./workspace.js";
 
 export interface ProjectAuthRoutesOptions {
@@ -21,7 +22,7 @@ export interface ProjectAuthRoutesOptions {
   switchActiveWorkspace: (
     c: Context<SapportaEnv>,
     workspaceId: string,
-  ) => Promise<SapportaAuthContext>;
+  ) => Promise<SapportaAuthContext<AppAbility, AppWorkspaceMembership>>;
 }
 
 export function createProjectAuthRoutes(options: ProjectAuthRoutesOptions) {
@@ -34,7 +35,7 @@ export function createProjectAuthRoutes(options: ProjectAuthRoutesOptions) {
 
   api.register("getAuthContext", getAuthContextRoute, ({ c }) => ({
     status: 200,
-    body: authContextResponse(requireOnlyBareLoggedInUser(c)),
+    body: authContextResponse(requireAppAuthContext(c)),
   }));
 
   api.register("switchActiveWorkspace", switchActiveWorkspaceRoute, async ({ c, request }) => {
@@ -63,6 +64,15 @@ export function createProjectAuthRoutes(options: ProjectAuthRoutesOptions) {
   return api;
 }
 
+function requireAppAuthContext(
+  c: Context<SapportaEnv>,
+): SapportaAuthContext<AppAbility, AppWorkspaceMembership> {
+  return requireAuthContext(c) as SapportaAuthContext<
+    AppAbility,
+    AppWorkspaceMembership
+  >;
+}
+
 export function authBootstrapStatus(
   conn: ProjectDbConnection,
 ): AuthBootstrapStatus {
@@ -76,25 +86,33 @@ export function authBootstrapStatus(
 }
 
 export function authContextResponse(
-  auth: SapportaAuthContext,
+  auth: SapportaAuthContext<AppAbility, AppWorkspaceMembership>,
 ): AuthContextResponse {
+  if (auth.principal.kind !== "user") {
+    throw new Error("A signed-in user is required to build auth context response.");
+  }
+  // The frontend contract is intentionally user-shaped. Derive it from the
+  // principal membership so route code does not grow a second owner/role model.
+  const membership = auth.principal.membership;
+  const workspace = membership.workspace;
+  const role = membership.roles.includes("owner") ? "owner" : "member";
+  const isOwner = role === "owner";
   return {
-    user: auth.user,
-    workspace: auth.workspace,
+    user: auth.principal.user,
+    workspace: {
+      ...workspace,
+      isOwner,
+    },
     memberships: [
       {
-        id: auth.member.id,
-        workspace: {
-          id: auth.workspace.id,
-          name: auth.workspace.name,
-          slug: auth.workspace.slug,
-        },
-        role: auth.member.role,
-        isOwner: auth.workspace.isOwner,
+        id: membership.id,
+        workspace,
+        role,
+        isOwner,
       },
     ],
-    role: auth.member.role,
-    isOwner: auth.workspace.isOwner,
+    role,
+    isOwner,
   };
 }
 

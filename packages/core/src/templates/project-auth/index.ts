@@ -1,22 +1,30 @@
 import type { Context } from "hono";
 import type {
+  BuildAbility,
   ProjectDbConnection,
   SapportaAuthContext,
   SapportaEnv,
   TableCatalog,
 } from "@sapporta/server";
 import type { SapportaMailer } from "../mailer.js";
+import type { AppAbility, AppWorkspaceMembership } from "../authz/types.js";
 import { createBetterAuth, type ProjectBetterAuth } from "./better-auth.js";
 import {
   resolveSapportaAuthContext,
   switchActiveWorkspace as switchActiveWorkspaceContext,
+  type ResolveRowsAllowedForRequest,
 } from "./context.js";
 import { createProjectAuthRoutes } from "./routes.js";
 import type { ProjectAuthEnv } from "./env.js";
 import {
-  createProjectAuthMiddleware,
+  rejectAnonymousByDefault,
+  requireAuthContext,
+  requirePrincipalUser,
+  requireVerifiedUser,
   requireWorkspaceOwner,
-  requireWorkspaceUser,
+  requireWorkspaceRowsAllowed,
+  resolveProjectAuthMiddleware,
+  type PublicRoutePattern,
 } from "./middleware.js";
 
 export interface CreateProjectAuthOptions {
@@ -24,36 +32,59 @@ export interface CreateProjectAuthOptions {
   env: ProjectAuthEnv;
   catalog: TableCatalog;
   mailer: SapportaMailer;
+  buildAbility: BuildAbility<AppAbility, AppWorkspaceMembership>;
+  resolveRowsAllowedForRequest: ResolveRowsAllowedForRequest;
+  publicRoutes?: readonly PublicRoutePattern[];
 }
 
 export interface ProjectAuth {
   auth: ProjectBetterAuth;
   env: ProjectAuthEnv;
   routes: ReturnType<typeof createProjectAuthRoutes>;
-  middleware: ReturnType<typeof createProjectAuthMiddleware<SapportaEnv>>;
-  isAuthRoute: (c: Context<SapportaEnv>) => boolean;
-  resolveAuth: (c: Context<SapportaEnv>) => Promise<SapportaAuthContext | null>;
-  requireWorkspaceUser: (c: Context<SapportaEnv>) => SapportaAuthContext;
+  resolveMiddleware: ReturnType<typeof resolveProjectAuthMiddleware<SapportaEnv>>;
+  rejectAnonymousMiddleware: ReturnType<typeof rejectAnonymousByDefault<SapportaEnv>>;
+  resolveAuth: (
+    c: Context<SapportaEnv>,
+  ) => Promise<SapportaAuthContext<AppAbility, AppWorkspaceMembership>>;
+  requireAuthContext: (c: Context<SapportaEnv>) => SapportaAuthContext;
+  requirePrincipalUser: (c: Context<SapportaEnv>) => Extract<
+    SapportaAuthContext["principal"],
+    { kind: "user" }
+  >;
+  requireVerifiedUser: (c: Context<SapportaEnv>) => SapportaAuthContext;
+  requireWorkspaceRowsAllowed: (c: Context<SapportaEnv>) => SapportaAuthContext;
   requireWorkspaceOwner: (c: Context<SapportaEnv>) => SapportaAuthContext;
   switchActiveWorkspace: (
     c: Context<SapportaEnv>,
     workspaceId: string,
-  ) => Promise<SapportaAuthContext>;
+  ) => Promise<SapportaAuthContext<AppAbility, AppWorkspaceMembership>>;
 }
+
+const defaultPublicRoutes = [
+  { method: "GET", path: "/api/auth-bootstrap" },
+  { method: "GET", path: "/api/meta/info" },
+] as const satisfies readonly PublicRoutePattern[];
 
 export function createProjectAuth({
   conn,
   env,
   catalog,
   mailer,
+  buildAbility,
+  resolveRowsAllowedForRequest,
+  publicRoutes = [],
 }: CreateProjectAuthOptions): ProjectAuth {
   const auth = createBetterAuth({ conn, env, mailer });
-  const isAuthRoute = (c: Context<SapportaEnv>) =>
-    c.req.path.startsWith("/api/auth/") ||
-    c.req.path === "/api/auth-bootstrap" ||
-    (c.req.method === "GET" && c.req.path === "/api/meta/info");
   const resolveAuth = (c: Context<SapportaEnv>) =>
-    resolveSapportaAuthContext(auth.api, conn, catalog, c.req.raw.headers);
+    resolveSapportaAuthContext({
+      auth: auth.api,
+      conn,
+      catalog,
+      headers: c.req.raw.headers,
+      c,
+      buildAbility,
+      resolveRowsAllowedForRequest,
+    });
 
   return {
     auth,
@@ -61,39 +92,51 @@ export function createProjectAuth({
     routes: createProjectAuthRoutes({
       conn,
       switchActiveWorkspace: (c, workspaceId) =>
-        switchActiveWorkspaceContext(
-          auth.api,
+        switchActiveWorkspaceContext({
+          auth: auth.api,
           conn,
           catalog,
-          c.req.raw.headers,
+          headers: c.req.raw.headers,
+          c,
+          buildAbility,
+          resolveRowsAllowedForRequest,
           workspaceId,
-        ),
+        }),
     }),
-    middleware: createProjectAuthMiddleware(resolveAuth, {
-      requireVerifiedEmail: env.requireVerifiedEmail,
-      skip: isAuthRoute,
+    resolveMiddleware: resolveProjectAuthMiddleware(resolveAuth),
+    rejectAnonymousMiddleware: rejectAnonymousByDefault({
+      publicRoutes: [...defaultPublicRoutes, ...publicRoutes],
     }),
-    isAuthRoute,
     resolveAuth,
-    requireWorkspaceUser,
+    requireAuthContext,
+    requirePrincipalUser,
+    requireVerifiedUser,
+    requireWorkspaceRowsAllowed,
     requireWorkspaceOwner,
     switchActiveWorkspace: (c, workspaceId) =>
-      switchActiveWorkspaceContext(
-        auth.api,
+      switchActiveWorkspaceContext({
+        auth: auth.api,
         conn,
         catalog,
-        c.req.raw.headers,
+        headers: c.req.raw.headers,
+        c,
+        buildAbility,
+        resolveRowsAllowedForRequest,
         workspaceId,
-      ),
+      }),
   };
 }
 
 export { createBetterAuth, type ProjectBetterAuth } from "./better-auth.js";
 export {
-  authContextFromPayload,
+  membershipFromRow,
+  resolvePrincipal,
   resolveSapportaAuthContext,
   switchActiveWorkspace,
+  userFromSessionPayload,
   type BetterAuthSessionPayload,
+  type ResolveRowsAllowedForRequest,
+  type ResolveSapportaAuthContextInput,
 } from "./context.js";
 export {
   readProjectAuthEnv,
@@ -114,12 +157,15 @@ export {
   type ProjectAuthFailure,
 } from "./errors.js";
 export {
-  createProjectAuthMiddleware,
-  requireOnlyBareLoggedInUser,
-  requireOnlyBareVerifiedUser,
+  rejectAnonymousByDefault,
+  requireAuthContext,
+  requirePrincipalUser,
+  requireVerifiedUser,
   requireWorkspaceOwner,
-  requireWorkspaceUser,
-  type ProjectAuthMiddlewareOptions,
+  requireWorkspaceRowsAllowed,
+  resolveProjectAuthMiddleware,
+  type AnonymousGateOptions,
+  type PublicRoutePattern,
   type ResolveProjectAuth,
 } from "./middleware.js";
 export * from "./workspace.js";

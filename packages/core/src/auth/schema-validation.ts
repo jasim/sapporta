@@ -14,7 +14,8 @@ import {
   type ResolvedReferenceFact,
   type RowScope,
 } from "./row-scope.js";
-import type { SapportaAuthIdentity } from "./context.js";
+import type { RowsAllowedForRequest } from "./rows-allowed-for-request.js";
+import { RowScopePolicyError } from "./row-scope-policy-error.js";
 
 export type AuthSchemaIssueCode =
   | "invalid_row_scope"
@@ -243,7 +244,7 @@ export function validateClientPayloadPolicy(
   return { ...(payload as Record<string, unknown>) };
 }
 
-export interface TrustedScopeInsertValues {
+export interface TrustedInsertValuesForAllowedRows {
   /** SQL column names for Drizzle insert/update payloads. */
   sql: Record<string, string>;
   /** TypeScript property names for schema-facing callers. */
@@ -251,14 +252,18 @@ export interface TrustedScopeInsertValues {
 }
 
 /**
- * Computes trusted ownership fields for inserting a row in the active auth
- * boundary. Values come only from `SapportaAuthIdentity`, never from client
- * input.
+ * Computes trusted ownership fields for inserting a row using the rows allowed
+ * for the request. Values come only from `RowsAllowedForRequest`, never from
+ * client input.
+ *
+ * The same fail-closed row-scope matrix applies to stamping as to reads:
+ * system tables need no ownership values, workspace tables require workspace
+ * row facts, and user-scoped tables require both workspace and user row facts.
  */
-export function trustedScopeInsertValues(
-  auth: SapportaAuthIdentity,
+export function trustedInsertValuesForAllowedRows(
+  rowsAllowedForRequest: RowsAllowedForRequest,
   table: TableDef,
-): TrustedScopeInsertValues {
+): TrustedInsertValuesForAllowedRows {
   const rowScope = table.meta.rowScope;
   if (!isRowScope(rowScope)) {
     throw new AuthSchemaValidationError([
@@ -274,6 +279,13 @@ export function trustedScopeInsertValues(
     return { sql: {}, typescript: {} };
   }
 
+  if (
+    rowsAllowedForRequest.kind !== "allowWorkspaceWideRows" &&
+    rowsAllowedForRequest.kind !== "allowWorkspaceUserRows"
+  ) {
+    throw new RowScopePolicyError(table, rowsAllowedForRequest);
+  }
+
   const workspace = workspaceScopeColumn(table);
   if (!workspace) {
     throw new AuthSchemaValidationError([
@@ -287,13 +299,17 @@ export function trustedScopeInsertValues(
   }
 
   const sqlValues: Record<string, string> = {
-    [workspace.sqlName]: auth.workspace.id,
+    [workspace.sqlName]: rowsAllowedForRequest.workspace.id,
   };
   const typescriptValues: Record<string, string> = {
-    [workspace.propertyName ?? workspace.typescriptName]: auth.workspace.id,
+    [workspace.propertyName ?? workspace.typescriptName]:
+      rowsAllowedForRequest.workspace.id,
   };
 
   if (rowScope === "workspaceUserScoped") {
+    if (rowsAllowedForRequest.kind !== "allowWorkspaceUserRows") {
+      throw new RowScopePolicyError(table, rowsAllowedForRequest);
+    }
     const scopedToUser = scopedToUserScopeColumn(table);
     if (!scopedToUser) {
       throw new AuthSchemaValidationError([
@@ -305,8 +321,9 @@ export function trustedScopeInsertValues(
         },
       ]);
     }
-    sqlValues[scopedToUser.sqlName] = auth.user.id;
-    typescriptValues[scopedToUser.propertyName ?? scopedToUser.typescriptName] = auth.user.id;
+    sqlValues[scopedToUser.sqlName] = rowsAllowedForRequest.user.id;
+    typescriptValues[scopedToUser.propertyName ?? scopedToUser.typescriptName] =
+      rowsAllowedForRequest.user.id;
   }
 
   return { sql: sqlValues, typescript: typescriptValues };

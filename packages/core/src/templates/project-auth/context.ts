@@ -1,19 +1,40 @@
+import type { Context } from "hono";
 import {
-  createRowSecurity,
+  anonymousPrincipal,
+  createAuthContext,
+  userPrincipal,
+  type BuildAbility,
   type ProjectDbConnection,
   type SapportaAuthContext,
-  type SapportaAuthIdentity,
+  type SapportaAuthUser,
+  type SapportaEnv,
   type TableCatalog,
 } from "@sapporta/server";
+import type { AppAbility, AppPrincipal, AppWorkspaceMembership } from "../authz/types.js";
 import type { BetterAuthSessionApi } from "./better-auth.js";
 import {
   ensureActiveWorkspace,
-  sapportaRole,
   switchWorkspaceMembership,
   type WorkspaceMembershipRow,
 } from "./workspace.js";
 
-/** Minimal Better Auth session shape needed to build Sapporta auth context. */
+export type ResolveRowsAllowedForRequest = (input: {
+  principal: AppPrincipal;
+  c: Context<SapportaEnv>;
+}) => Promise<
+  SapportaAuthContext<
+    AppAbility,
+    AppWorkspaceMembership
+  >["rowsAllowedForRequest"]
+>;
+
+/**
+ * Minimal Better Auth session shape needed to build the request principal.
+ *
+ * The session identifies the signed-in user. It does not decide row access by
+ * itself; the app's rows-allowed resolver does that after the principal is
+ * known.
+ */
 export interface BetterAuthSessionPayload {
   session: {
     id: string;
@@ -28,79 +49,111 @@ export interface BetterAuthSessionPayload {
   };
 }
 
-/**
- * Resolves the current Better Auth session into Sapporta's request auth context.
- *
- * The loaded table catalog is required here so `rowSecurity` is fully ready for
- * domain handlers; no later middleware decorates or replaces the auth context.
- */
-export async function resolveSapportaAuthContext(
-  auth: BetterAuthSessionApi,
-  conn: ProjectDbConnection,
-  catalog: TableCatalog,
-  headers: Headers,
-): Promise<SapportaAuthContext | null> {
-  const payload = await getSessionPayload(auth, headers);
-  if (!payload) return null;
-  const membership = ensureActiveWorkspace(conn, payload);
-  return authContextFromPayload(payload, membership, catalog);
+export interface ResolveSapportaAuthContextInput {
+  auth: BetterAuthSessionApi;
+  conn: ProjectDbConnection;
+  catalog: TableCatalog;
+  headers: Headers;
+  c: Context<SapportaEnv>;
+  buildAbility: BuildAbility<AppAbility, AppWorkspaceMembership>;
+  resolveRowsAllowedForRequest: ResolveRowsAllowedForRequest;
 }
 
 /**
- * Switches the active workspace after verifying membership, then returns a new
- * table-bound auth context for the same request.
+ * Builds the auth context that every API route reads from `c.get("auth")`.
+ *
+ * No-session requests still receive an anonymous principal and a real ability.
+ * The anonymous gate decides whether that request may reach a route, and the
+ * route still performs its own CASL check.
  */
+export async function resolveSapportaAuthContext(
+  input: ResolveSapportaAuthContextInput,
+): Promise<SapportaAuthContext<AppAbility, AppWorkspaceMembership>> {
+  const principal = await resolvePrincipal(input.auth, input.conn, input.headers);
+  const rowsAllowedForRequest = await input.resolveRowsAllowedForRequest({
+    principal,
+    c: input.c,
+  });
+  const ability = input.buildAbility({ principal, rowsAllowedForRequest });
+  return createAuthContext({
+    principal,
+    rowsAllowedForRequest,
+    ability,
+    catalog: input.catalog,
+  });
+}
+
 export async function switchActiveWorkspace(
-  auth: BetterAuthSessionApi,
-  conn: ProjectDbConnection,
-  catalog: TableCatalog,
-  headers: Headers,
-  workspaceId: string,
-): Promise<SapportaAuthContext> {
-  const payload = await getSessionPayload(auth, headers);
+  input: ResolveSapportaAuthContextInput & { workspaceId: string },
+): Promise<SapportaAuthContext<AppAbility, AppWorkspaceMembership>> {
+  const payload = await getSessionPayload(input.auth, input.headers);
   if (!payload) {
     throw new Error("You must sign in before switching workspaces.");
   }
-  const membership = switchWorkspaceMembership(conn, payload, workspaceId);
-  return authContextFromPayload(payload, membership, catalog);
+  const membership = switchWorkspaceMembership(
+    input.conn,
+    payload,
+    input.workspaceId,
+  );
+  const principal = userPrincipal({
+    user: userFromSessionPayload(payload),
+    membership: membershipFromRow(membership),
+  });
+  const rowsAllowedForRequest = await input.resolveRowsAllowedForRequest({
+    principal,
+    c: input.c,
+  });
+  const ability = input.buildAbility({ principal, rowsAllowedForRequest });
+  return createAuthContext({
+    principal,
+    rowsAllowedForRequest,
+    ability,
+    catalog: input.catalog,
+  });
+}
+
+export async function resolvePrincipal(
+  auth: BetterAuthSessionApi,
+  conn: ProjectDbConnection,
+  headers: Headers,
+): Promise<AppPrincipal> {
+  const payload = await getSessionPayload(auth, headers);
+  if (!payload) return anonymousPrincipal();
+  const membership = ensureActiveWorkspace(conn, payload);
+  return userPrincipal({
+    user: userFromSessionPayload(payload),
+    membership: membershipFromRow(membership),
+  });
+}
+
+export function userFromSessionPayload(
+  payload: BetterAuthSessionPayload,
+): SapportaAuthUser {
+  return {
+    id: payload.user.id,
+    name: payload.user.name ?? null,
+    email: payload.user.email,
+    emailVerified: payload.user.emailVerified,
+  };
 }
 
 /**
- * Converts Better Auth organization membership into Sapporta's auth model and
- * binds row security to the loaded table catalog.
+ * Converts the active workspace membership row into the app-facing membership
+ * facts. Role is resolved on the membership, not on the user, so the same user
+ * can have different roles in different workspaces.
  */
-export function authContextFromPayload(
-  payload: BetterAuthSessionPayload,
-  membership: WorkspaceMembershipRow,
-  catalog: TableCatalog,
-): SapportaAuthContext {
-  const role = sapportaRole(membership.role);
-  const identity: SapportaAuthIdentity = {
-    session: {
-      id: payload.session.id,
-      userId: payload.user.id,
-      activeWorkspaceId: membership.organization_id,
-    },
-    user: {
-      id: payload.user.id,
-      name: payload.user.name ?? null,
-      email: payload.user.email,
-      emailVerified: payload.user.emailVerified,
-    },
-    workspace: {
-      id: membership.organization_id,
-      name: membership.organization_name,
-      slug: membership.organization_slug,
-      isOwner: role === "owner",
-    },
-    member: {
-      id: membership.member_id,
-      role,
-    },
-  };
+export function membershipFromRow(
+  row: WorkspaceMembershipRow,
+): AppWorkspaceMembership {
+  const role = row.role === "owner" || row.role === "admin" ? "owner" : "member";
   return {
-    ...identity,
-    rowSecurity: createRowSecurity(identity, { catalog }),
+    id: row.member_id,
+    workspace: {
+      id: row.organization_id,
+      name: row.organization_name,
+      slug: row.organization_slug,
+    },
+    roles: [role],
   };
 }
 

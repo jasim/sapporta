@@ -5,15 +5,14 @@ import {
   checkAuthSchemaDefinitions,
   clientPayloadPolicyIssues,
   resolveTableReferences,
-  trustedScopeInsertValues,
+  trustedInsertValuesForAllowedRows,
 } from "./index.js";
-import type { SapportaAuthIdentity } from "./context.js";
+import type { RowsAllowedForRequest } from "./rows-allowed-for-request.js";
 
-const authIdentity: SapportaAuthIdentity = {
-  session: { id: "session-1", userId: "user-1", activeWorkspaceId: "workspace-1" },
+const rowsAllowedForRequest: RowsAllowedForRequest = {
+  kind: "allowWorkspaceUserRows",
   user: { id: "user-1", name: "User One", email: "u1@example.com", emailVerified: true },
-  workspace: { id: "workspace-1", name: "Workspace One", slug: "workspace-one", isOwner: false },
-  member: { id: "member-1", role: "user" },
+  workspace: { id: "workspace-1", name: "Workspace One", slug: "workspace-one" },
 };
 function scopedColumns() {
   return {
@@ -298,7 +297,7 @@ describe("auth schema validation", () => {
     expect(issues.map((issue) => issue.field)).toEqual(["workspace_id", "workspaceId", "account_id"]);
   });
 
-  it("computes trusted scope insert values in sql and typescript key forms", () => {
+  it("computes trusted insert values for allowed rows in sql and typescript key forms", () => {
     const ordersTable = sqliteTable("orders", {
       id: integer("id").primaryKey({ autoIncrement: true }),
       workspaceId: text("workspace_id").notNull(),
@@ -306,7 +305,7 @@ describe("auth schema validation", () => {
     });
     const orders = table({ drizzle: ordersTable, meta: { rowScope: "workspaceUserScoped" } });
 
-    const values = trustedScopeInsertValues(authIdentity, orders);
+    const values = trustedInsertValuesForAllowedRows(rowsAllowedForRequest, orders);
 
     expect(values.sql).toEqual({ workspace_id: "workspace-1", scoped_to_user_id: "user-1" });
     expect(values.typescript).toEqual({ workspaceId: "workspace-1", scopedToUserId: "user-1" });

@@ -2,9 +2,16 @@
  * Handler factory for the /tables namespace.
  *
  * Generated table routes are thin HTTP adapters over `scopedRows()`. The
- * request guard resolves the principal, `scopedRows()` binds that principal to
- * one table, and handlers stay focused on request extraction, status codes,
- * response envelopes, and CSV formatting.
+ * request guard returns the current auth context, table handlers check CASL,
+ * `scopedRows()` binds the request scope to one table, and handlers stay
+ * focused on request extraction, status codes, response envelopes, and CSV
+ * formatting.
+ *
+ * Generated table subjects are the table's canonical SQL name. A CASL rule such
+ * as `can("read", "quotes")` allows the generic table action, and
+ * `can("manage", "all")` can satisfy every generated action check. Neither
+ * rule widens row visibility; `scopedRows()` still applies the request's row
+ * predicates and trusted insert stamping.
  */
 
 import type { Env } from "hono";
@@ -27,6 +34,8 @@ import type { TableHandlers } from "./mount-tables.js";
 import type { SapportaEnv } from "./server.js";
 import {
   AuthPayloadPolicyError,
+  forbidUnless,
+  RowScopePolicyError,
   type SapportaAuthContext,
 } from "../auth/index.js";
 import type { TableDef } from "../schema/table.js";
@@ -40,18 +49,22 @@ function tableNotFoundResponse(tableName: string): Response {
   );
 }
 
-export interface WorkspaceSafeTableHandlersOptions<E extends SapportaEnv> {
-  /**
-   * Project-owned guard for framework routes. Generated projects usually pass
-   * `projectAuth.requireWorkspaceOwner`.
-   */
+type GeneratedTableAction =
+  | "read"
+  | "export"
+  | "create"
+  | "update"
+  | "delete";
+
+export interface AuthorizedTableHandlersOptions<E extends SapportaEnv> {
+  /** Project-owned guard that returns the current request auth context. */
   guard: (c: Context<E>) => SapportaAuthContext;
 }
 
-export function makeWorkspaceSafeTableHandlers<E extends SapportaEnv>(
+export function makeAuthorizedTableHandlers<E extends SapportaEnv>(
   catalog: TableCatalog,
   db: BetterSQLite3Database,
-  options: WorkspaceSafeTableHandlersOptions<E>,
+  options: AuthorizedTableHandlersOptions<E>,
 ): TableHandlers<E> {
   const guard = options.guard;
 
@@ -59,7 +72,8 @@ export function makeWorkspaceSafeTableHandlers<E extends SapportaEnv>(
     list:
       ({ def }) =>
       async ({ c }) => {
-        const rows = scopedRows(db, guard(c), def);
+        const auth = authorizeTableAction(c, guard(c), "read", def);
+        const rows = scopedRows(db, auth, def);
         try {
           return c.json(await rows.list(queryParams(c)), 200);
         } catch (err) {
@@ -69,7 +83,8 @@ export function makeWorkspaceSafeTableHandlers<E extends SapportaEnv>(
     get:
       ({ def }) =>
       async ({ c, request }) => {
-        const rows = scopedRows(db, guard(c), def);
+        const auth = authorizeTableAction(c, guard(c), "read", def);
+        const rows = scopedRows(db, auth, def);
         try {
           return c.json({ data: await rows.get(request.params.id) }, 200);
         } catch (err) {
@@ -79,7 +94,7 @@ export function makeWorkspaceSafeTableHandlers<E extends SapportaEnv>(
     create:
       ({ def }) =>
       async ({ c }) => {
-        const auth = guard(c);
+        const auth = authorizeTableAction(c, guard(c), "create", def);
         const body = await c.req.json();
         try {
           if (isRecord(body) && isMasterDetailBody(body)) {
@@ -101,7 +116,8 @@ export function makeWorkspaceSafeTableHandlers<E extends SapportaEnv>(
     update:
       ({ def }) =>
       async ({ c, request }) => {
-        const rows = scopedRows(db, guard(c), def);
+        const auth = authorizeTableAction(c, guard(c), "update", def);
+        const rows = scopedRows(db, auth, def);
         const body = await c.req.json();
         try {
           return c.json(
@@ -115,7 +131,8 @@ export function makeWorkspaceSafeTableHandlers<E extends SapportaEnv>(
     delete:
       ({ def }) =>
       async ({ c, request }) => {
-        const rows = scopedRows(db, guard(c), def);
+        const auth = authorizeTableAction(c, guard(c), "delete", def);
+        const rows = scopedRows(db, auth, def);
         try {
           return c.json({ data: await rows.delete(request.params.id) }, 200);
         } catch (err) {
@@ -125,7 +142,8 @@ export function makeWorkspaceSafeTableHandlers<E extends SapportaEnv>(
     exportCsv:
       ({ def }) =>
       async ({ c }) => {
-        const rows = scopedRows(db, guard(c), def);
+        const auth = authorizeTableAction(c, guard(c), "export", def);
+        const rows = scopedRows(db, auth, def);
         try {
           return await streamCsv(c, def, await rows.exportRows(queryParams(c)));
         } catch (err) {
@@ -136,17 +154,32 @@ export function makeWorkspaceSafeTableHandlers<E extends SapportaEnv>(
       const tableName = request.params.tableName;
       const def = catalog.get(tableName);
       if (!def) return tableNotFoundResponse(tableName);
-      const rows = scopedRows(db, guard(c), def);
+      const auth = authorizeTableAction(c, guard(c), "read", def);
+      const rows = scopedRows(db, auth, def);
       return handleLookup(c, rows);
     },
     count: ({ c, request }) => {
       const tableName = request.params.tableName;
       const def = catalog.get(tableName);
       if (!def) return tableNotFoundResponse(tableName);
-      const rows = scopedRows(db, guard(c), def);
+      const auth = authorizeTableAction(c, guard(c), "read", def);
+      const rows = scopedRows(db, auth, def);
       return handleCount(c, rows);
     },
   };
+}
+
+function authorizeTableAction<E extends SapportaEnv>(
+  c: Context<E>,
+  auth: SapportaAuthContext,
+  action: GeneratedTableAction,
+  table: TableDef,
+): SapportaAuthContext {
+  // Ask for the concrete generated action even when CASL may satisfy it via a
+  // broader `manage` rule. Row security is enforced by the scoped row operation
+  // that follows, not by CASL condition objects.
+  forbidUnless(c, auth.ability.can(action, table.sqlName));
+  return auth;
 }
 
 async function handleLookup<E extends Env>(
@@ -171,7 +204,7 @@ async function handleCount<E extends Env>(
   }
 }
 
-async function handleMasterDetailCreate<E extends Env>(
+async function handleMasterDetailCreate<E extends SapportaEnv>(
   masterSchema: TableDef,
   db: BetterSQLite3Database,
   c: Context<E>,
@@ -193,6 +226,10 @@ async function handleMasterDetailCreate<E extends Env>(
   if (!detailDef) {
     return c.json({ error: `Detail table "${$details.table}" not found` }, 404);
   }
+  // Parent and child rows are both creates, so both tables need an explicit
+  // create grant. The shared auth context still stamps and validates each table
+  // through its own row-scope metadata.
+  authorizeTableAction(c, auth, "create", detailDef);
 
   const masterAccess = auth.rowSecurity.forTable(masterSchema);
   const detailAccess = auth.rowSecurity.forTable(detailDef);
@@ -239,6 +276,9 @@ function tableReadErrorResponse<E extends Env>(
       400,
     );
   }
+  if (err instanceof RowScopePolicyError) {
+    return c.json({ error: "Forbidden", code: err.code }, 403);
+  }
   throw err;
 }
 
@@ -252,6 +292,9 @@ function tableWriteErrorResponse<E extends Env>(
   }
   if (err instanceof RowNotFoundError) {
     return c.json({ error: "Not found" }, 404);
+  }
+  if (err instanceof RowScopePolicyError) {
+    return c.json({ error: "Forbidden", code: err.code }, 403);
   }
   if (err instanceof AuthPayloadPolicyError) {
     log.warn("Auth payload policy failed", {

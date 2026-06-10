@@ -1,11 +1,12 @@
 import { Route, Navigate } from "react-router-dom";
 import type { Navigation } from "@sapporta/frontend/shell";
 import { Sparkles } from "lucide-react";
+import { PublicPage } from "./PublicPage";
 import { Welcome } from "./Welcome";
 
 const welcomePath = "/welcome";
 
-// Add each domain screen here with its navigation item and route.
+// Add protected domain screens here with their navigation items.
 export const appNavigation: Navigation = [
   {
     label: "Views",
@@ -24,11 +25,20 @@ export const appHomeRoute = (
   <Route index element={<Navigate to={welcomePath} replace />} />
 );
 
-export const appRoutes = (
+// Routes here render without requiring a signed-in session.
+export const appPublicRoutes = (
+  <>
+    {/* PUBLIC: anyone can load this page. Keep its data intentionally public. */}
+    <Route path="public" element={<PublicPage />} />
+  </>
+);
+
+// Routes here render inside the authenticated app shell.
+export const appProtectedRoutes = (
   <>
     <Route path="welcome" element={<Welcome />} />
 
-    {/* Add app routes here, e.g.:
+    {/* Add protected app routes here, e.g.:
         <Route path="views/imports" element={<Imports />} /> */}
   </>
 );

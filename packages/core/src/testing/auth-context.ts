@@ -1,9 +1,9 @@
 import { createTableCatalog } from "../schema/catalog.js";
 import type { TableDef } from "../schema/table.js";
 import {
-  createRowSecurity,
+  createAuthContext,
   type SapportaAuthContext,
-  type SapportaAuthIdentity,
+  type SapportaAbility,
 } from "../auth/index.js";
 
 export interface TestAuthContextOptions {
@@ -18,35 +18,36 @@ export function createTestAuthContext(
 ): SapportaAuthContext {
   const userId = options.userId ?? "user-1";
   const workspaceId = options.workspaceId ?? "workspace-1";
-  const role = options.isOwner ? "owner" : "user";
-  const identity: SapportaAuthIdentity = {
-    session: {
-      id: `session-${userId}`,
-      userId,
-      activeWorkspaceId: workspaceId,
-    },
-    user: {
-      id: userId,
-      name: "Test User",
-      email: `${userId}@example.com`,
-      emailVerified: true,
-    },
-    workspace: {
-      id: workspaceId,
-      name: "Test Workspace",
-      slug: workspaceId,
-      isOwner: options.isOwner ?? false,
-    },
-    member: {
-      id: `member-${userId}`,
-      role,
-    },
+  const workspace = {
+    id: workspaceId,
+    name: "Test Workspace",
+    slug: workspaceId,
   };
+  const user = {
+    id: userId,
+    name: "Test User",
+    email: `${userId}@example.com`,
+    emailVerified: true,
+  };
+  return createAuthContext({
+    principal: {
+      kind: "user",
+      user,
+      membership: {
+        id: `member-${userId}`,
+        roles: [options.isOwner ? "owner" : "member"],
+      },
+    },
+    rowsAllowedForRequest: {
+      kind: "allowWorkspaceUserRows",
+      workspace,
+      user,
+    },
+    ability: allowAllAbility(),
+    catalog: createTableCatalog(options.tables ?? []),
+  });
+}
 
-  return {
-    ...identity,
-    rowSecurity: createRowSecurity(identity, {
-      catalog: createTableCatalog(options.tables ?? []),
-    }),
-  };
+function allowAllAbility(): SapportaAbility {
+  return { can: () => true };
 }

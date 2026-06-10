@@ -130,21 +130,20 @@ export function installFrameworkRoutePolicy<E extends SapportaEnv>(
   app: Hono<E>,
   guard: SapportaAuthGuard<E>,
 ): Hono<E> {
-  const ownerOnly = async (c: Context<E>, next: () => Promise<void>) => {
+  const currentAuthOnly = async (c: Context<E>, next: () => Promise<void>) => {
     guard(c);
     return next();
   };
-  const ownerOnlyMeta = async (c: Context<E>, next: () => Promise<void>) => {
+  const currentAuthOnlyMeta = async (c: Context<E>, next: () => Promise<void>) => {
     if (c.req.method === "GET" && c.req.path === "/api/meta/info") {
       return next();
     }
     guard(c);
     return next();
   };
-  app.use("/api/openapi.json", ownerOnly);
-  app.use("/api/meta/*", ownerOnlyMeta);
-  app.use("/api/tables/*", ownerOnly);
-  app.use("/api/reports/*", ownerOnly);
+  app.use("/api/openapi.json", currentAuthOnly);
+  app.use("/api/meta/*", currentAuthOnlyMeta);
+  app.use("/api/reports/*", currentAuthOnly);
   return app;
 }
 

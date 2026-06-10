@@ -13,8 +13,15 @@
 
 import { createApiClient } from "@sapporta/shared/client";
 import { getApiBase } from "@sapporta/frontend/platform";
-import { helloContract } from "%%SAPPORTA:SLUG%%-shared";
+import {
+  helloContract,
+  publicApiSampleContract,
+} from "%%SAPPORTA:SLUG%%-shared";
 
 export const customApi = createApiClient(helloContract, {
+  baseUrl: getApiBase,
+});
+
+export const publicApi = createApiClient(publicApiSampleContract, {
   baseUrl: getApiBase,
 });

@@ -1,14 +1,25 @@
+export type { SapportaAbility, BuildAbility } from "./ability.js";
+export type { SapportaAuthContext } from "./context.js";
+export { createAuthContext } from "./create-auth-context.js";
+export type { CreateAuthContextInput } from "./create-auth-context.js";
+export { forbidUnless } from "./forbid.js";
+export type {
+  AuthWorkspace,
+  Principal,
+  SapportaAuthUser,
+  WorkspaceMembership,
+  WorkspaceRole,
+} from "./principal.js";
 export {
-  ownsActiveWorkspace,
-  sapportaAuthRoles,
-  type SapportaAuthContext,
-  type SapportaAuthIdentity,
-  type SapportaAuthMember,
-  type SapportaAuthRole,
-  type SapportaAuthSession,
-  type SapportaAuthUser,
-  type SapportaAuthWorkspace,
-} from "./context.js";
+  anonymousPrincipal,
+  userPrincipal,
+} from "./principal.js";
+export {
+  allowOnlySystemWideRows,
+  allowWorkspaceUserRows,
+  allowWorkspaceWideRows,
+} from "./rows-allowed-for-request.js";
+export type { RowsAllowedForRequest } from "./rows-allowed-for-request.js";
 
 export {
   SCOPED_TO_USER_ID_SQL_COLUMN,
@@ -39,12 +50,12 @@ export {
   clientPayloadPolicyIssues,
   requireResolvedTableReferences,
   resolveTableReferences,
-  trustedScopeInsertValues,
+  trustedInsertValuesForAllowedRows,
   validateClientPayloadPolicy,
   type AuthSchemaIssue,
   type AuthSchemaIssueCode,
   type ReferenceResolutionResult,
-  type TrustedScopeInsertValues,
+  type TrustedInsertValuesForAllowedRows,
 } from "./schema-validation.js";
 
 export {
@@ -56,11 +67,12 @@ export {
 } from "./row-security.js";
 
 export {
-  allSystemRows,
-  allWorkspaceRows,
-  currentUserRows,
   lookupRowAccessPredicate,
+  RowScopePolicyError,
   selectRowAccessPredicate,
+  systemRows,
   validateForeignKeyReferences,
+  workspaceRows,
+  workspaceUserRows,
   type ForeignKeyValidationOptions,
 } from "./row-access.js";

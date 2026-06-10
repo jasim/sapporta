@@ -1,11 +1,11 @@
 import { and, eq, sql, type SQL } from "drizzle-orm";
 import type { BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
 import type { TableDef } from "../schema/table.js";
-import type { SapportaAuthIdentity } from "./context.js";
+import type { RowsAllowedForRequest } from "./rows-allowed-for-request.js";
+import { RowScopePolicyError } from "./row-scope-policy-error.js";
 import {
-  type AuthSchemaIssue,
-  AuthSchemaValidationError,
   AuthPayloadPolicyError,
+  AuthSchemaValidationError,
   clientPayloadPolicyIssues,
   requireResolvedTableReferences,
 } from "./schema-validation.js";
@@ -17,70 +17,80 @@ import {
   workspaceScopeColumn,
 } from "./row-scope.js";
 
-/**
- * Predicate for rows owned by the current user inside the active workspace.
- * Only valid for `workspaceUserScoped` tables.
- */
-export function currentUserRows(auth: SapportaAuthIdentity, table: TableDef): SQL {
-  assertRowScope(table, "workspaceUserScoped");
-  const workspaceColumn = requireWorkspaceColumn(table);
-  const scopedToUserColumn = requireScopedToUserColumn(table);
-  return and(
-    eq(workspaceColumn.column, auth.workspace.id),
-    eq(scopedToUserColumn.column, auth.user.id),
-  )!;
-}
+export { RowScopePolicyError } from "./row-scope-policy-error.js";
 
 /**
- * Predicate for every row in the active workspace. Valid for workspace-scoped
- * tables and used by owner/framework flows that intentionally see all users'
- * rows in one workspace.
+ * Row-scope predicates translate trusted request facts into SQL.
+ *
+ * This module deliberately ignores CASL. A route first asks CASL whether the
+ * principal may use an action; row access then limits the database rows touched
+ * by that already-authorized action.
  */
-export function allWorkspaceRows(auth: SapportaAuthIdentity, table: TableDef): SQL {
-  const rowScope = assertKnownRowScope(table);
-  if (rowScope !== "workspaceGlobal" && rowScope !== "workspaceUserScoped") {
-    throw rowAccessError(table, `allWorkspaceRows cannot be used with ${rowScope} tables.`);
-  }
-  const workspaceColumn = requireWorkspaceColumn(table);
-  return eq(workspaceColumn.column, auth.workspace.id);
-}
-
-/**
- * Predicate for system-global reference tables. These tables are visible
- * installation-wide and do not carry workspace ownership columns.
- */
-export function allSystemRows(_auth: SapportaAuthIdentity, table: TableDef): SQL {
+export function systemRows(
+  rowsAllowedForRequest: RowsAllowedForRequest,
+  table: TableDef,
+): SQL {
   assertRowScope(table, "systemGlobal");
   return sql`TRUE`;
 }
 
-/**
- * Chooses the row visibility predicate for one table and auth identity.
- *
- * `workspaceUserScoped` tables always resolve to current-user rows. Framework
- * route permission may decide whether a route can run, but it does not widen
- * row visibility.
- */
-export function selectRowAccessPredicate(
-  auth: SapportaAuthIdentity,
+export function workspaceRows(
+  rowsAllowedForRequest: RowsAllowedForRequest,
   table: TableDef,
 ): SQL {
-  const rowScope = assertKnownRowScope(table);
-  if (rowScope === "systemGlobal") return allSystemRows(auth, table);
-  if (rowScope === "workspaceGlobal") return allWorkspaceRows(auth, table);
-  return currentUserRows(auth, table);
+  assertRowScope(table, "workspaceGlobal");
+  if (
+    rowsAllowedForRequest.kind !== "allowWorkspaceWideRows" &&
+    rowsAllowedForRequest.kind !== "allowWorkspaceUserRows"
+  ) {
+    throw new RowScopePolicyError(table, rowsAllowedForRequest);
+  }
+  const workspaceColumn = requireWorkspaceColumn(table);
+  return eq(workspaceColumn.column, rowsAllowedForRequest.workspace.id);
+}
+
+export function workspaceUserRows(
+  rowsAllowedForRequest: RowsAllowedForRequest,
+  table: TableDef,
+): SQL {
+  assertRowScope(table, "workspaceUserScoped");
+  if (rowsAllowedForRequest.kind !== "allowWorkspaceUserRows") {
+    throw new RowScopePolicyError(table, rowsAllowedForRequest);
+  }
+  const workspaceColumn = requireWorkspaceColumn(table);
+  const scopedToUserColumn = requireScopedToUserColumn(table);
+  return and(
+    eq(workspaceColumn.column, rowsAllowedForRequest.workspace.id),
+    eq(scopedToUserColumn.column, rowsAllowedForRequest.user.id),
+  )!;
 }
 
 /**
- * Chooses the row predicate used while validating a foreign-key target.
- * Kept separate from `selectRowAccessPredicate` so lookup/reference policy can
- * evolve independently from direct table access if needed.
+ * Selects the predicate required by the table's declared row scope.
+ *
+ * The matrix is fail-closed:
+ * - `systemGlobal` is visible for every rows-allowed value;
+ * - `workspaceGlobal` requires workspace-wide or workspace-user rows;
+ * - `workspaceUserScoped` requires workspace-user rows and filters by both
+ *   workspace id and user id.
  */
+export function selectRowAccessPredicate(
+  rowsAllowedForRequest: RowsAllowedForRequest,
+  table: TableDef,
+): SQL {
+  const rowScope = assertKnownRowScope(table);
+  if (rowScope === "systemGlobal") return systemRows(rowsAllowedForRequest, table);
+  if (rowScope === "workspaceGlobal") {
+    return workspaceRows(rowsAllowedForRequest, table);
+  }
+  return workspaceUserRows(rowsAllowedForRequest, table);
+}
+
 export function lookupRowAccessPredicate(
-  auth: SapportaAuthIdentity,
+  rowsAllowedForRequest: RowsAllowedForRequest,
   targetTable: TableDef,
 ): SQL {
-  return selectRowAccessPredicate(auth, targetTable);
+  return selectRowAccessPredicate(rowsAllowedForRequest, targetTable);
 }
 
 export interface ForeignKeyValidationOptions {
@@ -98,24 +108,23 @@ export interface ForeignKeyValidationOptions {
 }
 
 /**
- * Verifies submitted FK values point to rows visible inside the active auth
- * boundary.
+ * Validates that submitted references point to rows visible to this request.
  *
- * This is stricter than checking row existence: every FK lookup is AND-composed
- * with the target table's row-access predicate. Client payload policy is also
- * enforced unless the caller passes `skipPayloadPolicy` after doing its own
- * client-vs-server sequencing.
+ * Existence is not enough. A row id from another workspace, or another user's
+ * user-scoped table, must behave like an invalid reference for this request.
  */
 export async function validateForeignKeyReferences(
   db: BetterSQLite3Database,
-  auth: SapportaAuthIdentity,
+  rowsAllowedForRequest: RowsAllowedForRequest,
   sourceTable: TableDef,
   payload: unknown,
   registeredTables: readonly TableDef[],
   options: ForeignKeyValidationOptions = {},
 ): Promise<void> {
   if (!isRecord(payload)) {
-    throw new AuthPayloadPolicyError([{ field: "$", message: "Expected an object payload." }]);
+    throw new AuthPayloadPolicyError([
+      { field: "$", message: "Expected an object payload." },
+    ]);
   }
 
   const references = requireResolvedTableReferences(sourceTable, registeredTables);
@@ -137,7 +146,10 @@ export async function validateForeignKeyReferences(
     const value = payload[reference.sourceColumn];
     if (value === null || value === undefined) continue;
 
-    const accessPredicate = lookupRowAccessPredicate(auth, reference.targetTable);
+    const accessPredicate = lookupRowAccessPredicate(
+      rowsAllowedForRequest,
+      reference.targetTable,
+    );
     const rows = await db
       .select({ id: reference.targetColumnRef })
       .from(reference.targetTable.drizzle)
@@ -147,7 +159,7 @@ export async function validateForeignKeyReferences(
     if (rows.length === 0) {
       validationErrors.push({
         field: reference.sourceColumn,
-        message: "Referenced row does not exist or is not visible in the active auth boundary.",
+        message: "Referenced row does not exist or is not visible in the active request scope.",
       });
     }
   }
@@ -171,10 +183,19 @@ function assertKnownRowScope(table: TableDef) {
   return rowScope;
 }
 
-function assertRowScope(table: TableDef, expected: ReturnType<typeof assertKnownRowScope>): void {
+function assertRowScope(
+  table: TableDef,
+  expected: ReturnType<typeof assertKnownRowScope>,
+): void {
   const rowScope = assertKnownRowScope(table);
   if (rowScope !== expected) {
-    throw rowAccessError(table, `Expected ${expected} row scope, got ${rowScope}.`);
+    throw new AuthSchemaValidationError([
+      {
+        table: table.sqlName,
+        code: "invalid_row_scope",
+        message: `Expected ${expected} row scope, got ${rowScope}.`,
+      },
+    ]);
   }
 }
 
@@ -206,15 +227,6 @@ function requireScopedToUserColumn(table: TableDef) {
     ]);
   }
   return column;
-}
-
-function rowAccessError(table: TableDef, message: string): AuthSchemaValidationError {
-  const issue: AuthSchemaIssue = {
-    table: table.sqlName,
-    code: "invalid_row_scope",
-    message,
-  };
-  return new AuthSchemaValidationError([issue]);
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

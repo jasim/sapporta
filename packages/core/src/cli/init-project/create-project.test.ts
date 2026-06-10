@@ -45,7 +45,21 @@ describe("renderScaffoldFiles", () => {
       'import { SapportaApp } from "./SapportaApp";',
     );
     expect(byDest.get("packages/frontend/src/App.tsx")).toContain(
-      "export const appRoutes",
+      "export const appPublicRoutes",
+    );
+    expect(byDest.get("packages/frontend/src/App.tsx")).toContain(
+      "export const appProtectedRoutes",
+    );
+    expect(byDest.get("packages/api/app.ts")).toContain(
+      'path: "/api/public-api-sample"',
+    );
+    expect(
+      byDest.get("packages/api/app/public-api-sample.ts"),
+    ).toContain(
+      'auth.ability.can("read", "public_api_sample")',
+    );
+    expect(byDest.get("packages/api/authz/ability.ts")).toContain(
+      'can("read", "public_api_sample")',
     );
 
     for (const file of files) {

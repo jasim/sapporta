@@ -81,6 +81,7 @@
     "zod": "^4.3.6"
   },
   "devDependencies": {
+    "@casl/ability": "^7.0.0",
     "@better-auth/drizzle-adapter": "^1.6.13",
     "@sapporta/honest": "workspace:*",
     "@sapporta/rest-core": "3.52.2",

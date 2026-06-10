@@ -2,23 +2,36 @@ import { afterEach, describe, expect, it } from "vitest";
 import { Hono } from "hono";
 import {
   connectProject,
+  createAuthContext,
   createTableCatalog,
+  allowOnlySystemWideRows,
+  type BuildAbility,
   type ProjectDbConnection,
+  type RowsAllowedForRequest,
+  type SapportaAbility,
   type SapportaAuthContext,
   type SapportaEnv,
 } from "@sapporta/server";
 import type { BetterAuthSessionApi } from "../src/templates/project-auth/better-auth.js";
 import {
-  authContextFromPayload,
   resolveSapportaAuthContext,
   switchActiveWorkspace,
   type BetterAuthSessionPayload,
+  type ResolveRowsAllowedForRequest,
 } from "../src/templates/project-auth/context.js";
 import {
-  createProjectAuthMiddleware,
+  rejectAnonymousByDefault,
+  requireAuthContext,
+  requirePrincipalUser,
+  requireVerifiedUser,
   requireWorkspaceOwner,
-  requireWorkspaceUser,
+  requireWorkspaceRowsAllowed,
+  resolveProjectAuthMiddleware,
 } from "../src/templates/project-auth/middleware.js";
+import type {
+  AppAbility,
+  AppWorkspaceMembership,
+} from "../src/templates/packages/api/authz/types.js";
 import { readProjectAuthEnv } from "../src/templates/project-auth/env.js";
 import {
   WorkspaceSwitchError,
@@ -141,13 +154,22 @@ describe("project auth template", () => {
     ).toThrow(/PORT/);
   });
 
-  it("returns null when better-auth has no session", async () => {
+  it("resolves an anonymous context when better-auth has no session", async () => {
     conn = createAuthDb();
     const auth = sessionApi(null);
 
-    await expect(
-      resolveSapportaAuthContext(auth, conn, emptyCatalog, new Headers()),
-    ).resolves.toBeNull();
+    const context = await resolveSapportaAuthContext({
+      auth,
+      conn,
+      catalog: emptyCatalog,
+      headers: new Headers(),
+      c: requestContext(),
+      buildAbility: buildAppAbility,
+      resolveRowsAllowedForRequest,
+    });
+
+    expect(context.principal).toEqual({ kind: "anonymous" });
+    expect(context.rowsAllowedForRequest).toEqual({ kind: "allowOnlySystemWideRows" });
   });
 
   it("builds context from the active organization membership", async () => {
@@ -156,26 +178,31 @@ describe("project auth template", () => {
     insertWorkspace(conn, "workspace-1", "Acme", "acme");
     insertMember(conn, "member-1", "workspace-1", "user-1", "admin", 1);
 
-    const context = await resolveSapportaAuthContext(
-      sessionApi(sessionPayload({ activeOrganizationId: "workspace-1" })),
+    const context = await resolveSapportaAuthContext({
+      auth: sessionApi(sessionPayload({ activeOrganizationId: "workspace-1" })),
       conn,
-      emptyCatalog,
-      new Headers(),
-    );
+      catalog: emptyCatalog,
+      headers: new Headers(),
+      c: requestContext(),
+      buildAbility: buildAppAbility,
+      resolveRowsAllowedForRequest,
+    });
 
     expect(context).toMatchObject({
-      session: {
-        id: "session-1",
-        userId: "user-1",
-        activeWorkspaceId: "workspace-1",
+      principal: {
+        kind: "user",
+        user: { id: "user-1", email: "owner@example.test" },
+        membership: {
+          id: "member-1",
+          workspace: {
+            id: "workspace-1",
+            name: "Acme",
+            slug: "acme",
+          },
+          roles: ["owner"],
+        },
       },
-      workspace: {
-        id: "workspace-1",
-        name: "Acme",
-        slug: "acme",
-        isOwner: true,
-      },
-      member: { id: "member-1", role: "owner" },
+      rowsAllowedForRequest: { kind: "allowWorkspaceUserRows" },
     });
   });
 
@@ -236,13 +263,16 @@ describe("project auth template", () => {
     insertMember(conn, "member-1", "workspace-1", "user-1", "owner", 1);
 
     await expect(
-      switchActiveWorkspace(
-        sessionApi(sessionPayload({ activeOrganizationId: "workspace-1" })),
+      switchActiveWorkspace({
+        auth: sessionApi(sessionPayload({ activeOrganizationId: "workspace-1" })),
         conn,
-        emptyCatalog,
-        new Headers(),
-        "workspace-2",
-      ),
+        catalog: emptyCatalog,
+        headers: new Headers(),
+        c: requestContext(),
+        buildAbility: buildAppAbility,
+        resolveRowsAllowedForRequest,
+        workspaceId: "workspace-2",
+      }),
     ).rejects.toBeInstanceOf(WorkspaceSwitchError);
   });
 
@@ -340,12 +370,27 @@ describe("project auth template", () => {
     });
   });
 
-  it("middleware returns unauthenticated when session is missing", async () => {
+  it("auth resolver sets anonymous auth context when session is missing", async () => {
     const app = new Hono<SapportaEnv>();
     app.use(
       "/api/*",
-      createProjectAuthMiddleware(() => null),
+      resolveProjectAuthMiddleware(() => routeAnonymousContext()),
     );
+    app.get("/api/private", (c) => c.json(c.get("auth").principal));
+
+    const response = await app.request("/api/private");
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ kind: "anonymous" });
+  });
+
+  it("anonymous gate rejects private routes by default", async () => {
+    const app = new Hono<SapportaEnv>();
+    app.use(
+      "/api/*",
+      resolveProjectAuthMiddleware(() => routeAnonymousContext()),
+    );
+    app.use("/api/*", rejectAnonymousByDefault());
     app.get("/api/private", (c) => c.json({ ok: true }));
 
     const response = await app.request("/api/private");
@@ -357,16 +402,36 @@ describe("project auth template", () => {
     });
   });
 
-  it("middleware enforces verified-email policy when configured", async () => {
+  it("anonymous gate allows explicit public routes", async () => {
     const app = new Hono<SapportaEnv>();
     app.use(
       "/api/*",
-      createProjectAuthMiddleware(
-        () => routeAuthContext({ emailVerified: false }),
-        { requireVerifiedEmail: true },
-      ),
+      resolveProjectAuthMiddleware(() => routeAnonymousContext()),
     );
+    app.use(
+      "/api/*",
+      rejectAnonymousByDefault({
+        publicRoutes: [{ method: "GET", path: "/api/public" }],
+      }),
+    );
+    app.get("/api/public", (c) => c.json({ public: true }));
     app.get("/api/private", (c) => c.json({ ok: true }));
+
+    const publicResponse = await app.request("/api/public");
+    const privateResponse = await app.request("/api/private");
+
+    expect(publicResponse.status).toBe(200);
+    await expect(publicResponse.json()).resolves.toEqual({ public: true });
+    expect(privateResponse.status).toBe(401);
+  });
+
+  it("requireVerifiedUser enforces verified email", async () => {
+    const app = new Hono<SapportaEnv>();
+    app.use("*", async (c, next) => {
+      c.set("auth", routeAuthContext({ emailVerified: false }));
+      await next();
+    });
+    app.get("/api/private", (c) => c.json(requireVerifiedUser(c)));
 
     const response = await app.request("/api/private");
 
@@ -377,32 +442,15 @@ describe("project auth template", () => {
     });
   });
 
-  it("middleware skips public auth routes", async () => {
-    const app = new Hono<SapportaEnv>();
-    app.use(
-      "/api/*",
-      createProjectAuthMiddleware(() => null, {
-        skip: (c) => c.req.path.startsWith("/api/auth/"),
-      }),
-    );
-    app.get("/api/auth/session", (c) => c.json({ public: true }));
-    app.get("/api/private", (c) => c.json({ ok: true }));
-
-    const publicResponse = await app.request("/api/auth/session");
-    const privateResponse = await app.request("/api/private");
-
-    expect(publicResponse.status).toBe(200);
-    await expect(publicResponse.json()).resolves.toEqual({ public: true });
-    expect(privateResponse.status).toBe(401);
-  });
-
-  it("requireWorkspaceUser accepts an active workspace context", async () => {
+  it("requireWorkspaceRowsAllowed accepts workspace row access", async () => {
     const app = new Hono<SapportaEnv>();
     app.use("*", async (c, next) => {
       c.set("auth", routeAuthContext());
       await next();
     });
-    app.get("/api/private", (c) => c.json(requireWorkspaceUser(c).workspace));
+    app.get("/api/private", (c) =>
+      c.json(requireWorkspaceRowsAllowed(c).rowsAllowedForRequest.workspace),
+    );
 
     const response = await app.request("/api/private");
 
@@ -414,21 +462,15 @@ describe("project auth template", () => {
   });
 
   it("requireWorkspaceOwner accepts owner and admin mapped users", async () => {
-    const ownerApp = guardedApp(
-      routeAuthContext({ role: "owner", isOwner: true }),
-    );
-    const adminMappedApp = guardedApp(
-      routeAuthContext({ role: "admin", isOwner: true }),
-    );
+    const ownerApp = guardedApp(routeAuthContext({ role: "owner" }));
+    const adminMappedApp = guardedApp(routeAuthContext({ role: "admin" }));
 
     expect((await ownerApp.request("/api/private")).status).toBe(200);
     expect((await adminMappedApp.request("/api/private")).status).toBe(200);
   });
 
   it("requireWorkspaceOwner rejects non-owner users", async () => {
-    const app = guardedApp(
-      routeAuthContext({ role: "member", isOwner: false }),
-    );
+    const app = guardedApp(routeAuthContext({ role: "member" }));
 
     const response = await app.request("/api/private");
 
@@ -576,7 +618,7 @@ function guardedApp(auth: SapportaAuthContext): Hono<SapportaEnv> {
     await next();
   });
   app.get("/api/private", (c) =>
-    c.json({ workspaceId: requireWorkspaceOwner(c).workspace.id }),
+    c.json({ workspaceId: requireWorkspaceOwner(c).rowsAllowedForRequest.workspace.id }),
   );
   return app;
 }
@@ -584,29 +626,71 @@ function guardedApp(auth: SapportaAuthContext): Hono<SapportaEnv> {
 function routeAuthContext(
   overrides: {
     role?: string;
-    isOwner?: boolean;
     emailVerified?: boolean;
     workspaceId?: string;
   } = {},
-): SapportaAuthContext {
-  const role = overrides.role ?? "owner";
+): SapportaAuthContext<AppAbility, AppWorkspaceMembership> {
+  const storedRole = overrides.role ?? "owner";
+  const role = storedRole === "owner" || storedRole === "admin" ? "owner" : "member";
   const workspaceId = overrides.workspaceId ?? "workspace-1";
-  const payload = sessionPayload({ activeOrganizationId: workspaceId });
-  if (overrides.emailVerified !== undefined) {
-    payload.user.emailVerified = overrides.emailVerified;
-  }
-  const auth = authContextFromPayload(
-    payload,
-    {
-      member_id: "member-1",
-      role,
-      organization_id: workspaceId,
-      organization_name: "Acme",
-      organization_slug: "acme",
-    },
-    emptyCatalog,
-  );
-  return overrides.isOwner === undefined
-    ? auth
-    : { ...auth, workspace: { ...auth.workspace, isOwner: overrides.isOwner } };
+  const user = {
+    id: "user-1",
+    name: "Owner",
+    email: "owner@example.test",
+    emailVerified: overrides.emailVerified ?? true,
+  };
+  const workspace = {
+    id: workspaceId,
+    name: "Acme",
+    slug: "acme",
+  };
+
+  const principal = {
+      kind: "user",
+      user,
+      membership: {
+        id: "member-1",
+        workspace,
+        roles: [role],
+      },
+    } as const;
+  const rowsAllowedForRequest = {
+      kind: "allowWorkspaceUserRows",
+      workspace,
+      user,
+    } as const satisfies RowsAllowedForRequest;
+
+  return createAuthContext({
+    principal,
+    rowsAllowedForRequest,
+    ability: buildAppAbility({ principal, rowsAllowedForRequest }),
+    catalog: emptyCatalog,
+  });
+}
+
+function routeAnonymousContext(): SapportaAuthContext<AppAbility, AppWorkspaceMembership> {
+  const principal = { kind: "anonymous" } as const;
+  const rowsAllowedForRequest = allowOnlySystemWideRows();
+  return createAuthContext({
+    principal,
+    rowsAllowedForRequest,
+    ability: buildAppAbility({ principal, rowsAllowedForRequest }),
+    catalog: emptyCatalog,
+  });
+}
+
+const buildAppAbility: BuildAbility<AppAbility, AppWorkspaceMembership> = () =>
+  ({ can: () => true }) as unknown as AppAbility;
+
+const resolveRowsAllowedForRequest: ResolveRowsAllowedForRequest = async ({ principal }) => {
+  if (principal.kind !== "user") return allowOnlySystemWideRows();
+  return {
+    kind: "allowWorkspaceUserRows",
+    workspace: principal.membership.workspace,
+    user: principal.user,
+  };
+};
+
+function requestContext(): Parameters<ResolveRowsAllowedForRequest>[0]["c"] {
+  return {} as Parameters<ResolveRowsAllowedForRequest>[0]["c"];
 }

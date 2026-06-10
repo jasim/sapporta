@@ -48,6 +48,7 @@ export type ScaffoldPackages = {
     grid: string;
     frontend: string;
     shared: string;
+    caslAbility: string;
     betterSqlite3: string;
     drizzle: string;
     drizzleKit: string;
@@ -209,6 +210,7 @@ export function resolveScaffoldPackages(
           devModePackageRoot,
           "shared",
         ),
+        caslAbility: coreInstalled("@casl/ability"),
         betterSqlite3: coreInstalled("better-sqlite3"),
         drizzle: coreInstalled("drizzle-orm"),
         drizzleKit: coreInstalled("drizzle-kit"),
@@ -284,6 +286,7 @@ export function resolveScaffoldPackages(
       grid: sapportaPackageSpec(grid, "@sapporta/grid"),
       frontend: sapportaPackageSpec(frontend, "@sapporta/frontend"),
       shared: sapportaPackageSpec(shared, "@sapporta/shared"),
+      caslAbility: coreSpec("@casl/ability"),
       betterSqlite3: coreSpec("better-sqlite3"),
       drizzle: coreSpec("drizzle-orm"),
       drizzleKit: coreSpec("drizzle-kit"),
@@ -471,6 +474,7 @@ function buildTemplateReplacements(
     "%%SAPPORTA:GRID_SPEC%%": packages.specs.grid,
     "%%SAPPORTA:FRONTEND_SPEC%%": packages.specs.frontend,
     "%%SAPPORTA:SHARED_SPEC%%": packages.specs.shared,
+    "%%SAPPORTA:CASL_ABILITY_VERSION%%": packages.specs.caslAbility,
     "%%SAPPORTA:HONO_SPEC%%": packages.specs.hono,
     "%%SAPPORTA:HONO_NODE_SERVER_SPEC%%": packages.specs.honoNodeServer,
     "%%SAPPORTA:NODEMAILER_VERSION%%": packages.specs.nodemailer,

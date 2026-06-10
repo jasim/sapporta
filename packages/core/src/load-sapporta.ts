@@ -35,7 +35,7 @@ import {
   mountTables,
   mountReports,
   makeMetaHandlers,
-  makeWorkspaceSafeTableHandlers,
+  makeAuthorizedTableHandlers,
   makeReportHandlers,
 } from "./api/index.js";
 
@@ -143,8 +143,8 @@ export function installSapportaRequestContext(
 /**
  * Mounts Sapporta's framework API under `/api`.
  *
- * This installs the route policy first when auth is supplied, then mounts meta,
- * table, and report routes. It returns the framework `TsRestApi` so
+ * This installs route policy for framework surfaces that are not CASL-aware,
+ * then mounts meta, table, and report routes. It returns the framework `TsRestApi` so
  * `mountOpenApi()` can merge user route emitters into the same document.
  */
 export function mountSapportaFramework(
@@ -168,7 +168,7 @@ export function mountSapportaFramework(
   mountTables(
     api,
     catalog,
-    makeWorkspaceSafeTableHandlers(catalog, db, {
+    makeAuthorizedTableHandlers(catalog, db, {
       guard: options.auth.requireFrameworkAccess,
     }),
   );

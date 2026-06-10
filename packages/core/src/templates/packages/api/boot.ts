@@ -28,6 +28,9 @@ import {
   type SapportaEnv,
 } from "@sapporta/server";
 import { loadApp } from "./app.js";
+import { publicApiRoutes } from "./app.js";
+import { buildAbility } from "./authz/ability.js";
+import { resolveRowsAllowedForRequest } from "./authz/rows-allowed-for-request.js";
 import { createSapportaMailer } from "./mailer.js";
 import { createProjectAuth, readProjectAuthEnv } from "./project-auth/index.js";
 
@@ -62,6 +65,9 @@ const projectAuth = createProjectAuth({
   env: projectEnv,
   catalog: sapporta.catalog,
   mailer,
+  buildAbility,
+  resolveRowsAllowedForRequest,
+  publicRoutes: publicApiRoutes,
 });
 
 // 3. Shared Hono app - framework and user routes mount onto it.
@@ -78,19 +84,20 @@ installSapportaErrorHandler(app);
 mountHealth(
   app,
   projectAuth.env.healthPolicy,
-  projectAuth.requireWorkspaceUser,
+  projectAuth.requirePrincipalUser,
 );
 app.on(["GET", "POST"], "/api/auth/*", (c) =>
   projectAuth.auth.handler(c.req.raw),
 );
 installSapportaRequestContext(app, conn);
-app.use("/api/*", projectAuth.middleware);
+app.use("/api/*", projectAuth.resolveMiddleware);
+app.use("/api/*", projectAuth.rejectAnonymousMiddleware);
 
 // 5. Framework: /api/meta + /api/tables + /api/reports.
 const sapportaApi = mountSapportaFramework(app, sapporta, {
   conn,
   auth: {
-    requireFrameworkAccess: projectAuth.requireWorkspaceOwner,
+    requireFrameworkAccess: projectAuth.requireAuthContext,
   },
 });
 

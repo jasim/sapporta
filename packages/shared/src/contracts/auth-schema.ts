@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export const authRoleSchema = z.enum(["owner", "user"]).meta({ id: "AuthRole" });
+export const authRoleSchema = z.enum(["owner", "member"]).meta({ id: "AuthRole" });
 export type AuthRole = z.output<typeof authRoleSchema>;
 
 export const authCurrentUserSchema = z

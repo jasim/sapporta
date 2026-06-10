@@ -3,7 +3,12 @@ import { Route, Routes, useNavigate } from "react-router-dom";
 import { AppShell, setNavigate } from "@sapporta/frontend/app";
 import { BootLoader } from "@sapporta/frontend/app";
 import { AuthGate, useAuthStore } from "@sapporta/frontend/auth/runtime";
-import { appHomeRoute, appNavigation, appRoutes } from "./App";
+import {
+  appHomeRoute,
+  appNavigation,
+  appProtectedRoutes,
+  appPublicRoutes,
+} from "./App";
 import {
   sapportaNotFoundRoute,
   sapportaProtectedRoutes,
@@ -20,6 +25,7 @@ export function SapportaApp() {
   return (
     <Routes>
       {sapportaPublicRoutes}
+      {appPublicRoutes}
 
       <Route
         element={
@@ -34,7 +40,7 @@ export function SapportaApp() {
         }
       >
         {appHomeRoute}
-        {appRoutes}
+        {appProtectedRoutes}
         {sapportaProtectedRoutes}
         {sapportaNotFoundRoute}
       </Route>

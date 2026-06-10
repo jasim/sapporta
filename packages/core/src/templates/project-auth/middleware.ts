@@ -1,65 +1,63 @@
 import { HTTPException } from "hono/http-exception";
 import type { Context, MiddlewareHandler } from "hono";
-import type { SapportaAuthContext, SapportaEnv } from "@sapporta/server";
-import { ownsActiveWorkspace } from "@sapporta/server";
+import type {
+  RowsAllowedForRequest,
+  SapportaAuthContext,
+  SapportaEnv,
+} from "@sapporta/server";
 import { authFailure } from "./errors.js";
 
 export type ResolveProjectAuth<E extends SapportaEnv = SapportaEnv> = (
   c: Context<E>,
-) =>
-  | SapportaAuthContext
-  | null
-  | undefined
-  | Promise<SapportaAuthContext | null | undefined>;
+) => SapportaAuthContext | Promise<SapportaAuthContext>;
 
-export interface ProjectAuthMiddlewareOptions<
-  E extends SapportaEnv = SapportaEnv,
-> {
-  /** Reject signed-in users whose email is not verified. */
-  requireVerifiedEmail?: boolean;
-  /** Allows public routes such as `/api/auth/*` to bypass project auth. */
-  skip?: (c: Context<E>) => boolean;
+export type PublicRoutePattern =
+  | string
+  | {
+      method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
+      path: string;
+    };
+
+export interface AnonymousGateOptions {
+  publicRoutes?: readonly PublicRoutePattern[];
 }
 
 /**
- * Installs project auth for protected API routes.
- *
- * The resolver owns Better Auth/session lookup. This middleware enforces the
- * generated project's email/workspace policy and stores the table-bound
- * `SapportaAuthContext` on Hono as `auth`.
+ * Resolves auth before route code runs. This middleware should run for API
+ * routes whether the request has a session or not, so public routes can use the
+ * same ability and row-security path as signed-in routes.
  */
-export function createProjectAuthMiddleware<E extends SapportaEnv>(
+export function resolveProjectAuthMiddleware<E extends SapportaEnv>(
   resolveAuth: ResolveProjectAuth<E>,
-  options: ProjectAuthMiddlewareOptions<E> = {},
 ): MiddlewareHandler<E> {
   return async (c, next) => {
-    if (options.skip?.(c) === true) {
-      return next();
-    }
-
-    const auth = await resolveAuth(c);
-    if (!auth) {
-      const failure = authFailure("unauthenticated");
-      return c.json(failure.body, failure.status);
-    }
-
-    if (options.requireVerifiedEmail === true && !auth.user.emailVerified) {
-      const failure = authFailure("email_not_verified");
-      return c.json(failure.body, failure.status);
-    }
-
-    if (!auth.workspace.id || !auth.member.id) {
-      const failure = authFailure("workspace_required");
-      return c.json(failure.body, failure.status);
-    }
-
-    c.set("auth", auth);
+    c.set("auth", await resolveAuth(c));
     return next();
   };
 }
 
-/** Returns the current auth context, requiring only a signed-in user. */
-export function requireOnlyBareLoggedInUser<E extends SapportaEnv>(
+/**
+ * Keeps authenticated APIs private by default.
+ *
+ * A public route pattern only lets anonymous traffic reach the route. It does
+ * not grant CASL permissions and it does not skip row security; the route must
+ * still call `forbidUnless(c, auth.ability.can(...))` before reading or writing
+ * application data.
+ */
+export function rejectAnonymousByDefault<E extends SapportaEnv>(
+  options: AnonymousGateOptions = {},
+): MiddlewareHandler<E> {
+  return async (c, next) => {
+    const auth = c.get("auth");
+    if (auth.principal.kind === "user") return next();
+    if (matchesPublicRoute(c, options.publicRoutes ?? [])) return next();
+
+    const failure = authFailure("unauthenticated");
+    return c.json(failure.body, failure.status);
+  };
+}
+
+export function requireAuthContext<E extends SapportaEnv>(
   c: Context<E>,
 ): SapportaAuthContext {
   const auth = c.get("auth");
@@ -67,39 +65,84 @@ export function requireOnlyBareLoggedInUser<E extends SapportaEnv>(
   return auth;
 }
 
-/** Returns the current auth context and requires a verified email address. */
-export function requireOnlyBareVerifiedUser<E extends SapportaEnv>(
+export function requirePrincipalUser<E extends SapportaEnv>(
+  c: Context<E>,
+): Extract<SapportaAuthContext["principal"], { kind: "user" }> {
+  const auth = requireAuthContext(c);
+  if (auth.principal.kind !== "user") throwAuth("unauthenticated");
+  return auth.principal;
+}
+
+export function requireVerifiedUser<E extends SapportaEnv>(
   c: Context<E>,
 ): SapportaAuthContext {
-  const auth = requireOnlyBareLoggedInUser(c);
-  if (!auth.user.emailVerified) throwAuth("email_not_verified");
+  const auth = requireAuthContext(c);
+  if (auth.principal.kind !== "user") throwAuth("unauthenticated");
+  if (!auth.principal.user.emailVerified) throwAuth("email_not_verified");
   return auth;
 }
 
-/**
- * Returns the current auth context and requires an active workspace membership.
- * Use this by default for product/domain routes.
- */
-export function requireWorkspaceUser<E extends SapportaEnv>(
+export function requireWorkspaceRowsAllowed<E extends SapportaEnv>(
   c: Context<E>,
-): SapportaAuthContext {
-  const auth = requireOnlyBareLoggedInUser(c);
-  if (!auth.workspace.id || !auth.member.id) throwAuth("workspace_required");
-  return auth;
+): SapportaAuthContext & {
+  rowsAllowedForRequest: Extract<
+    RowsAllowedForRequest,
+    { kind: "allowWorkspaceWideRows" | "allowWorkspaceUserRows" }
+  >;
+} {
+  const auth = requireAuthContext(c);
+  if (
+    auth.rowsAllowedForRequest.kind !== "allowWorkspaceWideRows" &&
+    auth.rowsAllowedForRequest.kind !== "allowWorkspaceUserRows"
+  ) {
+    throwAuth("workspace_required");
+  }
+  return auth as SapportaAuthContext & {
+    rowsAllowedForRequest: Extract<
+      RowsAllowedForRequest,
+      { kind: "allowWorkspaceWideRows" | "allowWorkspaceUserRows" }
+    >;
+  };
 }
 
-/**
- * Returns the current auth context and requires owner access to the active
- * workspace. Generated framework routes use this by default.
- */
 export function requireWorkspaceOwner<E extends SapportaEnv>(
   c: Context<E>,
-): SapportaAuthContext {
-  const auth = requireWorkspaceUser(c);
-  if (!ownsActiveWorkspace(auth) || auth.member.role !== "owner") {
+): SapportaAuthContext & {
+  rowsAllowedForRequest: Extract<
+    RowsAllowedForRequest,
+    { kind: "allowWorkspaceWideRows" | "allowWorkspaceUserRows" }
+  >;
+} {
+  const auth = requireWorkspaceRowsAllowed(c);
+  // Owner is a membership role. This check can allow a workflow, but it does
+  // not widen `auth.rowsAllowedForRequest` for user-scoped tables.
+  if (
+    auth.principal.kind !== "user" ||
+    !auth.principal.membership.roles.includes("owner")
+  ) {
     throwAuth("forbidden");
   }
   return auth;
+}
+
+function matchesPublicRoute<E extends SapportaEnv>(
+  c: Context<E>,
+  patterns: readonly PublicRoutePattern[],
+): boolean {
+  for (const pattern of patterns) {
+    const method = typeof pattern === "string" ? undefined : pattern.method;
+    const path = typeof pattern === "string" ? pattern : pattern.path;
+    if (method && method !== c.req.method) continue;
+    if (matchesPath(path, c.req.path)) return true;
+  }
+  return false;
+}
+
+function matchesPath(pattern: string, path: string): boolean {
+  if (pattern.endsWith("*")) {
+    return path.startsWith(pattern.slice(0, -1));
+  }
+  return pattern === path;
 }
 
 function throwAuth(code: Parameters<typeof authFailure>[0]): never {

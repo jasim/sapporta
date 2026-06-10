@@ -23,6 +23,10 @@ export const SCAFFOLD_FILES: ScaffoldFile[] = [
   },
   scaffoldFile("packages/api/app.ts", "example"),
   scaffoldFile("packages/api/app/hello.ts", "example"),
+  scaffoldFile("packages/api/app/public-api-sample.ts", "example"),
+  scaffoldFile("packages/api/authz/types.ts", "example"),
+  scaffoldFile("packages/api/authz/ability.ts", "example"),
+  scaffoldFile("packages/api/authz/rows-allowed-for-request.ts", "example"),
   {
     src: "project-auth/index.ts",
     dest: "packages/api/project-auth/index.ts",
@@ -98,6 +102,7 @@ export const SCAFFOLD_FILES: ScaffoldFile[] = [
   scaffoldFile("packages/frontend/src/SapportaApp.tsx", "framework"),
   scaffoldFile("packages/frontend/src/SapportaRoutes.tsx", "framework"),
   scaffoldFile("packages/frontend/src/App.tsx", "workspace"),
+  scaffoldFile("packages/frontend/src/PublicPage.tsx", "example"),
   scaffoldFile("packages/frontend/src/Welcome.tsx", "example"),
   scaffoldFile("packages/frontend/src/api.ts", "framework"),
   scaffoldFile("packages/frontend/src/app.css", "example"),
@@ -107,5 +112,6 @@ export const SCAFFOLD_FILES: ScaffoldFile[] = [
   scaffoldFile("packages/shared/src/index.ts", "example"),
   scaffoldFile("packages/shared/src/contracts/index.ts", "example"),
   scaffoldFile("packages/shared/src/contracts/hello.ts", "example"),
+  scaffoldFile("packages/shared/src/contracts/public-api-sample.ts", "example"),
   scaffoldFile("packages/shared/CLAUDE.md", "workspace"),
 ];

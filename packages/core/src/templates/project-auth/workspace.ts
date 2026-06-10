@@ -1,8 +1,5 @@
 import { randomUUID } from "node:crypto";
-import type {
-  ProjectDbConnection,
-  SapportaAuthRole,
-} from "@sapporta/server";
+import type { ProjectDbConnection } from "@sapporta/server";
 import type { BetterAuthSessionPayload } from "./context.js";
 
 export interface WorkspaceMembershipRow {
@@ -53,10 +50,6 @@ export function switchWorkspaceMembership(
   setActiveWorkspace(conn, payload.session.id, workspaceId);
   payload.session.activeOrganizationId = workspaceId;
   return membership;
-}
-
-export function sapportaRole(role: string): SapportaAuthRole {
-  return role === "owner" || role === "admin" ? "owner" : "user";
 }
 
 export function findMembership(

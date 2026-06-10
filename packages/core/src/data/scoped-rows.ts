@@ -2,14 +2,17 @@
  * Row-scoped table operations for generated routes and ordinary product code.
  *
  * `scopedRows(db, auth, table)` is Sapporta's default table API after a request
- * has resolved to a workspace user. It binds one Drizzle table to the
- * request's row-security policy, then exposes CRUD, lookup, count, and export
- * operations that never let callers choose or bypass ownership columns.
+ * has an auth context. The principal may be signed in or anonymous; row access
+ * comes from `auth.rowsAllowedForRequest`, not from assuming there is always a
+ * workspace user. The helper binds one Drizzle table to the request's
+ * row-security policy, then exposes CRUD, lookup, count, and export operations
+ * that never let callers choose or bypass ownership columns.
  *
  * The important rule is that primary keys and client payloads are not security
  * boundaries. Reads and destructive writes add the table's workspace/user
  * visibility predicate in SQL. Creates and updates first reject client-supplied
- * ownership fields, then stamp trusted scope values from the auth context.
+ * ownership fields, then stamp trusted scope values from the request's allowed
+ * row facts.
  *
  * The row-security module builds that request-bound policy with
  * `createRowSecurity()`, exposed on `SapportaAuthContext` as `RowSecurity`.

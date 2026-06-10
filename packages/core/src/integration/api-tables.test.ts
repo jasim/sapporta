@@ -496,7 +496,7 @@ describe("/api/tables table operations", () => {
       expect(error.details).toContainEqual(
         expect.objectContaining({
           field: "account_id",
-          message: "Referenced row does not exist or is not visible in the active auth boundary.",
+          message: "Referenced row does not exist or is not visible in the active request scope.",
         }),
       );
     });

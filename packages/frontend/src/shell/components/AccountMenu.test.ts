@@ -94,7 +94,7 @@ describe("account menu helpers", () => {
     expect(getAccountSecondaryLabel(AUTH_CONTEXT)).toBe(
       "Analytical Engines - Owner",
     );
-    expect(formatAuthRole("user")).toBe("User");
+    expect(formatAuthRole("member")).toBe("Member");
   });
 });
 
