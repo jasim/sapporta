@@ -1184,6 +1184,7 @@ describe.sequential("sapporta init auth template - end-to-end", () => {
           },
         },
         expectedStatus: 422,
+        serverOutput: server?.output,
       }),
       ["invoice_id"],
     );

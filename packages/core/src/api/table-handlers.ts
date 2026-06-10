@@ -20,7 +20,10 @@ import type { Context } from "hono";
 import { stream } from "hono/streaming";
 import { getTableConfig } from "drizzle-orm/sqlite-core";
 import type { TableCatalog } from "../schema/catalog.js";
-import { savePipeline } from "../data/save-pipeline.js";
+import {
+  savePipeline,
+  savePipelineInsertSync,
+} from "../data/save-pipeline.js";
 import {
   ImmutableTableOperationError,
   RowNotFoundError,
@@ -236,21 +239,24 @@ async function handleMasterDetailCreate<E extends SapportaEnv>(
   const masterPrepared = await masterAccess.insertValues(db, masterData);
   const masterPkCol = findPkColumn(masterSchema);
 
-  const result = await db.transaction(async (tx) => {
-    const masterResult = (await savePipeline(
+  const result = db.transaction((tx) => {
+    const masterResult = savePipelineInsertSync(
       masterSchema,
       tx,
       masterPrepared,
-    )) as Record<string, unknown>;
+    ) as Record<string, unknown>;
     const masterPkValue = masterResult[masterPkCol.name];
     const detailResults: Record<string, unknown>[] = [];
 
     for (const row of $details.rows) {
-      const prepared = await detailAccess.insertValues(tx, row, {
+      const prepared = detailAccess.insertValuesSync(tx, row, {
         serverValues: { [$details.fk]: masterPkValue },
       });
       detailResults.push(
-        (await savePipeline(detailDef, tx, prepared)) as Record<string, unknown>,
+        savePipelineInsertSync(detailDef, tx, prepared) as Record<
+          string,
+          unknown
+        >,
       );
     }
 

@@ -121,6 +121,24 @@ export async function validateForeignKeyReferences(
   registeredTables: readonly TableDef[],
   options: ForeignKeyValidationOptions = {},
 ): Promise<void> {
+  validateForeignKeyReferencesSync(
+    db,
+    rowsAllowedForRequest,
+    sourceTable,
+    payload,
+    registeredTables,
+    options,
+  );
+}
+
+export function validateForeignKeyReferencesSync(
+  db: BetterSQLite3Database,
+  rowsAllowedForRequest: RowsAllowedForRequest,
+  sourceTable: TableDef,
+  payload: unknown,
+  registeredTables: readonly TableDef[],
+  options: ForeignKeyValidationOptions = {},
+): void {
   if (!isRecord(payload)) {
     throw new AuthPayloadPolicyError([
       { field: "$", message: "Expected an object payload." },
@@ -150,11 +168,12 @@ export async function validateForeignKeyReferences(
       rowsAllowedForRequest,
       reference.targetTable,
     );
-    const rows = await db
+    const rows = db
       .select({ id: reference.targetColumnRef })
       .from(reference.targetTable.drizzle)
       .where(and(eq(reference.targetColumnRef, value), accessPredicate))
-      .limit(1);
+      .limit(1)
+      .all() as Array<{ id: unknown }>;
 
     if (rows.length === 0) {
       validationErrors.push({

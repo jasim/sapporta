@@ -15,10 +15,19 @@ export async function insertRow(
   db: BetterSQLite3Database,
   record: Record<string, unknown>,
 ): Promise<Record<string, unknown>> {
-  const result = await db
+  return insertRowSync(schema, db, record);
+}
+
+export function insertRowSync(
+  schema: TableDef,
+  db: BetterSQLite3Database,
+  record: Record<string, unknown>,
+): Record<string, unknown> {
+  const result = db
     .insert(schema.drizzle)
-    .values(record as any)
-    .returning();
+    .values(record as typeof schema.drizzle.$inferInsert)
+    .returning()
+    .all() as Record<string, unknown>[];
 
   return result[0] as Record<string, unknown>;
 }
@@ -64,6 +73,30 @@ export async function savePipeline(
   id?: RowId,
   options: { updatePredicate?: SQL } = {},
 ): Promise<Record<string, unknown>> {
+  validateForSave(schema, record, id);
+
+  // Step 2: Insert or update
+  if (id != null) {
+    return updateRow(schema, db, id, record, options);
+  } else {
+    return insertRow(schema, db, record);
+  }
+}
+
+export function savePipelineInsertSync(
+  schema: TableDef,
+  db: BetterSQLite3Database,
+  record: Record<string, unknown>,
+): Record<string, unknown> {
+  validateForSave(schema, record);
+  return insertRowSync(schema, db, record);
+}
+
+function validateForSave(
+  schema: TableDef,
+  record: Record<string, unknown>,
+  id?: RowId,
+): void {
   // Step 0: Reject control characters in string values
   for (const [key, value] of Object.entries(record)) {
     if (typeof value === "string") {
@@ -81,12 +114,5 @@ export async function savePipeline(
   const errors = validate(schema, record, id != null ? { partial: true } : undefined);
   if (errors.length > 0) {
     throw new ValidationError(errors);
-  }
-
-  // Step 2: Insert or update
-  if (id != null) {
-    return updateRow(schema, db, id, record, options);
-  } else {
-    return insertRow(schema, db, record);
   }
 }

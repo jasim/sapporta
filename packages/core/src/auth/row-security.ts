@@ -12,6 +12,7 @@ import {
 import {
   selectRowAccessPredicate,
   validateForeignKeyReferences,
+  validateForeignKeyReferencesSync,
 } from "./row-access.js";
 
 /**
@@ -64,6 +65,20 @@ export interface TableRowSecurity {
   ): Promise<Record<string, unknown>>;
 
   /**
+   * Synchronous variant for better-sqlite3 transaction callbacks.
+   */
+  insertValuesSync<T extends Record<string, unknown>>(
+    db: BetterSQLite3Database,
+    input: T,
+    options?: InsertValuesOptions<T>,
+  ): T & Record<string, unknown>;
+  insertValuesSync(
+    db: BetterSQLite3Database,
+    input: unknown,
+    options?: InsertValuesOptions<Record<string, unknown>>,
+  ): Record<string, unknown>;
+
+  /**
    * Prepares multiple client create payloads with the same guarantees as
    * `insertValues()`. Empty batches are rejected so callers do not accidentally
    * pass ambiguous SQL input to Drizzle.
@@ -106,6 +121,7 @@ export interface TableRowSecurity {
     db: BetterSQLite3Database,
     payload: unknown,
   ): Promise<void>;
+  validateReferencesSync(db: BetterSQLite3Database, payload: unknown): void;
 }
 
 export interface RowSecurity {
@@ -179,12 +195,21 @@ export function createRowSecurity(
         index: number,
         insertOptions: InsertValuesOptions<T> = {},
       ): Promise<T & Record<string, unknown>> {
+        return prepareInsertSync(db, input, index, insertOptions);
+      }
+
+      function prepareInsertSync<T extends Record<string, unknown>>(
+        db: BetterSQLite3Database,
+        input: T,
+        index: number,
+        insertOptions: InsertValuesOptions<T> = {},
+      ): T & Record<string, unknown> {
         // Keep the trust boundary explicit: validate the client shape first,
         // merge server-authored fields second, then validate the final graph.
         const safe = ensureClientPayload(input) as T;
         const trustedValues = resolveServerValues(insertOptions, safe, index);
         const merged = { ...safe, ...trustedValues };
-        await validateReferences(db, merged);
+        validateReferencesSync(db, merged);
         return {
           ...merged,
           ...trustedInsertValuesForAllowedRows(rowsAllowedForRequest, tableDef).sql,
@@ -196,6 +221,23 @@ export function createRowSecurity(
         payload: unknown,
       ): Promise<void> {
         await validateForeignKeyReferences(
+          db,
+          rowsAllowedForRequest,
+          tableDef,
+          payload,
+          options.catalog.tables,
+          {
+            ...options,
+            skipPayloadPolicy: true,
+          },
+        );
+      }
+
+      function validateReferencesSync(
+        db: BetterSQLite3Database,
+        payload: unknown,
+      ): void {
+        validateForeignKeyReferencesSync(
           db,
           rowsAllowedForRequest,
           tableDef,
@@ -224,6 +266,14 @@ export function createRowSecurity(
           insertOptions?: InsertValuesOptions<Record<string, unknown>>,
         ) {
           return prepareInsert(db, input, 0, insertOptions);
+        },
+
+        insertValuesSync(
+          db: BetterSQLite3Database,
+          input: Record<string, unknown>,
+          insertOptions?: InsertValuesOptions<Record<string, unknown>>,
+        ) {
+          return prepareInsertSync(db, input, 0, insertOptions);
         },
 
         async insertManyValues(db, inputs, insertOptions) {
@@ -259,6 +309,7 @@ export function createRowSecurity(
         },
 
         validateReferences,
+        validateReferencesSync,
       };
     },
   };
