@@ -78,11 +78,14 @@ export type HealthPolicy = "disabled" | "public" | "authenticated";
 export type SapportaAuthGuard<E extends SapportaEnv = SapportaEnv> = (
   c: Context<E>,
 ) => SapportaAuthContext;
+export type SapportaHealthGuard<E extends SapportaEnv = SapportaEnv> = (
+  c: Context<E>,
+) => unknown | Promise<unknown>;
 
 export function mountHealth<E extends SapportaEnv>(
   app: Hono<E>,
   policy: HealthPolicy = "public",
-  guard?: SapportaAuthGuard<E>,
+  guard?: SapportaHealthGuard<E>,
 ): Hono<E> {
   if (policy === "disabled") return app;
   app.get("/health", (c) => c.json({ status: "ok" }));
@@ -91,7 +94,7 @@ export function mountHealth<E extends SapportaEnv>(
       throw new Error("Authenticated health policy requires a project auth guard.");
     }
     app.use("/health", async (c, next) => {
-      guard(c);
+      await guard(c);
       return next();
     });
   }

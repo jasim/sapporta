@@ -1,5 +1,5 @@
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { execSync } from "node:child_process";
 import { ensureBetterSqlite3Loads } from "./sqlite-native-repair.js";
 import {
@@ -129,7 +129,9 @@ function writeScaffoldFiles(
   files: Array<{ dest: string; content: string }>,
 ): void {
   for (const file of files) {
-    writeFileSync(join(projectRoot, file.dest), file.content);
+    const targetPath = join(projectRoot, file.dest);
+    mkdirSync(dirname(targetPath), { recursive: true });
+    writeFileSync(targetPath, file.content);
   }
 }
 
