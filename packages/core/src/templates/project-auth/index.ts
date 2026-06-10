@@ -41,16 +41,19 @@ export interface ProjectAuth {
   auth: ProjectBetterAuth;
   env: ProjectAuthEnv;
   routes: ReturnType<typeof createProjectAuthRoutes>;
-  resolveMiddleware: ReturnType<typeof resolveProjectAuthMiddleware<SapportaEnv>>;
-  rejectAnonymousMiddleware: ReturnType<typeof rejectAnonymousByDefault<SapportaEnv>>;
+  resolveMiddleware: ReturnType<
+    typeof resolveProjectAuthMiddleware<SapportaEnv>
+  >;
+  rejectAnonymousMiddleware: ReturnType<
+    typeof rejectAnonymousByDefault<SapportaEnv>
+  >;
   resolveAuth: (
     c: Context<SapportaEnv>,
   ) => Promise<SapportaAuthContext<AppAbility, AppWorkspaceMembership>>;
   requireAuthContext: (c: Context<SapportaEnv>) => SapportaAuthContext;
-  requirePrincipalUser: (c: Context<SapportaEnv>) => Extract<
-    SapportaAuthContext["principal"],
-    { kind: "user" }
-  >;
+  requirePrincipalUser: (
+    c: Context<SapportaEnv>,
+  ) => Extract<SapportaAuthContext["principal"], { kind: "user" }>;
   requireVerifiedUser: (c: Context<SapportaEnv>) => SapportaAuthContext;
   requireWorkspaceRowsAllowed: (c: Context<SapportaEnv>) => SapportaAuthContext;
   requireWorkspaceOwner: (c: Context<SapportaEnv>) => SapportaAuthContext;
@@ -106,6 +109,7 @@ export function createProjectAuth({
     resolveMiddleware: resolveProjectAuthMiddleware(resolveAuth),
     rejectAnonymousMiddleware: rejectAnonymousByDefault({
       publicRoutes: [...defaultPublicRoutes, ...publicRoutes],
+      requireVerifiedEmail: env.requireVerifiedEmail,
     }),
     resolveAuth,
     requireAuthContext,

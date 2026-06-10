@@ -20,6 +20,7 @@ export type PublicRoutePattern =
 
 export interface AnonymousGateOptions {
   publicRoutes?: readonly PublicRoutePattern[];
+  requireVerifiedEmail?: boolean;
 }
 
 /**
@@ -49,8 +50,14 @@ export function rejectAnonymousByDefault<E extends SapportaEnv>(
 ): MiddlewareHandler<E> {
   return async (c, next) => {
     const auth = c.get("auth");
-    if (auth.principal.kind === "user") return next();
     if (matchesPublicRoute(c, options.publicRoutes ?? [])) return next();
+    if (auth.principal.kind === "user") {
+      if (options.requireVerifiedEmail && !auth.principal.user.emailVerified) {
+        const failure = authFailure("email_not_verified");
+        return c.json(failure.body, failure.status);
+      }
+      return next();
+    }
 
     const failure = authFailure("unauthenticated");
     return c.json(failure.body, failure.status);
