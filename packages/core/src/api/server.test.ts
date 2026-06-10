@@ -8,6 +8,7 @@ import { HTTPException } from "hono/http-exception";
 import {
   installExactOriginCors,
   installFrameworkRoutePolicy,
+  mountHealth,
   installSapportaDefaults,
   type SapportaEnv,
 } from "./server.js";
@@ -72,6 +73,19 @@ describe("installSapportaDefaults", () => {
     expect(await res.json()).toEqual({ error: "bad", code: "VALIDATION", hint: "fix it" });
   });
 
+  it("honors HTTPException-like responses from project dependencies", async () => {
+    const err = Object.assign(new Error(""), {
+      res: Response.json({ error: "Project auth rejected", code: "unauthenticated" }, { status: 401 }),
+      status: 401,
+    });
+    const res = await appThatThrows(err).request("/boom");
+    expect(res.status).toBe(401);
+    expect(await res.json()).toEqual({
+      error: "Project auth rejected",
+      code: "unauthenticated",
+    });
+  });
+
   it("returns JSON regardless of the client's Accept header", async () => {
     const res = await appThatThrows(new Error("boom")).request("/boom", {
       headers: { Accept: "text/html" },
@@ -113,6 +127,32 @@ describe("framework route policy", () => {
       name: "Acme Ledger",
       slug: "acme-ledger",
     });
+  });
+});
+
+describe("health policy", () => {
+  it("returns a JSON 404 when health is disabled", async () => {
+    const app = new Hono<SapportaEnv>();
+    mountHealth(app, "disabled");
+
+    const res = await app.request("/health");
+
+    expect(res.status).toBe(404);
+    expect(await res.json()).toEqual({ error: "Not found" });
+  });
+
+  it("runs the authenticated health guard before returning ok", async () => {
+    const app = new Hono<SapportaEnv>();
+    mountHealth(app, "authenticated", () => {
+      throw new HTTPException(401, {
+        res: Response.json({ error: "Sign in first" }, { status: 401 }),
+      });
+    });
+
+    const res = await app.request("/health");
+
+    expect(res.status).toBe(401);
+    expect(await res.json()).toEqual({ error: "Sign in first" });
   });
 });
 

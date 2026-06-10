@@ -61,6 +61,24 @@ describe("auth schema validation", () => {
     ]);
   });
 
+  it("rejects unknown row scope values before request-time policy checks", () => {
+    const accounts = table({
+      drizzle: sqliteTable("accounts", {
+        id: integer("id").primaryKey({ autoIncrement: true }),
+      }),
+      meta: { rowScope: "tenantScoped" as never },
+    });
+
+    const issues = checkAuthSchemaDefinitions([accounts]);
+
+    expect(issues).toMatchObject([
+      {
+        table: "accounts",
+        code: "invalid_row_scope",
+      },
+    ]);
+  });
+
   it("rejects client-editable system-managed scope columns", () => {
     const orders = table({
       drizzle: sqliteTable("orders", {

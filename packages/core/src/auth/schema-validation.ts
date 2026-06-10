@@ -42,7 +42,10 @@ export class AuthSchemaValidationError extends Error {
   constructor(issues: readonly AuthSchemaIssue[]) {
     super(
       `Auth schema validation failed: ${issues
-        .map((issue) => `${issue.table}${issue.column ? `.${issue.column}` : ""}: ${issue.message}`)
+        .map(
+          (issue) =>
+            `${issue.table}${issue.column ? `.${issue.column}` : ""} [${issue.code}]: ${issue.message}`,
+        )
         .join("; ")}`,
     );
     this.name = "AuthSchemaValidationError";
@@ -85,6 +88,16 @@ export function checkAuthSchemaDefinitions(tables: readonly TableDef[]): AuthSch
 
   for (const table of tables) {
     const rowScope = table.meta.rowScope;
+    if (!isRowScope(rowScope)) {
+      issues.push({
+        table: table.sqlName,
+        code: "invalid_row_scope",
+        message: `Invalid row scope "${String(rowScope)}".`,
+      });
+      issues.push(...resolveTableReferences(table, tables).issues);
+      continue;
+    }
+
     issues.push(...checkScopeColumns(table, rowScope));
 
     issues.push(...resolveTableReferences(table, tables).issues);

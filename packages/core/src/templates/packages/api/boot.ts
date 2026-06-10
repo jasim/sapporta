@@ -81,6 +81,9 @@ installExactOriginCors(app, {
   credentials: true,
 });
 installSapportaErrorHandler(app);
+if (projectAuth.env.healthPolicy === "authenticated") {
+  app.use("/health", projectAuth.resolveMiddleware);
+}
 mountHealth(
   app,
   projectAuth.env.healthPolicy,
