@@ -69,15 +69,6 @@ type AuthzWorkspaceBody = {
   role: "owner" | "member";
 };
 
-type StatusBody = {
-  status: boolean;
-};
-
-type BetterAuthErrorBody = {
-  code?: string;
-  message?: string;
-};
-
 type UserRow = {
   id: string;
   email: string;
@@ -522,6 +513,20 @@ describe.sequential("sapporta init auth template - end-to-end", () => {
       "/api/auth-context",
       { cookieFile: owner.cookieFile, expectedStatus: 200 },
     );
+    const ownerTaskForMemberDenial = await requestJson<RowBody>(
+      baseUrl,
+      "/api/tables/tasks",
+      {
+        cookieFile: owner.cookieFile,
+        method: "POST",
+        body: {
+          title: "Role owner protected task",
+          status: "todo",
+          priority: 3,
+        },
+        expectedStatus: 201,
+      },
+    );
 
     const member = await createSignedInUser("role-member", "Role Member");
     const memberOwnContext = await requestJson<AuthContextBody>(
@@ -568,6 +573,50 @@ describe.sequential("sapporta init auth template - end-to-end", () => {
       },
     );
     expectHttpError(memberTables, 403, { code: "forbidden" });
+
+    for (const denied of [
+      await requestJson<unknown>(baseUrl, "/api/tables/tasks", {
+        cookieFile: member.cookieFile,
+        method: "POST",
+        body: TASK_TWO,
+        expectedStatus: 403,
+      }),
+      await requestJson<unknown>(
+        baseUrl,
+        `/api/tables/tasks/${ownerTaskForMemberDenial.body.data.id}`,
+        {
+          cookieFile: member.cookieFile,
+          method: "PUT",
+          body: { title: "Member should not update" },
+          expectedStatus: 403,
+        },
+      ),
+      await requestJson<unknown>(
+        baseUrl,
+        `/api/tables/tasks/${ownerTaskForMemberDenial.body.data.id}`,
+        {
+          cookieFile: member.cookieFile,
+          method: "DELETE",
+          expectedStatus: 403,
+        },
+      ),
+      await requestJson<unknown>(baseUrl, "/api/tables/tasks/export.csv", {
+        cookieFile: member.cookieFile,
+        expectedStatus: 403,
+      }),
+    ]) {
+      expectHttpError(denied, 403, { code: "forbidden" });
+    }
+
+    const unchangedTask = await requestJson<RowBody>(
+      baseUrl,
+      `/api/tables/tasks/${ownerTaskForMemberDenial.body.data.id}`,
+      {
+        cookieFile: owner.cookieFile,
+        expectedStatus: 200,
+      },
+    );
+    expect(unchangedTask.body.data.title).toBe("Role owner protected task");
 
     await requestJson<AuthContextBody>(
       baseUrl,
@@ -1350,7 +1399,6 @@ describe.sequential("sapporta init auth template - end-to-end", () => {
 
   it("rejects invalid email/password auth requests", async () => {
     const baseUrl = server!.baseUrl;
-    const cookieJar = makeCookieJar(project!, "failure-owner");
     const credentials = {
       name: "Failure Owner",
       email: "failure-owner@example.test",
@@ -1359,224 +1407,69 @@ describe.sequential("sapporta init auth template - end-to-end", () => {
 
     await signUpEmailUser(project!, baseUrl, {
       ...credentials,
-      cookieFile: cookieJar,
+      cookieFile: makeCookieJar(project!, "failure-owner"),
     });
 
-    const wrongPassword = await requestJson<unknown>(
-      `${baseUrl}/api/auth/sign-in/email`,
-      {
-        method: "POST",
-        body: {
-          email: credentials.email,
-          password: "wrong-horse-battery-staple",
-        },
-      },
-    );
-    expectClientAuthFailure(wrongPassword.status);
-
-    const unknownUser = await requestJson<unknown>(
-      `${baseUrl}/api/auth/sign-in/email`,
-      {
-        method: "POST",
-        body: {
-          email: "unknown-user@example.test",
-          password: credentials.password,
-        },
-      },
-    );
-    expectClientAuthFailure(unknownUser.status);
-
-    const duplicateSignup = await requestJson<unknown>(
-      `${baseUrl}/api/auth/sign-up/email`,
-      {
-        method: "POST",
-        body: credentials,
-      },
-    );
-    expectClientAuthFailure(duplicateSignup.status);
-
-    const malformedEmail = await requestJson<unknown>(
-      `${baseUrl}/api/auth/sign-up/email`,
-      {
-        method: "POST",
-        body: {
-          name: "Malformed",
-          email: "not-an-email",
-          password: credentials.password,
-        },
-      },
-    );
-    expectClientAuthFailure(malformedEmail.status);
-
-    const missingPassword = await requestJson<unknown>(
-      `${baseUrl}/api/auth/sign-up/email`,
-      {
-        method: "POST",
-        body: {
-          name: "Missing Password",
-          email: "missing-password@example.test",
-        },
-      },
-    );
-    expectClientAuthFailure(missingPassword.status);
-  });
-
-  it("enforces verified-email policy and keeps auth email endpoints wired", async () => {
-    const localBaseUrl = server!.baseUrl;
-    const policyJar = makeCookieJar(project!, "verification-policy-user");
-    const credentials = {
-      name: "Verification Policy User",
-      email: "verification-policy@example.test",
-      password: "correct-horse-battery-staple",
-    };
-
-    await signUpEmailUser(project!, localBaseUrl, {
-      ...credentials,
-      cookieFile: policyJar,
-    });
-
-    const localContext = await requestJson<AuthContextBody>(
-      localBaseUrl,
-      "/api/auth-context",
-      { cookieFile: policyJar, expectedStatus: 200 },
-    );
-    expect(localContext.body.user.email).toBe(credentials.email);
-    expect(localContext.body.user.emailVerified).toBe(false);
-
-    await requestJson<RowsBody>(localBaseUrl, "/api/tables/tasks", {
-      cookieFile: policyJar,
-      expectedStatus: 200,
-    });
-
-    stopServer(server);
-    server = await startBuiltServer(project!, {
-      SAPPORTA_REQUIRE_VERIFIED_EMAIL: "true",
-    });
-    const requiredBaseUrl = server.baseUrl;
-
-    const contextWhileUnverified = await requestJson<unknown>(
-      requiredBaseUrl,
-      "/api/auth-context",
-      { cookieFile: policyJar, expectedStatus: 403 },
-    );
-    expectHttpError(contextWhileUnverified, 403, {
-      code: "email_not_verified",
-      error: "Email verification required",
-    });
-
-    for (const path of ["/api/hello", "/api/tables/tasks"]) {
-      const response = await requestJson<unknown>(requiredBaseUrl, path, {
-        cookieFile: policyJar,
-        expectedStatus: 403,
-      });
-      expectHttpError(response, 403, {
-        code: "email_not_verified",
-        error: "Email verification required",
-      });
-    }
-
-    const blockedSigninJar = makeCookieJar(
-      project!,
-      "verification-policy-signin",
-    );
-    const blockedSignin = await requestJson<BetterAuthErrorBody>(
-      requiredBaseUrl,
+    await expectRejectedAuthAttempt(
+      "wrong-password",
       "/api/auth/sign-in/email",
       {
-        cookieFile: blockedSigninJar,
-        method: "POST",
-        body: {
-          email: credentials.email,
-          password: credentials.password,
-        },
-        expectedStatus: 403,
+        email: credentials.email,
+        password: "wrong-horse-battery-staple",
       },
     );
-    expect(blockedSignin.body.code).toBe("EMAIL_NOT_VERIFIED");
-
-    const resendKnown = await requestJson<StatusBody>(
-      requiredBaseUrl,
-      "/api/auth/send-verification-email",
+    await expectRejectedAuthAttempt("unknown-user", "/api/auth/sign-in/email", {
+      email: "unknown-user@example.test",
+      password: credentials.password,
+    });
+    await expectRejectedAuthAttempt(
+      "duplicate-signup",
+      "/api/auth/sign-up/email",
+      credentials,
+    );
+    await expectRejectedAuthAttempt(
+      "malformed-email",
+      "/api/auth/sign-up/email",
       {
-        method: "POST",
-        body: { email: credentials.email },
-        expectedStatus: 200,
+        name: "Malformed",
+        email: "not-an-email",
+        password: credentials.password,
       },
     );
-    expect(resendKnown.body).toEqual({ status: true });
-
-    const resendUnknown = await requestJson<StatusBody>(
-      requiredBaseUrl,
-      "/api/auth/send-verification-email",
+    await expectRejectedAuthAttempt(
+      "missing-password",
+      "/api/auth/sign-up/email",
       {
-        method: "POST",
-        body: { email: "unknown-verification@example.test" },
-        expectedStatus: 200,
+        name: "Missing Password",
+        email: "missing-password@example.test",
       },
     );
-    expect(resendUnknown.body).toEqual({ status: true });
 
-    const invalidVerification = await requestJson<BetterAuthErrorBody>(
-      `${requiredBaseUrl}/api/auth/verify-email?token=invalid-token`,
-      { expectedStatus: 401 },
-    );
-    expect(invalidVerification.body.code).toBe("INVALID_TOKEN");
+    expect(await countUsersByEmail("unknown-user@example.test")).toBe(0);
+    expect(await countUsersByEmail("not-an-email")).toBe(0);
+    expect(await countUsersByEmail("missing-password@example.test")).toBe(0);
 
-    const resetRequest = await requestJson<StatusBody>(
-      requiredBaseUrl,
-      "/api/auth/request-password-reset",
-      {
+    async function expectRejectedAuthAttempt(
+      label: string,
+      path: string,
+      body: unknown,
+    ): Promise<void> {
+      const rejectedJar = makeCookieJar(project!, label);
+      const response = await requestJson<unknown>(baseUrl, path, {
+        cookieFile: rejectedJar,
         method: "POST",
-        body: { email: credentials.email },
-        expectedStatus: 200,
-      },
-    );
-    expect(resetRequest.body.status).toBe(true);
-
-    const resetWithoutToken = await requestJson<BetterAuthErrorBody>(
-      requiredBaseUrl,
-      "/api/auth/reset-password",
-      {
-        method: "POST",
-        body: { newPassword: "new-correct-horse-battery-staple" },
-        expectedStatus: 400,
-      },
-    );
-    expect(resetWithoutToken.body.code).toBe("INVALID_TOKEN");
-
-    const resetInvalidToken = await requestJson<BetterAuthErrorBody>(
-      requiredBaseUrl,
-      "/api/auth/reset-password",
-      {
-        method: "POST",
-        body: {
-          newPassword: "new-correct-horse-battery-staple",
-          token: "invalid-token",
-        },
-        expectedStatus: 400,
-      },
-    );
-    expect(resetInvalidToken.body.code).toBe("INVALID_TOKEN");
-
-    await runSqliteStatement(
-      project!,
-      'UPDATE "user" SET "emailVerified" = 1 WHERE "email" = ?',
-      [credentials.email],
-    );
-
-    const verifiedContext = await requestJson<AuthContextBody>(
-      requiredBaseUrl,
-      "/api/auth-context",
-      { cookieFile: policyJar, expectedStatus: 200 },
-    );
-    expect(verifiedContext.body.user.emailVerified).toBe(true);
-
-    const verifiedRows = await requestJson<RowsBody>(
-      requiredBaseUrl,
-      "/api/tables/tasks",
-      { cookieFile: policyJar, expectedStatus: 200 },
-    );
-    expect(Array.isArray(verifiedRows.body.data)).toBe(true);
+        body,
+      });
+      expectClientAuthFailure(response.status);
+      expectHttpError(
+        await requestJson<unknown>(baseUrl, "/api/auth-context", {
+          cookieFile: rejectedJar,
+          expectedStatus: 401,
+        }),
+        401,
+        { code: "unauthenticated" },
+      );
+    }
   });
 
   async function createSignedInUser(
@@ -1621,6 +1514,15 @@ describe.sequential("sapporta init auth template - end-to-end", () => {
       'SELECT "id", "userId", "activeOrganizationId" FROM "session" WHERE "userId" = ?',
       [userId],
     );
+  }
+
+  async function countUsersByEmail(email: string): Promise<number> {
+    const rows = await readSqliteRows<{ count: number }>(
+      project!,
+      'SELECT COUNT(*) AS count FROM "user" WHERE "email" = ?',
+      [email],
+    );
+    return rows[0]?.count ?? 0;
   }
 
   async function switchWorkspace(

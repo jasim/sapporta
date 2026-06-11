@@ -338,6 +338,40 @@ describe("generated table authz and row security - end-to-end", () => {
     );
     expect(deniedCountries.body.code).toBe("forbidden");
 
+    for (const deniedCountryAction of [
+      await requestJson<ErrorBody>(baseUrl, "/api/tables/countries", {
+        cookieFile: member.cookieFile,
+        method: "POST",
+        body: { code: "US", name: "United States" },
+        expectedStatus: 403,
+        serverOutput: server!.output,
+      }),
+      await requestJson<ErrorBody>(baseUrl, "/api/tables/countries/1", {
+        cookieFile: member.cookieFile,
+        method: "PUT",
+        body: { name: "Updated country" },
+        expectedStatus: 403,
+        serverOutput: server!.output,
+      }),
+      await requestJson<ErrorBody>(baseUrl, "/api/tables/countries/1", {
+        cookieFile: member.cookieFile,
+        method: "DELETE",
+        expectedStatus: 403,
+        serverOutput: server!.output,
+      }),
+      await requestJson<ErrorBody>(
+        baseUrl,
+        "/api/tables/countries/export.csv",
+        {
+          cookieFile: member.cookieFile,
+          expectedStatus: 403,
+          serverOutput: server!.output,
+        },
+      ),
+    ]) {
+      expect(deniedCountryAction.body.code).toBe("forbidden");
+    }
+
     const memberTaskA = await createTask(member.cookieFile, {
       title: "A member beta",
       status: "done",

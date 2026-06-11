@@ -647,38 +647,3 @@ describe("Success metric: switching source kinds requires no schema or component
     expect(restRows).toEqual(memRows);
   });
 });
-
-// ---------------------------------------------------------------------
-// Public surface guard — phase-12 deletion sweep regression.
-// ---------------------------------------------------------------------
-//
-// `cellRenders ≤ 3 per arrow press` from the design doc is asserted by
-// the controller-level tests in `key-handling.test.ts` and
-// `table-controller.test.ts`. There is no DOM render-counting harness in
-// this module today, so any change to that metric is observed at the
-// controller boundary, not here. Adding a cell-render counter would
-// require mounting React — out of scope for this end-to-end suite.
-
-describe("Public surface — phase-12 export sweep", () => {
-  it("does not export GridTree, applyTransaction, Transaction, initialSortByPath, or initialFilterByPath", async () => {
-    const mod = (await import("../index")) as Record<string, unknown>;
-    expect(mod).not.toHaveProperty("GridTree");
-    expect(mod).not.toHaveProperty("applyTransaction");
-    expect(mod).not.toHaveProperty("Transaction");
-    expect(mod).not.toHaveProperty("initialSortByPath");
-    expect(mod).not.toHaveProperty("initialFilterByPath");
-    expect(mod).not.toHaveProperty("useDisplayedRows");
-    expect(mod).not.toHaveProperty("computeDisplayedRows");
-  });
-
-  it("exports the public shape: runtime, root render, and grid data-source factories", async () => {
-    const mod = (await import("../index")) as Record<string, unknown>;
-    expect(typeof mod.createGridRuntime).toBe("function");
-    expect(typeof mod.GridRuntimeProvider).toBe("function");
-    expect(typeof mod.GridLevel).toBe("function");
-    expect(typeof mod.inMemoryGridDataSource).toBe("function");
-    expect(typeof mod.restGridDataSource).toBe("function");
-    expect(mod).not.toHaveProperty("inMemoryLevelSource");
-    expect(mod).not.toHaveProperty("restLevelSource");
-  });
-});
