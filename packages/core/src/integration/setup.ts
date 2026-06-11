@@ -15,9 +15,13 @@ import {
 import {
   createAuthContext,
   assertAuthSchemaDefinitions,
+  requestDataAuthority,
+  systemGlobalOnlyAuthority,
   type SapportaAuthContext,
   type SapportaAbility,
   type WorkspaceRole,
+  workspaceGlobalOnlyAuthority,
+  workspaceUserScopedAuthority,
 } from "../auth/index.js";
 import { createTestDb } from "../testing/test-utils.js";
 import { installSapportaDefaults, type SapportaEnv } from "../api/server.js";
@@ -210,11 +214,14 @@ function createTestAuth(
         roles: [overrides.role ?? (overrides.isOwner === false ? "member" : "owner")],
       },
     },
-    rowsAllowedForRequest: {
-      kind: "allowWorkspaceUserRows",
-      workspace,
-      user,
-    },
+    dataAuthority: requestDataAuthority({
+      systemGlobalOnly: systemGlobalOnlyAuthority(),
+      workspaceGlobalOnly: workspaceGlobalOnlyAuthority(workspace),
+      workspaceUserScoped: workspaceUserScopedAuthority({
+        workspace,
+        user,
+      }),
+    }),
     ability: allowAllAbility(),
     catalog,
   });

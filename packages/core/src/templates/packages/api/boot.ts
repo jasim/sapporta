@@ -30,7 +30,7 @@ import {
 import { loadApp } from "./app.js";
 import { publicApiRoutes } from "./app.js";
 import { buildAbility } from "./authz/ability.js";
-import { resolveRowsAllowedForRequest } from "./authz/rows-allowed-for-request.js";
+import { resolveRequestDataAuthority } from "./authz/request-data-authority.js";
 import { createSapportaMailer } from "./mailer.js";
 import { createProjectAuth, readProjectAuthEnv } from "./project-auth/index.js";
 
@@ -53,8 +53,8 @@ const sapporta = await loadSapportaProject({
   conn,
 });
 
-// Auth needs the loaded table catalog so every request can resolve row access
-// for the active workspace before a handler reads or writes data.
+// Auth needs the loaded table catalog so every request can apply row security
+// before a handler reads or writes table-backed data.
 assertAuthSchemaDefinitions(sapporta.catalog.tables);
 const projectEnv = readProjectAuthEnv();
 const mailer = createSapportaMailer(projectEnv.mail);
@@ -64,7 +64,7 @@ const projectAuth = createProjectAuth({
   catalog: sapporta.catalog,
   mailer,
   buildAbility,
-  resolveRowsAllowedForRequest,
+  resolveRequestDataAuthority,
   publicRoutes: publicApiRoutes,
 });
 

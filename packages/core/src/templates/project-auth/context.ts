@@ -5,6 +5,7 @@ import {
   createAuthContext,
   userPrincipal,
   type BuildAbility,
+  type RequestDataAuthority,
   type ProjectDbConnection,
   type SapportaAuthContext,
   type SapportaAuthUser,
@@ -24,21 +25,16 @@ import {
   TokenAuthError,
 } from "./auth-tokens.js";
 
-export type ResolveRowsAllowedForRequest = (input: {
+export type ResolveRequestDataAuthority = (input: {
   principal: AppPrincipal;
   c: Context<SapportaEnv>;
-}) => Promise<
-  SapportaAuthContext<
-    AppAbility,
-    AppWorkspaceMembership
-  >["rowsAllowedForRequest"]
->;
+}) => Promise<RequestDataAuthority>;
 
 /**
  * Minimal Better Auth session shape needed to build the request principal.
  *
  * The session identifies the signed-in user. It does not decide row access by
- * itself; the app's rows-allowed resolver does that after the principal is
+ * itself; the app's data-authority resolver does that after the principal is
  * known.
  */
 export interface BetterAuthSessionPayload {
@@ -62,7 +58,7 @@ export interface ResolveSapportaAuthContextInput {
   headers: Headers;
   c: Context<SapportaEnv>;
   buildAbility: BuildAbility<AppAbility, AppWorkspaceMembership>;
-  resolveRowsAllowedForRequest: ResolveRowsAllowedForRequest;
+  resolveRequestDataAuthority: ResolveRequestDataAuthority;
 }
 
 /**
@@ -81,14 +77,14 @@ export async function resolveSapportaAuthContext(
   input: ResolveSapportaAuthContextInput,
 ): Promise<SapportaAuthContext<AppAbility, AppWorkspaceMembership>> {
   const principal = await resolvePrincipal(input.auth, input.conn, input.headers);
-  const rowsAllowedForRequest = await input.resolveRowsAllowedForRequest({
+  const dataAuthority = await input.resolveRequestDataAuthority({
     principal,
     c: input.c,
   });
-  const ability = input.buildAbility({ principal, rowsAllowedForRequest });
+  const ability = input.buildAbility({ principal, dataAuthority });
   return createAuthContext({
     principal,
-    rowsAllowedForRequest,
+    dataAuthority,
     ability,
     catalog: input.catalog,
   });
@@ -110,14 +106,14 @@ export async function switchActiveWorkspace(
     user: userFromSessionPayload(payload),
     membership: membershipFromRow(membership),
   });
-  const rowsAllowedForRequest = await input.resolveRowsAllowedForRequest({
+  const dataAuthority = await input.resolveRequestDataAuthority({
     principal,
     c: input.c,
   });
-  const ability = input.buildAbility({ principal, rowsAllowedForRequest });
+  const ability = input.buildAbility({ principal, dataAuthority });
   return createAuthContext({
     principal,
-    rowsAllowedForRequest,
+    dataAuthority,
     ability,
     catalog: input.catalog,
   });

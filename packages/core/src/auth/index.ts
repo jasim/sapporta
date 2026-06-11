@@ -15,11 +15,23 @@ export {
   userPrincipal,
 } from "./principal.js";
 export {
-  allowOnlySystemWideRows,
-  allowWorkspaceUserRows,
-  allowWorkspaceWideRows,
-} from "./rows-allowed-for-request.js";
-export type { RowsAllowedForRequest } from "./rows-allowed-for-request.js";
+  assertDataAuthoritySupportsTable,
+  requestDataAuthority,
+  systemGlobalOnlyAuthority,
+  workspaceGlobalOnlyAuthority,
+  workspaceUserScopedAuthority,
+} from "./request-data-authority.js";
+export type {
+  AuthoritySlots,
+  RequestDataAuthority,
+  RequestRowAuthorityRecord,
+  SystemGlobalDataAuthority,
+  SystemGlobalOnlyAuthority,
+  WorkspaceGlobalDataAuthority,
+  WorkspaceGlobalOnlyAuthority,
+  WorkspaceUserDataAuthority,
+  WorkspaceUserScopedAuthority,
+} from "./request-data-authority.js";
 
 export {
   SCOPED_TO_USER_ID_SQL_COLUMN,
@@ -50,12 +62,12 @@ export {
   clientPayloadPolicyIssues,
   requireResolvedTableReferences,
   resolveTableReferences,
-  trustedInsertValuesForAllowedRows,
+  trustedInsertValuesForDataAuthority,
   validateClientPayloadPolicy,
   type AuthSchemaIssue,
   type AuthSchemaIssueCode,
   type ReferenceResolutionResult,
-  type TrustedInsertValuesForAllowedRows,
+  type TrustedInsertValuesForDataAuthority,
 } from "./schema-validation.js";
 
 export {

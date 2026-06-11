@@ -14,7 +14,7 @@ import {
   type ResolvedReferenceFact,
   type RowScope,
 } from "./row-scope.js";
-import type { RowsAllowedForRequest } from "./rows-allowed-for-request.js";
+import type { RequestDataAuthority } from "./request-data-authority.js";
 import { RowScopePolicyError } from "./row-scope-policy-error.js";
 
 export type AuthSchemaIssueCode =
@@ -257,7 +257,7 @@ export function validateClientPayloadPolicy(
   return { ...(payload as Record<string, unknown>) };
 }
 
-export interface TrustedInsertValuesForAllowedRows {
+export interface TrustedInsertValuesForDataAuthority {
   /** SQL column names for Drizzle insert/update payloads. */
   sql: Record<string, string>;
   /** TypeScript property names for schema-facing callers. */
@@ -265,18 +265,19 @@ export interface TrustedInsertValuesForAllowedRows {
 }
 
 /**
- * Computes trusted ownership fields for inserting a row using the rows allowed
- * for the request. Values come only from `RowsAllowedForRequest`, never from
+ * Computes trusted ownership fields for inserting a row using request data
+ * authority. Values come only from `RequestDataAuthority`, never from
  * client input.
  *
  * The same fail-closed row-scope matrix applies to stamping as to reads:
- * system tables need no ownership values, workspace tables require workspace
- * row facts, and user-scoped tables require both workspace and user row facts.
+ * system tables need system-global authority, workspace tables require
+ * workspace-global authority, and user-scoped tables require workspace-user
+ * authority.
  */
-export function trustedInsertValuesForAllowedRows(
-  rowsAllowedForRequest: RowsAllowedForRequest,
+export function trustedInsertValuesForDataAuthority(
+  dataAuthority: RequestDataAuthority,
   table: TableDef,
-): TrustedInsertValuesForAllowedRows {
+): TrustedInsertValuesForDataAuthority {
   const rowScope = table.meta.rowScope;
   if (!isRowScope(rowScope)) {
     throw new AuthSchemaValidationError([
@@ -289,14 +290,10 @@ export function trustedInsertValuesForAllowedRows(
   }
 
   if (rowScope === "systemGlobal") {
+    if (!dataAuthority.rowAuthorities.systemGlobalOnly) {
+      throw new RowScopePolicyError(table, dataAuthority);
+    }
     return { sql: {}, typescript: {} };
-  }
-
-  if (
-    rowsAllowedForRequest.kind !== "allowWorkspaceWideRows" &&
-    rowsAllowedForRequest.kind !== "allowWorkspaceUserRows"
-  ) {
-    throw new RowScopePolicyError(table, rowsAllowedForRequest);
   }
 
   const workspace = workspaceScopeColumn(table);
@@ -311,17 +308,23 @@ export function trustedInsertValuesForAllowedRows(
     ]);
   }
 
-  const sqlValues: Record<string, string> = {
-    [workspace.sqlName]: rowsAllowedForRequest.workspace.id,
-  };
-  const typescriptValues: Record<string, string> = {
-    [workspace.propertyName ?? workspace.typescriptName]:
-      rowsAllowedForRequest.workspace.id,
-  };
+  const sqlValues: Record<string, string> = {};
+  const typescriptValues: Record<string, string> = {};
+
+  if (rowScope === "workspaceGlobal") {
+    const workspaceAuthority = dataAuthority.rowAuthorities.workspaceGlobalOnly;
+    if (!workspaceAuthority) {
+      throw new RowScopePolicyError(table, dataAuthority);
+    }
+    sqlValues[workspace.sqlName] = workspaceAuthority.workspace.id;
+    typescriptValues[workspace.propertyName ?? workspace.typescriptName] =
+      workspaceAuthority.workspace.id;
+  }
 
   if (rowScope === "workspaceUserScoped") {
-    if (rowsAllowedForRequest.kind !== "allowWorkspaceUserRows") {
-      throw new RowScopePolicyError(table, rowsAllowedForRequest);
+    const userAuthority = dataAuthority.rowAuthorities.workspaceUserScoped;
+    if (!userAuthority) {
+      throw new RowScopePolicyError(table, dataAuthority);
     }
     const scopedToUser = scopedToUserScopeColumn(table);
     if (!scopedToUser) {
@@ -334,9 +337,12 @@ export function trustedInsertValuesForAllowedRows(
         },
       ]);
     }
-    sqlValues[scopedToUser.sqlName] = rowsAllowedForRequest.user.id;
+    sqlValues[workspace.sqlName] = userAuthority.workspace.id;
+    typescriptValues[workspace.propertyName ?? workspace.typescriptName] =
+      userAuthority.workspace.id;
+    sqlValues[scopedToUser.sqlName] = userAuthority.user.id;
     typescriptValues[scopedToUser.propertyName ?? scopedToUser.typescriptName] =
-      rowsAllowedForRequest.user.id;
+      userAuthority.user.id;
   }
 
   return { sql: sqlValues, typescript: typescriptValues };

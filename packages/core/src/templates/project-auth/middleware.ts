@@ -1,9 +1,12 @@
 import { HTTPException } from "hono/http-exception";
 import type { Context, MiddlewareHandler } from "hono";
 import type {
-  RowsAllowedForRequest,
+  RequestDataAuthority,
   SapportaAuthContext,
   SapportaEnv,
+  SystemGlobalOnlyAuthority,
+  WorkspaceGlobalOnlyAuthority,
+  WorkspaceUserScopedAuthority,
 } from "@sapporta/server";
 import { authFailure } from "./errors.js";
 
@@ -22,6 +25,48 @@ export interface AnonymousGateOptions {
   publicRoutes?: readonly PublicRoutePattern[];
   requireVerifiedEmail?: boolean;
 }
+
+export type FeatureRequirement = {
+  action: string;
+  subject: string;
+};
+
+export type SystemDataAuthority = RequestDataAuthority & {
+  rowAuthorities: {
+    systemGlobalOnly: SystemGlobalOnlyAuthority;
+    workspaceGlobalOnly?: never;
+    workspaceUserScoped?: never;
+  };
+};
+
+export type WorkspaceDataAuthority = RequestDataAuthority & {
+  rowAuthorities: {
+    workspaceGlobalOnly: WorkspaceGlobalOnlyAuthority;
+    systemGlobalOnly?: never;
+    workspaceUserScoped?: never;
+  };
+};
+
+export type WorkspaceUserDataAuthority = RequestDataAuthority & {
+  rowAuthorities: {
+    workspaceUserScoped: WorkspaceUserScopedAuthority;
+    systemGlobalOnly?: never;
+    workspaceGlobalOnly?: never;
+  };
+};
+
+export type AuthorizedSystemDataContext = SapportaAuthContext & {
+  dataAuthority: SystemDataAuthority;
+};
+
+export type AuthorizedWorkspaceDataContext = SapportaAuthContext & {
+  dataAuthority: WorkspaceDataAuthority;
+};
+
+export type AuthorizedWorkspaceUserDataContext = SapportaAuthContext & {
+  principal: Extract<SapportaAuthContext["principal"], { kind: "user" }>;
+  dataAuthority: WorkspaceUserDataAuthority;
+};
 
 /**
  * Resolve the request principal before API handlers run.
@@ -94,33 +139,36 @@ export function requireVerifiedUser<E extends SapportaEnv>(
 export function requireWorkspaceRowsAllowed<E extends SapportaEnv>(
   c: Context<E>,
 ): SapportaAuthContext & {
-  rowsAllowedForRequest: Extract<
-    RowsAllowedForRequest,
-    { kind: "allowWorkspaceWideRows" | "allowWorkspaceUserRows" }
-  >;
+  dataAuthority: RequestDataAuthority & {
+    rowAuthorities: Pick<
+      Required<RequestDataAuthority["rowAuthorities"]>,
+      "workspaceGlobalOnly"
+    >;
+  };
 } {
   const auth = requireAuthContext(c);
-  if (
-    auth.rowsAllowedForRequest.kind !== "allowWorkspaceWideRows" &&
-    auth.rowsAllowedForRequest.kind !== "allowWorkspaceUserRows"
-  ) {
+  if (!auth.dataAuthority.rowAuthorities.workspaceGlobalOnly) {
     throwAuth("workspace_required");
   }
   return auth as SapportaAuthContext & {
-    rowsAllowedForRequest: Extract<
-      RowsAllowedForRequest,
-      { kind: "allowWorkspaceWideRows" | "allowWorkspaceUserRows" }
-    >;
+    dataAuthority: RequestDataAuthority & {
+      rowAuthorities: Pick<
+        Required<RequestDataAuthority["rowAuthorities"]>,
+        "workspaceGlobalOnly"
+      >;
+    };
   };
 }
 
 export function requireWorkspaceOwner<E extends SapportaEnv>(
   c: Context<E>,
 ): SapportaAuthContext & {
-  rowsAllowedForRequest: Extract<
-    RowsAllowedForRequest,
-    { kind: "allowWorkspaceWideRows" | "allowWorkspaceUserRows" }
-  >;
+  dataAuthority: RequestDataAuthority & {
+    rowAuthorities: Pick<
+      Required<RequestDataAuthority["rowAuthorities"]>,
+      "workspaceGlobalOnly"
+    >;
+  };
 } {
   const auth = requireWorkspaceRowsAllowed(c);
   // Owner can allow a workflow such as inviting users or changing settings, but
@@ -132,6 +180,59 @@ export function requireWorkspaceOwner<E extends SapportaEnv>(
     throwAuth("forbidden");
   }
   return auth;
+}
+
+export function requireDataAuthority<E extends SapportaEnv>(
+  c: Context<E>,
+): RequestDataAuthority {
+  return requireAuthContext(c).dataAuthority;
+}
+
+export function requireAuthorizedSystemData<E extends SapportaEnv>(
+  c: Context<E>,
+  requirement: FeatureRequirement,
+): AuthorizedSystemDataContext {
+  const auth = requireAuthContext(c);
+  if (!auth.dataAuthority.rowAuthorities.systemGlobalOnly) {
+    throwAuth("forbidden");
+  }
+  forbidUnlessAuthorized(auth, requirement);
+  return withOnlySystemAuthority(auth);
+}
+
+export function requireAuthorizedWorkspaceData<E extends SapportaEnv>(
+  c: Context<E>,
+  requirement: FeatureRequirement,
+): AuthorizedWorkspaceDataContext {
+  const auth = requireAuthContext(c);
+  if (!auth.dataAuthority.rowAuthorities.workspaceGlobalOnly) {
+    throwAuth("workspace_required");
+  }
+  forbidUnlessAuthorized(auth, requirement);
+  return withOnlyWorkspaceAuthority(auth);
+}
+
+export function requireAuthorizedWorkspaceUserData<E extends SapportaEnv>(
+  c: Context<E>,
+  requirement: FeatureRequirement,
+): AuthorizedWorkspaceUserDataContext {
+  const auth = requireAuthContext(c);
+  if (auth.principal.kind !== "user") throwAuth("unauthenticated");
+  if (!auth.dataAuthority.rowAuthorities.workspaceUserScoped) {
+    throwAuth("forbidden");
+  }
+  forbidUnlessAuthorized(auth, requirement);
+  return withOnlyWorkspaceUserAuthority(auth);
+}
+
+export function requireAuthorizedInteractiveWorkspaceUserData<
+  E extends SapportaEnv,
+>(
+  c: Context<E>,
+  requirement: FeatureRequirement,
+): AuthorizedWorkspaceUserDataContext {
+  if (requestUsesBearerToken(c)) throwAuth("forbidden");
+  return requireAuthorizedWorkspaceUserData(c, requirement);
 }
 
 function matchesPublicRoute<E extends SapportaEnv>(
@@ -152,6 +253,64 @@ function matchesPath(pattern: string, path: string): boolean {
     return path.startsWith(pattern.slice(0, -1));
   }
   return pattern === path;
+}
+
+function forbidUnlessAuthorized(
+  auth: SapportaAuthContext,
+  requirement: FeatureRequirement,
+): void {
+  if (auth.ability.can(requirement.action, requirement.subject)) return;
+  throwAuth("forbidden");
+}
+
+function withOnlySystemAuthority(
+  auth: SapportaAuthContext,
+): AuthorizedSystemDataContext {
+  const narrowed: SystemDataAuthority = {
+    rowAuthorities: {
+      systemGlobalOnly: auth.dataAuthority.rowAuthorities.systemGlobalOnly!,
+    },
+  };
+  return {
+    ...auth,
+    dataAuthority: narrowed,
+    rowSecurity: auth.rowSecurity.withDataAuthority(narrowed),
+  } as AuthorizedSystemDataContext;
+}
+
+function withOnlyWorkspaceAuthority(
+  auth: SapportaAuthContext,
+): AuthorizedWorkspaceDataContext {
+  const narrowed: WorkspaceDataAuthority = {
+    rowAuthorities: {
+      workspaceGlobalOnly: auth.dataAuthority.rowAuthorities.workspaceGlobalOnly!,
+    },
+  };
+  return {
+    ...auth,
+    dataAuthority: narrowed,
+    rowSecurity: auth.rowSecurity.withDataAuthority(narrowed),
+  } as AuthorizedWorkspaceDataContext;
+}
+
+function withOnlyWorkspaceUserAuthority(
+  auth: SapportaAuthContext,
+): AuthorizedWorkspaceUserDataContext {
+  const narrowed: WorkspaceUserDataAuthority = {
+    rowAuthorities: {
+      workspaceUserScoped:
+        auth.dataAuthority.rowAuthorities.workspaceUserScoped!,
+    },
+  };
+  return {
+    ...auth,
+    dataAuthority: narrowed,
+    rowSecurity: auth.rowSecurity.withDataAuthority(narrowed),
+  } as AuthorizedWorkspaceUserDataContext;
+}
+
+function requestUsesBearerToken<E extends SapportaEnv>(c: Context<E>): boolean {
+  return c.req.header("authorization")?.match(/^Bearer\s+/i) !== undefined;
 }
 
 function throwAuth(code: Parameters<typeof authFailure>[0]): never {

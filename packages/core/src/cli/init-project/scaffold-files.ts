@@ -26,7 +26,7 @@ export const SCAFFOLD_FILES: ScaffoldFile[] = [
   scaffoldFile("packages/api/app/public-api-sample.ts", "example"),
   scaffoldFile("packages/api/authz/types.ts", "example"),
   scaffoldFile("packages/api/authz/ability.ts", "example"),
-  scaffoldFile("packages/api/authz/rows-allowed-for-request.ts", "example"),
+  scaffoldFile("packages/api/authz/request-data-authority.ts", "example"),
   {
     src: "project-auth/index.ts",
     dest: "packages/api/project-auth/index.ts",

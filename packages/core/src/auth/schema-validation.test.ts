@@ -4,16 +4,25 @@ import { table } from "../schema/table.js";
 import {
   checkAuthSchemaDefinitions,
   clientPayloadPolicyIssues,
+  requestDataAuthority,
   resolveTableReferences,
-  trustedInsertValuesForAllowedRows,
+  systemGlobalOnlyAuthority,
+  trustedInsertValuesForDataAuthority,
+  workspaceGlobalOnlyAuthority,
+  workspaceUserScopedAuthority,
 } from "./index.js";
-import type { RowsAllowedForRequest } from "./rows-allowed-for-request.js";
+import type { RequestDataAuthority } from "./request-data-authority.js";
 
-const rowsAllowedForRequest: RowsAllowedForRequest = {
-  kind: "allowWorkspaceUserRows",
-  user: { id: "user-1", name: "User One", email: "u1@example.com", emailVerified: true },
-  workspace: { id: "workspace-1", name: "Workspace One", slug: "workspace-one" },
-};
+const testUser = { id: "user-1", name: "User One", email: "u1@example.com", emailVerified: true };
+const testWorkspace = { id: "workspace-1", name: "Workspace One", slug: "workspace-one" };
+const dataAuthority: RequestDataAuthority = requestDataAuthority({
+  systemGlobalOnly: systemGlobalOnlyAuthority(),
+  workspaceGlobalOnly: workspaceGlobalOnlyAuthority(testWorkspace),
+  workspaceUserScoped: workspaceUserScopedAuthority({
+    workspace: testWorkspace,
+    user: testUser,
+  }),
+});
 function scopedColumns() {
   return {
     workspace_id: text("workspace_id").notNull(),
@@ -315,7 +324,7 @@ describe("auth schema validation", () => {
     expect(issues.map((issue) => issue.field)).toEqual(["workspace_id", "workspaceId", "account_id"]);
   });
 
-  it("computes trusted insert values for allowed rows in sql and typescript key forms", () => {
+  it("computes trusted insert values for data authority in sql and typescript key forms", () => {
     const ordersTable = sqliteTable("orders", {
       id: integer("id").primaryKey({ autoIncrement: true }),
       workspaceId: text("workspace_id").notNull(),
@@ -323,7 +332,7 @@ describe("auth schema validation", () => {
     });
     const orders = table({ drizzle: ordersTable, meta: { rowScope: "workspaceUserScoped" } });
 
-    const values = trustedInsertValuesForAllowedRows(rowsAllowedForRequest, orders);
+    const values = trustedInsertValuesForDataAuthority(dataAuthority, orders);
 
     expect(values.sql).toEqual({ workspace_id: "workspace-1", scoped_to_user_id: "user-1" });
     expect(values.typescript).toEqual({ workspaceId: "workspace-1", scopedToUserId: "user-1" });

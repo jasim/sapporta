@@ -2,12 +2,12 @@ import { and, type SQL } from "drizzle-orm";
 import type { BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
 import type { TableCatalog } from "../schema/catalog.js";
 import type { TableDef } from "../schema/table.js";
-import type { RowsAllowedForRequest } from "./rows-allowed-for-request.js";
+import type { RequestDataAuthority } from "./request-data-authority.js";
 import {
   AuthPayloadPolicyError,
   clientPayloadPolicyIssues,
   requireResolvedTableReferences,
-  trustedInsertValuesForAllowedRows,
+  trustedInsertValuesForDataAuthority,
 } from "./schema-validation.js";
 import {
   selectRowAccessPredicate,
@@ -19,7 +19,7 @@ import {
  * Request-bound security helpers for one table.
  *
  * Build these from `auth.rowSecurity.forTable(tableDef)` inside a handler.
- * Every method uses the rows allowed for the request plus the loaded table
+ * Every method uses request data authority plus the loaded table
  * catalog, so callers do not pass ownership fields or table sets around by
  * hand.
  *
@@ -50,7 +50,7 @@ export interface TableRowSecurity {
    *
    * The helper rejects client ownership tampering, rejects client-submitted
    * `clientCanSet: false` references, merges trusted `serverValues`, validates
-   * final FK visibility inside the rows allowed for the request, and stamps
+   * final FK visibility inside request data authority, and stamps
    * trusted ownership fields from auth.
    */
   insertValues<T extends Record<string, unknown>>(
@@ -90,7 +90,7 @@ export interface TableRowSecurity {
   ): Promise<Array<T & Record<string, unknown>>>;
 
   /**
-   * Returns the table visibility predicate for the rows allowed for the request.
+   * Returns the table visibility predicate for the request data authority.
    * When `predicate` is supplied, it is AND-composed with the ownership
    * predicate for safe reads, updates, and deletes.
    */
@@ -131,6 +131,13 @@ export interface RowSecurity {
    * workflow.
    */
   forTable(tableDef: TableDef): TableRowSecurity;
+
+  /**
+   * Returns a row-security engine narrowed to a more specific data authority.
+   * Exact route authorization helpers use this after validating the workflow's
+   * required authority slot.
+   */
+  withDataAuthority(dataAuthority: RequestDataAuthority): RowSecurity;
 }
 
 export interface InsertValuesOptions<
@@ -153,19 +160,23 @@ export interface CreateRowSecurityOptions {
 }
 
 /**
- * Creates request-bound row security from the rows allowed for the request and
+ * Creates request-bound row security from request data authority and
  * the loaded table catalog. Project auth constructs this once per request and
  * exposes it as `auth.rowSecurity`.
  *
- * `rowsAllowedForRequest` is the only source for trusted ownership values. Do
+ * `dataAuthority` is the only source for trusted ownership values. Do
  * not pass user ids or workspace ids separately into table workflows; doing so
  * would create a second row-access model for callers to reconcile.
  */
 export function createRowSecurity(
-  rowsAllowedForRequest: RowsAllowedForRequest,
+  dataAuthority: RequestDataAuthority,
   options: CreateRowSecurityOptions,
 ): RowSecurity {
   return {
+    withDataAuthority(nextDataAuthority) {
+      return createRowSecurity(nextDataAuthority, options);
+    },
+
     forTable(tableDef) {
       function ensureOwnership<T extends Record<string, unknown>>(input: T): T;
       function ensureOwnership(input: unknown): Record<string, unknown>;
@@ -212,7 +223,7 @@ export function createRowSecurity(
         validateReferencesSync(db, merged);
         return {
           ...merged,
-          ...trustedInsertValuesForAllowedRows(rowsAllowedForRequest, tableDef).sql,
+          ...trustedInsertValuesForDataAuthority(dataAuthority, tableDef).sql,
         };
       }
 
@@ -222,7 +233,7 @@ export function createRowSecurity(
       ): Promise<void> {
         await validateForeignKeyReferences(
           db,
-          rowsAllowedForRequest,
+          dataAuthority,
           tableDef,
           payload,
           options.catalog.tables,
@@ -239,7 +250,7 @@ export function createRowSecurity(
       ): void {
         validateForeignKeyReferencesSync(
           db,
-          rowsAllowedForRequest,
+          dataAuthority,
           tableDef,
           payload,
           options.catalog.tables,
@@ -254,7 +265,7 @@ export function createRowSecurity(
         addOwnershipFields(input) {
           return {
             ...input,
-            ...trustedInsertValuesForAllowedRows(rowsAllowedForRequest, tableDef).sql,
+            ...trustedInsertValuesForDataAuthority(dataAuthority, tableDef).sql,
           };
         },
 
@@ -294,7 +305,7 @@ export function createRowSecurity(
 
         ownedRows(predicate) {
           const ownershipPredicate = selectRowAccessPredicate(
-            rowsAllowedForRequest,
+            dataAuthority,
             tableDef,
           );
           return predicate

@@ -2,7 +2,7 @@ import type { MongoAbility } from "@casl/ability";
 import type {
   AuthWorkspace,
   Principal,
-  RowsAllowedForRequest,
+  RequestDataAuthority,
   WorkspaceMembership,
 } from "@sapporta/server";
 
@@ -39,11 +39,12 @@ export type AppAbility = MongoAbility<[AppAction, AppSubject]>;
 /**
  * Facts available while building the request ability.
  *
- * Use `principal` for who is asking and `rowsAllowedForRequest` for which row
- * facts the request may use. Do not treat an owner role as a shortcut for wider
- * row access; choose the row boundary in `resolveRowsAllowedForRequest`.
+ * Use `principal` for who is asking and `dataAuthority` for the trusted
+ * ownership facts this request may use. Do not treat an owner role as a
+ * shortcut for wider row access; choose data authority in
+ * `resolveRequestDataAuthority`.
  */
 export type AppAuthFacts = {
   principal: AppPrincipal;
-  rowsAllowedForRequest: RowsAllowedForRequest;
+  dataAuthority: RequestDataAuthority;
 };

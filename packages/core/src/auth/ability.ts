@@ -1,5 +1,5 @@
 import type { Principal, WorkspaceMembership } from "./principal.js";
-import type { RowsAllowedForRequest } from "./rows-allowed-for-request.js";
+import type { RequestDataAuthority } from "./request-data-authority.js";
 
 /**
  * Minimal ability protocol Sapporta needs from an application CASL ability.
@@ -15,12 +15,12 @@ export interface SapportaAbility {
 /**
  * Builds the request ability from the same facts that row security receives.
  * Role checks should read `principal.membership.roles`; row access should read
- * `rowsAllowedForRequest`.
+ * `dataAuthority`.
  */
 export type BuildAbility<
   AppAbility,
   Membership extends WorkspaceMembership = WorkspaceMembership,
 > = (facts: {
   principal: Principal<Membership>;
-  rowsAllowedForRequest: RowsAllowedForRequest;
+  dataAuthority: RequestDataAuthority;
 }) => AppAbility;

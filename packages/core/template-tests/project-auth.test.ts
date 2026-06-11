@@ -5,21 +5,25 @@ import {
   connectProject,
   createAuthContext,
   createTableCatalog,
-  allowOnlySystemWideRows,
-  allowWorkspaceWideRows,
+  requestDataAuthority,
+  systemGlobalOnlyAuthority,
   type BuildAbility,
+  type AuthWorkspace,
   type ProjectDbConnection,
-  type RowsAllowedForRequest,
+  type RequestDataAuthority,
   type SapportaAbility,
   type SapportaAuthContext,
+  type SapportaAuthUser,
   type SapportaEnv,
+  workspaceGlobalOnlyAuthority,
+  workspaceUserScopedAuthority,
 } from "@sapporta/server";
 import type { BetterAuthSessionApi } from "../src/templates/project-auth/better-auth.js";
 import {
   resolveSapportaAuthContext,
   switchActiveWorkspace,
   type BetterAuthSessionPayload,
-  type ResolveRowsAllowedForRequest,
+  type ResolveRequestDataAuthority,
 } from "../src/templates/project-auth/context.js";
 import {
   rejectAnonymousByDefault,
@@ -172,11 +176,13 @@ describe("project auth template", () => {
       headers: new Headers(),
       c: requestContext(),
       buildAbility: buildAppAbility,
-      resolveRowsAllowedForRequest,
+      resolveRequestDataAuthority,
     });
 
     expect(context.principal).toEqual({ kind: "anonymous" });
-    expect(context.rowsAllowedForRequest).toEqual({ kind: "allowOnlySystemWideRows" });
+    expect(context.dataAuthority).toEqual({
+      rowAuthorities: { systemGlobalOnly: { kind: "systemGlobalOnly" } },
+    });
   });
 
   it("builds context from the active organization membership", async () => {
@@ -192,7 +198,7 @@ describe("project auth template", () => {
       headers: new Headers(),
       c: requestContext(),
       buildAbility: buildAppAbility,
-      resolveRowsAllowedForRequest,
+      resolveRequestDataAuthority,
     });
 
     expect(context).toMatchObject({
@@ -209,7 +215,11 @@ describe("project auth template", () => {
           roles: ["owner"],
         },
       },
-      rowsAllowedForRequest: { kind: "allowWorkspaceUserRows" },
+      dataAuthority: {
+        rowAuthorities: {
+          workspaceUserScoped: { kind: "workspaceUserScoped" },
+        },
+      },
     });
   });
 
@@ -229,7 +239,7 @@ describe("project auth template", () => {
       headers: new Headers({ authorization: `Bearer ${created.rawToken}` }),
       c: requestContext(),
       buildAbility: buildAppAbility,
-      resolveRowsAllowedForRequest,
+      resolveRequestDataAuthority,
     });
 
     expect(context).toMatchObject({
@@ -241,7 +251,11 @@ describe("project auth template", () => {
           roles: ["owner"],
         },
       },
-      rowsAllowedForRequest: { kind: "allowWorkspaceUserRows" },
+      dataAuthority: {
+        rowAuthorities: {
+          workspaceUserScoped: { kind: "workspaceUserScoped" },
+        },
+      },
     });
     expect(readTokenLastUsedAt(conn, created.token.id)).toEqual(expect.any(Number));
   });
@@ -312,8 +326,12 @@ describe("project auth template", () => {
           roles: ["owner"],
         },
       },
-      rowsAllowedForRequest: {
-        workspace: { id: "workspace-1", slug: "acme" },
+      dataAuthority: {
+        rowAuthorities: {
+          workspaceUserScoped: {
+            workspace: { id: "workspace-1", slug: "acme" },
+          },
+        },
       },
     });
     expect(secondContext).toMatchObject({
@@ -324,8 +342,12 @@ describe("project auth template", () => {
           roles: ["member"],
         },
       },
-      rowsAllowedForRequest: {
-        workspace: { id: "workspace-2", slug: "second" },
+      dataAuthority: {
+        rowAuthorities: {
+          workspaceUserScoped: {
+            workspace: { id: "workspace-2", slug: "second" },
+          },
+        },
       },
     });
   });
@@ -394,7 +416,7 @@ describe("project auth template", () => {
         headers: new Headers(),
         c: requestContext(),
         buildAbility: buildAppAbility,
-        resolveRowsAllowedForRequest,
+        resolveRequestDataAuthority,
         workspaceId: "workspace-2",
       }),
     ).rejects.toBeInstanceOf(WorkspaceSwitchError);
@@ -540,7 +562,7 @@ describe("project auth template", () => {
     const memberAuth = routeAuthContext({ role: "member" });
     const ability = buildTemplateAbility({
       principal: memberAuth.principal,
-      rowsAllowedForRequest: memberAuth.rowsAllowedForRequest,
+      dataAuthority: memberAuth.dataAuthority,
     });
 
     expect(ability.can("read", "agent_access_token")).toBe(true);
@@ -804,7 +826,10 @@ describe("project auth template", () => {
       await next();
     });
     app.get("/api/private", (c) =>
-      c.json(requireWorkspaceRowsAllowed(c).rowsAllowedForRequest.workspace),
+      c.json(
+        requireWorkspaceRowsAllowed(c).dataAuthority.rowAuthorities
+          .workspaceGlobalOnly.workspace,
+      ),
     );
 
     const response = await app.request("/api/private");
@@ -1014,7 +1039,7 @@ async function resolveTokenAuthContext(
     headers: new Headers({ authorization: `Bearer ${rawToken}` }),
     c: requestContext(),
     buildAbility: buildAppAbility,
-    resolveRowsAllowedForRequest,
+    resolveRequestDataAuthority,
   });
 }
 
@@ -1058,7 +1083,11 @@ function guardedApp(auth: SapportaAuthContext): Hono<SapportaEnv> {
     await next();
   });
   app.get("/api/private", (c) =>
-    c.json({ workspaceId: requireWorkspaceOwner(c).rowsAllowedForRequest.workspace.id }),
+    c.json({
+      workspaceId:
+        requireWorkspaceOwner(c).dataAuthority.rowAuthorities.workspaceGlobalOnly
+          .workspace.id,
+    }),
   );
   return app;
 }
@@ -1096,15 +1125,11 @@ function routeAuthContext(
         roles: [role],
       },
     } as const;
-  const rowsAllowedForRequest = {
-      kind: "allowWorkspaceUserRows",
-      workspace,
-      user,
-    } as const satisfies RowsAllowedForRequest;
+  const dataAuthority = workspaceUserDataAuthority(workspace, user);
 
   return createAuthContext({
     principal,
-    rowsAllowedForRequest,
+    dataAuthority,
     ability: {
       can: overrides.can ?? (() => true),
     } as unknown as AppAbility,
@@ -1132,11 +1157,11 @@ function routeUserPrincipal(
 
 function routeAnonymousContext(): SapportaAuthContext<AppAbility, AppWorkspaceMembership> {
   const principal = { kind: "anonymous" } as const;
-  const rowsAllowedForRequest = allowOnlySystemWideRows();
+  const dataAuthority = systemDataAuthority();
   return createAuthContext({
     principal,
-    rowsAllowedForRequest,
-    ability: buildAppAbility({ principal, rowsAllowedForRequest }),
+    dataAuthority,
+    ability: buildAppAbility({ principal, dataAuthority }),
     catalog: emptyCatalog,
   });
 }
@@ -1165,10 +1190,10 @@ function routeWorkspaceWideContext(): SapportaAuthContext<
       roles: ["member"],
     },
   } as const;
-  const rowsAllowedForRequest = allowWorkspaceWideRows(workspace);
+  const dataAuthority = workspaceDataAuthority(workspace);
   return createAuthContext({
     principal,
-    rowsAllowedForRequest,
+    dataAuthority,
     ability: {
       can: () => true,
     } as unknown as AppAbility,
@@ -1179,15 +1204,40 @@ function routeWorkspaceWideContext(): SapportaAuthContext<
 const buildAppAbility: BuildAbility<AppAbility, AppWorkspaceMembership> = () =>
   ({ can: () => true }) as unknown as AppAbility;
 
-const resolveRowsAllowedForRequest: ResolveRowsAllowedForRequest = async ({ principal }) => {
-  if (principal.kind !== "user") return allowOnlySystemWideRows();
-  return {
-    kind: "allowWorkspaceUserRows",
-    workspace: principal.membership.workspace,
-    user: principal.user,
-  };
+const resolveRequestDataAuthority: ResolveRequestDataAuthority = async ({ principal }) => {
+  if (principal.kind !== "user") return systemDataAuthority();
+  return workspaceUserDataAuthority(
+    principal.membership.workspace,
+    principal.user,
+  );
 };
 
-function requestContext(): Parameters<ResolveRowsAllowedForRequest>[0]["c"] {
-  return {} as Parameters<ResolveRowsAllowedForRequest>[0]["c"];
+function systemDataAuthority(): RequestDataAuthority {
+  return requestDataAuthority({
+    systemGlobalOnly: systemGlobalOnlyAuthority(),
+  });
+}
+
+function workspaceDataAuthority(
+  workspace: AuthWorkspace,
+): RequestDataAuthority {
+  return requestDataAuthority({
+    systemGlobalOnly: systemGlobalOnlyAuthority(),
+    workspaceGlobalOnly: workspaceGlobalOnlyAuthority(workspace),
+  });
+}
+
+function workspaceUserDataAuthority(
+  workspace: AuthWorkspace,
+  user: SapportaAuthUser,
+): RequestDataAuthority {
+  return requestDataAuthority({
+    systemGlobalOnly: systemGlobalOnlyAuthority(),
+    workspaceGlobalOnly: workspaceGlobalOnlyAuthority(workspace),
+    workspaceUserScoped: workspaceUserScopedAuthority({ workspace, user }),
+  });
+}
+
+function requestContext(): Parameters<ResolveRequestDataAuthority>[0]["c"] {
+  return {} as Parameters<ResolveRequestDataAuthority>[0]["c"];
 }

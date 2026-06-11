@@ -9,11 +9,15 @@ import {
   createAuthContext,
   createRowSecurity,
   lookupRowAccessPredicate,
+  requestDataAuthority,
   systemRows as systemRowsPredicate,
+  systemGlobalOnlyAuthority,
   validateForeignKeyReferences,
+  workspaceGlobalOnlyAuthority,
   workspaceRows as workspaceRowsPredicate,
+  workspaceUserScopedAuthority,
   workspaceUserRows as workspaceUserRowsPredicate,
-  type RowsAllowedForRequest,
+  type RequestDataAuthority,
   type SapportaAuthContext,
   type SapportaAbility,
 } from "./index.js";
@@ -32,7 +36,7 @@ const testWorkspace = {
 };
 
 function auth(
-  rowsAllowedForRequest: RowsAllowedForRequest = personalRowsScope(),
+  dataAuthority: RequestDataAuthority = personalRowsScope(),
 ): SapportaAuthContext {
   return createAuthContext({
     principal: {
@@ -40,25 +44,28 @@ function auth(
       user: testUser,
       membership: { id: "member-1", roles: ["member"] },
     },
-    rowsAllowedForRequest,
+    dataAuthority,
     ability: allowAllAbility(),
     catalog: createTableCatalog([]),
   });
 }
 
-function personalRowsScope(): RowsAllowedForRequest {
-  return {
-    kind: "allowWorkspaceUserRows",
-    workspace: testWorkspace,
-    user: testUser,
-  };
+function personalRowsScope(): RequestDataAuthority {
+  return requestDataAuthority({
+    systemGlobalOnly: systemGlobalOnlyAuthority(),
+    workspaceGlobalOnly: workspaceGlobalOnlyAuthority(testWorkspace),
+    workspaceUserScoped: workspaceUserScopedAuthority({
+      workspace: testWorkspace,
+      user: testUser,
+    }),
+  });
 }
 
-function workspaceRowsScope(): RowsAllowedForRequest {
-  return {
-    kind: "allowWorkspaceWideRows",
-    workspace: testWorkspace,
-  };
+function workspaceRowsScope(): RequestDataAuthority {
+  return requestDataAuthority({
+    systemGlobalOnly: systemGlobalOnlyAuthority(),
+    workspaceGlobalOnly: workspaceGlobalOnlyAuthority(testWorkspace),
+  });
 }
 
 function allowAllAbility(): SapportaAbility {
@@ -142,7 +149,7 @@ describe("row access predicates", () => {
     const rows = await db
       .select()
       .from(userRows.drizzle)
-      .where(workspaceUserRowsPredicate(auth().rowsAllowedForRequest, userRows));
+      .where(workspaceUserRowsPredicate(auth().dataAuthority, userRows));
 
     expect(rows.map((row) => row.label)).toEqual(["mine"]);
   });
@@ -153,7 +160,7 @@ describe("row access predicates", () => {
     const rows = await db
       .select()
       .from(workspaceRows.drizzle)
-      .where(workspaceRowsPredicate(auth().rowsAllowedForRequest, workspaceRows));
+      .where(workspaceRowsPredicate(auth().dataAuthority, workspaceRows));
 
     expect(rows.map((row) => row.label)).toEqual(["visible"]);
   });
@@ -164,23 +171,23 @@ describe("row access predicates", () => {
     const rows = await db
       .select()
       .from(systemRows.drizzle)
-      .where(systemRowsPredicate(auth().rowsAllowedForRequest, systemRows));
+      .where(systemRowsPredicate(auth().dataAuthority, systemRows));
 
     expect(rows).toHaveLength(2);
-    expect(() => systemRowsPredicate(auth().rowsAllowedForRequest, workspaceRows)).toThrow(
+    expect(() => systemRowsPredicate(auth().dataAuthority, workspaceRows)).toThrow(
       /Expected systemGlobal/,
     );
   });
 
   it("invalid helper/table combinations fail closed", () => {
-    expect(() => workspaceUserRowsPredicate(auth().rowsAllowedForRequest, workspaceRows)).toThrow(
+    expect(() => workspaceUserRowsPredicate(auth().dataAuthority, workspaceRows)).toThrow(
       /Expected workspaceUserScoped/,
     );
-    expect(() => workspaceRowsPredicate(auth().rowsAllowedForRequest, systemRows)).toThrow(
+    expect(() => workspaceRowsPredicate(auth().dataAuthority, systemRows)).toThrow(
       /Expected workspaceGlobal/,
     );
     expect(() => workspaceUserRowsPredicate(workspaceRowsScope(), userRows)).toThrow(
-      /allowWorkspaceWideRows/,
+      /workspaceGlobalOnly/,
     );
   });
 
@@ -190,7 +197,7 @@ describe("row access predicates", () => {
     const normalRows = await db
       .select()
       .from(userRows.drizzle)
-      .where(lookupRowAccessPredicate(auth().rowsAllowedForRequest, userRows));
+      .where(lookupRowAccessPredicate(auth().dataAuthority, userRows));
     const workspaceScopedRows = await db
       .select()
       .from(workspaceRows.drizzle)
@@ -291,7 +298,7 @@ describe("foreign-key auth validation", () => {
     await expect(
       validateForeignKeyReferences(
         db,
-        auth().rowsAllowedForRequest,
+        auth().dataAuthority,
         orders,
         { customer_id: "customer-2" },
         [customers, orders],
@@ -315,7 +322,7 @@ describe("foreign-key auth validation", () => {
     const { db } = dbWithReferenceRows();
 
     await expect(
-      validateForeignKeyReferences(db, auth().rowsAllowedForRequest, orders, { doc_id: "doc-2" }, [
+      validateForeignKeyReferences(db, auth().dataAuthority, orders, { doc_id: "doc-2" }, [
         privateDocs,
         orders,
       ]),
@@ -344,7 +351,7 @@ describe("foreign-key auth validation", () => {
     await expect(
       validateForeignKeyReferences(
         db,
-        auth().rowsAllowedForRequest,
+        auth().dataAuthority,
         orders,
         { customer_id: "customer-1", country_id: "US" },
         [customers, countries, orders],
@@ -368,7 +375,7 @@ describe("foreign-key auth validation", () => {
     const { db } = dbWithReferenceRows();
 
     await expect(
-      validateForeignKeyReferences(db, auth().rowsAllowedForRequest, orders, { country_id: "US" }, [
+      validateForeignKeyReferences(db, auth().dataAuthority, orders, { country_id: "US" }, [
         countries,
         orders,
       ]),
@@ -466,7 +473,7 @@ describe("row-security guards", () => {
 
   it("prepares insert values by rejecting client ownership and stamping trusted ownership", async () => {
     const { db } = dbWithRows();
-    const guard = createRowSecurity(auth().rowsAllowedForRequest, {
+    const guard = createRowSecurity(auth().dataAuthority, {
       catalog: createTableCatalog([userRows]),
     }).forTable(userRows);
 
@@ -483,7 +490,7 @@ describe("row-security guards", () => {
 
   it("prepares patch values without stamping ownership", async () => {
     const { db } = dbWithRows();
-    const guard = createRowSecurity(auth().rowsAllowedForRequest, {
+    const guard = createRowSecurity(auth().dataAuthority, {
       catalog: createTableCatalog([userRows]),
     }).forTable(userRows);
 
@@ -497,7 +504,7 @@ describe("row-security guards", () => {
 
   it("prepares many insert values and rejects empty batches", async () => {
     const { db } = dbWithRows();
-    const guard = createRowSecurity(auth().rowsAllowedForRequest, {
+    const guard = createRowSecurity(auth().dataAuthority, {
       catalog: createTableCatalog([userRows]),
     }).forTable(userRows);
 
@@ -539,7 +546,7 @@ describe("row-security guards", () => {
       },
     });
     const { db } = dbWithReferenceRows();
-    const guard = createRowSecurity(auth().rowsAllowedForRequest, {
+    const guard = createRowSecurity(auth().dataAuthority, {
       catalog: createTableCatalog([countries, orders]),
     }).forTable(orders);
 
@@ -564,7 +571,7 @@ describe("row-security guards", () => {
       },
     });
     const { db } = dbWithReferenceRows();
-    const guard = createRowSecurity(auth().rowsAllowedForRequest, {
+    const guard = createRowSecurity(auth().dataAuthority, {
       catalog: createTableCatalog([invoices, lines]),
     }).forTable(lines);
 

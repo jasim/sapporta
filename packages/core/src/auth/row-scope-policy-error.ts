@@ -1,8 +1,11 @@
 import type { TableDef } from "../schema/table.js";
-import type { RowsAllowedForRequest } from "./rows-allowed-for-request.js";
+import {
+  authorityNames,
+  type RequestDataAuthority,
+} from "./request-data-authority.js";
 
 /**
- * Raised when a request's row facts cannot support the target table scope.
+ * Raised when a request's data authority cannot support the target table scope.
  *
  * This is a forbidden request, not a broken schema. For example, anonymous
  * system-only row access is valid, but it must fail closed when a handler tries
@@ -12,9 +15,9 @@ export class RowScopePolicyError extends Error {
   readonly status = 403;
   readonly code = "row_scope_forbidden";
 
-  constructor(table: TableDef, rowsAllowedForRequest: RowsAllowedForRequest) {
+  constructor(table: TableDef, dataAuthority: RequestDataAuthority) {
     super(
-      `Rows allowed for request "${rowsAllowedForRequest.kind}" cannot access "${table.sqlName}" rows.`,
+      `Request data authority [${authorityNames(dataAuthority).join(", ")}] cannot access "${table.sqlName}" ${String(table.meta.rowScope)} rows.`,
     );
     this.name = "RowScopePolicyError";
   }

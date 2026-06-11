@@ -2,9 +2,11 @@ import { describe, expect, it } from "vitest";
 import { Hono } from "hono";
 import { integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
 import {
-  allowWorkspaceWideRows,
   createAuthContext,
+  requestDataAuthority,
+  systemGlobalOnlyAuthority,
   type SapportaAbility,
+  workspaceGlobalOnlyAuthority,
 } from "../auth/index.js";
 import { createTableCatalog } from "../schema/catalog.js";
 import { table } from "../schema/table.js";
@@ -76,7 +78,10 @@ describe("makeAuthorizedTableHandlers", () => {
             roles: ["member"],
           },
         },
-        rowsAllowedForRequest: allowWorkspaceWideRows(workspace),
+        dataAuthority: requestDataAuthority({
+          systemGlobalOnly: systemGlobalOnlyAuthority(),
+          workspaceGlobalOnly: workspaceGlobalOnlyAuthority(workspace),
+        }),
         ability: createOnlyOrdersAbility(),
         catalog,
       });

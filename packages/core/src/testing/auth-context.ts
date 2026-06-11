@@ -2,8 +2,12 @@ import { createTableCatalog } from "../schema/catalog.js";
 import type { TableDef } from "../schema/table.js";
 import {
   createAuthContext,
+  requestDataAuthority,
+  systemGlobalOnlyAuthority,
   type SapportaAuthContext,
   type SapportaAbility,
+  workspaceGlobalOnlyAuthority,
+  workspaceUserScopedAuthority,
 } from "../auth/index.js";
 
 export interface TestAuthContextOptions {
@@ -38,11 +42,14 @@ export function createTestAuthContext(
         roles: [options.isOwner ? "owner" : "member"],
       },
     },
-    rowsAllowedForRequest: {
-      kind: "allowWorkspaceUserRows",
-      workspace,
-      user,
-    },
+    dataAuthority: requestDataAuthority({
+      systemGlobalOnly: systemGlobalOnlyAuthority(),
+      workspaceGlobalOnly: workspaceGlobalOnlyAuthority(workspace),
+      workspaceUserScoped: workspaceUserScopedAuthority({
+        workspace,
+        user,
+      }),
+    }),
     ability: allowAllAbility(),
     catalog: createTableCatalog(options.tables ?? []),
   });

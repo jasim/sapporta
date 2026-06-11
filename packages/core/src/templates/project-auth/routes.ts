@@ -1,10 +1,7 @@
 import type { Context } from "hono";
-import { HTTPException } from "hono/http-exception";
 import {
-  forbidUnless,
   TsRestApi,
   type ProjectDbConnection,
-  type RowsAllowedForRequest,
   type SapportaAuthContext,
   type SapportaEnv,
 } from "@sapporta/server";
@@ -20,7 +17,11 @@ import {
   type AuthContextResponse,
 } from "@sapporta/shared/contracts";
 import { authFailure } from "./errors.js";
-import { requireAuthContext } from "./middleware.js";
+import {
+  requireAuthContext,
+  requireAuthorizedInteractiveWorkspaceUserData,
+  type WorkspaceUserDataAuthority,
+} from "./middleware.js";
 import { WorkspaceSwitchError } from "./workspace.js";
 import {
   createAuthToken,
@@ -92,7 +93,7 @@ export function createProjectAuthRoutes(options: ProjectAuthRoutesOptions) {
         tokens: listAuthTokens(
           options.conn,
           auth.principal.user.id,
-          auth.rowsAllowedForRequest.workspace.id,
+          auth.dataAuthority.rowAuthorities.workspaceUserScoped.workspace.id,
         ),
       },
     };
@@ -128,7 +129,7 @@ export function createProjectAuthRoutes(options: ProjectAuthRoutesOptions) {
       options.conn,
       auth.principal.user.id,
       request.params.id,
-      auth.rowsAllowedForRequest.workspace.id,
+      auth.dataAuthority.rowAuthorities.workspaceUserScoped.workspace.id,
     );
     if (!revoked) {
       const failure = authFailure("not_found");
@@ -146,10 +147,6 @@ export function createProjectAuthRoutes(options: ProjectAuthRoutesOptions) {
   return api;
 }
 
-function requestUsesBearerToken(c: Context<SapportaEnv>): boolean {
-  return c.req.header("authorization")?.match(/^Bearer\s+/i) !== undefined;
-}
-
 function requireAppAuthContext(
   c: Context<SapportaEnv>,
 ): SapportaAuthContext<AppAbility, AppWorkspaceMembership> {
@@ -159,65 +156,36 @@ function requireAppAuthContext(
   >;
 }
 
-function requireUserAuthContext(
-  c: Context<SapportaEnv>,
-): SapportaAuthContext<AppAbility, AppWorkspaceMembership> & {
-  principal: Extract<SapportaAuthContext["principal"], { kind: "user" }>;
-} {
-  const auth = requireAppAuthContext(c);
-  if (auth.principal.kind !== "user") {
-    throw new Error("A signed-in user is required.");
-  }
-  return auth as SapportaAuthContext<AppAbility, AppWorkspaceMembership> & {
-    principal: Extract<SapportaAuthContext["principal"], { kind: "user" }>;
-  };
-}
-
-type UserWorkspaceRowsAllowed = Extract<
-  RowsAllowedForRequest,
-  { kind: "allowWorkspaceUserRows" }
->;
-
 function requireTokenManagementAccess(
   c: Context<SapportaEnv>,
   action: "read" | "create" | "delete",
-): SapportaAuthContext<AppAbility, AppWorkspaceMembership> & {
-  principal: Extract<SapportaAuthContext["principal"], { kind: "user" }>;
-  rowsAllowedForRequest: UserWorkspaceRowsAllowed;
-} {
-  if (requestUsesBearerToken(c)) {
-    throwAuthResponse(c, "forbidden");
-  }
-
-  const auth = requireUserAuthContext(c);
-  if (auth.rowsAllowedForRequest.kind !== "allowWorkspaceUserRows") {
-    throwAuthResponse(c, "forbidden");
-  }
-
-  forbidUnless(c, auth.ability.can(action, authTokenSubject));
-  return auth as SapportaAuthContext<AppAbility, AppWorkspaceMembership> & {
-    principal: Extract<SapportaAuthContext["principal"], { kind: "user" }>;
-    rowsAllowedForRequest: UserWorkspaceRowsAllowed;
-  };
+): TokenManagementAuthContext {
+  const auth = requireAuthorizedInteractiveWorkspaceUserData(c, {
+    action,
+    subject: authTokenSubject,
+  });
+  return auth as TokenManagementAuthContext;
 }
+
+type TokenManagementAuthContext = SapportaAuthContext<
+  AppAbility,
+  AppWorkspaceMembership
+> & {
+  principal: Extract<
+    SapportaAuthContext<AppAbility, AppWorkspaceMembership>["principal"],
+    { kind: "user" }
+  >;
+  dataAuthority: WorkspaceUserDataAuthority;
+};
 
 function tokenManagementScope(
   auth: ReturnType<typeof requireTokenManagementAccess>,
 ): AuthTokenManagementScope {
   return {
     userId: auth.principal.user.id,
-    organizationId: auth.rowsAllowedForRequest.workspace.id,
+    organizationId:
+      auth.dataAuthority.rowAuthorities.workspaceUserScoped.workspace.id,
   };
-}
-
-function throwAuthResponse(
-  c: Context<SapportaEnv>,
-  code: Parameters<typeof authFailure>[0],
-): never {
-  const failure = authFailure(code);
-  throw new HTTPException(failure.status, {
-    res: c.json(failure.body, failure.status),
-  });
 }
 
 export function authBootstrapStatus(

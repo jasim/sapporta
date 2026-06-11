@@ -12,7 +12,7 @@ import { createBetterAuth, type ProjectBetterAuth } from "./better-auth.js";
 import {
   resolveSapportaAuthContext,
   switchActiveWorkspace as switchActiveWorkspaceContext,
-  type ResolveRowsAllowedForRequest,
+  type ResolveRequestDataAuthority,
 } from "./context.js";
 import { createProjectAuthRoutes } from "./routes.js";
 import type { ProjectAuthEnv } from "./env.js";
@@ -20,6 +20,10 @@ import {
   rejectAnonymousByDefault,
   requireAuthContext,
   requirePrincipalUser,
+  requireAuthorizedInteractiveWorkspaceUserData,
+  requireAuthorizedSystemData,
+  requireAuthorizedWorkspaceData,
+  requireAuthorizedWorkspaceUserData,
   requireVerifiedUser,
   requireWorkspaceOwner,
   requireWorkspaceRowsAllowed,
@@ -41,7 +45,7 @@ export interface CreateProjectAuthOptions {
   catalog: TableCatalog;
   mailer: SapportaMailer;
   buildAbility: BuildAbility<AppAbility, AppWorkspaceMembership>;
-  resolveRowsAllowedForRequest: ResolveRowsAllowedForRequest;
+  resolveRequestDataAuthority: ResolveRequestDataAuthority;
   publicRoutes?: readonly PublicRoutePattern[];
 }
 
@@ -65,6 +69,10 @@ export interface ProjectAuth {
   requireVerifiedUser: (c: Context<SapportaEnv>) => SapportaAuthContext;
   requireWorkspaceRowsAllowed: (c: Context<SapportaEnv>) => SapportaAuthContext;
   requireWorkspaceOwner: (c: Context<SapportaEnv>) => SapportaAuthContext;
+  requireAuthorizedSystemData: typeof requireAuthorizedSystemData;
+  requireAuthorizedWorkspaceData: typeof requireAuthorizedWorkspaceData;
+  requireAuthorizedWorkspaceUserData: typeof requireAuthorizedWorkspaceUserData;
+  requireAuthorizedInteractiveWorkspaceUserData: typeof requireAuthorizedInteractiveWorkspaceUserData;
   switchActiveWorkspace: (
     c: Context<SapportaEnv>,
     workspaceId: string,
@@ -82,7 +90,7 @@ export function createProjectAuth({
   catalog,
   mailer,
   buildAbility,
-  resolveRowsAllowedForRequest,
+  resolveRequestDataAuthority,
   publicRoutes = [],
 }: CreateProjectAuthOptions): ProjectAuth {
   const auth = createBetterAuth({ conn, env, mailer });
@@ -94,7 +102,7 @@ export function createProjectAuth({
       headers: c.req.raw.headers,
       c,
       buildAbility,
-      resolveRowsAllowedForRequest,
+      resolveRequestDataAuthority,
     });
 
   return {
@@ -110,7 +118,7 @@ export function createProjectAuth({
           headers: c.req.raw.headers,
           c,
           buildAbility,
-          resolveRowsAllowedForRequest,
+          resolveRequestDataAuthority,
           workspaceId,
         }),
     }),
@@ -125,6 +133,10 @@ export function createProjectAuth({
     requireVerifiedUser,
     requireWorkspaceRowsAllowed,
     requireWorkspaceOwner,
+    requireAuthorizedSystemData,
+    requireAuthorizedWorkspaceData,
+    requireAuthorizedWorkspaceUserData,
+    requireAuthorizedInteractiveWorkspaceUserData,
     switchActiveWorkspace: (c, workspaceId) =>
       switchActiveWorkspaceContext({
         auth: auth.api,
@@ -133,7 +145,7 @@ export function createProjectAuth({
         headers: c.req.raw.headers,
         c,
         buildAbility,
-        resolveRowsAllowedForRequest,
+        resolveRequestDataAuthority,
         workspaceId,
       }),
   };
@@ -147,7 +159,7 @@ export {
   switchActiveWorkspace,
   userFromSessionPayload,
   type BetterAuthSessionPayload,
-  type ResolveRowsAllowedForRequest,
+  type ResolveRequestDataAuthority,
   type ResolveSapportaAuthContextInput,
 } from "./context.js";
 export {
@@ -179,6 +191,10 @@ export {
 export {
   rejectAnonymousByDefault,
   requireAuthContext,
+  requireAuthorizedInteractiveWorkspaceUserData,
+  requireAuthorizedSystemData,
+  requireAuthorizedWorkspaceData,
+  requireAuthorizedWorkspaceUserData,
   requirePrincipalUser,
   requireVerifiedUser,
   requireWorkspaceOwner,

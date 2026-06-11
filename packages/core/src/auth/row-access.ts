@@ -1,7 +1,7 @@
 import { and, eq, sql, type SQL } from "drizzle-orm";
 import type { BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
 import type { TableDef } from "../schema/table.js";
-import type { RowsAllowedForRequest } from "./rows-allowed-for-request.js";
+import type { RequestDataAuthority } from "./request-data-authority.js";
 import { RowScopePolicyError } from "./row-scope-policy-error.js";
 import {
   AuthPayloadPolicyError,
@@ -27,41 +27,43 @@ export { RowScopePolicyError } from "./row-scope-policy-error.js";
  * by that already-authorized action.
  */
 export function systemRows(
-  rowsAllowedForRequest: RowsAllowedForRequest,
+  dataAuthority: RequestDataAuthority,
   table: TableDef,
 ): SQL {
   assertRowScope(table, "systemGlobal");
+  if (!dataAuthority.rowAuthorities.systemGlobalOnly) {
+    throw new RowScopePolicyError(table, dataAuthority);
+  }
   return sql`TRUE`;
 }
 
 export function workspaceRows(
-  rowsAllowedForRequest: RowsAllowedForRequest,
+  dataAuthority: RequestDataAuthority,
   table: TableDef,
 ): SQL {
   assertRowScope(table, "workspaceGlobal");
-  if (
-    rowsAllowedForRequest.kind !== "allowWorkspaceWideRows" &&
-    rowsAllowedForRequest.kind !== "allowWorkspaceUserRows"
-  ) {
-    throw new RowScopePolicyError(table, rowsAllowedForRequest);
+  const authority = dataAuthority.rowAuthorities.workspaceGlobalOnly;
+  if (!authority) {
+    throw new RowScopePolicyError(table, dataAuthority);
   }
   const workspaceColumn = requireWorkspaceColumn(table);
-  return eq(workspaceColumn.column, rowsAllowedForRequest.workspace.id);
+  return eq(workspaceColumn.column, authority.workspace.id);
 }
 
 export function workspaceUserRows(
-  rowsAllowedForRequest: RowsAllowedForRequest,
+  dataAuthority: RequestDataAuthority,
   table: TableDef,
 ): SQL {
   assertRowScope(table, "workspaceUserScoped");
-  if (rowsAllowedForRequest.kind !== "allowWorkspaceUserRows") {
-    throw new RowScopePolicyError(table, rowsAllowedForRequest);
+  const authority = dataAuthority.rowAuthorities.workspaceUserScoped;
+  if (!authority) {
+    throw new RowScopePolicyError(table, dataAuthority);
   }
   const workspaceColumn = requireWorkspaceColumn(table);
   const scopedToUserColumn = requireScopedToUserColumn(table);
   return and(
-    eq(workspaceColumn.column, rowsAllowedForRequest.workspace.id),
-    eq(scopedToUserColumn.column, rowsAllowedForRequest.user.id),
+    eq(workspaceColumn.column, authority.workspace.id),
+    eq(scopedToUserColumn.column, authority.user.id),
   )!;
 }
 
@@ -69,28 +71,28 @@ export function workspaceUserRows(
  * Selects the predicate required by the table's declared row scope.
  *
  * The matrix is fail-closed:
- * - `systemGlobal` is visible for every rows-allowed value;
- * - `workspaceGlobal` requires workspace-wide or workspace-user rows;
- * - `workspaceUserScoped` requires workspace-user rows and filters by both
+ * - `systemGlobal` requires system-global authority;
+ * - `workspaceGlobal` requires workspace-global authority;
+ * - `workspaceUserScoped` requires workspace-user authority and filters by both
  *   workspace id and user id.
  */
 export function selectRowAccessPredicate(
-  rowsAllowedForRequest: RowsAllowedForRequest,
+  dataAuthority: RequestDataAuthority,
   table: TableDef,
 ): SQL {
   const rowScope = assertKnownRowScope(table);
-  if (rowScope === "systemGlobal") return systemRows(rowsAllowedForRequest, table);
+  if (rowScope === "systemGlobal") return systemRows(dataAuthority, table);
   if (rowScope === "workspaceGlobal") {
-    return workspaceRows(rowsAllowedForRequest, table);
+    return workspaceRows(dataAuthority, table);
   }
-  return workspaceUserRows(rowsAllowedForRequest, table);
+  return workspaceUserRows(dataAuthority, table);
 }
 
 export function lookupRowAccessPredicate(
-  rowsAllowedForRequest: RowsAllowedForRequest,
+  dataAuthority: RequestDataAuthority,
   targetTable: TableDef,
 ): SQL {
-  return selectRowAccessPredicate(rowsAllowedForRequest, targetTable);
+  return selectRowAccessPredicate(dataAuthority, targetTable);
 }
 
 export interface ForeignKeyValidationOptions {
@@ -115,7 +117,7 @@ export interface ForeignKeyValidationOptions {
  */
 export async function validateForeignKeyReferences(
   db: BetterSQLite3Database,
-  rowsAllowedForRequest: RowsAllowedForRequest,
+  dataAuthority: RequestDataAuthority,
   sourceTable: TableDef,
   payload: unknown,
   registeredTables: readonly TableDef[],
@@ -123,7 +125,7 @@ export async function validateForeignKeyReferences(
 ): Promise<void> {
   validateForeignKeyReferencesSync(
     db,
-    rowsAllowedForRequest,
+    dataAuthority,
     sourceTable,
     payload,
     registeredTables,
@@ -133,7 +135,7 @@ export async function validateForeignKeyReferences(
 
 export function validateForeignKeyReferencesSync(
   db: BetterSQLite3Database,
-  rowsAllowedForRequest: RowsAllowedForRequest,
+  dataAuthority: RequestDataAuthority,
   sourceTable: TableDef,
   payload: unknown,
   registeredTables: readonly TableDef[],
@@ -165,7 +167,7 @@ export function validateForeignKeyReferencesSync(
     if (value === null || value === undefined) continue;
 
     const accessPredicate = lookupRowAccessPredicate(
-      rowsAllowedForRequest,
+      dataAuthority,
       reference.targetTable,
     );
     const rows = db

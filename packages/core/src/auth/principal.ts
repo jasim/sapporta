@@ -43,8 +43,8 @@ export type SapportaAuthUser = {
  *
  * Anonymous is a real state, not a placeholder user. Do not create fake users,
  * sessions, memberships, roles, or workspace ids for public traffic; keep the
- * principal anonymous and express any allowed row facts with
- * `RowsAllowedForRequest`.
+ * principal anonymous and express any trusted ownership facts with
+ * `RequestDataAuthority`.
  */
 export type Principal<
   Membership extends WorkspaceMembership = WorkspaceMembership,

@@ -28,7 +28,7 @@ export function buildAbility(ctx: AppAuthFacts): AppAbility {
     ctx.principal.membership.roles.includes("owner")
   ) {
     // This allows owner actions; row security still limits database rows to the
-    // request's allowed workspace/user facts.
+    // request's trusted ownership facts.
     can("manage", "all");
   }
 
