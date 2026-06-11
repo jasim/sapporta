@@ -1,5 +1,4 @@
 import { cors } from "hono/cors";
-import { HTTPException } from "hono/http-exception";
 import type { Context, Env, Hono } from "hono";
 import type { BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
 import type Database from "better-sqlite3";
@@ -7,6 +6,7 @@ import type { SapportaAuthContext } from "../auth/index.js";
 import { logger, requestLogger } from "../db/logger.js";
 import { OperationError } from "../introspect/types.js";
 import { ERROR_CODE_STATUS } from "./error-codes.js";
+import { normalizeHttpException } from "./http-exceptions.js";
 
 /**
  * Hono `Env` shape used by every Sapporta-managed app and sub-app.
@@ -108,9 +108,9 @@ export function installSapportaErrorHandler<E extends SapportaEnv>(app: Hono<E>)
   app.onError((err, c) => {
     const log = logger.child({ module: "http" });
 
-    const httpException = httpExceptionLike(err);
+    const httpException = normalizeHttpException(err);
     if (httpException) {
-      if (httpException.res) return httpException.res;
+      if (httpException.response) return httpException.response;
       return c.json({ error: httpException.message }, httpException.status);
     }
 
@@ -131,86 +131,6 @@ export function installSapportaErrorHandler<E extends SapportaEnv>(app: Hono<E>)
   });
 
   return app;
-}
-
-type HttpExceptionLike = {
-  status: HttpErrorStatus;
-  message: string;
-  res?: Response;
-};
-
-function httpExceptionLike(err: unknown): HttpExceptionLike | null {
-  if (err instanceof HTTPException) {
-    return {
-      status: httpErrorStatusFromNumber(err.status),
-      message: err.message,
-      res: err.res,
-    };
-  }
-  if (typeof err !== "object" || err === null) return null;
-  const candidate = err as {
-    status?: unknown;
-    message?: unknown;
-    res?: unknown;
-    getResponse?: unknown;
-  };
-  const response =
-    responseLike(candidate.res) ??
-    (typeof candidate.getResponse === "function"
-      ? responseLike(candidate.getResponse())
-      : null);
-  if (response) {
-    return {
-      status: httpErrorStatusFromNumber(response.status),
-      message:
-        typeof candidate.message === "string" ? candidate.message : "",
-      res: response,
-    };
-  }
-  if (
-    typeof candidate.status === "number" &&
-    isHttpErrorStatus(candidate.status) &&
-    typeof candidate.message === "string"
-  ) {
-    return { status: candidate.status, message: candidate.message };
-  }
-  return null;
-}
-
-function httpErrorStatusFromNumber(status: number): HttpErrorStatus {
-  return isHttpErrorStatus(status) ? status : 500;
-}
-
-function isHttpErrorStatus(status: number): status is HttpErrorStatus {
-  return (
-    status === 400 ||
-    status === 401 ||
-    status === 403 ||
-    status === 404 ||
-    status === 409 ||
-    status === 422 ||
-    status === 500
-  );
-}
-
-function responseLike(value: unknown): Response | null {
-  if (value instanceof Response) return value;
-  if (typeof value !== "object" || value === null) return null;
-  const candidate = value as {
-    status?: unknown;
-    headers?: unknown;
-    clone?: unknown;
-    text?: unknown;
-  };
-  if (
-    typeof candidate.status === "number" &&
-    typeof candidate.headers === "object" &&
-    typeof candidate.clone === "function" &&
-    typeof candidate.text === "function"
-  ) {
-    return value as Response;
-  }
-  return null;
 }
 
 export function installFrameworkRoutePolicy<E extends SapportaEnv>(

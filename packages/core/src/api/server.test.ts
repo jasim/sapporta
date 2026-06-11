@@ -5,6 +5,7 @@
 import { describe, it, expect } from "vitest";
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
+import { createRequire } from "node:module";
 import {
   installExactOriginCors,
   installFrameworkRoutePolicy,
@@ -13,6 +14,21 @@ import {
   type SapportaEnv,
 } from "./server.js";
 import { OperationError } from "../introspect/types.js";
+
+type HonoHttpExceptionConstructor = new (
+  status?: number,
+  options?: { message?: string; res?: Response; cause?: unknown },
+) => Error & {
+  status: number;
+  res?: Response;
+  getResponse(): Response;
+};
+
+const require = createRequire(import.meta.url);
+const { HTTPException: CjsHTTPException } =
+  require("hono/http-exception") as unknown as {
+    HTTPException: HonoHttpExceptionConstructor;
+  };
 
 function appThatThrows(err: unknown) {
   const app = installSapportaDefaults(new Hono<SapportaEnv>());
@@ -73,17 +89,39 @@ describe("installSapportaDefaults", () => {
     expect(await res.json()).toEqual({ error: "bad", code: "VALIDATION", hint: "fix it" });
   });
 
-  it("honors HTTPException-like responses from project dependencies", async () => {
-    const err = Object.assign(new Error(""), {
-      res: Response.json({ error: "Project auth rejected", code: "unauthenticated" }, { status: 401 }),
-      status: 401,
+  it("honors HTTPException responses from a different Hono module instance", async () => {
+    const err = new CjsHTTPException(401, {
+      res: Response.json(
+        { error: "Project auth rejected", code: "unauthenticated" },
+        { status: 401 },
+      ),
     });
+    expect(err).not.toBeInstanceOf(HTTPException);
+
     const res = await appThatThrows(err).request("/boom");
     expect(res.status).toBe(401);
     expect(await res.json()).toEqual({
       error: "Project auth rejected",
       code: "unauthenticated",
     });
+  });
+
+  it("reshapes a bare HTTPException from a different Hono module instance", async () => {
+    const err = new CjsHTTPException(429, { message: "Slow down" });
+    expect(err).not.toBeInstanceOf(HTTPException);
+
+    const res = await appThatThrows(err).request("/boom");
+    expect(res.status).toBe(429);
+    expect(res.headers.get("content-type")).toMatch(/application\/json/);
+    expect(await res.json()).toEqual({ error: "Slow down" });
+  });
+
+  it("does not treat plain status/message errors as HTTP exceptions", async () => {
+    const err = Object.assign(new Error("teapot"), { status: 418 });
+    const res = await appThatThrows(err).request("/boom");
+
+    expect(res.status).toBe(500);
+    expect(await res.json()).toEqual({ error: "teapot", code: "INTERNAL" });
   });
 
   it("returns JSON regardless of the client's Accept header", async () => {
