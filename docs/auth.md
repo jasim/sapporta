@@ -7,9 +7,10 @@ guards, frontend auth context APIs, and row-scoped generated table APIs.
 
 The main rule is simple: row ownership lives in the database, but clients do not
 get to choose it. A signed-in request resolves to an active workspace, a user,
-and a membership role. The standard table API is `scopedRows(db, auth, table)`.
-It uses that request auth context to stamp trusted scope columns on inserts and
-to add SQL predicates to reads, updates, deletes, lookups, exports, and counts.
+membership roles, an application ability, and request data authority. The
+standard table API is `scopedRows(db, auth, table)`. It uses the request's data
+authority to stamp trusted scope columns on inserts and to add SQL predicates
+to reads, updates, deletes, lookups, exports, and counts.
 
 ## What You Get In A New Sapporta Project
 
@@ -22,11 +23,12 @@ A new Sapporta project includes:
 - Session-backed auth middleware for API requests.
 - First-workspace provisioning.
 - Active workspace selection.
-- Owner/user role resolution.
+- Owner/member role resolution.
 - Route guards for product routes and framework/admin routes.
 - Frontend auth context APIs and an `AuthGate`.
 - Agent access tokens for CLI, coding agent, and CI access to protected APIs.
 - Generated table operations that protect rows by workspace and user scope.
+- Request data authority helpers for custom product code.
 
 ## Environment
 
@@ -56,23 +58,28 @@ For ordinary table work, use the row-scoped table API exported by
 `@sapporta/server`:
 
 ```ts
-const auth = projectAuth.requireWorkspaceUser(c);
+const auth = projectAuth.requireAuthorizedWorkspaceUserData(c, {
+  action: "create",
+  subject: "invoices",
+});
 const rows = scopedRows(c.get("db"), auth, invoices);
 ```
 
-Generated `/api/tables/*` routes use the same API. Use it in custom product
-routes for ordinary list, get, create, update, delete, lookup, count, and export
-work. When a route needs a custom Drizzle workflow, such as joins,
-transactions, aggregates, or domain-specific invariants, use the lower-level
-row-security primitives described later in this guide.
+Generated `/api/tables/*` routes use the same API. Custom product routes should
+first choose the narrowest data authority that matches the workflow, then pass
+that auth context to `scopedRows()` for ordinary list, get, create, update,
+delete, lookup, count, and export work. When a route needs a custom Drizzle
+workflow, such as joins, transactions, aggregates, or domain-specific
+invariants, use the lower-level row-security primitives described later in this
+guide.
 
 - If you use generated table routes, Sapporta applies row protection for you.
 - If you write ordinary custom table operations, start with
-  `scopedRows(db, auth, table)`.
+  `scopedRows(db, auth, table)` after selecting the route's data authority.
 - If you write advanced Drizzle workflows, use the lower-level row-security
   primitives explicitly.
 - You still own and can edit the project auth code copied into
-  `packages/api/project-auth`.
+  `packages/api/project-auth` and `packages/api/authz`.
 
 ## The Running Example
 
@@ -88,9 +95,9 @@ A cashier signs in. Sapporta resolves the session, active workspace, user, and
 membership. Invoice rows are scoped to both the active workspace and the current
 cashier. Another cashier in the same workspace does not see those invoices.
 For example, an owner-only route may allow a store owner to void one of their
-own invoices, but `scopedRows(db, auth, invoices)` still only sees rows visible
-to that owner as the authenticated user. It does not become an "all cashiers'
-invoices" query just because the route required `requireWorkspaceOwner(c)`.
+own invoices, but `scopedRows(db, auth, invoices)` still only sees rows allowed
+by the auth context's data authority. It does not become an "all cashiers'
+invoices" query just because the route checked an owner role.
 
 For user-owned invoices:
 
@@ -165,7 +172,8 @@ code. In current templates it:
 3. Loads Sapporta schemas and reports.
 4. Checks migration readiness while loading the Sapporta project.
 5. Validates auth schema metadata for the loaded table catalog.
-6. Creates project auth from Better Auth config and the loaded catalog.
+6. Creates project auth from Better Auth config, ability rules, data-authority
+   resolution, and the loaded catalog.
 7. Creates the Hono app.
 8. Installs request logging, exact-origin credentialed CORS, error handling,
    and health policy.
@@ -191,20 +199,32 @@ Project auth middleware failures return JSON auth codes:
 - `403 workspace_required`
 - `403 forbidden`
 
-The generated guard helpers all read the already-resolved `c.get("auth")`:
+The generated guard helpers all read the already-resolved `c.get("auth")`.
+Use them to require the right principal, ability, and data authority before a
+handler touches table-backed data:
 
-- `requireOnlyBareLoggedInUser(c)`
-- `requireOnlyBareVerifiedUser(c)`
-- `requireWorkspaceUser(c)`
+- `requirePrincipalUser(c)`
+- `requireVerifiedUser(c)`
+- `requireAuthorizedSystemData(c, requirement)`
+- `requireAuthorizedWorkspaceData(c, requirement)`
+- `requireAuthorizedWorkspaceUserData(c, requirement)`
+- `requireAuthorizedInteractiveWorkspaceUserData(c, requirement)`
+- `requireWorkspaceRowsAllowed(c)`
 - `requireWorkspaceOwner(c)`
 
 ## Project Auth Files
 
 The source template for generated project auth lives in
 `packages/core/src/templates/project-auth`. `sapporta init` copies it once into
-local project code:
+local project code. Ability and data-authority defaults live beside it in
+`packages/api/authz`:
 
 ```txt
+packages/api/authz/
+  ability.ts
+  request-data-authority.ts
+  types.ts
+
 packages/api/project-auth/
   index.ts
   better-auth.ts
@@ -219,9 +239,15 @@ packages/api/project-auth/
 ```
 
 Generated projects own those files. They may customize workspace provisioning,
-role mapping, middleware behavior, guard policy, error responses, and auth
-routes without changing `@sapporta/server`.
+role mapping, ability rules, data-authority resolution, middleware behavior,
+guard policy, error responses, and auth routes without changing
+`@sapporta/server`.
 
+- `authz/ability.ts`: defines what feature actions each principal may perform.
+- `authz/request-data-authority.ts`: chooses the trusted row facts available to
+  each request.
+- `authz/types.ts`: defines app-specific roles, ability subjects, and auth
+  facts.
 - `env.ts`: parses auth secrets, API base URL, frontend origins, verified-email
   policy, mail delivery config, and health policy.
 - `better-auth.ts`: creates the Better Auth instance with email/password and
@@ -252,35 +278,100 @@ On first login, Better Auth creates or reads the session. Project auth resolves
 the active workspace. If the user has no workspace membership yet, the generated
 project auth code provisions an initial workspace and owner membership. Better
 Auth organization membership roles are mapped into Sapporta roles:
-`owner`/`admin` become `owner`; everything else becomes `user`.
+`owner`/`admin` become `owner`; everything else becomes `member`.
 
 The request receives a `SapportaAuthContext`:
 
 ```ts
 interface SapportaAuthContext {
-  session: { id: string; userId: string; activeWorkspaceId: string };
-  user: { id: string; name: string | null; email: string; emailVerified: boolean };
-  workspace: { id: string; name: string; slug: string; isOwner: boolean };
-  member: { id: string; role: "owner" | "user" };
+  principal: Principal;
+  dataAuthority: RequestDataAuthority;
+  ability: AppAbility;
   rowSecurity: RowSecurity;
 }
 ```
 
-That `rowSecurity` object is bound to the request identity and loaded table
-catalog.
+Read those as separate facts:
+
+- `principal`: who is asking, such as anonymous or a signed-in user with active
+  workspace membership.
+- `dataAuthority`: which trusted ownership facts database helpers may use.
+- `ability`: what feature actions the principal may perform.
+- `rowSecurity`: how data authority and table metadata become SQL predicates,
+  trusted insert values, and reference checks.
+
+Data authority is not a permission grant. A CASL rule can allow a feature
+action without widening row predicates, and an owner role does not automatically
+turn user-owned rows into workspace-wide rows.
+
+## Customize Request Data Authority
+
+Generated projects build data authority in
+`packages/api/authz/request-data-authority.ts`. The starter policy gives
+anonymous requests access only to system-global data and gives signed-in
+workspace users all three row-authority slots for their active workspace:
+
+```ts
+import {
+  requestDataAuthority,
+  systemGlobalOnlyAuthority,
+  workspaceGlobalOnlyAuthority,
+  workspaceUserScopedAuthority,
+  type RequestDataAuthority,
+} from "@sapporta/server";
+import type { Context } from "hono";
+import type { AppPrincipal } from "./types.js";
+
+export async function resolveRequestDataAuthority(input: {
+  principal: AppPrincipal;
+  c: Context;
+}): Promise<RequestDataAuthority> {
+  if (input.principal.kind !== "user") {
+    return requestDataAuthority({
+      systemGlobalOnly: systemGlobalOnlyAuthority(),
+    });
+  }
+
+  const workspace = input.principal.membership.workspace;
+  return requestDataAuthority({
+    systemGlobalOnly: systemGlobalOnlyAuthority(),
+    workspaceGlobalOnly: workspaceGlobalOnlyAuthority(workspace),
+    workspaceUserScoped: workspaceUserScopedAuthority({
+      workspace,
+      user: input.principal.user,
+    }),
+  });
+}
+```
+
+Customize this file when a product route intentionally needs a different data
+boundary. For example, a public workspace catalog route should first verify that
+the requested workspace has enabled that public catalog, then return
+`workspaceGlobalOnlyAuthority(workspace)` for that request. Do not infer row
+authority from a role alone; roles belong in `authz/ability.ts`, while
+ownership facts belong in data authority.
 
 ## Protect Product Routes
 
-Generated framework routes are owner-gated by default. Product/domain routes
-should usually require a workspace user and then use `scopedRows()` for
-ordinary table work.
+Generated table routes authorize the requested action with `auth.ability` and
+then run through `scopedRows()`. Product/domain routes should follow the same
+shape:
+
+1. Choose the helper that matches the workflow's required data authority.
+2. Pass the returned auth context to `scopedRows()` for ordinary table work, or
+   to `auth.rowSecurity.forTable(table)` for custom Drizzle workflows.
+
+For user-owned rows such as `workspaceUserScoped` invoices:
 
 ```ts
 import { scopedRows } from "@sapporta/server";
 
 api.register("createInvoice", contract.createInvoice, async ({ c, request }) => {
   const db = c.get("db");
-  const auth = projectAuth.requireWorkspaceUser(c);
+  const auth = projectAuth.requireAuthorizedWorkspaceUserData(c, {
+    action: "create",
+    subject: "invoices",
+  });
   const rows = scopedRows(db, auth, invoices);
 
   const created = await rows.create(request.body);
@@ -288,10 +379,50 @@ api.register("createInvoice", contract.createInvoice, async ({ c, request }) => 
 });
 ```
 
-`projectAuth.requireWorkspaceUser(c)` authenticates the request and guarantees
-an active workspace membership. `scopedRows(db, auth, invoices)` is the
-trust-boundary constructor for ordinary table operations. It binds that request
-auth context to one table and internally uses `auth.rowSecurity.forTable(table)`.
+For workspace-wide shared rows such as `workspaceGlobal` customers:
+
+```ts
+api.register("createCustomer", contract.createCustomer, async ({ c, request }) => {
+  const auth = projectAuth.requireAuthorizedWorkspaceData(c, {
+    action: "create",
+    subject: "customers",
+  });
+  const rows = scopedRows(c.get("db"), auth, customers);
+
+  const created = await rows.create(request.body);
+  return { status: 201, body: { data: created } };
+});
+```
+
+For installation-wide reference rows such as `systemGlobal` countries:
+
+```ts
+api.register("listCountries", contract.listCountries, async ({ c, request }) => {
+  const auth = projectAuth.requireAuthorizedSystemData(c, {
+    action: "read",
+    subject: "countries",
+  });
+  const rows = scopedRows(c.get("db"), auth, countries);
+
+  return { status: 200, body: await rows.list(request.query) };
+});
+```
+
+For browser-only workflows, such as token management or profile settings that
+must not be callable with an agent access token:
+
+```ts
+const auth = projectAuth.requireAuthorizedInteractiveWorkspaceUserData(c, {
+  action: "create",
+  subject: "agent_access_token",
+});
+```
+
+The `requireAuthorized*Data()` helpers do two things: they check
+`auth.ability.can(action, subject)`, and they return an auth context whose
+`dataAuthority` and `rowSecurity` are narrowed to the requested row-authority
+slot. If a route chooses workspace data authority and then tries to access a
+`workspaceUserScoped` table, row security fails closed.
 
 Client-provided `workspace_id` or `scoped_to_user_id` is rejected. Trusted scope
 values are inserted from auth. Reads, updates, deletes, lookups, counts, and
@@ -306,7 +437,10 @@ or export rows. This is the path generated `/api/tables/*` routes use.
 ```ts
 api.register("listMyInvoices", contract.listMyInvoices, async ({ c, request }) => {
   const db = c.get("db");
-  const auth = projectAuth.requireWorkspaceUser(c);
+  const auth = projectAuth.requireAuthorizedWorkspaceUserData(c, {
+    action: "read",
+    subject: "invoices",
+  });
   const rows = scopedRows(db, auth, invoices);
 
   const result = await rows.list(request.query);
@@ -314,7 +448,10 @@ api.register("listMyInvoices", contract.listMyInvoices, async ({ c, request }) =
 });
 
 api.register("getInvoice", contract.getInvoice, async ({ c, request }) => {
-  const auth = projectAuth.requireWorkspaceUser(c);
+  const auth = projectAuth.requireAuthorizedWorkspaceUserData(c, {
+    action: "read",
+    subject: "invoices",
+  });
   const rows = scopedRows(c.get("db"), auth, invoices);
 
   const invoice = await rows.get(request.params.id);
@@ -322,7 +459,10 @@ api.register("getInvoice", contract.getInvoice, async ({ c, request }) => {
 });
 
 api.register("voidInvoice", contract.voidInvoice, async ({ c, request }) => {
-  const auth = projectAuth.requireWorkspaceUser(c);
+  const auth = projectAuth.requireAuthorizedWorkspaceUserData(c, {
+    action: "update",
+    subject: "invoices",
+  });
   const rows = scopedRows(c.get("db"), auth, invoices);
 
   const invoice = await rows.update(request.params.id, { status: "void" });
@@ -330,7 +470,10 @@ api.register("voidInvoice", contract.voidInvoice, async ({ c, request }) => {
 });
 
 api.register("deleteInvoice", contract.deleteInvoice, async ({ c, request }) => {
-  const auth = projectAuth.requireWorkspaceUser(c);
+  const auth = projectAuth.requireAuthorizedWorkspaceUserData(c, {
+    action: "delete",
+    subject: "invoices",
+  });
   const rows = scopedRows(c.get("db"), auth, invoices);
 
   const deleted = await rows.delete(request.params.id);
@@ -362,13 +505,19 @@ workflow: joins, transactions, aggregates, multi-table state transitions,
 custom SQL, or domain-specific invariants that `scopedRows()` cannot express.
 
 ```ts
-const auth = projectAuth.requireWorkspaceUser(c);
+const auth = projectAuth.requireAuthorizedWorkspaceUserData(c, {
+  action: "create",
+  subject: "invoice_workflow",
+});
 const invoiceGuard = auth.rowSecurity.forTable(invoices);
 const lineGuard = auth.rowSecurity.forTable(invoiceLines);
 ```
 
 Use one guard per table because each table has its own row scope and reference
-rules.
+rules. Choose the authority helper for the tables the workflow actually touches:
+`requireAuthorizedWorkspaceUserData()` for `workspaceUserScoped`,
+`requireAuthorizedWorkspaceData()` for `workspaceGlobal`, and
+`requireAuthorizedSystemData()` for `systemGlobal`.
 
 ### Read Rows With Custom SQL
 
@@ -408,7 +557,10 @@ and scope the mutation with `ownedRows()`:
 ```ts
 api.register("voidInvoice", contract.voidInvoice, async ({ c, request }) => {
   const db = c.get("db");
-  const auth = projectAuth.requireWorkspaceUser(c);
+  const auth = projectAuth.requireAuthorizedWorkspaceUserData(c, {
+    action: "update",
+    subject: "invoices",
+  });
   const invoiceGuard = auth.rowSecurity.forTable(invoices);
 
   await db
@@ -476,7 +628,10 @@ The route inserts the invoice first, then inserts the lines with
 ```ts
 api.register("createInvoice", contract.createInvoice, async ({ c, request }) => {
   const db = c.get("db");
-  const auth = projectAuth.requireWorkspaceUser(c);
+  const auth = projectAuth.requireAuthorizedWorkspaceUserData(c, {
+    action: "create",
+    subject: "invoice_workflow",
+  });
   const invoiceGuard = auth.rowSecurity.forTable(invoices);
   const lineGuard = auth.rowSecurity.forTable(invoiceLines);
 
@@ -560,10 +715,12 @@ the handler:
 - `export`: `rows.exportRows(query)` applies row ownership before filters,
   sort, and output.
 
-Framework table routes are mounted with `projectAuth.requireWorkspaceOwner` in
-the generated template. That guard decides whether the route may run; it does
+Framework table routes are mounted with `projectAuth.requireAuthContext` in the
+generated template. Each handler then checks `auth.ability.can(action,
+table.sqlName)` before calling `scopedRows(db, auth, table)`. A broad ability
+rule such as `can("manage", "all")` can allow the generated action, but it does
 not broaden row visibility. Row visibility still comes only from the resolved
-`SapportaAuthContext` passed to `scopedRows()`.
+`auth.dataAuthority`.
 
 Rows outside the active auth boundary return `404` for generated get, update,
 and delete. Update and delete do not perform a prior broad fetch followed by a
@@ -688,11 +845,21 @@ workspace-scoped row predicates use this workspace.
 
 Member: the user's membership record in the active workspace.
 
-Owner: a workspace member whose Sapporta role is `owner`. Owners can access
-generated framework routes by default.
+Owner: a workspace member whose Sapporta role is `owner`. The starter ability
+rules let owners manage generated framework routes by default.
 
-Auth context: the request-local session, user, workspace, member, and
+Auth context: the request-local principal, data authority, ability, and
 row-security helper.
+
+Principal: who is asking. It may be anonymous or a signed-in user with an active
+workspace membership.
+
+Ability: feature-level permission rules. Ability decides whether a handler may
+run an action; it does not decide which table rows the handler can touch.
+
+Data authority: the trusted row facts available to a request. The built-in
+slots are `systemGlobalOnly`, `workspaceGlobalOnly`, and
+`workspaceUserScoped`.
 
 Row scope: table metadata declaring whether rows are user-owned within a
 workspace, shared across a workspace, or system-global.
@@ -719,11 +886,39 @@ session.
 
 ## Compact API Reference
 
-`projectAuth.requireWorkspaceUser(c)`: use by default for product routes. It
-returns the current auth context and requires an active workspace membership.
+`projectAuth.requireAuthContext(c)`: return the resolved request auth context.
+Use this only when the route will perform its own authorization and data
+authority checks.
+
+`projectAuth.requirePrincipalUser(c)`: require a signed-in user, without
+choosing any row authority.
+
+`projectAuth.requireVerifiedUser(c)`: require a verified signed-in user, without
+choosing any row authority.
+
+`projectAuth.requireAuthorizedSystemData(c, requirement)`: require the CASL
+ability rule and return an auth context narrowed to `systemGlobalOnly` data
+authority.
+
+`projectAuth.requireAuthorizedWorkspaceData(c, requirement)`: require the CASL
+ability rule and return an auth context narrowed to `workspaceGlobalOnly` data
+authority.
+
+`projectAuth.requireAuthorizedWorkspaceUserData(c, requirement)`: require a
+signed-in user, require the CASL ability rule, and return an auth context
+narrowed to `workspaceUserScoped` data authority.
+
+`projectAuth.requireAuthorizedInteractiveWorkspaceUserData(c, requirement)`:
+same as `requireAuthorizedWorkspaceUserData()`, but rejects bearer-token
+requests. Use it for browser-session-only workflows such as token management.
+
+`projectAuth.requireWorkspaceRowsAllowed(c)`: require an auth context that has
+workspace-global row authority. Prefer the `requireAuthorized*Data()` helpers
+for product route code because they also check ability and narrow row security.
 
 `projectAuth.requireWorkspaceOwner(c)`: use for owner/admin workflows. Generated
-framework routes use this by default.
+templates keep it available for app-specific owner checks, but generated table
+routes authorize with `auth.ability` and still use data authority for rows.
 
 `scopedRows(db, auth, tableDef)`: default API for ordinary row-scoped table
 operations. It binds the request auth context to one table via
@@ -771,22 +966,37 @@ paths because they also enforce reference policy.
 ownership fields on an already-safe object. Prefer `insertValues()` for normal
 client create bodies.
 
-`currentUserRows(auth, table)`: predicate for `workspaceUserScoped` rows owned
-by the current user in the active workspace.
+`requestDataAuthority(rowAuthorities)`: build a request data-authority record
+from one or more atomic row-authority slots. The helper rejects conflicting
+workspace ids.
 
-`allWorkspaceRows(auth, table)`: predicate for rows in the active workspace.
+`systemGlobalOnlyAuthority()`: create the authority slot for `systemGlobal`
+tables.
 
-`allSystemRows(auth, table)`: predicate for `systemGlobal` reference rows.
+`workspaceGlobalOnlyAuthority(workspace)`: create the authority slot for
+`workspaceGlobal` tables in one workspace.
 
-`selectRowAccessPredicate(auth, table)`: choose the right predicate from a
-table's row scope.
+`workspaceUserScopedAuthority({ workspace, user })`: create the authority slot
+for `workspaceUserScoped` rows owned by one user in one workspace.
 
-`lookupRowAccessPredicate(auth, targetTable)`: choose the target-row
+`workspaceUserRows(dataAuthority, table)`: predicate for
+`workspaceUserScoped` rows owned by the authority's user in the authority's
+workspace.
+
+`workspaceRows(dataAuthority, table)`: predicate for `workspaceGlobal` rows in
+the authority's workspace.
+
+`systemRows(dataAuthority, table)`: predicate for `systemGlobal` rows.
+
+`selectRowAccessPredicate(dataAuthority, table)`: choose the right predicate
+from a table's row scope.
+
+`lookupRowAccessPredicate(dataAuthority, targetTable)`: choose the target-row
 predicate used by lookup/autocomplete and FK validation.
 
-`validateForeignKeyReferences(db, auth, sourceTable, payload, tables, options?)`:
-low-level FK visibility check. Use table guards for ordinary route code; use
-this only when composing lower-level auth workflows.
+`validateForeignKeyReferences(db, dataAuthority, sourceTable, payload, tables,
+options?)`: low-level FK visibility check. Use table guards for ordinary route
+code; use this only when composing lower-level auth workflows.
 
 ## Verification Checklist
 
@@ -798,11 +1008,15 @@ workspace, and visible/invisible FK target rows.
 - Routes reject unauthenticated users.
 - Product app routes reject unverified and missing-workspace requests according
   to project auth policy.
-- Product routes require workspace users.
-- Framework routes require workspace owners unless the project changes that
-  policy intentionally.
-- Non-owner users cannot access framework routes.
+- Product routes use the narrowest `requireAuthorized*Data()` helper for the
+  workflow.
+- Framework routes check `auth.ability` for the generated table action before
+  calling `scopedRows()`.
+- Non-owner users cannot perform owner-only actions unless the project changes
+  ability rules intentionally.
 - Public Better Auth routes remain reachable.
+- Public product routes still check ability and use row security before reading
+  table-backed data.
 - User-scoped rows are invisible to other users in the same workspace.
 - Workspace rows are invisible across workspaces.
 - Clients cannot submit `workspace_id` or `scoped_to_user_id`.
@@ -817,6 +1031,7 @@ workspace, and visible/invisible FK target rows.
 - Credentialed CORS does not use wildcard origins.
 - Agent access tokens are shown only once, can be revoked, are scoped to one
   workspace, and cannot manage other tokens.
+- Interactive-only routes reject bearer-token requests.
 - Boot does not mutate schema at runtime.
 - Workspace ownership is not treated as global cross-workspace authorization.
 - Generated table routes and custom routes use `scopedRows()` for ordinary
