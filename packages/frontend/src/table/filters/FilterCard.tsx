@@ -36,7 +36,7 @@ export function FilterCard({
   const [open, setOpen] = useState(false);
 
   const column = columns.find((c) => c.name === condition.column) ?? null;
-  const label = column?.header ?? condition.column;
+  const label = column?.label ?? condition.column;
   const opLabel = column
     ? findEntryForCondition(
         inferFilterColumnType(column),

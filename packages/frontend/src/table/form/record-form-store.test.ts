@@ -12,13 +12,13 @@ const PRODUCTS_SCHEMA: TableSchema = {
   immutable: false,
   children: [],
   columns: [
-    { name: "id", primary: true, hasDefault: true },
-    { name: "sku", notNull: true },
-    { name: "name", notNull: true },
-    { name: "is_active" },
-    { name: "workspace_id", notNull: true },
-    { name: "scoped_to_user_id", notNull: true },
-    { name: "server_owned_id", clientEditable: false },
+    { name: "id", label: "ID", primary: true, hasDefault: true },
+    { name: "sku", label: "SKU", notNull: true },
+    { name: "name", label: "Name", notNull: true },
+    { name: "is_active", label: "Is active" },
+    { name: "workspace_id", label: "Workspace", notNull: true },
+    { name: "scoped_to_user_id", label: "Scoped to user", notNull: true },
+    { name: "server_owned_id", label: "Server owned", clientEditable: false },
   ],
 };
 
@@ -28,8 +28,8 @@ const CATEGORIES_SCHEMA: TableSchema = {
   immutable: false,
   children: [],
   columns: [
-    { name: "id", primary: true, hasDefault: true },
-    { name: "name", notNull: true },
+    { name: "id", label: "ID", primary: true, hasDefault: true },
+    { name: "name", label: "Name", notNull: true },
   ],
 };
 

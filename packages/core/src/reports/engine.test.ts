@@ -628,7 +628,7 @@ describe("executeReport (integration)", () => {
       tree: {
         source: "account_types",
         levelName: "account_type_group",
-        columns: [{ name: "account_type", header: "Account Type" }],
+        columns: [{ name: "account_type", label: "Account Type" }],
         rollup: (children) => ({
           total_debit: children.accounts.reduce(
             (s, n) => s + Number(n.columns.total_debit ?? 0),
@@ -668,22 +668,22 @@ describe("executeReport (integration)", () => {
             levelName: "accounts",
             bind: { account_type: "$parent.account_type" },
             columns: [
-              { name: "name", header: "Account" },
+              { name: "name", label: "Account" },
               {
                 name: "total_debit",
-                header: "Debit",
+                label: "Debit",
                 kind: "number",
                 displayFormat: "currency",
               },
               {
                 name: "total_credit",
-                header: "Credit",
+                label: "Credit",
                 kind: "number",
                 displayFormat: "currency",
               },
               {
                 name: "balance",
-                header: "Balance",
+                label: "Balance",
                 kind: "number",
                 displayFormat: "currency",
               },
@@ -779,8 +779,8 @@ describe("executeReport (integration)", () => {
         source: "account_info",
         levelName: "account",
         columns: [
-          { name: "name", header: "Account Name" },
-          { name: "account_type", header: "Account Type" },
+          { name: "name", label: "Account Name" },
+          { name: "account_type", label: "Account Type" },
         ],
         children: [
           {
@@ -791,7 +791,7 @@ describe("executeReport (integration)", () => {
             columns: [
               {
                 name: "opening_balance",
-                header: "Opening Balance",
+                label: "Opening Balance",
                 kind: "number",
                 displayFormat: "currency",
               },
@@ -802,23 +802,23 @@ describe("executeReport (integration)", () => {
             levelName: "entries",
             bind: { account_id: "$parent.id" },
             columns: [
-              { name: "date", header: "Date", kind: "date" },
-              { name: "narration", header: "Narration" },
+              { name: "date", label: "Date", kind: "date" },
+              { name: "narration", label: "Narration" },
               {
                 name: "debit",
-                header: "Debit",
+                label: "Debit",
                 kind: "number",
                 displayFormat: "currency",
               },
               {
                 name: "credit",
-                header: "Credit",
+                label: "Credit",
                 kind: "number",
                 displayFormat: "currency",
               },
               {
                 name: "balance",
-                header: "Balance",
+                label: "Balance",
                 kind: "number",
                 displayFormat: "currency",
               },
@@ -966,7 +966,7 @@ describe("executeReport (integration)", () => {
       tree: {
         source: "sections",
         levelName: "section",
-        columns: [{ name: "section", header: "Section" }],
+        columns: [{ name: "section", label: "Section" }],
         rollup: (children) => ({
           section_total: children.accounts.reduce(
             (s, n) => s + Number(n.columns.balance ?? 0),
@@ -995,10 +995,10 @@ describe("executeReport (integration)", () => {
             levelName: "accounts",
             bind: { section: "$parent.section" },
             columns: [
-              { name: "name", header: "Account" },
+              { name: "name", label: "Account" },
               {
                 name: "balance",
-                header: "Balance",
+                label: "Balance",
                 kind: "number",
                 displayFormat: "currency",
               },
@@ -1082,34 +1082,34 @@ describe("executeReport (integration)", () => {
         source: "monthly_deltas",
         levelName: "month_row",
         columns: [
-          { name: "month", header: "Month" },
+          { name: "month", label: "Month" },
           {
             name: "asset_delta",
-            header: "Asset Delta",
+            label: "Asset Delta",
             kind: "number",
             displayFormat: "currency",
           },
           {
             name: "liability_delta",
-            header: "Liability Delta",
+            label: "Liability Delta",
             kind: "number",
             displayFormat: "currency",
           },
           {
             name: "assets",
-            header: "Assets",
+            label: "Assets",
             kind: "number",
             displayFormat: "currency",
           },
           {
             name: "liabilities",
-            header: "Liabilities",
+            label: "Liabilities",
             kind: "number",
             displayFormat: "currency",
           },
           {
             name: "net_worth",
-            header: "Net Worth",
+            label: "Net Worth",
             kind: "number",
             displayFormat: "currency",
           },
@@ -1527,10 +1527,10 @@ describe("executeReport (integration)", () => {
           columns: [
             {
               name: "name",
-              header: "Name",
+              label: "Name",
               display: (row) => `${row.name} (${row.account_type})`,
             },
-            { name: "account_type", header: "Type" },
+            { name: "account_type", label: "Type" },
           ],
         },
       };
@@ -1560,7 +1560,7 @@ describe("executeReport (integration)", () => {
           columns: [
             {
               name: "name",
-              header: "Name",
+              label: "Name",
               display: (row) => `${row.name} [${row.account_type}]`,
             },
           ],
@@ -1596,7 +1596,7 @@ describe("executeReport (integration)", () => {
             { name: "section" },
             {
               name: "total",
-              header: "Total",
+              label: "Total",
               display: (row) => `$${Number(row.total).toLocaleString()}`,
             },
           ],
@@ -1651,7 +1651,7 @@ describe("executeReport (integration)", () => {
             { name: "name" },
             {
               name: "count",
-              header: "Count",
+              label: "Count",
               display: (row) => `${row.count} items`,
             },
           ],
@@ -1692,7 +1692,7 @@ describe("executeReport (integration)", () => {
                 { name: "name" },
                 {
                   name: "total",
-                  header: "Total",
+                  label: "Total",
                   display: (row) =>
                     row.total != null ? `${row.total} accounts` : null,
                 },

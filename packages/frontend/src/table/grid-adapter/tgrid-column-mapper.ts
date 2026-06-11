@@ -103,7 +103,7 @@ function columnFor(
     displayType !== "timestamp";
   const common = {
     id: column.name as ColId,
-    name: column.header ?? column.name,
+    name: column.label,
     editable,
     width: tableColumnPresetWidth(column),
     meta: {

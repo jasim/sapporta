@@ -35,7 +35,7 @@ export function CellFilterAction({
       <PopoverTrigger asChild>
         <button
           type="button"
-          aria-label={`Filter by ${column.header ?? column.name}`}
+          aria-label={`Filter by ${column.label}`}
           className="flex items-center justify-center h-6 w-6 rounded border border-sap-border bg-sap-surface text-sap-subtle hover:text-sap-fg hover:bg-sap-row-hover shadow-sm"
           onClick={(e) => e.stopPropagation()}
         >

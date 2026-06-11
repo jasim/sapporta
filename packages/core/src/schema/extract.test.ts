@@ -92,7 +92,7 @@ describe("extractSchemas", () => {
     expect(result[0].rowLabelColumns).toEqual(["id"]);
   });
 
-  it("normalizes table defaults without synthesizing column display hints", () => {
+  it("normalizes table defaults without storing author-supplied column labels", () => {
     expect(ledger.meta).toMatchObject({
       label: "ledger",
       rowScope: "workspaceUserScoped",
@@ -101,7 +101,7 @@ describe("extractSchemas", () => {
       references: {},
       children: [],
     });
-    expect(ledger.meta.columns.description?.header).toBeUndefined();
+    expect(ledger.meta.columns.description?.label).toBeUndefined();
   });
 
   it("extracts column metadata", () => {
@@ -117,11 +117,12 @@ describe("extractSchemas", () => {
     expect(nameCol.notNull).toBe(true);
     expect(nameCol.dataType).toBe("string");
     expect(nameCol.primary).toBe(false);
-    expect(nameCol.header).toBeUndefined();
+    expect(nameCol.label).toBe("Name");
 
     const balanceCol = cols.find((c) => c.name === "balance")!;
     expect(balanceCol.notNull).toBe(false);
     expect(balanceCol.dataType).toBe("number");
+    expect(balanceCol.label).toBe("Balance");
   });
 
   it("includes select metadata", () => {
@@ -136,6 +137,7 @@ describe("extractSchemas", () => {
     const result = extractSchemas([invoices]);
     const fkCol = result[0].columns.find((c) => c.name === "account_id")!;
     expect(fkCol.foreignKey).toEqual({ table: "accounts", column: "id" });
+    expect(fkCol.label).toBe("Account");
   });
 
   it("marks immutable tables", () => {

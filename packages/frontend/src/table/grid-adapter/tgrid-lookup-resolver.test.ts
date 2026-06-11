@@ -8,6 +8,7 @@ import type {
 
 const ownerColumn: ColumnSchema = {
   name: "owner_id",
+  label: "Owner",
   kind: "number",
   foreignKey: { table: "users", column: "id" },
 };

@@ -69,8 +69,8 @@ export interface ColumnMeta {
   /** Display/editor hint for text columns. Does NOT change storage,
    *  validation, filtering, sorting, or text semantics. */
   textDisplay?: "multiLine" | "markdown";
-  /** Custom column header for display */
-  header?: string;
+  /** Display label for the column. Defaults are resolved during schema extraction. */
+  label?: string;
   /** Hide column from grid and drawer (auto-set for created_at/updated_at). */
   visuallyHidden?: boolean;
   /** Width hint in approximate character count */

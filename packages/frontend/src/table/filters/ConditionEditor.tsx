@@ -194,9 +194,7 @@ export function ConditionEditor({
                 className="h-sap-ctl flex items-center justify-between gap-[6px] px-[10px] rounded-[5px] border border-sap-border bg-sap-surface text-sap-fg text-left hover:bg-sap-row-hover"
               >
                 <span className={draft.column ? "" : "text-sap-muted"}>
-                  {draft.column
-                    ? draft.column.header ?? draft.column.name
-                    : "Pick a column"}
+                  {draft.column ? draft.column.label : "Pick a column"}
                 </span>
                 <ChevronDown className="h-4 w-4 opacity-50" />
               </button>
@@ -212,7 +210,7 @@ export function ConditionEditor({
                   <CommandEmpty>No columns.</CommandEmpty>
                   <CommandGroup>
                     {columns.map((c) => {
-                      const label = c.header ?? c.name;
+                      const label = c.label;
                       return (
                         <CommandItem
                           key={c.name}

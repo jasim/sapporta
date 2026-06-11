@@ -39,8 +39,8 @@ const ordersTable: TableSchema = {
   label: "Orders",
   immutable: false,
   columns: [
-    { name: "id", kind: "text", primary: true },
-    { name: "customer", kind: "text" },
+    { name: "id", label: "ID", kind: "text", primary: true },
+    { name: "customer", label: "Customer", kind: "text" },
   ],
   children: [],
   search: { columns: ["customer"] },

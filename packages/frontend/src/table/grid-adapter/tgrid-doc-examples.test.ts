@@ -53,12 +53,13 @@ const invoicesTable: TableSchema = {
   label: "Invoices",
   immutable: false,
   columns: [
-    { name: "id", kind: "text", primary: true },
-    { name: "customer_id", kind: "text" },
-    { name: "invoice_date", kind: "date" },
-    { name: "due_date", kind: "date" },
+    { name: "id", label: "ID", kind: "text", primary: true },
+    { name: "customer_id", label: "Customer", kind: "text" },
+    { name: "invoice_date", label: "Invoice date", kind: "date" },
+    { name: "due_date", label: "Due date", kind: "date" },
     {
       name: "status",
+      label: "Status",
       kind: "text",
       select: { options: ["draft", "sent", "paid"] },
     },
@@ -72,11 +73,11 @@ const invoiceItemsTable: TableSchema = {
   label: "Invoice items",
   immutable: false,
   columns: [
-    { name: "id", kind: "text", primary: true },
-    { name: "invoice_id", kind: "text" },
-    { name: "item_id", kind: "text" },
-    { name: "quantity", kind: "number" },
-    { name: "balance_stock", kind: "number" },
+    { name: "id", label: "ID", kind: "text", primary: true },
+    { name: "invoice_id", label: "Invoice", kind: "text" },
+    { name: "item_id", label: "Item", kind: "text" },
+    { name: "quantity", label: "Quantity", kind: "number" },
+    { name: "balance_stock", label: "Balance stock", kind: "number" },
   ],
   children: [],
 };
@@ -137,14 +138,14 @@ function buildOrderItemColumns(
   columns: TGridColumnsBuilder<RowsByLevel, AppServices, "invoices.items">,
 ) {
   return [
-    columns.table("item_id", { header: "Item" }),
+    columns.table("item_id", { label: "Item" }),
     columns.table("quantity", {
-      header: "Qty",
+      label: "Qty",
       saveCellValue: saveQuantity,
     }),
-    columns.table("balance_stock", { header: "Stock", editable: false }),
+    columns.table("balance_stock", { label: "Stock", editable: false }),
     columns.client("stock_hold", {
-      header: "Hold",
+      label: "Hold",
       width: 120,
       renderCell: StockHoldCell,
     }),
@@ -165,14 +166,14 @@ describe("TGRID-USAGE examples", () => {
             urlSync: true,
           },
           columns: (columns) => [
-            columns.table("customer_id", { header: "Customer" }),
-            columns.table("invoice_date", { header: "Date", editable: false }),
+            columns.table("customer_id", { label: "Customer" }),
+            columns.table("invoice_date", { label: "Date", editable: false }),
             columns.table("status", {
-              header: "Payment",
+              label: "Payment",
               renderCell: PaymentStatusCell,
             }),
             columns.client("overdue_days", {
-              header: "Overdue",
+              label: "Overdue",
               width: 96,
               renderCell: OverdueDaysCell,
             }),

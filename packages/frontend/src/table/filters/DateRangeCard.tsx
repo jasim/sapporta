@@ -94,7 +94,7 @@ export function DateRangeCard({
 }: DateRangeCardProps) {
   const [open, setOpen] = useState(false);
   const { column, gte, lte } = range;
-  const label = column.header ?? column.name;
+  const label = column.label;
 
   function removeBoth() {
     onRemove(gte.id);

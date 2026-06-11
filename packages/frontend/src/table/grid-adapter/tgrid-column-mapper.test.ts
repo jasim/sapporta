@@ -42,23 +42,35 @@ describe("TGridColumnMapper.columnsFor", () => {
   it("maps every table display type to the matching preset kind", () => {
     const columns = columnMapper.columnsFor({
       table: table([
-        { name: "id", primary: true, kind: "number" },
+        { name: "id", label: "ID", primary: true, kind: "number" },
         {
           name: "owner_id",
+          label: "Owner",
           kind: "number",
           foreignKey: { table: "users", column: "id" },
         },
         {
           name: "status",
+          label: "Status",
           kind: "text",
           select: { options: ["draft", "done"] },
         },
-        { name: "active", kind: "boolean" },
-        { name: "created_at", kind: "timestamp" },
-        { name: "qty", kind: "number" },
-        { name: "price", kind: "number", displayFormat: "currency" },
-        { name: "rate", kind: "number", displayFormat: "percentage" },
-        { name: "name", kind: "text" },
+        { name: "active", label: "Active", kind: "boolean" },
+        { name: "created_at", label: "Created at", kind: "timestamp" },
+        { name: "qty", label: "Qty", kind: "number" },
+        {
+          name: "price",
+          label: "Price",
+          kind: "number",
+          displayFormat: "currency",
+        },
+        {
+          name: "rate",
+          label: "Rate",
+          kind: "number",
+          displayFormat: "percentage",
+        },
+        { name: "name", label: "Name", kind: "text" },
       ]),
       immutable: false,
       expandable: false,
@@ -81,10 +93,15 @@ describe("TGridColumnMapper.columnsFor", () => {
     const columns = columnMapper.columnsFor({
       table: table(
         [
-          { name: "id", primary: true, kind: "number" },
-          { name: "name", header: "Name", kind: "text" },
-          { name: "created_at", kind: "date" },
-          { name: "secret", kind: "text", visuallyHidden: true },
+          { name: "id", label: "ID", primary: true, kind: "number" },
+          { name: "name", label: "Name", kind: "text" },
+          { name: "created_at", label: "Created at", kind: "date" },
+          {
+            name: "secret",
+            label: "Secret",
+            kind: "text",
+            visuallyHidden: true,
+          },
         ],
         false,
       ),
@@ -106,7 +123,7 @@ describe("TGridColumnMapper.columnsFor", () => {
 
   it("makes immutable tables read-only", () => {
     const columns = columnMapper.columnsFor({
-      table: table([{ name: "name", kind: "text" }], true),
+      table: table([{ name: "name", label: "Name", kind: "text" }], true),
       immutable: true,
       expandable: false,
     });
@@ -117,7 +134,14 @@ describe("TGridColumnMapper.columnsFor", () => {
 
   it("maps textDisplay into the text preset display", () => {
     const columns = columnMapper.columnsFor({
-      table: table([{ name: "body", kind: "text", textDisplay: "markdown" }]),
+      table: table([
+        {
+          name: "body",
+          label: "Body",
+          kind: "text",
+          textDisplay: "markdown",
+        },
+      ]),
       immutable: false,
       expandable: false,
     });
@@ -133,6 +157,7 @@ describe("TGridColumnMapper.columnsFor", () => {
       table: table([
         {
           name: "balance",
+          label: "Balance",
           kind: "number",
           displayFormat: "currency",
           colorRule: "signed",
@@ -159,6 +184,7 @@ describe("TGridColumnMapper.columnsFor", () => {
       table: table([
         {
           name: "price",
+          label: "Price",
           kind: "number",
           displayFormat: "currency",
         },
@@ -178,6 +204,7 @@ describe("TGridColumnMapper.columnsFor", () => {
       table: table([
         {
           name: "owner_id",
+          label: "Owner",
           kind: "number",
           foreignKey: { table: "users", column: "id" },
         },
@@ -195,7 +222,7 @@ describe("TGridColumnMapper.columnsFor", () => {
 
   it("wraps the first visible column for expandable levels", () => {
     const columns = columnMapper.columnsFor({
-      table: table([{ name: "id", primary: true, kind: "number" }]),
+      table: table([{ name: "id", label: "ID", primary: true, kind: "number" }]),
       immutable: false,
       expandable: true,
     });
@@ -221,18 +248,21 @@ describe("TGridColumnMapper.columnsFor", () => {
 describe("tableColumnPresetWidth", () => {
   it("converts table character width hints to preset tracks", () => {
     expect(
-      tableColumnPresetWidth({ name: "a", kind: "text", width: 12 }),
+      tableColumnPresetWidth({ name: "a", label: "A", kind: "text", width: 12 }),
     ).toEqual({
       track: "calc(12ch + 1rem)",
     });
     expect(
       tableColumnPresetWidth({
         name: "b",
+        label: "B",
         kind: "text",
         minWidth: 8,
         maxWidth: 20,
       }),
     ).toEqual({ track: "minmax(calc(8ch + 1rem), calc(20ch + 1rem))" });
-    expect(tableColumnPresetWidth({ name: "c", kind: "text" })).toBeUndefined();
+    expect(
+      tableColumnPresetWidth({ name: "c", label: "C", kind: "text" }),
+    ).toBeUndefined();
   });
 });

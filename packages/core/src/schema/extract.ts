@@ -6,6 +6,7 @@ import { findPkColumn } from "./pk.js";
 import { isAutoManagedTimestampColumn, type TableDef } from "./table.js";
 import { logger } from "../db/logger.js";
 import { findRowLabelColumns } from "../data/row-label.js";
+import { defaultColumnLabel } from "@sapporta/shared";
 import type {
   ChildSchema,
   ColumnSchema,
@@ -75,7 +76,7 @@ export function extractSchemas(defs: readonly TableDef[]): TableSchema[] {
         kind: resolveColumnKind(schema, col.name),
         displayFormat: columnMeta?.displayFormat,
         textDisplay: columnMeta?.textDisplay,
-        header: columnMeta?.header,
+        label: columnMeta?.label ?? defaultColumnLabel(col.name),
         width: columnMeta?.width,
         minWidth: columnMeta?.minWidth,
         maxWidth: columnMeta?.maxWidth,

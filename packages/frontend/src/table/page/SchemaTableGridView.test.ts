@@ -31,8 +31,8 @@ const ordersTable: TableSchema = {
   label: "Orders",
   immutable: false,
   columns: [
-    { name: "id", primary: true, kind: "text" },
-    { name: "customer", kind: "text" },
+    { name: "id", label: "ID", primary: true, kind: "text" },
+    { name: "customer", label: "Customer", kind: "text" },
   ],
   children: [],
 };

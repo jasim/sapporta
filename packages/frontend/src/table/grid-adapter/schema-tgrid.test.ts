@@ -8,8 +8,8 @@ const ordersTable: TableSchema = {
   label: "Orders",
   immutable: false,
   columns: [
-    { name: "id", primary: true, kind: "number" },
-    { name: "customer", kind: "text" },
+    { name: "id", label: "ID", primary: true, kind: "number" },
+    { name: "customer", label: "Customer", kind: "text" },
   ],
   children: [
     {
@@ -27,9 +27,9 @@ const linesTable: TableSchema = {
   label: "Order lines",
   immutable: false,
   columns: [
-    { name: "id", primary: true, kind: "number" },
-    { name: "order_id", kind: "number" },
-    { name: "line_no", kind: "number" },
+    { name: "id", label: "ID", primary: true, kind: "number" },
+    { name: "order_id", label: "Order", kind: "number" },
+    { name: "line_no", label: "Line no", kind: "number" },
   ],
   children: [],
 };

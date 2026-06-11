@@ -15,6 +15,7 @@ import type {
   ColumnSchema as TableColumnSchema,
   TableSchema,
 } from "@sapporta/shared/contracts";
+import { defaultColumnLabel } from "@sapporta/shared";
 import type { TGridColumnMapper } from "./tgrid-column-mapper";
 import type {
   RowFieldName,
@@ -225,7 +226,7 @@ function applyTableColumnOptions<
   if (!options) return column;
   return {
     ...column,
-    header: options.header ?? column.header,
+    label: options.label ?? column.label,
     width: options.width ?? column.width,
     minWidth: options.minWidth ?? column.minWidth,
     maxWidth: options.maxWidth ?? column.maxWidth,
@@ -254,7 +255,7 @@ function customizeTableColumn<
     gridColumn,
   };
   const next: GridColumnSchema = { ...gridColumn };
-  if (options.header) next.name = options.header;
+  if (options.label) next.name = options.label;
   if (options.editable === false) {
     next.editCell = undefined;
     next.editTriggers = [];
@@ -290,7 +291,7 @@ function clientColumnFor<
 ): GridColumnSchema {
   const gridColumn = columnPreset.text({
     id: spec.id as ColId,
-    name: spec.options.header ?? spec.id,
+    name: spec.options.label ?? defaultColumnLabel(spec.id),
     width: normalizeClientColumnWidth(spec.options.width),
     editable: spec.options.editable ?? Boolean(spec.options.editor),
     editTriggers: spec.options.editTriggers,

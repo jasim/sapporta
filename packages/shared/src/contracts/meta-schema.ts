@@ -55,7 +55,7 @@ export const selectOptionsSchema = z.object({
 
 export const columnSchemaSchema = z.object({
   name: z.string(),
-  header: z.string().optional(),
+  label: z.string(),
   kind: valueKindSchema.optional(),
   displayFormat: z.enum(["currency", "percentage"]).optional(),
   textDisplay: z.enum(["multiLine", "markdown"]).optional(),

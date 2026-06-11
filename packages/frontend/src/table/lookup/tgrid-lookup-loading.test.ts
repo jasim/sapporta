@@ -20,16 +20,19 @@ const linesPath = childPath(ordersPath, "42", "orders.lines");
 
 const idColumn: TableColumnSchema = {
   name: "id",
+  label: "ID",
   kind: "number",
   primary: true,
 };
 const customerColumn: TableColumnSchema = {
   name: "customer_id",
+  label: "Customer",
   kind: "number",
   foreignKey: { table: "customers", column: "id" },
 };
 const productColumn: TableColumnSchema = {
   name: "product_id",
+  label: "Product",
   kind: "number",
   foreignKey: { table: "products", column: "id" },
 };

@@ -24,8 +24,8 @@
 //       source: "items",
 //       levelName: "item",
 //       columns: [
-//         { name: "name", header: "Name" },
-//         { name: "amount", header: "Amount", kind: "number", displayFormat: "currency" },
+//         { name: "name", label: "Name" },
+//         { name: "amount", label: "Amount", kind: "number", displayFormat: "currency" },
 //       ],
 //     },
 //   });
@@ -80,11 +80,9 @@ export type ReportSource = {
 // Columns can also be "virtual" — not present in the SQL result but populated
 // by a `transform` function. Declare them in columns so the UI knows about them.
 //
-// Report columns use ColumnSchema (the same type used for table columns).
-// Only `name` is required; use `header` for display label, `kind` for the
-// semantic value type, and `displayFormat` for presentation hints like
-// currency. DB-specific fields (primary, foreignKey, etc.) are optional and
-// default to inert values.
+// Report columns normalize to the same wire shape as table columns. Only
+// `name` is required while authoring; omit `label` to use the standard
+// column-label derivation.
 
 import type {
   ColumnSchema,
@@ -110,7 +108,7 @@ export type {
 };
 
 /**
- * Author DSL for declaring a report column. Identical wire shape to
+ * Author DSL for declaring a report column. The engine normalizes it to
  * `ColumnSchema`, plus an optional runtime `display` function the engine
  * applies before emitting the response. The function is JSON-stripped at
  * the wire boundary, so what consumers see is a plain `ColumnSchema`.
@@ -119,7 +117,8 @@ export type {
  * (`ReportResult.columns`, `ReportResult.levelColumns`) stay typed as
  * `ColumnSchema` because that's what survives serialization.
  */
-export type ReportColumn = ColumnSchema & {
+export type ReportColumn = Omit<ColumnSchema, "label"> & {
+  label?: string;
   display?: (data: Record<string, unknown>) => string | number | null;
 };
 

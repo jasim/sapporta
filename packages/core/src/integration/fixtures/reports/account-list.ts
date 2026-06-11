@@ -17,9 +17,9 @@ export default report({
     source: "accounts",
     levelName: "account",
     columns: [
-      { name: "name", header: "Name" },
-      { name: "type", header: "Type" },
-      { name: "balance", header: "Balance" },
+      { name: "name", label: "Name" },
+      { name: "type", label: "Type" },
+      { name: "balance", label: "Balance" },
     ],
   },
 });

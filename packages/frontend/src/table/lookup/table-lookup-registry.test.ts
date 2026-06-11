@@ -4,6 +4,7 @@ import { createTableLookupRegistry } from "./table-lookup-registry";
 
 const ownerColumn: ColumnSchema = {
   name: "owner_id",
+  label: "Owner",
   kind: "number",
   foreignKey: { table: "users", column: "id" },
 };
@@ -38,7 +39,7 @@ describe("createTableLookupRegistry", () => {
     expect(
       registry.bundleFor({
         sourceTable: "orders",
-        column: { name: "description", kind: "text" },
+        column: { name: "description", label: "Description", kind: "text" },
       }),
     ).toBeUndefined();
   });

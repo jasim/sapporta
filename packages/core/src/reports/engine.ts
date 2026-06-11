@@ -10,6 +10,7 @@ import { extractBindVariables, buildPositionalQuery } from "./sql-bind.js";
 import { parseFilterValue, serializeTypedValue } from "@sapporta/shared/filter";
 import type { ValueKind } from "@sapporta/shared/value-kind";
 import {
+  defaultColumnLabel,
   formatPlainDate,
   parseDateRange,
   resolveDateRange,
@@ -40,6 +41,7 @@ export interface ReportSqlClient {
 
 import type {
   ReportDefinition,
+  ReportColumn,
   ReportTreeNode,
   ReportSource,
   ReportSort,
@@ -528,7 +530,7 @@ function collectLevelColumns(
   const result: Record<string, ColumnSchema[]> = {};
 
   function walk(node: ReportTreeNode) {
-    result[node.levelName] = node.columns;
+    result[node.levelName] = normalizeReportColumns(node.columns);
     if (node.children) {
       for (const child of node.children) {
         walk(child);
@@ -538,6 +540,21 @@ function collectLevelColumns(
 
   walk(tree);
   return result;
+}
+
+function normalizeReportColumns(
+  columns: readonly ReportColumn[],
+): ColumnSchema[] {
+  return columns.map(normalizeReportColumn);
+}
+
+function normalizeReportColumn(column: ReportColumn): ColumnSchema {
+  const wireColumn: Omit<ReportColumn, "display"> = { ...column };
+  delete (wireColumn as { display?: ReportColumn["display"] }).display;
+  return {
+    ...wireColumn,
+    label: wireColumn.label ?? defaultColumnLabel(wireColumn.name),
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -752,7 +769,7 @@ export async function executeReport(
     name: definition.name,
     label: definition.label,
     params: definition.params,
-    columns: definition.tree.columns,
+    columns: normalizeReportColumns(definition.tree.columns),
     levelColumns,
     data,
     ...(Object.keys(levelOptions).length > 0 ? { levelOptions } : {}),

@@ -37,7 +37,7 @@ export function FormField({
   return (
     <div className="space-y-2">
       <Label htmlFor={id} className="text-sm font-medium">
-        {column.header ?? column.name}
+        {column.label}
         {column.notNull && !column.hasDefault && (
           <span className="text-destructive ml-1">*</span>
         )}
@@ -124,7 +124,7 @@ export function FormField({
         >
           <SelectTrigger id={id}>
             <SelectValue
-              placeholder={`Select ${column.header ?? column.name}`}
+              placeholder={`Select ${column.label}`}
             />
           </SelectTrigger>
           <SelectContent>

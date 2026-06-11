@@ -4,3 +4,4 @@ export * from "./temporal.js";
 export * from "./daterange.js";
 export * from "./daterange-picker.js";
 export * from "./row-id.js";
+export * from "./labels.js";

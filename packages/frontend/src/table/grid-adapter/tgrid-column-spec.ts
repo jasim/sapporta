@@ -18,7 +18,7 @@ export type TableColumnOptions<
   LevelId extends TGridLevelId<RowsByLevel>,
   K extends RowFieldName<RowsByLevel[LevelId]>,
 > = {
-  header?: string;
+  label?: string;
   width?: number;
   minWidth?: number;
   maxWidth?: number;
@@ -38,7 +38,7 @@ export type ClientColumnOptions<
   AppServices,
   LevelId extends TGridLevelId<RowsByLevel>,
 > = {
-  header?: string;
+  label?: string;
   width?: number | ColumnWidth;
   editable?: boolean;
   editTriggers?: readonly EditTrigger[];

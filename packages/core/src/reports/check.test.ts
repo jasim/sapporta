@@ -17,8 +17,8 @@ describe("checkReportDefinition", () => {
         source: "items",
         levelName: "item",
         columns: [
-          { name: "name", header: "Name" },
-          { name: "amount", header: "Amount" },
+          { name: "name", label: "Name" },
+          { name: "amount", label: "Amount" },
         ],
       },
     };
@@ -126,7 +126,7 @@ describe("checkReportDefinition", () => {
         levelName: "group",
         columns: [
           { name: "name" },
-          { name: "total", header: "Total", kind: "number", displayFormat: "currency" },
+          { name: "total", label: "Total", kind: "number", displayFormat: "currency" },
         ],
         rollup: (children) => ({
           total: children.item.reduce((s) => s + 1, 0),
@@ -188,7 +188,7 @@ describe("checkReportDefinition", () => {
         levelName: "item",
         columns: [
           { name: "name" },
-          { name: "amount", header: "Amount" },
+          { name: "amount", label: "Amount" },
         ],
         footer: [
           {
@@ -266,8 +266,8 @@ describe("checkReportDefinition", () => {
         source: "sections",
         levelName: "section",
         columns: [
-          { name: "section", header: "Section" },
-          { name: "section_total", header: "Total", kind: "number", displayFormat: "currency" },
+          { name: "section", label: "Section" },
+          { name: "section_total", label: "Total", kind: "number", displayFormat: "currency" },
         ],
         rollup: (children) => ({
           section_total: children.accounts.reduce(
@@ -291,8 +291,8 @@ describe("checkReportDefinition", () => {
             source: "section_accounts",
             levelName: "accounts",
             columns: [
-              { name: "name", header: "Account" },
-              { name: "balance", header: "Balance", kind: "number", displayFormat: "currency" },
+              { name: "name", label: "Account" },
+              { name: "balance", label: "Balance", kind: "number", displayFormat: "currency" },
             ],
           },
         ],

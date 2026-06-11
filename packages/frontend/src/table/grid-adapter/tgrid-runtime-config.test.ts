@@ -1,6 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
 import { isValidElement } from "react";
-import type { Row, TableSchema } from "@sapporta/shared/contracts";
+import type {
+  Row,
+  TableSchema,
+} from "@sapporta/shared/contracts";
 import { eqCondition } from "@sapporta/shared/filter";
 import type { GridRuntime, RestEndpointFactory } from "@sapporta/grid";
 import { ExpandCell } from "@sapporta/grid";
@@ -36,9 +39,14 @@ describe("compileTGridRuntimeConfig", () => {
     label: "Orders",
     immutable: false,
     columns: [
-      { name: "id", primary: true, kind: "number" },
-      { name: "customer", kind: "text" },
-      { name: "internal", kind: "text", visuallyHidden: true },
+      { name: "id", label: "ID", primary: true, kind: "number" },
+      { name: "customer", label: "Customer", kind: "text" },
+      {
+        name: "internal",
+        label: "Internal",
+        kind: "text",
+        visuallyHidden: true,
+      },
     ],
     children: [],
   };
@@ -48,11 +56,11 @@ describe("compileTGridRuntimeConfig", () => {
     label: "Lines",
     immutable: false,
     columns: [
-      { name: "id", primary: true, kind: "number" },
-      { name: "order_id", kind: "number" },
-      { name: "line_no", kind: "number" },
-      { name: "sku", kind: "text" },
-      { name: "cost", kind: "number" },
+      { name: "id", label: "ID", primary: true, kind: "number" },
+      { name: "order_id", label: "Order", kind: "number" },
+      { name: "line_no", label: "Line no", kind: "number" },
+      { name: "sku", label: "SKU", kind: "text" },
+      { name: "cost", label: "Cost", kind: "number" },
     ],
     children: [],
   };
@@ -62,9 +70,9 @@ describe("compileTGridRuntimeConfig", () => {
     label: "Allocations",
     immutable: true,
     columns: [
-      { name: "id", primary: true, kind: "number" },
-      { name: "line_id", kind: "number" },
-      { name: "warehouse", kind: "text" },
+      { name: "id", label: "ID", primary: true, kind: "number" },
+      { name: "line_id", label: "Line", kind: "number" },
+      { name: "warehouse", label: "Warehouse", kind: "text" },
     ],
     children: [],
   };
@@ -265,7 +273,10 @@ describe("compileTGridRuntimeConfig", () => {
         orders: {
           table: {
             ...orderSchema,
-            columns: [...orderSchema.columns, { name: "status", kind: "text" }],
+            columns: [
+              ...orderSchema.columns,
+              { name: "status", label: "Status", kind: "text" },
+            ],
           },
           childLevels: [],
           query: { owner: "host", fixedFilters: [fixedFilter] },
@@ -499,7 +510,7 @@ describe("compileTGridRuntimeConfig", () => {
           query: { owner: "host" },
           columns: [
             columns.table("customer", {
-              header: "Customer Name",
+              label: "Customer Name",
               saveCellValue: async (ctx) => ({
                 kind: "row",
                 row: {
@@ -509,7 +520,7 @@ describe("compileTGridRuntimeConfig", () => {
               }),
             }),
             columns.client("status", {
-              header: "Status",
+              label: "Status",
               renderCell: () => "ok",
             }),
             columns.remainingTable({ exclude: ["id"] }),
