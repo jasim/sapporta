@@ -61,6 +61,11 @@ export class TokenManagementError extends Error {
   }
 }
 
+export interface AuthTokenManagementScope {
+  userId: string;
+  organizationId: string;
+}
+
 /**
  * Resolve `Authorization: Bearer spat_<tokenId>_<secret>` into the same user
  * principal shape used by browser sessions.
@@ -106,7 +111,33 @@ export function resolveBearerTokenPrincipal(
 export function listAuthTokens(
   conn: ProjectDbConnection,
   userId: string,
+  organizationId?: string,
 ): AuthToken[] {
+  if (organizationId) {
+    return conn.sqlite
+      .prepare(
+        `
+      SELECT
+        id,
+        userId AS user_id,
+        organizationId AS organization_id,
+        name,
+        secretHash AS secret_hash,
+        createdAt AS created_at,
+        expiresAt AS expires_at,
+        lastUsedAt AS last_used_at,
+        revokedAt AS revoked_at
+      FROM personalAccessToken
+      WHERE userId = ? AND organizationId = ?
+      ORDER BY createdAt DESC, id ASC
+      `,
+      )
+      .all(userId, organizationId)
+      .map(readTokenRow)
+      .filter((row): row is PersonalAccessTokenRow => row !== null)
+      .map(serializeToken);
+  }
+
   return conn.sqlite
     .prepare(
       `
@@ -134,17 +165,31 @@ export function listAuthTokens(
 /**
  * Create a workspace-scoped token for the signed-in user.
  *
- * If `organizationId` is omitted, the user's active workspace is used. Passing
- * another workspace is allowed only when the user is a member there. The
- * response includes `rawToken` once so the user can copy it into
+ * Token-management routes pass the current workspace scope. If the request
+ * names another workspace, creation is rejected instead of switching scope.
+ * The response includes `rawToken` once so the user can copy it into
  * `SAPPORTA_API_TOKEN`; later list calls return metadata only.
  */
 export function createAuthToken(
   conn: ProjectDbConnection,
   principal: Extract<AppPrincipal, { kind: "user" }>,
   body: CreateAuthTokenBody,
+  scope?: AuthTokenManagementScope,
 ): CreateAuthTokenResponse {
-  const organizationId = body.organizationId ?? principal.membership.workspace.id;
+  if (scope && scope.userId !== principal.user.id) {
+    throw new TokenManagementError("forbidden");
+  }
+  if (
+    scope &&
+    body.organizationId !== undefined &&
+    body.organizationId !== scope.organizationId
+  ) {
+    throw new TokenManagementError("forbidden");
+  }
+  const organizationId =
+    scope?.organizationId ??
+    body.organizationId ??
+    principal.membership.workspace.id;
   const membership = findMembership(conn, principal.user.id, organizationId);
   if (!membership) throw new TokenManagementError("forbidden");
 
@@ -194,7 +239,21 @@ export function revokeAuthToken(
   conn: ProjectDbConnection,
   userId: string,
   tokenId: string,
+  organizationId?: string,
 ): boolean {
+  if (organizationId) {
+    const result = conn.sqlite
+      .prepare(
+        `
+        UPDATE personalAccessToken
+        SET revokedAt = ?
+        WHERE id = ? AND userId = ? AND organizationId = ? AND revokedAt IS NULL
+        `,
+      )
+      .run(Date.now(), tokenId, userId, organizationId);
+    return result.changes > 0;
+  }
+
   const result = conn.sqlite
     .prepare(
       `

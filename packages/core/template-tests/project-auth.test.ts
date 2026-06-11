@@ -6,6 +6,7 @@ import {
   createAuthContext,
   createTableCatalog,
   allowOnlySystemWideRows,
+  allowWorkspaceWideRows,
   type BuildAbility,
   type ProjectDbConnection,
   type RowsAllowedForRequest,
@@ -33,6 +34,7 @@ import type {
   AppAbility,
   AppWorkspaceMembership,
 } from "../src/templates/packages/api/authz/types.js";
+import { buildAbility as buildTemplateAbility } from "../src/templates/packages/api/authz/ability.js";
 import { readProjectAuthEnv } from "../src/templates/project-auth/env.js";
 import {
   WorkspaceSwitchError,
@@ -534,6 +536,138 @@ describe("project auth template", () => {
     expect(listAuthTokens(conn, "user-1")[0]).not.toHaveProperty("secretHash");
   });
 
+  it("allows non-owner users to manage their own agent access tokens", () => {
+    const memberAuth = routeAuthContext({ role: "member" });
+    const ability = buildTemplateAbility({
+      principal: memberAuth.principal,
+      rowsAllowedForRequest: memberAuth.rowsAllowedForRequest,
+    });
+
+    expect(ability.can("read", "agent_access_token")).toBe(true);
+    expect(ability.can("create", "agent_access_token")).toBe(true);
+    expect(ability.can("delete", "agent_access_token")).toBe(true);
+  });
+
+  it("rejects token management without user-scoped workspace rows", async () => {
+    conn = createAuthDb({ includeUserTable: true, includeTokenTable: true });
+    insertUser(conn, "user-1", "Member", "member@example.test", true);
+    insertWorkspace(conn, "workspace-1", "Acme", "acme");
+    insertMember(conn, "member-1", "workspace-1", "user-1", "member", 1);
+    const routes = createProjectAuthRoutes({
+      conn,
+      switchActiveWorkspace: async () => routeAuthContext(),
+    });
+    const app = authRoutesApp(routes, routeWorkspaceWideContext());
+
+    const response = await app.request("/api/auth-tokens");
+
+    expect(response.status).toBe(403);
+    await expect(response.json()).resolves.toEqual({
+      error: "Forbidden",
+      code: "forbidden",
+    });
+  });
+
+  it("requires token-management ability before reading, creating, or revoking tokens", async () => {
+    conn = createAuthDb({ includeUserTable: true, includeTokenTable: true });
+    insertUser(conn, "user-1", "Owner", "owner@example.test", true);
+    insertWorkspace(conn, "workspace-1", "Acme", "acme");
+    insertMember(conn, "member-1", "workspace-1", "user-1", "owner", 1);
+    const created = createAuthToken(conn, routeUserPrincipal(), {
+      name: "codex-local",
+    });
+    const routes = createProjectAuthRoutes({
+      conn,
+      switchActiveWorkspace: async () => routeAuthContext(),
+    });
+    const app = authRoutesApp(
+      routes,
+      routeAuthContext({
+        can: (action, subject) =>
+          !(subject === "agent_access_token" && action !== "manage"),
+      }),
+    );
+
+    const listResponse = await app.request("/api/auth-tokens");
+    const createResponse = await app.request("/api/auth-tokens", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ name: "codex-local" }),
+    });
+    const revokeResponse = await app.request(
+      `/api/auth-tokens/${created.token.id}`,
+      { method: "DELETE" },
+    );
+
+    expect(listResponse.status).toBe(403);
+    await expect(listResponse.json()).resolves.toEqual({
+      error: "Forbidden",
+      code: "forbidden",
+    });
+    expect(createResponse.status).toBe(403);
+    await expect(createResponse.json()).resolves.toEqual({
+      error: "Forbidden",
+      code: "forbidden",
+    });
+    expect(revokeResponse.status).toBe(403);
+    await expect(revokeResponse.json()).resolves.toEqual({
+      error: "Forbidden",
+      code: "forbidden",
+    });
+  });
+
+  it("limits token management routes to the current workspace scope", async () => {
+    conn = createAuthDb({ includeUserTable: true, includeTokenTable: true });
+    insertUser(conn, "user-1", "Owner", "owner@example.test", true);
+    insertWorkspace(conn, "workspace-1", "Acme", "acme");
+    insertWorkspace(conn, "workspace-2", "Second", "second");
+    insertMember(conn, "member-1", "workspace-1", "user-1", "owner", 1);
+    insertMember(conn, "member-2", "workspace-2", "user-1", "owner", 2);
+    const workspaceOneToken = createAuthToken(conn, routeUserPrincipal(), {
+      name: "workspace-one",
+    });
+    const workspaceTwoToken = createAuthToken(
+      conn,
+      routeUserPrincipal({ workspaceId: "workspace-2" }),
+      { name: "workspace-two" },
+    );
+    const routes = createProjectAuthRoutes({
+      conn,
+      switchActiveWorkspace: async () => routeAuthContext(),
+    });
+    const app = authRoutesApp(
+      routes,
+      routeAuthContext({ workspaceId: "workspace-1" }),
+    );
+
+    const listResponse = await app.request("/api/auth-tokens");
+    const crossWorkspaceCreateResponse = await app.request("/api/auth-tokens", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        name: "workspace-two-from-workspace-one",
+        organizationId: "workspace-2",
+      }),
+    });
+    const crossWorkspaceRevokeResponse = await app.request(
+      `/api/auth-tokens/${workspaceTwoToken.token.id}`,
+      { method: "DELETE" },
+    );
+
+    expect(listResponse.status).toBe(200);
+    await expect(listResponse.json()).resolves.toEqual({
+      tokens: [
+        expect.objectContaining({
+          id: workspaceOneToken.token.id,
+          organizationId: "workspace-1",
+        }),
+      ],
+    });
+    expect(crossWorkspaceCreateResponse.status).toBe(403);
+    expect(crossWorkspaceRevokeResponse.status).toBe(404);
+    expect(listAuthTokens(conn, "user-1")).toHaveLength(2);
+  });
+
   it("revokes only tokens owned by the signed-in user", async () => {
     conn = createAuthDb({ includeUserTable: true, includeTokenTable: true });
     insertUser(conn, "user-1", "Owner", "owner@example.test", true);
@@ -902,10 +1036,11 @@ async function expectTokenFailure(
 
 function authRoutesApp(
   routes: ReturnType<typeof createProjectAuthRoutes>,
+  auth: SapportaAuthContext<AppAbility, AppWorkspaceMembership> = routeAuthContext(),
 ): Hono<SapportaEnv> {
   const app = new Hono<SapportaEnv>();
   app.use("/api/*", async (c, next) => {
-    c.set("auth", routeAuthContext());
+    c.set("auth", auth);
     await next();
   });
   app.route("/api", routes);
@@ -934,6 +1069,7 @@ function routeAuthContext(
     emailVerified?: boolean;
     workspaceId?: string;
     userId?: string;
+    can?: (action: string, subject: string) => boolean;
   } = {},
 ): SapportaAuthContext<AppAbility, AppWorkspaceMembership> {
   const storedRole = overrides.role ?? "owner";
@@ -969,7 +1105,9 @@ function routeAuthContext(
   return createAuthContext({
     principal,
     rowsAllowedForRequest,
-    ability: buildAppAbility({ principal, rowsAllowedForRequest }),
+    ability: {
+      can: overrides.can ?? (() => true),
+    } as unknown as AppAbility,
     catalog: emptyCatalog,
   });
 }
@@ -999,6 +1137,41 @@ function routeAnonymousContext(): SapportaAuthContext<AppAbility, AppWorkspaceMe
     principal,
     rowsAllowedForRequest,
     ability: buildAppAbility({ principal, rowsAllowedForRequest }),
+    catalog: emptyCatalog,
+  });
+}
+
+function routeWorkspaceWideContext(): SapportaAuthContext<
+  AppAbility,
+  AppWorkspaceMembership
+> {
+  const user = {
+    id: "user-1",
+    name: "Member",
+    email: "member@example.test",
+    emailVerified: true,
+  };
+  const workspace = {
+    id: "workspace-1",
+    name: "Acme",
+    slug: "acme",
+  };
+  const principal = {
+    kind: "user",
+    user,
+    membership: {
+      id: "member-1",
+      workspace,
+      roles: ["member"],
+    },
+  } as const;
+  const rowsAllowedForRequest = allowWorkspaceWideRows(workspace);
+  return createAuthContext({
+    principal,
+    rowsAllowedForRequest,
+    ability: {
+      can: () => true,
+    } as unknown as AppAbility,
     catalog: emptyCatalog,
   });
 }

@@ -1,7 +1,10 @@
 import type { Context } from "hono";
+import { HTTPException } from "hono/http-exception";
 import {
+  forbidUnless,
   TsRestApi,
   type ProjectDbConnection,
+  type RowsAllowedForRequest,
   type SapportaAuthContext,
   type SapportaEnv,
 } from "@sapporta/server";
@@ -21,6 +24,7 @@ import { requireAuthContext } from "./middleware.js";
 import { WorkspaceSwitchError } from "./workspace.js";
 import {
   createAuthToken,
+  type AuthTokenManagementScope,
   listAuthTokens,
   revokeAuthToken,
   TokenManagementError,
@@ -33,6 +37,8 @@ export interface ProjectAuthRoutesOptions {
     workspaceId: string,
   ) => Promise<SapportaAuthContext<AppAbility, AppWorkspaceMembership>>;
 }
+
+const authTokenSubject = "agent_access_token";
 
 /**
  * Auth routes used by the app UI.
@@ -79,35 +85,30 @@ export function createProjectAuthRoutes(options: ProjectAuthRoutesOptions) {
   });
 
   api.register("listAuthTokens", listAuthTokensRoute, ({ c }) => {
-    if (requestUsesBearerToken(c)) {
-      const failure = authFailure("forbidden");
-      return {
-        status: 403,
-        body: failure.body,
-      };
-    }
-    const auth = requireUserAuthContext(c);
+    const auth = requireTokenManagementAccess(c, "read");
     return {
       status: 200,
       body: {
-        tokens: listAuthTokens(options.conn, auth.principal.user.id),
+        tokens: listAuthTokens(
+          options.conn,
+          auth.principal.user.id,
+          auth.rowsAllowedForRequest.workspace.id,
+        ),
       },
     };
   });
 
   api.register("createAuthToken", createAuthTokenRoute, ({ c, request }) => {
     try {
-      if (requestUsesBearerToken(c)) {
-        const failure = authFailure("forbidden");
-        return {
-          status: 403,
-          body: failure.body,
-        };
-      }
-      const auth = requireUserAuthContext(c);
+      const auth = requireTokenManagementAccess(c, "create");
       return {
         status: 201,
-        body: createAuthToken(options.conn, auth.principal, request.body),
+        body: createAuthToken(
+          options.conn,
+          auth.principal,
+          request.body,
+          tokenManagementScope(auth),
+        ),
       };
     } catch (err) {
       if (err instanceof TokenManagementError) {
@@ -122,18 +123,12 @@ export function createProjectAuthRoutes(options: ProjectAuthRoutesOptions) {
   });
 
   api.register("revokeAuthToken", revokeAuthTokenRoute, ({ c, request }) => {
-    if (requestUsesBearerToken(c)) {
-      const failure = authFailure("forbidden");
-      return {
-        status: 403,
-        body: failure.body,
-      };
-    }
-    const auth = requireUserAuthContext(c);
+    const auth = requireTokenManagementAccess(c, "delete");
     const revoked = revokeAuthToken(
       options.conn,
       auth.principal.user.id,
       request.params.id,
+      auth.rowsAllowedForRequest.workspace.id,
     );
     if (!revoked) {
       const failure = authFailure("not_found");
@@ -176,6 +171,53 @@ function requireUserAuthContext(
   return auth as SapportaAuthContext<AppAbility, AppWorkspaceMembership> & {
     principal: Extract<SapportaAuthContext["principal"], { kind: "user" }>;
   };
+}
+
+type UserWorkspaceRowsAllowed = Extract<
+  RowsAllowedForRequest,
+  { kind: "allowWorkspaceUserRows" }
+>;
+
+function requireTokenManagementAccess(
+  c: Context<SapportaEnv>,
+  action: "read" | "create" | "delete",
+): SapportaAuthContext<AppAbility, AppWorkspaceMembership> & {
+  principal: Extract<SapportaAuthContext["principal"], { kind: "user" }>;
+  rowsAllowedForRequest: UserWorkspaceRowsAllowed;
+} {
+  if (requestUsesBearerToken(c)) {
+    throwAuthResponse(c, "forbidden");
+  }
+
+  const auth = requireUserAuthContext(c);
+  if (auth.rowsAllowedForRequest.kind !== "allowWorkspaceUserRows") {
+    throwAuthResponse(c, "forbidden");
+  }
+
+  forbidUnless(c, auth.ability.can(action, authTokenSubject));
+  return auth as SapportaAuthContext<AppAbility, AppWorkspaceMembership> & {
+    principal: Extract<SapportaAuthContext["principal"], { kind: "user" }>;
+    rowsAllowedForRequest: UserWorkspaceRowsAllowed;
+  };
+}
+
+function tokenManagementScope(
+  auth: ReturnType<typeof requireTokenManagementAccess>,
+): AuthTokenManagementScope {
+  return {
+    userId: auth.principal.user.id,
+    organizationId: auth.rowsAllowedForRequest.workspace.id,
+  };
+}
+
+function throwAuthResponse(
+  c: Context<SapportaEnv>,
+  code: Parameters<typeof authFailure>[0],
+): never {
+  const failure = authFailure(code);
+  throw new HTTPException(failure.status, {
+    res: c.json(failure.body, failure.status),
+  });
 }
 
 export function authBootstrapStatus(

@@ -18,6 +18,9 @@ export function buildAbility(ctx: AppAuthFacts): AppAbility {
 
   if (ctx.principal.kind === "user") {
     can("read", "hello");
+    can("read", "agent_access_token");
+    can("create", "agent_access_token");
+    can("delete", "agent_access_token");
   }
 
   if (
