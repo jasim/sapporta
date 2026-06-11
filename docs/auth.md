@@ -25,6 +25,7 @@ A new Sapporta project includes:
 - Owner/user role resolution.
 - Route guards for product routes and framework/admin routes.
 - Frontend auth context APIs and an `AuthGate`.
+- Agent access tokens for CLI, coding agent, and CI access to protected APIs.
 - Generated table operations that protect rows by workspace and user scope.
 
 ## Environment
@@ -214,6 +215,7 @@ packages/api/project-auth/
   env.ts
   middleware.ts
   errors.ts
+  auth-tokens.ts
 ```
 
 Generated projects own those files. They may customize workspace provisioning,
@@ -232,10 +234,13 @@ routes without changing `@sapporta/server`.
 - `workspace.ts`: handles membership lookup, active workspace selection,
   initial workspace provisioning, workspace switching, and role mapping.
 - `routes.ts`: implements `GET /api/auth-context` and
-  `POST /api/auth-context/active-workspace`.
+  `POST /api/auth-context/active-workspace`, plus token-management routes used
+  by the account profile screen.
 - `middleware.ts`: installs request auth resolution, public route skipping,
   verified-email policy, and project-owned route guards.
 - `errors.ts`: defines project auth JSON error responses.
+- `auth-tokens.ts`: creates, resolves, lists, and revokes workspace-scoped
+  agent access tokens.
 
 Generated migrations create Better Auth tables and product tables before the
 app serves requests. Boot checks migration readiness only; it must not mutate
@@ -608,6 +613,46 @@ write validation use the same target-row boundary.
 The frontend guard is a user-experience boundary only; backend route guards and
 row-security predicates are authoritative.
 
+## Agent Access Tokens
+
+Use an agent access token when a non-browser client needs to call protected app
+APIs: the Sapporta CLI, a coding agent, a scheduled job, or CI.
+
+Create tokens from the account profile screen while signed in. The create
+response shows the raw token once. Copy it into the caller's secret store as
+`SAPPORTA_API_TOKEN`:
+
+```bash
+export SAPPORTA_API_URL="https://app.example.com"
+export SAPPORTA_API_TOKEN="spat_..."
+
+pnpm exec sapporta describe
+pnpm exec sapporta tables
+pnpm exec sapporta reports
+```
+
+A token belongs to the signed-in user and the active workspace. Ordinary CLI data
+commands do not send a workspace id; the token selects the workspace. To call the
+same app as another workspace, switch workspaces in the app and create a token
+for that workspace.
+
+Token list responses show metadata only. They do not include the raw token or
+the stored secret hash. If the raw token is lost, revoke it and create another
+one.
+
+Bearer-token callers can use ordinary protected app APIs, table APIs, report
+APIs, SQL APIs, and `GET /api/openapi.json` when their permissions allow it.
+They cannot create, list, or revoke other tokens; token management stays a
+browser-session action.
+
+Auth errors are intended to be actionable:
+
+- `unauthenticated`: no usable session or bearer token was supplied.
+- `token_expired`: create a replacement token.
+- `token_revoked`: stop using that token.
+- `workspace_required`: the token's user no longer belongs to that workspace.
+- `forbidden`: the user or token cannot perform that action.
+
 ## Auth Context Routes
 
 `GET /api/auth-context` returns the current user, active workspace, active
@@ -624,6 +669,14 @@ returns the same auth context response shape.
 
 Current generated project auth returns the active membership in the
 `memberships` array.
+
+`GET /api/auth-tokens` lists the signed-in user's agent access token metadata
+for the active workspace.
+
+`POST /api/auth-tokens` creates a token for the signed-in user and active
+workspace. The response includes the raw token once.
+
+`DELETE /api/auth-tokens/:id` revokes one active-workspace token.
 
 ## Compact Concept Reference
 
@@ -659,6 +712,10 @@ Framework route: generated Sapporta admin route such as `/api/tables/*`,
 
 Product route: custom application route registered by the project under
 `/api/*`.
+
+Agent access token: a bearer token for non-browser clients. It names one user
+and one workspace, and can call ordinary protected APIs without a browser
+session.
 
 ## Compact API Reference
 
@@ -758,6 +815,8 @@ workspace, and visible/invisible FK target rows.
 - Tables do not rely on missing `rowScope`, inferred row scope from column
   presence, or ambiguous FK authorization.
 - Credentialed CORS does not use wildcard origins.
+- Agent access tokens are shown only once, can be revoked, are scoped to one
+  workspace, and cannot manage other tokens.
 - Boot does not mutate schema at runtime.
 - Workspace ownership is not treated as global cross-workspace authorization.
 - Generated table routes and custom routes use `scopedRows()` for ordinary

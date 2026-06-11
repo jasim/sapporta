@@ -40,3 +40,22 @@ delivery.
 
 Use exact origins for credentialed browser requests. Do not deploy authenticated
 browser traffic with wildcard CORS.
+
+## CLI And Agent Access
+
+After deploying an auth-enabled app, create an agent access token from your
+account profile when you want a CLI, coding agent, or CI job to call protected
+APIs.
+
+Set `SAPPORTA_API_URL` to the deployed app's API origin and store the raw token
+as `SAPPORTA_API_TOKEN` in the caller's secret store:
+
+```bash
+export SAPPORTA_API_URL="https://app.example.com"
+export SAPPORTA_API_TOKEN="spat_..."
+
+pnpm exec sapporta describe
+```
+
+Each token belongs to one user and one workspace. Rotate or revoke tokens from
+the account profile when access should change.

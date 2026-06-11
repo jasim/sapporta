@@ -124,6 +124,7 @@ npx skills add https://github.com/jasim/sapporta-skills --global
 
 - [Schema and Migrations](./docs/schema-and-migrations.md) - define tables and manage Drizzle migrations
 - [Auth and Row Security](./docs/auth.md) - build workspace-aware, row-safe apps
+- [CLI](./docs/cli.md) - inspect and work with running Sapporta apps from the command line
 - [Deployment](./docs/deployment.md) - build, migrate, configure, and run Sapporta apps in production
 - [Custom Table Grids](./docs/TGRID-USAGE.md) - build custom React table workflows on Sapporta table APIs
 - [BaseGrid](./docs/BASEGRID-GUIDE.md) - use the lower-level grid runtime without Sapporta table CRUD
