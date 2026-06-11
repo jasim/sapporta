@@ -103,6 +103,51 @@
   line-height: 1.45;
 }
 
+/* Numeric renderers are right-aligned inside their own cell. In cards, a
+   full-width cell pushes short numbers to the far edge of the card, so give
+   numeric values a stable 10-digit measure and let larger values grow. */
+:where(
+  .sapporta-table-grid[data-grid-presentation="cards"]
+    [data-grid-part="row-field"]:is(
+      [data-display-type="number"],
+      [data-display-type="currency"],
+      [data-display-type="percentage"]
+    )
+    [data-grid-part="cell"]
+) {
+  max-width: 100%;
+  width: fit-content;
+}
+
+:where(
+  .sapporta-table-grid[data-grid-presentation="cards"]
+    [data-grid-part="row-field"]:is(
+      [data-display-type="number"],
+      [data-display-type="currency"],
+      [data-display-type="percentage"]
+    )
+    [data-grid-part="cell-content"]
+) {
+  justify-content: flex-start;
+  max-width: 100%;
+  min-width: var(--grid-card-numeric-width, 10ch);
+  width: fit-content;
+}
+
+:where(
+  .sapporta-table-grid[data-grid-presentation="cards"]
+    [data-grid-part="row-field"]:is(
+      [data-display-type="number"],
+      [data-display-type="currency"],
+      [data-display-type="percentage"]
+    )
+    [data-grid-part="cell-frame"]
+) {
+  max-width: 100%;
+  min-width: var(--grid-card-numeric-width, 10ch);
+  width: fit-content;
+}
+
 :where(
   .sapporta-table-grid[data-grid-presentation="cards"]
     [data-grid-part="cell-frame-content"]
