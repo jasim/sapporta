@@ -1,10 +1,10 @@
 /**
  * Application entry point.
  *
- * Sequence: paths -> DB -> Sapporta project metadata -> auth -> Hono app ->
- * middleware -> framework routes -> user routes -> OpenAPI -> static assets ->
- * serve. Each step is a plain function call; read the source if you need to
- * customize.
+ * Start here when you need to change how the app is hosted. This file chooses
+ * the database, loads your table/report definitions, installs auth, mounts
+ * `/api/...` routes, exposes `/api/openapi.json` for CLI discovery, and serves
+ * the built frontend.
  */
 import { relative } from "node:path";
 import { serve } from "@hono/node-server";
@@ -34,9 +34,7 @@ import { resolveRowsAllowedForRequest } from "./authz/rows-allowed-for-request.j
 import { createSapportaMailer } from "./mailer.js";
 import { createProjectAuth, readProjectAuthEnv } from "./project-auth/index.js";
 
-// 1. Paths + DB + Sapporta project metadata. Loading the Sapporta project reads
-//    schema/report modules and checks migration readiness; it does not mutate
-//    the Hono app.
+// Find the project root first so the app can start from any working directory.
 const projectRoot = findProjectRootFrom(import.meta.dirname);
 if (!projectRoot) {
   throw new Error(
@@ -55,8 +53,8 @@ const sapporta = await loadSapportaProject({
   conn,
 });
 
-// 2. Auth can boot after loaded tables exist, so request auth contexts contain
-//    row-security guards from the start.
+// Auth needs the loaded table catalog so every request can resolve row access
+// for the active workspace before a handler reads or writes data.
 assertAuthSchemaDefinitions(sapporta.catalog.tables);
 const projectEnv = readProjectAuthEnv();
 const mailer = createSapportaMailer(projectEnv.mail);
@@ -70,11 +68,11 @@ const projectAuth = createProjectAuth({
   publicRoutes: publicApiRoutes,
 });
 
-// 3. Shared Hono app - framework and user routes mount onto it.
+// All HTTP behavior for this app is mounted on one Hono server.
 const app = new Hono<SapportaEnv>();
 
-// 4. Request middleware and public health. Auth projects mount Better Auth at
-//    /api/auth/* before installing project-auth middleware.
+// Browser sign-in lives under /api/auth/*. All other /api routes receive a
+// Sapporta auth context and are private unless explicitly allow-listed.
 installRequestLogging(app);
 installExactOriginCors(app, {
   origins: projectAuth.env.trustedOrigins,
@@ -96,7 +94,7 @@ installSapportaRequestContext(app, conn);
 app.use("/api/*", projectAuth.resolveMiddleware);
 app.use("/api/*", projectAuth.rejectAnonymousMiddleware);
 
-// 5. Framework: /api/meta + /api/tables + /api/reports.
+// Built-in app APIs: table metadata, CRUD rows, reports, and SQL tools.
 const sapportaApi = mountSapportaFramework(app, sapporta, {
   conn,
   auth: {
@@ -104,18 +102,19 @@ const sapportaApi = mountSapportaFramework(app, sapporta, {
   },
 });
 
-// 6. User routes. `loadApp()` registers project paths like "/bank";
-//    mounting apiApp under /api serves them at /api/bank.
+// Custom app APIs. `loadApp()` registers paths like "/bank"; mounting under
+// /api serves them at /api/bank.
 const apiApp = new TsRestApi<SapportaEnv>();
 loadApp(apiApp, { conn, mailer });
 app.route("/api", apiApp);
 app.route("/api", projectAuth.routes);
 
-// 7. /api/openapi.json. Must follow framework and user routes - emitters are
-//    snapshotted at this call.
+// CLI clients use this contract to discover the live API. Because /api routes
+// above are private by default, protected apps require the same credentials for
+// discovery that they require for data commands.
 mountOpenApi(app, sapporta, sapportaApi, apiApp, projectAuth.routes);
 
-// 8. Static assets + SPA fallback. Three deployment shapes work:
+// Serve the frontend from the same process by default. Three deployment shapes work:
 //   (a) same-origin via this Hono process (default; `pnpm start`)
 //   (b) same-origin behind nginx - nginx serves packages/frontend/dist directly
 //       and proxies /api/ here; this block becomes harmless dead code
@@ -123,8 +122,8 @@ mountOpenApi(app, sapporta, sapportaApi, apiApp, projectAuth.routes);
 //       for the SPA build, set SAPPORTA_PUBLIC_BASE_URL on the API host, and
 //       route public /api/auth/* requests to this API process.
 //
-// Mounted after /api so API routes match first; everything else falls
-// through to index.html for client-side routing on hard reload.
+// API routes have already matched above. Remaining browser requests fall
+// through to index.html so client-side routes survive hard reloads.
 //
 // Path is anchored to projectRoot (not "./packages/frontend/dist") so launching
 // from any cwd works - systemd, Docker, test harnesses. serveStatic's
@@ -154,14 +153,13 @@ app.use("/*", serveStatic({ root: frontendDist }));
 // GET-only - a stray POST to /wat must 404, not return index.html.
 app.get("/*", serveStatic({ root: frontendDist, path: "index.html" }));
 
-// 9. Serve
+// Start the API server.
 const port = projectEnv.port;
 const server = serve({ fetch: app.fetch, port }, () => {
   console.log(`%%SAPPORTA:SLUG%% API server ready (port ${port})`);
 });
 
-// Re-raise the signal after closing so the process exits with the
-// signal's status code rather than 0.
+// Close SQLite cleanly when the process receives a termination signal.
 const shutdown = (signal: NodeJS.Signals) => {
   server.close();
   conn.sqlite.close();

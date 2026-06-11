@@ -1,27 +1,33 @@
 /**
- * Minimal HTTP client for the CLI → API bridge.
+ * HTTP client used by API-backed CLI commands.
  *
- * All CLI commands that touch data go through this function.
- * The server runs at SAPPORTA_API_URL (default http://localhost:3000).
+ * The caller supplies the deployment URL and, when available, a workspace
+ * token. When a token is present it is sent as `Authorization: Bearer ...` on
+ * the request. When it is absent the request stays anonymous, so public
+ * endpoints can still be called and protected endpoints return the server's
+ * structured auth error.
  */
 
 export interface HttpResult {
   status: number;
-  data: any;
+  data: unknown;
+}
+
+export interface HttpRequestOptions {
+  body?: unknown;
+  queryParams?: Record<string, string>;
+  authToken?: string;
 }
 
 export async function httpRequest(
   baseUrl: string,
   method: string,
   path: string,
-  opts?: {
-    body?: unknown;
-    queryParams?: Record<string, string>;
-  },
+  opts: HttpRequestOptions = {},
 ): Promise<HttpResult> {
-  // Strip leading "/" so new URL() treats the path as relative to baseUrl's path.
-  // With a leading slash, new URL("/api/meta/tables", "http://host/p/playground/")
-  // discards the base path → "http://host/api/meta/tables" (broken).
+  // Keep any path prefix in the deployment URL, such as
+  // https://host/apps/acme/. A leading slash would make URL resolution discard
+  // that prefix and call the wrong deployment.
   const relativePath = path.startsWith("/") ? path.slice(1) : path;
   const url = new URL(relativePath, baseUrl.endsWith("/") ? baseUrl : baseUrl + "/");
   if (opts?.queryParams) {
@@ -32,11 +38,16 @@ export async function httpRequest(
 
   let res: Response;
   try {
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+    };
+    if (opts.authToken) {
+      headers.Authorization = `Bearer ${opts.authToken}`;
+    }
+
     res = await fetch(url, {
       method,
-      headers: {
-        "Content-Type": "application/json",
-      },
+      headers,
       ...(opts?.body !== undefined ? { body: JSON.stringify(opts.body) } : {}),
     });
   } catch (err: any) {

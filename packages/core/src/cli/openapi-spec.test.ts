@@ -7,6 +7,7 @@ import {
   fetchOpenApiSpec,
   type OpenApiDoc,
 } from "./openapi-spec.js";
+import { OperationError } from "../introspect/types.js";
 
 vi.mock("./http-client.js", () => ({
   httpRequest: vi.fn(),
@@ -315,13 +316,60 @@ describe("getEndpointDetail", () => {
 describe("fetchOpenApiSpec", () => {
   it("returns the parsed JSON on success", async () => {
     const doc = { openapi: "3.1.0", paths: {} };
-    (httpRequest as any).mockResolvedValueOnce({ status: 200, data: doc });
+    vi.mocked(httpRequest).mockResolvedValueOnce({ status: 200, data: doc });
     const out = await fetchOpenApiSpec("http://localhost:3000");
     expect(out).toEqual(doc);
   });
 
+  it("sends a bearer token when fetching the OpenAPI document", async () => {
+    const doc = { openapi: "3.1.0", paths: {} };
+    vi.mocked(httpRequest).mockResolvedValueOnce({ status: 200, data: doc });
+
+    await fetchOpenApiSpec("http://localhost:3000", "spat_token_secret");
+
+    expect(httpRequest).toHaveBeenCalledWith(
+      "http://localhost:3000",
+      "GET",
+      "/api/openapi.json",
+      { authToken: "spat_token_secret" },
+    );
+  });
+
+  it("preserves structured auth failures from protected OpenAPI", async () => {
+    vi.mocked(httpRequest).mockResolvedValueOnce({
+      status: 401,
+      data: {
+        error: "Authentication required",
+        code: "unauthenticated",
+      },
+    });
+
+    await expect(fetchOpenApiSpec("http://localhost:3000")).rejects.toMatchObject({
+      message: "Authentication required",
+      code: "unauthenticated",
+    });
+  });
+
+  it("throws an OperationError for non-2xx OpenAPI responses without a code", async () => {
+    vi.mocked(httpRequest).mockResolvedValueOnce({
+      status: 502,
+      data: { error: "Bad gateway" },
+    });
+
+    try {
+      await fetchOpenApiSpec("http://localhost:3000");
+      throw new Error("Expected OpenAPI fetch to fail.");
+    } catch (err) {
+      expect(err).toBeInstanceOf(OperationError);
+      expect(err).toMatchObject({
+        message: "Bad gateway",
+        code: "HTTP_502",
+      });
+    }
+  });
+
   it("propagates the ECONNREFUSED friendly error", async () => {
-    (httpRequest as any).mockRejectedValueOnce(
+    vi.mocked(httpRequest).mockRejectedValueOnce(
       new Error("Cannot connect to Sapporta server at http://localhost:3000. Is the server running?"),
     );
     await expect(fetchOpenApiSpec("http://localhost:3000")).rejects.toThrow(

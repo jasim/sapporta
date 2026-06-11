@@ -1,8 +1,10 @@
 /**
- * `sapporta describe` — unified OpenAPI-backed introspection.
+ * `sapporta describe` reads the live app contract from `/api/openapi.json`.
  *
- * Thin top layer: fetch the live `/api/openapi.json`, query it via the pure
- * primitives in `openapi-spec.ts`, and render. All hard logic lives below.
+ * Protected apps require the same token for discovery that they require for
+ * data access. This lets an agent discover exactly the endpoints available in
+ * the selected deployment and workspace without browser login or implicit
+ * profiles.
  */
 
 import type { OperationResult } from "../introspect/types.js";
@@ -14,8 +16,11 @@ import {
   type EndpointDetail,
 } from "./openapi-spec.js";
 
-export async function describeAll(baseUrl: string): Promise<OperationResult> {
-  const spec = await fetchOpenApiSpec(baseUrl);
+export async function describeAll(
+  baseUrl: string,
+  authToken?: string,
+): Promise<OperationResult> {
+  const spec = await fetchOpenApiSpec(baseUrl, authToken);
   const endpoints = listEndpoints(spec);
   return {
     ok: true,
@@ -27,8 +32,9 @@ export async function describeAll(baseUrl: string): Promise<OperationResult> {
 export async function describeOne(
   target: string,
   baseUrl: string,
+  authToken?: string,
 ): Promise<OperationResult> {
-  const spec = await fetchOpenApiSpec(baseUrl);
+  const spec = await fetchOpenApiSpec(baseUrl, authToken);
   const result = findEndpoint(spec, target);
 
   if (result.kind === "hit") {

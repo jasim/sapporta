@@ -1,4 +1,5 @@
 import type { Context } from "hono";
+import { HTTPException } from "hono/http-exception";
 import {
   anonymousPrincipal,
   createAuthContext,
@@ -17,6 +18,11 @@ import {
   switchWorkspaceMembership,
   type WorkspaceMembershipRow,
 } from "./workspace.js";
+import { authFailure } from "./errors.js";
+import {
+  resolveBearerTokenPrincipal,
+  TokenAuthError,
+} from "./auth-tokens.js";
 
 export type ResolveRowsAllowedForRequest = (input: {
   principal: AppPrincipal;
@@ -60,11 +66,16 @@ export interface ResolveSapportaAuthContextInput {
 }
 
 /**
- * Builds the auth context that every API route reads from `c.get("auth")`.
+ * Builds the auth context every API handler reads from `c.get("auth")`.
  *
- * No-session requests still receive an anonymous principal and a real ability.
- * The anonymous gate decides whether that request may reach a route, and the
- * route still performs its own CASL check.
+ * A request can identify the user in two ways:
+ * - an agent access token in `Authorization: Bearer ...`
+ * - a browser session cookie from the app UI
+ *
+ * Bearer tokens are checked first because they explicitly name the workspace
+ * for this request. If neither credential is present, the request is anonymous;
+ * public routes can still run, while private routes reject it before reading
+ * application data.
  */
 export async function resolveSapportaAuthContext(
   input: ResolveSapportaAuthContextInput,
@@ -117,6 +128,19 @@ export async function resolvePrincipal(
   conn: ProjectDbConnection,
   headers: Headers,
 ): Promise<AppPrincipal> {
+  try {
+    const bearerPrincipal = resolveBearerTokenPrincipal(conn, headers);
+    if (bearerPrincipal) return bearerPrincipal;
+  } catch (err) {
+    if (err instanceof TokenAuthError) {
+      const failure = authFailure(err.code);
+      throw new HTTPException(failure.status, {
+        res: Response.json(failure.body, { status: failure.status }),
+      });
+    }
+    throw err;
+  }
+
   const payload = await getSessionPayload(auth, headers);
   if (!payload) return anonymousPrincipal();
   const membership = ensureActiveWorkspace(conn, payload);
@@ -138,9 +162,11 @@ export function userFromSessionPayload(
 }
 
 /**
- * Converts the active workspace membership row into the app-facing membership
- * facts. Role is resolved on the membership, not on the user, so the same user
- * can have different roles in different workspaces.
+ * Converts the selected workspace membership into request facts.
+ *
+ * Roles live on the membership, not the user. The same person can be an owner
+ * in one workspace and a member in another, and agent access tokens preserve
+ * that distinction because each token names one workspace.
  */
 export function membershipFromRow(
   row: WorkspaceMembershipRow,

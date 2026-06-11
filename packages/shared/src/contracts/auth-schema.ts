@@ -1,5 +1,11 @@
 import { z } from "zod";
 
+/**
+ * Auth and workspace shapes returned to the browser UI.
+ *
+ * A request has one active workspace. Roles describe the user's membership in
+ * that workspace; a user may have a different role in another workspace.
+ */
 export const authRoleSchema = z.enum(["owner", "member"]).meta({ id: "AuthRole" });
 export type AuthRole = z.output<typeof authRoleSchema>;
 
@@ -65,3 +71,54 @@ export const switchActiveWorkspaceBodySchema = z
   })
   .meta({ id: "SwitchActiveWorkspaceBody" });
 export type SwitchActiveWorkspaceBody = z.output<typeof switchActiveWorkspaceBodySchema>;
+
+/**
+ * Metadata for an agent access token.
+ *
+ * Token lists intentionally expose only metadata. They never include
+ * `secretHash` and never include the raw bearer token. The raw token is present
+ * only in the create response so the user can copy it once.
+ */
+export const authTokenSchema = z
+  .object({
+    id: z.string(),
+    userId: z.string(),
+    organizationId: z.string(),
+    name: z.string(),
+    createdAt: z.string(),
+    expiresAt: z.string().nullable(),
+    lastUsedAt: z.string().nullable(),
+    revokedAt: z.string().nullable(),
+  })
+  .meta({ id: "AuthToken" });
+export type AuthToken = z.output<typeof authTokenSchema>;
+
+export const authTokenListResponseSchema = z
+  .object({
+    tokens: z.array(authTokenSchema),
+  })
+  .meta({ id: "AuthTokenListResponse" });
+export type AuthTokenListResponse = z.output<typeof authTokenListResponseSchema>;
+
+export const createAuthTokenBodySchema = z
+  .object({
+    name: z.string().trim().min(1).max(120),
+    organizationId: z.string().optional(),
+    expiresAt: z.string().datetime().nullable().optional(),
+  })
+  .meta({ id: "CreateAuthTokenBody" });
+export type CreateAuthTokenBody = z.output<typeof createAuthTokenBodySchema>;
+
+/**
+ * Creation returns both metadata and the one-time bearer token.
+ *
+ * Store `rawToken` in an agent environment or secret manager as
+ * `SAPPORTA_API_TOKEN`. It cannot be recovered from later list responses.
+ */
+export const createAuthTokenResponseSchema = z
+  .object({
+    token: authTokenSchema,
+    rawToken: z.string(),
+  })
+  .meta({ id: "CreateAuthTokenResponse" });
+export type CreateAuthTokenResponse = z.output<typeof createAuthTokenResponseSchema>;

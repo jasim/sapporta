@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { Hono } from "hono";
+import { HTTPException } from "hono/http-exception";
 import {
   connectProject,
   createAuthContext,
@@ -39,6 +40,10 @@ import {
   switchWorkspaceMembership,
 } from "../src/templates/project-auth/workspace.js";
 import { createProjectAuthRoutes } from "../src/templates/project-auth/routes.js";
+import {
+  createAuthToken,
+  listAuthTokens,
+} from "../src/templates/project-auth/auth-tokens.js";
 
 const emptyCatalog = createTableCatalog([]);
 
@@ -206,6 +211,123 @@ describe("project auth template", () => {
     });
   });
 
+  it("builds context from a valid bearer token before session auth", async () => {
+    conn = createAuthDb({ includeUserTable: true, includeTokenTable: true });
+    insertUser(conn, "user-1", "Owner", "owner@example.test", true);
+    insertWorkspace(conn, "workspace-1", "Acme", "acme");
+    insertMember(conn, "member-1", "workspace-1", "user-1", "owner", 1);
+    const created = createAuthToken(conn, routeUserPrincipal(), {
+      name: "codex-local",
+    });
+
+    const context = await resolveSapportaAuthContext({
+      auth: sessionApi(null),
+      conn,
+      catalog: emptyCatalog,
+      headers: new Headers({ authorization: `Bearer ${created.rawToken}` }),
+      c: requestContext(),
+      buildAbility: buildAppAbility,
+      resolveRowsAllowedForRequest,
+    });
+
+    expect(context).toMatchObject({
+      principal: {
+        kind: "user",
+        user: { id: "user-1", email: "owner@example.test" },
+        membership: {
+          workspace: { id: "workspace-1", slug: "acme" },
+          roles: ["owner"],
+        },
+      },
+      rowsAllowedForRequest: { kind: "allowWorkspaceUserRows" },
+    });
+    expect(readTokenLastUsedAt(conn, created.token.id)).toEqual(expect.any(Number));
+  });
+
+  it("rejects expired and revoked bearer tokens with stable codes", async () => {
+    conn = createAuthDb({ includeUserTable: true, includeTokenTable: true });
+    insertUser(conn, "user-1", "Owner", "owner@example.test", true);
+    insertWorkspace(conn, "workspace-1", "Acme", "acme");
+    insertMember(conn, "member-1", "workspace-1", "user-1", "owner", 1);
+    const expired = createAuthToken(conn, routeUserPrincipal(), {
+      name: "expired",
+      expiresAt: new Date(Date.now() - 1_000).toISOString(),
+    });
+    const revoked = createAuthToken(conn, routeUserPrincipal(), {
+      name: "revoked",
+    });
+    conn.sqlite
+      .prepare("UPDATE personalAccessToken SET revokedAt = ? WHERE id = ?")
+      .run(Date.now(), revoked.token.id);
+
+    await expectTokenFailure(conn, expired.rawToken, "token_expired");
+    await expectTokenFailure(conn, revoked.rawToken, "token_revoked");
+  });
+
+  it("rejects unknown bearer tokens with the unauthenticated code", async () => {
+    conn = createAuthDb({ includeUserTable: true, includeTokenTable: true });
+
+    await expectTokenFailure(conn, "spat_missing-token_secret", "unauthenticated");
+  });
+
+  it("rejects bearer tokens after workspace membership is removed", async () => {
+    conn = createAuthDb({ includeUserTable: true, includeTokenTable: true });
+    insertUser(conn, "user-1", "Owner", "owner@example.test", true);
+    insertWorkspace(conn, "workspace-1", "Acme", "acme");
+    insertMember(conn, "member-1", "workspace-1", "user-1", "owner", 1);
+    const created = createAuthToken(conn, routeUserPrincipal(), {
+      name: "codex-local",
+    });
+    conn.sqlite.prepare("DELETE FROM member WHERE id = ?").run("member-1");
+
+    await expectTokenFailure(conn, created.rawToken, "workspace_required");
+  });
+
+  it("resolves separate workspace tokens to separate row-security contexts", async () => {
+    conn = createAuthDb({ includeUserTable: true, includeTokenTable: true });
+    insertUser(conn, "user-1", "Owner", "owner@example.test", true);
+    insertWorkspace(conn, "workspace-1", "Acme", "acme");
+    insertWorkspace(conn, "workspace-2", "Second", "second");
+    insertMember(conn, "member-1", "workspace-1", "user-1", "owner", 1);
+    insertMember(conn, "member-2", "workspace-2", "user-1", "member", 2);
+    const firstToken = createAuthToken(conn, routeUserPrincipal(), {
+      name: "workspace-1",
+    });
+    const secondToken = createAuthToken(
+      conn,
+      routeUserPrincipal({ role: "member", workspaceId: "workspace-2" }),
+      { name: "workspace-2" },
+    );
+
+    const firstContext = await resolveTokenAuthContext(conn, firstToken.rawToken);
+    const secondContext = await resolveTokenAuthContext(conn, secondToken.rawToken);
+
+    expect(firstContext).toMatchObject({
+      principal: {
+        kind: "user",
+        membership: {
+          workspace: { id: "workspace-1", slug: "acme" },
+          roles: ["owner"],
+        },
+      },
+      rowsAllowedForRequest: {
+        workspace: { id: "workspace-1", slug: "acme" },
+      },
+    });
+    expect(secondContext).toMatchObject({
+      principal: {
+        kind: "user",
+        membership: {
+          workspace: { id: "workspace-2", slug: "second" },
+          roles: ["member"],
+        },
+      },
+      rowsAllowedForRequest: {
+        workspace: { id: "workspace-2", slug: "second" },
+      },
+    });
+  });
+
   it("selects the first membership when the session has no active organization", () => {
     conn = createAuthDb();
     const payload = sessionPayload({ activeOrganizationId: null });
@@ -370,6 +492,105 @@ describe("project auth template", () => {
     });
   });
 
+  it("creates and lists agent access token metadata from generated routes", async () => {
+    conn = createAuthDb({ includeUserTable: true, includeTokenTable: true });
+    insertUser(conn, "user-1", "Owner", "owner@example.test", true);
+    insertWorkspace(conn, "workspace-1", "Acme", "acme");
+    insertMember(conn, "member-1", "workspace-1", "user-1", "owner", 1);
+    const routes = createProjectAuthRoutes({
+      conn,
+      switchActiveWorkspace: async () => routeAuthContext(),
+    });
+    const app = authRoutesApp(routes);
+
+    const createResponse = await app.request("/api/auth-tokens", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ name: "codex-local" }),
+    });
+
+    expect(createResponse.status).toBe(201);
+    const created = await createResponse.json();
+    expect(created.rawToken).toMatch(/^spat_/);
+    expect(created.token).toMatchObject({
+      userId: "user-1",
+      organizationId: "workspace-1",
+      name: "codex-local",
+      revokedAt: null,
+    });
+    expect(created.token.secretHash).toBeUndefined();
+
+    const listResponse = await app.request("/api/auth-tokens");
+
+    expect(listResponse.status).toBe(200);
+    await expect(listResponse.json()).resolves.toEqual({
+      tokens: [
+        expect.objectContaining({
+          id: created.token.id,
+          name: "codex-local",
+        }),
+      ],
+    });
+    expect(listAuthTokens(conn, "user-1")[0]).not.toHaveProperty("secretHash");
+  });
+
+  it("revokes only tokens owned by the signed-in user", async () => {
+    conn = createAuthDb({ includeUserTable: true, includeTokenTable: true });
+    insertUser(conn, "user-1", "Owner", "owner@example.test", true);
+    insertUser(conn, "user-2", "Other", "other@example.test", true);
+    insertWorkspace(conn, "workspace-1", "Acme", "acme");
+    insertMember(conn, "member-1", "workspace-1", "user-1", "owner", 1);
+    insertMember(conn, "member-2", "workspace-1", "user-2", "member", 2);
+    const ownToken = createAuthToken(conn, routeUserPrincipal(), {
+      name: "own",
+    });
+    const otherToken = createAuthToken(
+      conn,
+      routeUserPrincipal({ userId: "user-2", role: "member" }),
+      { name: "other" },
+    );
+    const routes = createProjectAuthRoutes({
+      conn,
+      switchActiveWorkspace: async () => routeAuthContext(),
+    });
+    const app = authRoutesApp(routes);
+
+    const forbiddenResponse = await app.request(
+      `/api/auth-tokens/${otherToken.token.id}`,
+      { method: "DELETE" },
+    );
+    const ownResponse = await app.request(
+      `/api/auth-tokens/${ownToken.token.id}`,
+      { method: "DELETE" },
+    );
+
+    expect(forbiddenResponse.status).toBe(404);
+    expect(ownResponse.status).toBe(204);
+    expect(listAuthTokens(conn, "user-1")[0].revokedAt).not.toBeNull();
+  });
+
+  it("does not let bearer tokens manage agent access tokens", async () => {
+    conn = createAuthDb({ includeUserTable: true, includeTokenTable: true });
+    insertUser(conn, "user-1", "Owner", "owner@example.test", true);
+    insertWorkspace(conn, "workspace-1", "Acme", "acme");
+    insertMember(conn, "member-1", "workspace-1", "user-1", "owner", 1);
+    const routes = createProjectAuthRoutes({
+      conn,
+      switchActiveWorkspace: async () => routeAuthContext(),
+    });
+    const app = authRoutesApp(routes);
+
+    const response = await app.request("/api/auth-tokens", {
+      headers: { authorization: "Bearer spat_token_secret" },
+    });
+
+    expect(response.status).toBe(403);
+    await expect(response.json()).resolves.toEqual({
+      error: "Forbidden",
+      code: "forbidden",
+    });
+  });
+
   it("auth resolver sets anonymous auth context when session is missing", async () => {
     const app = new Hono<SapportaEnv>();
     app.use(
@@ -483,7 +704,7 @@ describe("project auth template", () => {
 });
 
 function createAuthDb(
-  options: { includeUserTable?: boolean } = {},
+  options: { includeUserTable?: boolean; includeTokenTable?: boolean } = {},
 ): ProjectDbConnection {
   const db = connectProject(":memory:");
   db.sqlite.exec(`
@@ -519,6 +740,21 @@ function createAuthDb(
         name TEXT NOT NULL,
         email TEXT NOT NULL,
         emailVerified INTEGER NOT NULL
+      );
+    `);
+  }
+  if (options.includeTokenTable === true) {
+    db.sqlite.exec(`
+      CREATE TABLE personalAccessToken (
+        id TEXT PRIMARY KEY,
+        userId TEXT NOT NULL,
+        organizationId TEXT NOT NULL,
+        name TEXT NOT NULL,
+        secretHash TEXT NOT NULL,
+        createdAt INTEGER NOT NULL,
+        expiresAt INTEGER,
+        lastUsedAt INTEGER,
+        revokedAt INTEGER
       );
     `);
   }
@@ -567,6 +803,20 @@ function insertSession(
     .run(id, userId, workspaceId);
 }
 
+function insertUser(
+  db: ProjectDbConnection,
+  id: string,
+  name: string,
+  email: string,
+  emailVerified: boolean,
+): void {
+  db.sqlite
+    .prepare(
+      "INSERT INTO user (id, name, email, emailVerified) VALUES (?, ?, ?, ?)",
+    )
+    .run(id, name, email, emailVerified ? 1 : 0);
+}
+
 function insertWorkspace(
   db: ProjectDbConnection,
   id: string,
@@ -607,6 +857,61 @@ function readSessionWorkspace(
   return typeof value === "string" ? value : null;
 }
 
+function readTokenLastUsedAt(
+  db: ProjectDbConnection,
+  tokenId: string,
+): number | null {
+  const row = db.sqlite
+    .prepare("SELECT lastUsedAt FROM personalAccessToken WHERE id = ?")
+    .get(tokenId);
+  if (!isRecord(row)) return null;
+  const value = row.lastUsedAt;
+  return typeof value === "number" ? value : null;
+}
+
+async function resolveTokenAuthContext(
+  db: ProjectDbConnection,
+  rawToken: string,
+): Promise<SapportaAuthContext<AppAbility, AppWorkspaceMembership>> {
+  return resolveSapportaAuthContext({
+    auth: sessionApi(null),
+    conn: db,
+    catalog: emptyCatalog,
+    headers: new Headers({ authorization: `Bearer ${rawToken}` }),
+    c: requestContext(),
+    buildAbility: buildAppAbility,
+    resolveRowsAllowedForRequest,
+  });
+}
+
+async function expectTokenFailure(
+  db: ProjectDbConnection,
+  rawToken: string,
+  code: string,
+): Promise<void> {
+  try {
+    await resolveTokenAuthContext(db, rawToken);
+    throw new Error("Expected token auth to fail.");
+  } catch (err) {
+    expect(err).toBeInstanceOf(HTTPException);
+    if (!(err instanceof HTTPException)) return;
+    expect(err.status).toBe(code === "workspace_required" ? 403 : 401);
+    await expect(err.getResponse().json()).resolves.toMatchObject({ code });
+  }
+}
+
+function authRoutesApp(
+  routes: ReturnType<typeof createProjectAuthRoutes>,
+): Hono<SapportaEnv> {
+  const app = new Hono<SapportaEnv>();
+  app.use("/api/*", async (c, next) => {
+    c.set("auth", routeAuthContext());
+    await next();
+  });
+  app.route("/api", routes);
+  return app;
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
@@ -628,13 +933,14 @@ function routeAuthContext(
     role?: string;
     emailVerified?: boolean;
     workspaceId?: string;
+    userId?: string;
   } = {},
 ): SapportaAuthContext<AppAbility, AppWorkspaceMembership> {
   const storedRole = overrides.role ?? "owner";
   const role = storedRole === "owner" || storedRole === "admin" ? "owner" : "member";
   const workspaceId = overrides.workspaceId ?? "workspace-1";
   const user = {
-    id: "user-1",
+    id: overrides.userId ?? "user-1",
     name: "Owner",
     email: "owner@example.test",
     emailVerified: overrides.emailVerified ?? true,
@@ -666,6 +972,24 @@ function routeAuthContext(
     ability: buildAppAbility({ principal, rowsAllowedForRequest }),
     catalog: emptyCatalog,
   });
+}
+
+function routeUserPrincipal(
+  overrides: {
+    role?: string;
+    emailVerified?: boolean;
+    workspaceId?: string;
+    userId?: string;
+  } = {},
+): Extract<
+  SapportaAuthContext<AppAbility, AppWorkspaceMembership>["principal"],
+  { kind: "user" }
+> {
+  const principal = routeAuthContext(overrides).principal;
+  if (principal.kind !== "user") {
+    throw new Error("Expected a user principal.");
+  }
+  return principal;
 }
 
 function routeAnonymousContext(): SapportaAuthContext<AppAbility, AppWorkspaceMembership> {

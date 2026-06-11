@@ -9,6 +9,7 @@ import { httpRequest } from "./http-client.js";
 import { OperationError, ErrorCode } from "../introspect/types.js";
 import { buildRequest, renderResult } from "./request.js";
 import { parseFlags, emitResult, resolveOutputFormat, type OutputFormat } from "./format.js";
+import { resolveCliCredentials } from "./credentials.js";
 
 // Re-export for programmatic access
 export { ROUTES } from "./routes.js";
@@ -61,19 +62,8 @@ function handleError(err: any, format: OutputFormat): never {
 }
 
 // ---------------------------------------------------------------------------
-// Base URL resolution
-// ---------------------------------------------------------------------------
-
-/**
- * Resolve the API base URL from flags or environment.
- */
-function resolveBaseUrl(flags: Record<string, string>): string {
-  const apiUrl = flags["api-url"] ?? process.env.SAPPORTA_API_URL ?? "http://localhost:3000";
-  return apiUrl.replace(/\/+$/, "");
-}
-
-// ---------------------------------------------------------------------------
-// API command runner (thin orchestration)
+// API command runner: resolve credentials, build the request, and render the
+// server response in the requested output format.
 // ---------------------------------------------------------------------------
 
 async function runApiCommand(
@@ -83,13 +73,14 @@ async function runApiCommand(
 ): Promise<void> {
   const format = resolveOutputFormat(allFlags);
 
-  const baseUrl = resolveBaseUrl(allFlags);
+  const credentials = resolveCliCredentials(allFlags);
 
   const req = buildRequest(route, params, allFlags);
 
-  const result = await httpRequest(baseUrl, req.method, req.urlPath, {
+  const result = await httpRequest(credentials.apiUrl, req.method, req.urlPath, {
     body: req.body,
     queryParams: req.queryParams,
+    authToken: credentials.apiToken,
   });
 
   const exitCode = renderResult(route, params, result, format);
@@ -141,12 +132,16 @@ async function main() {
     const flags = parseFlags(rest);
     const format = resolveOutputFormat(flags);
     try {
-      const baseUrl = resolveBaseUrl(flags);
+      const credentials = resolveCliCredentials(flags);
       const positional = (flags._ as string[]) ?? [];
       const result =
         positional.length === 0
-          ? await describeAll(baseUrl)
-          : await describeOne(positional.join(" "), baseUrl);
+          ? await describeAll(credentials.apiUrl, credentials.apiToken)
+          : await describeOne(
+              positional.join(" "),
+              credentials.apiUrl,
+              credentials.apiToken,
+            );
       emitResult(result, format);
     } catch (err: any) {
       handleError(err, format);
@@ -166,6 +161,7 @@ async function main() {
       "JSON object to send as the request body for commands that accept one",
     )
     .option("--api-url <url>", "Server URL (default: http://localhost:3000)")
+    .option("--api-token <token>", "Bearer token for authenticated API requests")
     .option("--sapporta-project-dir <path>", "Project root directory (overrides auto-detection)");
 
   registerRoutes(program, ROUTES, async (route, params, extraPositionals) => {

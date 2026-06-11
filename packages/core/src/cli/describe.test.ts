@@ -90,6 +90,15 @@ describe("describeAll", () => {
     ]);
   });
 
+  it("passes bearer token through OpenAPI fetching", async () => {
+    await describeAll("http://localhost:3000", "token-1");
+
+    expect(fetchOpenApiSpec).toHaveBeenCalledWith(
+      "http://localhost:3000",
+      "token-1",
+    );
+  });
+
   it("renders a message containing paths and summaries", async () => {
     const result = await describeAll("http://localhost:3000");
     if (!result.ok) return;

@@ -1,14 +1,13 @@
 /**
- * App-specific routes - the file the programmer edits daily.
+ * App-specific API routes.
  *
  * Mount each `packages/api/app/*.ts` sub-app here. `app` is already scoped to
- * `/api`, so `app.route("/bank", bankApi)` is served at `/api/bank` -
- * don't repeat the `/api` prefix.
+ * `/api`, so `app.route("/bank", bankApi)` is served at `/api/bank`; do not
+ * repeat the `/api` prefix.
  *
- * Mounting is explicit by design: dropping a file in `packages/api/app/` does
- * nothing on its own. Sapporta does not auto-discover routes - your
- * `boot.ts` owns the wiring, and this file is the one place where
- * project routes are declared.
+ * Add a route here when you want it available from the browser, CLI, or API
+ * clients. New files under `packages/api/app/` are not exposed until you mount
+ * them here.
  */
 import type {
   ProjectDbConnection,

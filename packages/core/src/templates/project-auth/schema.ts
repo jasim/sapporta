@@ -157,11 +157,45 @@ export const invitation = sqliteTable(
   ],
 );
 
+/**
+ * Workspace-scoped credentials for CLI, CI, and other non-browser clients.
+ *
+ * A token string has the form `spat_<id>_<secret>`. `id` selects this row and
+ * `secretHash` verifies the secret; the raw secret is never stored. The
+ * `organizationId` column is the workspace selected by the token, so data
+ * commands do not need a separate workspace id.
+ */
+export const personalAccessToken = sqliteTable(
+  "personalAccessToken",
+  {
+    id: text("id").primaryKey(),
+    userId: text("userId")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    organizationId: text("organizationId")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    secretHash: text("secretHash").notNull(),
+    createdAt: integer("createdAt", { mode: "timestamp_ms" })
+      .default(sql`(cast(unixepoch('subsecond') * 1000 as integer))`)
+      .notNull(),
+    expiresAt: integer("expiresAt", { mode: "timestamp_ms" }),
+    lastUsedAt: integer("lastUsedAt", { mode: "timestamp_ms" }),
+    revokedAt: integer("revokedAt", { mode: "timestamp_ms" }),
+  },
+  (table) => [
+    index("personalAccessToken_userId_idx").on(table.userId),
+    index("personalAccessToken_organizationId_idx").on(table.organizationId),
+  ],
+);
+
 export const userRelations = relations(user, ({ many }) => ({
   sessions: many(session),
   accounts: many(account),
   members: many(member),
   invitations: many(invitation),
+  personalAccessTokens: many(personalAccessToken),
 }));
 
 export const sessionRelations = relations(session, ({ one }) => ({
@@ -181,6 +215,7 @@ export const accountRelations = relations(account, ({ one }) => ({
 export const organizationRelations = relations(organization, ({ many }) => ({
   members: many(member),
   invitations: many(invitation),
+  personalAccessTokens: many(personalAccessToken),
 }));
 
 export const memberRelations = relations(member, ({ one }) => ({
@@ -204,3 +239,17 @@ export const invitationRelations = relations(invitation, ({ one }) => ({
     references: [user.id],
   }),
 }));
+
+export const personalAccessTokenRelations = relations(
+  personalAccessToken,
+  ({ one }) => ({
+    user: one(user, {
+      fields: [personalAccessToken.userId],
+      references: [user.id],
+    }),
+    organization: one(organization, {
+      fields: [personalAccessToken.organizationId],
+      references: [organization.id],
+    }),
+  }),
+);

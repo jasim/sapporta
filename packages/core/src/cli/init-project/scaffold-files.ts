@@ -53,6 +53,11 @@ export const SCAFFOLD_FILES: ScaffoldFile[] = [
     ownership: "framework",
   },
   {
+    src: "project-auth/auth-tokens.ts",
+    dest: "packages/api/project-auth/auth-tokens.ts",
+    ownership: "framework",
+  },
+  {
     src: "project-auth/workspace.ts",
     dest: "packages/api/project-auth/workspace.ts",
     ownership: "framework",

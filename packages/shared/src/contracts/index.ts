@@ -21,6 +21,10 @@ export {
   authMembershipSchema,
   authBootstrapStatusSchema,
   authContextResponseSchema,
+  authTokenSchema,
+  authTokenListResponseSchema,
+  createAuthTokenBodySchema,
+  createAuthTokenResponseSchema,
   switchActiveWorkspaceBodySchema,
   type AuthRole,
   type AuthCurrentUser,
@@ -29,6 +33,10 @@ export {
   type AuthMembership,
   type AuthBootstrapStatus,
   type AuthContextResponse,
+  type AuthToken,
+  type AuthTokenListResponse,
+  type CreateAuthTokenBody,
+  type CreateAuthTokenResponse,
   type SwitchActiveWorkspaceBody,
 } from "./auth-schema.js";
 
@@ -119,6 +127,9 @@ export { listReportsRoute, runReportRoute } from "./report-routes.js";
 export {
   getAuthBootstrapStatusRoute,
   getAuthContextRoute,
+  listAuthTokensRoute,
+  createAuthTokenRoute,
+  revokeAuthTokenRoute,
   switchActiveWorkspaceRoute,
 } from "./auth-routes.js";
 

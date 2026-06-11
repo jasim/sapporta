@@ -49,6 +49,40 @@ describe("httpRequest", () => {
     expect(result.data).toEqual({});
   });
 
+  it("sends a bearer token when authToken is provided", async () => {
+    globalThis.fetch = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ ok: true }), { status: 200 }),
+    );
+
+    await httpRequest("http://localhost:3000", "GET", "/api/ping", {
+      authToken: "spat_123_secret",
+    });
+
+    expect(globalThis.fetch).toHaveBeenCalledWith(
+      new URL("http://localhost:3000/api/ping"),
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          Authorization: "Bearer spat_123_secret",
+        }),
+      }),
+    );
+  });
+
+  it("omits authorization when no token is provided", async () => {
+    globalThis.fetch = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ ok: true }), { status: 200 }),
+    );
+
+    await httpRequest("http://localhost:3000", "GET", "/api/ping");
+
+    const [, init] = vi.mocked(globalThis.fetch).mock.calls[0];
+    expect(init).toMatchObject({
+      headers: {
+        "Content-Type": "application/json",
+      },
+    });
+  });
+
   it("truncates a large non-JSON body to 500 chars with an ellipsis", async () => {
     const big = "x".repeat(1000);
     globalThis.fetch = vi.fn().mockResolvedValue(

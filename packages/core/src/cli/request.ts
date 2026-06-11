@@ -1,7 +1,9 @@
 /**
- * Request building and response rendering for CLI → API bridge.
+ * Turns CLI arguments into ordinary HTTP requests.
  *
- * Side-effect-free — safe to import from other packages.
+ * Flags in `SYSTEM_FLAGS` configure the CLI itself. They are never sent to the
+ * app as query parameters or request body fields, which keeps credentials such
+ * as `--api-token` out of application data.
  */
 import type { CliRoute } from "./routes.js";
 import { formatTable, type OutputFormat } from "./format.js";
@@ -10,17 +12,18 @@ import { formatTable, type OutputFormat } from "./format.js";
 // System flags — excluded from body/query param building
 // ---------------------------------------------------------------------------
 
-/** Flags consumed by the CLI framework, never forwarded to the API. */
+/** Flags consumed by the CLI itself, never forwarded to the app API. */
 const SYSTEM_FLAGS = new Set([
   "_",
   "output-format",
   "input-body-json",
   "api-url",
+  "api-token",
   "sapporta-project-dir",
 ]);
 
 // ---------------------------------------------------------------------------
-// Request building (pure, testable)
+// CLI arguments -> HTTP request
 // ---------------------------------------------------------------------------
 
 export interface RequestSpec {
@@ -31,8 +34,11 @@ export interface RequestSpec {
 }
 
 /**
- * Build an HTTP request spec from a matched route and parsed flags.
- * Pure function — no I/O, fully testable.
+ * Build the request for one CLI route.
+ *
+ * Route parameters become path segments. Route-specific flags become query
+ * parameters or body fields. CLI settings such as output format, deployment
+ * URL, and token stay local to the command.
  */
 export function buildRequest(
   route: CliRoute,
@@ -107,7 +113,7 @@ export function buildRequest(
 }
 
 // ---------------------------------------------------------------------------
-// Response rendering (I/O shell)
+// HTTP response -> CLI output
 // ---------------------------------------------------------------------------
 
 /**
@@ -117,17 +123,18 @@ export function buildRequest(
 export function renderResult(
   route: CliRoute,
   params: Record<string, string>,
-  result: { status: number; data: any },
+  result: { status: number; data: unknown },
   format: OutputFormat,
 ): number {
   if (result.status >= 400) {
-    const errMsg = result.data?.error ?? `HTTP ${result.status}`;
+    const data = readResponseData(result.data);
+    const errMsg = data?.error ?? `HTTP ${result.status}`;
     if (format === "json") {
       console.log(JSON.stringify(result.data));
     } else {
       console.error(`Error: ${errMsg}`);
-      if (result.data?.details) {
-        console.error(JSON.stringify(result.data.details, null, 2));
+      if (data?.details) {
+        console.error(JSON.stringify(data.details, null, 2));
       }
     }
     return 1;
@@ -149,4 +156,15 @@ export function renderResult(
   }
 
   return 0;
+}
+
+function readResponseData(
+  data: unknown,
+): { error?: string; details?: unknown } | null {
+  if (typeof data !== "object" || data === null) return null;
+  const record = data as Record<string, unknown>;
+  return {
+    ...(typeof record.error === "string" ? { error: record.error } : {}),
+    ...("details" in record ? { details: record.details } : {}),
+  };
 }

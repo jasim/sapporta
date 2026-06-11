@@ -1,7 +1,17 @@
 import type { ErrorBody } from "@sapporta/shared/contracts";
 
+/**
+ * Stable auth error codes returned by protected routes.
+ *
+ * Humans see the message. CLI clients and automation should branch on `code`;
+ * for example, `token_expired` means rotate the token, while
+ * `workspace_required` means the token no longer maps to a valid workspace
+ * membership.
+ */
 export const projectAuthErrorCodes = [
   "unauthenticated",
+  "token_expired",
+  "token_revoked",
   "email_not_verified",
   "workspace_required",
   "forbidden",
@@ -15,6 +25,8 @@ export type ProjectAuthErrorStatus = 400 | 401 | 403 | 404 | 422;
 
 const AUTH_ERROR_STATUS: Record<ProjectAuthErrorCode, ProjectAuthErrorStatus> = {
   unauthenticated: 401,
+  token_expired: 401,
+  token_revoked: 401,
   email_not_verified: 403,
   workspace_required: 403,
   forbidden: 403,
@@ -24,6 +36,8 @@ const AUTH_ERROR_STATUS: Record<ProjectAuthErrorCode, ProjectAuthErrorStatus> = 
 
 const AUTH_ERROR_MESSAGES: Record<ProjectAuthErrorCode, string> = {
   unauthenticated: "Authentication required",
+  token_expired: "Agent access token expired",
+  token_revoked: "Agent access token revoked",
   email_not_verified: "Email verification required",
   workspace_required: "Active workspace required",
   forbidden: "Forbidden",

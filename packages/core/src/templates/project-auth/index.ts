@@ -27,6 +27,14 @@ import {
   type PublicRoutePattern,
 } from "./middleware.js";
 
+/**
+ * Creates the request auth model for this application.
+ *
+ * The resulting object gives `boot.ts` the pieces it needs to keep private API
+ * routes private by default, allow selected public routes, resolve browser
+ * sessions and agent access tokens, and expose token-management screens in the
+ * app UI.
+ */
 export interface CreateProjectAuthOptions {
   conn: ProjectDbConnection;
   env: ProjectAuthEnv;
@@ -160,6 +168,14 @@ export {
   type ProjectAuthErrorStatus,
   type ProjectAuthFailure,
 } from "./errors.js";
+export {
+  createAuthToken,
+  listAuthTokens,
+  resolveBearerTokenPrincipal,
+  revokeAuthToken,
+  TokenAuthError,
+  TokenManagementError,
+} from "./auth-tokens.js";
 export {
   rejectAnonymousByDefault,
   requireAuthContext,

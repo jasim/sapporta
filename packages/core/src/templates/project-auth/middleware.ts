@@ -24,9 +24,11 @@ export interface AnonymousGateOptions {
 }
 
 /**
- * Resolves auth before route code runs. This middleware should run for API
- * routes whether the request has a session or not, so public routes can use the
- * same ability and row-security path as signed-in routes.
+ * Resolve the request principal before API handlers run.
+ *
+ * Public and private routes both receive an auth context. That keeps row
+ * security decisions consistent: a public route still sees an anonymous
+ * principal unless the caller supplied a valid session or token.
  */
 export function resolveProjectAuthMiddleware<E extends SapportaEnv>(
   resolveAuth: ResolveProjectAuth<E>,
@@ -38,12 +40,12 @@ export function resolveProjectAuthMiddleware<E extends SapportaEnv>(
 }
 
 /**
- * Keeps authenticated APIs private by default.
+ * Keep API routes private unless they are explicitly listed as public.
  *
- * A public route pattern only lets anonymous traffic reach the route. It does
- * not grant CASL permissions and it does not skip row security; the route must
- * still call `forbidUnless(c, auth.ability.can(...))` before reading or writing
- * application data.
+ * A public route pattern only lets anonymous traffic reach the handler. It does
+ * not grant permissions and it does not bypass row security. Handlers for
+ * table-backed data should still read `c.get("auth")`, check `auth.ability`,
+ * and compose their query with `auth.rowSecurity`.
  */
 export function rejectAnonymousByDefault<E extends SapportaEnv>(
   options: AnonymousGateOptions = {},
@@ -121,8 +123,8 @@ export function requireWorkspaceOwner<E extends SapportaEnv>(
   >;
 } {
   const auth = requireWorkspaceRowsAllowed(c);
-  // Owner is a membership role. This check can allow a workflow, but it does
-  // not widen `auth.rowsAllowedForRequest` for user-scoped tables.
+  // Owner can allow a workflow such as inviting users or changing settings, but
+  // it does not widen the row boundary for user-scoped tables.
   if (
     auth.principal.kind !== "user" ||
     !auth.principal.membership.roles.includes("owner")

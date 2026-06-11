@@ -1,12 +1,13 @@
 /**
- * Pure primitives for querying an OpenAPI document.
+ * Helpers for reading the app's OpenAPI document.
  *
- * Everything except `fetchOpenApiSpec` is pure: it takes a spec and returns
- * data. This keeps the hard logic (ref resolution, matching, extraction)
- * unit-testable without any I/O, so `describe.ts` can stay a thin adapter.
+ * `sapporta describe` uses these helpers to list and inspect the endpoints
+ * exposed by the selected deployment. If the OpenAPI route is protected, the
+ * same bearer token used for table/report commands is used here too.
  */
 
 import { httpRequest } from "./http-client.js";
+import { OperationError } from "../introspect/types.js";
 
 export type HttpMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
 
@@ -45,12 +46,40 @@ export type FindResult =
   | { kind: "miss"; suggestions: EndpointSummary[] };
 
 /**
- * Thin I/O wrapper around httpRequest. ECONNREFUSED already surfaces as
- * the friendly "Is the server running?" error from http-client.
+ * Fetch the app contract for the selected deployment.
+ *
+ * Non-2xx responses remain command failures. In particular, auth errors from a
+ * protected OpenAPI route keep their stable server code, such as
+ * `unauthenticated`, `token_expired`, or `forbidden`.
  */
-export async function fetchOpenApiSpec(baseUrl: string): Promise<OpenApiDoc> {
-  const res = await httpRequest(baseUrl, "GET", "/api/openapi.json");
+export async function fetchOpenApiSpec(
+  baseUrl: string,
+  authToken?: string,
+): Promise<OpenApiDoc> {
+  const res = await httpRequest(baseUrl, "GET", "/api/openapi.json", {
+    authToken,
+  });
+  if (res.status < 200 || res.status >= 300) {
+    throw openApiFetchError(res.status, res.data);
+  }
   return res.data as OpenApiDoc;
+}
+
+function openApiFetchError(status: number, data: unknown): OperationError {
+  const body = readErrorBody(data);
+  return new OperationError(
+    body.error ?? `HTTP ${status} while fetching OpenAPI document`,
+    body.code ?? `HTTP_${status}`,
+  );
+}
+
+function readErrorBody(data: unknown): { error?: string; code?: string } {
+  if (typeof data !== "object" || data === null) return {};
+  const record = data as Record<string, unknown>;
+  return {
+    ...(typeof record.error === "string" ? { error: record.error } : {}),
+    ...(typeof record.code === "string" ? { code: record.code } : {}),
+  };
 }
 
 /** Flatten spec.paths into a sorted list of summaries. */
@@ -233,8 +262,8 @@ function suggestionsFor(
   const q = target.toLowerCase();
   const seen = new Set<string>();
   const out: EndpointSummary[] = [];
-  // Summary matches first — agents type intent ("create invoice") more
-  // often than paths.
+  // Summary matches first because callers often search by goal ("create
+  // invoice") before they know the route path.
   for (const e of endpoints) {
     if (e.summary && e.summary.toLowerCase().includes(q)) {
       const key = `${e.method} ${e.path}`;

@@ -47,4 +47,32 @@ describe("buildRequest", () => {
 
     expect(req.queryParams).toEqual({ period: "2026-05" });
   });
+
+  it("does not forward --api-token as a query param", () => {
+    const getRoute: CliRoute = {
+      pattern: ["rows", ":table"],
+      description: "List rows",
+      method: "GET",
+      path: "/api/tables/:table",
+      params: ["table"],
+      queryFlags: ["*"],
+      extractData: () => [],
+    };
+
+    const req = buildRequest(getRoute, { table: "customers" }, {
+      "api-token": "secret-token",
+      limit: "10",
+    });
+
+    expect(req.queryParams).toEqual({ limit: "10" });
+  });
+
+  it("does not forward --api-token into schema-built request bodies", () => {
+    const req = buildRequest(postRoute, {}, {
+      "api-token": "secret-token",
+      sql: "SELECT 1",
+    });
+
+    expect(req.body).toEqual({ sql: "SELECT 1" });
+  });
 });

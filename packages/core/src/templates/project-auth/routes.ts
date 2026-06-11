@@ -9,6 +9,9 @@ import type { AppAbility, AppWorkspaceMembership } from "../authz/types.js";
 import {
   getAuthBootstrapStatusRoute,
   getAuthContextRoute,
+  listAuthTokensRoute,
+  createAuthTokenRoute,
+  revokeAuthTokenRoute,
   switchActiveWorkspaceRoute,
   type AuthBootstrapStatus,
   type AuthContextResponse,
@@ -16,6 +19,12 @@ import {
 import { authFailure } from "./errors.js";
 import { requireAuthContext } from "./middleware.js";
 import { WorkspaceSwitchError } from "./workspace.js";
+import {
+  createAuthToken,
+  listAuthTokens,
+  revokeAuthToken,
+  TokenManagementError,
+} from "./auth-tokens.js";
 
 export interface ProjectAuthRoutesOptions {
   conn: ProjectDbConnection;
@@ -25,6 +34,14 @@ export interface ProjectAuthRoutesOptions {
   ) => Promise<SapportaAuthContext<AppAbility, AppWorkspaceMembership>>;
 }
 
+/**
+ * Auth routes used by the app UI.
+ *
+ * Browser-session users can read their current auth context, switch their
+ * active workspace, and manage agent access tokens. Bearer-token callers may
+ * use ordinary app APIs, but they cannot create, list, or revoke tokens; token
+ * management stays an interactive browser action.
+ */
 export function createProjectAuthRoutes(options: ProjectAuthRoutesOptions) {
   const api = new TsRestApi<SapportaEnv>();
 
@@ -61,7 +78,81 @@ export function createProjectAuthRoutes(options: ProjectAuthRoutesOptions) {
     }
   });
 
+  api.register("listAuthTokens", listAuthTokensRoute, ({ c }) => {
+    if (requestUsesBearerToken(c)) {
+      const failure = authFailure("forbidden");
+      return {
+        status: 403,
+        body: failure.body,
+      };
+    }
+    const auth = requireUserAuthContext(c);
+    return {
+      status: 200,
+      body: {
+        tokens: listAuthTokens(options.conn, auth.principal.user.id),
+      },
+    };
+  });
+
+  api.register("createAuthToken", createAuthTokenRoute, ({ c, request }) => {
+    try {
+      if (requestUsesBearerToken(c)) {
+        const failure = authFailure("forbidden");
+        return {
+          status: 403,
+          body: failure.body,
+        };
+      }
+      const auth = requireUserAuthContext(c);
+      return {
+        status: 201,
+        body: createAuthToken(options.conn, auth.principal, request.body),
+      };
+    } catch (err) {
+      if (err instanceof TokenManagementError) {
+        const failure = authFailure("forbidden");
+        return {
+          status: 403,
+          body: failure.body,
+        };
+      }
+      throw err;
+    }
+  });
+
+  api.register("revokeAuthToken", revokeAuthTokenRoute, ({ c, request }) => {
+    if (requestUsesBearerToken(c)) {
+      const failure = authFailure("forbidden");
+      return {
+        status: 403,
+        body: failure.body,
+      };
+    }
+    const auth = requireUserAuthContext(c);
+    const revoked = revokeAuthToken(
+      options.conn,
+      auth.principal.user.id,
+      request.params.id,
+    );
+    if (!revoked) {
+      const failure = authFailure("not_found");
+      return {
+        status: 404,
+        body: failure.body,
+      };
+    }
+    return {
+      status: 204,
+      body: undefined,
+    };
+  });
+
   return api;
+}
+
+function requestUsesBearerToken(c: Context<SapportaEnv>): boolean {
+  return c.req.header("authorization")?.match(/^Bearer\s+/i) !== undefined;
 }
 
 function requireAppAuthContext(
@@ -71,6 +162,20 @@ function requireAppAuthContext(
     AppAbility,
     AppWorkspaceMembership
   >;
+}
+
+function requireUserAuthContext(
+  c: Context<SapportaEnv>,
+): SapportaAuthContext<AppAbility, AppWorkspaceMembership> & {
+  principal: Extract<SapportaAuthContext["principal"], { kind: "user" }>;
+} {
+  const auth = requireAppAuthContext(c);
+  if (auth.principal.kind !== "user") {
+    throw new Error("A signed-in user is required.");
+  }
+  return auth as SapportaAuthContext<AppAbility, AppWorkspaceMembership> & {
+    principal: Extract<SapportaAuthContext["principal"], { kind: "user" }>;
+  };
 }
 
 export function authBootstrapStatus(
@@ -91,8 +196,8 @@ export function authContextResponse(
   if (auth.principal.kind !== "user") {
     throw new Error("A signed-in user is required to build auth context response.");
   }
-  // The frontend contract is intentionally user-shaped. Derive it from the
-  // principal membership so route code does not grow a second owner/role model.
+  // The UI reads one active workspace. Additional workspace switching can build
+  // on the memberships array without changing the shape of the current context.
   const membership = auth.principal.membership;
   const workspace = membership.workspace;
   const role = membership.roles.includes("owner") ? "owner" : "member";

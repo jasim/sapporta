@@ -1,6 +1,9 @@
 export {
+  createAuthToken,
   fetchAuthBootstrapStatus,
   fetchAuthContext,
+  listAuthTokens,
+  revokeAuthToken,
   switchActiveWorkspace,
   signOut,
 } from "./api/auth-context";
