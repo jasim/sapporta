@@ -5,7 +5,6 @@ import {
   MobileBottomNav,
   NavigationRail,
 } from "./Sidebar";
-import { StatusBar } from "./StatusBar";
 import { useSchemaStore } from "@/schema-catalog/state/schema-store";
 import type { ReportMeta, TableSchema } from "@sapporta/shared/contracts";
 import { Database, FileText } from "lucide-react";
@@ -53,7 +52,6 @@ export function AppShell({
           pickerNavigation={shellNavigation}
         />
       </div>
-      <StatusBar />
     </div>
   );
 }

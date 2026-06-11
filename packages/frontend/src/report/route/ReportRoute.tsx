@@ -6,15 +6,8 @@ import {
   buildReportSearchParams,
 } from "@/report/url/report-url";
 import { ReportView } from "@/report/view/ReportView";
-import { useKeyHints, type KeyHint } from "@/shell/state/hints-store";
-
-const REPORT_HINTS: KeyHint[] = [
-  { key: "⌘K", desc: "command" },
-  { key: "⌘E", desc: "export" },
-];
 
 export function ReportRoute() {
-  useKeyHints(REPORT_HINTS);
   const { reportName } = useParams<{ reportName: string }>();
   const [searchParams, setSearchParams] = useSearchParams();
   const { loaded, reports } = useSchemaStore();

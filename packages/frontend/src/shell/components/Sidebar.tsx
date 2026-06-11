@@ -119,7 +119,7 @@ export function DesktopSidebar({ navigation }: NavigationShellProps) {
   const location = useLocation();
 
   return (
-    <SidebarShell header={<SidebarHeader />} footer={<DefaultSidebarFooter />}>
+    <SidebarShell header={<SidebarHeader />} footer={<AuthAccountMenu />}>
       {navigation.map((section) => (
         <NavSection key={section.label} label={section.label}>
           {section.items.map((item) => (
@@ -172,7 +172,7 @@ export function MobileBottomNav({
   const stableItems = navigationItems(navigation).slice(0, 3);
 
   return (
-    <nav className="md:hidden fixed inset-x-0 bottom-[var(--height-sap-bar)] z-[var(--sap-z-shell-sticky)] h-[56px] border-t border-sap-border bg-sap-sidebar px-2 flex items-center justify-around">
+    <nav className="md:hidden fixed inset-x-0 bottom-0 z-[var(--sap-z-shell-sticky)] h-[56px] border-t border-sap-border bg-sap-sidebar px-2 flex items-center justify-around">
       {stableItems.map((item) => {
         const active = isNavigationItemActive(item, location);
         const Icon = item.icon;
@@ -273,24 +273,4 @@ function includeActiveRailItem(
     return [...visibleItems, activeItem];
   }
   return [...visibleItems.slice(0, 7), activeItem];
-}
-
-function SidebarKbd({ children }: { children: ReactNode }) {
-  return (
-    <kbd className="mono text-sap-label font-normal rounded-[3px] px-[5px] py-[1px] inline-flex items-center justify-center border border-sap-border bg-sap-kbd text-sap-subtle">
-      {children}
-    </kbd>
-  );
-}
-
-function DefaultSidebarFooter() {
-  return (
-    <div className="space-y-2">
-      <AuthAccountMenu />
-      <div className="flex items-center gap-2">
-        <SidebarKbd>⌘K</SidebarKbd>
-        <span className="text-sap-menu text-sap-muted">Command menu</span>
-      </div>
-    </div>
-  );
 }
