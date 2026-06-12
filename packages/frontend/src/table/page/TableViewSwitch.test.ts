@@ -43,19 +43,38 @@ describe("TableViewSwitch", () => {
     }
   });
 
-  it("renders Auto, Tabular, and Cards choices and reports selection changes", async () => {
+  it("opens table view options and reports selection changes", async () => {
     const onChange = vi.fn();
     mounted = await render(
       createElement(TableViewSwitch, { value: "auto", onChange }),
     );
 
-    expect(
-      [...mounted.container.querySelectorAll("button")].map((button) =>
-        button.textContent?.trim(),
-      ),
-    ).toEqual(["Auto", "Tabular", "Cards"]);
+    const trigger = mounted.container.querySelector<HTMLButtonElement>(
+      'button[aria-label="Open table view options"]',
+    );
+    if (!(trigger instanceof HTMLButtonElement)) {
+      throw new Error("expected table view menu trigger");
+    }
 
-    const cardsButton = [...mounted.container.querySelectorAll("button")].find(
+    expect(trigger.textContent?.trim()).toBe("");
+    expect(trigger.title).toBe("View options");
+
+    await act(async () => {
+      trigger.click();
+    });
+
+    const viewButtons = [...document.body.querySelectorAll("button")].filter(
+      (button) => button.getAttribute("role") === "menuitemradio",
+    );
+
+    expect(viewButtons.map((button) => button.textContent?.trim())).toEqual([
+      "Auto",
+      "Tabular",
+      "Cards",
+    ]);
+    expect(viewButtons[0]?.getAttribute("aria-checked")).toBe("true");
+
+    const cardsButton = viewButtons.find(
       (button) => button.textContent?.trim() === "Cards",
     );
     if (!(cardsButton instanceof HTMLButtonElement)) {
@@ -70,9 +89,7 @@ describe("TableViewSwitch", () => {
   });
 
   it("uses the documented per-table preference key", () => {
-    expect(tableViewPreferenceKey("quotes")).toBe(
-      "sapporta:table-view:quotes",
-    );
+    expect(tableViewPreferenceKey("quotes")).toBe("sapporta:table-view:quotes");
   });
 
   it("maps saved pre-rename view names to current names", () => {
