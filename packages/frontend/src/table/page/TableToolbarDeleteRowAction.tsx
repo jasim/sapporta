@@ -1,12 +1,6 @@
 import { useSyncExternalStore } from "react";
 import { Trash2 } from "lucide-react";
-import {
-  rootPath,
-  rowsInSelection,
-  type GridPath,
-  type GridRuntime,
-  type RowId,
-} from "@sapporta/grid";
+import { type GridPath, type GridRuntime } from "@sapporta/grid";
 import { TopBarButton } from "@/shell/components/TopBar";
 
 export type TableToolbarSession = {
@@ -20,101 +14,85 @@ export type TableToolbarDeleteRowActionProps = {
 export function TableToolbarDeleteRowAction({
   session,
 }: TableToolbarDeleteRowActionProps) {
-  const actionState = useDeleteRowActionState(session);
-  const label = actionState === "multiple" ? "Delete Rows" : "Delete Row";
+  const hasSelectedRow = useHasAnySelectedDataRow(session);
 
   return (
     <TopBarButton
       tone="ghost"
       icon={<Trash2 className="h-[12px] w-[12px]" />}
-      disabled={actionState === "none"}
+      disabled={!hasSelectedRow}
     >
-      <span className="sr-only">{label}</span>
+      <span className="sr-only">Delete Row</span>
     </TopBarButton>
   );
 }
 
-type DeleteRowActionState = "none" | "single" | "multiple";
-
-function useDeleteRowActionState(
+function useHasAnySelectedDataRow(
   session: TableToolbarSession | undefined,
-): DeleteRowActionState {
-  return useSyncExternalStore(
-    (notify) => {
-      if (!session) return () => {};
-      const root = rootPath(session.runtime.schema.rootLevel);
-      const controller = session.runtime.controllerFor(root);
-      const unsubs = [
-        controller.subscribe((state, previous) => {
-          if (
-            state.liveCellFocus !== previous.liveCellFocus ||
-            state.cellSelection !== previous.cellSelection
-          ) {
-            notify();
-          }
-        }),
-        session.runtime.subscribeRowInteractionSnapshot(root, notify),
-        session.runtime.subscribeDisplayedRowSequence(root, notify),
-      ];
-      return () => {
-        for (const unsub of unsubs) unsub();
-      };
-    },
-    () => {
-      if (!session) return "none";
-      return readDeleteRowActionState(
-        session,
-        rootPath(session.runtime.schema.rootLevel),
-      );
-    },
-    () => "none",
-  );
-}
-
-function readDeleteRowActionState(
-  session: TableToolbarSession,
-  root: GridPath,
-): DeleteRowActionState {
-  const runtime = session.runtime;
-  const displayed = runtime.displayedRowsFor(root);
-  const rowInteraction = runtime.rowInteractionSnapshotFor(root);
-  const selectedRowCount = countDeletableRows(
-    rowInteraction.selectedRowIds,
-    displayed,
-  );
-  const controllerState = runtime.controllerFor(root).getState();
-  let selectedCellRowCount = 0;
-  if (controllerState.cellSelection) {
-    selectedCellRowCount = countDeletableRows(
-      rowsInSelection(controllerState.cellSelection, displayed),
-      displayed,
-    );
-  }
-
-  if (selectedRowCount > 1 || selectedCellRowCount > 1) return "multiple";
-  if (selectedRowCount === 1 || selectedCellRowCount === 1) return "single";
-  if (isDeletableRow(controllerState.liveCellFocus?.rowId, displayed)) {
-    return "single";
-  }
-  if (isDeletableRow(rowInteraction.activeRowId, displayed)) {
-    return "single";
-  }
-  return "none";
-}
-
-type DisplayedRows = ReturnType<GridRuntime["displayedRowsFor"]>;
-
-function countDeletableRows(
-  rowIds: readonly RowId[],
-  displayed: DisplayedRows,
-): number {
-  return rowIds.filter((rowId) => isDeletableRow(rowId, displayed)).length;
-}
-
-function isDeletableRow(
-  rowId: RowId | null | undefined,
-  displayed: DisplayedRows,
 ): boolean {
-  if (!rowId) return false;
-  return displayed.rowById.get(rowId)?.kind === "data";
+  // Keep the toolbar affordance in step with the table tree the app is showing.
+  // A row selected inside an expanded child table should enable the same delete
+  // action as a row selected in the root table.
+  return useSyncExternalStore(
+    (notify) => subscribeSelectedDataRows(session, notify),
+    () => hasAnySelectedDataRow(session),
+    () => false,
+  );
+}
+
+function hasAnySelectedDataRow(
+  session: TableToolbarSession | undefined,
+): boolean {
+  if (!session) return false;
+  const runtime = session.runtime;
+  for (const path of runtime.registeredPaths()) {
+    const rowInteraction = runtime.rowInteractionSnapshotFor(path);
+    for (const rowId of rowInteraction.selectedRowIds) {
+      // Only persisted table rows are delete candidates. Draft rows, summary
+      // rows, footers, and rows filtered away from the displayed set should not
+      // make the toolbar look ready to delete.
+      if (runtime.displayedRowFor(path, rowId)?.kind === "data") {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+function subscribeSelectedDataRows(
+  session: TableToolbarSession | undefined,
+  notify: () => void,
+): () => void {
+  if (!session) return () => {};
+
+  const runtime = session.runtime;
+  const unsubs: Array<() => void> = [];
+  const subscribedPaths = new Set<GridPath>();
+
+  function subscribeKnownPaths(): void {
+    // Expanded child tables register their own grid paths. Attach listeners as
+    // those paths appear so custom nested table pages get the delete affordance
+    // without wiring a separate toolbar for each level.
+    for (const path of runtime.registeredPaths()) {
+      if (subscribedPaths.has(path)) continue;
+      subscribedPaths.add(path);
+      // Selection changes decide whether there is anything to delete; displayed
+      // row changes clear the affordance when a selected row disappears or stops
+      // being a persisted data row.
+      unsubs.push(runtime.subscribeRowInteractionSnapshot(path, notify));
+      unsubs.push(runtime.subscribeDisplayedRowSequence(path, notify));
+    }
+  }
+
+  subscribeKnownPaths();
+  unsubs.push(
+    runtime.subscribeRegistry(() => {
+      subscribeKnownPaths();
+      notify();
+    }),
+  );
+
+  return () => {
+    for (const unsub of unsubs) unsub();
+  };
 }
