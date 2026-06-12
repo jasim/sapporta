@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import type { CellEditorProps } from "../../grid/types/schema";
 import { presetRuntime } from "../preset";
 import styles from "../sapporta-preset.module.css";
+import { focusEditorInput } from "./editor-focus";
 import { parseForCommit } from "./parse-for-commit";
 
 export function TextEditor(props: CellEditorProps) {
@@ -17,9 +18,8 @@ export function TextEditor(props: CellEditorProps) {
   useEffect(() => {
     const node = multiLine ? textareaRef.current : inputRef.current;
     if (!node) return;
-    node.focus();
-    node.select();
-  }, [multiLine]);
+    focusEditorInput(node, props.trigger);
+  }, [multiLine, props.trigger]);
 
   if (multiLine) {
     return (

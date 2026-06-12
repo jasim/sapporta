@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { CellEditorProps } from "../../grid/types/schema";
+import { focusEditorInput } from "./editor-focus";
 import { parseForCommit } from "./parse-for-commit";
 
 export function DateEditor(props: CellEditorProps) {
@@ -7,9 +8,9 @@ export function DateEditor(props: CellEditorProps) {
   const ref = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
-    ref.current?.focus();
-    ref.current?.select();
-  }, []);
+    if (!ref.current) return;
+    focusEditorInput(ref.current, props.trigger);
+  }, [props.trigger]);
 
   return (
     <input
