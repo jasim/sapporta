@@ -199,7 +199,7 @@ describe("inMemoryGridDataSource", () => {
     ]);
   });
 
-  it("mutating the returned root source does NOT mutate the input tree array", () => {
+  it("mutating the returned root source does NOT mutate the input tree array", async () => {
     const tree = fixtureTree();
     const originalFirst = tree[0];
     const originalLength = tree.length;
@@ -208,7 +208,7 @@ describe("inMemoryGridDataSource", () => {
     const r = ds.rootSource();
     if (!r.writable) throw new Error("expected writable root");
     r.setCell("ord-1", "customer", "Aliceeee");
-    r.insertNode({
+    await r.createNode({
       levelName: "orders",
       columns: { id: "ord-3", customer: "C" },
     });

@@ -30,7 +30,7 @@ describe("LevelDataSource discriminated union", () => {
         // Edit verbs and reconciliation are present on the narrowed type.
         expectTypeOf(source.setCell).toBeFunction();
         expectTypeOf(source.applyChanges).toBeFunction();
-        expectTypeOf(source.insertNode).toBeFunction();
+        expectTypeOf(source.createNode).toBeFunction();
         expectTypeOf(source.removeNode).toBeFunction();
         expectTypeOf(source.onReconcile).toBeFunction();
       }
@@ -69,7 +69,9 @@ describe("ReconcileEvent discriminated union", () => {
 
   it("does not include a previousValue field on agreed", () => {
     type AgreedKeys = keyof Extract<ReconcileEvent, { kind: "agreed" }>;
-    expectTypeOf<AgreedKeys>().toEqualTypeOf<"kind" | "rowKey" | "colId" | "value">();
+    expectTypeOf<AgreedKeys>().toEqualTypeOf<
+      "kind" | "rowKey" | "colId" | "value"
+    >();
   });
 });
 
@@ -77,7 +79,9 @@ describe("LevelSnapshot.serverManaged", () => {
   it("is required (not optional)", () => {
     type ServerManagedKey = "serverManaged";
     type SnapshotRequiredKeys = {
-      [K in keyof LevelSnapshot]-?: undefined extends LevelSnapshot[K] ? never : K;
+      [K in keyof LevelSnapshot]-?: undefined extends LevelSnapshot[K]
+        ? never
+        : K;
     }[keyof LevelSnapshot];
     expectTypeOf<ServerManagedKey>().toMatchTypeOf<SnapshotRequiredKeys>();
   });

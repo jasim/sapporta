@@ -9,6 +9,7 @@ import {
   childPath,
   rootPath,
   type GridInteractionConfig,
+  type PhantomRowsConfig,
 } from "@sapporta/grid";
 import type {
   ColId,
@@ -65,6 +66,7 @@ export type TGridDefinition<
 > = {
   readonly rootLevel: TGridLevelId<RowsByLevel>;
   readonly interaction?: GridInteractionConfig;
+  readonly phantomRows?: PhantomRowsConfig;
   readonly levels: TGridLevelsConfigMap<RowsByLevel, AppServices>;
 };
 

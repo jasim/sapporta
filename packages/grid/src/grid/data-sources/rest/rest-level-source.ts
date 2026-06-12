@@ -726,32 +726,18 @@ export function restLevelSource<F = unknown>(
     });
   };
 
-  const insertNode: WritableLevelDataSource["insertNode"] = (node, atIndex) => {
+  const createNode: WritableLevelDataSource["createNode"] = async (
+    node,
+    atIndex,
+  ) => {
+    const serverNode = await opts.insertNode!({ node, atIndex });
     const idx = atIndex === undefined ? nodes.length : atIndex;
+    if (disposed) return { node: serverNode, atIndex: idx };
     const next = nodes.slice();
-    next.splice(idx, 0, node);
+    next.splice(idx, 0, serverNode);
     nodes = next;
     emit();
-    opts.insertNode!({ node, atIndex }).then(
-      (serverNode) => {
-        if (disposed) return;
-        // Replace the optimistic node with the server's authoritative
-        // copy so any normalized columns or a server-assigned id flow in.
-        const myKey = rowKeyFn(node, idx);
-        const here = findNodeIdx(myKey);
-        if (here < 0) return;
-        const next = nodes.slice();
-        next[here] = serverNode;
-        nodes = next;
-        emit();
-      },
-      () => {
-        if (disposed) return;
-        // Optimistic insert: keep on rejection; the host's reconcile
-        // listener can decide whether to remove. There is no per-row
-        // reconcile event for inserts in the current contract.
-      },
-    );
+    return { node: serverNode, atIndex: idx };
   };
 
   const removeNode: WritableLevelDataSource["removeNode"] = (rowKey) => {
@@ -765,7 +751,7 @@ export function restLevelSource<F = unknown>(
         // No state change on success — the row is already gone.
       },
       () => {
-        // Same posture as insertNode: leave the optimistic state in
+        // Same posture as createNode: leave the optimistic state in
         // place; host policy decides recovery.
       },
     );
@@ -789,7 +775,7 @@ export function restLevelSource<F = unknown>(
     dispose: read.dispose,
     setCell,
     applyChanges,
-    insertNode,
+    createNode,
     removeNode,
     onReconcile,
   };

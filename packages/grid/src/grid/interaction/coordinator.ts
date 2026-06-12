@@ -152,7 +152,8 @@ export function createGridCoordinator(
       const parentSchema = runtime.schemaAt(path);
       if (cellCursor) {
         const cellCursorIsInCollapsedSubtree = collapsedChildPaths.some(
-          (cp) => cellCursor.path === cp || cellCursor.path.startsWith(`${cp}.`),
+          (cp) =>
+            cellCursor.path === cp || cellCursor.path.startsWith(`${cp}.`),
         );
         if (cellCursorIsInCollapsedSubtree) {
           const parentCol =
@@ -190,9 +191,7 @@ export function createGridCoordinator(
     }
   };
 
-  function rowMoveFor(
-    intent: CellNavigationIntent,
-  ): {
+  function rowMoveFor(intent: CellNavigationIntent): {
     direction: RowDirection;
     colPolicy: "preserve" | "first" | "last";
     extend: boolean;
@@ -353,7 +352,7 @@ export function createGridCoordinator(
 
     const move = rowMoveFor(intent);
     if (!move) return null;
-    return nextVisibleRow(
+    const target = nextVisibleRow(
       runtime,
       coordinatorStore,
       { path: fromPath, rowId: cursor.rowId, colId: cursor.colId },
@@ -361,6 +360,14 @@ export function createGridCoordinator(
       move.colPolicy,
       { capabilitiesFor: args.capabilitiesFor },
     );
+    if (target) return target;
+    return move.direction === "down"
+      ? runtime.phantomBoundaryCellTarget(
+          fromPath,
+          cursor.colId,
+          move.colPolicy,
+        )
+      : null;
   }
 
   store.navigateCell = (fromPath, intent) => {
@@ -371,7 +378,8 @@ export function createGridCoordinator(
       // routes through rowInteraction so the operation target changes without
       // moving the cell cursor.
       const active = runtime.activeRowFor(fromPath);
-      if (active) runtime.rowInteraction.toggleRowSelection(active.path, active.rowId);
+      if (active)
+        runtime.rowInteraction.toggleRowSelection(active.path, active.rowId);
       return;
     }
     const current = cursorManager.currentCellCursor();
@@ -386,7 +394,9 @@ export function createGridCoordinator(
     // Navigation may resolve to a cell outside the current viewport. Reveal is
     // requested here, not by the cursor manager, so pointer-originated cursor
     // placement can update focus without unexpectedly moving visible content.
-    runtime.controllerFor(target.path).revealCell({ rowId: target.rowId, colId: target.colId });
+    runtime
+      .controllerFor(target.path)
+      .revealCell({ rowId: target.rowId, colId: target.colId });
   };
 
   function resolveRowMovement(
@@ -409,13 +419,29 @@ export function createGridCoordinator(
       // Row traversal is deliberately column-free. It uses the same
       // rowSelectable gate as row selection so keyboard focus and operation
       // selection cannot disagree about which rows are valid.
-      return nextRowSelectablePosition(runtime, coordinatorStore, rowCursor, intent.direction);
+      const target = nextRowSelectablePosition(
+        runtime,
+        coordinatorStore,
+        rowCursor,
+        intent.direction,
+      );
+      if (target) return target;
+      return intent.direction === "down"
+        ? runtime.phantomBoundaryRowTarget(fromPath)
+        : null;
     }
     if (intent.type === "moveActiveRowEdge") {
-      return nextRowSelectablePosition(runtime, coordinatorStore, rowCursor, intent.edge === "first" ? "first" : "last");
+      return nextRowSelectablePosition(
+        runtime,
+        coordinatorStore,
+        rowCursor,
+        intent.edge === "first" ? "first" : "last",
+      );
     }
     if (intent.type === "moveActiveRowDelta") {
-      return nextRowSelectablePosition(runtime, coordinatorStore, rowCursor, { delta: intent.delta });
+      return nextRowSelectablePosition(runtime, coordinatorStore, rowCursor, {
+        delta: intent.delta,
+      });
     }
     return null;
   }
@@ -440,7 +466,8 @@ export function createGridCoordinator(
     }
     if (intent.type === "toggleActiveRowSelection") {
       const active = runtime.activeRowFor(fromPath);
-      if (active) runtime.rowInteraction.toggleRowSelection(active.path, active.rowId);
+      if (active)
+        runtime.rowInteraction.toggleRowSelection(active.path, active.rowId);
       return;
     }
     if (intent.type === "clearRowSelection") {

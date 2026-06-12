@@ -36,8 +36,8 @@
 //      as paths are expanded.
 //
 // The runtime is also the single seam through which writes flow:
-// `writeCell`, `applyChanges`, `insertRow`, `removeRow`, and
-// `commitPhantom` look up the source for that path, capture pre-state,
+// `writeCell`, `applyChanges`, `createRow`, `removeRow`, and
+// `commitPhantomRow` look up the source for that path, capture pre-state,
 // ask the source to apply the change, and emit `mutationCommitted`.
 // All write verbs throw if the resolved source is readonly.
 //
@@ -71,10 +71,18 @@ import {
   childPath as makeChildPath,
   decomposePath,
   makeRowId,
+  phantomKeyFromDisplayedRowId,
   rootPath,
   rowKeyOfRowId,
 } from "../types/identity";
-import type { ColId, Coord, GridPath, RowId, RowKey } from "../types/identity";
+import type {
+  CellCursor,
+  ColId,
+  Coord,
+  GridPath,
+  RowId,
+  RowKey,
+} from "../types/identity";
 import type { GridInteractionConfig } from "../types/interaction";
 import { normalizeInteraction } from "../interaction/normalize-interaction";
 import type {
@@ -98,12 +106,14 @@ import type {
   DisplayedRowSequence,
   LevelRow,
   PhantomRow,
+  PhantomRowsConfig,
   TreeNode,
 } from "../types/level-row";
 import type { GridSchema, LevelSchema } from "../types/schema";
 import { defaultRowKey } from "../pipeline/stages/build-data";
 import type {
   CellChange,
+  CreateNodeResult,
   GridDataSource,
   LevelDataSource,
   LevelSnapshot,
@@ -140,12 +150,14 @@ import {
 import { createPhantomChannel } from "../data-sources/phantom-channel";
 import { createEmitter, type GridEmitter, type GridEvents } from "./emitter";
 import type { PhantomChannel } from "../data-sources/types";
+import { createPhantomRowLifecycle } from "./phantom-row-lifecycle";
 
 export type RuntimeArgs = {
   schema: GridSchema;
   dataSource: GridDataSource;
   interaction?: GridInteractionConfig;
   initialPhantomsByPath?: Map<GridPath, PhantomRow[]>;
+  phantomRows?: PhantomRowsConfig;
   on?: { [E in keyof GridEvents]?: (payload: GridEvents[E]) => void };
 };
 
@@ -218,15 +230,23 @@ export type GridRuntime = {
   applyChanges: (path: GridPath, changes: CellChange[]) => void;
   // Runtime-owned row insertion/removal. These are the host-facing row
   // mutation verbs; the concrete source verbs are private to the runtime.
-  insertRow: (path: GridPath, node: TreeNode, atIndex?: number) => void;
+  createRow: (
+    path: GridPath,
+    node: TreeNode,
+    atIndex?: number,
+  ) => Promise<CreateNodeResult>;
   removeRow: (path: GridPath, rowKey: RowKey) => void;
-  // Host-orchestrated phantom commit: read the phantom for `(path,
-  // rowKey)`, build a `TreeNode` from its columns, call `insertNode`
-  // on the path's source, then drop the phantom from the channel and
-  // emit `phantomCommitted`. Atomic from the host's view: if
-  // `insertNode` throws the phantom stays. Throws if the path's source
-  // is readonly or no phantom exists for `rowKey`.
-  commitPhantom: (path: GridPath, rowKey: RowKey, atIndex?: number) => void;
+  commitPhantomRow: (
+    path: GridPath,
+    rowKey: RowKey,
+    atIndex?: number,
+  ) => Promise<CreateNodeResult>;
+  phantomBoundaryCellTarget: (
+    path: GridPath,
+    colId: ColId,
+    colPolicy: "preserve" | "first" | "last",
+  ) => CellCursor | null;
+  phantomBoundaryRowTarget: (path: GridPath) => RowCursor | null;
 
   on: GridEmitter["on"];
   dispose: () => void;
@@ -241,6 +261,12 @@ export type RowInteractionCommands = {
   extendRowSelectionTo: (path: GridPath, rowId: RowId) => void;
   extendRowSelectionToCursor: (target: RowCursor) => void;
   clearRowSelection: (path: GridPath) => void;
+};
+
+type PendingPhantomCreate = {
+  promise: Promise<CreateNodeResult>;
+  node: TreeNode;
+  atIndex?: number;
 };
 
 export function createGridRuntime(args: RuntimeArgs): GridRuntime {
@@ -271,6 +297,21 @@ export function createGridRuntime(args: RuntimeArgs): GridRuntime {
   const sourceUnsubs = new Map<GridPath, () => void>();
   const reconcileUnsubs = new Map<GridPath, () => void>();
   const lastStatusByPath = new Map<GridPath, LevelStatus>();
+  const pendingPhantomCreates = new Map<string, PendingPhantomCreate>();
+  const phantomLifecycle = createPhantomRowLifecycle({
+    config: args.phantomRows,
+    getSource: (path) => sources.get(path),
+    schemaAt: (path) => schemaForPath(path),
+    getPhantoms: (path) => phantoms.get(path),
+    addPhantom: (path, phantom) => phantoms.add(path, phantom),
+    setPhantomCell: (path, rowKey, colId, value) =>
+      phantoms.setCell(path, rowKey, colId, value),
+    setPhantomState: (path, rowKey, state) =>
+      phantoms.setState(path, rowKey, state),
+    commitPhantomRow: (path, rowKey) => {
+      void commitPhantomRow(path, rowKey).catch(() => {});
+    },
+  });
 
   const root = rootPath(schemaTopology.rootLevelName);
   let disposed = false;
@@ -354,6 +395,7 @@ export function createGridRuntime(args: RuntimeArgs): GridRuntime {
         error ? { path, status, error } : { path, status },
       );
     }
+    phantomLifecycle.ensureBlankForEmptyPath(path);
   }
 
   // Eagerly install the root so initial reads (snapshotFor,
@@ -379,6 +421,7 @@ export function createGridRuntime(args: RuntimeArgs): GridRuntime {
         }),
       );
     }
+    phantomLifecycle.ensureBlankForEmptyPath(root);
     notifyRegistryChanged();
   }
 
@@ -413,6 +456,7 @@ export function createGridRuntime(args: RuntimeArgs): GridRuntime {
           }),
         );
       }
+      phantomLifecycle.ensureBlankForEmptyPath(childPath);
       bumped = true;
     }
     if (bumped) notifyRegistryChanged();
@@ -623,7 +667,7 @@ export function createGridRuntime(args: RuntimeArgs): GridRuntime {
     }
     if (!src.writable) {
       throw new Error(
-        `GridRuntime: source for path "${path}" is readonly — writeCell/applyChanges/insertRow/removeRow are not available.`,
+        `GridRuntime: source for path "${path}" is readonly — writeCell/applyChanges/createRow/removeRow are not available.`,
       );
     }
     return src;
@@ -631,6 +675,27 @@ export function createGridRuntime(args: RuntimeArgs): GridRuntime {
 
   function writeCell(path: GridPath, coord: Coord, value: unknown): void {
     const src = requireWritable(path);
+    const row = displayedRowsFor(path).rowById.get(coord.rowId);
+    if (!row) {
+      throw new Error(
+        `GridRuntime.writeCell: no displayed row "${coord.rowId}" at path "${path}".`,
+      );
+    }
+    if (row.kind === "phantom") {
+      const phantomKey = phantomKeyFromDisplayedRowId(coord.rowId);
+      if (!phantomKey) {
+        throw new Error(
+          `GridRuntime.writeCell: malformed phantom row id "${coord.rowId}".`,
+        );
+      }
+      phantomLifecycle.setPhantomCell(path, phantomKey, coord.colId, value);
+      return;
+    }
+    if (row.kind !== "data") {
+      throw new Error(
+        `GridRuntime.writeCell: row "${coord.rowId}" is ${row.kind}, not editable data.`,
+      );
+    }
     const rowKey = rowKeyOfRowId(coord.rowId);
     const oldValue = readCellValue(
       src.snapshot(),
@@ -648,32 +713,59 @@ export function createGridRuntime(args: RuntimeArgs): GridRuntime {
     });
   }
 
-  function commitPhantom(
+  function commitPhantomRow(
     path: GridPath,
     rowKey: RowKey,
     atIndex?: number,
-  ): void {
-    const src = requireWritable(path);
+  ): Promise<CreateNodeResult> {
+    const pendingKey = phantomCreateKey(path, rowKey);
+    const pending = pendingPhantomCreates.get(pendingKey);
+    if (pending) return pending.promise;
+
     const phantom = phantoms.get(path).find((p) => p.rowKey === rowKey);
     if (!phantom) {
-      throw new Error(
-        `GridRuntime.commitPhantom: no phantom with rowKey "${rowKey}" at path "${path}".`,
+      return Promise.reject(
+        new Error(
+          `GridRuntime.commitPhantomRow: no phantom with rowKey "${rowKey}" at path "${path}".`,
+        ),
       );
     }
-    const node = {
+    if (phantom.state.kind === "saving") {
+      return Promise.reject(
+        new Error(
+          `GridRuntime.commitPhantomRow: phantom with rowKey "${rowKey}" at path "${path}" is already saving.`,
+        ),
+      );
+    }
+    if (phantomLifecycle.isBlank(phantom.columns)) {
+      return Promise.reject(
+        new Error(
+          `GridRuntime.commitPhantomRow: phantom with rowKey "${rowKey}" at path "${path}" is blank.`,
+        ),
+      );
+    }
+    phantoms.setState(path, rowKey, { kind: "saving" });
+    const node: TreeNode = {
       levelName: schemaForPath(path).name,
-      columns: phantom.columns,
+      columns: { ...phantom.columns },
     };
-    const actualIndex = atIndex ?? src.snapshot().nodes.length;
-    src.insertNode(node, atIndex);
-    phantoms.remove(path, rowKey);
-    emitter.emit("mutationCommitted", {
-      kind: "insert",
-      path,
-      node,
-      atIndex: actualIndex,
-    });
-    emitter.emit("phantomCommitted", { path, rowKey });
+    const promise = (async () => {
+      try {
+        const result = await createRow(path, node, atIndex);
+        phantoms.remove(path, rowKey);
+        emitter.emit("phantomRowCommitted", { path, rowKey, ...result });
+        return result;
+      } catch (err) {
+        const reason = reasonOf(err);
+        phantoms.setState(path, rowKey, { kind: "failed", reason });
+        emitter.emit("phantomRowCreateFailed", { path, rowKey, reason });
+        throw err;
+      } finally {
+        pendingPhantomCreates.delete(pendingKey);
+      }
+    })();
+    pendingPhantomCreates.set(pendingKey, { promise, node, atIndex });
+    return promise;
   }
 
   function applyChanges(path: GridPath, changes: CellChange[]): void {
@@ -695,16 +787,20 @@ export function createGridRuntime(args: RuntimeArgs): GridRuntime {
     emitter.emit("mutationCommitted", { kind: "cells", path, edits });
   }
 
-  function insertRow(path: GridPath, node: TreeNode, atIndex?: number): void {
+  async function createRow(
+    path: GridPath,
+    node: TreeNode,
+    atIndex?: number,
+  ): Promise<CreateNodeResult> {
     const src = requireWritable(path);
-    const actualIndex = atIndex ?? src.snapshot().nodes.length;
-    src.insertNode(node, atIndex);
+    const result = await src.createNode(node, atIndex);
     emitter.emit("mutationCommitted", {
       kind: "insert",
       path,
-      node,
-      atIndex: actualIndex,
+      node: result.node,
+      atIndex: result.atIndex,
     });
+    return result;
   }
 
   function removeRow(path: GridPath, rowKey: RowKey): void {
@@ -756,6 +852,8 @@ export function createGridRuntime(args: RuntimeArgs): GridRuntime {
     coordinator,
     controllerCursorPortFor: (path) => controllerCursorPortFor(path),
     displayedRowsFor,
+    onCellCursorChanging: phantomLifecycle.onCellCursorChanging,
+    onRowCursorChanging: phantomLifecycle.onRowCursorChanging,
   });
   cursorManagerRef = cursorManager;
 
@@ -1099,9 +1197,11 @@ export function createGridRuntime(args: RuntimeArgs): GridRuntime {
     sourceFor,
     writeCell,
     applyChanges,
-    insertRow,
+    createRow,
     removeRow,
-    commitPhantom,
+    commitPhantomRow,
+    phantomBoundaryCellTarget: phantomLifecycle.boundaryCellTarget,
+    phantomBoundaryRowTarget: phantomLifecycle.boundaryRowTarget,
     on: emitter.on,
     dispose,
   };
@@ -1142,6 +1242,16 @@ function readNodeWithIndex(
     }
   }
   throw new Error(`GridRuntime.removeRow: no node with rowKey '${rowKey}'`);
+}
+
+function reasonOf(err: unknown): string {
+  if (err instanceof Error) return err.message;
+  if (err === null || err === undefined) return "";
+  return String(err);
+}
+
+function phantomCreateKey(path: GridPath, rowKey: RowKey): string {
+  return `${path}\u0000${rowKey}`;
 }
 
 function rowCursorSnapshotEqual(

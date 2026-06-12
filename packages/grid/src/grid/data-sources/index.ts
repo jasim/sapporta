@@ -2,6 +2,7 @@ export type {
   LevelStatus,
   LevelSnapshot,
   CellChange,
+  CreateNodeResult,
   ReconcileEvent,
   ReadonlyLevelDataSource,
   WritableLevelDataSource,

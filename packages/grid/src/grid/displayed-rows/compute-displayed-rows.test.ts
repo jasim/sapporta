@@ -34,6 +34,10 @@ vi.mock("../pipeline/stages/with-filter", async () => {
   return { withFilter: vi.fn(actual.withFilter) };
 });
 
+function phantom(rowKey: string): PhantomRow {
+  return { rowKey, columns: {}, state: { kind: "editing" } };
+}
+
 const sortSpy = withSort as unknown as ReturnType<typeof vi.fn>;
 const filterSpy = withFilter as unknown as ReturnType<typeof vi.fn>;
 
@@ -170,14 +174,14 @@ describe("withFooters", () => {
 describe("withPhantoms", () => {
   it("appends phantoms when level allows them", () => {
     const protos = buildDataRows(nodes, opts);
-    const phantomRows: PhantomRow[] = [{ rowKey: "draft1", columns: {} }];
+    const phantomRows: PhantomRow[] = [phantom("draft1")];
     const out = withPhantoms(protos, phantomRows, opts);
     expect(out[out.length - 1].kind).toBe("phantom");
   });
 
   it("ignores phantoms on a level that disallows them", () => {
     const protos = buildDataRows(nodes, reportOpts);
-    const phantomRows: PhantomRow[] = [{ rowKey: "draft1", columns: {} }];
+    const phantomRows: PhantomRow[] = [phantom("draft1")];
     expect(withPhantoms(protos, phantomRows, reportOpts)).toBe(protos);
   });
 });
@@ -344,7 +348,7 @@ describe("deriveDisplayedRowsState composition", () => {
         footerRows: [{ rowKey: "total", columns: { name: "Total", qty: 6 } }],
         sort: [{ colId: "qty", direction: "asc" }],
       }),
-      phantomRows: [{ rowKey: "p1", columns: {} }],
+      phantomRows: [phantom("p1")],
     });
     const out = deriveDisplayedRowsState(input);
     expect(out.displayedRows.rows.map((r) => r.kind)).toEqual([
@@ -444,7 +448,7 @@ describe("deriveDisplayedRowsState identity preservation", () => {
     expect(first.displayedRows.rows.some((r) => r.kind === "phantom")).toBe(
       false,
     );
-    const phantomRows: PhantomRow[] = [{ rowKey: "p1", columns: {} }];
+    const phantomRows: PhantomRow[] = [phantom("p1")];
     const second = deriveDisplayedRowsState({ ...base, phantomRows }, first);
     expect(second).not.toBe(first);
     expect(second.displayedRows.rows.some((r) => r.kind === "phantom")).toBe(

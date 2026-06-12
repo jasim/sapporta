@@ -399,7 +399,9 @@ describe("restLevelSource — setCell reconciliation", () => {
     });
   }
 
-  async function readyWritable(extra: Partial<RestLevelSourceOpts<TestFilter>> = {}) {
+  async function readyWritable(
+    extra: Partial<RestLevelSourceOpts<TestFilter>> = {},
+  ) {
     const src = restLevelSource(writableOpts(extra));
     if (!src.writable) throw new Error("expected writable source");
     // Drain the initial fetchPage microtasks.
@@ -548,7 +550,6 @@ describe("restLevelSource — setCell reconciliation", () => {
     const colIds = patchCell.mock.calls.map((c) => c[0].colId).sort();
     expect(colIds).toEqual(["id", "v"]);
   });
-
 });
 
 describe("restLevelSource — applyChanges atomicity", () => {
@@ -563,7 +564,9 @@ describe("restLevelSource — applyChanges atomicity", () => {
     });
   }
 
-  async function readyWritable(extra: Partial<RestLevelSourceOpts<TestFilter>> = {}) {
+  async function readyWritable(
+    extra: Partial<RestLevelSourceOpts<TestFilter>> = {},
+  ) {
     const src = restLevelSource(writableOpts(extra));
     if (!src.writable) throw new Error("expected writable source");
     await flush();
@@ -616,7 +619,123 @@ describe("restLevelSource — applyChanges atomicity", () => {
     expect(src.snapshot().nodes[0].columns.v).toBe(1);
     expect(src.snapshot().nodes[1].columns.v).toBe(2);
     expect(events.map((e) => e.kind)).toEqual(["rejected", "rejected"]);
-    expect(events.map((e) => (e.kind === "rejected" ? e.priorValue : undefined))).toEqual([1, 2]);
+    expect(
+      events.map((e) => (e.kind === "rejected" ? e.priorValue : undefined)),
+    ).toEqual([1, 2]);
+  });
+});
+
+describe("restLevelSource — createNode", () => {
+  async function readyWritable(
+    extra: Partial<RestLevelSourceOpts<TestFilter>> = {},
+  ) {
+    const src = restLevelSource(
+      baseOpts({
+        patchCell: async () => ({ value: 0 }),
+        insertNode: async (req) => req.node,
+        removeNode: async () => {},
+        ...extra,
+      }),
+    );
+    if (!src.writable) throw new Error("expected writable source");
+    await flush();
+    await flush();
+    return src;
+  }
+
+  it("waits for the endpoint result before inserting the authoritative node", async () => {
+    const creates: Array<ReturnType<typeof deferred<TreeNode>>> = [];
+    const src = await readyWritable({
+      insertNode: async () => {
+        const d = deferred<TreeNode>();
+        creates.push(d);
+        return d.promise;
+      },
+    });
+    if (!src.writable) throw new Error("writable");
+
+    const draft: TreeNode = {
+      levelName: "rows",
+      columns: { v: 4 },
+    };
+    const promise = src.createNode(draft);
+    expect(src.snapshot().nodes).toHaveLength(3);
+
+    const serverNode: TreeNode = {
+      levelName: "rows",
+      columns: { id: "d", v: 40 },
+    };
+    creates[0].resolve(serverNode);
+    await expect(promise).resolves.toEqual({ node: serverNode, atIndex: 3 });
+    await flush();
+
+    expect(src.snapshot().nodes).toHaveLength(4);
+    expect(src.snapshot().nodes[3]).toBe(serverNode);
+  });
+
+  it("appends default creates at the index visible after each server response", async () => {
+    const creates: Array<ReturnType<typeof deferred<TreeNode>>> = [];
+    const src = await readyWritable({
+      insertNode: async () => {
+        const d = deferred<TreeNode>();
+        creates.push(d);
+        return d.promise;
+      },
+    });
+    if (!src.writable) throw new Error("writable");
+
+    const first = src.createNode({
+      levelName: "rows",
+      columns: { id: "d", v: 4 },
+    });
+    const second = src.createNode({
+      levelName: "rows",
+      columns: { id: "e", v: 5 },
+    });
+
+    const secondServerNode: TreeNode = {
+      levelName: "rows",
+      columns: { id: "e", v: 50 },
+    };
+    creates[1].resolve(secondServerNode);
+    await expect(second).resolves.toEqual({
+      node: secondServerNode,
+      atIndex: 3,
+    });
+
+    const firstServerNode: TreeNode = {
+      levelName: "rows",
+      columns: { id: "d", v: 40 },
+    };
+    creates[0].resolve(firstServerNode);
+    await expect(first).resolves.toEqual({
+      node: firstServerNode,
+      atIndex: 4,
+    });
+
+    expect(src.snapshot().nodes.map((node) => node.columns.id)).toEqual([
+      "a",
+      "b",
+      "c",
+      "e",
+      "d",
+    ]);
+  });
+
+  it("leaves source nodes unchanged when create rejects", async () => {
+    const src = await readyWritable({
+      insertNode: async () => {
+        throw new Error("nope");
+      },
+    });
+    if (!src.writable) throw new Error("writable");
+    const before = src.snapshot().nodes;
+
+    await expect(
+      src.createNode({ levelName: "rows", columns: { v: 4 } }),
+    ).rejects.toThrow("nope");
+
+    expect(src.snapshot().nodes).toBe(before);
   });
 });
 

@@ -6,11 +6,18 @@ import type { PhantomRow } from "../types/level-row";
 const A = rootPath("rows");
 const B = childPath(A, "row-1", "items");
 
+function phantom(
+  rowKey: string,
+  columns: Record<string, unknown> = {},
+): PhantomRow {
+  return { rowKey, columns, state: { kind: "editing" } };
+}
+
 describe("PhantomChannel", () => {
   it("get returns identity-stable arrays across no-op reads", () => {
     const ch = createPhantomChannel();
     expect(ch.get(A)).toBe(ch.get(A));
-    ch.add(A, { rowKey: "p1", columns: {} });
+    ch.add(A, phantom("p1"));
     const after = ch.get(A);
     expect(ch.get(A)).toBe(after);
   });
@@ -25,22 +32,22 @@ describe("PhantomChannel", () => {
     const ch = createPhantomChannel();
     const beforeA = ch.get(A);
     const beforeB = ch.get(B);
-    ch.add(A, { rowKey: "p1", columns: {} });
+    ch.add(A, phantom("p1"));
     expect(ch.get(A)).not.toBe(beforeA);
     expect(ch.get(B)).toBe(beforeB);
   });
 
   it("add replaces a phantom on rowKey collision", () => {
     const ch = createPhantomChannel();
-    ch.add(A, { rowKey: "p1", columns: { name: "first" } });
-    ch.add(A, { rowKey: "p1", columns: { name: "second" } });
+    ch.add(A, phantom("p1", { name: "first" }));
+    ch.add(A, phantom("p1", { name: "second" }));
     expect(ch.get(A)).toHaveLength(1);
     expect(ch.get(A)[0].columns.name).toBe("second");
   });
 
   it("remove drops the phantom and evicts the path on last-remove", () => {
     const ch = createPhantomChannel();
-    ch.add(A, { rowKey: "p1", columns: {} });
+    ch.add(A, phantom("p1"));
     ch.remove(A, "p1");
     const fresh = createPhantomChannel();
     expect(ch.get(A)).toBe(fresh.get(A));
@@ -48,7 +55,7 @@ describe("PhantomChannel", () => {
 
   it("remove of a non-existent rowKey is a no-op (no allocation, no notification)", () => {
     const ch = createPhantomChannel();
-    ch.add(A, { rowKey: "p1", columns: {} });
+    ch.add(A, phantom("p1"));
     const before = ch.get(A);
     const sub = vi.fn();
     ch.subscribe(A, sub);
@@ -67,8 +74,8 @@ describe("PhantomChannel", () => {
 
   it("setCell mutates only the matching phantom; siblings keep their references", () => {
     const ch = createPhantomChannel();
-    ch.add(A, { rowKey: "p1", columns: { name: "" } });
-    ch.add(A, { rowKey: "p2", columns: { name: "" } });
+    ch.add(A, phantom("p1", { name: "" }));
+    ch.add(A, phantom("p2", { name: "" }));
     const before = ch.get(A);
     const beforeP1 = before[0];
     const beforeP2 = before[1];
@@ -83,7 +90,7 @@ describe("PhantomChannel", () => {
 
   it("setCell on a non-existent rowKey is a no-op", () => {
     const ch = createPhantomChannel();
-    ch.add(A, { rowKey: "p1", columns: {} });
+    ch.add(A, phantom("p1"));
     const before = ch.get(A);
     const sub = vi.fn();
     ch.subscribe(A, sub);
@@ -99,11 +106,11 @@ describe("PhantomChannel", () => {
     ch.subscribe(A, subA);
     ch.subscribe(B, subB);
 
-    ch.add(A, { rowKey: "p1", columns: {} });
+    ch.add(A, phantom("p1"));
     expect(subA).toHaveBeenCalledTimes(1);
     expect(subB).not.toHaveBeenCalled();
 
-    ch.add(B, { rowKey: "p2", columns: {} });
+    ch.add(B, phantom("p2"));
     expect(subA).toHaveBeenCalledTimes(1);
     expect(subB).toHaveBeenCalledTimes(1);
   });
@@ -112,16 +119,16 @@ describe("PhantomChannel", () => {
     const ch = createPhantomChannel();
     const sub = vi.fn();
     const unsub = ch.subscribe(A, sub);
-    ch.add(A, { rowKey: "p1", columns: {} });
+    ch.add(A, phantom("p1"));
     expect(sub).toHaveBeenCalledTimes(1);
     unsub();
-    ch.add(A, { rowKey: "p2", columns: {} });
+    ch.add(A, phantom("p2"));
     expect(sub).toHaveBeenCalledTimes(1);
   });
 
   it("seed map preserves entries by reference", () => {
     const seed = new Map<GridPath, PhantomRow[]>();
-    const arrA: PhantomRow[] = [{ rowKey: "p1", columns: { name: "x" } }];
+    const arrA: PhantomRow[] = [phantom("p1", { name: "x" })];
     seed.set(A, arrA);
 
     const ch = createPhantomChannel(seed);

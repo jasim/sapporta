@@ -4,7 +4,7 @@
 // the runtime's source, controller, phantom channel, or commit helper.
 //
 // For nested grids, callers go through `runtime.controllerFor(path)` /
-// `runtime.sourceFor(path)` / `runtime.phantoms` / `runtime.commitPhantom`
+// `runtime.sourceFor(path)` / `runtime.phantoms` / `runtime.commitPhantomRow`
 // directly. This wrapper exists for the dominant case where the host
 // only cares about the root level. It does NOT replace
 // `runtime.controllerFor(...)` for nested grids — those still go through
@@ -12,7 +12,7 @@
 //
 // The wrapper is a discriminated union on the root source's `writable`
 // flag. `rootSource` is always the runtime's read view and never exposes
-// edit verbs; writable roots add phantom helpers and commitPhantom.
+// edit verbs; writable roots add phantom helpers and commitPhantomRow.
 // Runtime methods remain the write seam. At runtime,
 // `'setCell' in controller.rootSource === false`.
 
@@ -42,10 +42,10 @@ export type WritableTableController = {
   readonly rootSource: RuntimeLevelDataSource;
   readonly rootController: GridControllerPublic;
   readonly phantoms: RootPhantomHelpers;
-  // Two-step commit delegated to `runtime.commitPhantom` for the root
-  // path. Atomic from the host's view; emits `phantomCommitted` on
+  // Two-step commit delegated to `runtime.commitPhantomRow` for the root
+  // path. Atomic from the host's view; emits `phantomRowCommitted` on
   // success.
-  commitPhantom: (rowKey: RowKey, atIndex?: number) => void;
+  commitPhantomRow: (rowKey: RowKey, atIndex?: number) => Promise<unknown>;
 };
 
 export type TableController = ReadonlyTableController | WritableTableController;
@@ -66,7 +66,8 @@ export function createTableController(args: {
     get: () => runtime.phantoms.get(path),
     add: (phantom) => runtime.phantoms.add(path, phantom),
     remove: (rowKey) => runtime.phantoms.remove(path, rowKey),
-    setCell: (rowKey, colId, value) => runtime.phantoms.setCell(path, rowKey, colId, value),
+    setCell: (rowKey, colId, value) =>
+      runtime.phantoms.setCell(path, rowKey, colId, value),
     subscribe: (fn) => runtime.phantoms.subscribe(path, fn),
   };
 
@@ -75,6 +76,7 @@ export function createTableController(args: {
     rootSource,
     rootController,
     phantoms,
-    commitPhantom: (rowKey, atIndex) => runtime.commitPhantom(path, rowKey, atIndex),
+    commitPhantomRow: (rowKey, atIndex) =>
+      runtime.commitPhantomRow(path, rowKey, atIndex),
   };
 }

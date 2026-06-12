@@ -11,12 +11,13 @@ import type {
 } from "../data-sources/types";
 import {
   childPath,
+  displayedPhantomRowKey,
   makeRowId,
   rootPath,
   type GridPath,
   type RowKey,
 } from "../types/identity";
-import type { TreeNode } from "../types/level-row";
+import type { PhantomRow, TreeNode } from "../types/level-row";
 import type { ColumnSchema, GridSchema, LevelSchema } from "../types/schema";
 import {
   CELL_GRID_WITH_ACTIVE_ROW,
@@ -26,6 +27,32 @@ import {
 import { rowInteractionStatusFor } from "../types/row-selection";
 
 const TestEditor = () => null;
+
+function phantom(
+  rowKey: string,
+  columns: Record<string, unknown> = {},
+): PhantomRow {
+  return { rowKey, columns, state: { kind: "editing" } };
+}
+
+async function flushMicrotasks(): Promise<void> {
+  for (let i = 0; i < 5; i++) await Promise.resolve();
+}
+
+function deferred<T>(): {
+  promise: Promise<T>;
+  resolve: (value: T) => void;
+  reject: (err: unknown) => void;
+} {
+  let resolve!: (value: T) => void;
+  let reject!: (err: unknown) => void;
+  const promise = new Promise<T>((res, rej) => {
+    resolve = res;
+    reject = rej;
+  });
+  return { promise, resolve, reject };
+}
+
 const cols: ColumnSchema[] = [
   {
     id: "name",
@@ -119,6 +146,41 @@ function tableDataSource() {
       rows: { sortMode: "none", filterMode: "none", paginationMode: "none" },
     },
   });
+}
+
+function dataSourceWithRoot(source: LevelDataSource): GridDataSource {
+  return {
+    rootSource: () => source,
+    resolveChild: () => {
+      throw new Error("not used");
+    },
+    dispose: () => {},
+  };
+}
+
+function writableSourceWithCreate(
+  createNode: WritableLevelDataSource["createNode"],
+  nodes: TreeNode[] = [],
+): WritableLevelDataSource {
+  return {
+    writable: true,
+    snapshot: () => ({
+      status: "ready",
+      nodes,
+      serverManaged: { sort: false, filter: false, pagination: false },
+    }),
+    subscribe: () => () => {},
+    setSort: () => {},
+    setFilter: () => {},
+    setPage: () => {},
+    refetch: () => {},
+    dispose: () => {},
+    setCell: () => {},
+    applyChanges: () => {},
+    createNode,
+    removeNode: () => {},
+    onReconcile: () => () => {},
+  };
 }
 
 function reportDataSource(): GridDataSource {
@@ -275,7 +337,7 @@ describe("GridRuntime", () => {
     expect(src.writable).toBe(true);
     expect("setCell" in src).toBe(false);
     expect("applyChanges" in src).toBe(false);
-    expect("insertNode" in src).toBe(false);
+    expect("createNode" in src).toBe(false);
     expect("removeNode" in src).toBe(false);
     expect("dispose" in src).toBe(false);
     expect(src.snapshot().nodes).toHaveLength(2);
@@ -498,7 +560,10 @@ describe("GridRuntime", () => {
       dispose: () => {},
       setCell: () => {},
       applyChanges: () => {},
-      insertNode: () => {},
+      createNode: async (node, atIndex) => ({
+        node,
+        atIndex: atIndex ?? 0,
+      }),
       removeNode: () => {},
       onReconcile: (fn) => {
         reconcileFn = fn;
@@ -673,7 +738,7 @@ describe("GridRuntime", () => {
     );
   });
 
-  it("subscribeDisplayedRowSequence wakes on insert and remove", () => {
+  it("subscribeDisplayedRowSequence wakes on create and remove", async () => {
     const rt = createGridRuntime({
       schema: tableSchema,
       dataSource: tableDataSource(),
@@ -682,7 +747,7 @@ describe("GridRuntime", () => {
     const before = rt.displayedRowSequenceFor(rowsRoot);
     rt.subscribeDisplayedRowSequence(rowsRoot, listener);
 
-    rt.insertRow(rowsRoot, {
+    await rt.createRow(rowsRoot, {
       levelName: "rows",
       columns: { id: "c", name: "Cherry", qty: 3 },
     });
@@ -731,9 +796,9 @@ describe("GridRuntime", () => {
     const before = rt.displayedRowSequenceFor(rowsRoot);
     rt.subscribeDisplayedRowSequence(rowsRoot, sequence);
 
-    rt.phantoms.add(rowsRoot, { rowKey: "draft1", columns: { name: "X" } });
+    rt.phantoms.add(rowsRoot, phantom("draft1", { name: "X" }));
 
-    const phantomId = makeRowId(rowsRoot, "phantom:draft1");
+    const phantomId = makeRowId(rowsRoot, displayedPhantomRowKey("draft1"));
     const afterAdd = rt.displayedRowSequenceFor(rowsRoot);
     expect(sequence).toHaveBeenCalledTimes(1);
     expect(afterAdd).not.toBe(before);
@@ -753,7 +818,7 @@ describe("GridRuntime", () => {
     expect(phantomRow).toHaveBeenCalledTimes(2);
   });
 
-  it("source emission for one path does not wake row-sequence subscribers for another path", () => {
+  it("source emission for one path does not wake row-sequence subscribers for another path", async () => {
     const rt = createGridRuntime({
       schema: reportSchema,
       dataSource: reportDataSource(),
@@ -765,7 +830,7 @@ describe("GridRuntime", () => {
     rt.subscribeDisplayedRowSequence(reportRoot, rootList);
     rt.subscribeDisplayedRowSequence(itemsPath, childList);
 
-    rt.insertRow(itemsPath, {
+    await rt.createRow(itemsPath, {
       levelName: "items",
       columns: { name: "Cherry" },
     });
@@ -779,12 +844,348 @@ describe("GridRuntime", () => {
       schema: tableSchema,
       dataSource: tableDataSource(),
     });
-    rt.phantoms.add(rowsRoot, { rowKey: "draft1", columns: { name: "X" } });
+    rt.phantoms.add(rowsRoot, phantom("draft1", { name: "X" }));
     const displayed = rt.displayedRowsFor(rowsRoot);
     expect(displayed.rows.some((r) => r.kind === "phantom")).toBe(true);
     rt.phantoms.remove(rowsRoot, "draft1");
     const after = rt.displayedRowsFor(rowsRoot);
     expect(after.rows.every((r) => r.kind !== "phantom")).toBe(true);
+  });
+
+  it("base grid does not auto-create blank phantoms without lifecycle config", () => {
+    const rt = createGridRuntime({
+      schema: tableSchema,
+      dataSource: inMemoryGridDataSource({
+        schema: tableSchema,
+        tree: [],
+        levels: {
+          rows: {
+            sortMode: "none",
+            filterMode: "none",
+            paginationMode: "none",
+          },
+        },
+      }),
+    });
+
+    expect(rt.phantoms.get(rowsRoot)).toHaveLength(0);
+    expect(rt.displayedRowsFor(rowsRoot).rows).toEqual([]);
+  });
+
+  it("empty ready writable phantom-enabled levels get one editable phantom row", () => {
+    const rt = createGridRuntime({
+      schema: tableSchema,
+      dataSource: inMemoryGridDataSource({
+        schema: tableSchema,
+        tree: [],
+        levels: {
+          rows: {
+            sortMode: "none",
+            filterMode: "none",
+            paginationMode: "none",
+          },
+        },
+      }),
+      phantomRows: {},
+    });
+
+    const phantoms = rt.phantoms.get(rowsRoot);
+    expect(phantoms).toHaveLength(1);
+    expect(phantoms[0].state).toEqual({ kind: "editing" });
+    expect(rt.displayedRowsFor(rowsRoot).rows.map((row) => row.kind)).toEqual([
+      "phantom",
+    ]);
+  });
+
+  it("editing a phantom row stays local and does not emit mutationCommitted", () => {
+    const setCell = vi.fn();
+    const mutationCommitted = vi.fn();
+    const source: WritableLevelDataSource = {
+      writable: true,
+      snapshot: () => ({
+        status: "ready",
+        nodes: [],
+        serverManaged: { sort: false, filter: false, pagination: false },
+      }),
+      subscribe: () => () => {},
+      setSort: () => {},
+      setFilter: () => {},
+      setPage: () => {},
+      refetch: () => {},
+      dispose: () => {},
+      setCell,
+      applyChanges: () => {},
+      createNode: async (node, atIndex) => ({
+        node,
+        atIndex: atIndex ?? 0,
+      }),
+      removeNode: () => {},
+      onReconcile: () => () => {},
+    };
+    const rt = createGridRuntime({
+      schema: tableSchema,
+      dataSource: {
+        rootSource: () => source,
+        resolveChild: () => {
+          throw new Error("not used");
+        },
+        dispose: () => {},
+      },
+      phantomRows: {},
+      on: { mutationCommitted },
+    });
+
+    const phantomRow = rt.phantoms.get(rowsRoot)[0];
+    rt.writeCell(
+      rowsRoot,
+      {
+        rowId: makeRowId(rowsRoot, displayedPhantomRowKey(phantomRow.rowKey)),
+        colId: "name",
+      },
+      "New row",
+    );
+
+    expect(setCell).not.toHaveBeenCalled();
+    expect(mutationCommitted).not.toHaveBeenCalled();
+    expect(rt.phantoms.get(rowsRoot)[0].columns.name).toBe("New row");
+  });
+
+  it("ArrowDown at the last row creates or reuses one blank phantom", () => {
+    const rt = createGridRuntime({
+      schema: tableSchema,
+      dataSource: tableDataSource(),
+      phantomRows: {},
+    });
+    const lastDataCursor = {
+      path: rowsRoot,
+      rowId: makeRowId(rowsRoot, "b"),
+      colId: "qty",
+    };
+    rt.cursorManager.moveCellCursorTo(lastDataCursor);
+
+    rt.coordinator.navigateCell(rowsRoot, {
+      type: "moveRow",
+      direction: "down",
+      colPolicy: "preserve",
+      extend: false,
+    });
+    const firstTarget = rt.cursorManager.currentCellCursor();
+    expect(firstTarget).not.toBeNull();
+    expect(rt.displayedRowFor(rowsRoot, firstTarget!.rowId)?.kind).toBe(
+      "phantom",
+    );
+    expect(rt.phantoms.get(rowsRoot)).toHaveLength(1);
+
+    rt.coordinator.navigateCell(rowsRoot, {
+      type: "moveRow",
+      direction: "down",
+      colPolicy: "preserve",
+      extend: false,
+    });
+    expect(rt.phantoms.get(rowsRoot)).toHaveLength(1);
+    expect(rt.cursorManager.currentCellCursor()).toEqual(firstTarget);
+  });
+
+  it("leaving a nonblank phantom row creates one authoritative row", async () => {
+    const mutationCommitted = vi.fn();
+    const phantomRowCommitted = vi.fn();
+    const rt = createGridRuntime({
+      schema: tableSchema,
+      dataSource: inMemoryGridDataSource({
+        schema: tableSchema,
+        tree: [],
+        levels: {
+          rows: {
+            sortMode: "none",
+            filterMode: "none",
+            paginationMode: "none",
+          },
+        },
+      }),
+      phantomRows: {},
+      on: {
+        mutationCommitted,
+        phantomRowCommitted,
+      },
+    });
+    const phantomRow = rt.phantoms.get(rowsRoot)[0];
+    const rowId = makeRowId(
+      rowsRoot,
+      displayedPhantomRowKey(phantomRow.rowKey),
+    );
+    rt.cursorManager.moveCellCursorTo({ path: rowsRoot, rowId, colId: "name" });
+    rt.writeCell(rowsRoot, { rowId, colId: "id" }, "c");
+    rt.writeCell(rowsRoot, { rowId, colId: "name" }, "Cherry");
+
+    rt.cursorManager.clearCellCursor();
+    await flushMicrotasks();
+
+    expect(rt.phantoms.get(rowsRoot)).toHaveLength(0);
+    expect(
+      rt.snapshotFor(rowsRoot).nodes.map((node) => node.columns.id),
+    ).toEqual(["c"]);
+    expect(mutationCommitted).toHaveBeenCalledTimes(1);
+    expect(phantomRowCommitted).toHaveBeenCalledTimes(1);
+  });
+
+  it("double commitPhantomRow reuses the pending create", async () => {
+    const created = deferred<{
+      node: TreeNode;
+      atIndex: number;
+    }>();
+    const createNode = vi.fn<WritableLevelDataSource["createNode"]>(
+      () => created.promise,
+    );
+    const rt = createGridRuntime({
+      schema: tableSchema,
+      dataSource: dataSourceWithRoot(writableSourceWithCreate(createNode)),
+    });
+    rt.phantoms.add(rowsRoot, phantom("draft1", { id: "c", name: "Cherry" }));
+
+    const first = rt.commitPhantomRow(rowsRoot, "draft1");
+    const second = rt.commitPhantomRow(rowsRoot, "draft1");
+
+    expect(second).toBe(first);
+    expect(createNode).toHaveBeenCalledTimes(1);
+
+    const serverNode: TreeNode = {
+      levelName: "rows",
+      columns: { id: "c", name: "Cherry" },
+    };
+    created.resolve({ node: serverNode, atIndex: 0 });
+    await expect(first).resolves.toEqual({ node: serverNode, atIndex: 0 });
+  });
+
+  it("cursor leave plus direct commit does not create a phantom twice", async () => {
+    const created = deferred<{
+      node: TreeNode;
+      atIndex: number;
+    }>();
+    const createNode = vi.fn<WritableLevelDataSource["createNode"]>(
+      () => created.promise,
+    );
+    const rt = createGridRuntime({
+      schema: tableSchema,
+      dataSource: dataSourceWithRoot(writableSourceWithCreate(createNode)),
+      phantomRows: {},
+    });
+    const phantomRow = rt.phantoms.get(rowsRoot)[0];
+    const rowId = makeRowId(
+      rowsRoot,
+      displayedPhantomRowKey(phantomRow.rowKey),
+    );
+    rt.cursorManager.moveCellCursorTo({ path: rowsRoot, rowId, colId: "name" });
+    rt.writeCell(rowsRoot, { rowId, colId: "id" }, "c");
+
+    rt.cursorManager.clearCellCursor();
+    const direct = rt.commitPhantomRow(rowsRoot, phantomRow.rowKey);
+
+    expect(createNode).toHaveBeenCalledTimes(1);
+    created.resolve({
+      node: { levelName: "rows", columns: { id: "c" } },
+      atIndex: 0,
+    });
+    await expect(direct).resolves.toEqual({
+      node: { levelName: "rows", columns: { id: "c" } },
+      atIndex: 0,
+    });
+  });
+
+  it("committing a phantom snapshots columns and rejects edits while saving", async () => {
+    const created = deferred<{
+      node: TreeNode;
+      atIndex: number;
+    }>();
+    const createNode = vi.fn<WritableLevelDataSource["createNode"]>(
+      () => created.promise,
+    );
+    const rt = createGridRuntime({
+      schema: tableSchema,
+      dataSource: dataSourceWithRoot(writableSourceWithCreate(createNode)),
+    });
+    rt.phantoms.add(rowsRoot, phantom("draft1", { id: "c", name: "Cherry" }));
+    const rowId = makeRowId(rowsRoot, displayedPhantomRowKey("draft1"));
+
+    const promise = rt.commitPhantomRow(rowsRoot, "draft1");
+
+    expect(() =>
+      rt.writeCell(rowsRoot, { rowId, colId: "name" }, "Changed"),
+    ).toThrow(/is saving and cannot be edited/);
+    expect(rt.phantoms.get(rowsRoot)[0].columns.name).toBe("Cherry");
+    expect(createNode).toHaveBeenCalledWith(
+      { levelName: "rows", columns: { id: "c", name: "Cherry" } },
+      undefined,
+    );
+
+    rt.phantoms.setCell(rowsRoot, "draft1", "name", "Direct channel edit");
+    created.resolve({
+      node: { levelName: "rows", columns: { id: "c", name: "Cherry" } },
+      atIndex: 0,
+    });
+    await promise;
+    expect(createNode.mock.calls[0][0].columns.name).toBe("Cherry");
+  });
+
+  it("failed phantom row creates keep the phantom with failure state", async () => {
+    const createFailed = vi.fn();
+    const source: WritableLevelDataSource = {
+      writable: true,
+      snapshot: () => ({
+        status: "ready",
+        nodes: [],
+        serverManaged: { sort: false, filter: false, pagination: false },
+      }),
+      subscribe: () => () => {},
+      setSort: () => {},
+      setFilter: () => {},
+      setPage: () => {},
+      refetch: () => {},
+      dispose: () => {},
+      setCell: () => {},
+      applyChanges: () => {},
+      createNode: async () => {
+        throw new Error("validation failed");
+      },
+      removeNode: () => {},
+      onReconcile: () => () => {},
+    };
+    const rt = createGridRuntime({
+      schema: tableSchema,
+      dataSource: {
+        rootSource: () => source,
+        resolveChild: () => {
+          throw new Error("not used");
+        },
+        dispose: () => {},
+      },
+      phantomRows: {},
+      on: { phantomRowCreateFailed: createFailed },
+    });
+    const phantomRow = rt.phantoms.get(rowsRoot)[0];
+    const rowId = makeRowId(
+      rowsRoot,
+      displayedPhantomRowKey(phantomRow.rowKey),
+    );
+    rt.cursorManager.moveCellCursorTo({ path: rowsRoot, rowId, colId: "name" });
+    rt.writeCell(rowsRoot, { rowId, colId: "name" }, "Cherry");
+
+    rt.cursorManager.clearCellCursor();
+    await flushMicrotasks();
+
+    expect(rt.phantoms.get(rowsRoot)).toHaveLength(1);
+    expect(rt.phantoms.get(rowsRoot)[0].state).toEqual({
+      kind: "failed",
+      reason: "validation failed",
+    });
+    expect(createFailed).toHaveBeenCalledWith({
+      path: rowsRoot,
+      rowKey: phantomRow.rowKey,
+      reason: "validation failed",
+    });
+
+    rt.writeCell(rowsRoot, { rowId, colId: "name" }, "Cherry retry");
+    expect(rt.phantoms.get(rowsRoot)[0].state).toEqual({ kind: "editing" });
+    expect(rt.phantoms.get(rowsRoot)[0].columns.name).toBe("Cherry retry");
   });
 
   it("setCell on a different path does not invalidate sibling pipelines", () => {
@@ -803,7 +1204,7 @@ describe("GridRuntime", () => {
     expect(rt.displayedRowsFor(itemsPath)).toBe(beforeChild);
   });
 
-  it("insertRow and removeRow are runtime verbs and emit mutationCommitted", () => {
+  it("createRow and removeRow are runtime verbs and emit mutationCommitted", async () => {
     const mutation = vi.fn();
     const rt = createGridRuntime({
       schema: tableSchema,
@@ -814,7 +1215,7 @@ describe("GridRuntime", () => {
       levelName: "rows",
       columns: { id: "c", name: "Cherry", qty: 3 },
     };
-    rt.insertRow(rowsRoot, node);
+    await rt.createRow(rowsRoot, node);
     expect(rt.snapshotFor(rowsRoot).nodes.map((n) => n.columns.id)).toEqual([
       "a",
       "b",

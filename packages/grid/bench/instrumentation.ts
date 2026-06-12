@@ -15,7 +15,7 @@ export type BenchCounters = {
   sourceDisposeCalls: number;
   sourceSetCellCalls: number;
   sourceApplyChangesCalls: number;
-  sourceInsertNodeCalls: number;
+  sourceCreateNodeCalls: number;
   sourceRemoveNodeCalls: number;
   reconcileSubscribeCalls: number;
   reconcileSubscriberFires: number;
@@ -34,7 +34,8 @@ export type BenchCounters = {
   hostRowSelectionChangedEvents: number;
   hostCellReconciledEvents: number;
   hostLevelStatusChangedEvents: number;
-  hostPhantomCommittedEvents: number;
+  hostPhantomRowCommittedEvents: number;
+  hostPhantomRowCreateFailedEvents: number;
 };
 
 export function createBenchCounters(): BenchCounters {
@@ -47,7 +48,7 @@ export function createBenchCounters(): BenchCounters {
     sourceDisposeCalls: 0,
     sourceSetCellCalls: 0,
     sourceApplyChangesCalls: 0,
-    sourceInsertNodeCalls: 0,
+    sourceCreateNodeCalls: 0,
     sourceRemoveNodeCalls: 0,
     reconcileSubscribeCalls: 0,
     reconcileSubscriberFires: 0,
@@ -66,7 +67,8 @@ export function createBenchCounters(): BenchCounters {
     hostRowSelectionChangedEvents: 0,
     hostCellReconciledEvents: 0,
     hostLevelStatusChangedEvents: 0,
-    hostPhantomCommittedEvents: 0,
+    hostPhantomRowCommittedEvents: 0,
+    hostPhantomRowCreateFailedEvents: 0,
   };
 }
 
@@ -92,9 +94,9 @@ export function instrumentGridDataSource(
   };
 }
 
-export function eventCounters(
-  counters: BenchCounters,
-): { [E in keyof GridEvents]: (payload: GridEvents[E]) => void } {
+export function eventCounters(counters: BenchCounters): {
+  [E in keyof GridEvents]: (payload: GridEvents[E]) => void;
+} {
   return {
     mutationCommitted: () => {
       counters.hostMutationCommittedEvents++;
@@ -111,8 +113,11 @@ export function eventCounters(
     levelStatusChanged: () => {
       counters.hostLevelStatusChangedEvents++;
     },
-    phantomCommitted: () => {
-      counters.hostPhantomCommittedEvents++;
+    phantomRowCommitted: () => {
+      counters.hostPhantomRowCommittedEvents++;
+    },
+    phantomRowCreateFailed: () => {
+      counters.hostPhantomRowCreateFailedEvents++;
     },
   };
 }
@@ -222,9 +227,9 @@ function instrumentLevelDataSource(
       counters.sourceApplyChangesCalls++;
       source.applyChanges(changes);
     },
-    insertNode(node, atIndex) {
-      counters.sourceInsertNodeCalls++;
-      source.insertNode(node, atIndex);
+    createNode(node, atIndex) {
+      counters.sourceCreateNodeCalls++;
+      return source.createNode(node, atIndex);
     },
     removeNode(rowKey) {
       counters.sourceRemoveNodeCalls++;

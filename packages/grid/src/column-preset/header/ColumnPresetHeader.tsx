@@ -46,11 +46,11 @@ export function ColumnPresetHeader<TMeta = unknown, TFilter = unknown>({
     setFilter: (filter) => source.setFilter(filter),
     setPage: (page, pageSize) => source.setPage(page, pageSize),
     refetch: () => source.refetch(),
-    insertRow: (node, atIndex) => runtime.insertRow(path, node, atIndex),
+    createRow: (node, atIndex) => runtime.createRow(path, node, atIndex),
     removeRow: (rowKey) => runtime.removeRow(path, rowKey),
     writeCell: (coord, value) => runtime.writeCell(path, coord, value),
-    commitPhantom: (rowKey, atIndex) =>
-      runtime.commitPhantom(path, rowKey, atIndex),
+    commitPhantomRow: (rowKey, atIndex) =>
+      runtime.commitPhantomRow(path, rowKey, atIndex),
   };
   const commands: GridLevelCommands<TFilter> = {
     ...defaultCommands,

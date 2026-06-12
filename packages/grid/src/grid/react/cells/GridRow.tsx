@@ -54,6 +54,9 @@ export const GridRow = memo(function GridRow({
       data-grid-part="row"
       data-row-id={row.id}
       data-row-kind={row.kind}
+      data-row-phantom-state={
+        row.kind === "phantom" ? row.source.state.kind : undefined
+      }
       data-row-active={active ? "true" : undefined}
       data-row-selected={selected ? "true" : undefined}
       data-row-presentation={presentation}
@@ -81,11 +84,7 @@ export const GridRow = memo(function GridRow({
     >
       <RowInteractionStatusProvider status={rowInteractionStatus}>
         {schema.map((col) => (
-          <RowCellSlot
-            key={col.id}
-            column={col}
-            presentation={presentation}
-          >
+          <RowCellSlot key={col.id} column={col} presentation={presentation}>
             <GridDataCell
               row={row}
               column={col}

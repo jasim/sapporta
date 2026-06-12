@@ -31,7 +31,23 @@ export type FooterRow = {
 export type PhantomRow = {
   rowKey: RowKey;
   columns: Record<ColId, unknown>;
+  state: PhantomRowState;
 };
+
+export type PhantomRowState =
+  | { kind: "editing" }
+  | { kind: "saving" }
+  | { kind: "failed"; reason: string };
+
+export type PhantomRowsConfig =
+  | false
+  | {
+      isBlank?: (columns: Record<ColId, unknown>) => boolean;
+      makeRowKey?: (context: {
+        path: import("./identity").GridPath;
+        existing: readonly PhantomRow[];
+      }) => RowKey;
+    };
 
 export type LevelOptions = {
   // Map a TreeNode + its local index (within siblings of the same level) to a stable RowKey.

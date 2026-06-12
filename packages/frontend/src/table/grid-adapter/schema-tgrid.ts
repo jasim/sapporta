@@ -22,7 +22,10 @@ export type SchemaTableGridSource = {
 };
 
 export type SchemaTableRootRowsOptions = RootLevelQueryConfig;
-export type SchemaTableRelatedRowsOptions = Omit<TGridLevelQueryConfig, "owner">;
+export type SchemaTableRelatedRowsOptions = Omit<
+  TGridLevelQueryConfig,
+  "owner"
+>;
 
 export type SchemaTGridConfigInput = {
   source: SchemaTableGridSource;
@@ -66,5 +69,6 @@ export function defineSchemaTGrid({
   return defineTGrid<SchemaTableRowsByLevel>({
     ...buildSchemaTGridConfig(config),
     interaction,
+    phantomRows: {},
   });
 }

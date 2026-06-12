@@ -221,20 +221,27 @@ describe("inMemoryLevelSource (writable)", () => {
     expect(src.snapshot()).toBe(before);
   });
 
-  it("insertNode appends by default and surfaces the new node", () => {
+  it("createNode appends by default and surfaces the new node", async () => {
     const src = inMemoryLevelSource(baseOpts());
-    src.insertNode({
+    const result = await src.createNode({
       levelName: "items",
       columns: { id: "d", amount: 5, name: "Date" },
+    });
+    expect(result).toEqual({
+      node: {
+        levelName: "items",
+        columns: { id: "d", amount: 5, name: "Date" },
+      },
+      atIndex: 3,
     });
     const snap = src.snapshot();
     expect(snap.nodes).toHaveLength(4);
     expect(snap.nodes[3].columns.id).toBe("d");
   });
 
-  it("insertNode at index puts the node in the right base position", () => {
+  it("createNode at index puts the node in the right base position", async () => {
     const src = inMemoryLevelSource(baseOpts());
-    src.insertNode(
+    await src.createNode(
       { levelName: "items", columns: { id: "z", amount: 0, name: "Z" } },
       1,
     );
@@ -368,7 +375,7 @@ describe("inMemoryReadonlyLevelSource", () => {
     const src = inMemoryReadonlyLevelSource(baseOpts());
     expect("setCell" in src).toBe(false);
     expect("applyChanges" in src).toBe(false);
-    expect("insertNode" in src).toBe(false);
+    expect("createNode" in src).toBe(false);
     expect("removeNode" in src).toBe(false);
     expect("onReconcile" in src).toBe(false);
   });

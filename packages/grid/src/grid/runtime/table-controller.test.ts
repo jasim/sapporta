@@ -4,12 +4,19 @@ import { createTableController } from "./table-controller";
 import { inMemoryGridDataSource } from "../data-sources/memory/in-memory-grid-source";
 import { inMemoryReadonlyLevelSource } from "../data-sources/memory/in-memory-level-source";
 import { rootPath, makeRowId } from "../types/identity";
-import type { TreeNode } from "../types/level-row";
+import type { PhantomRow, TreeNode } from "../types/level-row";
 import type { ColumnSchema, GridSchema } from "../types/schema";
 import type { GridDataSource } from "../data-sources/types";
 import type { RowPredicate } from "../pipeline/types";
 
 type TestFilter = Record<string, (value: unknown) => boolean>;
+
+function phantom(
+  rowKey: string,
+  columns: Record<string, unknown> = {},
+): PhantomRow {
+  return { rowKey, columns, state: { kind: "editing" } };
+}
 
 const compileTestFilter = (
   filter: TestFilter | undefined,
@@ -117,7 +124,7 @@ describe("TableController — writable construction", () => {
     if (!tc.writable) return;
     expect(tc.rootSource.writable).toBe(true);
     expect("setCell" in tc.rootSource).toBe(false);
-    expect("insertNode" in tc.rootSource).toBe(false);
+    expect("createNode" in tc.rootSource).toBe(false);
     expect("removeNode" in tc.rootSource).toBe(false);
   });
 });
@@ -160,20 +167,20 @@ describe("TableController — phantoms", () => {
     const rt = buildRuntime();
     const tc = createTableController({ runtime: rt });
     if (!tc.writable) throw new Error("expected writable");
-    tc.phantoms.add({ rowKey: "draft1", columns: { id: "draft1", qty: 999 } });
+    tc.phantoms.add(phantom("draft1", { id: "draft1", qty: 999 }));
     const displayed = rt.displayedRowsFor(rootPath("rows"));
     expect(displayed.rows.some((r) => r.kind === "phantom")).toBe(true);
     expect(tc.phantoms.get()).toHaveLength(1);
   });
 
-  it("commitPhantom inserts a real node, removes the phantom, emits phantomCommitted exactly once", () => {
+  it("commitPhantomRow creates a real node, removes the phantom, emits phantomRowCommitted exactly once", async () => {
     const rt = buildRuntime();
     const tc = createTableController({ runtime: rt });
     if (!tc.writable) throw new Error("expected writable");
     let committed = 0;
     let lastPayload: { path: string; rowKey: string } | null = null;
     let lastMutation: unknown = null;
-    rt.on("phantomCommitted", (e) => {
+    rt.on("phantomRowCommitted", (e) => {
       committed += 1;
       lastPayload = { path: e.path, rowKey: e.rowKey };
     });
@@ -181,8 +188,8 @@ describe("TableController — phantoms", () => {
       lastMutation = e;
     });
 
-    tc.phantoms.add({ rowKey: "draft1", columns: { id: "r25", qty: 25 } });
-    tc.commitPhantom("draft1");
+    tc.phantoms.add(phantom("draft1", { id: "r25", qty: 25 }));
+    await tc.commitPhantomRow("draft1");
 
     const displayed = rt.displayedRowsFor(rootPath("rows"));
     expect(displayed.rows.some((r) => r.kind === "phantom")).toBe(false);
@@ -200,28 +207,28 @@ describe("TableController — phantoms", () => {
     });
   });
 
-  it("commitPhantom with a missing rowKey throws and does not mutate state", () => {
+  it("commitPhantomRow with a missing rowKey rejects and does not mutate state", async () => {
     const rt = buildRuntime();
     const tc = createTableController({ runtime: rt });
     if (!tc.writable) throw new Error("expected writable");
     let committed = 0;
-    rt.on("phantomCommitted", () => {
+    rt.on("phantomRowCommitted", () => {
       committed += 1;
     });
     const before = rt.snapshotFor(rootPath("rows")).nodes;
-    expect(() => tc.commitPhantom("ghost")).toThrow(
+    await expect(tc.commitPhantomRow("ghost")).rejects.toThrow(
       /no phantom with rowKey "ghost"/,
     );
     expect(rt.snapshotFor(rootPath("rows")).nodes).toBe(before);
     expect(committed).toBe(0);
   });
 
-  it("commitPhantom forwards atIndex to insertNode", () => {
+  it("commitPhantomRow forwards atIndex to createNode", async () => {
     const rt = buildRuntime();
     const tc = createTableController({ runtime: rt });
     if (!tc.writable) throw new Error("expected writable");
-    tc.phantoms.add({ rowKey: "draft1", columns: { id: "r99", qty: 99 } });
-    tc.commitPhantom("draft1", 0);
+    tc.phantoms.add(phantom("draft1", { id: "r99", qty: 99 }));
+    await tc.commitPhantomRow("draft1", 0);
     const displayed = rt.displayedRowsFor(rootPath("rows"));
     expect(displayed.rows[0].id).toBe(makeRowId(rootPath("rows"), "r99"));
   });
@@ -235,9 +242,9 @@ describe("TableController — readonly root", () => {
     if (tc.writable) return;
     expect(tc.rootSource.writable).toBe(false);
     expect("setCell" in tc.rootSource).toBe(false);
-    expect("insertNode" in tc.rootSource).toBe(false);
+    expect("createNode" in tc.rootSource).toBe(false);
     expect("phantoms" in tc).toBe(false);
-    expect("commitPhantom" in tc).toBe(false);
+    expect("commitPhantomRow" in tc).toBe(false);
   });
 
   it("readonly rootSource still windows via setPage", () => {

@@ -222,6 +222,7 @@ class DefaultTGridSession<
       schema: runtimeConfig.gridSchema,
       dataSource,
       interaction: definition.interaction,
+      phantomRows: definition.phantomRows,
       on: {
         cellReconciled: ({ event }) => {
           if (event.kind === "rejected") {
@@ -232,6 +233,11 @@ class DefaultTGridSession<
                 `Failed to save ${String(event.colId)}: ${event.reason}`,
               );
           }
+        },
+        phantomRowCreateFailed: ({ path, reason }) => {
+          this.errorStoreForPath(path)
+            ?.getState()
+            .setErrorBanner(`Failed to create row: ${reason}`);
         },
       },
     });
@@ -492,6 +498,17 @@ class DefaultTGridSession<
       );
     }
     return store;
+  }
+
+  private errorStoreForPath(
+    path: GridPath,
+  ): StoreApi<TGridLevelQueryState<TGridTableRow>> | undefined {
+    const levelId = this.runtime.schemaAt(path)
+      .name as TGridLevelId<RowsByLevel>;
+    return (
+      this.queryStoresByLevel.get(levelId) ??
+      this.queryStoresByLevel.get(this.rootLevel)
+    );
   }
 
   private readonly currentSessionContext = (): TGridSessionContext<

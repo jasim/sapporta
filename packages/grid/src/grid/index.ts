@@ -46,7 +46,8 @@
 // shape. Data lives on a `GridDataSource` (in-memory, REST, or custom).
 // The runtime is a plain TypeScript value, not a React thing. Components
 // reach it via context. Host events (mutationCommitted, cellSelectionChanged,
-// rowSelectionChanged, cellReconciled, levelStatusChanged, phantomCommitted)
+// rowSelectionChanged, cellReconciled, levelStatusChanged,
+// phantomRowCommitted, phantomRowCreateFailed)
 // are wired at construction via `runtime.on(…)`, not through React props —
 // see `emitter.ts`.
 //
@@ -298,7 +299,7 @@
 // `GridRuntime` (runtime/create-grid-runtime.ts) is a plain TypeScript value, not a
 // React thing. It owns the schema/path topologies, the per-path displayed-row
 // stores, the controller instances, and the seams through which all data writes
-// flow (`writeCell`, `applyChanges`, `commitPhantom`) — each resolves the
+// flow (`writeCell`, `applyChanges`, `commitPhantomRow`) — each resolves the
 // path's `LevelDataSource` and forwards. Components reach it via
 // `useGridRuntime()`.
 //
@@ -418,6 +419,7 @@ export type {
   LevelStatus,
   LevelSnapshot,
   CellChange,
+  CreateNodeResult,
   ReconcileEvent,
   ReadonlyLevelDataSource,
   WritableLevelDataSource,
@@ -455,6 +457,8 @@ export type {
   LevelRowKind,
   FooterRow,
   PhantomRow,
+  PhantomRowState,
+  PhantomRowsConfig,
   DisplayedRowRef,
   DisplayedRowSequence,
   DisplayedRows,
@@ -492,6 +496,9 @@ export {
   trailingEdge,
   parseChildPath,
   makeRowId,
+  displayedPhantomRowKey,
+  phantomKeyFromDisplayedRowId,
+  isDisplayedPhantomRowId,
   pathOfRowId,
   rowKeyOfRowId,
   coordsEqual,

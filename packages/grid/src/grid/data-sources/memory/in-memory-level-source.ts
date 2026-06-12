@@ -30,8 +30,8 @@
 //     chrome won't render paging controls for a level that doesn't page.
 //   - These are orthogonal: `'client'` means the source applies the concern
 //     and publishes the result; `'none'` means the concern is absent.
-  //     Displayed-row derivation never sees an in-memory source with
-  //     `serverManaged` flags.
+//     Displayed-row derivation never sees an in-memory source with
+//     `serverManaged` flags.
 //
 // Aggregation: when an `aggregator` is supplied, it runs after
 // sort/filter/window and its rollup payloads are merged into `node.rollup`
@@ -107,7 +107,7 @@ type Core<F> = {
   // implementation.
   setCell: WritableLevelDataSource["setCell"];
   applyChanges: WritableLevelDataSource["applyChanges"];
-  insertNode: WritableLevelDataSource["insertNode"];
+  createNode: WritableLevelDataSource["createNode"];
   removeNode: WritableLevelDataSource["removeNode"];
   onReconcile: WritableLevelDataSource["onReconcile"];
   // Bulk replacement — primarily for hosts that hand the in-memory
@@ -144,7 +144,10 @@ function buildCore<F>(opts: InMemoryLevelSourceOpts<F>): Core<F> {
   let filter: F | undefined =
     opts.filterMode === "client" ? opts.initialFilter : undefined;
   let page = opts.paginationMode === "client" ? initialPage : 0;
-  let pageSize = opts.paginationMode === "client" ? initialPageSize : Number.POSITIVE_INFINITY;
+  let pageSize =
+    opts.paginationMode === "client"
+      ? initialPageSize
+      : Number.POSITIVE_INFINITY;
 
   const subs = new Set<() => void>();
   const reconcileSubs = new Set<(e: ReconcileEvent) => void>();
@@ -230,9 +233,12 @@ function buildCore<F>(opts: InMemoryLevelSourceOpts<F>): Core<F> {
     // Reuse prior `nodes` / `footerRows` references when the content is
     // structurally identical, letting displayed-row derivation reuse rows
     // across writes that didn't actually change the published view.
-    const finalNodes = nodesEqual(lastNodes, publishedNodes) ? lastNodes! : publishedNodes;
-    const finalFooters =
-      footerRowsEqual(lastFooterRows, footerRows) ? lastFooterRows : footerRows;
+    const finalNodes = nodesEqual(lastNodes, publishedNodes)
+      ? lastNodes!
+      : publishedNodes;
+    const finalFooters = footerRowsEqual(lastFooterRows, footerRows)
+      ? lastFooterRows
+      : footerRows;
 
     const snapshot: LevelSnapshot<F> = {
       status: "ready",
@@ -240,7 +246,8 @@ function buildCore<F>(opts: InMemoryLevelSourceOpts<F>): Core<F> {
       serverManaged: SERVER_MANAGED,
     };
     if (opts.sortMode === "client" && sort) snapshot.sort = sort;
-    if (opts.filterMode === "client" && filter !== undefined) snapshot.filter = filter;
+    if (opts.filterMode === "client" && filter !== undefined)
+      snapshot.filter = filter;
     // See the recompute comment: source filtered `finalNodes` already, so
     // the pipeline's `withFilter` against this predicate is a no-op. We
     // still publish the predicate so the pipeline's stage cache keys on a
@@ -282,7 +289,10 @@ function buildCore<F>(opts: InMemoryLevelSourceOpts<F>): Core<F> {
   function applyOne(rowKey: RowKey, colId: ColId, value: unknown): void {
     const baseIdx = lookupBaseIdx(rowKey);
     const node = baseNodes[baseIdx];
-    baseNodes[baseIdx] = { ...node, columns: { ...node.columns, [colId]: value } };
+    baseNodes[baseIdx] = {
+      ...node,
+      columns: { ...node.columns, [colId]: value },
+    };
   }
 
   const read: ReadonlyLevelDataSource = {
@@ -332,7 +342,11 @@ function buildCore<F>(opts: InMemoryLevelSourceOpts<F>): Core<F> {
     },
   };
 
-  const setCell: WritableLevelDataSource["setCell"] = (rowKey, colId, value) => {
+  const setCell: WritableLevelDataSource["setCell"] = (
+    rowKey,
+    colId,
+    value,
+  ) => {
     applyOne(rowKey, colId, value);
     invalidate();
     notify();
@@ -347,12 +361,16 @@ function buildCore<F>(opts: InMemoryLevelSourceOpts<F>): Core<F> {
     notify();
   };
 
-  const insertNode: WritableLevelDataSource["insertNode"] = (node, atIndex) => {
+  const createNode: WritableLevelDataSource["createNode"] = async (
+    node,
+    atIndex,
+  ) => {
     const idx = atIndex === undefined ? baseNodes.length : atIndex;
     baseNodes = baseNodes.slice();
     baseNodes.splice(idx, 0, node);
     invalidate();
     notify();
+    return { node, atIndex: idx };
   };
 
   const removeNode: WritableLevelDataSource["removeNode"] = (rowKey) => {
@@ -384,7 +402,7 @@ function buildCore<F>(opts: InMemoryLevelSourceOpts<F>): Core<F> {
     read,
     setCell,
     applyChanges,
-    insertNode,
+    createNode,
     removeNode,
     onReconcile,
     replaceNodes,
@@ -408,7 +426,7 @@ export function inMemoryLevelSource<F = unknown>(
     dispose: core.read.dispose,
     setCell: core.setCell,
     applyChanges: core.applyChanges,
-    insertNode: core.insertNode,
+    createNode: core.createNode,
     removeNode: core.removeNode,
     onReconcile: core.onReconcile,
     replaceNodes: core.replaceNodes,

@@ -40,9 +40,8 @@
 //   6. Phantoms are not data. They are author-state, kept on a separate
 //      per-path `PhantomChannel` and layered into displayed-row derivation
 //      alongside the data snapshot. A source never sees a phantom.
-//      `commitPhantom` is a host-orchestrated two-step: source verb
-//      (`insertNode`) plus phantom removal — done in the runtime helper, not
-//      on the source.
+//      `commitPhantomRow` creates an authoritative source row from a nonblank
+//      phantom and removes the phantom only after that create succeeds.
 //
 // Read-only sources omit the edit verbs entirely so the discriminated union
 // prevents callers from invoking writes on them at compile time (and at
@@ -55,7 +54,12 @@
 //      event iff a runtime write verb was invoked.
 
 import type { ColId, GridPath, RowKey } from "../types/identity";
-import type { FooterRow, PhantomRow, TreeNode } from "../types/level-row";
+import type {
+  FooterRow,
+  PhantomRow,
+  PhantomRowState,
+  TreeNode,
+} from "../types/level-row";
 import type { RowPredicate, SortDescriptor } from "../pipeline/types";
 
 export type LevelStatus = "idle" | "loading" | "error" | "ready";
@@ -129,6 +133,11 @@ export type LevelSnapshot<F = unknown> = {
 };
 
 export type CellChange = { rowKey: RowKey; colId: ColId; value: unknown };
+
+export type CreateNodeResult = {
+  node: TreeNode;
+  atIndex: number;
+};
 
 // The named outcome of an optimistic edit, surfaced after the server
 // roundtrip resolves. Hosts read this to drive notifications, conflict
@@ -226,7 +235,7 @@ export type WritableLevelDataSource = Omit<
   setCell: (rowKey: RowKey, colId: ColId, value: unknown) => void;
   // Atomic from the grid's view: every change applies or none does.
   applyChanges: (changes: CellChange[]) => void;
-  insertNode: (node: TreeNode, atIndex?: number) => void;
+  createNode: (node: TreeNode, atIndex?: number) => Promise<CreateNodeResult>;
   removeNode: (rowKey: RowKey) => void;
   // Per-cell reconciliation channel. Fires once per `setCell` /
   // `applyChanges` entry when the optimistic write has been resolved
@@ -269,6 +278,12 @@ export type PhantomChannel = {
     rowKey: RowKey,
     colId: ColId,
     value: unknown,
+  ) => void;
+  setState: (path: GridPath, rowKey: RowKey, state: PhantomRowState) => void;
+  update: (
+    path: GridPath,
+    rowKey: RowKey,
+    update: (row: PhantomRow) => PhantomRow,
   ) => void;
   subscribe: (path: GridPath, fn: () => void) => () => void;
 };

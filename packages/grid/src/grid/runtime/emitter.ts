@@ -1,7 +1,8 @@
 // Emitters — how the grid talks to host code.
 //
 // Host callbacks (mutationCommitted, cellSelectionChanged, rowSelectionChanged,
-// cellReconciled, levelStatusChanged, phantomCommitted) are wired via
+// cellReconciled, levelStatusChanged, phantomRowCommitted,
+// phantomRowCreateFailed) are wired via
 // `runtime.on(...)` at runtime construction and torn down with `dispose()`.
 // The runtime is created from a `RuntimeArgs` that includes initial
 // subscriptions; React props are not the carrier.
@@ -68,9 +69,13 @@ export type GridEvents = {
   // Source status transitions — fires on every transition observed by the
   // runtime's source subscription.
   levelStatusChanged: { path: GridPath; status: LevelStatus; error?: Error };
-  // A phantom row at `path` was promoted into a real node via the
-  // host-orchestrated commit (insertNode + phantom remove).
-  phantomCommitted: { path: GridPath; rowKey: RowKey };
+  phantomRowCommitted: {
+    path: GridPath;
+    rowKey: RowKey;
+    node: TreeNode;
+    atIndex: number;
+  };
+  phantomRowCreateFailed: { path: GridPath; rowKey: RowKey; reason: string };
 };
 
 type EventName = keyof GridEvents;

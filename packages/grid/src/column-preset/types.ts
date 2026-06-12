@@ -53,10 +53,10 @@ export type GridLevelCommands<TFilter = unknown> = {
   setFilter: (filter: TFilter | undefined) => void;
   setPage: (page: number, pageSize: number) => void;
   refetch: () => void;
-  insertRow: (node: TreeNode, atIndex?: number) => void;
+  createRow: (node: TreeNode, atIndex?: number) => Promise<unknown>;
   removeRow: (rowKey: RowKey) => void;
   writeCell: (coord: Coord, value: unknown) => void;
-  commitPhantom: (rowKey: RowKey, atIndex?: number) => void;
+  commitPhantomRow: (rowKey: RowKey, atIndex?: number) => Promise<unknown>;
 };
 
 export type HeaderLevelState<TFilter = unknown> = {

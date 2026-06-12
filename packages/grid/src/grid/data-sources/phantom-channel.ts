@@ -26,7 +26,9 @@ import type { PhantomChannel } from "./types";
 // derivation identity preservation treats this as the "no phantoms" sentinel.
 const EMPTY: PhantomRow[] = [];
 
-export function createPhantomChannel(initial?: Map<GridPath, PhantomRow[]>): PhantomChannel {
+export function createPhantomChannel(
+  initial?: Map<GridPath, PhantomRow[]>,
+): PhantomChannel {
   const byPath = new Map<GridPath, PhantomRow[]>();
   if (initial) {
     for (const [path, arr] of initial) {
@@ -70,17 +72,21 @@ export function createPhantomChannel(initial?: Map<GridPath, PhantomRow[]>): Pha
       notify(path);
     },
     setCell(path, rowKey, colId, value) {
+      this.update(path, rowKey, (old) => ({
+        ...old,
+        columns: { ...old.columns, [colId]: value },
+      }));
+    },
+    setState(path, rowKey, state) {
+      this.update(path, rowKey, (old) => ({ ...old, state }));
+    },
+    update(path, rowKey, update) {
       const cur = byPath.get(path);
       if (!cur) return;
       const idx = cur.findIndex((p) => p.rowKey === rowKey);
       if (idx < 0) return;
-      const old = cur[idx];
-      const updated: PhantomRow = {
-        ...old,
-        columns: { ...old.columns, [colId]: value },
-      };
       const next = cur.slice();
-      next[idx] = updated;
+      next[idx] = update(cur[idx]);
       byPath.set(path, next);
       notify(path);
     },

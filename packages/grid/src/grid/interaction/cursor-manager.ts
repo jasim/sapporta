@@ -4,10 +4,7 @@ import type { CellCursor } from "../types/identity";
 import type { CellSelectionState } from "../types/selection";
 import type { GridInteractionConfig } from "../types/interaction";
 import type { RowCursor, RowSelection } from "../types/row-selection";
-import {
-  normalizeRowSelection,
-  rowCursorEqual,
-} from "../types/row-selection";
+import { normalizeRowSelection, rowCursorEqual } from "../types/row-selection";
 import type { GridCoordinatorStore } from "./coordinator";
 import type { GridControllerCursorPort } from "./controller";
 import type { DisplayedRows } from "../types/level-row";
@@ -51,23 +48,36 @@ export type CursorManagerDeps = {
   coordinator: GridCoordinatorStore;
   controllerCursorPortFor: (path: GridPath) => GridControllerCursorPort;
   displayedRowsFor: (path: GridPath) => DisplayedRows;
+  onCellCursorChanging?: (
+    previous: CellCursor | null,
+    next: CellCursor | null,
+  ) => void;
+  onRowCursorChanging?: (
+    previous: RowCursor | null,
+    next: RowCursor | null,
+  ) => void;
 };
 
 export function createCursorManager(deps: CursorManagerDeps): CursorManager {
   function assertCellGrid(command: string): boolean {
     if (deps.interaction.mode === "cell-grid") return true;
-    throw new Error(`CursorManager.${command}: cell cursor commands require cell-grid interaction.`);
+    throw new Error(
+      `CursorManager.${command}: cell cursor commands require cell-grid interaction.`,
+    );
   }
 
   function assertRowList(command: string): boolean {
     if (deps.interaction.mode === "row-list") return true;
-    throw new Error(`CursorManager.${command}: row cursor commands require row-list interaction.`);
+    throw new Error(
+      `CursorManager.${command}: row cursor commands require row-list interaction.`,
+    );
   }
 
   function applyCellCursor(target: CellCursor | null): void {
     assertCellGrid("applyCellCursor");
     const prev = deps.coordinator.getState().cellCursor;
     if (cursorEqual(prev, target)) return;
+    deps.onCellCursorChanging?.(prev, target);
 
     // When the cell cursor leaves a path, clear that path's live mirror before
     // installing the new cursor. This prevents two levels from rendering as
@@ -135,6 +145,7 @@ export function createCursorManager(deps: CursorManagerDeps): CursorManager {
     assertRowList("applyRowCursor");
     const prev = deps.coordinator.getState().rowCursor;
     if (rowCursorEqual(prev, target)) return;
+    deps.onRowCursorChanging?.(prev, target);
 
     // Same denormalization rule as cells: one global row cursor, plus a
     // path-local liveRowFocus only on the path that owns it.

@@ -196,6 +196,23 @@ export function makeRowId(path: GridPath, rowKey: RowKey): RowId {
   return `${path}#${rowKey}` as RowId;
 }
 
+const DISPLAYED_PHANTOM_ROW_KEY_PREFIX = "phantom:";
+
+export function displayedPhantomRowKey(rowKey: RowKey): RowKey {
+  return `${DISPLAYED_PHANTOM_ROW_KEY_PREFIX}${rowKey}`;
+}
+
+export function phantomKeyFromDisplayedRowId(rowId: RowId): RowKey | null {
+  const rowKey = rowKeyOfRowId(rowId);
+  return rowKey.startsWith(DISPLAYED_PHANTOM_ROW_KEY_PREFIX)
+    ? rowKey.slice(DISPLAYED_PHANTOM_ROW_KEY_PREFIX.length)
+    : null;
+}
+
+export function isDisplayedPhantomRowId(rowId: RowId): boolean {
+  return phantomKeyFromDisplayedRowId(rowId) !== null;
+}
+
 export function pathOfRowId(id: RowId): GridPath {
   const idx = id.indexOf("#");
   if (idx < 0) throw new Error(`Malformed RowId: ${id}`);
