@@ -67,6 +67,11 @@ export {
   type TableGridToolbarRenderArgs,
 } from "./page/TableGridView";
 export { TableToolbar, type TableToolbarProps } from "./page/TableToolbar";
+export {
+  TableToolbarDeleteRowAction,
+  type TableToolbarDeleteRowActionProps,
+  type TableToolbarSession,
+} from "./page/TableToolbarDeleteRowAction";
 export * from "./page/table-grid-url-state";
 export * from "./page/table-pagination-binding";
 export * from "./page/table-toolbar-binding";

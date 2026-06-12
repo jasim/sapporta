@@ -62,6 +62,7 @@ export function TopBarButton({
   href,
   download,
   shortcut,
+  disabled,
   children,
 }: {
   tone?: "primary" | "ghost" | "danger";
@@ -70,6 +71,7 @@ export function TopBarButton({
   href?: string;
   download?: boolean;
   shortcut?: string;
+  disabled?: boolean;
   children: ReactNode;
 }) {
   const toneCls =
@@ -80,7 +82,7 @@ export function TopBarButton({
         : "bg-sap-surface text-sap-soft hover:bg-sap-row-hover border border-sap-border";
 
   const cls = cn(
-    "inline-flex items-center gap-[6px] h-sap-ctl px-[10px] rounded-[6px] text-sap-emph font-[650] whitespace-nowrap",
+    "inline-flex items-center gap-[6px] h-sap-ctl px-[10px] rounded-[6px] text-sap-emph font-[650] whitespace-nowrap disabled:pointer-events-none disabled:opacity-40",
     toneCls,
   );
 
@@ -93,7 +95,7 @@ export function TopBarButton({
     </>
   );
 
-  if (href) {
+  if (href && !disabled) {
     return (
       <a href={href} download={download} className={cls}>
         {content}
@@ -101,7 +103,7 @@ export function TopBarButton({
     );
   }
   return (
-    <button type="button" onClick={onClick} className={cls}>
+    <button type="button" onClick={onClick} className={cls} disabled={disabled}>
       {content}
     </button>
   );

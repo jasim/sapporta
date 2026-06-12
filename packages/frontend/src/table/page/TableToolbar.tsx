@@ -8,8 +8,13 @@ import type {
   NewFilterCondition,
 } from "@sapporta/shared/filter";
 import type { ColumnSchema } from "@sapporta/shared/contracts";
+import {
+  TableToolbarDeleteRowAction,
+  type TableToolbarSession,
+} from "./TableToolbarDeleteRowAction";
 
 export type TableToolbarProps = {
+  session?: TableToolbarSession;
   tableLabel: string;
   totalCount: number;
   columns: readonly ColumnSchema[];
@@ -31,6 +36,7 @@ export type TableToolbarProps = {
 // Use this component directly when your page already has toolbar props, or use
 // `useTableToolbarProps` to bind it to a live table session.
 export function TableToolbar({
+  session,
   tableLabel,
   totalCount,
   columns,
@@ -77,6 +83,7 @@ export function TableToolbar({
             >
               Export
             </TopBarButton>
+            <TableToolbarDeleteRowAction session={session} />
             {onNewRecord && (
               <TopBarButton
                 tone="primary"

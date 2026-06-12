@@ -46,6 +46,7 @@ export function useTableToolbarProps<
   const search = useStore(store, (state) => state.search);
 
   return {
+    session,
     tableLabel: table.label ?? table.name,
     totalCount,
     columns: table.columns,
