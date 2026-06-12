@@ -4,7 +4,7 @@ import type {
   FilterCondition,
   NewFilterCondition,
 } from "@sapporta/shared/filter";
-import { Popover, PopoverContent, PopoverTrigger } from "@sapporta/ui";
+import { cn, Popover, PopoverContent, PopoverTrigger } from "@sapporta/ui";
 import type { ColumnSchema } from "@sapporta/shared/contracts";
 import type { FkOptionsMap } from "@/lookup/types";
 import { ConditionEditor } from "./ConditionEditor";
@@ -20,6 +20,7 @@ export interface FilterCardsBarProps {
   onRemove: (id: string) => void;
   /** Per-condition backend error keyed by condition id. */
   filterErrors?: Record<string, string>;
+  className?: string;
 }
 
 /** Persistent overview of active filters. When no filters are set,
@@ -33,6 +34,7 @@ export function FilterCardsBar({
   onUpdate,
   onRemove,
   filterErrors,
+  className,
 }: FilterCardsBarProps) {
   const [addOpen, setAddOpen] = useState(false);
 
@@ -51,7 +53,12 @@ export function FilterCardsBar({
   if (filterableColumns.length === 0 && filters.length === 0) return null;
 
   return (
-    <div className="shrink-0 flex flex-wrap items-center gap-3 px-5 pt-[14px] pb-4 bg-sap-surface">
+    <div
+      className={cn(
+        "shrink-0 flex flex-wrap items-center gap-3 px-5 pt-[14px] pb-4 bg-sap-surface",
+        className,
+      )}
+    >
       {entries.map((entry) =>
         entry.kind === "range" ? (
           <DateRangeCard
@@ -76,7 +83,7 @@ export function FilterCardsBar({
         <PopoverTrigger asChild>
           <button
             type="button"
-            className="inline-flex items-center gap-[4px] h-sap-ctl px-[10px] rounded-[6px] border border-sap-border-soft text-sap-muted hover:text-sap-fg hover:bg-sap-row-hover text-sap-data font-semibold"
+            className="inline-flex items-center gap-[4px] h-sap-ctl px-[10px] rounded-[6px] border border-sap-border-soft text-sap-muted hover:text-sap-fg hover:bg-sap-row-hover text-sap-data font-semibold group-data-[toolbar-band=compact]/table-toolbar:h-11 group-data-[toolbar-band=compact]/table-toolbar:px-3"
           >
             <Plus className="h-[11px] w-[11px]" />
             Add filter

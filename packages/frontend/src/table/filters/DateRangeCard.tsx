@@ -103,15 +103,15 @@ export function DateRangeCard({
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
-      <div className="inline-flex items-stretch h-sap-ctl rounded-[5px] border border-sap-border overflow-hidden">
+      <div className="inline-flex h-sap-ctl max-w-full items-stretch overflow-hidden rounded-[5px] border border-sap-border group-data-[toolbar-band=compact]/table-toolbar:h-11">
         <PopoverTrigger asChild>
           <button
             type="button"
-            className="flex items-center gap-[6px] px-[10px] bg-sap-surface hover:bg-sap-row-hover text-sap-fg text-sap-emph"
+            className="flex min-w-0 items-center gap-[6px] bg-sap-surface px-[10px] text-sap-emph text-sap-fg hover:bg-sap-row-hover"
           >
-            <span className="text-sap-muted">{label}</span>
-            <span className="text-sap-subtle">between</span>
-            <span className="font-medium">
+            <span className="truncate text-sap-muted">{label}</span>
+            <span className="shrink-0 text-sap-subtle">between</span>
+            <span className="truncate font-medium">
               {gte.value || "…"} – {lte.value || "…"}
             </span>
           </button>
@@ -120,7 +120,7 @@ export function DateRangeCard({
           type="button"
           aria-label={`Remove ${label} range filter`}
           onClick={removeBoth}
-          className="flex items-center px-[8px] bg-sap-surface hover:bg-sap-row-hover text-sap-muted hover:text-sap-fg border-l border-sap-border"
+          className="flex shrink-0 items-center border-l border-sap-border bg-sap-surface px-[8px] text-sap-muted hover:bg-sap-row-hover hover:text-sap-fg group-data-[toolbar-band=compact]/table-toolbar:w-11 group-data-[toolbar-band=compact]/table-toolbar:justify-center group-data-[toolbar-band=compact]/table-toolbar:px-0"
         >
           <X className="h-[11px] w-[11px]" />
         </button>

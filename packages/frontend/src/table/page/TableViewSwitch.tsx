@@ -32,9 +32,9 @@ export function TableViewSwitch({
       <PopoverTrigger
         aria-label="Open table view options"
         title="View options"
-        className="inline-flex h-sap-ctl w-[30px] items-center justify-center rounded-[6px] border border-sap-border bg-sap-surface text-sap-soft hover:bg-sap-row-hover hover:text-sap-fg"
+        className="inline-flex h-sap-ctl w-[30px] items-center justify-center rounded-[6px] border border-sap-border bg-sap-surface text-sap-soft hover:bg-sap-row-hover hover:text-sap-fg group-data-[toolbar-band=compact]/table-toolbar:h-11 group-data-[toolbar-band=compact]/table-toolbar:w-11 group-data-[toolbar-band=compact]/table-toolbar:shrink-0"
       >
-        <PanelsTopLeft className="h-[12px] w-[12px]" />
+        <PanelsTopLeft className="h-[12px] w-[12px] group-data-[toolbar-band=compact]/table-toolbar:h-4 group-data-[toolbar-band=compact]/table-toolbar:w-4" />
       </PopoverTrigger>
       <PopoverContent
         align="end"

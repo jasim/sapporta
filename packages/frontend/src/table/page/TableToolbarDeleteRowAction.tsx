@@ -11,6 +11,11 @@ export type TableToolbarDeleteRowActionProps = {
   session?: TableToolbarSession;
 };
 
+export type TableToolbarSelectionState =
+  | { kind: "none"; count: 0 }
+  | { kind: "single"; count: 1 }
+  | { kind: "multiple"; count: number };
+
 export function TableToolbarDeleteRowAction({
   session,
 }: TableToolbarDeleteRowActionProps) {
@@ -27,24 +32,53 @@ export function TableToolbarDeleteRowAction({
   );
 }
 
+export function useTableToolbarSelection(
+  session: TableToolbarSession | undefined,
+): TableToolbarSelectionState {
+  const count = useSelectedDataRowCount(session);
+  if (count === 0) return { kind: "none", count };
+  if (count === 1) return { kind: "single", count };
+  return { kind: "multiple", count };
+}
+
+export function clearTableToolbarSelection(
+  session: TableToolbarSession | undefined,
+): void {
+  if (!session) return;
+  const runtime = session.runtime;
+  for (const path of runtime.registeredPaths()) {
+    if (runtime.rowInteractionSnapshotFor(path).selectedRowIds.length === 0) {
+      continue;
+    }
+    runtime.rowInteraction.clearRowSelection(path);
+  }
+}
+
 function useHasAnySelectedDataRow(
   session: TableToolbarSession | undefined,
 ): boolean {
+  return useSelectedDataRowCount(session) > 0;
+}
+
+function useSelectedDataRowCount(
+  session: TableToolbarSession | undefined,
+): number {
   // Keep the toolbar affordance in step with the table tree the app is showing.
   // A row selected inside an expanded child table should enable the same delete
   // action as a row selected in the root table.
   return useSyncExternalStore(
     (notify) => subscribeSelectedDataRows(session, notify),
-    () => hasAnySelectedDataRow(session),
-    () => false,
+    () => selectedDataRowCount(session),
+    () => 0,
   );
 }
 
-function hasAnySelectedDataRow(
+function selectedDataRowCount(
   session: TableToolbarSession | undefined,
-): boolean {
-  if (!session) return false;
+): number {
+  if (!session) return 0;
   const runtime = session.runtime;
+  let count = 0;
   for (const path of runtime.registeredPaths()) {
     const rowInteraction = runtime.rowInteractionSnapshotFor(path);
     for (const rowId of rowInteraction.selectedRowIds) {
@@ -52,11 +86,11 @@ function hasAnySelectedDataRow(
       // rows, footers, and rows filtered away from the displayed set should not
       // make the toolbar look ready to delete.
       if (runtime.displayedRowFor(path, rowId)?.kind === "data") {
-        return true;
+        count += 1;
       }
     }
   }
-  return false;
+  return count;
 }
 
 function subscribeSelectedDataRows(
