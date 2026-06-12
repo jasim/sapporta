@@ -32,7 +32,6 @@ import {
   lookupRoute,
   updateRowRoute,
 } from "./table-routes.js";
-import { listReportsRoute, runReportRoute } from "./report-routes.js";
 
 const c = initContract();
 
@@ -58,9 +57,6 @@ export const uiContract = c.router({
   deleteRow: deleteRowRoute,
   lookup: lookupRoute,
   count: countRoute,
-
-  listReports: listReportsRoute,
-  runReport: runReportRoute,
 });
 
 export type UiContract = typeof uiContract;

@@ -41,6 +41,7 @@
     "./value-kind": "./dist/value-kind.js",
     "./temporal": "./dist/temporal.js",
     "./daterange": "./dist/daterange.js",
+    "./report-grid": "./dist/report-grid/index.js",
     "./row-id": "./dist/row-id.js",
     "./contracts": "./dist/contracts/index.js",
     "./client": "./dist/client/index.js",

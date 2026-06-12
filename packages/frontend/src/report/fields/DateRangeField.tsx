@@ -31,14 +31,14 @@ const SELECT_LABELS: Record<DateRangeSelectKey, string> = {
 
 export interface DateRangeFieldProps {
   label: string;
-  required: boolean;
+  required?: boolean;
   value: DateRangeState;
   onChange: (state: DateRangeState) => void;
 }
 
 export function DateRangeField({
   label,
-  required,
+  required = false,
   value,
   onChange,
 }: DateRangeFieldProps) {

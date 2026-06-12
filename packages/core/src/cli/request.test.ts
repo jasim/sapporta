@@ -30,22 +30,22 @@ describe("buildRequest", () => {
 
   it("does not forward --output-format or --input-body-json as query params", () => {
     const getRoute: CliRoute = {
-      pattern: ["reports", "run", ":report"],
-      description: "Run report",
+      pattern: ["rows", ":table"],
+      description: "List rows",
       method: "GET",
-      path: "/api/reports/:report/results",
-      params: ["report"],
+      path: "/api/tables/:table",
+      params: ["table"],
       queryFlags: ["*"],
       extractData: () => [],
     };
 
-    const req = buildRequest(getRoute, { report: "trial-balance" }, {
+    const req = buildRequest(getRoute, { table: "accounts" }, {
       "output-format": "json",
       "input-body-json": '{"ignored":true}',
-      period: "2026-05",
+      limit: "25",
     });
 
-    expect(req.queryParams).toEqual({ period: "2026-05" });
+    expect(req.queryParams).toEqual({ limit: "25" });
   });
 
   it("does not forward --api-token as a query param", () => {

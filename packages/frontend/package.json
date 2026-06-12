@@ -71,9 +71,9 @@
       "types": "./dist/routes/new-record.d.ts",
       "import": "./dist/routes/new-record.js"
     },
-    "./routes/report": {
-      "types": "./dist/routes/report.d.ts",
-      "import": "./dist/routes/report.js"
+    "./report": {
+      "types": "./dist/report/index.d.ts",
+      "import": "./dist/report/index.js"
     },
     "./layout": {
       "types": "./dist/shell/components/SidebarShell.d.ts",

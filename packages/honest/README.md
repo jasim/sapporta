@@ -131,7 +131,7 @@ A route can set `metadata: { skipBodyValidation: true }` to bypass the adapter's
 
 ## Status
 
-Early. Extracted from the [Sapporta](https://github.com/jasim/sapporta) monorepo where it drives the framework's table / meta / reports namespaces. API may shift between 0.x releases.
+Early. Extracted from the [Sapporta](https://github.com/jasim/sapporta) monorepo where it drives the framework's table, metadata, and app route namespaces. API may shift between 0.x releases.
 
 ## License
 

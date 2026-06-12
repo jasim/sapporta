@@ -94,7 +94,7 @@ installSapportaRequestContext(app, conn);
 app.use("/api/*", projectAuth.resolveMiddleware);
 app.use("/api/*", projectAuth.rejectAnonymousMiddleware);
 
-// Built-in app APIs: table metadata, CRUD rows, reports, and SQL tools.
+// Built-in app APIs: table metadata, CRUD rows, and SQL tools.
 const sapportaApi = mountSapportaFramework(app, sapporta, {
   conn,
   auth: {

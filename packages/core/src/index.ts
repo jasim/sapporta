@@ -77,25 +77,6 @@ export type { TableCatalog } from "./schema/catalog.js";
 // Name validation
 export { validateTableName, validateColumnName } from "./schema/reserved.js";
 
-// Reports. Author-DSL types (`ReportDefinition`, `ReportTreeNode`,
-// `ReportSource`, `ReportSort`, `ReportFooter`, `ReportColumn`,
-// `TransformContext`) are defined here — they carry function fields
-// that don't survive serialization. Wire-shape types (`ReportParam`,
-// `ReportOutputNode`, `ReportFooterRow`, `ReportResult`,
-// `SerializedReportStat`) live in `@sapporta/shared/contracts`.
-export { report } from "./reports/report.js";
-export type {
-  ReportDefinition,
-  ReportSource,
-  ReportTreeNode,
-  ReportSort,
-  ReportFooter,
-  ReportColumn,
-  TransformContext,
-} from "./reports/report.js";
-export { executeReport } from "./reports/engine.js";
-export { loadReports } from "./reports/loader.js";
-
 // Framework boot for external projects that own their entry point.
 export {
   installSapportaRequestContext,

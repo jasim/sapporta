@@ -62,7 +62,10 @@ export type TestRequestInit = RequestInit & {
 };
 
 export async function createIntegrationApp(
-  options: { installDefaults?: boolean } = {},
+  options: {
+    installDefaults?: boolean;
+    configureApi?: (api: TsRestApi<SapportaEnv>) => void;
+  } = {},
 ): Promise<{
   app: Hono<SapportaEnv>;
 }> {
@@ -83,6 +86,7 @@ export async function createIntegrationApp(
   const accountsModule = await import(join(FIXTURES_DIR, "app/accounts.js"));
   apiApp.route("/", accountsModule.default);
   apiApp.extend(accountsModule.default);
+  options.configureApi?.(apiApp);
 
   const sapporta = await loadSapportaProject({
     name: "Test",

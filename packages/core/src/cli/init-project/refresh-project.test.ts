@@ -94,8 +94,6 @@ describe("refreshScaffoldProject", () => {
       "custom framework app host\n",
     );
     writeFileSync(join(target, "packages/api/schema/accounts.ts"), "schema\n");
-    writeFileSync(join(target, "packages/api/reports/ledger.ts"), "report\n");
-
     const summary = refreshScaffoldProject({
       projectDir: target,
       mode: "write",
@@ -139,9 +137,6 @@ describe("refreshScaffoldProject", () => {
     expect(
       readFileSync(join(target, "packages/api/schema/accounts.ts"), "utf-8"),
     ).toBe("schema\n");
-    expect(
-      readFileSync(join(target, "packages/api/reports/ledger.ts"), "utf-8"),
-    ).toBe("report\n");
     expect(existsSync(join(target, "packages/frontend/src/api.ts"))).toBe(true);
 
     const apiPackageJson = JSON.parse(
@@ -180,7 +175,6 @@ describe("refreshScaffoldProject", () => {
 function createTargetProject(): string {
   const target = makeTempDir();
   mkdirSync(join(target, "packages/api/schema"), { recursive: true });
-  mkdirSync(join(target, "packages/api/reports"), { recursive: true });
   mkdirSync(join(target, "packages/frontend/src"), { recursive: true });
   mkdirSync(join(target, "packages/shared"), { recursive: true });
   writeFileSync(join(target, "sapporta.json"), "{}\n");

@@ -16,7 +16,7 @@ import { join, dirname } from "node:path";
 export const PROJECT_MARKER = "sapporta.json";
 
 /** Subdirectory names that the dev watcher should observe for hot-reload. */
-export const WATCHABLE_SUBDIRS = ["app", "reports"] as const;
+export const WATCHABLE_SUBDIRS = ["app"] as const;
 
 /**
  * Given a project root (containing sapporta.json), derive all standard paths.
@@ -48,7 +48,7 @@ export function fromProjectRoot(projectRoot: string) {
 
 /**
  * Given an API code directory (either packages/api or packages/api/dist), derive resource
- * subdirectories. The subdirectory names (`schema`, `app`, `reports`) are
+ * subdirectories. The subdirectory names (`schema`, `app`) are
  * identical under both trees, so the same helper serves both the source-lint
  * path and the runtime-load path.
  */
@@ -56,7 +56,6 @@ export function fromApiCodeDir(codeDir: string) {
   return {
     schemaDir: join(codeDir, "schema"),
     appDir: join(codeDir, "app"),
-    reportsDir: join(codeDir, "reports"),
   };
 }
 
@@ -75,8 +74,8 @@ export function storeDbPath(storeDir: string, projectId: string): string {
 // Holds the absolute path to the current Sapporta project root for the
 // lifetime of the process. The generated `packages/api/boot.ts` calls
 // `setProjectRoot` once at boot, before any user code runs. User code
-// anywhere in the project — sub-apps under `packages/api/app/`, reports under
-// `packages/api/reports/`, ad-hoc scripts — then reads it via `projectRoot()` /
+// anywhere in the project — sub-apps under `packages/api/app/`,
+// ad-hoc scripts — then reads it via `projectRoot()` /
 // `projectPath(...)` without needing to plumb it through.
 //
 // This API is single-project per process by design. Multi-project hosts
@@ -127,8 +126,8 @@ export function setProjectRoot(root: string): void {
 /**
  * The absolute path to the current Sapporta project root — Rails.root analogue.
  *
- * Use this from user app code (sub-apps under `packages/api/app/`, reports under
- * `packages/api/reports/`) when you need to read project-relative files. Do **not**
+ * Use this from user app code (sub-apps under `packages/api/app/`) when you
+ * need to read project-relative files. Do **not**
  * use `__dirname` / `import.meta.dirname` for asset paths — at runtime they
  * resolve under `dist/`, where non-TS assets (JSON, prompts, txt) don't exist.
  *

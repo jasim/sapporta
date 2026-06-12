@@ -50,11 +50,19 @@ export type DateRangeState =
     };
 
 /** Flattened boundary pair the engine passes to SQL. `null` on either
- *  side means the bound is omitted; reports use the
+ *  side means the bound is omitted; route-based report screens can use the
  *  `$x IS NULL OR col >= $x` idiom to honor that. */
 export type ResolvedDateRange = {
   from: Temporal.PlainDate | null;
   to: Temporal.PlainDate | null;
+};
+
+/** Date bounds resolved from route query params, ready for SQL/Drizzle
+ *  comparisons. `null` means the bound is open on that side. */
+export type DateRangeQueryBounds = {
+  state: DateRangeState;
+  from: string | null;
+  to: string | null;
 };
 
 // ---------------------------------------------------------------------------
@@ -228,6 +236,29 @@ export function parseDateRange(
   }
 
   return allTime();
+}
+
+/**
+ * Parse a route query's daterange fields and resolve them to ISO date strings.
+ *
+ * Route-based report handlers can pass the returned `from` and `to` values
+ * directly into Drizzle predicates or SQL parameters:
+ *
+ *   const period = resolveDateRangeQueryBounds("period", request.query);
+ *   // period.from / period.to are string | null
+ */
+export function resolveDateRangeQueryBounds(
+  paramName: string,
+  params: Record<string, unknown>,
+  today: Temporal.PlainDate = Temporal.Now.plainDateISO(),
+): DateRangeQueryBounds {
+  const state = parseDateRange(paramName, params);
+  const { from, to } = resolveDateRange(state, today);
+  return {
+    state,
+    from: from ? formatPlainDate(from) : null,
+    to: to ? formatPlainDate(to) : null,
+  };
 }
 
 function stringOrEmpty(v: unknown): string {

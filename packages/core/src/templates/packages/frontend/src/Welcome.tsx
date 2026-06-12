@@ -4,7 +4,7 @@ import { useSchemaStore } from "@sapporta/frontend/schema";
 // Replace this screen with the first dashboard, workflow, or form your app
 // needs. The server check shows how a screen calls your typed API client.
 export function Welcome() {
-  const { tables, reports } = useSchemaStore();
+  const { tables } = useSchemaStore();
   const [hello, setHello] = useState<HelloState>({ kind: "loading" });
 
   useEffect(() => {
@@ -48,7 +48,7 @@ export function Welcome() {
 
         <div className="grid grid-cols-2 gap-3">
           <Stat label="Tables discovered" value={tables.length} />
-          <Stat label="Reports discovered" value={reports.length} />
+          <Stat label="Custom routes" value={1} />
         </div>
 
         <section>

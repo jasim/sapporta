@@ -150,7 +150,6 @@ export function installFrameworkRoutePolicy<E extends SapportaEnv>(
   };
   app.use("/api/openapi.json", currentAuthOnly);
   app.use("/api/meta/*", currentAuthOnlyMeta);
-  app.use("/api/reports/*", currentAuthOnly);
   return app;
 }
 

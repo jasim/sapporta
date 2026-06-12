@@ -2,7 +2,7 @@
   "name": "@sapporta/server",
   "version": "0.2.4",
   "type": "module",
-  "description": "Sapporta server — schema-as-code tables, auto-generated CRUD, hierarchical reports, and an OpenAPI-emitting Hono app, all wired up with Drizzle and SQLite.",
+  "description": "Sapporta server — schema-as-code tables, auto-generated CRUD, route primitives, and an OpenAPI-emitting Hono app, all wired up with Drizzle and SQLite.",
   "keywords": [
     "sapporta",
     "framework",
@@ -47,7 +47,6 @@
       "import": "./dist/index.js"
     },
     "./table": "./dist/schema/table.js",
-    "./report": "./dist/reports/report.js",
     "./errors": "./dist/db/errors.js",
     "./create-project": "./dist/create-project.js",
     "./cli": "./dist/cli/index.js",

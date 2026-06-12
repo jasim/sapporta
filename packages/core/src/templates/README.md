@@ -20,7 +20,7 @@ of delivering it. It is ignored by git.
 ## Project layout
 
 ```
-packages/api/       backend — boot.ts, app.ts, schema/, app/, reports/
+packages/api/       backend — boot.ts, app.ts, schema/, app/
 packages/frontend/  SPA — Vite + React, imports @sapporta/frontend and @sapporta/ui CSS
 packages/shared/    ts-rest contracts + types shared by backend and frontend
 ```

@@ -9,9 +9,8 @@ import { valueKindSchema } from "./value-kind-schema.js";
  * `TableSchema[]`. Single source of truth — both sides import the type
  * from here.
  *
- * Report definitions in `@sapporta/server/reports/report.ts` use a
- * superset of `ColumnSchema` that adds a runtime `display` function;
- * that's a separate authoring type, not a wire shape, and lives in core.
+ * Table metadata and route-based report grids use separate wire types.
+ * Report grid columns live in `@sapporta/shared/report-grid`.
  */
 
 /** Maps target (table filter / report param) name → source column name on

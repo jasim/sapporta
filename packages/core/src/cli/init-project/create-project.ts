@@ -119,7 +119,6 @@ function createScaffoldDirectories(project: {
   mkdirSync(join(project.apiDir, "project-auth"), { recursive: true });
   mkdirSync(join(project.apiDir, "schema"), { recursive: true });
   mkdirSync(join(project.apiDir, "migrations"), { recursive: true });
-  mkdirSync(join(project.apiDir, "reports"), { recursive: true });
   mkdirSync(join(project.frontendDir, "src"), { recursive: true });
   mkdirSync(join(project.sharedDir, "src", "contracts"), { recursive: true });
 }

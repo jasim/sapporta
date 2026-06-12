@@ -14,8 +14,8 @@ export function formatCurrency(value: unknown): string {
   const n = typeof value === "number" ? value : Number(value);
   return Number.isFinite(n)
     ? new Intl.NumberFormat(undefined, {
-        style: "currency",
-        currency: "USD",
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
       }).format(n)
     : String(value);
 }
@@ -36,4 +36,3 @@ export function formatDate(value: unknown): string {
   if (value instanceof Date) return value.toISOString().slice(0, 10);
   return String(value);
 }
-

@@ -4,7 +4,7 @@ import { loadAdminMetadata } from "@/app/actions/boot";
 import { useSchemaStore } from "@/schema-catalog/state/schema-store";
 
 /**
- * Loads schema and reports on mount.
+ * Loads schema on mount.
  * Gates children until schema is loaded.
  */
 export function BootLoader({ children }: { children: ReactNode }) {

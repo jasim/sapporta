@@ -1,8 +1,8 @@
 # Sapporta CLI
 
 The Sapporta CLI can validate local project files and call a running Sapporta
-app. Use it to inspect the app's API, work with tables and reports, and run data
-commands against the same routes your users call from the browser.
+app. Use it to inspect the app's API, work with tables, and run data commands
+against the same built-in routes your users call from the browser.
 
 ## Local Commands
 
@@ -20,7 +20,6 @@ These commands call the selected Sapporta API server:
 ```bash
 pnpm exec sapporta describe
 pnpm exec sapporta tables
-pnpm exec sapporta reports
 pnpm exec sapporta rows insert <table> --data '[{...}]'
 pnpm exec sapporta db exec-sql "SELECT ..."
 ```
@@ -43,10 +42,10 @@ Command flags override environment variables.
 
 ## Protected Apps
 
-Auth-enabled apps usually protect table, report, SQL, and OpenAPI routes. Create
-an agent access token from your account profile in the app, copy the raw token
-once, and store it as `SAPPORTA_API_TOKEN` in your shell, CI system, or agent
-secret store:
+Auth-enabled apps usually protect table, SQL, OpenAPI, and custom app routes.
+Create an agent access token from your account profile in the app, copy the raw
+token once, and store it as `SAPPORTA_API_TOKEN` in your shell, CI system, or
+agent secret store:
 
 ```bash
 export SAPPORTA_API_URL="https://app.example.com"
@@ -54,7 +53,6 @@ export SAPPORTA_API_TOKEN="spat_..."
 
 pnpm exec sapporta describe
 pnpm exec sapporta tables sample customers
-pnpm exec sapporta reports run receivables-aging --as_of_date 2026-06-11
 ```
 
 You can also pass a token for one command:
@@ -81,8 +79,9 @@ Use `sapporta describe` to inspect custom endpoints:
 pnpm exec sapporta describe "POST /api/invoices/void"
 ```
 
-The CLI can call built-in table, report, row, SQL, and metadata commands. For a
-custom endpoint, call the route with `curl` or another HTTP client:
+The CLI can call built-in table, row, SQL, and metadata commands. Reports are
+app-owned routes, so use `sapporta describe` to inspect them and call the route
+with `curl` or another HTTP client:
 
 ```bash
 curl -fsS \
@@ -90,6 +89,12 @@ curl -fsS \
   -H "Content-Type: application/json" \
   -d '{"reason":"duplicate"}' \
   "${SAPPORTA_API_URL}/api/invoices/123/void"
+```
+
+```bash
+curl -fsS \
+  -H "Authorization: Bearer ${SAPPORTA_API_TOKEN}" \
+  "${SAPPORTA_API_URL}/api/reports/trial-balance?asOfDate=2026-06-12"
 ```
 
 ## Auth Errors
@@ -105,4 +110,4 @@ Protected apps return structured auth errors:
 
 `sapporta describe` uses the same API URL and token as data commands. If
 discovery fails with an auth error, fix the token before composing table,
-report, or custom endpoint requests.
+SQL, report, or custom endpoint requests.

@@ -36,9 +36,6 @@ export * from "./mount-tables.js";
 export * from "./table-handlers.js";
 export * from "./mount-meta.js";
 export * from "./meta-handlers.js";
-export * from "./report-contracts.js";
-export * from "./mount-reports.js";
-export * from "./report-handlers.js";
 
 // Note: contract objects (`projectInfoRoute`, `uiContract`, etc.) live in
 // `@sapporta/shared/contracts` and are imported from there. They are not

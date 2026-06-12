@@ -103,18 +103,9 @@ describe("CLI route table", () => {
     expect(route!.params).toEqual(["table", "id"]);
   });
 
-  it("reports → GET /api/reports", () => {
-    const route = findRoute(["reports"]);
-    expect(route).toBeDefined();
-    expect(route!.path).toBe("/api/reports");
-    expect(route!.method).toBe("GET");
-  });
-
-  it("reports run → GET /api/reports/:report/results", () => {
-    const route = findRoute(["reports", "run"]);
-    expect(route).toBeDefined();
-    expect(route!.path).toBe("/api/reports/:report/results");
-    expect(route!.method).toBe("GET");
+  it("reports are not registry-backed CLI commands", () => {
+    expect(findRoute(["reports"])).toBeUndefined();
+    expect(findRoute(["reports", "run"])).toBeUndefined();
   });
 
 });

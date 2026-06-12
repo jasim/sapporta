@@ -39,11 +39,6 @@ const NewRecordRoute = lazy(() =>
     default: m.NewRecordRoute,
   })),
 );
-const ReportRoute = lazy(() =>
-  import("@sapporta/frontend/routes/report").then((m) => ({
-    default: m.ReportRoute,
-  })),
-);
 
 function RouteFallback() {
   return (
@@ -116,14 +111,6 @@ export const sapportaProtectedRoutes = (
       element={
         <Suspense fallback={<RouteFallback />}>
           <TableRoute />
-        </Suspense>
-      }
-    />
-    <Route
-      path="reports/:reportName"
-      element={
-        <Suspense fallback={<RouteFallback />}>
-          <ReportRoute />
         </Suspense>
       }
     />

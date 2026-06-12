@@ -785,7 +785,6 @@ export SAPPORTA_API_TOKEN="spat_..."
 
 pnpm exec sapporta describe
 pnpm exec sapporta tables
-pnpm exec sapporta reports
 ```
 
 A token belongs to the signed-in user and the active workspace. Ordinary CLI data
@@ -797,10 +796,10 @@ Token list responses show metadata only. They do not include the raw token or
 the stored secret hash. If the raw token is lost, revoke it and create another
 one.
 
-Bearer-token callers can use ordinary protected app APIs, table APIs, report
-APIs, SQL APIs, and `GET /api/openapi.json` when their permissions allow it.
-They cannot create, list, or revoke other tokens; token management stays a
-browser-session action.
+Bearer-token callers can use ordinary protected app APIs, table APIs, SQL APIs,
+and `GET /api/openapi.json` when their permissions allow it. App-owned report
+routes are ordinary protected app APIs. Bearer-token callers cannot create,
+list, or revoke other tokens; token management stays a browser-session action.
 
 Auth errors are intended to be actionable:
 
@@ -875,10 +874,10 @@ Reference visibility: FK values must point to rows visible inside the active
 auth boundary.
 
 Framework route: generated Sapporta admin route such as `/api/tables/*`,
-`/api/meta/*`, `/api/reports/*`, and `/api/openapi.json`.
+`/api/meta/*`, and `/api/openapi.json`.
 
 Product route: custom application route registered by the project under
-`/api/*`.
+`/api/*`, including app-owned report routes.
 
 Agent access token: a bearer token for non-browser clients. It names one user
 and one workspace, and can call ordinary protected APIs without a browser

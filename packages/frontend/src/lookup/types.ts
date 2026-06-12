@@ -1,7 +1,7 @@
 /**
  * UI-internal types only.
  *
- * Wire shapes (`ColumnSchema`, `TableSchema`, `ReportResult`, `Row`, ...)
+ * Wire shapes (`ColumnSchema`, `TableSchema`, `Row`, ...)
  * live in `@sapporta/shared/contracts` — the single source of truth shared
  * with the server. Components import them from there directly.
  *

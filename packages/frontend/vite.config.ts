@@ -44,7 +44,7 @@ export default defineConfig({
           __dirname,
           "src/routes/new-record.ts",
         ),
-        "routes/report": path.resolve(__dirname, "src/routes/report.ts"),
+        report: path.resolve(__dirname, "src/report/index.ts"),
       },
       formats: ["es"],
     },

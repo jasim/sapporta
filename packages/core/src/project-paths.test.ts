@@ -22,7 +22,7 @@ describe("project-paths", () => {
   });
 
   it("WATCHABLE_SUBDIRS lists hot-reloadable directories", () => {
-    expect(WATCHABLE_SUBDIRS).toEqual(["app", "reports"]);
+    expect(WATCHABLE_SUBDIRS).toEqual(["app"]);
   });
 
   it("fromProjectRoot derives all standard paths", () => {
@@ -44,7 +44,6 @@ describe("project-paths", () => {
     expect(dirs).toEqual({
       schemaDir: "/tmp/myproject/packages/api/schema",
       appDir: "/tmp/myproject/packages/api/app",
-      reportsDir: "/tmp/myproject/packages/api/reports",
     });
   });
 

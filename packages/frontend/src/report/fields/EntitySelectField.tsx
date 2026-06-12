@@ -1,14 +1,15 @@
 import { useEffect, useState } from "react";
 import { fetchLookupEntriesForSearch } from "@/lookup/api/lookup";
 import { Combobox } from "@sapporta/ui";
-import type { ReportParam } from "@sapporta/shared/contracts";
 
 export function EntitySelectField({
-  param,
+  tableName,
+  label,
   value,
   onChange,
 }: {
-  param: ReportParam;
+  tableName: string;
+  label?: string;
   value: string;
   onChange: (value: string) => void;
 }) {
@@ -19,7 +20,7 @@ export function EntitySelectField({
     let cancelled = false;
     setLoading(true);
     fetchLookupEntriesForSearch({
-      tableName: param.lookup!,
+      tableName,
       searchText: "",
       limit: 5000,
     })
@@ -40,12 +41,12 @@ export function EntitySelectField({
     return () => {
       cancelled = true;
     };
-  }, [param.lookup]);
+  }, [tableName]);
 
   const stringValue = value ? String(value) : null;
   const placeholder = loading
     ? "Loading options..."
-    : `Select ${param.label ?? param.name}`;
+    : `Select ${label ?? tableName}`;
 
   return (
     <Combobox

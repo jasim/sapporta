@@ -7,6 +7,7 @@ import {
   parseDateRange,
   relative,
   resolveDateRange,
+  resolveDateRangeQueryBounds,
   serializeDateRange,
   snapshotDateRange,
 } from "./daterange.js";
@@ -154,6 +155,43 @@ describe("parseDateRange — error cases", () => {
         other_relative: "30d",
       }),
     ).toEqual(allTime());
+  });
+});
+
+describe("resolveDateRangeQueryBounds", () => {
+  it("parses and serializes custom bounds for route handlers", () => {
+    expect(
+      resolveDateRangeQueryBounds(
+        "period",
+        {
+          period_from: "2024-01-01",
+          period_to: "2024-01-31",
+        },
+        today,
+      ),
+    ).toEqual({
+      state: custom(parsePlainDate("2024-01-01"), parsePlainDate("2024-01-31")),
+      from: "2024-01-01",
+      to: "2024-01-31",
+    });
+  });
+
+  it("resolves relative query params against the supplied today", () => {
+    expect(
+      resolveDateRangeQueryBounds("period", { period_relative: "mtd" }, today),
+    ).toEqual({
+      state: relative("mtd"),
+      from: "2025-04-01",
+      to: "2025-04-15",
+    });
+  });
+
+  it("returns null bounds for all time", () => {
+    expect(resolveDateRangeQueryBounds("period", {}, today)).toEqual({
+      state: allTime(),
+      from: null,
+      to: null,
+    });
   });
 });
 

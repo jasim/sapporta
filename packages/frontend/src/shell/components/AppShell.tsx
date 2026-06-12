@@ -6,8 +6,8 @@ import {
   NavigationRail,
 } from "./Sidebar";
 import { useSchemaStore } from "@/schema-catalog/state/schema-store";
-import type { ReportMeta, TableSchema } from "@sapporta/shared/contracts";
-import { Database, FileText } from "lucide-react";
+import type { TableSchema } from "@sapporta/shared/contracts";
+import { Database } from "lucide-react";
 import type { Navigation, NavigationSection } from "../navigation";
 
 export interface AppShellProps {
@@ -19,13 +19,13 @@ export function AppShell({
   navigation = [],
   showFrameworkNavigation = true,
 }: AppShellProps) {
-  const { loaded, error, tables, reports } = useSchemaStore();
+  const { loaded, error, tables } = useSchemaStore();
   const shellNavigation = useMemo(() => {
     const frameworkNavigation = showFrameworkNavigation
-      ? frameworkNavigationSections({ tables, reports })
+      ? frameworkNavigationSections({ tables })
       : [];
     return [...navigation, ...frameworkNavigation];
-  }, [navigation, reports, showFrameworkNavigation, tables]);
+  }, [navigation, showFrameworkNavigation, tables]);
 
   return (
     <div className="flex flex-col h-screen overflow-hidden">
@@ -58,10 +58,8 @@ export function AppShell({
 
 function frameworkNavigationSections({
   tables,
-  reports,
 }: {
   tables: readonly TableSchema[];
-  reports: readonly ReportMeta[];
 }): Navigation {
   const sections: NavigationSection[] = [];
 
@@ -72,17 +70,6 @@ function frameworkNavigationSections({
         label: table.label,
         to: `/tables/${table.name}`,
         icon: Database,
-      })),
-    });
-  }
-
-  if (reports.length > 0) {
-    sections.push({
-      label: "Reports",
-      items: reports.map((report) => ({
-        label: report.label,
-        to: `/reports/${report.name}`,
-        icon: FileText,
       })),
     });
   }

@@ -4,13 +4,13 @@
  * The public boot functions are intentionally small so project-owned
  * `boot.ts` files show the app's real startup order:
  *
- *   1. `loadSapportaProject(opts)` — load schemas/reports and verify DB
+ *   1. `loadSapportaProject(opts)` — load schemas and verify DB
  *      migrations. It does not mutate the Hono app.
  *   2. Project auth can now boot with the loaded table definitions.
  *   3. `installSapportaRequestContext(app, conn)` — expose db/sqlite to
  *      request handlers.
  *   4. `mountSapportaFramework(app, project, opts)` — mount
- *      /api/meta, /api/tables, and /api/reports.
+ *      /api/meta and /api/tables.
  *   5. `mountOpenApi(...)` — publish /api/openapi.json after every route is
  *      registered.
  */
@@ -22,21 +22,17 @@ import {
   type SapportaEnv,
 } from "./api/server.js";
 import type { ProjectDbConnection } from "./db/sqlite-connection.js";
-import type { ReportDefinition } from "./reports/report.js";
 import type { TableDef } from "./schema/table.js";
 import { fromApiCodeDir } from "./project-paths.js";
 import { createTableCatalog, type TableCatalog } from "./schema/catalog.js";
 import { loadSchemas } from "./schema/loader.js";
 import { assertMigrationsReady } from "./migrations/guard.js";
-import { loadReports } from "./reports/loader.js";
 import {
   TsRestApi,
   mountMeta,
   mountTables,
-  mountReports,
   makeMetaHandlers,
   makeAuthorizedTableHandlers,
-  makeReportHandlers,
 } from "./api/index.js";
 
 export interface LoadSapportaProjectOptions {
@@ -47,16 +43,11 @@ export interface LoadSapportaProjectOptions {
   projectRoot: string;
   /**
    * Absolute path to the project's compiled `packages/api/dist/` (with
-   * `schema/` and `reports/` subdirectories). Schemas and reports load from here at
+   * a `schema/` subdirectory). Schemas load from here at
    * runtime; `tsc --watch` keeps it fresh during development.
    */
   apiDistDir: string;
   conn: ProjectDbConnection;
-  /**
-   * Bypass Node's ESM module cache when importing report files — used
-   * by dev watchers to pick up changes without restarting.
-   */
-  bustCache?: boolean;
 }
 
 export interface SapportaProject {
@@ -68,13 +59,10 @@ export interface SapportaProject {
   apiDistDir: string;
   /** Static table catalog loaded from project schema files. */
   catalog: TableCatalog;
-  /** Loaded report definitions mounted by the framework report API. */
-  reports: ReportDefinition[];
 }
 
 type FrameworkDocCtx = {
   tables: readonly TableDef[];
-  reports: readonly ReportDefinition[];
 };
 
 export type SapportaFrameworkApi = TsRestApi<SapportaEnv, FrameworkDocCtx>;
@@ -89,7 +77,7 @@ export interface MountSapportaFrameworkOptions {
 /**
  * Loads the Sapporta project catalog without mutating the Hono app.
  *
- * This imports compiled schema/report modules, builds the static table catalog,
+ * This imports compiled schema modules, builds the static table catalog,
  * and verifies the database migrations are ready for the loaded tables. Auth
  * boot should run after this so `SapportaAuthContext.rowSecurity` can bind to
  * the returned table definitions.
@@ -97,7 +85,7 @@ export interface MountSapportaFrameworkOptions {
 export async function loadSapportaProject(
   opts: LoadSapportaProjectOptions,
 ): Promise<SapportaProject> {
-  const { slug, apiDistDir, conn, bustCache } = opts;
+  const { slug, apiDistDir, conn } = opts;
   const { sqlite } = conn;
   const dirs = fromApiCodeDir(apiDistDir);
 
@@ -111,14 +99,11 @@ export async function loadSapportaProject(
     tables: catalog.tables,
   });
 
-  const reports = await loadReports(dirs.reportsDir, bustCache);
-
   return {
     name: opts.name,
     slug,
     apiDistDir,
     catalog,
-    reports,
   };
 }
 
@@ -144,7 +129,7 @@ export function installSapportaRequestContext(
  * Mounts Sapporta's framework API under `/api`.
  *
  * This installs route policy for framework surfaces that are not CASL-aware,
- * then mounts meta, table, and report routes. It returns the framework `TsRestApi` so
+ * then mounts meta and table routes. It returns the framework `TsRestApi` so
  * `mountOpenApi()` can merge user route emitters into the same document.
  */
 export function mountSapportaFramework(
@@ -154,11 +139,11 @@ export function mountSapportaFramework(
 ): SapportaFrameworkApi {
   const { conn } = options;
   const { sqlite, db } = conn;
-  const { name, slug, apiDistDir, catalog, reports } = project;
+  const { name, slug, apiDistDir, catalog } = project;
 
   installFrameworkRoutePolicy(app, options.auth.requireFrameworkAccess);
 
-  // Contract paths already carry the /meta, /tables, /reports prefix, so
+  // Contract paths already carry the /meta and /tables prefix, so
   // mounting at /api yields the full URLs.
   const api = new TsRestApi<SapportaEnv, FrameworkDocCtx>();
   mountMeta(
@@ -172,7 +157,6 @@ export function mountSapportaFramework(
       guard: options.auth.requireFrameworkAccess,
     }),
   );
-  mountReports(api, reports, makeReportHandlers(reports, sqlite));
   app.route("/api", api);
 
   return api;
@@ -204,7 +188,7 @@ export function mountOpenApi(
   app.get("/api/openapi.json", (c) =>
     c.json(
       frameworkApi.generateDocument(
-        { tables: project.catalog.tables, reports: project.reports },
+        { tables: project.catalog.tables },
         { info: { title: `${project.slug} API`, version: "1" } },
         { setOperationId: true, jsonQuery: true, pathPrefix: "/api" },
       ),

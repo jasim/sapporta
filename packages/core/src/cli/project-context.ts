@@ -19,7 +19,7 @@ export interface ProjectContext {
  *   2. Walk up from cwd looking for sapporta.json
  *
  * From the project root we derive packages/api/dist/ (compiled
- * schema/app/reports, what the runtime loads) and data/sqlite.db (database).
+ * schema/app, what the runtime loads) and data/sqlite.db (database).
  */
 export async function resolveProjectContext(
   flags: Record<string, string>,

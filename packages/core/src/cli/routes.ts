@@ -234,43 +234,6 @@ export const ROUTES: CliRoute[] = [
     }),
     extractData: (res) => (Array.isArray(res) ? res : res.data ?? [res]),
   },
-
-  // ── /reports ───────────────────────────────────────────────────────────
-  {
-    pattern: ["reports"],
-    description: "List report definitions",
-    method: "GET",
-    path: "/api/reports",
-    params: [],
-    extractData: (res) =>
-      (res.reports ?? []).map((r: any) => ({
-        name: r.name,
-        label: r.label ?? r.name,
-        params: (r.params ?? []).map((p: any) => p.name).join(", "),
-      })),
-  },
-  {
-    pattern: ["reports", "show", ":report"],
-    description: "Get report metadata and parameters",
-    method: "GET",
-    path: "/api/reports/:report",
-    params: ["report"],
-    extractData: (res) => [res],
-  },
-  {
-    pattern: ["reports", "run", ":report"],
-    description: "Execute a report with parameters",
-    method: "GET",
-    path: "/api/reports/:report/results",
-    params: ["report"],
-    queryFlags: ["*"],
-    extractData: (res) => {
-      if (res.nodes) return res.nodes;
-      if (Array.isArray(res)) return res;
-      return [res];
-    },
-  },
-
 ];
 
 // ── Commander registration ──────────────────────────────────────────────────

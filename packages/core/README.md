@@ -68,7 +68,6 @@ A Sapporta code project (created by `sapporta init`) has this structure:
   packages/api/
     schema/             Table definitions (Drizzle + Sapporta wrapper)
     app/                App-owned API routes
-    reports/            Report definitions
     migrations/         Drizzle SQL migrations
 ```
 
@@ -184,18 +183,11 @@ sapporta rows update <table> <id> --data '{"name":"Updated"}'
 sapporta rows delete <table> <id>
 ```
 
-### Report Commands
+### Route-Based Reports
 
-```bash
-# List all reports
-sapporta reports
-
-# Get report metadata
-sapporta reports show <name>
-
-# Execute a report with parameters
-sapporta reports run <name> --year 2024 --month 1
-```
+Reports are ordinary app routes that return `GridReportResult` from
+`@sapporta/shared/report-grid`. Use `sapporta describe` to inspect the route
+contract and call the route like any other endpoint.
 
 ### Action Commands
 
@@ -220,29 +212,26 @@ The CLI auto-detects the project by walking up from `cwd` looking for `sapporta.
 
 ## API Namespaces (Per-Project)
 
-Routes are organized into five namespaces per project under the prefix `/p/{slug}/api`:
+Framework routes are organized under `/api`; app-owned routes use whatever
+paths the project registers:
 
 ```
-/p/{slug}/api/meta/...                 System metadata, introspection, admin
-/p/{slug}/api/tables/...               Table operations on row data
-/p/{slug}/api/reports/...              Report listing and execution
-/p/{slug}/api/actions/...              Transactional operations
-/p/{slug}/api/views/...                Custom view metadata
+/api/meta/...                          System metadata, introspection, admin
+/api/tables/...                        Table operations on row data
+/api/<app-route>                       App-owned routes, including reports
 ```
 
 Each namespace has a distinct prefix — route ordering no longer matters.
 
 ### Key Route Details
 
-- **Schema introspection**: `GET /p/{slug}/api/meta/tables` — lists all tables with structure + UI metadata
-- **Single table schema**: `GET /p/{slug}/api/meta/tables/{name}` — one table's schema
-- **DB introspection**: `GET /p/{slug}/api/meta/tables/{name}/indexes`, `.../api/meta/tables/{name}/sample`
-- **SQL proxy**: `POST /p/{slug}/api/meta/sql`
-- **Table operations**: `GET/POST /p/{slug}/api/tables/{table}`, `GET/PUT/DELETE /p/{slug}/api/tables/{table}/{id}`
-- **Lookup**: `GET /p/{slug}/api/tables/{table}/_lookup`
-- **Reports**: `GET /p/{slug}/api/reports`, `GET /p/{slug}/api/reports/{name}/results?params`
-- **Actions**: `GET /p/{slug}/api/actions`, `POST /p/{slug}/api/actions/{name}`
-- **Views**: `GET /p/{slug}/api/views`
+- **Schema introspection**: `GET /api/meta/tables` — lists all tables with structure + UI metadata
+- **Single table schema**: `GET /api/meta/tables/{name}` — one table's schema
+- **DB introspection**: `GET /api/meta/tables/{name}/indexes`, `/api/meta/tables/{name}/sample`
+- **SQL proxy**: `POST /api/meta/sql`
+- **Table operations**: `GET/POST /api/tables/{table}`, `GET/PUT/DELETE /api/tables/{table}/{id}`
+- **Lookup**: `GET /api/tables/{table}/_lookup`
+- **Route-based reports**: app-owned contracts such as `GET /api/reports/trial-balance`
 
 ## Core Modules
 
@@ -251,7 +240,6 @@ Each namespace has a distinct prefix — route ordering no longer matters.
 - **Migrations**: native Drizzle Kit `generate` and `migrate`; Sapporta only checks readiness at boot
 - **Meta API**: `mount-meta.ts` mounts schema introspection, DB introspection, and the SQL proxy
 - **Tables API**: `tables-api.ts` — parametric `/:tableName` table-operation routing with runtime table registration
-- **Actions API**: `action-api.ts` — single parametric `/:name` route with Map lookup
 - **Enums**: SQLite has no native enum type. Use `text()` columns with `meta.selects` for dropdown/validation support.
 - **Imports**: `@sapporta/server/table`, `@sapporta/server/runtime`, `@sapporta/server/view`, etc. (via package.json exports)
 

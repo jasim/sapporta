@@ -82,26 +82,6 @@ export {
   type CountQuery,
 } from "./table-schema.js";
 
-// ── Report wire shapes ──────────────────────────────────────────────────────
-export {
-  paramTypeSchema,
-  reportParamSchema,
-  reportMetaSchema,
-  reportFooterRowSchema,
-  reportOutputNodeSchema,
-  reportResultSchema,
-  reportsListResponseSchema,
-  serializedReportStatSchema,
-  type ParamType,
-  type ReportParam,
-  type ReportMeta,
-  type ReportFooterRow,
-  type ReportOutputNode,
-  type ReportResult,
-  type ReportsListResponse,
-  type SerializedReportStat,
-} from "./report-schema.js";
-
 // ── Routes ──────────────────────────────────────────────────────────────────
 export {
   projectInfoRoute,
@@ -121,8 +101,6 @@ export {
   lookupRoute,
   countRoute,
 } from "./table-routes.js";
-
-export { listReportsRoute, runReportRoute } from "./report-routes.js";
 
 export {
   getAuthBootstrapStatusRoute,

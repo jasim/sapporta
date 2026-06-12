@@ -5,14 +5,19 @@
  * no other test happens to inspect the generated spec.
  *
  * Scope deliberately narrow:
- *  - built-in paths present (/api/meta/tables, /api/meta/sql, /api/reports)
+ *  - built-in paths present (/api/meta/tables, /api/meta/sql)
  *  - every operation has ≥1 2xx response entry
  *
- * We do NOT assert anything about /api/tables/{tableName} or /api/reports/{name}/results
- * here — those are registered generically in IMPL-3 and specialized in IMPL-4,
- * so pinning their presence would couple these two stages' tests.
+ * Reports are ordinary app routes now, so the framework spec should not expose
+ * a registry or generic report runner.
  */
 import { describe, it, expect } from "vitest";
+import { z } from "zod";
+import {
+  gridReportResultSchema,
+  type GridReportResult,
+} from "@sapporta/shared/report-grid";
+import { initContract } from "./index.js";
 import { createIntegrationApp } from "../integration/setup.js";
 
 async function createServedApp() {
@@ -28,10 +33,10 @@ describe("openapi smoke — built-in sub-apps in /openapi.json", () => {
     const spec = (await res.json()) as { paths: Record<string, unknown> };
     expect(spec.paths["/api/meta/tables"]).toBeDefined();
     expect(spec.paths["/api/meta/sql"]).toBeDefined();
-    expect(spec.paths["/api/reports"]).toBeDefined();
+    expect(spec.paths["/api/reports"]).toBeUndefined();
   });
 
-  it("specializes dynamic /tables and /reports templates (IMPL-4)", async () => {
+  it("specializes dynamic table templates", async () => {
     const app = await createServedApp();
     const res = await app.request("/api/openapi.json");
     const spec = (await res.json()) as {
@@ -40,7 +45,6 @@ describe("openapi smoke — built-in sub-apps in /openapi.json", () => {
 
     // The loose templates must not survive into the served document.
     expect(spec.paths["/api/tables/{tableName}"]).toBeUndefined();
-    expect(spec.paths["/api/reports/{name}/results"]).toBeUndefined();
 
     // The accounts fixture yields concrete /api/tables/accounts operations
     // with a real row schema on create. The create body is emitted as a
@@ -87,7 +91,10 @@ describe("openapi smoke — built-in sub-apps in /openapi.json", () => {
     const app = await createServedApp();
     const res = await app.request("/api/openapi.json");
     const spec = (await res.json()) as {
-      paths: Record<string, Record<string, { responses?: Record<string, unknown> }>>;
+      paths: Record<
+        string,
+        Record<string, { responses?: Record<string, unknown> }>
+      >;
     };
     const offenders: string[] = [];
     for (const [path, methods] of Object.entries(spec.paths)) {
@@ -100,5 +107,112 @@ describe("openapi smoke — built-in sub-apps in /openapi.json", () => {
       }
     }
     expect(offenders).toEqual([]);
+  });
+
+  it("serves app-owned report routes through the app API and OpenAPI", async () => {
+    const c = initContract();
+    const trialBalanceRoute = c.query({
+      method: "GET",
+      path: "/reports/trial-balance",
+      summary: "Trial Balance",
+      metadata: { tags: ["reports"] },
+      query: z.object({ asOfDate: z.string() }),
+      responses: {
+        200: gridReportResultSchema,
+      },
+    });
+
+    const { app } = await createIntegrationApp({
+      configureApi: (api) => {
+        api.register("trialBalanceReport", trialBalanceRoute, ({ request }) => {
+          const result = {
+            name: "trial-balance",
+            label: "Trial Balance",
+            columns: [
+              { name: "account", label: "Account" },
+              {
+                name: "debit",
+                label: "Debit",
+                kind: "number",
+                displayFormat: "currency",
+                zeroDisplay: "blank",
+              },
+              {
+                name: "credit",
+                label: "Credit",
+                kind: "number",
+                displayFormat: "currency",
+                zeroDisplay: "blank",
+              },
+            ],
+            levelColumns: {
+              account: [
+                { name: "account", label: "Account" },
+                {
+                  name: "asOfDate",
+                  label: "As of Date",
+                  visuallyHidden: true,
+                },
+                {
+                  name: "debit",
+                  label: "Debit",
+                  kind: "number",
+                  displayFormat: "currency",
+                  zeroDisplay: "blank",
+                },
+                {
+                  name: "credit",
+                  label: "Credit",
+                  kind: "number",
+                  displayFormat: "currency",
+                  zeroDisplay: "blank",
+                },
+              ],
+            },
+            data: [
+              {
+                levelName: "account",
+                columns: {
+                  account: "Cash",
+                  asOfDate: request.query.asOfDate,
+                  debit: 125,
+                  credit: 0,
+                },
+              },
+            ],
+            footerRows: [
+              {
+                label: "Grand Total",
+                columns: { debit: 125, credit: 0 },
+              },
+            ],
+          } satisfies GridReportResult;
+
+          return { status: 200, body: result };
+        });
+      },
+    });
+
+    const specResponse = await app.request("/api/openapi.json");
+    expect(specResponse.status).toBe(200);
+    const spec = (await specResponse.json()) as {
+      paths: Record<string, unknown>;
+    };
+    expect(spec.paths["/api/reports/trial-balance"]).toBeDefined();
+
+    const reportResponse = await app.request(
+      "/api/reports/trial-balance?asOfDate=2026-06-12",
+    );
+    expect(reportResponse.status).toBe(200);
+    const body = gridReportResultSchema.parse(await reportResponse.json());
+    expect(body).toMatchObject({
+      name: "trial-balance",
+      data: [
+        {
+          levelName: "account",
+          columns: { account: "Cash", asOfDate: "2026-06-12" },
+        },
+      ],
+    });
   });
 });

@@ -1,51 +1,44 @@
-import { dateRangeFieldNames } from "@sapporta/shared";
-import type { ReportParam } from "@sapporta/shared/contracts";
+import { useCallback, useMemo } from "react";
+import { useSearchParams } from "react-router-dom";
 
-export function buildReportSearchParams(
-  values: Record<string, string>,
-): URLSearchParams {
+export type UrlQueryValue = string | number | boolean | null | undefined;
+export type UrlQueryObject = Record<string, UrlQueryValue>;
+
+export function buildSearchParams(values: UrlQueryObject): URLSearchParams {
   const params = new URLSearchParams();
-  for (const [key, val] of Object.entries(values)) {
-    if (val) {
-      params.set(key, val);
-    }
+  for (const [key, value] of Object.entries(values)) {
+    if (value === null || value === undefined || value === "") continue;
+    params.set(key, String(value));
   }
   return params;
 }
 
-/**
- * Report URLs stay in the flat wire shape. Dateranges therefore read/write the
- * three companion keys (`<name>_relative`, `<name>_from`, `<name>_to`) rather
- * than a nested object.
- */
-export function parseReportSearchParams(
-  searchParams: URLSearchParams,
-  params: ReportParam[],
-): Record<string, string> {
-  const result: Record<string, string> = {};
-
-  for (const param of params) {
-    if (param.type === "daterange") {
-      const names = dateRangeFieldNames(param.name);
-      for (const key of [names.relative, names.from, names.to]) {
-        const value = searchParams.get(key);
-        if (value !== null) result[key] = value;
-      }
-      continue;
-    }
-
-    const value = searchParams.get(param.name);
-    if (value !== null) result[param.name] = value;
-  }
-
-  return result;
+export function createSnapshotUrl(path: string, values: UrlQueryObject): string {
+  const query = buildSearchParams(values).toString();
+  return query ? `${path}?${query}` : path;
 }
 
-/** URL for a report view with pre-populated params. */
-export function reportUrlWithParams(
-  reportName: string,
-  values: Record<string, string>,
-): string {
-  const params = buildReportSearchParams(values);
-  return `/reports/${reportName}?${params.toString()}`;
+export function useUrlQueryState<TState extends Record<string, string>>(
+  defaults: TState,
+): [TState, (next: Partial<TState>) => void] {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const state = useMemo(() => {
+    const next = { ...defaults };
+    for (const key of Object.keys(defaults)) {
+      const value = searchParams.get(key);
+      if (value !== null) next[key as keyof TState] = value as TState[keyof TState];
+    }
+    return next;
+  }, [defaults, searchParams]);
+
+  const setState = useCallback(
+    (next: Partial<TState>) => {
+      setSearchParams(buildSearchParams({ ...state, ...next }), {
+        replace: true,
+      });
+    },
+    [setSearchParams, state],
+  );
+
+  return [state, setState];
 }

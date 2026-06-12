@@ -21,10 +21,9 @@ export interface ReportSummaryStatsProps {
  * UI "shouts". Renders evenly-spaced stat cards inside a report frame:
  * small uppercase label on top, large mono value below.
  *
- * Apps pass this (populated from a report's rollup) into `ReportView`'s
- * `summary` prop. Framework-generic — `tone` maps to the semantic accent
- * tokens (positive/negative/brand) so non-accounting apps can use the
- * same primitive.
+ * Apps can render this above `ReportGridResult` for report-specific totals.
+ * Framework-generic — `tone` maps to the semantic accent tokens
+ * (positive/negative/brand) so non-accounting apps can use the same primitive.
  */
 export function ReportSummaryStats({ stats }: ReportSummaryStatsProps) {
   return (
