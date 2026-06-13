@@ -58,7 +58,11 @@ export function TagInput({ values, onChange, autoFocus }: ListInputProps) {
           if (e.key === "Enter" || e.key === ",") {
             e.preventDefault();
             commit();
-          } else if (e.key === "Backspace" && draft === "" && values.length > 0) {
+          } else if (
+            e.key === "Backspace" &&
+            draft === "" &&
+            values.length > 0
+          ) {
             e.preventDefault();
             removeTag(values.length - 1);
           }

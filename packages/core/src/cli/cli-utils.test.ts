@@ -1,8 +1,19 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import Database from "better-sqlite3";
 import { parseFlags, formatTable, truncateValues } from "./format.js";
-import { requireSelect, rejectDangerousSQL, validateTableName, validateColumnNames, rejectControlChars } from "../introspect/sql-safety.js";
-import { buildInsertQuery, assertTableExists, getTableColumns, validatePayloadColumns } from "../introspect/db-helpers.js";
+import {
+  requireSelect,
+  rejectDangerousSQL,
+  validateTableName,
+  validateColumnNames,
+  rejectControlChars,
+} from "../introspect/sql-safety.js";
+import {
+  buildInsertQuery,
+  assertTableExists,
+  getTableColumns,
+  validatePayloadColumns,
+} from "../introspect/db-helpers.js";
 
 describe("parseFlags", () => {
   it("parses --key value pairs", () => {
@@ -51,9 +62,9 @@ describe("requireSelect", () => {
   });
 
   it("rejects UPDATE", () => {
-    expect(() =>
-      requireSelect("UPDATE accounts SET name = 'x'"),
-    ).toThrow("Only SELECT");
+    expect(() => requireSelect("UPDATE accounts SET name = 'x'")).toThrow(
+      "Only SELECT",
+    );
   });
 
   it("rejects DELETE", () => {
@@ -97,7 +108,9 @@ describe("validateTableName", () => {
   });
 
   it("rejects names with special characters", () => {
-    expect(() => validateTableName("users; DROP TABLE")).toThrow("Invalid table name");
+    expect(() => validateTableName("users; DROP TABLE")).toThrow(
+      "Invalid table name",
+    );
     expect(() => validateTableName("my-table")).toThrow("Invalid table name");
     expect(() => validateTableName("my table")).toThrow("Invalid table name");
   });
@@ -113,21 +126,31 @@ describe("validateTableName", () => {
 
 describe("validateColumnNames", () => {
   it("accepts valid column names", () => {
-    expect(() => validateColumnNames(["id", "first_name", "AccountType"])).not.toThrow();
+    expect(() =>
+      validateColumnNames(["id", "first_name", "AccountType"]),
+    ).not.toThrow();
   });
 
   it("rejects column names with semicolons", () => {
-    expect(() => validateColumnNames(["id; DROP TABLE users"])).toThrow("Invalid column name");
+    expect(() => validateColumnNames(["id; DROP TABLE users"])).toThrow(
+      "Invalid column name",
+    );
   });
 
   it("rejects column names with special characters", () => {
     expect(() => validateColumnNames(["name?"])).toThrow("Invalid column name");
-    expect(() => validateColumnNames(["col'name"])).toThrow("Invalid column name");
-    expect(() => validateColumnNames(["col name"])).toThrow("Invalid column name");
+    expect(() => validateColumnNames(["col'name"])).toThrow(
+      "Invalid column name",
+    );
+    expect(() => validateColumnNames(["col name"])).toThrow(
+      "Invalid column name",
+    );
   });
 
   it("rejects column names starting with numbers", () => {
-    expect(() => validateColumnNames(["1column"])).toThrow("Invalid column name");
+    expect(() => validateColumnNames(["1column"])).toThrow(
+      "Invalid column name",
+    );
   });
 
   it("accepts empty array", () => {
@@ -137,8 +160,13 @@ describe("validateColumnNames", () => {
 
 describe("buildInsertQuery", () => {
   it("builds a parameterized INSERT with RETURNING *", () => {
-    const { query, values } = buildInsertQuery("accounts", { name: "Cash", type: "asset" });
-    expect(query).toBe('INSERT INTO "accounts" ("name", "type") VALUES (?, ?) RETURNING *');
+    const { query, values } = buildInsertQuery("accounts", {
+      name: "Cash",
+      type: "asset",
+    });
+    expect(query).toBe(
+      'INSERT INTO "accounts" ("name", "type") VALUES (?, ?) RETURNING *',
+    );
     expect(values).toEqual(["Cash", "asset"]);
   });
 
@@ -157,7 +185,9 @@ describe("buildInsertQuery", () => {
 
 describe("rejectControlChars", () => {
   it("accepts normal text", () => {
-    expect(() => rejectControlChars('{"name":"Cash","amount":100}')).not.toThrow();
+    expect(() =>
+      rejectControlChars('{"name":"Cash","amount":100}'),
+    ).not.toThrow();
   });
 
   it("accepts whitespace characters (tab, newline, carriage return)", () => {
@@ -165,19 +195,27 @@ describe("rejectControlChars", () => {
   });
 
   it("rejects null byte", () => {
-    expect(() => rejectControlChars('{"name":"Cash\x00"}')).toThrow("control characters");
+    expect(() => rejectControlChars('{"name":"Cash\x00"}')).toThrow(
+      "control characters",
+    );
   });
 
   it("rejects bell character", () => {
-    expect(() => rejectControlChars('{"name":"Cash\x07"}')).toThrow("control characters");
+    expect(() => rejectControlChars('{"name":"Cash\x07"}')).toThrow(
+      "control characters",
+    );
   });
 
   it("rejects backspace", () => {
-    expect(() => rejectControlChars('{"name":"Cash\x08"}')).toThrow("control characters");
+    expect(() => rejectControlChars('{"name":"Cash\x08"}')).toThrow(
+      "control characters",
+    );
   });
 
   it("rejects form feed within restricted range", () => {
-    expect(() => rejectControlChars('{"name":"Cash\x0e"}')).toThrow("control characters");
+    expect(() => rejectControlChars('{"name":"Cash\x0e"}')).toThrow(
+      "control characters",
+    );
   });
 });
 
@@ -246,7 +284,9 @@ describe("assertTableExists", () => {
   beforeEach(() => {
     sqlite = new Database(":memory:");
     sqlite.pragma("foreign_keys = ON");
-    sqlite.exec(`CREATE TABLE accounts (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, type TEXT)`);
+    sqlite.exec(
+      `CREATE TABLE accounts (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, type TEXT)`,
+    );
   });
 
   afterEach(() => {
@@ -268,7 +308,9 @@ describe("getTableColumns", () => {
   beforeEach(() => {
     sqlite = new Database(":memory:");
     sqlite.pragma("foreign_keys = ON");
-    sqlite.exec(`CREATE TABLE accounts (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, type TEXT)`);
+    sqlite.exec(
+      `CREATE TABLE accounts (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, type TEXT)`,
+    );
   });
 
   afterEach(() => {
@@ -292,7 +334,9 @@ describe("validatePayloadColumns", () => {
   beforeEach(() => {
     sqlite = new Database(":memory:");
     sqlite.pragma("foreign_keys = ON");
-    sqlite.exec(`CREATE TABLE accounts (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, type TEXT)`);
+    sqlite.exec(
+      `CREATE TABLE accounts (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, type TEXT)`,
+    );
   });
 
   afterEach(() => {
@@ -300,14 +344,20 @@ describe("validatePayloadColumns", () => {
   });
 
   it("passes when all columns exist", () => {
-    expect(() => validatePayloadColumns(sqlite, "accounts", ["name", "type"])).not.toThrow();
+    expect(() =>
+      validatePayloadColumns(sqlite, "accounts", ["name", "type"]),
+    ).not.toThrow();
   });
 
   it("throws for unknown columns", () => {
-    expect(() => validatePayloadColumns(sqlite, "accounts", ["name", "bogus"])).toThrow("Unknown column");
+    expect(() =>
+      validatePayloadColumns(sqlite, "accounts", ["name", "bogus"]),
+    ).toThrow("Unknown column");
   });
 
   it("throws TABLE_NOT_FOUND if table missing", () => {
-    expect(() => validatePayloadColumns(sqlite, "missing", ["x"])).toThrow("not found");
+    expect(() => validatePayloadColumns(sqlite, "missing", ["x"])).toThrow(
+      "not found",
+    );
   });
 });

@@ -7,4 +7,3 @@ export function BooleanEditor(props: CellEditorProps) {
   }, []);
   return null;
 }
-

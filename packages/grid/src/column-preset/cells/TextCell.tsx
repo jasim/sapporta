@@ -20,9 +20,7 @@ export function TextCell({
 }: PresetCellProps<string>) {
   const textMode = "text" in preset ? preset.text.display : undefined;
   const className = cn(
-    preset.kind === "identifier"
-      ? styles.identifierTextCell
-      : styles.textCell,
+    preset.kind === "identifier" ? styles.identifierTextCell : styles.textCell,
     textMode && styles.multiLineTextCell,
   );
 

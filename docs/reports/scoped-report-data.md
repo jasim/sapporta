@@ -3,19 +3,23 @@
 Report routes use normal route authorization and normal scoped data access.
 
 ```ts
-api.register("incomeStatement", incomeStatementRoute, async ({ c, request }) => {
-  const auth = c.get("auth");
-  auth.requireAuthenticated();
-  auth.requireCan("read", "reports:income-statement");
+api.register(
+  "incomeStatement",
+  incomeStatementRoute,
+  async ({ c, request }) => {
+    const auth = c.get("auth");
+    auth.requireAuthenticated();
+    auth.requireCan("read", "reports:income-statement");
 
-  const rows = await readIncomeStatementRows({
-    db: c.get("db"),
-    auth,
-    input: request.query,
-  });
+    const rows = await readIncomeStatementRows({
+      db: c.get("db"),
+      auth,
+      input: request.query,
+    });
 
-  return { status: 200, body: toIncomeStatementResult(rows) };
-});
+    return { status: 200, body: toIncomeStatementResult(rows) };
+  },
+);
 ```
 
 Keep handlers thin:

@@ -76,9 +76,7 @@ export {
   AuthAccountMenu,
   type AuthAccountMenuProps,
 } from "@/shell/components/AuthAccountMenu";
-export {
-  SapportaMark,
-} from "@/shell/components/Sidebar";
+export { SapportaMark } from "@/shell/components/Sidebar";
 export { SidebarShell } from "@/shell/components/SidebarShell";
 export { TopBar } from "@/shell/components/TopBar";
 export { StatusBar } from "@/shell/components/StatusBar";

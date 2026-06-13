@@ -1,9 +1,5 @@
 import type { ColId, RowKey } from "../types/identity";
-import type {
-  FooterRow,
-  PhantomRow,
-  TreeNode,
-} from "../types/level-row";
+import type { FooterRow, PhantomRow, TreeNode } from "../types/level-row";
 
 // ProtoRow is the intermediate shape carried through pipeline stages.
 // It mirrors LevelRow but carries `rowKey` instead of the final `id: RowId`;
@@ -16,10 +12,30 @@ export type ProtoRow =
       hasChildren: boolean;
       source: TreeNode;
     }
-  | { kind: "rollup"; rowKey: RowKey; columns: Record<ColId, unknown>; source: TreeNode }
-  | { kind: "opening" | "closing" | "subtotal"; rowKey: RowKey; columns: Record<ColId, unknown>; source: TreeNode }
-  | { kind: "footer"; rowKey: RowKey; columns: Record<ColId, unknown>; source: FooterRow }
-  | { kind: "phantom"; rowKey: RowKey; columns: Record<ColId, unknown>; source: PhantomRow };
+  | {
+      kind: "rollup";
+      rowKey: RowKey;
+      columns: Record<ColId, unknown>;
+      source: TreeNode;
+    }
+  | {
+      kind: "opening" | "closing" | "subtotal";
+      rowKey: RowKey;
+      columns: Record<ColId, unknown>;
+      source: TreeNode;
+    }
+  | {
+      kind: "footer";
+      rowKey: RowKey;
+      columns: Record<ColId, unknown>;
+      source: FooterRow;
+    }
+  | {
+      kind: "phantom";
+      rowKey: RowKey;
+      columns: Record<ColId, unknown>;
+      source: PhantomRow;
+    };
 
 // Sort is the only per-column concern the grid takes a position on: a
 // column id plus a direction. Anything richer (multi-key sort priorities

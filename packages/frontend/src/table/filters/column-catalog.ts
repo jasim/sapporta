@@ -21,18 +21,11 @@
 import type { ColumnSchema } from "@sapporta/shared/contracts";
 import type { KeyedValues, FkOptionsMap } from "@/lookup/types";
 import { inferDisplayType } from "@/table/model/column-types";
-import type {
-  ListInputComponent,
-  ScalarInputComponent,
-} from "./inputs/types";
+import type { ListInputComponent, ScalarInputComponent } from "./inputs/types";
 import { TextInput, NumberInput, DateInput } from "./inputs/ScalarInput";
 import { TagInput } from "./inputs/TagInput";
 import { CheckboxList } from "./inputs/CheckboxList";
-import type {
-  ListOp,
-  Polarity,
-  ScalarOp,
-} from "@sapporta/shared/filter";
+import type { ListOp, Polarity, ScalarOp } from "@sapporta/shared/filter";
 
 /** Filter-side column types — coarser than the render-side DisplayType. */
 export type FilterColumnType =
@@ -81,7 +74,8 @@ export function inferFilterColumnType(col: ColumnSchema): FilterColumnType {
   if (dt === "select") return "enum";
   if (dt === "checkbox") return "boolean";
   if (dt === "date" || dt === "timestamp") return "date";
-  if (dt === "number" || dt === "currency" || dt === "percentage") return "number";
+  if (dt === "number" || dt === "currency" || dt === "percentage")
+    return "number";
   return "text";
 }
 

@@ -20,10 +20,7 @@ import type { Context } from "hono";
 import { stream } from "hono/streaming";
 import { getTableConfig } from "drizzle-orm/sqlite-core";
 import type { TableCatalog } from "../schema/catalog.js";
-import {
-  savePipeline,
-  savePipelineInsertSync,
-} from "../data/save-pipeline.js";
+import { savePipeline, savePipelineInsertSync } from "../data/save-pipeline.js";
 import {
   ImmutableTableOperationError,
   RowNotFoundError,
@@ -52,12 +49,7 @@ function tableNotFoundResponse(tableName: string): Response {
   );
 }
 
-type GeneratedTableAction =
-  | "read"
-  | "export"
-  | "create"
-  | "update"
-  | "delete";
+type GeneratedTableAction = "read" | "export" | "create" | "update" | "delete";
 
 export interface AuthorizedTableHandlersOptions<E extends SapportaEnv> {
   /** Project-owned guard that returns the current request auth context. */
@@ -345,9 +337,8 @@ async function streamCsv<E extends Env>(
     await s.write(columns.map((col) => csvEscape(col.name)).join(",") + "\n");
     for (const row of rows) {
       await s.write(
-        columns
-          .map((col) => csvEscape(cellToString(row[col.name])))
-          .join(",") + "\n",
+        columns.map((col) => csvEscape(cellToString(row[col.name]))).join(",") +
+          "\n",
       );
     }
   });

@@ -18,7 +18,10 @@
 import { existsSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import Database from "better-sqlite3";
-import { drizzle, type BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
+import {
+  drizzle,
+  type BetterSQLite3Database,
+} from "drizzle-orm/better-sqlite3";
 
 export interface ProjectDbConnection {
   /** Raw better-sqlite3 handle — used for PRAGMAs, raw SQL, transactions */

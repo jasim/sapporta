@@ -2,16 +2,26 @@ import { z } from "zod";
 import type { SqlClient, OperationResult } from "../introspect/types.js";
 import { OperationError, ErrorCode } from "../introspect/types.js";
 import { rejectDangerousSQL } from "../introspect/sql-safety.js";
-import { buildInsertQuery, assertTableExists, getTableColumns } from "../introspect/db-helpers.js";
+import {
+  buildInsertQuery,
+  assertTableExists,
+  getTableColumns,
+} from "../introspect/db-helpers.js";
 import { formatTable } from "./format.js";
-import { validateTableName, validateColumnNames, rejectControlChars } from "../introspect/sql-safety.js";
+import {
+  validateTableName,
+  validateColumnNames,
+  rejectControlChars,
+} from "../introspect/sql-safety.js";
 
 export const rowsInsertMasterDetailInput = z.object({
   masterTable: z.string().describe("Master table name"),
   masterData: z.string().describe("JSON object for master record"),
   detailTable: z.string().describe("Detail table name"),
   detailData: z.string().describe("JSON array of detail records"),
-  detailFk: z.string().describe("FK column name on detail table (e.g. 'order_id')"),
+  detailFk: z
+    .string()
+    .describe("FK column name on detail table (e.g. 'order_id')"),
   dryRun: z.boolean().optional().describe("Validate without executing"),
 });
 
@@ -41,12 +51,18 @@ export async function rowsInsertMasterDetail(
   const detailFk = flags["detail-fk"];
   const dryRun = flags["dry-run"] === "true";
 
-  if (!masterTable || !masterDataJson || !detailTable || !detailDataJson || !detailFk) {
+  if (
+    !masterTable ||
+    !masterDataJson ||
+    !detailTable ||
+    !detailDataJson ||
+    !detailFk
+  ) {
     throw new OperationError(
       "Usage: sapporta rows insert-master-detail " +
-      "--master-table T --master-data '{}' " +
-      "--detail-table T --detail-data '[{}]' " +
-      "--detail-fk column_name",
+        "--master-table T --master-data '{}' " +
+        "--detail-table T --detail-data '[{}]' " +
+        "--detail-fk column_name",
       ErrorCode.MISSING_ARGUMENT,
     );
   }
@@ -66,7 +82,10 @@ export async function rowsInsertMasterDetail(
   const detailRows = JSON.parse(detailDataJson);
 
   if (!Array.isArray(detailRows)) {
-    throw new OperationError("--detail-data must be a JSON array", ErrorCode.INVALID_JSON);
+    throw new OperationError(
+      "--detail-data must be a JSON array",
+      ErrorCode.INVALID_JSON,
+    );
   }
 
   // Validate all column names upfront
@@ -76,14 +95,24 @@ export async function rowsInsertMasterDetail(
   }
 
   if (dryRun) {
-    return dryRunValidation(sql, masterTable, masterData, detailTable, detailRows, detailFk);
+    return dryRunValidation(
+      sql,
+      masterTable,
+      masterData,
+      detailTable,
+      detailRows,
+      detailFk,
+    );
   }
 
   // All inserts happen in a single transaction.
   // The master row's id is backfilled into each detail row's FK column.
   const { masterRow, detailResults } = await sql.begin(async (tx) => {
     // 1. Insert master record
-    const { query: masterQuery, values: masterValues } = buildInsertQuery(masterTable, masterData);
+    const { query: masterQuery, values: masterValues } = buildInsertQuery(
+      masterTable,
+      masterData,
+    );
     rejectDangerousSQL(masterQuery);
     const [masterRow] = await tx.unsafe(masterQuery, masterValues);
     const masterId = masterRow.id;
@@ -143,7 +172,9 @@ async function dryRunValidation(
 
   // Validate master columns against actual schema
   const masterDbCols = await getTableColumns(sql as any, masterTable);
-  const unknownMasterCols = Object.keys(masterData).filter((c) => !masterDbCols.has(c));
+  const unknownMasterCols = Object.keys(masterData).filter(
+    (c) => !masterDbCols.has(c),
+  );
   if (unknownMasterCols.length > 0) {
     throw new OperationError(
       `Unknown column(s) in '${masterTable}': ${unknownMasterCols.join(", ")}`,
@@ -160,8 +191,12 @@ async function dryRunValidation(
       ErrorCode.INVALID_COLUMN_NAME,
     );
   }
-  const allDetailPayloadCols = [...new Set(detailRows.flatMap((r) => Object.keys(r)))];
-  const unknownDetailCols = allDetailPayloadCols.filter((c) => !detailDbCols.has(c));
+  const allDetailPayloadCols = [
+    ...new Set(detailRows.flatMap((r) => Object.keys(r))),
+  ];
+  const unknownDetailCols = allDetailPayloadCols.filter(
+    (c) => !detailDbCols.has(c),
+  );
   if (unknownDetailCols.length > 0) {
     throw new OperationError(
       `Unknown column(s) in '${detailTable}': ${unknownDetailCols.join(", ")}`,

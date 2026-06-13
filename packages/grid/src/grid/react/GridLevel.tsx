@@ -3,11 +3,7 @@ import { useStore } from "zustand";
 import type { ColId, GridPath } from "../types/identity";
 import type { ColumnSchema } from "../types/schema";
 import { EmptyLevel } from "./EmptyLevel";
-import {
-  Grid,
-  type GridChromeContext,
-  type GridPresentation,
-} from "./Grid";
+import { Grid, type GridChromeContext, type GridPresentation } from "./Grid";
 import { GridRow } from "./cells/GridRow";
 import { LevelStatusBand } from "./LevelStatusBand";
 import {

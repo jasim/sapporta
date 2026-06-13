@@ -9,7 +9,10 @@ import { rejectControlChars as coreRejectControlChars } from "../data/sanitize.j
 export function requireSelect(sql: string): void {
   const trimmed = sql.trim().toUpperCase();
   if (!trimmed.startsWith("SELECT") && !trimmed.startsWith("WITH")) {
-    throw new OperationError("Only SELECT and WITH (CTE) queries are allowed", ErrorCode.SELECT_ONLY);
+    throw new OperationError(
+      "Only SELECT and WITH (CTE) queries are allowed",
+      ErrorCode.SELECT_ONLY,
+    );
   }
 }
 
@@ -18,15 +21,14 @@ export function requireSelect(sql: string): void {
  */
 export function rejectDangerousSQL(sql: string): void {
   const trimmed = sql.trim().toUpperCase();
-  const dangerous = [
-    "DROP DATABASE",
-    "TRUNCATE",
-    "DROP SCHEMA",
-  ];
+  const dangerous = ["DROP DATABASE", "TRUNCATE", "DROP SCHEMA"];
 
   for (const pattern of dangerous) {
     if (trimmed.includes(pattern)) {
-      throw new OperationError(`Dangerous SQL rejected: contains ${pattern}`, ErrorCode.DANGEROUS_SQL);
+      throw new OperationError(
+        `Dangerous SQL rejected: contains ${pattern}`,
+        ErrorCode.DANGEROUS_SQL,
+      );
     }
   }
 }

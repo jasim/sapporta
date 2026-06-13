@@ -15,21 +15,52 @@ export function withRowIds(rows: ProtoRow[], path: GridPath): LevelRow[] {
     const rowSelectable = capabilitiesFor(r.kind).rowSelectable;
     switch (r.kind) {
       case "data":
-        out[i] = { kind: "data", id, rowSelectable, columns: r.columns, hasChildren: r.hasChildren, source: r.source };
+        out[i] = {
+          kind: "data",
+          id,
+          rowSelectable,
+          columns: r.columns,
+          hasChildren: r.hasChildren,
+          source: r.source,
+        };
         break;
       case "rollup":
-        out[i] = { kind: "rollup", id, rowSelectable, columns: r.columns, source: r.source };
+        out[i] = {
+          kind: "rollup",
+          id,
+          rowSelectable,
+          columns: r.columns,
+          source: r.source,
+        };
         break;
       case "opening":
       case "closing":
       case "subtotal":
-        out[i] = { kind: r.kind, id, rowSelectable, columns: r.columns, source: r.source };
+        out[i] = {
+          kind: r.kind,
+          id,
+          rowSelectable,
+          columns: r.columns,
+          source: r.source,
+        };
         break;
       case "footer":
-        out[i] = { kind: "footer", id, rowSelectable, columns: r.columns, source: r.source };
+        out[i] = {
+          kind: "footer",
+          id,
+          rowSelectable,
+          columns: r.columns,
+          source: r.source,
+        };
         break;
       case "phantom":
-        out[i] = { kind: "phantom", id, rowSelectable, columns: r.columns, source: r.source };
+        out[i] = {
+          kind: "phantom",
+          id,
+          rowSelectable,
+          columns: r.columns,
+          source: r.source,
+        };
         break;
     }
   }

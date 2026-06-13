@@ -8,7 +8,11 @@ export function scalarInput(
   type: "text" | "number" | "date",
   placeholder = "",
 ): ScalarInputComponent {
-  return function ScalarInput({ value, onChange, autoFocus }: ScalarInputProps) {
+  return function ScalarInput({
+    value,
+    onChange,
+    autoFocus,
+  }: ScalarInputProps) {
     return (
       <Input
         type={type}

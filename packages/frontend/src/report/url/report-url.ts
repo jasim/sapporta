@@ -13,7 +13,10 @@ export function buildSearchParams(values: UrlQueryObject): URLSearchParams {
   return params;
 }
 
-export function createSnapshotUrl(path: string, values: UrlQueryObject): string {
+export function createSnapshotUrl(
+  path: string,
+  values: UrlQueryObject,
+): string {
   const query = buildSearchParams(values).toString();
   return query ? `${path}?${query}` : path;
 }
@@ -26,7 +29,8 @@ export function useUrlQueryState<TState extends Record<string, string>>(
     const next = { ...defaults };
     for (const key of Object.keys(defaults)) {
       const value = searchParams.get(key);
-      if (value !== null) next[key as keyof TState] = value as TState[keyof TState];
+      if (value !== null)
+        next[key as keyof TState] = value as TState[keyof TState];
     }
     return next;
   }, [defaults, searchParams]);

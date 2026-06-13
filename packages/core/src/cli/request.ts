@@ -51,7 +51,11 @@ export function buildRequest(
   }
 
   let body: unknown | undefined;
-  if (route.method === "POST" || route.method === "PUT" || route.method === "PATCH") {
+  if (
+    route.method === "POST" ||
+    route.method === "PUT" ||
+    route.method === "PATCH"
+  ) {
     if (allFlags["input-body-json"]) {
       body = JSON.parse(allFlags["input-body-json"]);
       if (route.inputSchema) {
@@ -64,7 +68,11 @@ export function buildRequest(
       if (route.positionalArgs) {
         const positionals = allFlags._ as unknown as string[];
         if (positionals) {
-          for (let i = 0; i < route.positionalArgs.length && i < positionals.length; i++) {
+          for (
+            let i = 0;
+            i < route.positionalArgs.length && i < positionals.length;
+            i++
+          ) {
             schemaBody[route.positionalArgs[i].field] = positionals[i];
           }
         }

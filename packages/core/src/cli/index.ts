@@ -8,7 +8,12 @@ import { ROUTES, registerRoutes } from "./routes.js";
 import { httpRequest } from "./http-client.js";
 import { OperationError, ErrorCode } from "../introspect/types.js";
 import { buildRequest, renderResult } from "./request.js";
-import { parseFlags, emitResult, resolveOutputFormat, type OutputFormat } from "./format.js";
+import {
+  parseFlags,
+  emitResult,
+  resolveOutputFormat,
+  type OutputFormat,
+} from "./format.js";
 import { resolveCliCredentials } from "./credentials.js";
 
 // Re-export for programmatic access
@@ -77,11 +82,16 @@ async function runApiCommand(
 
   const req = buildRequest(route, params, allFlags);
 
-  const result = await httpRequest(credentials.apiUrl, req.method, req.urlPath, {
-    body: req.body,
-    queryParams: req.queryParams,
-    authToken: credentials.apiToken,
-  });
+  const result = await httpRequest(
+    credentials.apiUrl,
+    req.method,
+    req.urlPath,
+    {
+      body: req.body,
+      queryParams: req.queryParams,
+      authToken: credentials.apiToken,
+    },
+  );
 
   const exitCode = renderResult(route, params, result, format);
   if (exitCode !== 0) process.exit(exitCode);
@@ -155,14 +165,23 @@ async function main() {
     .version(readCliPackageVersion())
     // Declare global options so Commander doesn't confuse their values
     // with subcommand names
-    .option("--output-format <format>", "Output format: table (default) or json")
+    .option(
+      "--output-format <format>",
+      "Output format: table (default) or json",
+    )
     .option(
       "--input-body-json <json>",
       "JSON object to send as the request body for commands that accept one",
     )
     .option("--api-url <url>", "Server URL (default: http://localhost:3000)")
-    .option("--api-token <token>", "Bearer token for authenticated API requests")
-    .option("--sapporta-project-dir <path>", "Project root directory (overrides auto-detection)");
+    .option(
+      "--api-token <token>",
+      "Bearer token for authenticated API requests",
+    )
+    .option(
+      "--sapporta-project-dir <path>",
+      "Project root directory (overrides auto-detection)",
+    );
 
   registerRoutes(program, ROUTES, async (route, params, extraPositionals) => {
     const allFlags = parseFlags(process.argv.slice(2));
@@ -176,11 +195,14 @@ async function main() {
     }
   });
 
-  program.addHelpText("after", `
+  program.addHelpText(
+    "after",
+    `
 Local commands (no server required):
   check                                Validate project definitions
   init <name>                          Create a new project directory
-  describe [route]                     List endpoints or describe one`);
+  describe [route]                     List endpoints or describe one`,
+  );
 
   if (!firstArg) {
     program.help();

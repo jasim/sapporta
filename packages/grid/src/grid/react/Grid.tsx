@@ -120,7 +120,8 @@ export function Grid({
       data-active={String(isActive)}
       style={{ position: "relative", outline: "none", ...style }}
     >
-      {header ?? (presentation === "tabular" ? <GridHeader schema={schema} /> : null)}
+      {header ??
+        (presentation === "tabular" ? <GridHeader schema={schema} /> : null)}
       {children}
       <CellEditorOverlay
         containerRef={containerRef}

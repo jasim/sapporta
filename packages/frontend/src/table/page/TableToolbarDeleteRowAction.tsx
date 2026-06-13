@@ -207,7 +207,10 @@ function pathDepth(path: GridPath): number {
   return String(path).split(".").length;
 }
 
-function refetchPaths(runtime: GridRuntime, paths: ReadonlySet<GridPath>): void {
+function refetchPaths(
+  runtime: GridRuntime,
+  paths: ReadonlySet<GridPath>,
+): void {
   for (const path of paths) {
     runtime.sourceFor(path).refetch();
   }

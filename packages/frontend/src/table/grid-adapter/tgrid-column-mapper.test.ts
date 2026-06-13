@@ -222,7 +222,9 @@ describe("TGridColumnMapper.columnsFor", () => {
 
   it("wraps the first visible column for expandable levels", () => {
     const columns = columnMapper.columnsFor({
-      table: table([{ name: "id", label: "ID", primary: true, kind: "number" }]),
+      table: table([
+        { name: "id", label: "ID", primary: true, kind: "number" },
+      ]),
       immutable: false,
       expandable: true,
     });
@@ -248,7 +250,12 @@ describe("TGridColumnMapper.columnsFor", () => {
 describe("tableColumnPresetWidth", () => {
   it("converts table character width hints to preset tracks", () => {
     expect(
-      tableColumnPresetWidth({ name: "a", label: "A", kind: "text", width: 12 }),
+      tableColumnPresetWidth({
+        name: "a",
+        label: "A",
+        kind: "text",
+        width: 12,
+      }),
     ).toEqual({
       track: "calc(12ch + 1rem)",
     });

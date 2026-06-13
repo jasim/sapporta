@@ -126,7 +126,8 @@ const plainDateColumn = customType<{
     // Runtime tolerance: accept a pre-canonicalized ISO string (e.g. from
     // user-submitted JSON, before the boundary parse has turned it into a
     // Temporal). Parsing + re-serializing guarantees storage invariants.
-    if (typeof value === "string") return formatPlainDate(parsePlainDate(value));
+    if (typeof value === "string")
+      return formatPlainDate(parsePlainDate(value));
     return formatPlainDate(value);
   },
   fromDriver: (value) => parsePlainDate(value),

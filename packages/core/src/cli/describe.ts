@@ -58,9 +58,10 @@ export async function describeOne(
   }
 
   const suggestLines = result.suggestions.map((s) => `  ${s.method} ${s.path}`);
-  const didYouMean = suggestLines.length > 0
-    ? `\n\nDid you mean:\n${suggestLines.join("\n")}`
-    : "";
+  const didYouMean =
+    suggestLines.length > 0
+      ? `\n\nDid you mean:\n${suggestLines.join("\n")}`
+      : "";
   return {
     ok: false,
     error: `No endpoint matches "${target}".${didYouMean}`,

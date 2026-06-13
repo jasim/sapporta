@@ -7,31 +7,50 @@ describe("normalizeDataType", () => {
   // cover the override path; non-date types pass through unchanged.
 
   it("Pg PgDateString → date (overrides Drizzle's 'string')", () => {
-    expect(normalizeDataType({ columnType: "PgDateString", dataType: "string" })).toBe("date");
+    expect(
+      normalizeDataType({ columnType: "PgDateString", dataType: "string" }),
+    ).toBe("date");
   });
 
   it("Pg PgTimestampString → date (overrides Drizzle's 'string')", () => {
-    expect(normalizeDataType({ columnType: "PgTimestampString", dataType: "string" })).toBe("date");
+    expect(
+      normalizeDataType({
+        columnType: "PgTimestampString",
+        dataType: "string",
+      }),
+    ).toBe("date");
   });
 
   it("Pg PgTimestamp (Date mode) → date", () => {
-    expect(normalizeDataType({ columnType: "PgTimestamp", dataType: "date" })).toBe("date");
+    expect(
+      normalizeDataType({ columnType: "PgTimestamp", dataType: "date" }),
+    ).toBe("date");
   });
 
   it("Pg PgDate → date (overrides Drizzle's 'string')", () => {
-    expect(normalizeDataType({ columnType: "PgDate", dataType: "string" })).toBe("date");
+    expect(
+      normalizeDataType({ columnType: "PgDate", dataType: "string" }),
+    ).toBe("date");
   });
 
   it("SQLite timestamp → date (matched by columnType, not dataType)", () => {
-    expect(normalizeDataType({ columnType: "SQLiteTimestamp", dataType: "date" })).toBe("date");
+    expect(
+      normalizeDataType({ columnType: "SQLiteTimestamp", dataType: "date" }),
+    ).toBe("date");
   });
 
   // Non-date types fall through to Drizzle's dataType unchanged.
 
   it("unknown columnType falls through to dataType", () => {
-    expect(normalizeDataType({ columnType: "SomeFutureType", dataType: "string" })).toBe("string");
-    expect(normalizeDataType({ columnType: "SomeFutureType", dataType: "number" })).toBe("number");
-    expect(normalizeDataType({ columnType: "SomeFutureType", dataType: "boolean" })).toBe("boolean");
+    expect(
+      normalizeDataType({ columnType: "SomeFutureType", dataType: "string" }),
+    ).toBe("string");
+    expect(
+      normalizeDataType({ columnType: "SomeFutureType", dataType: "number" }),
+    ).toBe("number");
+    expect(
+      normalizeDataType({ columnType: "SomeFutureType", dataType: "boolean" }),
+    ).toBe("boolean");
   });
 });
 

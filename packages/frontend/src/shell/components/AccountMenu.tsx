@@ -162,7 +162,7 @@ export function AccountMenu({
                 <span className="min-w-0 flex-1">
                   <span className="block truncate font-medium">
                     {pendingActionId === action.id
-                      ? action.pendingLabel ?? `${action.label}...`
+                      ? (action.pendingLabel ?? `${action.label}...`)
                       : action.label}
                   </span>
                   {action.description && (
@@ -220,7 +220,8 @@ export function formatAuthRole(role: AuthRole): string {
 }
 
 interface DefaultAccountMenuTriggerProps
-  extends AccountMenuTriggerRenderProps,
+  extends
+    AccountMenuTriggerRenderProps,
     ButtonHTMLAttributes<HTMLButtonElement> {
   ariaLabel?: string;
 }

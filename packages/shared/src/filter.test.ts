@@ -22,10 +22,7 @@ import {
   TypedFilterParseError,
   type FilterCondition,
 } from "./filter.js";
-import {
-  OPERATOR_APPLICABILITY,
-  type ValueKind,
-} from "./value-kind.js";
+import { OPERATOR_APPLICABILITY, type ValueKind } from "./value-kind.js";
 import { Temporal } from "./temporal.js";
 
 const ALL_KINDS: readonly ValueKind[] = [
@@ -50,8 +47,12 @@ describe("parseFilterValue — number", () => {
   });
 
   it("rejects non-numeric text", () => {
-    expect(() => parseFilterValue("number", "abc")).toThrow(TypedFilterParseError);
-    expect(() => parseFilterValue("number", "$95k")).toThrow(TypedFilterParseError);
+    expect(() => parseFilterValue("number", "abc")).toThrow(
+      TypedFilterParseError,
+    );
+    expect(() => parseFilterValue("number", "$95k")).toThrow(
+      TypedFilterParseError,
+    );
   });
 
   it("rejects Infinity and NaN", () => {
@@ -61,7 +62,9 @@ describe("parseFilterValue — number", () => {
     expect(() => parseFilterValue("number", "-Infinity")).toThrow(
       TypedFilterParseError,
     );
-    expect(() => parseFilterValue("number", "NaN")).toThrow(TypedFilterParseError);
+    expect(() => parseFilterValue("number", "NaN")).toThrow(
+      TypedFilterParseError,
+    );
   });
 });
 
@@ -73,7 +76,9 @@ describe("parseFilterValue — boolean", () => {
 
   it("rejects anything else — no coercion of yes/no/1/0", () => {
     for (const bad of ["yes", "no", "1", "0", "True", "FALSE", ""]) {
-      expect(() => parseFilterValue("boolean", bad)).toThrow(TypedFilterParseError);
+      expect(() => parseFilterValue("boolean", bad)).toThrow(
+        TypedFilterParseError,
+      );
     }
   });
 });
@@ -147,7 +152,16 @@ describe("OPERATOR_APPLICABILITY — every (kind, op) pair", () => {
   it("pins the intended shape of the matrix (regression guard)", () => {
     // If a kind or op is added, this assertion forces a conscious update.
     expect(OPERATOR_APPLICABILITY).toEqual({
-      text: ["eq", "neq", "contains", "startswith", "endswith", "in", "nin", "is"],
+      text: [
+        "eq",
+        "neq",
+        "contains",
+        "startswith",
+        "endswith",
+        "in",
+        "nin",
+        "is",
+      ],
       number: ["eq", "neq", "gt", "gte", "lt", "lte", "in", "nin", "is"],
       boolean: ["eq", "neq", "is"],
       date: ["eq", "neq", "gt", "gte", "lt", "lte", "in", "nin", "is"],
@@ -159,8 +173,8 @@ describe("OPERATOR_APPLICABILITY — every (kind, op) pair", () => {
 // ── parseFilters — error surfaces ───────────────────────────────────────
 
 describe("parseFilters — kind resolution and error surfaces", () => {
-  const resolveKind =
-    (map: Record<string, ValueKind>) => (col: string) => map[col];
+  const resolveKind = (map: Record<string, ValueKind>) => (col: string) =>
+    map[col];
 
   it("threads kind through scalar, list, and null ops", () => {
     const raw: FilterCondition[] = [
@@ -186,9 +200,7 @@ describe("parseFilters — kind resolution and error surfaces", () => {
         [{ id: "a", column: "ghost", op: "eq", value: "x" }],
         resolveKind({}),
       ),
-    ).toThrow(
-      expect.objectContaining({ code: "unknown_column" }),
-    );
+    ).toThrow(expect.objectContaining({ code: "unknown_column" }));
   });
 
   it("raises op_not_applicable for disallowed kind/op pairs", () => {
@@ -213,8 +225,8 @@ describe("parseFilters — kind resolution and error surfaces", () => {
 // ── Layer 4: URL round-trip (grammar level) ─────────────────────────────
 
 describe("encodeFilters → decodeFilters → parseFilters round-trip", () => {
-  const resolveKind =
-    (map: Record<string, ValueKind>) => (col: string) => map[col];
+  const resolveKind = (map: Record<string, ValueKind>) => (col: string) =>
+    map[col];
 
   it("round-trips scalar ops across kinds with typed output", () => {
     const original: FilterCondition[] = [

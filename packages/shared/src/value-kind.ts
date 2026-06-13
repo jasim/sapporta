@@ -56,4 +56,3 @@ export const OPERATOR_APPLICABILITY: Record<ValueKind, readonly Operator[]> = {
 export function isOperatorApplicable(kind: ValueKind, op: Operator): boolean {
   return OPERATOR_APPLICABILITY[kind].includes(op);
 }
-

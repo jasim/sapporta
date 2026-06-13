@@ -4,8 +4,16 @@ import {
   useContext,
   type ReactNode,
 } from "react";
-import type { GridPath, GridRuntime, RowKey, CommitTarget } from "@sapporta/grid";
-import type { TableSchema, ColumnSchema as TableColumnSchema } from "@sapporta/shared/contracts";
+import type {
+  GridPath,
+  GridRuntime,
+  RowKey,
+  CommitTarget,
+} from "@sapporta/grid";
+import type {
+  TableSchema,
+  ColumnSchema as TableColumnSchema,
+} from "@sapporta/shared/contracts";
 import type { ColumnSchema as GridColumnSchema } from "@sapporta/grid";
 import type { TableLookupRegistry } from "@/table/lookup/table-lookup-registry";
 import type {
@@ -136,7 +144,8 @@ export const tgridCellContext = createContext<
 >(undefined);
 
 export const tgridCellEditorContext = createContext<
-  TGridCellEditorContext<TGridUnknownRowsByLevel, unknown, string, string> | undefined
+  | TGridCellEditorContext<TGridUnknownRowsByLevel, unknown, string, string>
+  | undefined
 >(undefined);
 
 export const tgridSessionContext = createContext<
@@ -159,7 +168,11 @@ export function useTGridCell<
       `useTGridCell: expected level '${levelId}', got '${context.levelId}'`,
     );
   }
-  return context as unknown as TGridCellContext<RowsByLevel, AppServices, LevelId>;
+  return context as unknown as TGridCellContext<
+    RowsByLevel,
+    AppServices,
+    LevelId
+  >;
 }
 
 export function useTGridCellEditor<

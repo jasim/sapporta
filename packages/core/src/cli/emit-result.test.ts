@@ -19,7 +19,10 @@ describe("resolveOutputFormat", () => {
     } else {
       process.env.SAPPORTA_OUTPUT_FORMAT = originalEnv;
     }
-    Object.defineProperty(process.stdout, "isTTY", { value: originalIsTTY, writable: true });
+    Object.defineProperty(process.stdout, "isTTY", {
+      value: originalIsTTY,
+      writable: true,
+    });
   });
 
   it("returns json when --output-format json is passed", () => {
@@ -42,13 +45,19 @@ describe("resolveOutputFormat", () => {
 
   it("defaults to json when stdout is not a TTY (agent/pipe mode)", () => {
     delete process.env.SAPPORTA_OUTPUT_FORMAT;
-    Object.defineProperty(process.stdout, "isTTY", { value: undefined, writable: true });
+    Object.defineProperty(process.stdout, "isTTY", {
+      value: undefined,
+      writable: true,
+    });
     expect(resolveOutputFormat({})).toBe("json");
   });
 
   it("defaults to table when stdout is a TTY (interactive mode)", () => {
     delete process.env.SAPPORTA_OUTPUT_FORMAT;
-    Object.defineProperty(process.stdout, "isTTY", { value: true, writable: true });
+    Object.defineProperty(process.stdout, "isTTY", {
+      value: true,
+      writable: true,
+    });
     expect(resolveOutputFormat({})).toBe("table");
   });
 });
@@ -84,7 +93,10 @@ describe("emitResult", () => {
   });
 
   it("JSON mode: emits error result as single JSON line", () => {
-    emitResult({ ok: false, error: "not found", code: "TABLE_NOT_FOUND" }, "json");
+    emitResult(
+      { ok: false, error: "not found", code: "TABLE_NOT_FOUND" },
+      "json",
+    );
     expect(logSpy).toHaveBeenCalledOnce();
     const parsed = JSON.parse(logSpy.mock.calls[0][0] as string);
     expect(parsed.ok).toBe(false);
@@ -95,7 +107,10 @@ describe("emitResult", () => {
   // -- Table mode --
 
   it("table mode: prints error to stderr", () => {
-    emitResult({ ok: false, error: "bad input", code: "INVALID_JSON" }, "table");
+    emitResult(
+      { ok: false, error: "bad input", code: "INVALID_JSON" },
+      "table",
+    );
     expect(errorSpy).toHaveBeenCalledWith("Error: bad input");
     expect(logSpy).not.toHaveBeenCalled();
   });
@@ -106,10 +121,7 @@ describe("emitResult", () => {
   });
 
   it("table mode: renders data rows as a formatted table", () => {
-    emitResult(
-      { ok: true, data: [{ id: 1, name: "Cash" }] },
-      "table",
-    );
+    emitResult({ ok: true, data: [{ id: 1, name: "Cash" }] }, "table");
     // formatTable produces header + separator + data rows
     const output = logSpy.mock.calls[0][0] as string;
     expect(output).toContain("id");

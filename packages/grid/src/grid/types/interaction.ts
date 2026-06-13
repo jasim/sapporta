@@ -43,9 +43,7 @@ export type SelectedRowsConfig =
       keyboard: SelectedRowsKeyboardConfig;
     };
 
-export type SelectedCellsConfig =
-  | { kind: "none" }
-  | { kind: "range" };
+export type SelectedCellsConfig = { kind: "none" } | { kind: "range" };
 
 export type CellArrowKeyBehavior = "grid" | "field-list";
 

@@ -11,11 +11,7 @@ export {
 } from "./primitives/command";
 export { Input } from "./primitives/input";
 export { Label } from "./primitives/label";
-export {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "./primitives/popover";
+export { Popover, PopoverContent, PopoverTrigger } from "./primitives/popover";
 export {
   Select,
   SelectContent,

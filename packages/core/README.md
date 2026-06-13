@@ -30,30 +30,34 @@ Use `scopedRows()` for ordinary custom table operations. It is the trust-boundar
 import { scopedRows } from "@sapporta/server";
 import { invoices } from "../schema/invoices.js";
 
-api.register("createInvoice", contract.createInvoice, async ({ c, request }) => {
-  const auth = projectAuth.requireWorkspaceUser(c);
-  const rows = scopedRows(c.get("db"), auth, invoices);
+api.register(
+  "createInvoice",
+  contract.createInvoice,
+  async ({ c, request }) => {
+    const auth = projectAuth.requireWorkspaceUser(c);
+    const rows = scopedRows(c.get("db"), auth, invoices);
 
-  const created = await rows.create(request.body);
-  return { status: 201, body: { data: created } };
-});
+    const created = await rows.create(request.body);
+    return { status: 201, body: { data: created } };
+  },
+);
 ```
 
 Use `auth.rowSecurity.forTable(table)` directly for advanced Drizzle workflows such as joins, transactions, multi-table state transitions, aggregates, custom SQL, and domain-specific invariants.
 
 ## Environment variables
 
-| Variable | Purpose |
-|---|---|
+| Variable                         | Purpose                                                                                                                                  |
+| -------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
 | `SAPPORTA_DEV_MODE_PACKAGE_ROOT` | Monorepo root. When set, `create-project` uses `link:` specs instead of published versions. Must be set explicitly — see DEVELOPMENT.md. |
-| `SAPPORTA_PROJECT_DIR` | Resolved project directory. |
-| `SAPPORTA_DATA_DIR` | Data directory. Default: `{projectDir}/data`. |
-| `SAPPORTA_CODE_DIR` | Code directory. Default: `{projectDir}/code`. |
-| `SAPPORTA_API_URL` | Server URL for CLI commands. Default: `http://localhost:3000`. |
-| `SAPPORTA_OUTPUT_FORMAT` | Default CLI output format: `json` or `table`. |
-| `PORT` | Server port. Default: `3000`. |
-| `LOG_FORMAT` | Set to `json` for structured logging. |
-| `LOG_LEVEL` | Log level. Default: `debug`. |
+| `SAPPORTA_PROJECT_DIR`           | Resolved project directory.                                                                                                              |
+| `SAPPORTA_DATA_DIR`              | Data directory. Default: `{projectDir}/data`.                                                                                            |
+| `SAPPORTA_CODE_DIR`              | Code directory. Default: `{projectDir}/code`.                                                                                            |
+| `SAPPORTA_API_URL`               | Server URL for CLI commands. Default: `http://localhost:3000`.                                                                           |
+| `SAPPORTA_OUTPUT_FORMAT`         | Default CLI output format: `json` or `table`.                                                                                            |
+| `PORT`                           | Server port. Default: `3000`.                                                                                                            |
+| `LOG_FORMAT`                     | Set to `json` for structured logging.                                                                                                    |
+| `LOG_LEVEL`                      | Log level. Default: `debug`.                                                                                                             |
 
 ## Sapporta Code Project Layout
 
@@ -252,7 +256,7 @@ Views are React components defined as `.tsx` files in the project's `views/` dir
 export const meta = {
   name: "dashboard",
   label: "Dashboard",
-  icon: "layout-dashboard",  // Lucide icon name, optional
+  icon: "layout-dashboard", // Lucide icon name, optional
 };
 
 export default function DashboardView() {
@@ -263,10 +267,12 @@ export default function DashboardView() {
 **Discovery:** The backend reads only `meta` for the API; the component runs in the browser.
 
 **API endpoints:**
+
 - `GET /views` — list views with metadata
 - `GET /views/:name` — view metadata
 
 **Action labels:** Actions can have an optional `label` property for display in the UI:
+
 ```ts
 action({ name: "log_meal", label: "Log Meal", input: z.object({...}), run: ... })
 ```

@@ -123,9 +123,7 @@ export function FormField({
           onValueChange={(v) => onChange(v || null)}
         >
           <SelectTrigger id={id}>
-            <SelectValue
-              placeholder={`Select ${column.label}`}
-            />
+            <SelectValue placeholder={`Select ${column.label}`} />
           </SelectTrigger>
           <SelectContent>
             {Object.entries(fkOptions).map(([id, label]) => (

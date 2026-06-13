@@ -13,4 +13,8 @@ export {
   SignupPage,
   VerifyEmailPage,
 } from "./components/AuthPages";
-export { useAuthStore, type AuthState, type AuthStatus } from "./state/auth-store";
+export {
+  useAuthStore,
+  type AuthState,
+  type AuthStatus,
+} from "./state/auth-store";

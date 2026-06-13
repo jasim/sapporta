@@ -111,7 +111,11 @@ function validateForSave(
   }
 
   // Step 1: Validate (partial for updates — only submitted fields are checked)
-  const errors = validate(schema, record, id != null ? { partial: true } : undefined);
+  const errors = validate(
+    schema,
+    record,
+    id != null ? { partial: true } : undefined,
+  );
   if (errors.length > 0) {
     throw new ValidationError(errors);
   }

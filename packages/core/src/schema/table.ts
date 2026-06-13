@@ -154,21 +154,23 @@ type SapportaMetaDefaultedField =
  *
  * These fields are optional at the authoring boundary and normalized into
  * `SapportaMeta` before the TableDef is returned. */
-export type SapportaTableInputMeta =
-  Omit<SapportaMeta, SapportaMetaDefaultedField> & {
-    label?: string;
-    selects?: SelectMeta[];
-    immutable?: boolean;
-    references?: Record<string, ReferenceRule>;
-    children?: ChildMeta[];
-    columns?: Record<string, ColumnMeta>;
-    /**
-     * Defaults to `workspaceUserScoped`, the strictest row boundary. Use
-     * `workspaceGlobal` or `systemGlobal` only for data that intentionally has a
-     * broader visibility boundary.
-     */
-    rowScope?: RowScope;
-  };
+export type SapportaTableInputMeta = Omit<
+  SapportaMeta,
+  SapportaMetaDefaultedField
+> & {
+  label?: string;
+  selects?: SelectMeta[];
+  immutable?: boolean;
+  references?: Record<string, ReferenceRule>;
+  children?: ChildMeta[];
+  columns?: Record<string, ColumnMeta>;
+  /**
+   * Defaults to `workspaceUserScoped`, the strictest row boundary. Use
+   * `workspaceGlobal` or `systemGlobal` only for data that intentionally has a
+   * broader visibility boundary.
+   */
+  rowScope?: RowScope;
+};
 
 /** A Sapporta table definition — wraps a Drizzle SQLite table with metadata */
 export interface TableDef {
@@ -253,6 +255,11 @@ export function table(options: TableOptions): TableDef {
   return {
     drizzle: options.drizzle,
     sqlName: config.name,
-    meta: normalizeSapportaMeta(config.name, columnNames, options.meta, drained),
+    meta: normalizeSapportaMeta(
+      config.name,
+      columnNames,
+      options.meta,
+      drained,
+    ),
   };
 }

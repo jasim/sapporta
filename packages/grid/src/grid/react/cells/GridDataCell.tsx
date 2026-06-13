@@ -130,7 +130,12 @@ function selectCellStatus(
   }
   if (
     s.cellSelection &&
-    selectionContainsCoord(s.cellSelection, { rowId, colId }, displayed, colOrder)
+    selectionContainsCoord(
+      s.cellSelection,
+      { rowId, colId },
+      displayed,
+      colOrder,
+    )
   ) {
     return "in-selection";
   }

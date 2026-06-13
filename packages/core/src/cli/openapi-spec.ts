@@ -96,7 +96,11 @@ export function listEndpoints(spec: OpenApiDoc): EndpointSummary[] {
       out.push(summary);
     }
   }
-  out.sort((a, b) => (a.path === b.path ? a.method.localeCompare(b.method) : a.path.localeCompare(b.path)));
+  out.sort((a, b) =>
+    a.path === b.path
+      ? a.method.localeCompare(b.method)
+      : a.path.localeCompare(b.path),
+  );
   return out;
 }
 
@@ -178,7 +182,7 @@ export function getEndpointDetail(
     responses[status] = {
       description: r?.description,
       contentType,
-      schema: contentType ? content[contentType]?.schema ?? null : null,
+      schema: contentType ? (content[contentType]?.schema ?? null) : null,
     };
   }
 
@@ -230,7 +234,10 @@ export function findEndpoint(spec: OpenApiDoc, target: string): FindResult {
       const method = maybeMethod as HttpMethod;
       for (const path of candidatePaths(rawPath)) {
         if (spec.paths?.[path]?.[method.toLowerCase()]) {
-          return { kind: "hit", endpoint: getEndpointDetail(spec, method, path) };
+          return {
+            kind: "hit",
+            endpoint: getEndpointDetail(spec, method, path),
+          };
         }
       }
       return { kind: "miss", suggestions: suggestionsFor(endpoints, trimmed) };

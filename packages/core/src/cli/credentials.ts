@@ -40,6 +40,8 @@ export function resolveApiToken(
   return token && token.length > 0 ? { apiToken: token } : {};
 }
 
-function readScalarFlag(value: string | string[] | undefined): string | undefined {
+function readScalarFlag(
+  value: string | string[] | undefined,
+): string | undefined {
   return typeof value === "string" && value.length > 0 ? value : undefined;
 }

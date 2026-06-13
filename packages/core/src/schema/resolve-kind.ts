@@ -30,15 +30,19 @@ export function resolveColumnKind(
     dataType: col.dataType,
   });
   switch (dt) {
-    case "number":  return "number";
-    case "boolean": return "boolean";
-    case "date":    return "timestamp";
-    case "string":  return "text";
+    case "number":
+      return "number";
+    case "boolean":
+      return "boolean";
+    case "date":
+      return "timestamp";
+    case "string":
+      return "text";
     default:
       throw new Error(
         `resolveColumnKind: unmapped Drizzle dataType "${dt}" ` +
-        `for column "${column}" (columnType "${col.columnType}"). ` +
-        `Add an explicit mapping — data-type inference is not a catch-all.`,
+          `for column "${column}" (columnType "${col.columnType}"). ` +
+          `Add an explicit mapping — data-type inference is not a catch-all.`,
       );
   }
 }

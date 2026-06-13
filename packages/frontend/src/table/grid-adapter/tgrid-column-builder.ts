@@ -133,7 +133,8 @@ export function buildTGridColumnsForTable<
       for (const column of args.table.columns) {
         if (column.visuallyHidden) continue;
         if (usedTableColumns.has(column.name)) continue;
-        if (excluded.has(column.name as RowFieldName<RowsByLevel[LevelId]>)) continue;
+        if (excluded.has(column.name as RowFieldName<RowsByLevel[LevelId]>))
+          continue;
         columns.push(
           args.columnMapper.columnFor({
             tableName: args.table.name,
@@ -308,7 +309,12 @@ function clientColumnFor<
   return {
     ...gridColumn,
     renderCell: spec.options.renderCell
-      ? typedRenderCell(levelId, spec.options.renderCell, columnContext, sessionContext)
+      ? typedRenderCell(
+          levelId,
+          spec.options.renderCell,
+          columnContext,
+          sessionContext,
+        )
       : gridColumn.renderCell,
     editCell: spec.options.editor
       ? typedEditor(levelId, spec.options.editor, columnContext, sessionContext)
@@ -322,7 +328,9 @@ function typedRenderCell<
   LevelId extends TGridLevelId<RowsByLevel>,
 >(
   levelId: LevelId,
-  RenderCell: ComponentType<TGridCellContext<RowsByLevel, AppServices, LevelId>>,
+  RenderCell: ComponentType<
+    TGridCellContext<RowsByLevel, AppServices, LevelId>
+  >,
   column: TGridColumnContext<RowsByLevel[LevelId]>,
   sessionContext: () => TGridSessionContext<RowsByLevel, AppServices>,
 ) {
@@ -358,7 +366,9 @@ function typedEditor<
   K extends RowFieldName<RowsByLevel[LevelId]>,
 >(
   levelId: LevelId,
-  Editor: ComponentType<TGridCellEditorContext<RowsByLevel, AppServices, LevelId, K>>,
+  Editor: ComponentType<
+    TGridCellEditorContext<RowsByLevel, AppServices, LevelId, K>
+  >,
   column: TGridColumnContext<RowsByLevel[LevelId]>,
   sessionContext: () => TGridSessionContext<RowsByLevel, AppServices>,
 ) {

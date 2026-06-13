@@ -9,14 +9,7 @@ const scriptDir = dirname(fileURLToPath(import.meta.url));
 const coreDir = dirname(scriptDir);
 const repoDir = dirname(dirname(coreDir));
 
-const snapshotPackages = [
-  "cli",
-  "ui",
-  "grid",
-  "frontend",
-  "shared",
-  "honest",
-];
+const snapshotPackages = ["cli", "ui", "grid", "frontend", "shared", "honest"];
 
 function pathInCore(...parts) {
   return join(coreDir, ...parts);
@@ -138,7 +131,9 @@ const command = commands[commandName];
 
 if (!command) {
   const names = Object.keys(commands).join(", ");
-  throw new Error(`Unknown build command "${commandName ?? ""}". Expected: ${names}`);
+  throw new Error(
+    `Unknown build command "${commandName ?? ""}". Expected: ${names}`,
+  );
 }
 
 await command();

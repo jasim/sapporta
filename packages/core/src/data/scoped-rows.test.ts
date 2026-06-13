@@ -195,7 +195,8 @@ describe("scopedRows", () => {
     await rows.create({ name: "Bank", type: "asset" });
     await rows.create({ name: "Revenue", type: "revenue" });
 
-    await expect(rows.count({ group_by: "type", ids: "asset,revenue" }))
-      .resolves.toEqual({ asset: 2, revenue: 1 });
+    await expect(
+      rows.count({ group_by: "type", ids: "asset,revenue" }),
+    ).resolves.toEqual({ asset: 2, revenue: 1 });
   });
 });

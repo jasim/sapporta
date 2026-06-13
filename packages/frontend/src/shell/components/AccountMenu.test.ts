@@ -158,7 +158,9 @@ describe("account menu trigger", () => {
   });
 
   it("keeps the menu open and reports action failures", async () => {
-    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    const consoleError = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => {});
     await act(async () => {
       root.render(
         createElement(AccountMenu, {

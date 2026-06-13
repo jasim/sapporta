@@ -13,10 +13,7 @@ export type AppWorkspaceRole = "owner" | "member";
  * domain roles here when the same user can do different work in different
  * workspaces.
  */
-export type AppWorkspaceMembership = Omit<
-  WorkspaceMembership,
-  "roles"
-> & {
+export type AppWorkspaceMembership = Omit<WorkspaceMembership, "roles"> & {
   workspace: AuthWorkspace;
   roles: readonly AppWorkspaceRole[];
 };

@@ -124,16 +124,13 @@ describe("GridRow cards presentation", () => {
 
   it("renders every visible column in schema order through grid cells", async () => {
     mounted = await render(
-      createElement(
-        GridRuntimeProvider,
-        {
-          runtime: createQuotesRuntime(),
-          children: createElement(GridLevel, {
-            path: rootPath("quotes"),
-            presentation: "cards",
-          }),
-        },
-      ),
+      createElement(GridRuntimeProvider, {
+        runtime: createQuotesRuntime(),
+        children: createElement(GridLevel, {
+          path: rootPath("quotes"),
+          presentation: "cards",
+        }),
+      }),
     );
 
     const firstRow = mounted.container.querySelector('[data-grid-part="row"]');
@@ -152,9 +149,9 @@ describe("GridRow cards presentation", () => {
     expect(fields[0]?.getAttribute("data-display-type")).toBe("pk");
     expect(firstRow.querySelector('[data-grid-part="card-title"]')).toBeNull();
     expect(mounted.container.textContent).toContain("Call me Ishmael.");
-    expect(mounted.container.querySelectorAll('[role="gridcell"]')).toHaveLength(
-      8,
-    );
+    expect(
+      mounted.container.querySelectorAll('[role="gridcell"]'),
+    ).toHaveLength(8);
   });
 
   it("does not render tabular column headers in cards presentation", async () => {
@@ -180,16 +177,13 @@ describe("GridRow cards presentation", () => {
   it("keeps cell focus behavior in cards presentation", async () => {
     const runtime = createQuotesRuntime();
     mounted = await render(
-      createElement(
-        GridRuntimeProvider,
-        {
-          runtime,
-          children: createElement(GridLevel, {
-            path: rootPath("quotes"),
-            presentation: "cards",
-          }),
-        },
-      ),
+      createElement(GridRuntimeProvider, {
+        runtime,
+        children: createElement(GridLevel, {
+          path: rootPath("quotes"),
+          presentation: "cards",
+        }),
+      }),
     );
 
     const textCell = mounted.container.querySelector(
@@ -212,16 +206,13 @@ describe("GridRow cards presentation", () => {
   it("moves down through vertical fields and into the next row", async () => {
     const runtime = createQuotesRuntime();
     mounted = await render(
-      createElement(
-        GridRuntimeProvider,
-        {
-          runtime,
-          children: createElement(GridLevel, {
-            path: rootPath("quotes"),
-            presentation: "cards",
-          }),
-        },
-      ),
+      createElement(GridRuntimeProvider, {
+        runtime,
+        children: createElement(GridLevel, {
+          path: rootPath("quotes"),
+          presentation: "cards",
+        }),
+      }),
     );
 
     const firstTextCell = mounted.container.querySelector(
@@ -255,16 +246,13 @@ describe("GridRow cards presentation", () => {
   it("keeps row-list focus behavior in cards presentation", async () => {
     const runtime = createQuotesRuntime(ROW_MULTISELECT_LIST);
     mounted = await render(
-      createElement(
-        GridRuntimeProvider,
-        {
-          runtime,
-          children: createElement(GridLevel, {
-            path: rootPath("quotes"),
-            presentation: "cards",
-          }),
-        },
-      ),
+      createElement(GridRuntimeProvider, {
+        runtime,
+        children: createElement(GridLevel, {
+          path: rootPath("quotes"),
+          presentation: "cards",
+        }),
+      }),
     );
 
     const textCell = mounted.container.querySelector(

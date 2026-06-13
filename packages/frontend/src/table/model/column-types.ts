@@ -32,7 +32,8 @@ export function inferDisplayType(col: ColumnSchema): DisplayType {
 }
 
 export function columnAlign(type: DisplayType): "left" | "center" | "right" {
-  if (type === "number" || type === "currency" || type === "percentage") return "right";
+  if (type === "number" || type === "currency" || type === "percentage")
+    return "right";
   if (type === "checkbox") return "center";
   return "left";
 }

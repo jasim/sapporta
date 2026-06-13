@@ -721,7 +721,9 @@ function TaskToolbar({ path }: { path: GridPath }) {
 
   return (
     <div>
-      <button onClick={() => source.setSort([{ colId: "dueDate", direction: "asc" }])}>
+      <button
+        onClick={() => source.setSort([{ colId: "dueDate", direction: "asc" }])}
+      >
         Sort by due date
       </button>
       <button onClick={() => source.refetch()}>Refresh</button>

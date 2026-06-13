@@ -73,9 +73,7 @@ export function datasetNames(): BenchDatasetName[] {
   return Object.keys(DATASETS) as BenchDatasetName[];
 }
 
-export function buildBenchDataset(
-  config: BenchDatasetConfig,
-): BenchDataset {
+export function buildBenchDataset(config: BenchDatasetConfig): BenchDataset {
   const schema = buildSchema(config);
   const tree = buildLevelRows(config, 0, config.rootRows, "r");
   return {

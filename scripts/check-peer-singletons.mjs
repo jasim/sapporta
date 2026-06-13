@@ -25,11 +25,15 @@ const failures = [];
 
 for (const packageName of identityPackages) {
   const roots = JSON.parse(
-    execFileSync("pnpm", ["list", packageName, "--depth", "Infinity", "--json"], {
-      cwd: projectRoot,
-      encoding: "utf-8",
-      stdio: ["ignore", "pipe", "pipe"],
-    }),
+    execFileSync(
+      "pnpm",
+      ["list", packageName, "--depth", "Infinity", "--json"],
+      {
+        cwd: projectRoot,
+        encoding: "utf-8",
+        stdio: ["ignore", "pipe", "pipe"],
+      },
+    ),
   );
   const instances = collectPackageInstances(roots, packageName);
   if (instances.size === 0) {

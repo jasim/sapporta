@@ -4,8 +4,10 @@ import { useNavigate } from "react-router-dom";
 import { useAuthStore } from "@/auth/state/auth-store";
 import { AccountMenu, type AccountMenuSection } from "./AccountMenu";
 
-export interface AuthAccountMenuProps
-  extends Omit<ComponentProps<typeof AccountMenu>, "context" | "onLogout"> {
+export interface AuthAccountMenuProps extends Omit<
+  ComponentProps<typeof AccountMenu>,
+  "context" | "onLogout"
+> {
   onLogout?: () => void | Promise<void>;
 }
 

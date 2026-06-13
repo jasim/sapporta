@@ -159,12 +159,7 @@ function parseMaybe(schema: unknown, value: unknown): unknown {
 
 function responseContentType(route: AppRoute, status: number): ContentType {
   const res = (route.responses as Record<number, unknown>)[status];
-  if (
-    res &&
-    typeof res === "object" &&
-    "contentType" in res &&
-    "body" in res
-  ) {
+  if (res && typeof res === "object" && "contentType" in res && "body" in res) {
     return (res as { contentType: string }).contentType as ContentType;
   }
   return "application/json";

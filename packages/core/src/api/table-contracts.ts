@@ -44,13 +44,15 @@ export function listRoute(def: TableDef) {
     path: `/tables/${def.sqlName}`,
     summary: `List rows in ${def.sqlName}`,
     metadata: { tags: ["tables"] },
-    query: z.object({
-      limit: z.coerce.number().int().positive().max(1000).optional(),
-      offset: z.coerce.number().int().nonnegative().optional(),
-      page: z.coerce.number().int().positive().optional(),
-      sort: z.string().optional(),
-      q: z.string().optional(),
-    }).loose(),
+    query: z
+      .object({
+        limit: z.coerce.number().int().positive().max(1000).optional(),
+        offset: z.coerce.number().int().nonnegative().optional(),
+        page: z.coerce.number().int().positive().optional(),
+        sort: z.string().optional(),
+        q: z.string().optional(),
+      })
+      .loose(),
     responses: {
       200: z.object({ data: z.array(row), meta: listMetaSchema }),
       400: errorBodySchema,

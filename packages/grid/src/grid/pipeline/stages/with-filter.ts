@@ -33,7 +33,11 @@ export function withFilter(
         dropOwner = row.source;
         changed = true;
       }
-    } else if (row.kind === "rollup" && dropOwner !== null && row.source === dropOwner) {
+    } else if (
+      row.kind === "rollup" &&
+      dropOwner !== null &&
+      row.source === dropOwner
+    ) {
       changed = true;
       // skip rollup tied to a dropped data row
     } else {

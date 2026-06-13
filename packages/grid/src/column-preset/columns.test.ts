@@ -134,9 +134,7 @@ describe("columnPreset columns", () => {
         ? rendered.props.className
         : null;
       expect(className).toEqual(expect.stringContaining("textCell"));
-      expect(className).toEqual(
-        expect.stringContaining("multiLineTextCell"),
-      );
+      expect(className).toEqual(expect.stringContaining("multiLineTextCell"));
     }
   });
 
@@ -165,9 +163,7 @@ describe("columnPreset columns", () => {
       ? rendered.props.className
       : null;
     expect(className).toEqual(expect.stringContaining("textCell"));
-    expect(className).not.toEqual(
-      expect.stringContaining("multiLineTextCell"),
-    );
+    expect(className).not.toEqual(expect.stringContaining("multiLineTextCell"));
   });
 
   it("lookupValue and foreignKey store lookup capabilities", () => {

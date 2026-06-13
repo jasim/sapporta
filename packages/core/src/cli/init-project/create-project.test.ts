@@ -53,9 +53,7 @@ describe("renderScaffoldFiles", () => {
     expect(byDest.get("packages/api/app.ts")).toContain(
       'path: "/api/public-api-sample"',
     );
-    expect(
-      byDest.get("packages/api/app/public-api-sample.ts"),
-    ).toContain(
+    expect(byDest.get("packages/api/app/public-api-sample.ts")).toContain(
       'auth.ability.can("read", "public_api_sample")',
     );
     expect(byDest.get("packages/api/authz/ability.ts")).toContain(

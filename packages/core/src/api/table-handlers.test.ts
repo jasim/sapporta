@@ -126,7 +126,9 @@ describe("makeAuthorizedTableHandlers", () => {
         error: "Forbidden",
         code: "forbidden",
       });
-      expect(sqlite.prepare("SELECT COUNT(*) AS count FROM orders").get()).toEqual({
+      expect(
+        sqlite.prepare("SELECT COUNT(*) AS count FROM orders").get(),
+      ).toEqual({
         count: 0,
       });
       expect(

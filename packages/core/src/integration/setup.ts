@@ -215,7 +215,9 @@ function createTestAuth(
       user,
       membership: {
         id: overrides.memberId ?? `member-${userId}-${workspaceId}`,
-        roles: [overrides.role ?? (overrides.isOwner === false ? "member" : "owner")],
+        roles: [
+          overrides.role ?? (overrides.isOwner === false ? "member" : "owner"),
+        ],
       },
     },
     dataAuthority: requestDataAuthority({

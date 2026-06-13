@@ -16,9 +16,7 @@ export type WorkspaceRole = "owner" | "member";
  * owner in one workspace and a member in another. Applications can extend the
  * role vocabulary and keep presenting the resolved role set here.
  */
-export type WorkspaceMembership<
-  Role extends string = WorkspaceRole,
-> = {
+export type WorkspaceMembership<Role extends string = WorkspaceRole> = {
   id: string;
   roles: readonly Role[];
 };
@@ -66,9 +64,7 @@ export function anonymousPrincipal<
  * Wraps already-resolved user and membership facts. This constructor does not
  * load data, choose a workspace, or grant row access.
  */
-export function userPrincipal<
-  Membership extends WorkspaceMembership,
->(input: {
+export function userPrincipal<Membership extends WorkspaceMembership>(input: {
   user: SapportaAuthUser;
   membership: Membership;
 }): Principal<Membership> {

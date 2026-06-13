@@ -21,9 +21,15 @@ export type SapportaLogger = {
  */
 const devFormat = printf(({ level, message, module, timestamp, ...rest }) => {
   const mod = module ? ` [${module}]` : "";
-  const extras = Object.keys(rest).length > 0
-    ? " " + Object.entries(rest).map(([k, v]) => `${k}=${typeof v === "object" ? JSON.stringify(v) : v}`).join(" ")
-    : "";
+  const extras =
+    Object.keys(rest).length > 0
+      ? " " +
+        Object.entries(rest)
+          .map(
+            ([k, v]) => `${k}=${typeof v === "object" ? JSON.stringify(v) : v}`,
+          )
+          .join(" ")
+      : "";
   return `${timestamp} ${level}${mod} ${message}${extras}`;
 });
 

@@ -12,7 +12,10 @@
 
 import { useState } from "react";
 import { X } from "lucide-react";
-import type { FilterCondition, NewFilterCondition } from "@sapporta/shared/filter";
+import type {
+  FilterCondition,
+  NewFilterCondition,
+} from "@sapporta/shared/filter";
 import { Popover, PopoverContent, PopoverTrigger } from "@sapporta/ui";
 import { Input } from "@sapporta/ui";
 import type { ColumnSchema } from "@sapporta/shared/contracts";
@@ -125,7 +128,11 @@ export function DateRangeCard({
           <X className="h-[11px] w-[11px]" />
         </button>
       </div>
-      <PopoverContent align="start" sideOffset={4} className="p-[12px] w-[280px]">
+      <PopoverContent
+        align="start"
+        sideOffset={4}
+        className="p-[12px] w-[280px]"
+      >
         <div className="flex flex-col gap-[10px]">
           <FieldLabel label="From">
             <Input

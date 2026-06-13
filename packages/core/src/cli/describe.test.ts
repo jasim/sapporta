@@ -57,7 +57,10 @@ const STUB_SPEC: OpenApiDoc = {
             description: "Validation error",
             content: {
               "application/json": {
-                schema: { type: "object", properties: { error: { type: "string" } } },
+                schema: {
+                  type: "object",
+                  properties: { error: { type: "string" } },
+                },
               },
             },
           },
@@ -65,8 +68,14 @@ const STUB_SPEC: OpenApiDoc = {
       },
     },
     "/ambiguous-path": {
-      get: { summary: "Get ambiguous", responses: { "200": { description: "ok" } } },
-      post: { summary: "Post ambiguous", responses: { "200": { description: "ok" } } },
+      get: {
+        summary: "Get ambiguous",
+        responses: { "200": { description: "ok" } },
+      },
+      post: {
+        summary: "Post ambiguous",
+        responses: { "200": { description: "ok" } },
+      },
     },
   },
 };
@@ -112,7 +121,10 @@ describe("describeAll", () => {
 
 describe("describeOne", () => {
   it("hit: POST /api/accounts returns full detail including request body and responses", async () => {
-    const result = await describeOne("POST /api/accounts", "http://localhost:3000");
+    const result = await describeOne(
+      "POST /api/accounts",
+      "http://localhost:3000",
+    );
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     const detail = result.data[0] as any;
@@ -127,7 +139,10 @@ describe("describeOne", () => {
   });
 
   it("hit: GET /api/meta/tables renders without a Request body section", async () => {
-    const result = await describeOne("GET /api/meta/tables", "http://localhost:3000");
+    const result = await describeOne(
+      "GET /api/meta/tables",
+      "http://localhost:3000",
+    );
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     const msg = result.meta?.message ?? "";
@@ -136,7 +151,10 @@ describe("describeOne", () => {
   });
 
   it("ambiguous: path-only target with multiple methods", async () => {
-    const result = await describeOne("/ambiguous-path", "http://localhost:3000");
+    const result = await describeOne(
+      "/ambiguous-path",
+      "http://localhost:3000",
+    );
     expect(result.ok).toBe(false);
     if (result.ok) return;
     expect(result.code).toBe("MISSING_ARGUMENT");

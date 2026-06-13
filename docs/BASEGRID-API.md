@@ -203,11 +203,42 @@ Runtime reads return `LevelRow`, not raw `TreeNode`.
 
 ```ts
 type LevelRow =
-  | { kind: "data"; id: RowId; columns: Record<ColId, unknown>; source: TreeNode; hasChildren: boolean; rowSelectable: boolean }
-  | { kind: "rollup"; id: RowId; columns: Record<ColId, unknown>; source: TreeNode; rowSelectable: boolean }
-  | { kind: "opening" | "closing" | "subtotal"; id: RowId; columns: Record<ColId, unknown>; source: TreeNode; rowSelectable: boolean }
-  | { kind: "footer"; id: RowId; columns: Record<ColId, unknown>; source: FooterRow; rowSelectable: boolean }
-  | { kind: "phantom"; id: RowId; columns: Record<ColId, unknown>; source: PhantomRow; rowSelectable: boolean };
+  | {
+      kind: "data";
+      id: RowId;
+      columns: Record<ColId, unknown>;
+      source: TreeNode;
+      hasChildren: boolean;
+      rowSelectable: boolean;
+    }
+  | {
+      kind: "rollup";
+      id: RowId;
+      columns: Record<ColId, unknown>;
+      source: TreeNode;
+      rowSelectable: boolean;
+    }
+  | {
+      kind: "opening" | "closing" | "subtotal";
+      id: RowId;
+      columns: Record<ColId, unknown>;
+      source: TreeNode;
+      rowSelectable: boolean;
+    }
+  | {
+      kind: "footer";
+      id: RowId;
+      columns: Record<ColId, unknown>;
+      source: FooterRow;
+      rowSelectable: boolean;
+    }
+  | {
+      kind: "phantom";
+      id: RowId;
+      columns: Record<ColId, unknown>;
+      source: PhantomRow;
+      rowSelectable: boolean;
+    };
 ```
 
 Branch on `row.kind` in renderers and host UI. Interaction code should use
@@ -308,17 +339,37 @@ recommended starting point for most BaseGrid columns.
 ### Constructors
 
 ```ts
-function identifier<TMeta = unknown>(options: ColumnPresetOptions<TMeta>): ColumnSchema;
+function identifier<TMeta = unknown>(
+  options: ColumnPresetOptions<TMeta>,
+): ColumnSchema;
 function text<TMeta = unknown>(options: TextColumnOptions<TMeta>): ColumnSchema;
-function number<TMeta = unknown>(options: NumberColumnOptions<TMeta>): ColumnSchema;
-function currency<TMeta = unknown>(options: NumberColumnOptions<TMeta>): ColumnSchema;
-function percentage<TMeta = unknown>(options: NumberColumnOptions<TMeta>): ColumnSchema;
-function date<TMeta = unknown>(options: ColumnPresetOptions<TMeta>): ColumnSchema;
-function boolean<TMeta = unknown>(options: ColumnPresetOptions<TMeta>): ColumnSchema;
-function select<TMeta = unknown>(options: SelectColumnOptions<TMeta>): ColumnSchema;
-function lookupValue<TMeta = unknown>(options: LookupColumnOptions<TMeta>): ColumnSchema;
-function foreignKey<TMeta = unknown>(options: LookupColumnOptions<TMeta>): ColumnSchema;
-function column<TMeta = unknown>(options: ColumnPresetOptions<TMeta>): ColumnSchema;
+function number<TMeta = unknown>(
+  options: NumberColumnOptions<TMeta>,
+): ColumnSchema;
+function currency<TMeta = unknown>(
+  options: NumberColumnOptions<TMeta>,
+): ColumnSchema;
+function percentage<TMeta = unknown>(
+  options: NumberColumnOptions<TMeta>,
+): ColumnSchema;
+function date<TMeta = unknown>(
+  options: ColumnPresetOptions<TMeta>,
+): ColumnSchema;
+function boolean<TMeta = unknown>(
+  options: ColumnPresetOptions<TMeta>,
+): ColumnSchema;
+function select<TMeta = unknown>(
+  options: SelectColumnOptions<TMeta>,
+): ColumnSchema;
+function lookupValue<TMeta = unknown>(
+  options: LookupColumnOptions<TMeta>,
+): ColumnSchema;
+function foreignKey<TMeta = unknown>(
+  options: LookupColumnOptions<TMeta>,
+): ColumnSchema;
+function column<TMeta = unknown>(
+  options: ColumnPresetOptions<TMeta>,
+): ColumnSchema;
 ```
 
 ### Common Options
@@ -433,8 +484,12 @@ function preset(column: ColumnSchema): ColumnPreset | undefined;
 function meta<TMeta = unknown>(column: ColumnSchema): TMeta | undefined;
 function kind(column: ColumnSchema): ColumnPresetKind | undefined;
 function width(column: ColumnSchema): ColumnWidth | undefined;
-function parse(column: ColumnSchema): ((value: string, props: CellEditorProps) => unknown) | undefined;
-function lookupCapabilities(column: ColumnSchema): LookupCapabilities | undefined;
+function parse(
+  column: ColumnSchema,
+): ((value: string, props: CellEditorProps) => unknown) | undefined;
+function lookupCapabilities(
+  column: ColumnSchema,
+): LookupCapabilities | undefined;
 function trackForColumn(column: ColumnSchema): string;
 function templateColumns(columns: readonly ColumnSchema[]): string;
 ```
@@ -670,8 +725,15 @@ type GridRuntime = {
   displayedRowSequenceFor(path: GridPath): DisplayedRowSequence;
   displayedRowFor(path: GridPath, rowId: RowId): LevelRow | undefined;
   subscribeDisplayedRowSequence(path: GridPath, fn: () => void): () => void;
-  subscribeDisplayedRow(path: GridPath, rowId: RowId, fn: () => void): () => void;
-  invalidateDisplayedRows(path: GridPath, reason: DisplayedRowsInvalidationReason): void;
+  subscribeDisplayedRow(
+    path: GridPath,
+    rowId: RowId,
+    fn: () => void,
+  ): () => void;
+  invalidateDisplayedRows(
+    path: GridPath,
+    reason: DisplayedRowsInvalidationReason,
+  ): void;
 
   writeCell(path: GridPath, coord: Coord, value: unknown): void;
   applyChanges(path: GridPath, changes: CellChange[]): void;
@@ -809,7 +871,9 @@ Reads the runtime from context.
 ```tsx
 function RefreshButton({ path }: { path: GridPath }) {
   const runtime = useGridRuntime();
-  return <button onClick={() => runtime.sourceFor(path).refetch()}>Refresh</button>;
+  return (
+    <button onClick={() => runtime.sourceFor(path).refetch()}>Refresh</button>
+  );
 }
 ```
 

@@ -14,8 +14,9 @@ export type TGridRowsByLevel = Record<string, TGridTableRow>;
 
 // Level id is any string key in the rows-by-level map.
 // This id is used everywhere the runtime needs a stable level identity.
-export type TGridLevelId<RowsByLevel extends TGridRowsByLevel = TGridRowsByLevel> =
-  keyof RowsByLevel & string;
+export type TGridLevelId<
+  RowsByLevel extends TGridRowsByLevel = TGridRowsByLevel,
+> = keyof RowsByLevel & string;
 
 // A row field name picked from a specific row shape.
 // Used to type-safe access columns, editors, and write handlers.

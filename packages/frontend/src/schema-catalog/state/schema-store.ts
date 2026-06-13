@@ -28,7 +28,8 @@ export const useSchemaStore = create<SchemaState & SchemaActions>((set) => ({
   error: null,
   activeTable: null,
 
-  setTables: (tables) => set({ tables, loaded: true, loading: false, error: null }),
+  setTables: (tables) =>
+    set({ tables, loaded: true, loading: false, error: null }),
   setProjectInfo: (info) => set({ name: info.name, slug: info.slug }),
   setLoading: (loading) => set({ loading }),
   setError: (error) => set({ error, loading: false }),

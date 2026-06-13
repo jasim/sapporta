@@ -22,4 +22,7 @@ export {
 } from "./cursor-manager";
 
 export { keyEventToCellIntent, keyEventToRowIntent } from "./key-handling";
-export { normalizeInteraction, assertValidInteraction } from "./normalize-interaction";
+export {
+  normalizeInteraction,
+  assertValidInteraction,
+} from "./normalize-interaction";

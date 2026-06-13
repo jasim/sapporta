@@ -1,12 +1,6 @@
 import type { ColumnSchema as TableColumnSchema } from "@sapporta/shared/contracts";
-import {
-  CachedSearchLookup,
-  type SearchLookup,
-} from "@sapporta/grid/lookup";
-import {
-  CachedValueLookup,
-  type ValueLookup,
-} from "@sapporta/grid/lookup";
+import { CachedSearchLookup, type SearchLookup } from "@sapporta/grid/lookup";
+import { CachedValueLookup, type ValueLookup } from "@sapporta/grid/lookup";
 import {
   fetchLookupEntriesForSearch,
   fetchLookupEntriesForValues,

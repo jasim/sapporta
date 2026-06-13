@@ -7,11 +7,12 @@ import { dirname, join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { $, fs } from "zx";
 
-const scriptArgIndex = process.argv.findIndex((arg) =>
-  arg.endsWith("scripts/generate-project-auth-schema.mjs") ||
-  arg.endsWith("scripts/generate-project-auth-schema.mts") ||
-  arg.endsWith("generate-project-auth-schema.mjs") ||
-  arg.endsWith("generate-project-auth-schema.mts")
+const scriptArgIndex = process.argv.findIndex(
+  (arg) =>
+    arg.endsWith("scripts/generate-project-auth-schema.mjs") ||
+    arg.endsWith("scripts/generate-project-auth-schema.mts") ||
+    arg.endsWith("generate-project-auth-schema.mjs") ||
+    arg.endsWith("generate-project-auth-schema.mts"),
 );
 const outputArg =
   scriptArgIndex >= 0 ? process.argv[scriptArgIndex + 1] : process.argv[2];

@@ -107,11 +107,12 @@ describe("CLI route table", () => {
     expect(findRoute(["reports"])).toBeUndefined();
     expect(findRoute(["reports", "run"])).toBeUndefined();
   });
-
 });
 
 describe("CLI route registration", () => {
-  function registeredProgram(handler: Parameters<typeof registerRoutes>[2] = async () => {}) {
+  function registeredProgram(
+    handler: Parameters<typeof registerRoutes>[2] = async () => {},
+  ) {
     const program = new Command("sapporta").exitOverride();
     registerRoutes(program, ROUTES, handler);
     return program;
@@ -123,9 +124,11 @@ describe("CLI route registration", () => {
       params: Record<string, string>;
       extraPositionals: string[];
     }> = [];
-    const program = registeredProgram(async (route, params, extraPositionals) => {
-      calls.push({ route, params, extraPositionals });
-    });
+    const program = registeredProgram(
+      async (route, params, extraPositionals) => {
+        calls.push({ route, params, extraPositionals });
+      },
+    );
     await program.parseAsync(args, { from: "user" });
     return calls;
   }

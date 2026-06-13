@@ -45,9 +45,7 @@ export function buildZodSchema(
     }
     let fieldSchema: z.ZodTypeAny = zodForKind(kind);
 
-    const selectMeta = schema.meta.selects.find(
-      (s) => s.column === col.name,
-    );
+    const selectMeta = schema.meta.selects.find((s) => s.column === col.name);
     if (selectMeta) {
       fieldSchema = z.enum(selectMeta.options as [string, ...string[]]);
     }

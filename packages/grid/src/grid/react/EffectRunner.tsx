@@ -63,8 +63,14 @@ function runEffect(e: GridEffect, container: HTMLDivElement | null) {
 }
 
 function cssEscape(s: string): string {
-  if (typeof window !== "undefined" && (window as Window & { CSS?: { escape?: (s: string) => string } }).CSS?.escape) {
-    return (window as Window & { CSS: { escape: (s: string) => string } }).CSS.escape(s);
+  if (
+    typeof window !== "undefined" &&
+    (window as Window & { CSS?: { escape?: (s: string) => string } }).CSS
+      ?.escape
+  ) {
+    return (
+      window as Window & { CSS: { escape: (s: string) => string } }
+    ).CSS.escape(s);
   }
   return s.replace(/[^\w-]/g, (c) => `\\${c.charCodeAt(0).toString(16)} `);
 }

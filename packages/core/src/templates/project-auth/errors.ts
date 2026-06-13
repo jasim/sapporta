@@ -23,16 +23,17 @@ export type ProjectAuthErrorCode = (typeof projectAuthErrorCodes)[number];
 
 export type ProjectAuthErrorStatus = 400 | 401 | 403 | 404 | 422;
 
-const AUTH_ERROR_STATUS: Record<ProjectAuthErrorCode, ProjectAuthErrorStatus> = {
-  unauthenticated: 401,
-  token_expired: 401,
-  token_revoked: 401,
-  email_not_verified: 403,
-  workspace_required: 403,
-  forbidden: 403,
-  not_found: 404,
-  validation_failed: 422,
-};
+const AUTH_ERROR_STATUS: Record<ProjectAuthErrorCode, ProjectAuthErrorStatus> =
+  {
+    unauthenticated: 401,
+    token_expired: 401,
+    token_revoked: 401,
+    email_not_verified: 403,
+    workspace_required: 403,
+    forbidden: 403,
+    not_found: 404,
+    validation_failed: 422,
+  };
 
 const AUTH_ERROR_MESSAGES: Record<ProjectAuthErrorCode, string> = {
   unauthenticated: "Authentication required",
@@ -54,7 +55,9 @@ export interface ProjectAuthFailure {
   body: ProjectAuthErrorBody;
 }
 
-export function authErrorStatus(code: ProjectAuthErrorCode): ProjectAuthErrorStatus {
+export function authErrorStatus(
+  code: ProjectAuthErrorCode,
+): ProjectAuthErrorStatus {
   return AUTH_ERROR_STATUS[code];
 }
 

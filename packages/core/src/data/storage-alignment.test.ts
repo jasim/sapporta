@@ -108,8 +108,9 @@ describe("storage alignment — dates", () => {
 
   it("rejects US-format date inputs at the boundary", async () => {
     const { rows } = await setup();
-    await expect(rows.create({ occurred_on: "1/15/2024" }))
-      .rejects.toBeInstanceOf(ValidationError);
+    await expect(
+      rows.create({ occurred_on: "1/15/2024" }),
+    ).rejects.toBeInstanceOf(ValidationError);
   });
 
   it("gt filter matches calendrically", async () => {
@@ -279,7 +280,10 @@ describe("URL round-trip — encoded filters execute and match", () => {
   });
 });
 
-function rowsFor(db: ReturnType<typeof createTestDb>["db"], tableDef: TableDef) {
+function rowsFor(
+  db: ReturnType<typeof createTestDb>["db"],
+  tableDef: TableDef,
+) {
   return scopedRows(
     db,
     createTestAuthContext({ tables: [tableDef] }),

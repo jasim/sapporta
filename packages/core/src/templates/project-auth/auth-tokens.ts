@@ -384,7 +384,8 @@ function userFromRow(row: TokenUserRow): SapportaAuthUser {
 function membershipFromRow(
   row: WorkspaceMembershipRow,
 ): AppWorkspaceMembership {
-  const role = row.role === "owner" || row.role === "admin" ? "owner" : "member";
+  const role =
+    row.role === "owner" || row.role === "admin" ? "owner" : "member";
   return {
     id: row.member_id,
     workspace: {
@@ -417,7 +418,14 @@ function readTokenRow(row: unknown): PersonalAccessTokenRow | null {
   const name = readString(row, "name");
   const secretHash = readString(row, "secret_hash");
   const createdAt = readNumber(row, "created_at");
-  if (!id || !userId || !organizationId || !name || !secretHash || createdAt === null) {
+  if (
+    !id ||
+    !userId ||
+    !organizationId ||
+    !name ||
+    !secretHash ||
+    createdAt === null
+  ) {
     return null;
   }
   return {

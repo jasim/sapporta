@@ -2,23 +2,23 @@
 
 BaseGrid's interaction system controls how the keyboard and mouse navigate a grid. It answers two questions:
 
-- **Where does the next Arrow key start?** — this is the *cursor*.
-- **Which rows are operation targets?** — this is the *selection*.
+- **Where does the next Arrow key start?** — this is the _cursor_.
+- **Which rows are operation targets?** — this is the _selection_.
 
 These are separate values. A checkbox click can toggle a row into a selection without moving the keyboard cursor. An Arrow key can move the cursor without changing which rows are selected. The interaction config you pass to the runtime determines which of these concepts exist and how they behave.
 
 ## Quick Chooser
 
-| Desired UX | Preset | Notes |
-| --- | --- | --- |
-| Editable spreadsheet | `CELL_EDITING_GRID` | Default. Active cell plus cell range selection. |
-| Editable spreadsheet without range selection | `CELL_EDITING_NO_SELECTION_GRID` | Shift+Arrow moves without creating a range. |
-| Editable spreadsheet with active-row highlighting | `CELL_GRID_WITH_ACTIVE_ROW` | Active row derives from the active cell. |
-| Editable spreadsheet with bulk row checkboxes | `CELL_GRID_WITH_INDEPENDENT_ROW_SELECTION` | Cell cursor and row selection are independent. |
-| Editable spreadsheet with side panel following cursor row | `CELL_PRIMARY_WITH_SIDE_PANEL_ROW` | Effective row selection follows the active row. |
+| Desired UX                                                    | Preset                                      | Notes                                                            |
+| ------------------------------------------------------------- | ------------------------------------------- | ---------------------------------------------------------------- |
+| Editable spreadsheet                                          | `CELL_EDITING_GRID`                         | Default. Active cell plus cell range selection.                  |
+| Editable spreadsheet without range selection                  | `CELL_EDITING_NO_SELECTION_GRID`            | Shift+Arrow moves without creating a range.                      |
+| Editable spreadsheet with active-row highlighting             | `CELL_GRID_WITH_ACTIVE_ROW`                 | Active row derives from the active cell.                         |
+| Editable spreadsheet with bulk row checkboxes                 | `CELL_GRID_WITH_INDEPENDENT_ROW_SELECTION`  | Cell cursor and row selection are independent.                   |
+| Editable spreadsheet with side panel following cursor row     | `CELL_PRIMARY_WITH_SIDE_PANEL_ROW`          | Effective row selection follows the active row.                  |
 | Editable spreadsheet with independently pinned side-panel row | `CELL_PRIMARY_WITH_SELECTED_SIDE_PANEL_ROW` | Space chooses the side-panel row without moving the cell cursor. |
-| Master-detail row list | `ROW_PRIMARY_MASTER_DETAIL` | No cell editing. Arrow keys move the row cursor. |
-| Multi-select row list | `ROW_MULTISELECT_LIST` | Shift+Arrow extends row selection; Space toggles the active row. |
+| Master-detail row list                                        | `ROW_PRIMARY_MASTER_DETAIL`                 | No cell editing. Arrow keys move the row cursor.                 |
+| Multi-select row list                                         | `ROW_MULTISELECT_LIST`                      | Shift+Arrow extends row selection; Space toggles the active row. |
 
 ## Common Recipes
 
@@ -62,11 +62,11 @@ const invoicesDefinition = defineTGrid<RowsByLevel>({
       childLevels: [],
       query: { owner: "host", pageSize: 50 },
       columns: [
-        rowSelectionColumn(),  // checkbox column
+        rowSelectionColumn(), // checkbox column
         cols.table("customer_id", { header: "Customer" }),
         cols.table("invoice_date", { header: "Date" }),
-        cols.table("status",    { header: "Status" }),
-        cols.table("amount",    { header: "Amount" }),
+        cols.table("status", { header: "Status" }),
+        cols.table("amount", { header: "Amount" }),
       ],
     },
   },
@@ -198,7 +198,7 @@ A cursor answers "where does the next key start?" A selection answers "what are 
 
 A checkbox click is a selection command. It never moves the cursor or changes what Arrow keys do.
 
-The one exception is `extendRowSelectionToCursor` — the keyboard Shift+Arrow command. It moves the row cursor to the new position *and* extends row selection from the anchor. This is inherently a hybrid: Shift+Arrow must move the cursor to the new row while also extending the selection range.
+The one exception is `extendRowSelectionToCursor` — the keyboard Shift+Arrow command. It moves the row cursor to the new position _and_ extends row selection from the anchor. This is inherently a hybrid: Shift+Arrow must move the cursor to the new row while also extending the selection range.
 
 ### Active Row
 
@@ -242,37 +242,37 @@ The most common implementation mistakes come from blurring the boundary between 
 
 ### Cell-Grid
 
-| Key | Behavior |
-|-----|----------|
-| Arrow keys | Move the active cell. |
-| Shift+Arrow | Extend the cell range (when `selectedCells.kind === "range"`), or just move (when `"none"`). |
-| Space | Toggle the active row in/out of row selection (when enabled + independent + `space: "toggle-active-row"`). |
-| Enter / F2 | Start editing the active cell. |
-| Escape | Clear cell selection, or cancel edit. |
+| Key         | Behavior                                                                                                   |
+| ----------- | ---------------------------------------------------------------------------------------------------------- |
+| Arrow keys  | Move the active cell.                                                                                      |
+| Shift+Arrow | Extend the cell range (when `selectedCells.kind === "range"`), or just move (when `"none"`).               |
+| Space       | Toggle the active row in/out of row selection (when enabled + independent + `space: "toggle-active-row"`). |
+| Enter / F2  | Start editing the active cell.                                                                             |
+| Escape      | Clear cell selection, or cancel edit.                                                                      |
 
-| Mouse | Behavior |
-|-------|----------|
-| Click cell | Move active cell cursor. |
-| Shift+Click cell | Extend cell range. |
-| Double-click cell | Start editing. |
-| Click checkbox | Toggle row selection (cursor stays). |
+| Mouse             | Behavior                             |
+| ----------------- | ------------------------------------ |
+| Click cell        | Move active cell cursor.             |
+| Shift+Click cell  | Extend cell range.                   |
+| Double-click cell | Start editing.                       |
+| Click checkbox    | Toggle row selection (cursor stays). |
 
 ### Row-List
 
-| Key | Behavior |
-|-----|----------|
-| Arrow Up / Down | Move the row cursor. |
-| Shift+Arrow | Extend row selection (when `shiftArrows: "extend-selected-rows"`) or just move (when `"move-active-row"`). |
-| Space | Toggle the active row in/out of row selection (when enabled + independent + `space: "toggle-active-row"`). |
-| Home / End | Move to first / last row. |
-| PageUp / PageDown | Move by page delta. |
-| Escape | Clear row selection. |
+| Key               | Behavior                                                                                                   |
+| ----------------- | ---------------------------------------------------------------------------------------------------------- |
+| Arrow Up / Down   | Move the row cursor.                                                                                       |
+| Shift+Arrow       | Extend row selection (when `shiftArrows: "extend-selected-rows"`) or just move (when `"move-active-row"`). |
+| Space             | Toggle the active row in/out of row selection (when enabled + independent + `space: "toggle-active-row"`). |
+| Home / End        | Move to first / last row.                                                                                  |
+| PageUp / PageDown | Move by page delta.                                                                                        |
+| Escape            | Clear row selection.                                                                                       |
 
-| Mouse | Behavior |
-|-------|----------|
-| Click row | Move row cursor to that row. |
-| Shift+Click row | Extend row selection to that row. |
-| Click checkbox | Toggle row selection (cursor stays). |
+| Mouse           | Behavior                             |
+| --------------- | ------------------------------------ |
+| Click row       | Move row cursor to that row.         |
+| Shift+Click row | Extend row selection to that row.    |
+| Click checkbox  | Toggle row selection (cursor stays). |
 
 ## Presets
 
@@ -653,16 +653,16 @@ runtime.rowInteraction.extendRowSelectionToCursor({ path, rowId });
 runtime.rowInteraction.clearRowSelection(path);
 ```
 
-| Command | Moves cursor? | Writes selection? | When |
-|---------|:---:|:---:|---|
-| `setRowCursor` | ✓ | ✗ | Row-list mode |
-| `clearRowCursor` | ✓ | ✗ | Row-list mode |
-| `selectRow` | ✗ | ✓ | Row selection enabled + independent |
-| `setRowSelection` | ✗ | ✓ | Row selection enabled + independent |
-| `toggleRowSelection` | ✗ | ✓ | Row selection enabled + independent |
-| `extendRowSelectionTo` | ✗ | ✓ | Row selection enabled + independent |
-| `extendRowSelectionToCursor` | ✓ | ✓ | Row-list + shiftArrows extends |
-| `clearRowSelection` | ✗ | ✓ | Row selection enabled + independent |
+| Command                      | Moves cursor? | Writes selection? | When                                |
+| ---------------------------- | :-----------: | :---------------: | ----------------------------------- |
+| `setRowCursor`               |       ✓       |         ✗         | Row-list mode                       |
+| `clearRowCursor`             |       ✓       |         ✗         | Row-list mode                       |
+| `selectRow`                  |       ✗       |         ✓         | Row selection enabled + independent |
+| `setRowSelection`            |       ✗       |         ✓         | Row selection enabled + independent |
+| `toggleRowSelection`         |       ✗       |         ✓         | Row selection enabled + independent |
+| `extendRowSelectionTo`       |       ✗       |         ✓         | Row selection enabled + independent |
+| `extendRowSelectionToCursor` |       ✓       |         ✓         | Row-list + shiftArrows extends      |
+| `clearRowSelection`          |       ✗       |         ✓         | Row selection enabled + independent |
 
 - `selectRow` sets selection to a single row.
 - `setRowSelection` writes an arbitrary `RowSelection`. Normalizes against displayed rows and the configured mode before writing.
@@ -696,12 +696,12 @@ row shell.
 
 Status values:
 
-| Status | Meaning |
-|--------|---------|
-| `"idle"` | Row is neither the cursor nor selected. |
-| `"selected"` | Row is selected but is not the cursor. |
-| `"cursor"` | Row is the cursor but is not selected. |
-| `"cursor-selected"` | Row is both the cursor and selected. |
+| Status              | Meaning                                 |
+| ------------------- | --------------------------------------- |
+| `"idle"`            | Row is neither the cursor nor selected. |
+| `"selected"`        | Row is selected but is not the cursor.  |
+| `"cursor"`          | Row is the cursor but is not selected.  |
+| `"cursor-selected"` | Row is both the cursor and selected.    |
 
 ### Selector Columns
 
@@ -723,10 +723,10 @@ Because the selector column is ordinary `ColumnSchema`, the base grid renders it
 
 ```ts
 type RowSelection =
-  | null                                    // nothing selected
-  | { kind: "single"; rowId: RowId }        // exactly one row
-  | { kind: "range"; anchor: RowId; head: RowId }  // contiguous range
-  | { kind: "set"; rowIds: ReadonlySet<RowId> }    // arbitrary membership
+  | null // nothing selected
+  | { kind: "single"; rowId: RowId } // exactly one row
+  | { kind: "range"; anchor: RowId; head: RowId } // contiguous range
+  | { kind: "set"; rowIds: ReadonlySet<RowId> }; // arbitrary membership
 ```
 
 - **`null`** — nothing selected. Empty sets are always `null`, never `{ kind: "set", rowIds: emptySet }`.
@@ -736,14 +736,18 @@ type RowSelection =
 
 The `mode` field in `SelectedRowsConfig` constrains which shapes survive normalization:
 
-| Mode | Allowed shapes |
-|------|---------------|
-| `"single"` | `null` or `{ kind: "single" }` |
-| `"range"` | `null`, `{ kind: "single" }`, or `{ kind: "range" }` |
-| `"multi"` | Any non-null shape: `single`, `range`, or `set` |
+| Mode       | Allowed shapes                                       |
+| ---------- | ---------------------------------------------------- |
+| `"single"` | `null` or `{ kind: "single" }`                       |
+| `"range"`  | `null`, `{ kind: "single" }`, or `{ kind: "range" }` |
+| `"multi"`  | Any non-null shape: `single`, `range`, or `set`      |
 
 ```ts
-import { makeSingleRowSelection, makeRowRangeSelection, makeRowSetSelection } from "@sapporta/ui";
+import {
+  makeSingleRowSelection,
+  makeRowRangeSelection,
+  makeRowSetSelection,
+} from "@sapporta/ui";
 
 const none = null;
 const one = makeSingleRowSelection("row-42");
@@ -757,14 +761,14 @@ const empty = makeRowSetSelection([]); // returns null
 Not all rows are eligible for row selection. The `rowSelectable` capability gate controls this:
 
 | Row kind | `selectable` (cell ranges) | `rowSelectable` (row operations) |
-|----------|:--:|:--:|
-| data | ✓ | ✓ |
-| rollup | ✓ | ✓ |
-| opening | ✗ | ✗ |
-| closing | ✗ | ✗ |
-| subtotal | ✓ | ✗ |
-| footer | ✗ | ✗ |
-| phantom | ✓ | ✓ |
+| -------- | :------------------------: | :------------------------------: |
+| data     |             ✓              |                ✓                 |
+| rollup   |             ✓              |                ✓                 |
+| opening  |             ✗              |                ✗                 |
+| closing  |             ✗              |                ✗                 |
+| subtotal |             ✓              |                ✗                 |
+| footer   |             ✗              |                ✗                 |
+| phantom  |             ✓              |                ✓                 |
 
 A subtotal row can participate in a visual cell range but is never a target for row operations like delete or export. The row-selection helpers (`rowIdsInRowSelection`, `normalizeRowSelection`) automatically filter out non-row-selectable rows.
 
@@ -871,9 +875,7 @@ See [Row Selection and Sync Modes](#row-selection-and-sync-modes) for `sync`, an
 #### `SelectedCellsConfig`
 
 ```ts
-type SelectedCellsConfig =
-  | { kind: "none" }
-  | { kind: "range" };
+type SelectedCellsConfig = { kind: "none" } | { kind: "range" };
 ```
 
 - `"none"` — no cell range selection. Shift+Arrow and Shift+Click move the cursor without creating a range.
@@ -882,9 +884,7 @@ type SelectedCellsConfig =
 #### `CellGridActiveRowConfig`
 
 ```ts
-type CellGridActiveRowConfig =
-  | { kind: "none" }
-  | { kind: "from-active-cell" };
+type CellGridActiveRowConfig = { kind: "none" } | { kind: "from-active-cell" };
 ```
 
 See [Active Row](#active-row).
@@ -957,10 +957,29 @@ mapping rows.
 ```ts
 type CellNavigationIntent =
   | { type: "commitMove"; target: Exclude<CommitTarget, "stay"> }
-  | { type: "moveColumn"; direction: "left" | "right" | "rowStart" | "rowEnd"; extend: boolean }
-  | { type: "moveRow"; direction: "up" | "down"; colPolicy: ColPolicy; extend: boolean }
-  | { type: "moveRowDelta"; delta: number; colPolicy: "preserve"; extend: boolean }
-  | { type: "moveGridEdge"; edge: "first" | "last"; colPolicy: "preserve"; extend: boolean }
+  | {
+      type: "moveColumn";
+      direction: "left" | "right" | "rowStart" | "rowEnd";
+      extend: boolean;
+    }
+  | {
+      type: "moveRow";
+      direction: "up" | "down";
+      colPolicy: ColPolicy;
+      extend: boolean;
+    }
+  | {
+      type: "moveRowDelta";
+      delta: number;
+      colPolicy: "preserve";
+      extend: boolean;
+    }
+  | {
+      type: "moveGridEdge";
+      edge: "first" | "last";
+      colPolicy: "preserve";
+      extend: boolean;
+    }
   | { type: "startEdit"; trigger: "type"; initial: string }
   | { type: "startEdit"; trigger: NonTypedEditTrigger; initial?: never }
   | { type: "clearCellSelection" }
@@ -1018,8 +1037,8 @@ Returns a `ColumnSchema` for a checkbox selector column. See the [Bulk Actions r
 
 ```ts
 type RowSelectionColumnOptions = {
-  id?: ColId;         // default: "__row_selection"
-  name?: string;      // default: ""
+  id?: ColId; // default: "__row_selection"
+  name?: string; // default: ""
   width?: ColumnWidth; // default: "compact"
   header?: "checkbox" | "blank";
 };
@@ -1029,23 +1048,25 @@ type RowSelectionColumnOptions = {
 
 All typed with `satisfies GridInteractionConfig`.
 
-| Constant | Mode | Cell selection | Active row | Row selection |
-|----------|------|---------------|------------|---------------|
-| `CELL_EDITING_GRID` | cell-grid | range | none | none |
-| `CELL_EDITING_NO_SELECTION_GRID` | cell-grid | none | none | none |
-| `CELL_GRID_WITH_ACTIVE_ROW` | cell-grid | range | from-active-cell | none |
-| `CELL_GRID_WITH_INDEPENDENT_ROW_SELECTION` | cell-grid | range | from-active-cell | enabled / multi / independent / space: toggle |
-| `CELL_PRIMARY_WITH_SIDE_PANEL_ROW` | cell-grid | range | from-active-cell | enabled / single / follows / space: ignore |
-| `CELL_PRIMARY_WITH_SELECTED_SIDE_PANEL_ROW` | cell-grid | range | from-active-cell | enabled / single / independent / space: toggle |
-| `ROW_PRIMARY_MASTER_DETAIL` | row-list | none | from-row-cursor / shift: move | enabled / single / follows / space: ignore |
-| `ROW_MULTISELECT_LIST` | row-list | none | from-row-cursor / shift: extend | enabled / multi / independent / space: toggle |
+| Constant                                    | Mode      | Cell selection | Active row                      | Row selection                                  |
+| ------------------------------------------- | --------- | -------------- | ------------------------------- | ---------------------------------------------- |
+| `CELL_EDITING_GRID`                         | cell-grid | range          | none                            | none                                           |
+| `CELL_EDITING_NO_SELECTION_GRID`            | cell-grid | none           | none                            | none                                           |
+| `CELL_GRID_WITH_ACTIVE_ROW`                 | cell-grid | range          | from-active-cell                | none                                           |
+| `CELL_GRID_WITH_INDEPENDENT_ROW_SELECTION`  | cell-grid | range          | from-active-cell                | enabled / multi / independent / space: toggle  |
+| `CELL_PRIMARY_WITH_SIDE_PANEL_ROW`          | cell-grid | range          | from-active-cell                | enabled / single / follows / space: ignore     |
+| `CELL_PRIMARY_WITH_SELECTED_SIDE_PANEL_ROW` | cell-grid | range          | from-active-cell                | enabled / single / independent / space: toggle |
+| `ROW_PRIMARY_MASTER_DETAIL`                 | row-list  | none           | from-row-cursor / shift: move   | enabled / single / follows / space: ignore     |
+| `ROW_MULTISELECT_LIST`                      | row-list  | none           | from-row-cursor / shift: extend | enabled / multi / independent / space: toggle  |
 
 ### Functions
 
 #### `normalizeInteraction`
 
 ```ts
-function normalizeInteraction(interaction?: GridInteractionConfig): GridInteractionConfig;
+function normalizeInteraction(
+  interaction?: GridInteractionConfig,
+): GridInteractionConfig;
 ```
 
 Defaults to `CELL_EDITING_GRID` when `undefined`. Calls `assertValidInteraction`.
@@ -1118,8 +1139,8 @@ function rowCursorEqual(a: RowCursor | null, b: RowCursor | null): boolean;
 type RowCapabilities = {
   editable: boolean;
   focusable: boolean;
-  selectable: boolean;        // gates cell range selection
-  rowSelectable: boolean;    // gates row operation selection
+  selectable: boolean; // gates cell range selection
+  rowSelectable: boolean; // gates row operation selection
   hasContextMenu: boolean;
   canExpand: boolean;
 };

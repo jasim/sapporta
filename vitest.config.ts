@@ -25,7 +25,10 @@ export default defineConfig({
         __dirname,
         "./packages/core/src/reports/report.ts",
       ),
-      "@sapporta/server": path.resolve(__dirname, "./packages/core/src/index.ts"),
+      "@sapporta/server": path.resolve(
+        __dirname,
+        "./packages/core/src/index.ts",
+      ),
     },
   },
   test: {

@@ -10,17 +10,45 @@ import type { DisplayedRows, LevelRow } from "./level-row";
 
 const path = rootPath("rows");
 
-function buildDisplayed(specs: Array<{ key: string; kind: LevelRow["kind"] }>): DisplayedRows {
+function buildDisplayed(
+  specs: Array<{ key: string; kind: LevelRow["kind"] }>,
+): DisplayedRows {
   const rows = specs.map((s) => {
     const id = makeRowId(path, s.key);
     if (s.kind === "data") {
-      return { kind: "data", id, rowSelectable: true, columns: {}, hasChildren: false, source: {} as never };
+      return {
+        kind: "data",
+        id,
+        rowSelectable: true,
+        columns: {},
+        hasChildren: false,
+        source: {} as never,
+      };
     }
     if (s.kind === "footer") {
-      return { kind: "footer", id, rowSelectable: false, columns: {}, source: {} as never };
+      return {
+        kind: "footer",
+        id,
+        rowSelectable: false,
+        columns: {},
+        source: {} as never,
+      };
     }
-    if (s.kind === "rollup") return { kind: "rollup", id, rowSelectable: true, columns: {}, source: {} as never };
-    return { kind: s.kind, id, rowSelectable: true, columns: {}, source: {} as never };
+    if (s.kind === "rollup")
+      return {
+        kind: "rollup",
+        id,
+        rowSelectable: true,
+        columns: {},
+        source: {} as never,
+      };
+    return {
+      kind: s.kind,
+      id,
+      rowSelectable: true,
+      columns: {},
+      source: {} as never,
+    };
   }) as LevelRow[];
   const rowById = new Map(rows.map((r) => [r.id, r] as const));
   const rowIndexById = new Map(rows.map((r, i) => [r.id, i] as const));
@@ -34,7 +62,9 @@ describe("level-row-traversal", () => {
       { key: "a", kind: "data" },
       { key: "b", kind: "data" },
     ]);
-    expect(firstFocusableRow(d, capabilitiesFor)?.id).toBe(makeRowId(path, "a"));
+    expect(firstFocusableRow(d, capabilitiesFor)?.id).toBe(
+      makeRowId(path, "a"),
+    );
   });
 
   it("lastFocusableRow returns the last row whose capabilities are focusable", () => {
@@ -69,7 +99,9 @@ describe("level-row-traversal", () => {
       { key: "c", kind: "data" },
     ]);
     // From index 0 → searches starting at 1 → returns "b".
-    expect(nextFocusableRow(d, 0, 1, capabilitiesFor)?.id).toBe(makeRowId(path, "b"));
+    expect(nextFocusableRow(d, 0, 1, capabilitiesFor)?.id).toBe(
+      makeRowId(path, "b"),
+    );
   });
 
   it("nextFocusableRow treats fromIndex as exclusive (backward)", () => {
@@ -79,7 +111,9 @@ describe("level-row-traversal", () => {
       { key: "c", kind: "data" },
     ]);
     // From index 2 → searches starting at 1 → returns "b".
-    expect(nextFocusableRow(d, 2, -1, capabilitiesFor)?.id).toBe(makeRowId(path, "b"));
+    expect(nextFocusableRow(d, 2, -1, capabilitiesFor)?.id).toBe(
+      makeRowId(path, "b"),
+    );
   });
 
   it("nextFocusableRow skips non-focusable rows in the walk direction", () => {
@@ -89,8 +123,12 @@ describe("level-row-traversal", () => {
       { key: "f2", kind: "footer" },
       { key: "b", kind: "data" },
     ]);
-    expect(nextFocusableRow(d, 0, 1, capabilitiesFor)?.id).toBe(makeRowId(path, "b"));
-    expect(nextFocusableRow(d, 3, -1, capabilitiesFor)?.id).toBe(makeRowId(path, "a"));
+    expect(nextFocusableRow(d, 0, 1, capabilitiesFor)?.id).toBe(
+      makeRowId(path, "b"),
+    );
+    expect(nextFocusableRow(d, 3, -1, capabilitiesFor)?.id).toBe(
+      makeRowId(path, "a"),
+    );
   });
 
   it("nextFocusableRow returns null when no focusable row exists in the walk direction", () => {
@@ -114,7 +152,9 @@ describe("level-row-traversal", () => {
       { key: "r", kind: "rollup" },
       { key: "d", kind: "data" },
     ]);
-    expect(firstFocusableRow(d, capabilitiesFor)?.id).toBe(makeRowId(path, "o"));
+    expect(firstFocusableRow(d, capabilitiesFor)?.id).toBe(
+      makeRowId(path, "o"),
+    );
     expect(lastFocusableRow(d, capabilitiesFor)?.id).toBe(makeRowId(path, "d"));
   });
 });

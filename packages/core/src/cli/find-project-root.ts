@@ -8,6 +8,8 @@ import { findProjectRootFrom } from "../project-paths.js";
  * truth for path-and-marker knowledge); this CLI-facing wrapper is kept
  * for backwards compatibility with existing call sites.
  */
-export function findProjectRoot(startDir: string = process.cwd()): string | null {
+export function findProjectRoot(
+  startDir: string = process.cwd(),
+): string | null {
   return findProjectRootFrom(startDir);
 }

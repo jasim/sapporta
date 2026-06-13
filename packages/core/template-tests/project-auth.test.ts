@@ -257,7 +257,9 @@ describe("project auth template", () => {
         },
       },
     });
-    expect(readTokenLastUsedAt(conn, created.token.id)).toEqual(expect.any(Number));
+    expect(readTokenLastUsedAt(conn, created.token.id)).toEqual(
+      expect.any(Number),
+    );
   });
 
   it("rejects expired and revoked bearer tokens with stable codes", async () => {
@@ -283,7 +285,11 @@ describe("project auth template", () => {
   it("rejects unknown bearer tokens with the unauthenticated code", async () => {
     conn = createAuthDb({ includeUserTable: true, includeTokenTable: true });
 
-    await expectTokenFailure(conn, "spat_missing-token_secret", "unauthenticated");
+    await expectTokenFailure(
+      conn,
+      "spat_missing-token_secret",
+      "unauthenticated",
+    );
   });
 
   it("rejects bearer tokens after workspace membership is removed", async () => {
@@ -315,8 +321,14 @@ describe("project auth template", () => {
       { name: "workspace-2" },
     );
 
-    const firstContext = await resolveTokenAuthContext(conn, firstToken.rawToken);
-    const secondContext = await resolveTokenAuthContext(conn, secondToken.rawToken);
+    const firstContext = await resolveTokenAuthContext(
+      conn,
+      firstToken.rawToken,
+    );
+    const secondContext = await resolveTokenAuthContext(
+      conn,
+      secondToken.rawToken,
+    );
 
     expect(firstContext).toMatchObject({
       principal: {
@@ -410,7 +422,9 @@ describe("project auth template", () => {
 
     await expect(
       switchActiveWorkspace({
-        auth: sessionApi(sessionPayload({ activeOrganizationId: "workspace-1" })),
+        auth: sessionApi(
+          sessionPayload({ activeOrganizationId: "workspace-1" }),
+        ),
         conn,
         catalog: emptyCatalog,
         headers: new Headers(),
@@ -1061,7 +1075,10 @@ async function expectTokenFailure(
 
 function authRoutesApp(
   routes: ReturnType<typeof createProjectAuthRoutes>,
-  auth: SapportaAuthContext<AppAbility, AppWorkspaceMembership> = routeAuthContext(),
+  auth: SapportaAuthContext<
+    AppAbility,
+    AppWorkspaceMembership
+  > = routeAuthContext(),
 ): Hono<SapportaEnv> {
   const app = new Hono<SapportaEnv>();
   app.use("/api/*", async (c, next) => {
@@ -1085,8 +1102,8 @@ function guardedApp(auth: SapportaAuthContext): Hono<SapportaEnv> {
   app.get("/api/private", (c) =>
     c.json({
       workspaceId:
-        requireWorkspaceOwner(c).dataAuthority.rowAuthorities.workspaceGlobalOnly
-          .workspace.id,
+        requireWorkspaceOwner(c).dataAuthority.rowAuthorities
+          .workspaceGlobalOnly.workspace.id,
     }),
   );
   return app;
@@ -1102,7 +1119,8 @@ function routeAuthContext(
   } = {},
 ): SapportaAuthContext<AppAbility, AppWorkspaceMembership> {
   const storedRole = overrides.role ?? "owner";
-  const role = storedRole === "owner" || storedRole === "admin" ? "owner" : "member";
+  const role =
+    storedRole === "owner" || storedRole === "admin" ? "owner" : "member";
   const workspaceId = overrides.workspaceId ?? "workspace-1";
   const user = {
     id: overrides.userId ?? "user-1",
@@ -1117,14 +1135,14 @@ function routeAuthContext(
   };
 
   const principal = {
-      kind: "user",
-      user,
-      membership: {
-        id: "member-1",
-        workspace,
-        roles: [role],
-      },
-    } as const;
+    kind: "user",
+    user,
+    membership: {
+      id: "member-1",
+      workspace,
+      roles: [role],
+    },
+  } as const;
   const dataAuthority = workspaceUserDataAuthority(workspace, user);
 
   return createAuthContext({
@@ -1155,7 +1173,10 @@ function routeUserPrincipal(
   return principal;
 }
 
-function routeAnonymousContext(): SapportaAuthContext<AppAbility, AppWorkspaceMembership> {
+function routeAnonymousContext(): SapportaAuthContext<
+  AppAbility,
+  AppWorkspaceMembership
+> {
   const principal = { kind: "anonymous" } as const;
   const dataAuthority = systemDataAuthority();
   return createAuthContext({
@@ -1204,7 +1225,9 @@ function routeWorkspaceWideContext(): SapportaAuthContext<
 const buildAppAbility: BuildAbility<AppAbility, AppWorkspaceMembership> = () =>
   ({ can: () => true }) as unknown as AppAbility;
 
-const resolveRequestDataAuthority: ResolveRequestDataAuthority = async ({ principal }) => {
+const resolveRequestDataAuthority: ResolveRequestDataAuthority = async ({
+  principal,
+}) => {
   if (principal.kind !== "user") return systemDataAuthority();
   return workspaceUserDataAuthority(
     principal.membership.workspace,

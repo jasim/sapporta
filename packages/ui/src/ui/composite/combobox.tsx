@@ -1,10 +1,6 @@
 import { useState, type Ref } from "react";
 import { ChevronDown } from "lucide-react";
-import {
-  Popover,
-  PopoverTrigger,
-  PopoverContent,
-} from "../primitives/popover";
+import { Popover, PopoverTrigger, PopoverContent } from "../primitives/popover";
 import { Button } from "../primitives/button";
 import {
   Command,

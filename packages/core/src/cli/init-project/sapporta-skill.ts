@@ -5,15 +5,30 @@ import { spawnSync } from "node:child_process";
 import { createInterface } from "node:readline/promises";
 import { stdin as input, stdout as output } from "node:process";
 
-const SAPPORTA_SKILL_PATH = join(homedir(), ".agents", "skills", "sapporta", "SKILL.md");
-const INSTALL_COMMAND = "npx skills add https://github.com/jasim/sapporta-skills --skill sapporta";
-const INSTALL_ARGS = ["skills", "add", "https://github.com/jasim/sapporta-skills", "--skill", "sapporta"];
+const SAPPORTA_SKILL_PATH = join(
+  homedir(),
+  ".agents",
+  "skills",
+  "sapporta",
+  "SKILL.md",
+);
+const INSTALL_COMMAND =
+  "npx skills add https://github.com/jasim/sapporta-skills --skill sapporta";
+const INSTALL_ARGS = [
+  "skills",
+  "add",
+  "https://github.com/jasim/sapporta-skills",
+  "--skill",
+  "sapporta",
+];
 
 function installCommandBlock(projectDir: string): string {
   return [`  cd ${projectDir}`, `  ${INSTALL_COMMAND}`].join("\n");
 }
 
-export async function ensureSapportaSkillInstalled(projectDir: string): Promise<string> {
+export async function ensureSapportaSkillInstalled(
+  projectDir: string,
+): Promise<string> {
   if (existsSync(SAPPORTA_SKILL_PATH)) {
     return (
       "Sapporta skill is already installed. " +
@@ -53,7 +68,10 @@ export async function ensureSapportaSkillInstalled(projectDir: string): Promise<
     ].join("\n");
   }
 
-  const result = spawnSync("npx", INSTALL_ARGS, { cwd: projectDir, stdio: "inherit" });
+  const result = spawnSync("npx", INSTALL_ARGS, {
+    cwd: projectDir,
+    stdio: "inherit",
+  });
   if (result.error) {
     return [
       `Sapporta skill installation failed: ${result.error.message}`,

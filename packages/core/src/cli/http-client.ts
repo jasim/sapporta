@@ -29,7 +29,10 @@ export async function httpRequest(
   // https://host/apps/acme/. A leading slash would make URL resolution discard
   // that prefix and call the wrong deployment.
   const relativePath = path.startsWith("/") ? path.slice(1) : path;
-  const url = new URL(relativePath, baseUrl.endsWith("/") ? baseUrl : baseUrl + "/");
+  const url = new URL(
+    relativePath,
+    baseUrl.endsWith("/") ? baseUrl : baseUrl + "/",
+  );
   if (opts?.queryParams) {
     for (const [k, v] of Object.entries(opts.queryParams)) {
       if (v !== undefined && v !== "") url.searchParams.set(k, v);

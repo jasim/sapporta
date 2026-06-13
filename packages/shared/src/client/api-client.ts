@@ -39,9 +39,10 @@ type SuccessKey<TRoute extends AppRoute> = keyof TRoute["responses"] &
 /** The body of any 2xx response declared by the route. Resolves only the
  *  success keys actually declared on the route — `ClientInferResponseBody`
  *  rejects status codes that aren't keys of `responses`. */
-type SuccessBody<TRoute extends AppRoute> = SuccessKey<TRoute> extends never
-  ? never
-  : ClientInferResponseBody<TRoute, SuccessKey<TRoute>>;
+type SuccessBody<TRoute extends AppRoute> =
+  SuccessKey<TRoute> extends never
+    ? never
+    : ClientInferResponseBody<TRoute, SuccessKey<TRoute>>;
 
 /** Are all keys of T optional? Mirrors ts-rest's internal helper so we
  *  can keep the args-optional vs args-required call signature exactly
@@ -101,15 +102,16 @@ function wrapThrowing<T extends AppRouter>(
       const value = (target as Record<string | symbol, unknown>)[prop];
       if (typeof value === "function") {
         return async (...args: unknown[]) => {
-          const response = await (value as (...a: unknown[]) => Promise<unknown>).apply(
-            target,
-            args,
-          );
+          const response = await (
+            value as (...a: unknown[]) => Promise<unknown>
+          ).apply(target, args);
           return unwrapResponse(response as { status: number; body: unknown });
         };
       }
       if (value && typeof value === "object") {
-        return wrapThrowing(value as InitClientReturn<AppRouter, InitClientArgs>);
+        return wrapThrowing(
+          value as InitClientReturn<AppRouter, InitClientArgs>,
+        );
       }
       return value;
     },

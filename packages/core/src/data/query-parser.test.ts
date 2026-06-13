@@ -1,5 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { sqliteTable, text, integer, SQLiteSyncDialect } from "drizzle-orm/sqlite-core";
+import {
+  sqliteTable,
+  text,
+  integer,
+  SQLiteSyncDialect,
+} from "drizzle-orm/sqlite-core";
 import type { SQL } from "drizzle-orm";
 import { timestamp } from "../schema/table.js";
 import { table } from "../schema/table.js";
@@ -68,7 +73,12 @@ describe("parseQuery()", () => {
     });
 
     it("parses ordinal operators", () => {
-      for (const [op, glyph] of [["gt", ">"], ["gte", ">="], ["lt", "<"], ["lte", "<="]]) {
+      for (const [op, glyph] of [
+        ["gt", ">"],
+        ["gte", ">="],
+        ["lt", "<"],
+        ["lte", "<="],
+      ]) {
         const q = parseQuery({ [`filter[amount][${op}]`]: "100" }, orders);
         const { sql, params } = compile(q.where);
         expect(sql).toBe(`"orders"."amount" ${glyph} ?`);
@@ -79,7 +89,10 @@ describe("parseQuery()", () => {
     });
 
     it("parses in with CSV values", () => {
-      const q = parseQuery({ "filter[status][in]": "paid,void,refunded" }, orders);
+      const q = parseQuery(
+        { "filter[status][in]": "paid,void,refunded" },
+        orders,
+      );
       const { sql, params } = compile(q.where);
       expect(sql).toBe('"orders"."status" in (?, ?, ?)');
       expect(params).toEqual(["paid", "void", "refunded"]);

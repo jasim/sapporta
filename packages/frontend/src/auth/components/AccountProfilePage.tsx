@@ -137,9 +137,7 @@ function AgentAccessTokens() {
     try {
       const created = await createAuthToken({
         name,
-        ...(expiresAt
-          ? { expiresAt: new Date(expiresAt).toISOString() }
-          : {}),
+        ...(expiresAt ? { expiresAt: new Date(expiresAt).toISOString() } : {}),
       });
       setRawToken(created.rawToken);
       setTokens((current) => [created.token, ...current]);
@@ -291,7 +289,9 @@ function ProfileRow({
         {icon}
       </span>
       <span className="text-sap-data font-medium text-sap-muted">{label}</span>
-      <span className="min-w-0 truncate text-sap-body text-sap-fg">{value}</span>
+      <span className="min-w-0 truncate text-sap-body text-sap-fg">
+        {value}
+      </span>
     </div>
   );
 }

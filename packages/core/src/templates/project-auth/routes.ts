@@ -62,28 +62,35 @@ export function createProjectAuthRoutes(options: ProjectAuthRoutesOptions) {
     body: authContextResponse(requireAppAuthContext(c)),
   }));
 
-  api.register("switchActiveWorkspace", switchActiveWorkspaceRoute, async ({ c, request }) => {
-    try {
-      const auth = await options.switchActiveWorkspace(c, request.body.workspaceId);
-      return {
-        status: 200,
-        body: authContextResponse(auth),
-      };
-    } catch (err) {
-      if (err instanceof WorkspaceSwitchError) {
-        const failure = authFailure("forbidden");
+  api.register(
+    "switchActiveWorkspace",
+    switchActiveWorkspaceRoute,
+    async ({ c, request }) => {
+      try {
+        const auth = await options.switchActiveWorkspace(
+          c,
+          request.body.workspaceId,
+        );
         return {
-          status: 403,
+          status: 200,
+          body: authContextResponse(auth),
+        };
+      } catch (err) {
+        if (err instanceof WorkspaceSwitchError) {
+          const failure = authFailure("forbidden");
+          return {
+            status: 403,
+            body: failure.body,
+          };
+        }
+        const failure = authFailure("unauthenticated");
+        return {
+          status: 401,
           body: failure.body,
         };
       }
-      const failure = authFailure("unauthenticated");
-      return {
-        status: 401,
-        body: failure.body,
-      };
-    }
-  });
+    },
+  );
 
   api.register("listAuthTokens", listAuthTokensRoute, ({ c }) => {
     const auth = requireTokenManagementAccess(c, "read");
@@ -204,7 +211,9 @@ export function authContextResponse(
   auth: SapportaAuthContext<AppAbility, AppWorkspaceMembership>,
 ): AuthContextResponse {
   if (auth.principal.kind !== "user") {
-    throw new Error("A signed-in user is required to build auth context response.");
+    throw new Error(
+      "A signed-in user is required to build auth context response.",
+    );
   }
   // The UI reads one active workspace. Additional workspace switching can build
   // on the memberships array without changing the shape of the current context.

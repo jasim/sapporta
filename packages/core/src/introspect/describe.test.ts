@@ -35,7 +35,9 @@ describe("db describe", () => {
   });
 
   it("shows foreign keys", () => {
-    sqlite.exec(`CREATE TABLE accounts (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL)`);
+    sqlite.exec(
+      `CREATE TABLE accounts (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL)`,
+    );
     sqlite.exec(`
       CREATE TABLE invoices (
         id INTEGER PRIMARY KEY AUTOINCREMENT,

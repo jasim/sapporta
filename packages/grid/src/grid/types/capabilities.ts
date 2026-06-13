@@ -34,18 +34,60 @@ export type RowCapabilities = {
 export function capabilitiesFor(kind: LevelRowKind): RowCapabilities {
   switch (kind) {
     case "data":
-      return { editable: true, focusable: true, selectable: true, rowSelectable: true, hasContextMenu: true, canExpand: true };
+      return {
+        editable: true,
+        focusable: true,
+        selectable: true,
+        rowSelectable: true,
+        hasContextMenu: true,
+        canExpand: true,
+      };
     case "rollup":
-      return { editable: true, focusable: true, selectable: true, rowSelectable: true, hasContextMenu: true, canExpand: false };
+      return {
+        editable: true,
+        focusable: true,
+        selectable: true,
+        rowSelectable: true,
+        hasContextMenu: true,
+        canExpand: false,
+      };
     case "opening":
     case "closing":
-      return { editable: false, focusable: true, selectable: false, rowSelectable: false, hasContextMenu: false, canExpand: false };
+      return {
+        editable: false,
+        focusable: true,
+        selectable: false,
+        rowSelectable: false,
+        hasContextMenu: false,
+        canExpand: false,
+      };
     case "subtotal":
-      return { editable: false, focusable: true, selectable: true, rowSelectable: false, hasContextMenu: false, canExpand: false };
+      return {
+        editable: false,
+        focusable: true,
+        selectable: true,
+        rowSelectable: false,
+        hasContextMenu: false,
+        canExpand: false,
+      };
     case "footer":
-      return { editable: false, focusable: false, selectable: false, rowSelectable: false, hasContextMenu: false, canExpand: false };
+      return {
+        editable: false,
+        focusable: false,
+        selectable: false,
+        rowSelectable: false,
+        hasContextMenu: false,
+        canExpand: false,
+      };
     case "phantom":
-      return { editable: true, focusable: true, selectable: true, rowSelectable: true, hasContextMenu: false, canExpand: false };
+      return {
+        editable: true,
+        focusable: true,
+        selectable: true,
+        rowSelectable: true,
+        hasContextMenu: false,
+        canExpand: false,
+      };
     default: {
       const _exhaustive: never = kind;
       throw new Error(`capabilitiesFor: unhandled kind ${_exhaustive}`);

@@ -47,7 +47,10 @@ export interface CliRoute {
   /** Extract rows from the API response for --output-format table rendering */
   extractData: (res: any) => Record<string, unknown>[];
   /** Optional header text printed before the table in --output-format table mode */
-  formatHeader?: (res: any, params: Record<string, string>) => string | undefined;
+  formatHeader?: (
+    res: any,
+    params: Record<string, string>,
+  ) => string | undefined;
 }
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
@@ -71,7 +74,9 @@ function tableDescribeRows(res: any) {
     type: col.dataType ?? "",
     notNull: col.notNull ? "YES" : "",
     pk: col.primary ? "YES" : "",
-    fk: col.foreignKey ? `→ ${col.foreignKey.table}.${col.foreignKey.column}` : "",
+    fk: col.foreignKey
+      ? `→ ${col.foreignKey.table}.${col.foreignKey.column}`
+      : "",
     default: col.hasDefault ? "YES" : "",
   }));
 }
@@ -99,7 +104,8 @@ export const ROUTES: CliRoute[] = [
     path: "/api/meta/tables/:table",
     params: ["table"],
     extractData: tableDescribeRows,
-    formatHeader: (res) => res.name ? `Table: ${res.name} (${res.label})` : undefined,
+    formatHeader: (res) =>
+      res.name ? `Table: ${res.name} (${res.label})` : undefined,
   },
   {
     pattern: ["tables", "indexes", ":table"],
@@ -129,7 +135,13 @@ export const ROUTES: CliRoute[] = [
     inputSchema: z.object({
       name: z.string().optional().describe("New table name (rename)"),
       label: z.string().optional().describe("Display label"),
-      row_label_columns: z.array(z.string()).min(1).optional().describe("Columns whose values build a row's label in FK dropdowns and lookups (concatenated with a space)"),
+      row_label_columns: z
+        .array(z.string())
+        .min(1)
+        .optional()
+        .describe(
+          "Columns whose values build a row's label in FK dropdowns and lookups (concatenated with a space)",
+        ),
       immutable: z.boolean().optional().describe("Prevent updates and deletes"),
       position: z.number().optional().describe("Sort position in sidebar"),
     }),
@@ -157,7 +169,9 @@ export const ROUTES: CliRoute[] = [
     extractData: (res) => res.data ?? [],
     formatHeader: (res) => {
       const m = res.meta;
-      return m ? `Page ${m.page}/${m.pages} (${m.total} total rows)` : undefined;
+      return m
+        ? `Page ${m.page}/${m.pages} (${m.total} total rows)`
+        : undefined;
     },
   },
   {
@@ -166,7 +180,7 @@ export const ROUTES: CliRoute[] = [
     method: "GET",
     path: "/api/tables/:table/:id",
     params: ["table", "id"],
-    extractData: (res) => res.data ? [res.data] : [],
+    extractData: (res) => (res.data ? [res.data] : []),
   },
   {
     pattern: ["rows", "insert", ":table"],
@@ -189,7 +203,7 @@ export const ROUTES: CliRoute[] = [
     params: ["table", "id"],
     bodyField: "data",
     mutating: true,
-    extractData: (res) => res.data ? [res.data] : [],
+    extractData: (res) => (res.data ? [res.data] : []),
   },
   {
     pattern: ["rows", "delete", ":table", ":id"],
@@ -198,7 +212,7 @@ export const ROUTES: CliRoute[] = [
     path: "/api/tables/:table/:id",
     params: ["table", "id"],
     mutating: true,
-    extractData: (res) => res.data ? [res.data] : [],
+    extractData: (res) => (res.data ? [res.data] : []),
   },
 
   // ── Enums ─────────────────────────────────────────────────────────────
@@ -214,8 +228,7 @@ export const ROUTES: CliRoute[] = [
   // ── Database ──────────────────────────────────────────────────────────
   {
     pattern: ["db", "exec-sql"],
-    description:
-      "Execute raw SQL; reads return rows, writes report row counts",
+    description: "Execute raw SQL; reads return rows, writes report row counts",
     method: "POST",
     path: "/api/meta/sql",
     params: [],
@@ -230,9 +243,11 @@ export const ROUTES: CliRoute[] = [
       dryRun: z
         .boolean()
         .optional()
-        .describe("For writes: validate via EXPLAIN QUERY PLAN without executing"),
+        .describe(
+          "For writes: validate via EXPLAIN QUERY PLAN without executing",
+        ),
     }),
-    extractData: (res) => (Array.isArray(res) ? res : res.data ?? [res]),
+    extractData: (res) => (Array.isArray(res) ? res : (res.data ?? [res])),
   },
 ];
 

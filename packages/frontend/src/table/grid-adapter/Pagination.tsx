@@ -160,9 +160,7 @@ export function Pagination({
                 <a
                   href={hrefForPage(item)}
                   aria-current={isCurrent ? "page" : undefined}
-                  aria-label={
-                    isCurrent ? `Page ${item}` : `Go to page ${item}`
-                  }
+                  aria-label={isCurrent ? `Page ${item}` : `Go to page ${item}`}
                   onClick={(event) => handleLinkClick(event, item)}
                   className={className}
                   style={pageSlotStyle}
@@ -173,9 +171,7 @@ export function Pagination({
                 <button
                   type="button"
                   aria-current={isCurrent ? "page" : undefined}
-                  aria-label={
-                    isCurrent ? `Page ${item}` : `Go to page ${item}`
-                  }
+                  aria-label={isCurrent ? `Page ${item}` : `Go to page ${item}`}
                   onClick={() => goToPage(item)}
                   className={className}
                   style={pageSlotStyle}

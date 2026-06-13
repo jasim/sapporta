@@ -15,11 +15,15 @@
   --grid-cards-row-gap: 7px;
 }
 
-:where(.sapporta-table-grid[data-grid-presentation="cards"] [data-grid-part="body"]) {
+:where(
+  .sapporta-table-grid[data-grid-presentation="cards"] [data-grid-part="body"]
+) {
   gap: var(--grid-cards-row-gap);
 }
 
-:where(.sapporta-table-grid[data-grid-presentation="cards"] [data-grid-part="row"]) {
+:where(
+  .sapporta-table-grid[data-grid-presentation="cards"] [data-grid-part="row"]
+) {
   --grid-row-base-background: var(--grid-card-background);
   --grid-cell-border-inline-end: none;
   --grid-cell-min-height: 28px;

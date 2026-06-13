@@ -89,14 +89,18 @@ A typical custom route resolves the signed-in workspace user, then uses Sapporta
 ```ts
 import { scopedRows } from "@sapporta/server";
 
-api.register("createCustomer", contract.createCustomer, async ({ c, request }) => {
-  const db = c.get("db");
-  const auth = projectAuth.requireWorkspaceUser(c);
-  const rows = scopedRows(db, auth, customers);
+api.register(
+  "createCustomer",
+  contract.createCustomer,
+  async ({ c, request }) => {
+    const db = c.get("db");
+    const auth = projectAuth.requireWorkspaceUser(c);
+    const rows = scopedRows(db, auth, customers);
 
-  const created = await rows.create(request.body);
-  return { status: 201, body: { data: created } };
-});
+    const created = await rows.create(request.body);
+    return { status: 201, body: { data: created } };
+  },
+);
 ```
 
 The `scopedRows(db, auth, table)` call returns an object that lets you call list, get, create, update, delete, lookup, and export. All of these are tightly scoped to the current user's role and permissions.
@@ -108,7 +112,7 @@ The `scopedRows(db, auth, table)` call returns an object that lets you call list
 - **Shared**: typed REST contracts (sapporta-rest, a minimal fork of ts-rest)
 - **Testing**: Vitest + in-memory SQLite
 
-Projects created using Sapporta depend on these libraries directly. Sapporta is a thin set of helpers that provide quality of life improvements, and does not wrap anything inside opaque abstractions. 
+Projects created using Sapporta depend on these libraries directly. Sapporta is a thin set of helpers that provide quality of life improvements, and does not wrap anything inside opaque abstractions.
 
 ## Coding-Agent Skills
 

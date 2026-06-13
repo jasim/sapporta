@@ -4,7 +4,7 @@ Sapporta is a **library** for building database applications with TypeScript. It
 
 ## Library, Not Framework
 
-Sapporta is modular and composable. The high-level features in Sapporta should be built by composing low-level primitives, which should be equally available for end users. It should be possible for end user to compose their own versions of high-level Sapporta feature using these primitives. 
+Sapporta is modular and composable. The high-level features in Sapporta should be built by composing low-level primitives, which should be equally available for end users. It should be possible for end user to compose their own versions of high-level Sapporta feature using these primitives.
 
 Every part of Sapporta must be overridable, extensible, or skippable. Projects own their entry points — `boot.ts` and `main.tsx` on both backend and frontend live in the project, not in Sapporta — and `@sapporta/core` and `@sapporta/ui` export composable building blocks the project wires in itself.
 

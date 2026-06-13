@@ -112,7 +112,14 @@ function copyWorktree(destination) {
 function pinMinimumSpecs(projectRoot) {
   const packageJsonFiles = execFileSync(
     "git",
-    ["ls-files", "--cached", "--others", "--exclude-standard", "package.json", "packages/*/package.json"],
+    [
+      "ls-files",
+      "--cached",
+      "--others",
+      "--exclude-standard",
+      "package.json",
+      "packages/*/package.json",
+    ],
     { cwd: root, encoding: "utf-8" },
   )
     .split("\n")

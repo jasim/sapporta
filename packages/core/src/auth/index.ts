@@ -10,10 +10,7 @@ export type {
   WorkspaceMembership,
   WorkspaceRole,
 } from "./principal.js";
-export {
-  anonymousPrincipal,
-  userPrincipal,
-} from "./principal.js";
+export { anonymousPrincipal, userPrincipal } from "./principal.js";
 export {
   assertDataAuthoritySupportsTable,
   requestDataAuthority,

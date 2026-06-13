@@ -17,7 +17,11 @@ describe("httpRequest", () => {
       }),
     );
 
-    const result = await httpRequest("http://localhost:3000", "GET", "/api/ping");
+    const result = await httpRequest(
+      "http://localhost:3000",
+      "GET",
+      "/api/ping",
+    );
     expect(result.status).toBe(200);
     expect(result.data).toEqual({ ok: true, data: [{ id: 1 }] });
   });
@@ -30,7 +34,11 @@ describe("httpRequest", () => {
       }),
     );
 
-    const result = await httpRequest("http://localhost:3000", "GET", "/api/boom");
+    const result = await httpRequest(
+      "http://localhost:3000",
+      "GET",
+      "/api/boom",
+    );
     expect(result.status).toBe(500);
     expect(result.data).toEqual({
       ok: false,
@@ -40,19 +48,25 @@ describe("httpRequest", () => {
   });
 
   it("returns {} for an empty 2xx response body", async () => {
-    globalThis.fetch = vi.fn().mockResolvedValue(
-      new Response(null, { status: 204 }),
-    );
+    globalThis.fetch = vi
+      .fn()
+      .mockResolvedValue(new Response(null, { status: 204 }));
 
-    const result = await httpRequest("http://localhost:3000", "DELETE", "/api/thing/1");
+    const result = await httpRequest(
+      "http://localhost:3000",
+      "DELETE",
+      "/api/thing/1",
+    );
     expect(result.status).toBe(204);
     expect(result.data).toEqual({});
   });
 
   it("sends a bearer token when authToken is provided", async () => {
-    globalThis.fetch = vi.fn().mockResolvedValue(
-      new Response(JSON.stringify({ ok: true }), { status: 200 }),
-    );
+    globalThis.fetch = vi
+      .fn()
+      .mockResolvedValue(
+        new Response(JSON.stringify({ ok: true }), { status: 200 }),
+      );
 
     await httpRequest("http://localhost:3000", "GET", "/api/ping", {
       authToken: "spat_123_secret",
@@ -69,9 +83,11 @@ describe("httpRequest", () => {
   });
 
   it("omits authorization when no token is provided", async () => {
-    globalThis.fetch = vi.fn().mockResolvedValue(
-      new Response(JSON.stringify({ ok: true }), { status: 200 }),
-    );
+    globalThis.fetch = vi
+      .fn()
+      .mockResolvedValue(
+        new Response(JSON.stringify({ ok: true }), { status: 200 }),
+      );
 
     await httpRequest("http://localhost:3000", "GET", "/api/ping");
 
@@ -85,11 +101,15 @@ describe("httpRequest", () => {
 
   it("truncates a large non-JSON body to 500 chars with an ellipsis", async () => {
     const big = "x".repeat(1000);
-    globalThis.fetch = vi.fn().mockResolvedValue(
-      new Response(big, { status: 500 }),
-    );
+    globalThis.fetch = vi
+      .fn()
+      .mockResolvedValue(new Response(big, { status: 500 }));
 
-    const result = await httpRequest("http://localhost:3000", "GET", "/api/boom");
+    const result = await httpRequest(
+      "http://localhost:3000",
+      "GET",
+      "/api/boom",
+    );
     const data = result.data as { error: string; code: string };
     expect(data.code).toBe("NON_JSON_RESPONSE");
     expect(data.error).toBe("x".repeat(500) + "…");

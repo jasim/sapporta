@@ -81,7 +81,9 @@ export function activeRowFor(
     // Cell-grid active row is derived, not stored. A cell cursor may point at a
     // row in another path; runtime.activeRowFor(path) filters that after this
     // pure helper returns the canonical active-row value.
-    return cellCursor ? { path: cellCursor.path, rowId: cellCursor.rowId } : null;
+    return cellCursor
+      ? { path: cellCursor.path, rowId: cellCursor.rowId }
+      : null;
   }
   return liveRowFocus ? { path, rowId: liveRowFocus } : null;
 }

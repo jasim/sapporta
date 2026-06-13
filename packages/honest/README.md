@@ -32,7 +32,11 @@ api.get("/healthz", (c) => c.text("ok")); // plain Hono still works
 const parent = new Hono();
 parent.route("/api", api);
 parent.get("/api/openapi.json", (c) =>
-  c.json(api.generateDocument(undefined, { info: { title: "My API", version: "1.0.0" } })),
+  c.json(
+    api.generateDocument(undefined, {
+      info: { title: "My API", version: "1.0.0" },
+    }),
+  ),
 );
 ```
 
@@ -58,7 +62,8 @@ api.registerFamily({
   method: "get",
   genericPath: "/tables/:tableName",
   // At doc-generation time, emit one concrete route per table.
-  docs: (ctx) => Object.fromEntries(ctx.tables.map((t) => [`list_${t.name}`, listRoute(t)])),
+  docs: (ctx) =>
+    Object.fromEntries(ctx.tables.map((t) => [`list_${t.name}`, listRoute(t)])),
   // At request time, resolve to the concrete route for THIS table.
   dispatch: (c) => {
     const table = resolver.get(c.req.param("tableName"));
@@ -117,11 +122,11 @@ The shared `{ error, code?, details? }` Zod schema (with OpenAPI component id `"
 
 Honest emits a few well-known errors directly (before the handler is called):
 
-| Status | Code | When |
-|--------|------|------|
-| 400 | `BAD_REQUEST` | Request failed Zod validation. `details` carries `ZodIssue[]`. |
-| 400 | `BAD_JSON` | Request body wasn't valid JSON. |
-| 404 | `NOT_FOUND` | `registerFamily` dispatch resolved to `undefined` and no `notFound` was provided. |
+| Status | Code          | When                                                                              |
+| ------ | ------------- | --------------------------------------------------------------------------------- |
+| 400    | `BAD_REQUEST` | Request failed Zod validation. `details` carries `ZodIssue[]`.                    |
+| 400    | `BAD_JSON`    | Request body wasn't valid JSON.                                                   |
+| 404    | `NOT_FOUND`   | `registerFamily` dispatch resolved to `undefined` and no `notFound` was provided. |
 
 All match `errorBodySchema`. Handler-thrown exceptions are **not** caught — they bubble to the Hono app's `onError`, where the host can shape its global error response.
 

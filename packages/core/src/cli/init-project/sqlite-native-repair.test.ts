@@ -1,4 +1,10 @@
-import { mkdtempSync, mkdirSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import {
+  mkdtempSync,
+  mkdirSync,
+  realpathSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { afterEach, describe, expect, it } from "vitest";
@@ -13,7 +19,10 @@ const tempDirs: string[] = [];
 function tempProject(): string {
   const dir = mkdtempSync(join(tmpdir(), "sapporta-create-project-"));
   tempDirs.push(dir);
-  writeFileSync(join(dir, "package.json"), JSON.stringify({ name: "fixture", type: "module" }));
+  writeFileSync(
+    join(dir, "package.json"),
+    JSON.stringify({ name: "fixture", type: "module" }),
+  );
   return dir;
 }
 
@@ -29,7 +38,8 @@ describe("isMissingBetterSqlite3Binding", () => {
       status: 1,
       signal: null,
       stdout: "",
-      stderr: "Error: Could not locate the bindings file. Tried:\n -> /x/build/Release/better_sqlite3.node",
+      stderr:
+        "Error: Could not locate the bindings file. Tried:\n -> /x/build/Release/better_sqlite3.node",
     };
 
     expect(isMissingBetterSqlite3Binding(result)).toBe(true);

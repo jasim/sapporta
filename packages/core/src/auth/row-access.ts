@@ -147,9 +147,16 @@ export function validateForeignKeyReferencesSync(
     ]);
   }
 
-  const references = requireResolvedTableReferences(sourceTable, registeredTables);
+  const references = requireResolvedTableReferences(
+    sourceTable,
+    registeredTables,
+  );
   if (options.skipPayloadPolicy !== true) {
-    const policyIssues = clientPayloadPolicyIssues(sourceTable, payload, references);
+    const policyIssues = clientPayloadPolicyIssues(
+      sourceTable,
+      payload,
+      references,
+    );
     if (policyIssues.length > 0) {
       throw new AuthPayloadPolicyError(policyIssues);
     }
@@ -158,7 +165,9 @@ export function validateForeignKeyReferencesSync(
   const validationErrors: Array<{ field: string; message: string }> = [];
 
   for (const reference of references) {
-    if (!Object.prototype.hasOwnProperty.call(payload, reference.sourceColumn)) {
+    if (
+      !Object.prototype.hasOwnProperty.call(payload, reference.sourceColumn)
+    ) {
       if (options.partial) continue;
       continue;
     }
@@ -180,7 +189,8 @@ export function validateForeignKeyReferencesSync(
     if (rows.length === 0) {
       validationErrors.push({
         field: reference.sourceColumn,
-        message: "Referenced row does not exist or is not visible in the active request scope.",
+        message:
+          "Referenced row does not exist or is not visible in the active request scope.",
       });
     }
   }

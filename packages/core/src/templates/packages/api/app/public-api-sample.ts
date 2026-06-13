@@ -11,10 +11,7 @@
  * public data.
  */
 import { forbidUnless, TsRestApi, type SapportaEnv } from "@sapporta/server";
-import {
-  APP_NAME,
-  publicApiSampleContract,
-} from "%%SAPPORTA:SLUG%%-shared";
+import { APP_NAME, publicApiSampleContract } from "%%SAPPORTA:SLUG%%-shared";
 
 const api = new TsRestApi<SapportaEnv>();
 

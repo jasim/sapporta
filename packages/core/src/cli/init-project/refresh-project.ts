@@ -231,7 +231,10 @@ export function mergePackageJson(
   return merged;
 }
 
-function mergeNestedObject(existing: JsonValue, scaffold: JsonValue): JsonValue {
+function mergeNestedObject(
+  existing: JsonValue,
+  scaffold: JsonValue,
+): JsonValue {
   if (!isJsonObject(existing) || !isJsonObject(scaffold)) {
     return existing;
   }

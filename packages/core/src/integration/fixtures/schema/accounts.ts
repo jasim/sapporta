@@ -17,7 +17,11 @@ export const accounts = table({
     label: "Accounts",
     rowScope: "workspaceGlobal",
     selects: [
-      { type: "select", column: "type", options: ["asset", "liability", "equity", "revenue", "expense"] },
+      {
+        type: "select",
+        column: "type",
+        options: ["asset", "liability", "equity", "revenue", "expense"],
+      },
     ],
   },
 });

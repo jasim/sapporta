@@ -39,7 +39,9 @@ function statusForCode(code: string): HttpErrorStatus {
   return (ERROR_CODE_STATUS[code] ?? 500) as HttpErrorStatus;
 }
 
-export function installRequestLogging<E extends SapportaEnv>(app: Hono<E>): Hono<E> {
+export function installRequestLogging<E extends SapportaEnv>(
+  app: Hono<E>,
+): Hono<E> {
   app.use("*", requestLogger());
   return app;
 }
@@ -55,7 +57,9 @@ export function installExactOriginCors<E extends SapportaEnv>(
   options: ExactOriginCorsOptions = {},
 ): Hono<E> {
   if (options.credentials === true && options.origins?.includes("*")) {
-    throw new Error("Credentialed CORS requires exact origins; wildcard origins are not allowed.");
+    throw new Error(
+      "Credentialed CORS requires exact origins; wildcard origins are not allowed.",
+    );
   }
 
   app.use(
@@ -93,7 +97,9 @@ export function mountHealth<E extends SapportaEnv>(
   }
   if (policy === "authenticated") {
     if (!guard) {
-      throw new Error("Authenticated health policy requires a project auth guard.");
+      throw new Error(
+        "Authenticated health policy requires a project auth guard.",
+      );
     }
     app.use("/health", async (c, next) => {
       await guard(c);
@@ -104,7 +110,9 @@ export function mountHealth<E extends SapportaEnv>(
   return app;
 }
 
-export function installSapportaErrorHandler<E extends SapportaEnv>(app: Hono<E>): Hono<E> {
+export function installSapportaErrorHandler<E extends SapportaEnv>(
+  app: Hono<E>,
+): Hono<E> {
   app.onError((err, c) => {
     const log = logger.child({ module: "http" });
 
@@ -115,7 +123,10 @@ export function installSapportaErrorHandler<E extends SapportaEnv>(app: Hono<E>)
     }
 
     if (err instanceof OperationError) {
-      return c.json({ error: err.message, code: err.code }, statusForCode(err.code));
+      return c.json(
+        { error: err.message, code: err.code },
+        statusForCode(err.code),
+      );
     }
 
     log.error("unhandled request error", {
@@ -141,7 +152,10 @@ export function installFrameworkRoutePolicy<E extends SapportaEnv>(
     guard(c);
     return next();
   };
-  const currentAuthOnlyMeta = async (c: Context<E>, next: () => Promise<void>) => {
+  const currentAuthOnlyMeta = async (
+    c: Context<E>,
+    next: () => Promise<void>,
+  ) => {
     if (c.req.method === "GET" && c.req.path === "/api/meta/info") {
       return next();
     }

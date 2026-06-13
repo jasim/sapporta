@@ -1,8 +1,15 @@
 import { z } from "zod";
 import type { SqlClient, OperationResult } from "../introspect/types.js";
 import { rejectDangerousSQL } from "../introspect/sql-safety.js";
-import { buildInsertQuery, validatePayloadColumns } from "../introspect/db-helpers.js";
-import { validateTableName, validateColumnNames, rejectControlChars } from "../introspect/sql-safety.js";
+import {
+  buildInsertQuery,
+  validatePayloadColumns,
+} from "../introspect/db-helpers.js";
+import {
+  validateTableName,
+  validateColumnNames,
+  rejectControlChars,
+} from "../introspect/sql-safety.js";
 
 export const rowsInsertInput = z.object({
   table: z.string().describe("Target table name"),

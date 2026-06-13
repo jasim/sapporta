@@ -21,7 +21,11 @@ pnpm add @sapporta/shared
 `@sapporta/shared/contracts` contains the Zod schemas, wire-shape types, and ts-rest route contracts used by the Sapporta server and UI.
 
 ```ts
-import { uiContract, type TableSchema, type Row } from "@sapporta/shared/contracts";
+import {
+  uiContract,
+  type TableSchema,
+  type Row,
+} from "@sapporta/shared/contracts";
 ```
 
 ### Typed Client Helpers
@@ -42,7 +46,11 @@ const client = createApiClient(uiContract, {
 `@sapporta/shared/filter` owns Sapporta's table filter grammar and serialization helpers.
 
 ```ts
-import { encodeFilters, decodeFilters, type FilterCondition } from "@sapporta/shared/filter";
+import {
+  encodeFilters,
+  decodeFilters,
+  type FilterCondition,
+} from "@sapporta/shared/filter";
 ```
 
 ### Temporal Helpers
@@ -50,7 +58,10 @@ import { encodeFilters, decodeFilters, type FilterCondition } from "@sapporta/sh
 `@sapporta/shared/temporal` contains date/time parsing and serialization helpers used consistently across server validation and UI editing.
 
 ```ts
-import { parseCanonicalInstant, parsePlainDate } from "@sapporta/shared/temporal";
+import {
+  parseCanonicalInstant,
+  parsePlainDate,
+} from "@sapporta/shared/temporal";
 ```
 
 ### Other Utilities

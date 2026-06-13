@@ -1,10 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { Hono } from "hono";
-import {
-  sqliteTable,
-  text,
-  integer,
-} from "drizzle-orm/sqlite-core";
+import { sqliteTable, text, integer } from "drizzle-orm/sqlite-core";
 import { timestamp, money, table } from "./table.js";
 import { Temporal } from "@sapporta/shared/temporal";
 import { schemaApi, extractSchemas, extractSchema } from "./extract.js";
@@ -15,7 +11,9 @@ const accountsTable = sqliteTable("accounts", {
   type: text("type").notNull(),
   balance: integer("balance"),
   active: integer("active", { mode: "boolean" }).default(true),
-  created_at: timestamp("created_at").notNull().$defaultFn(() => Temporal.Now.instant()),
+  created_at: timestamp("created_at")
+    .notNull()
+    .$defaultFn(() => Temporal.Now.instant()),
 });
 
 const accounts = table({
@@ -235,7 +233,9 @@ describe("extractSchemas", () => {
   it("allows meta.columns to override auto-hidden timestamps", () => {
     const customTable = sqliteTable("audit", {
       id: integer("id").primaryKey({ autoIncrement: true }),
-      created_at: timestamp("created_at").notNull().$defaultFn(() => Temporal.Now.instant()),
+      created_at: timestamp("created_at")
+        .notNull()
+        .$defaultFn(() => Temporal.Now.instant()),
     });
     const audit = table({
       drizzle: customTable,
@@ -260,7 +260,9 @@ describe("extractSchemas", () => {
     });
     const lineItemsTable = sqliteTable("line_items", {
       id: integer("id").primaryKey({ autoIncrement: true }),
-      order_id: integer("order_id").notNull().references(() => ordersTable.id),
+      order_id: integer("order_id")
+        .notNull()
+        .references(() => ordersTable.id),
       product: text("product").notNull(),
       quantity: integer("quantity").notNull(),
       created_at: timestamp("created_at"),
@@ -271,9 +273,7 @@ describe("extractSchemas", () => {
       drizzle: ordersTable,
       meta: {
         label: "Orders",
-        children: [
-          { table: "line_items", foreignKey: "order_id" },
-        ],
+        children: [{ table: "line_items", foreignKey: "order_id" }],
       },
     });
     const lineItems = table({

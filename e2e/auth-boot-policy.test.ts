@@ -178,11 +178,9 @@ describe("sapporta init auth template - CORS and health policy", () => {
       { readyPath: "/api/meta/info" },
     );
 
-    const health = await requestJson<unknown>(
-      server.baseUrl,
-      "/health",
-      { expectedStatus: 404 },
-    );
+    const health = await requestJson<unknown>(server.baseUrl, "/health", {
+      expectedStatus: 404,
+    });
     expect(health.status).toBe(404);
   });
 });
@@ -206,7 +204,9 @@ describe("sapporta init auth template - boot validation", () => {
     await buildGeneratedApiProject(project!);
 
     const failure = await expectBuiltServerBootFailure(project!);
-    expect(failure.output.join("")).toContain("Sapporta migrations are not ready");
+    expect(failure.output.join("")).toContain(
+      "Sapporta migrations are not ready",
+    );
     expect(failure.output.join("")).toContain("Pending migration");
     await assertSqliteTableMissing(project!, "boot_ready_tasks");
 

@@ -21,7 +21,11 @@ describe("loadSchemas()", () => {
     const { tables } = await loadSchemas(schemaDir);
     const tableNames = tables.map((t) => t.sqlName);
     expect(tableNames).toContain("accounts");
-    expect(tables.every((t) => typeof t.sqlName === "string" && typeof t.drizzle === "object")).toBe(true);
+    expect(
+      tables.every(
+        (t) => typeof t.sqlName === "string" && typeof t.drizzle === "object",
+      ),
+    ).toBe(true);
   });
 
   it("skips .test.ts files", async () => {

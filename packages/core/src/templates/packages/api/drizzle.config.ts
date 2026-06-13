@@ -20,7 +20,9 @@ function findProjectRoot(startDir: string): string {
     if (existsSync(join(dir, "sapporta.json"))) return dir;
     const parent = dirname(dir);
     if (parent === dir) {
-      throw new Error(`Could not find sapporta.json walking up from ${startDir}`);
+      throw new Error(
+        `Could not find sapporta.json walking up from ${startDir}`,
+      );
     }
     dir = parent;
   }

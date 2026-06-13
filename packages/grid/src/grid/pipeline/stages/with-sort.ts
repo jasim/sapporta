@@ -25,7 +25,10 @@ export function withSort(
     const r = rows[i];
     if (r.kind === "data") {
       const next = rows[i + 1];
-      const rollup = next && next.kind === "rollup" && next.source === r.source ? next : null;
+      const rollup =
+        next && next.kind === "rollup" && next.source === r.source
+          ? next
+          : null;
       groups.push({ lead: r, rollup });
       slots.push({ kind: "data" });
       if (rollup) i++;

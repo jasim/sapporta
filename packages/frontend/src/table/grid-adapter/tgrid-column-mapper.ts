@@ -17,8 +17,6 @@ export type TGridTableColumnMeta = {
   displayType: DisplayType;
 };
 
-
-
 export type TGridColumnMapOptions = {
   table: TableSchema;
   includedColumnNames?: readonly TableColumnName[];

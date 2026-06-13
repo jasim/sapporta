@@ -27,7 +27,11 @@ export function ensureActiveWorkspace(
 
   const firstMembership = findFirstMembership(conn, payload.user.id);
   if (firstMembership) {
-    setActiveWorkspace(conn, payload.session.id, firstMembership.organization_id);
+    setActiveWorkspace(
+      conn,
+      payload.session.id,
+      firstMembership.organization_id,
+    );
     payload.session.activeOrganizationId = firstMembership.organization_id;
     return firstMembership;
   }

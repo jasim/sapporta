@@ -24,7 +24,9 @@ const api = new TsRestApi<SapportaEnv>();
 api.register("createAccount", createAccountRoute, async ({ c, request }) => {
   const db = c.get("db");
   const auth = c.get("auth");
-  const tableDef = accounts as unknown as Parameters<typeof auth.rowSecurity.forTable>[0];
+  const tableDef = accounts as unknown as Parameters<
+    typeof auth.rowSecurity.forTable
+  >[0];
   const input = await auth.rowSecurity
     .forTable(tableDef)
     .insertValues(db, request.body);

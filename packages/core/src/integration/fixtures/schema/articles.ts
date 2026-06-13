@@ -23,7 +23,11 @@ export const articles = table({
     label: "Articles",
     rowScope: "workspaceUserScoped",
     selects: [
-      { type: "select", column: "status", options: ["draft", "published", "archived"] },
+      {
+        type: "select",
+        column: "status",
+        options: ["draft", "published", "archived"],
+      },
     ],
     search: { columns: ["title", "body"] },
   },

@@ -120,15 +120,33 @@ export type TypedValue =
  * the schema.
  */
 export type TypedFilterCondition =
-  | { id: string; column: string; op: ScalarOp; kind: ValueKind; value: TypedValue }
-  | { id: string; column: string; op: ListOp; kind: ValueKind; values: TypedValue[] }
-  | { id: string; column: string; op: NullOp; kind: ValueKind; polarity: Polarity };
+  | {
+      id: string;
+      column: string;
+      op: ScalarOp;
+      kind: ValueKind;
+      value: TypedValue;
+    }
+  | {
+      id: string;
+      column: string;
+      op: ListOp;
+      kind: ValueKind;
+      values: TypedValue[];
+    }
+  | {
+      id: string;
+      column: string;
+      op: NullOp;
+      kind: ValueKind;
+      polarity: Polarity;
+    };
 
 /** Typed version of `FilterParseError` failure codes. */
 export type TypedFilterParseCode =
-  | "bad_value"          // raw string doesn't parse under declared kind
-  | "op_not_applicable"  // operator not allowed on column's kind
-  | "unknown_column";    // column is not on the target table
+  | "bad_value" // raw string doesn't parse under declared kind
+  | "op_not_applicable" // operator not allowed on column's kind
+  | "unknown_column"; // column is not on the target table
 
 /** Thrown by `parseFilters` and `parseFilterValue` on typed-boundary
  *  failures. The server wraps these into `QueryParseError` with the same
@@ -263,7 +281,13 @@ export function parseFilters(
       case "in":
       case "nin": {
         const values = cond.values.map((v) => parseFilterValue(kind, v));
-        out.push({ id: cond.id, column: cond.column, op: cond.op, kind, values });
+        out.push({
+          id: cond.id,
+          column: cond.column,
+          op: cond.op,
+          kind,
+          values,
+        });
         break;
       }
       case "is":
@@ -277,7 +301,13 @@ export function parseFilters(
         break;
       default: {
         const value = parseFilterValue(kind, cond.value);
-        out.push({ id: cond.id, column: cond.column, op: cond.op, kind, value });
+        out.push({
+          id: cond.id,
+          column: cond.column,
+          op: cond.op,
+          kind,
+          value,
+        });
       }
     }
   }
@@ -468,5 +498,7 @@ export function normalizeFilters(
 ): FilterCondition[] {
   if (!init) return [];
   if (Array.isArray(init)) return init;
-  return Object.entries(init).map(([column, value]) => eqCondition(column, value));
+  return Object.entries(init).map(([column, value]) =>
+    eqCondition(column, value),
+  );
 }

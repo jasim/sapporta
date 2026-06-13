@@ -104,7 +104,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     }),
 }));
 
-function authFailureState(err: unknown): Pick<AuthState, "status" | "context" | "error"> {
+function authFailureState(
+  err: unknown,
+): Pick<AuthState, "status" | "context" | "error"> {
   const code = errorCode(err);
   if (code === "unauthenticated") {
     return { status: "unauthenticated", context: null, error: null };

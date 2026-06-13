@@ -28,13 +28,17 @@ export function assertValidInteraction(
       interaction.activeCell.keyboard.arrows.tabular !== "grid" &&
       interaction.activeCell.keyboard.arrows.tabular !== "field-list"
     ) {
-      throw new Error("cell-grid interaction has an invalid tabular arrow policy.");
+      throw new Error(
+        "cell-grid interaction has an invalid tabular arrow policy.",
+      );
     }
     if (
       interaction.activeCell.keyboard.arrows.cards !== "grid" &&
       interaction.activeCell.keyboard.arrows.cards !== "field-list"
     ) {
-      throw new Error("cell-grid interaction has an invalid cards arrow policy.");
+      throw new Error(
+        "cell-grid interaction has an invalid cards arrow policy.",
+      );
     }
     return;
   }
@@ -49,6 +53,8 @@ export function assertValidInteraction(
     interaction.activeRow.keyboard.expansion !== "left-right-enter" &&
     interaction.activeRow.keyboard.expansion !== "none"
   ) {
-    throw new Error("row-list interaction has an invalid expansion key policy.");
+    throw new Error(
+      "row-list interaction has an invalid expansion key policy.",
+    );
   }
 }

@@ -41,7 +41,9 @@ describe("renderChain()", () => {
   });
 
   it("renders entries with the level→rowKey notation", () => {
-    expect(renderChain([{ levelName: "orders", rowKey: "O1" }])).toBe("[orders→O1]");
+    expect(renderChain([{ levelName: "orders", rowKey: "O1" }])).toBe(
+      "[orders→O1]",
+    );
     expect(
       renderChain([
         { levelName: "orders", rowKey: "O1" },

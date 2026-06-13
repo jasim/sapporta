@@ -6,7 +6,9 @@ import { z } from "zod";
  * A request has one active workspace. Roles describe the user's membership in
  * that workspace; a user may have a different role in another workspace.
  */
-export const authRoleSchema = z.enum(["owner", "member"]).meta({ id: "AuthRole" });
+export const authRoleSchema = z
+  .enum(["owner", "member"])
+  .meta({ id: "AuthRole" });
 export type AuthRole = z.output<typeof authRoleSchema>;
 
 export const authCurrentUserSchema = z
@@ -70,7 +72,9 @@ export const switchActiveWorkspaceBodySchema = z
     workspaceId: z.string(),
   })
   .meta({ id: "SwitchActiveWorkspaceBody" });
-export type SwitchActiveWorkspaceBody = z.output<typeof switchActiveWorkspaceBodySchema>;
+export type SwitchActiveWorkspaceBody = z.output<
+  typeof switchActiveWorkspaceBodySchema
+>;
 
 /**
  * Metadata for an agent access token.
@@ -98,7 +102,9 @@ export const authTokenListResponseSchema = z
     tokens: z.array(authTokenSchema),
   })
   .meta({ id: "AuthTokenListResponse" });
-export type AuthTokenListResponse = z.output<typeof authTokenListResponseSchema>;
+export type AuthTokenListResponse = z.output<
+  typeof authTokenListResponseSchema
+>;
 
 export const createAuthTokenBodySchema = z
   .object({
@@ -121,4 +127,6 @@ export const createAuthTokenResponseSchema = z
     rawToken: z.string(),
   })
   .meta({ id: "CreateAuthTokenResponse" });
-export type CreateAuthTokenResponse = z.output<typeof createAuthTokenResponseSchema>;
+export type CreateAuthTokenResponse = z.output<
+  typeof createAuthTokenResponseSchema
+>;

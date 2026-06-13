@@ -10,15 +10,22 @@ const baseSnapshot: LevelSnapshot = {
 
 describe("levelStatusBandModel", () => {
   it("returns null when status is ready", () => {
-    expect(levelStatusBandModel({ ...baseSnapshot, status: "ready" }, "rows")).toBeNull();
+    expect(
+      levelStatusBandModel({ ...baseSnapshot, status: "ready" }, "rows"),
+    ).toBeNull();
   });
 
   it("returns null when status is idle", () => {
-    expect(levelStatusBandModel({ ...baseSnapshot, status: "idle" }, "rows")).toBeNull();
+    expect(
+      levelStatusBandModel({ ...baseSnapshot, status: "idle" }, "rows"),
+    ).toBeNull();
   });
 
   it("loading without pagination uses the bare form", () => {
-    const m = levelStatusBandModel({ ...baseSnapshot, status: "loading" }, "rows");
+    const m = levelStatusBandModel(
+      { ...baseSnapshot, status: "loading" },
+      "rows",
+    );
     expect(m).toEqual({ kind: "loading", text: "Loading rows…" });
   });
 
@@ -32,7 +39,10 @@ describe("levelStatusBandModel", () => {
       "orders",
     );
     // 137 / 25 → 6 pages.
-    expect(m).toEqual({ kind: "loading", text: "Loading orders, page 2 of 6…" });
+    expect(m).toEqual({
+      kind: "loading",
+      text: "Loading orders, page 2 of 6…",
+    });
   });
 
   it("loading with totalCount=0 still renders 1 total page", () => {
@@ -68,14 +78,20 @@ describe("levelStatusBandModel", () => {
       },
       "rows",
     );
-    expect(m).toEqual({ kind: "error", text: "Failed to load rows: connection refused" });
+    expect(m).toEqual({
+      kind: "error",
+      text: "Failed to load rows: connection refused",
+    });
   });
 
   it("error without an Error instance still renders a band", () => {
     // Defensive guard: shape is determined by `status === 'error'` alone,
     // not by the presence of `error`. The framing is still emitted; the
     // verbatim portion is empty.
-    const m = levelStatusBandModel({ ...baseSnapshot, status: "error" }, "rows");
+    const m = levelStatusBandModel(
+      { ...baseSnapshot, status: "error" },
+      "rows",
+    );
     expect(m).toEqual({ kind: "error", text: "Failed to load rows: " });
   });
 });

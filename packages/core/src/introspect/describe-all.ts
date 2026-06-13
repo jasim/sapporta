@@ -61,7 +61,8 @@ export function dbDescribeAll(sqlite: Database.Database): OperationResult {
       if (col.is_unique === "YES") flags.push("UNIQUE");
       if (col.is_nullable === "NO") flags.push("NOT NULL");
       if (col.column_default) flags.push(`DEFAULT ${col.column_default}`);
-      if (col.foreign_table) flags.push(`FK → ${col.foreign_table}.${col.foreign_column}`);
+      if (col.foreign_table)
+        flags.push(`FK → ${col.foreign_table}.${col.foreign_column}`);
       const flagStr = flags.length > 0 ? ` (${flags.join(", ")})` : "";
       lines.push(`  ${col.column_name}: ${col.data_type}${flagStr}`);
     }

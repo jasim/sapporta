@@ -162,7 +162,9 @@ export class CachedValueLookup<TValue extends LookupValue = LookupValue>
     this.loadingEntriesByValueKey.clear();
   }
 
-  private async loadAndStoreEntries(keysToLoad: readonly string[]): Promise<void> {
+  private async loadAndStoreEntries(
+    keysToLoad: readonly string[],
+  ): Promise<void> {
     try {
       const entries = await this.loadEntriesForValues(keysToLoad);
       const changed = this.setEntries(entries);

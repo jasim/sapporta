@@ -134,7 +134,13 @@ describe("keyEventToCellIntent", () => {
       ),
     ).toBe(null);
     expect(
-      keyEventToCellIntent(ev("Escape"), editing, displayed, cols, capabilitiesFor),
+      keyEventToCellIntent(
+        ev("Escape"),
+        editing,
+        displayed,
+        cols,
+        capabilitiesFor,
+      ),
     ).toBe(null);
   });
 
@@ -151,10 +157,22 @@ describe("keyEventToCellIntent", () => {
 
   it("ignores edit-trigger keys when there is no live focus", () => {
     expect(
-      keyEventToCellIntent(ev("F2"), baseState, displayed, cols, capabilitiesFor),
+      keyEventToCellIntent(
+        ev("F2"),
+        baseState,
+        displayed,
+        cols,
+        capabilitiesFor,
+      ),
     ).toBe(null);
     expect(
-      keyEventToCellIntent(ev("a"), baseState, displayed, cols, capabilitiesFor),
+      keyEventToCellIntent(
+        ev("a"),
+        baseState,
+        displayed,
+        cols,
+        capabilitiesFor,
+      ),
     ).toBe(null);
   });
 
@@ -383,7 +401,13 @@ describe("keyEventToCellIntent", () => {
       ),
     ).toBe(null);
     expect(
-      keyEventToCellIntent(ev("z"), focusAt("open", "a"), d, cols, capabilitiesFor),
+      keyEventToCellIntent(
+        ev("z"),
+        focusAt("open", "a"),
+        d,
+        cols,
+        capabilitiesFor,
+      ),
     ).toBe(null);
   });
 

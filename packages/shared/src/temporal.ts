@@ -131,7 +131,9 @@ export function parseDateTimeLocalInputToCanonicalInstantString(
   });
   return formatCanonicalInstant(
     localDateTime
-      .toZonedDateTime(Temporal.Now.timeZoneId(), { disambiguation: "compatible" })
+      .toZonedDateTime(Temporal.Now.timeZoneId(), {
+        disambiguation: "compatible",
+      })
       .toInstant(),
   );
 }

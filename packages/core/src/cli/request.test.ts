@@ -18,9 +18,13 @@ describe("buildRequest", () => {
   };
 
   it("uses --input-body-json as the request body for mutating commands", () => {
-    const req = buildRequest(postRoute, {}, {
-      "input-body-json": '{"sql":"SELECT * FROM accounts","limit":50}',
-    });
+    const req = buildRequest(
+      postRoute,
+      {},
+      {
+        "input-body-json": '{"sql":"SELECT * FROM accounts","limit":50}',
+      },
+    );
 
     expect(req.body).toEqual({
       sql: "SELECT * FROM accounts",
@@ -39,11 +43,15 @@ describe("buildRequest", () => {
       extractData: () => [],
     };
 
-    const req = buildRequest(getRoute, { table: "accounts" }, {
-      "output-format": "json",
-      "input-body-json": '{"ignored":true}',
-      limit: "25",
-    });
+    const req = buildRequest(
+      getRoute,
+      { table: "accounts" },
+      {
+        "output-format": "json",
+        "input-body-json": '{"ignored":true}',
+        limit: "25",
+      },
+    );
 
     expect(req.queryParams).toEqual({ limit: "25" });
   });
@@ -59,19 +67,27 @@ describe("buildRequest", () => {
       extractData: () => [],
     };
 
-    const req = buildRequest(getRoute, { table: "customers" }, {
-      "api-token": "secret-token",
-      limit: "10",
-    });
+    const req = buildRequest(
+      getRoute,
+      { table: "customers" },
+      {
+        "api-token": "secret-token",
+        limit: "10",
+      },
+    );
 
     expect(req.queryParams).toEqual({ limit: "10" });
   });
 
   it("does not forward --api-token into schema-built request bodies", () => {
-    const req = buildRequest(postRoute, {}, {
-      "api-token": "secret-token",
-      sql: "SELECT 1",
-    });
+    const req = buildRequest(
+      postRoute,
+      {},
+      {
+        "api-token": "secret-token",
+        sql: "SELECT 1",
+      },
+    );
 
     expect(req.body).toEqual({ sql: "SELECT 1" });
   });

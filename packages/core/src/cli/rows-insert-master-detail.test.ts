@@ -14,7 +14,9 @@ import type { SqlClient } from "../introspect/types.js";
  * nested transaction semantics. The transaction SqlClient passed to the
  * callback also carries the sqlite handle's native methods.
  */
-function createTestSql(sqlite: Database.Database): SqlClient & Database.Database {
+function createTestSql(
+  sqlite: Database.Database,
+): SqlClient & Database.Database {
   const extended = sqlite as any;
   extended.unsafe = (query: string, params?: any[]) => {
     return Promise.resolve(sqlite.prepare(query).all(...(params ?? [])));
@@ -69,7 +71,8 @@ describe("rows insert-master-detail", () => {
       "master-table": "orders",
       "master-data": '{"customer":"Alice"}',
       "detail-table": "order_items",
-      "detail-data": '[{"product":"Widget","quantity":3},{"product":"Gadget","quantity":1}]',
+      "detail-data":
+        '[{"product":"Widget","quantity":3},{"product":"Gadget","quantity":1}]',
       "detail-fk": "order_id",
     });
 
@@ -77,7 +80,9 @@ describe("rows insert-master-detail", () => {
     expect(orders).toHaveLength(1);
     expect(orders[0].customer).toBe("Alice");
 
-    const items = sqlite.prepare("SELECT * FROM order_items ORDER BY id").all() as any[];
+    const items = sqlite
+      .prepare("SELECT * FROM order_items ORDER BY id")
+      .all() as any[];
     expect(items).toHaveLength(2);
     expect(items[0].order_id).toBe(1);
     expect(items[0].product).toBe("Widget");

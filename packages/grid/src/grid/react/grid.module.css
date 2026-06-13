@@ -59,18 +59,21 @@
   min-width: 0;
 }
 
-:where(.root[data-grid-presentation="cards"]) [data-grid-part="row-field-label"] {
+:where(.root[data-grid-presentation="cards"])
+  [data-grid-part="row-field-label"] {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-:where(.root[data-grid-presentation="cards"]) [data-grid-part="row-field-cell"] {
+:where(.root[data-grid-presentation="cards"])
+  [data-grid-part="row-field-cell"] {
   min-width: 0;
 }
 
-:where(.root[data-grid-presentation="cards"]) [data-grid-part="row-field-cell"]
+:where(.root[data-grid-presentation="cards"])
+  [data-grid-part="row-field-cell"]
   > [data-grid-part="cell"] {
   min-height: 0;
 }

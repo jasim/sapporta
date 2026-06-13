@@ -82,7 +82,10 @@ export interface GridControllerPublicVerbs {
   clearRowSelection: () => void;
   // host I/O — stable; bound once to DOM by Grid.tsx. Returns true if the
   // event was consumed (caller should preventDefault), false otherwise.
-  handleKey: (e: KeyboardEvent, presentation?: CellKeyboardPresentation) => boolean;
+  handleKey: (
+    e: KeyboardEvent,
+    presentation?: CellKeyboardPresentation,
+  ) => boolean;
   // Explicit viewport reveal. This is deliberately not part of cursor
   // placement: pointer clicks should be able to move focus without moving
   // visible content, while keyboard-style navigation can reveal its resolved

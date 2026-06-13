@@ -102,7 +102,9 @@ invoices" query just because the route checked an owner role.
 For user-owned invoices:
 
 ```ts
-meta: { rowScope: "workspaceUserScoped" }
+meta: {
+  rowScope: "workspaceUserScoped";
+}
 ```
 
 That table must have both:
@@ -366,46 +368,58 @@ For user-owned rows such as `workspaceUserScoped` invoices:
 ```ts
 import { scopedRows } from "@sapporta/server";
 
-api.register("createInvoice", contract.createInvoice, async ({ c, request }) => {
-  const db = c.get("db");
-  const auth = projectAuth.requireAuthorizedWorkspaceUserData(c, {
-    action: "create",
-    subject: "invoices",
-  });
-  const rows = scopedRows(db, auth, invoices);
+api.register(
+  "createInvoice",
+  contract.createInvoice,
+  async ({ c, request }) => {
+    const db = c.get("db");
+    const auth = projectAuth.requireAuthorizedWorkspaceUserData(c, {
+      action: "create",
+      subject: "invoices",
+    });
+    const rows = scopedRows(db, auth, invoices);
 
-  const created = await rows.create(request.body);
-  return { status: 201, body: { data: created } };
-});
+    const created = await rows.create(request.body);
+    return { status: 201, body: { data: created } };
+  },
+);
 ```
 
 For workspace-wide shared rows such as `workspaceGlobal` customers:
 
 ```ts
-api.register("createCustomer", contract.createCustomer, async ({ c, request }) => {
-  const auth = projectAuth.requireAuthorizedWorkspaceData(c, {
-    action: "create",
-    subject: "customers",
-  });
-  const rows = scopedRows(c.get("db"), auth, customers);
+api.register(
+  "createCustomer",
+  contract.createCustomer,
+  async ({ c, request }) => {
+    const auth = projectAuth.requireAuthorizedWorkspaceData(c, {
+      action: "create",
+      subject: "customers",
+    });
+    const rows = scopedRows(c.get("db"), auth, customers);
 
-  const created = await rows.create(request.body);
-  return { status: 201, body: { data: created } };
-});
+    const created = await rows.create(request.body);
+    return { status: 201, body: { data: created } };
+  },
+);
 ```
 
 For installation-wide reference rows such as `systemGlobal` countries:
 
 ```ts
-api.register("listCountries", contract.listCountries, async ({ c, request }) => {
-  const auth = projectAuth.requireAuthorizedSystemData(c, {
-    action: "read",
-    subject: "countries",
-  });
-  const rows = scopedRows(c.get("db"), auth, countries);
+api.register(
+  "listCountries",
+  contract.listCountries,
+  async ({ c, request }) => {
+    const auth = projectAuth.requireAuthorizedSystemData(c, {
+      action: "read",
+      subject: "countries",
+    });
+    const rows = scopedRows(c.get("db"), auth, countries);
 
-  return { status: 200, body: await rows.list(request.query) };
-});
+    return { status: 200, body: await rows.list(request.query) };
+  },
+);
 ```
 
 For browser-only workflows, such as token management or profile settings that
@@ -435,17 +449,21 @@ row, create rows, update a row, delete a row, power a lookup, count child rows,
 or export rows. This is the path generated `/api/tables/*` routes use.
 
 ```ts
-api.register("listMyInvoices", contract.listMyInvoices, async ({ c, request }) => {
-  const db = c.get("db");
-  const auth = projectAuth.requireAuthorizedWorkspaceUserData(c, {
-    action: "read",
-    subject: "invoices",
-  });
-  const rows = scopedRows(db, auth, invoices);
+api.register(
+  "listMyInvoices",
+  contract.listMyInvoices,
+  async ({ c, request }) => {
+    const db = c.get("db");
+    const auth = projectAuth.requireAuthorizedWorkspaceUserData(c, {
+      action: "read",
+      subject: "invoices",
+    });
+    const rows = scopedRows(db, auth, invoices);
 
-  const result = await rows.list(request.query);
-  return { status: 200, body: result };
-});
+    const result = await rows.list(request.query);
+    return { status: 200, body: result };
+  },
+);
 
 api.register("getInvoice", contract.getInvoice, async ({ c, request }) => {
   const auth = projectAuth.requireAuthorizedWorkspaceUserData(c, {
@@ -469,16 +487,20 @@ api.register("voidInvoice", contract.voidInvoice, async ({ c, request }) => {
   return { status: 200, body: { data: invoice } };
 });
 
-api.register("deleteInvoice", contract.deleteInvoice, async ({ c, request }) => {
-  const auth = projectAuth.requireAuthorizedWorkspaceUserData(c, {
-    action: "delete",
-    subject: "invoices",
-  });
-  const rows = scopedRows(c.get("db"), auth, invoices);
+api.register(
+  "deleteInvoice",
+  contract.deleteInvoice,
+  async ({ c, request }) => {
+    const auth = projectAuth.requireAuthorizedWorkspaceUserData(c, {
+      action: "delete",
+      subject: "invoices",
+    });
+    const rows = scopedRows(c.get("db"), auth, invoices);
 
-  const deleted = await rows.delete(request.params.id);
-  return { status: 200, body: { data: deleted } };
-});
+    const deleted = await rows.delete(request.params.id);
+    return { status: 200, body: { data: deleted } };
+  },
+);
 ```
 
 `scopedRows()` owns the boring but security-sensitive details:
@@ -626,32 +648,36 @@ The route inserts the invoice first, then inserts the lines with
 `invoice_id` supplied as a trusted server value:
 
 ```ts
-api.register("createInvoice", contract.createInvoice, async ({ c, request }) => {
-  const db = c.get("db");
-  const auth = projectAuth.requireAuthorizedWorkspaceUserData(c, {
-    action: "create",
-    subject: "invoice_workflow",
-  });
-  const invoiceGuard = auth.rowSecurity.forTable(invoices);
-  const lineGuard = auth.rowSecurity.forTable(invoiceLines);
+api.register(
+  "createInvoice",
+  contract.createInvoice,
+  async ({ c, request }) => {
+    const db = c.get("db");
+    const auth = projectAuth.requireAuthorizedWorkspaceUserData(c, {
+      action: "create",
+      subject: "invoice_workflow",
+    });
+    const invoiceGuard = auth.rowSecurity.forTable(invoices);
+    const lineGuard = auth.rowSecurity.forTable(invoiceLines);
 
-  const created = await db.transaction(async (tx) => {
-    const invoice = await tx
-      .insert(invoicesTable)
-      .values(await invoiceGuard.insertValues(tx, request.body.invoice))
-      .returning()
-      .get();
+    const created = await db.transaction(async (tx) => {
+      const invoice = await tx
+        .insert(invoicesTable)
+        .values(await invoiceGuard.insertValues(tx, request.body.invoice))
+        .returning()
+        .get();
 
-    const lines = await lineGuard.insertManyValues(tx, request.body.lines, {
-      serverValues: () => ({ invoice_id: invoice.id }),
+      const lines = await lineGuard.insertManyValues(tx, request.body.lines, {
+        serverValues: () => ({ invoice_id: invoice.id }),
+      });
+
+      await tx.insert(invoiceLinesTable).values(lines);
+      return { invoice, lines };
     });
 
-    await tx.insert(invoiceLinesTable).values(lines);
-    return { invoice, lines };
-  });
-
-  return { status: 201, body: { data: created } };
-});
+    return { status: 201, body: { data: created } };
+  },
+);
 ```
 
 Both tables are `workspaceUserScoped` because the invoice header and detail rows
@@ -667,7 +693,7 @@ boundary, FK validation fails even if that primary key exists.
 Prefer Drizzle `.references()` when the database has a physical FK:
 
 ```ts
-customer_id: integer("customer_id").references(() => customersTable.id)
+customer_id: integer("customer_id").references(() => customersTable.id);
 ```
 
 Use `meta.references` for logical FKs or to refine policy:
@@ -817,7 +843,9 @@ membership summary, role, and owner boolean.
 `POST /api/auth-context/active-workspace` accepts:
 
 ```ts
-{ workspaceId: string }
+{
+  workspaceId: string;
+}
 ```
 
 It verifies membership before updating the active workspace for the session and

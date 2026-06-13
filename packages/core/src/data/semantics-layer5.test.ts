@@ -14,7 +14,11 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { sqliteTable, integer, text as drizzleText } from "drizzle-orm/sqlite-core";
+import {
+  sqliteTable,
+  integer,
+  text as drizzleText,
+} from "drizzle-orm/sqlite-core";
 import { table } from "../schema/table.js";
 import type { TableDef } from "../schema/table.js";
 import { timestamp, date } from "../schema/columns.js";
@@ -22,7 +26,10 @@ import { parseQuery } from "./query-parser.js";
 import { scopedRows } from "./scoped-rows.js";
 import { createTestDb } from "../testing/test-utils.js";
 import { createTestAuthContext } from "../testing/auth-context.js";
-import { parsePlainDate, parseCanonicalInstant } from "@sapporta/shared/temporal";
+import {
+  parsePlainDate,
+  parseCanonicalInstant,
+} from "@sapporta/shared/temporal";
 import { QueryParseError } from "../db/errors.js";
 
 // §2 — Strict calendar validity (exercised through the boundary parse)
@@ -47,10 +54,7 @@ describe("strict calendar validity", () => {
 
     // Impossible date routed through the server's filter parse → 400.
     expect(() =>
-      parseQuery(
-        { "filter[occurred_on][eq]": "2024-02-30" },
-        events_def,
-      ),
+      parseQuery({ "filter[occurred_on][eq]": "2024-02-30" }, events_def),
     ).toThrow(QueryParseError);
   });
 });
@@ -77,7 +81,9 @@ describe("REAL money arithmetic", () => {
     sqlite.exec(`CREATE TABLE t (v REAL NOT NULL)`);
     const insert = sqlite.prepare(`INSERT INTO t (v) VALUES (?)`);
     for (let i = 0; i < 10000; i++) insert.run(0.01);
-    const row = sqlite.prepare(`SELECT SUM(v) AS s FROM t`).get() as { s: number };
+    const row = sqlite.prepare(`SELECT SUM(v) AS s FROM t`).get() as {
+      s: number;
+    };
     expect(Math.abs(row.s - 100)).toBeLessThan(1e-6);
   });
 });
@@ -110,7 +116,9 @@ describe("LIKE escaping — user wildcards match literally", () => {
     rows: ReturnType<typeof rowsFor>,
     query: string,
   ): Promise<string[]> {
-    const body = await rows.list(Object.fromEntries(new URLSearchParams(query)));
+    const body = await rows.list(
+      Object.fromEntries(new URLSearchParams(query)),
+    );
     return body.data.map((row) => String(row.name));
   }
 
@@ -177,7 +185,10 @@ describe("timestamp precision normalization", () => {
   });
 });
 
-function rowsFor(db: ReturnType<typeof createTestDb>["db"], tableDef: TableDef) {
+function rowsFor(
+  db: ReturnType<typeof createTestDb>["db"],
+  tableDef: TableDef,
+) {
   return scopedRows(
     db,
     createTestAuthContext({ tables: [tableDef] }),

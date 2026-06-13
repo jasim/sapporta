@@ -86,9 +86,7 @@ export function normalizeDataType(col: {
  *   Postgres: PgTimestamp (default mode) returns Date objects
  *   SQLite:   SQLiteTimestamp (mode: "timestamp") returns Date objects
  */
-export function isDateObjectMode(col: {
-  columnType: string;
-}): boolean {
+export function isDateObjectMode(col: { columnType: string }): boolean {
   // PgTimestamp is the default-mode Postgres timestamp — returns Date objects.
   // PgTimestampString is the string-mode variant — returns ISO strings (safe).
   if (col.columnType === "PgTimestamp") return true;

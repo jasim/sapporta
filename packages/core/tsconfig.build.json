@@ -3,5 +3,11 @@
 // a clean dist with only production code.
 {
   "extends": "./tsconfig.json",
-  "exclude": ["src/**/*.test.ts", "src/integration/**", "src/test-fixtures/**", "src/templates/**", "dist"]
+  "exclude": [
+    "src/**/*.test.ts",
+    "src/integration/**",
+    "src/test-fixtures/**",
+    "src/templates/**",
+    "dist"
+  ]
 }

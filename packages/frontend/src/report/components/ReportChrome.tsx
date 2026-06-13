@@ -18,7 +18,12 @@ export function ReportScreenFrame({
 }: ReportScreenFrameProps) {
   return (
     <div className="flex h-full flex-col overflow-hidden">
-      <TopBar section="Reports" title={title} subtitle={subtitle} actions={actions} />
+      <TopBar
+        section="Reports"
+        title={title}
+        subtitle={subtitle}
+        actions={actions}
+      />
       {children}
     </div>
   );
@@ -35,7 +40,9 @@ export function ReportToolbar({ children, actions }: ReportToolbarProps) {
       <div className="flex min-w-0 flex-wrap items-center gap-x-5 gap-y-2">
         {children}
       </div>
-      {actions ? <div className="flex items-center gap-2">{actions}</div> : null}
+      {actions ? (
+        <div className="flex items-center gap-2">{actions}</div>
+      ) : null}
     </div>
   );
 }

@@ -15,8 +15,5 @@
   },
   "include": ["src"],
   "exclude": ["src/templates"],
-  "references": [
-    { "path": "../shared" },
-    { "path": "../honest" }
-  ]
+  "references": [{ "path": "../shared" }, { "path": "../honest" }]
 }

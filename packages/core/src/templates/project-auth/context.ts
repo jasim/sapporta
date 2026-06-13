@@ -12,7 +12,11 @@ import {
   type SapportaEnv,
   type TableCatalog,
 } from "@sapporta/server";
-import type { AppAbility, AppPrincipal, AppWorkspaceMembership } from "../authz/types.js";
+import type {
+  AppAbility,
+  AppPrincipal,
+  AppWorkspaceMembership,
+} from "../authz/types.js";
 import type { BetterAuthSessionApi } from "./better-auth.js";
 import {
   ensureActiveWorkspace,
@@ -20,10 +24,7 @@ import {
   type WorkspaceMembershipRow,
 } from "./workspace.js";
 import { authFailure } from "./errors.js";
-import {
-  resolveBearerTokenPrincipal,
-  TokenAuthError,
-} from "./auth-tokens.js";
+import { resolveBearerTokenPrincipal, TokenAuthError } from "./auth-tokens.js";
 
 export type ResolveRequestDataAuthority = (input: {
   principal: AppPrincipal;
@@ -76,7 +77,11 @@ export interface ResolveSapportaAuthContextInput {
 export async function resolveSapportaAuthContext(
   input: ResolveSapportaAuthContextInput,
 ): Promise<SapportaAuthContext<AppAbility, AppWorkspaceMembership>> {
-  const principal = await resolvePrincipal(input.auth, input.conn, input.headers);
+  const principal = await resolvePrincipal(
+    input.auth,
+    input.conn,
+    input.headers,
+  );
   const dataAuthority = await input.resolveRequestDataAuthority({
     principal,
     c: input.c,
@@ -167,7 +172,8 @@ export function userFromSessionPayload(
 export function membershipFromRow(
   row: WorkspaceMembershipRow,
 ): AppWorkspaceMembership {
-  const role = row.role === "owner" || row.role === "admin" ? "owner" : "member";
+  const role =
+    row.role === "owner" || row.role === "admin" ? "owner" : "member";
   return {
     id: row.member_id,
     workspace: {

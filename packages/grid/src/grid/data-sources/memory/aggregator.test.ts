@@ -9,7 +9,12 @@ const node = (cols: Record<string, unknown>): TreeNode => ({
 
 describe("sumBy", () => {
   it("sums numeric values", () => {
-    expect(sumBy([node({ amount: 1 }), node({ amount: 2 }), node({ amount: 3 })], "amount")).toBe(6);
+    expect(
+      sumBy(
+        [node({ amount: 1 }), node({ amount: 2 }), node({ amount: 3 })],
+        "amount",
+      ),
+    ).toBe(6);
   });
 
   it("returns 0 over an empty set", () => {
@@ -17,7 +22,9 @@ describe("sumBy", () => {
   });
 
   it("coerces numeric strings", () => {
-    expect(sumBy([node({ amount: "10" }), node({ amount: "20" })], "amount")).toBe(30);
+    expect(
+      sumBy([node({ amount: "10" }), node({ amount: "20" })], "amount"),
+    ).toBe(30);
   });
 
   it("skips null, undefined, NaN, empty strings, and non-numeric strings", () => {
@@ -36,7 +43,12 @@ describe("sumBy", () => {
 
 describe("avgBy", () => {
   it("averages numeric values", () => {
-    expect(avgBy([node({ amount: 2 }), node({ amount: 4 }), node({ amount: 6 })], "amount")).toBe(4);
+    expect(
+      avgBy(
+        [node({ amount: 2 }), node({ amount: 4 }), node({ amount: 6 })],
+        "amount",
+      ),
+    ).toBe(4);
   });
 
   it("returns null on an empty set rather than 0 or NaN", () => {
@@ -44,10 +56,17 @@ describe("avgBy", () => {
   });
 
   it("returns null when no finite values are present", () => {
-    expect(avgBy([node({ amount: null }), node({ amount: "abc" })], "amount")).toBeNull();
+    expect(
+      avgBy([node({ amount: null }), node({ amount: "abc" })], "amount"),
+    ).toBeNull();
   });
 
   it("ignores non-numeric values when computing the denominator", () => {
-    expect(avgBy([node({ amount: 2 }), node({ amount: null }), node({ amount: 6 })], "amount")).toBe(4);
+    expect(
+      avgBy(
+        [node({ amount: 2 }), node({ amount: null }), node({ amount: 6 })],
+        "amount",
+      ),
+    ).toBe(4);
   });
 });

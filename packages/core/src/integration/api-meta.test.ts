@@ -25,7 +25,13 @@ describe("/api/meta", () => {
       expect(body.tables).toHaveLength(5);
 
       const names = body.tables.map((t: any) => t.name).sort();
-      expect(names).toEqual(["accounts", "agents", "articles", "audit_log", "journal_entries"]);
+      expect(names).toEqual([
+        "accounts",
+        "agents",
+        "articles",
+        "audit_log",
+        "journal_entries",
+      ]);
 
       const accounts = body.tables.find((t: any) => t.name === "accounts");
       expect(accounts.label).toBe("Accounts");
@@ -50,9 +56,13 @@ describe("/api/meta", () => {
 
       const typeCol = body.columns.find((c: any) => c.name === "type");
       expect(typeCol.select).toBeDefined();
-      expect(typeCol.select.options).toEqual(
-        ["asset", "liability", "equity", "revenue", "expense"],
-      );
+      expect(typeCol.select.options).toEqual([
+        "asset",
+        "liability",
+        "equity",
+        "revenue",
+        "expense",
+      ]);
     });
 
     it("GET /api/meta/tables/nonexistent returns 404", async () => {
@@ -73,7 +83,10 @@ describe("/api/meta", () => {
     });
 
     it("GET /api/meta/tables/accounts/sample returns sample rows", async () => {
-      await postJson("/api/tables/accounts", { name: "SampleAccount", type: "asset" });
+      await postJson("/api/tables/accounts", {
+        name: "SampleAccount",
+        type: "asset",
+      });
 
       const res = await request("/api/meta/tables/accounts/sample");
       expect(res.status).toBe(200);
@@ -93,7 +106,10 @@ describe("/api/meta", () => {
 
   describe("SQL proxy", () => {
     it("POST /api/meta/sql runs a SELECT", async () => {
-      await postJson("/api/tables/accounts", { name: "SQLTestAccount", type: "equity" });
+      await postJson("/api/tables/accounts", {
+        name: "SQLTestAccount",
+        type: "equity",
+      });
 
       const res = await postJson("/api/meta/sql", {
         sql: "SELECT name, type FROM accounts WHERE type = 'equity'",

@@ -1,10 +1,6 @@
 import { useMemo } from "react";
 import { Outlet } from "react-router-dom";
-import {
-  DesktopSidebar,
-  MobileBottomNav,
-  NavigationRail,
-} from "./Sidebar";
+import { DesktopSidebar, MobileBottomNav, NavigationRail } from "./Sidebar";
 import { useSchemaStore } from "@/schema-catalog/state/schema-store";
 import type { TableSchema } from "@sapporta/shared/contracts";
 import { Database } from "lucide-react";

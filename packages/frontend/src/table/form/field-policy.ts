@@ -7,7 +7,9 @@ export const SYSTEM_MANAGED_SCOPE_FIELD_NAMES = [
   "scopedToUserId",
 ] as const;
 
-const SYSTEM_MANAGED_SCOPE_FIELDS = new Set<string>(SYSTEM_MANAGED_SCOPE_FIELD_NAMES);
+const SYSTEM_MANAGED_SCOPE_FIELDS = new Set<string>(
+  SYSTEM_MANAGED_SCOPE_FIELD_NAMES,
+);
 
 export function isSystemManagedScopeField(name: string): boolean {
   return SYSTEM_MANAGED_SCOPE_FIELDS.has(name);

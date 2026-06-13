@@ -57,7 +57,9 @@ export class AuthPayloadPolicyError extends Error {
   public readonly errors: readonly ValidationErrorDetail[];
 
   constructor(errors: readonly ValidationErrorDetail[]) {
-    super(`Auth payload policy failed: ${errors.map((error) => `${error.field}: ${error.message}`).join(", ")}`);
+    super(
+      `Auth payload policy failed: ${errors.map((error) => `${error.field}: ${error.message}`).join(", ")}`,
+    );
     this.name = "AuthPayloadPolicyError";
     this.errors = errors;
   }
@@ -83,7 +85,9 @@ interface DrizzleReferenceFact {
  * reference metadata. It returns structured issues instead of throwing so boot
  * code can aggregate every schema problem in one pass.
  */
-export function checkAuthSchemaDefinitions(tables: readonly TableDef[]): AuthSchemaIssue[] {
+export function checkAuthSchemaDefinitions(
+  tables: readonly TableDef[],
+): AuthSchemaIssue[] {
   const issues: AuthSchemaIssue[] = [];
 
   for (const table of tables) {
@@ -132,7 +136,9 @@ export function resolveTableReferences(
 ): ReferenceResolutionResult {
   const issues: AuthSchemaIssue[] = [];
   const references: ResolvedReferenceFact[] = [];
-  const tablesByName = new Map(registeredTables.map((registered) => [registered.sqlName, registered]));
+  const tablesByName = new Map(
+    registeredTables.map((registered) => [registered.sqlName, registered]),
+  );
   const explicitRules = table.meta.references;
   const explicitSourceColumns = new Set(Object.keys(explicitRules));
   const drizzleRefs = drizzleReferenceFacts(table, issues);
@@ -222,7 +228,8 @@ export function clientPayloadPolicyIssues(
     if (Object.prototype.hasOwnProperty.call(payload, field)) {
       errors.push({
         field,
-        message: "This field is managed by Sapporta auth and cannot be submitted by clients.",
+        message:
+          "This field is managed by Sapporta auth and cannot be submitted by clients.",
       });
     }
   }
@@ -232,7 +239,8 @@ export function clientPayloadPolicyIssues(
     if (Object.prototype.hasOwnProperty.call(payload, reference.sourceColumn)) {
       errors.push({
         field: reference.sourceColumn,
-        message: "This reference is managed by the server and cannot be submitted by clients.",
+        message:
+          "This reference is managed by the server and cannot be submitted by clients.",
       });
     }
   }
@@ -348,7 +356,10 @@ export function trustedInsertValuesForDataAuthority(
   return { sql: sqlValues, typescript: typescriptValues };
 }
 
-function checkScopeColumns(table: TableDef, rowScope: RowScope): AuthSchemaIssue[] {
+function checkScopeColumns(
+  table: TableDef,
+  rowScope: RowScope,
+): AuthSchemaIssue[] {
   const issues: AuthSchemaIssue[] = [];
   if (rowScope === "workspaceGlobal" || rowScope === "workspaceUserScoped") {
     if (!workspaceScopeColumn(table)) {
@@ -376,7 +387,8 @@ function checkScopeColumns(table: TableDef, rowScope: RowScope): AuthSchemaIssue
         table: table.sqlName,
         column: field,
         code: "system_managed_column_client_editable",
-        message: "Auth scope columns are system-managed and cannot be client-editable.",
+        message:
+          "Auth scope columns are system-managed and cannot be client-editable.",
       });
     }
   }
@@ -397,7 +409,8 @@ function drizzleReferenceFacts(
       issues.push({
         table: table.sqlName,
         code: "composite_reference",
-        message: "Composite foreign keys are not supported for auth reference validation.",
+        message:
+          "Composite foreign keys are not supported for auth reference validation.",
       });
       continue;
     }
@@ -408,7 +421,8 @@ function drizzleReferenceFacts(
       issues.push({
         table: table.sqlName,
         code: "ambiguous_reference",
-        message: "Foreign key metadata did not expose a single source and target column.",
+        message:
+          "Foreign key metadata did not expose a single source and target column.",
       });
       continue;
     }
@@ -445,14 +459,16 @@ function resolveReferenceFact(args: {
     };
   }
 
-  const targetTableName = args.explicitRule?.table ?? args.drizzleRef?.targetTableName;
+  const targetTableName =
+    args.explicitRule?.table ?? args.drizzleRef?.targetTableName;
   if (!targetTableName) {
     return {
       issue: {
         table: args.sourceTable.sqlName,
         column: args.sourceColumn,
         code: "ambiguous_reference",
-        message: "Reference target must come from Drizzle metadata or meta.references.",
+        message:
+          "Reference target must come from Drizzle metadata or meta.references.",
       },
     };
   }
@@ -469,7 +485,8 @@ function resolveReferenceFact(args: {
     };
   }
 
-  const explicitTargetColumn = args.explicitRule?.column ?? findPkColumn(targetTable).name;
+  const explicitTargetColumn =
+    args.explicitRule?.column ?? findPkColumn(targetTable).name;
   const targetColumn = args.drizzleRef?.targetColumn ?? explicitTargetColumn;
 
   if (

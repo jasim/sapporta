@@ -1,5 +1,8 @@
 import { performance } from "node:perf_hooks";
-import { createGridRuntime, type GridRuntime } from "../src/grid/runtime/create-grid-runtime";
+import {
+  createGridRuntime,
+  type GridRuntime,
+} from "../src/grid/runtime/create-grid-runtime";
 import { inMemoryGridDataSource } from "../src/grid/data-sources/memory/in-memory-grid-source";
 import { rootPath } from "../src/grid/types/identity";
 import { CELL_GRID_WITH_INDEPENDENT_ROW_SELECTION } from "../src/grid/types/interaction";
@@ -92,7 +95,8 @@ const BENCHES: BenchName[] = [
 ];
 
 const args = parseArgs(process.argv.slice(2));
-const selectedDatasets = args.dataset === "all" ? datasetNames() : [args.dataset];
+const selectedDatasets =
+  args.dataset === "all" ? datasetNames() : [args.dataset];
 const selectedBenches = args.bench === "all" ? BENCHES : [args.bench];
 const results: BenchResult[] = [];
 
@@ -108,7 +112,10 @@ if (args.format === "json") {
   printMarkdown(results);
 }
 
-function runBench(bench: BenchName, datasetName: BenchDatasetName): BenchResult {
+function runBench(
+  bench: BenchName,
+  datasetName: BenchDatasetName,
+): BenchResult {
   forceGc();
   const heapBefore = heapUsedMb();
   const totalStart = performance.now();
@@ -465,7 +472,10 @@ function touchAllDisplayed(runtime: GridRuntime): void {
   }
 }
 
-function touchDisplayed(runtime: GridRuntime | null, timings: PhaseTimings): void {
+function touchDisplayed(
+  runtime: GridRuntime | null,
+  timings: PhaseTimings,
+): void {
   timePhase(timings, "touchDisplayed", () =>
     touchAllDisplayed(runtimeOrThrow(runtime)),
   );
@@ -628,30 +638,31 @@ function printMarkdown(results: BenchResult[]): void {
     [
       "| benchmark | dataset | nodes | paths | rows | dataset ms | runtime ms | expand ms | touch ms | subscribe ms | action ms | total ms | dataset MB | live delta MB | retained MB | row fires | sequence fires | selected fires | interaction fires | source fires | mutations |",
       "|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|",
-      ...results.map((result) =>
-        `| ${[
-          result.bench,
-          result.dataset,
-          result.nodeCount,
-          result.pathCount,
-          result.rowCount,
-          result.timingsMs.datasetBuild.toFixed(2),
-          result.timingsMs.runtimeCreate.toFixed(2),
-          result.timingsMs.expand.toFixed(2),
-          result.timingsMs.touchDisplayed.toFixed(2),
-          result.timingsMs.attachSubscribers.toFixed(2),
-          result.timingsMs.action.toFixed(2),
-          result.timingsMs.measuredWork.toFixed(2),
-          result.memoryMb.datasetDelta.toFixed(2),
-          result.memoryMb.liveDelta.toFixed(2),
-          result.memoryMb.retainedDelta.toFixed(2),
-          result.counters.runtimeDisplayedRowFires,
-          result.counters.runtimeDisplayedSequenceFires,
-          result.counters.runtimeSelectedRowFires,
-          result.counters.runtimeRowInteractionFires,
-          result.counters.sourceSubscriberFires,
-          result.counters.hostMutationCommittedEvents,
-        ].join(" | ")} |`,
+      ...results.map(
+        (result) =>
+          `| ${[
+            result.bench,
+            result.dataset,
+            result.nodeCount,
+            result.pathCount,
+            result.rowCount,
+            result.timingsMs.datasetBuild.toFixed(2),
+            result.timingsMs.runtimeCreate.toFixed(2),
+            result.timingsMs.expand.toFixed(2),
+            result.timingsMs.touchDisplayed.toFixed(2),
+            result.timingsMs.attachSubscribers.toFixed(2),
+            result.timingsMs.action.toFixed(2),
+            result.timingsMs.measuredWork.toFixed(2),
+            result.memoryMb.datasetDelta.toFixed(2),
+            result.memoryMb.liveDelta.toFixed(2),
+            result.memoryMb.retainedDelta.toFixed(2),
+            result.counters.runtimeDisplayedRowFires,
+            result.counters.runtimeDisplayedSequenceFires,
+            result.counters.runtimeSelectedRowFires,
+            result.counters.runtimeRowInteractionFires,
+            result.counters.sourceSubscriberFires,
+            result.counters.hostMutationCommittedEvents,
+          ].join(" | ")} |`,
       ),
     ].join("\n") + "\n",
   );

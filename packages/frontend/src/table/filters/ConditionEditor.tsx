@@ -8,7 +8,10 @@
 
 import { useMemo, useState } from "react";
 import { ChevronDown } from "lucide-react";
-import type { FilterCondition, NewFilterCondition } from "@sapporta/shared/filter";
+import type {
+  FilterCondition,
+  NewFilterCondition,
+} from "@sapporta/shared/filter";
 import type { ColumnSchema } from "@sapporta/shared/contracts";
 import type { FkOptionsMap } from "@/lookup/types";
 import {
@@ -71,7 +74,8 @@ interface DraftState {
 function seedToString(seed: unknown): string {
   if (seed == null) return "";
   if (typeof seed === "string") return seed;
-  if (typeof seed === "number" || typeof seed === "boolean") return String(seed);
+  if (typeof seed === "number" || typeof seed === "boolean")
+    return String(seed);
   return "";
 }
 
@@ -83,7 +87,7 @@ function initialDraft(
 ): DraftState {
   const column =
     lockedColumn ??
-    (initial ? columns.find((c) => c.name === initial.column) ?? null : null);
+    (initial ? (columns.find((c) => c.name === initial.column) ?? null) : null);
   if (!column) {
     return { column: null, opKey: "", scalarValue: "", listValues: [] };
   }

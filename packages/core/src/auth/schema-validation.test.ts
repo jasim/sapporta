@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { foreignKey, integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
+import {
+  foreignKey,
+  integer,
+  sqliteTable,
+  text,
+} from "drizzle-orm/sqlite-core";
 import { table } from "../schema/table.js";
 import {
   checkAuthSchemaDefinitions,
@@ -13,8 +18,17 @@ import {
 } from "./index.js";
 import type { RequestDataAuthority } from "./request-data-authority.js";
 
-const testUser = { id: "user-1", name: "User One", email: "u1@example.com", emailVerified: true };
-const testWorkspace = { id: "workspace-1", name: "Workspace One", slug: "workspace-one" };
+const testUser = {
+  id: "user-1",
+  name: "User One",
+  email: "u1@example.com",
+  emailVerified: true,
+};
+const testWorkspace = {
+  id: "workspace-1",
+  name: "Workspace One",
+  slug: "workspace-one",
+};
 const dataAuthority: RequestDataAuthority = requestDataAuthority({
   systemGlobalOnly: systemGlobalOnlyAuthority(),
   workspaceGlobalOnly: workspaceGlobalOnlyAuthority(testWorkspace),
@@ -62,7 +76,10 @@ describe("auth schema validation", () => {
       meta: { rowScope: "workspaceUserScoped" },
     });
 
-    const issues = checkAuthSchemaDefinitions([workspaceGlobal, workspaceUserScoped]);
+    const issues = checkAuthSchemaDefinitions([
+      workspaceGlobal,
+      workspaceUserScoped,
+    ]);
 
     expect(issues.map((issue) => issue.code)).toEqual([
       "missing_workspace_scope_column",
@@ -102,7 +119,9 @@ describe("auth schema validation", () => {
 
     const issues = checkAuthSchemaDefinitions([orders]);
 
-    expect(issues.map((issue) => issue.code)).toContain("system_managed_column_client_editable");
+    expect(issues.map((issue) => issue.code)).toContain(
+      "system_managed_column_client_editable",
+    );
   });
 
   it("accepts valid workspace and system scoped tables", () => {
@@ -127,7 +146,9 @@ describe("auth schema validation", () => {
       meta: { rowScope: "systemGlobal" },
     });
 
-    expect(checkAuthSchemaDefinitions([workspaceRows, userRows, systemRows])).toEqual([]);
+    expect(
+      checkAuthSchemaDefinitions([workspaceRows, userRows, systemRows]),
+    ).toEqual([]);
   });
 
   it("resolves references from Drizzle foreign-key metadata", () => {
@@ -140,8 +161,14 @@ describe("auth schema validation", () => {
       workspace_id: text("workspace_id").notNull(),
       account_id: integer("account_id").references(() => accountsTable.id),
     });
-    const accounts = table({ drizzle: accountsTable, meta: { rowScope: "workspaceGlobal" } });
-    const invoices = table({ drizzle: invoicesTable, meta: { rowScope: "workspaceGlobal" } });
+    const accounts = table({
+      drizzle: accountsTable,
+      meta: { rowScope: "workspaceGlobal" },
+    });
+    const invoices = table({
+      drizzle: invoicesTable,
+      meta: { rowScope: "workspaceGlobal" },
+    });
 
     const result = resolveTableReferences(invoices, [accounts, invoices]);
 
@@ -172,7 +199,9 @@ describe("auth schema validation", () => {
       }),
       meta: {
         rowScope: "workspaceGlobal",
-        references: { account_id: { table: "accounts", column: "id", clientCanSet: false } },
+        references: {
+          account_id: { table: "accounts", column: "id", clientCanSet: false },
+        },
       },
     });
 
@@ -203,7 +232,9 @@ describe("auth schema validation", () => {
 
     const result = resolveTableReferences(invoices, [invoices]);
 
-    expect(result.issues.map((issue) => issue.code)).toContain("unregistered_reference_table");
+    expect(result.issues.map((issue) => issue.code)).toContain(
+      "unregistered_reference_table",
+    );
   });
 
   it("fails references whose source column is not on the table", () => {
@@ -227,10 +258,12 @@ describe("auth schema validation", () => {
 
     const result = resolveTableReferences(invoices, [accounts, invoices]);
 
-    expect(result.issues).toContainEqual(expect.objectContaining({
-      code: "unknown_reference_source_column",
-      column: "account_id",
-    }));
+    expect(result.issues).toContainEqual(
+      expect.objectContaining({
+        code: "unknown_reference_source_column",
+        column: "account_id",
+      }),
+    );
   });
 
   it("fails meta.references that conflict with Drizzle foreign-key metadata", () => {
@@ -250,7 +283,10 @@ describe("auth schema validation", () => {
       workspace_id: text("workspace_id").notNull(),
       account_id: integer("account_id").references(() => accountsTable.id),
     });
-    const accounts = table({ drizzle: accountsTable, meta: { rowScope: "workspaceGlobal" } });
+    const accounts = table({
+      drizzle: accountsTable,
+      meta: { rowScope: "workspaceGlobal" },
+    });
     const invoices = table({
       drizzle: invoicesTable,
       meta: {
@@ -259,12 +295,18 @@ describe("auth schema validation", () => {
       },
     });
 
-    const result = resolveTableReferences(invoices, [accounts, customers, invoices]);
+    const result = resolveTableReferences(invoices, [
+      accounts,
+      customers,
+      invoices,
+    ]);
 
-    expect(result.issues).toContainEqual(expect.objectContaining({
-      code: "conflicting_reference_rule",
-      column: "account_id",
-    }));
+    expect(result.issues).toContainEqual(
+      expect.objectContaining({
+        code: "conflicting_reference_rule",
+        column: "account_id",
+      }),
+    );
   });
 
   it("fails composite foreign keys", () => {
@@ -286,12 +328,20 @@ describe("auth schema validation", () => {
         }),
       ],
     );
-    const headers = table({ drizzle: orderHeaders, meta: { rowScope: "workspaceGlobal" } });
-    const lines = table({ drizzle: orderLines, meta: { rowScope: "workspaceGlobal" } });
+    const headers = table({
+      drizzle: orderHeaders,
+      meta: { rowScope: "workspaceGlobal" },
+    });
+    const lines = table({
+      drizzle: orderLines,
+      meta: { rowScope: "workspaceGlobal" },
+    });
 
     const result = resolveTableReferences(lines, [headers, lines]);
 
-    expect(result.issues.map((issue) => issue.code)).toContain("composite_reference");
+    expect(result.issues.map((issue) => issue.code)).toContain(
+      "composite_reference",
+    );
   });
 
   it("rejects clientCanSet false and system-managed client fields", () => {
@@ -313,15 +363,26 @@ describe("auth schema validation", () => {
         references: { account_id: { table: "accounts", clientCanSet: false } },
       },
     });
-    const references = resolveTableReferences(invoices, [accounts, invoices]).references;
+    const references = resolveTableReferences(invoices, [
+      accounts,
+      invoices,
+    ]).references;
 
-    const issues = clientPayloadPolicyIssues(invoices, {
-      workspace_id: "workspace-1",
-      workspaceId: "workspace-1",
-      account_id: 1,
-    }, references);
+    const issues = clientPayloadPolicyIssues(
+      invoices,
+      {
+        workspace_id: "workspace-1",
+        workspaceId: "workspace-1",
+        account_id: 1,
+      },
+      references,
+    );
 
-    expect(issues.map((issue) => issue.field)).toEqual(["workspace_id", "workspaceId", "account_id"]);
+    expect(issues.map((issue) => issue.field)).toEqual([
+      "workspace_id",
+      "workspaceId",
+      "account_id",
+    ]);
   });
 
   it("computes trusted insert values for data authority in sql and typescript key forms", () => {
@@ -330,12 +391,20 @@ describe("auth schema validation", () => {
       workspaceId: text("workspace_id").notNull(),
       scopedToUserId: text("scoped_to_user_id").notNull(),
     });
-    const orders = table({ drizzle: ordersTable, meta: { rowScope: "workspaceUserScoped" } });
+    const orders = table({
+      drizzle: ordersTable,
+      meta: { rowScope: "workspaceUserScoped" },
+    });
 
     const values = trustedInsertValuesForDataAuthority(dataAuthority, orders);
 
-    expect(values.sql).toEqual({ workspace_id: "workspace-1", scoped_to_user_id: "user-1" });
-    expect(values.typescript).toEqual({ workspaceId: "workspace-1", scopedToUserId: "user-1" });
+    expect(values.sql).toEqual({
+      workspace_id: "workspace-1",
+      scoped_to_user_id: "user-1",
+    });
+    expect(values.typescript).toEqual({
+      workspaceId: "workspace-1",
+      scopedToUserId: "user-1",
+    });
   });
-
 });

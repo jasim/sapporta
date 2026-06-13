@@ -37,7 +37,9 @@ describe("buildZodSchema()", () => {
     const schema = table({
       drizzle: sqliteTable("test_defaults", {
         id: integer("id").primaryKey({ autoIncrement: true }),
-        created_at: timestamp("created_at").notNull().$defaultFn(() => Temporal.Now.instant()),
+        created_at: timestamp("created_at")
+          .notNull()
+          .$defaultFn(() => Temporal.Now.instant()),
       }),
     });
 

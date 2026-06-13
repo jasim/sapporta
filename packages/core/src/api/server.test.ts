@@ -40,7 +40,9 @@ function appThatThrows(err: unknown) {
 
 describe("installSapportaDefaults", () => {
   it("returns JSON with code: INTERNAL for arbitrary thrown errors", async () => {
-    const app = appThatThrows(new Error("NOT NULL constraint failed: x.created_at"));
+    const app = appThatThrows(
+      new Error("NOT NULL constraint failed: x.created_at"),
+    );
     const res = await app.request("/boom");
     expect(res.status).toBe(500);
     expect(res.headers.get("content-type")).toMatch(/application\/json/);
@@ -51,10 +53,15 @@ describe("installSapportaDefaults", () => {
   });
 
   it("preserves a sqlite-style error.code on the JSON body", async () => {
-    const err = Object.assign(new Error("constraint failed"), { code: "SQLITE_CONSTRAINT_NOTNULL" });
+    const err = Object.assign(new Error("constraint failed"), {
+      code: "SQLITE_CONSTRAINT_NOTNULL",
+    });
     const res = await appThatThrows(err).request("/boom");
     expect(res.status).toBe(500);
-    expect(await res.json()).toEqual({ error: "constraint failed", code: "SQLITE_CONSTRAINT_NOTNULL" });
+    expect(await res.json()).toEqual({
+      error: "constraint failed",
+      code: "SQLITE_CONSTRAINT_NOTNULL",
+    });
   });
 
   it("does not leak stack or cause on unhandled errors", async () => {
@@ -69,11 +76,16 @@ describe("installSapportaDefaults", () => {
     const err = new OperationError("Table 'foo' not found", "TABLE_NOT_FOUND");
     const res = await appThatThrows(err).request("/boom");
     expect(res.status).toBe(404);
-    expect(await res.json()).toEqual({ error: "Table 'foo' not found", code: "TABLE_NOT_FOUND" });
+    expect(await res.json()).toEqual({
+      error: "Table 'foo' not found",
+      code: "TABLE_NOT_FOUND",
+    });
   });
 
   it("reshapes a bare HTTPException into a JSON envelope", async () => {
-    const res = await appThatThrows(new HTTPException(409, { message: "Conflict" })).request("/boom");
+    const res = await appThatThrows(
+      new HTTPException(409, { message: "Conflict" }),
+    ).request("/boom");
     expect(res.status).toBe(409);
     expect(res.headers.get("content-type")).toMatch(/application\/json/);
     expect(await res.json()).toEqual({ error: "Conflict" });
@@ -81,12 +93,19 @@ describe("installSapportaDefaults", () => {
 
   it("honors a structured JSON body attached via HTTPException res option", async () => {
     const err = new HTTPException(422, {
-      res: Response.json({ error: "bad", code: "VALIDATION", hint: "fix it" }, { status: 422 }),
+      res: Response.json(
+        { error: "bad", code: "VALIDATION", hint: "fix it" },
+        { status: 422 },
+      ),
     });
     const res = await appThatThrows(err).request("/boom");
     expect(res.status).toBe(422);
     expect(res.headers.get("content-type")).toMatch(/application\/json/);
-    expect(await res.json()).toEqual({ error: "bad", code: "VALIDATION", hint: "fix it" });
+    expect(await res.json()).toEqual({
+      error: "bad",
+      code: "VALIDATION",
+      hint: "fix it",
+    });
   });
 
   it("honors HTTPException responses from a different Hono module instance", async () => {
@@ -138,7 +157,10 @@ describe("framework route policy", () => {
     const app = installSapportaDefaults(new Hono<SapportaEnv>());
     installFrameworkRoutePolicy(app, () => {
       throw new HTTPException(403, {
-        res: Response.json({ error: "Project guard rejected" }, { status: 403 }),
+        res: Response.json(
+          { error: "Project guard rejected" },
+          { status: 403 },
+        ),
       });
     });
     app.get("/api/meta/project", (c) => c.json({ ok: true }));
@@ -152,7 +174,10 @@ describe("framework route policy", () => {
     const app = installSapportaDefaults(new Hono<SapportaEnv>());
     installFrameworkRoutePolicy(app, () => {
       throw new HTTPException(403, {
-        res: Response.json({ error: "Project guard rejected" }, { status: 403 }),
+        res: Response.json(
+          { error: "Project guard rejected" },
+          { status: 403 },
+        ),
       });
     });
     app.get("/api/meta/info", (c) =>

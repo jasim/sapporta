@@ -283,7 +283,8 @@ function withOnlyWorkspaceAuthority(
 ): AuthorizedWorkspaceDataContext {
   const narrowed: WorkspaceDataAuthority = {
     rowAuthorities: {
-      workspaceGlobalOnly: auth.dataAuthority.rowAuthorities.workspaceGlobalOnly!,
+      workspaceGlobalOnly:
+        auth.dataAuthority.rowAuthorities.workspaceGlobalOnly!,
     },
   };
   return {

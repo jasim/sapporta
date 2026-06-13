@@ -123,8 +123,7 @@ export function keyEventToCellIntent(
     ) {
       return {
         type: "commitMove",
-        target:
-          e.key === "ArrowUp" || e.key === "ArrowLeft" ? "prev" : "next",
+        target: e.key === "ArrowUp" || e.key === "ArrowLeft" ? "prev" : "next",
       };
     }
 

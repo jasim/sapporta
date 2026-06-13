@@ -39,7 +39,10 @@ describe("auth store", () => {
   });
 
   it("loads the Sapporta auth context", async () => {
-    vi.stubGlobal("fetch", vi.fn(async () => jsonResponse(AUTH_CONTEXT)));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => jsonResponse(AUTH_CONTEXT)),
+    );
 
     await useAuthStore.getState().load();
 
@@ -58,7 +61,10 @@ describe("auth store", () => {
     vi.stubGlobal(
       "fetch",
       vi.fn(async () =>
-        jsonResponse({ error: "Authentication required", code: "unauthenticated" }, 401),
+        jsonResponse(
+          { error: "Authentication required", code: "unauthenticated" },
+          401,
+        ),
       ),
     );
 
@@ -72,7 +78,10 @@ describe("auth store", () => {
     vi.stubGlobal(
       "fetch",
       vi.fn(async () =>
-        jsonResponse({ error: "Email verification required", code: "email_not_verified" }, 403),
+        jsonResponse(
+          { error: "Email verification required", code: "email_not_verified" },
+          403,
+        ),
       ),
     );
 
@@ -84,7 +93,10 @@ describe("auth store", () => {
     vi.stubGlobal(
       "fetch",
       vi.fn(async () =>
-        jsonResponse({ error: "Workspace required", code: "workspace_required" }, 403),
+        jsonResponse(
+          { error: "Workspace required", code: "workspace_required" },
+          403,
+        ),
       ),
     );
 
@@ -138,7 +150,9 @@ describe("auth store", () => {
   it("records generic auth load failures", async () => {
     vi.stubGlobal(
       "fetch",
-      vi.fn(async () => jsonResponse({ error: "Server unavailable", code: "internal" }, 500)),
+      vi.fn(async () =>
+        jsonResponse({ error: "Server unavailable", code: "internal" }, 500),
+      ),
     );
 
     await useAuthStore.getState().load();
@@ -149,10 +163,15 @@ describe("auth store", () => {
   });
 
   it("resets loaded metadata after workspace switch", async () => {
-    vi.stubGlobal("fetch", vi.fn(async () => jsonResponse(AUTH_CONTEXT)));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => jsonResponse(AUTH_CONTEXT)),
+    );
     useSchemaStore.setState({ loaded: true });
 
-    await useAuthStore.getState().switchWorkspace({ workspaceId: "workspace-1" });
+    await useAuthStore
+      .getState()
+      .switchWorkspace({ workspaceId: "workspace-1" });
 
     expect(useSchemaStore.getState().loaded).toBe(false);
     expect(useAuthStore.getState().status).toBe("authenticated");
@@ -167,7 +186,10 @@ describe("auth store", () => {
   });
 
   it("logs out and clears auth and schema state", async () => {
-    vi.stubGlobal("fetch", vi.fn(async () => jsonResponse({ ok: true })));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => jsonResponse({ ok: true })),
+    );
     useAuthStore.setState({
       status: "authenticated",
       context: AUTH_CONTEXT,

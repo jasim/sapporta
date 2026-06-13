@@ -24,7 +24,10 @@ describe("resolveRefs", () => {
     {
       schemas: {
         X: { type: "string" },
-        Y: { type: "object", properties: { x: { $ref: "#/components/schemas/X" } } },
+        Y: {
+          type: "object",
+          properties: { x: { $ref: "#/components/schemas/X" } },
+        },
         Cycle: {
           type: "object",
           properties: { self: { $ref: "#/components/schemas/Cycle" } },
@@ -55,7 +58,10 @@ describe("resolveRefs", () => {
   });
 
   it("breaks cycles by leaving $ref in place", () => {
-    const out = resolveRefs({ $ref: "#/components/schemas/Cycle" }, spec) as any;
+    const out = resolveRefs(
+      { $ref: "#/components/schemas/Cycle" },
+      spec,
+    ) as any;
     expect(out.type).toBe("object");
     expect(out.properties.self).toEqual({ $ref: "#/components/schemas/Cycle" });
   });
@@ -143,7 +149,11 @@ describe("findEndpoint", () => {
         post: { summary: "Create an account" },
       },
     },
-    { schemas: { Invoice: { type: "object", properties: { amount: { type: "number" } } } } },
+    {
+      schemas: {
+        Invoice: { type: "object", properties: { amount: { type: "number" } } },
+      },
+    },
   );
 
   it("hits on exact METHOD path", () => {
@@ -263,7 +273,12 @@ describe("getEndpointDetail", () => {
           summary: "Create thing",
           description: "Creates one thing",
           parameters: [
-            { name: "id", in: "path", required: true, schema: { type: "string" } },
+            {
+              name: "id",
+              in: "path",
+              required: true,
+              schema: { type: "string" },
+            },
             { name: "q", in: "query", schema: { type: "string" } },
           ],
           requestBody: {
@@ -344,7 +359,9 @@ describe("fetchOpenApiSpec", () => {
       },
     });
 
-    await expect(fetchOpenApiSpec("http://localhost:3000")).rejects.toMatchObject({
+    await expect(
+      fetchOpenApiSpec("http://localhost:3000"),
+    ).rejects.toMatchObject({
       message: "Authentication required",
       code: "unauthenticated",
     });
@@ -370,7 +387,9 @@ describe("fetchOpenApiSpec", () => {
 
   it("propagates the ECONNREFUSED friendly error", async () => {
     vi.mocked(httpRequest).mockRejectedValueOnce(
-      new Error("Cannot connect to Sapporta server at http://localhost:3000. Is the server running?"),
+      new Error(
+        "Cannot connect to Sapporta server at http://localhost:3000. Is the server running?",
+      ),
     );
     await expect(fetchOpenApiSpec("http://localhost:3000")).rejects.toThrow(
       /Is the server running\?/,

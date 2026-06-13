@@ -13,17 +13,17 @@
 
 import { useState } from "react";
 import { ArrowDown, ArrowUp, SlidersHorizontal, X } from "lucide-react";
-import type { FilterCondition, NewFilterCondition } from "@sapporta/shared/filter";
+import type {
+  FilterCondition,
+  NewFilterCondition,
+} from "@sapporta/shared/filter";
 import type { ColumnSchema } from "@sapporta/shared/contracts";
 import type { FkOptionsMap } from "@/lookup/types";
 import type { SortDescriptor } from "@sapporta/grid";
 import { Popover, PopoverContent, PopoverTrigger } from "@sapporta/ui";
 import { ConditionEditor } from "./ConditionEditor";
 import { CheckboxList } from "./inputs/CheckboxList";
-import {
-  inferFilterColumnType,
-  resolveColumnOptions,
-} from "./column-catalog";
+import { inferFilterColumnType, resolveColumnOptions } from "./column-catalog";
 
 export interface HeaderFilterPopoverProps {
   column: ColumnSchema;
@@ -147,72 +147,72 @@ export function HeaderFilterMenuContent({
 
   return (
     <>
-        <MenuRow
-          icon={<ArrowUp className="h-[12px] w-[12px]" />}
-          onClick={() => setSortForColumn("asc")}
-        >
-          Sort A → Z
-        </MenuRow>
-        <MenuRow
-          icon={<ArrowDown className="h-[12px] w-[12px]" />}
-          onClick={() => setSortForColumn("desc")}
-        >
-          Sort Z → A
-        </MenuRow>
-        <Divider />
-        {showQuickPicker && (
-          <>
-            <div className="px-[6px] py-[4px]">
-              <CheckboxList
-                values={quickValues}
-                onChange={applyQuick}
-                column={column}
-                options={resolved.options}
-                labels={resolved.labels}
-              />
-            </div>
-            <Divider />
-          </>
-        )}
-        <Popover open={editorOpen} onOpenChange={setEditorOpen}>
-          <PopoverTrigger asChild>
-            <button
-              type="button"
-              className="w-full flex items-center gap-2 px-[10px] py-[5px] text-sap-data rounded-[3px] hover:bg-sap-row-hover text-left text-sap-emph"
-            >
-              <SlidersHorizontal className="h-[12px] w-[12px] text-sap-subtle" />
-              <span className="flex-1">Filter by condition…</span>
-            </button>
-          </PopoverTrigger>
-          <PopoverContent
-            align="start"
-            sideOffset={4}
-            className="p-0 w-auto border-sap-border bg-sap-surface"
-          >
-            <ConditionEditor
-              columns={columns}
-              lockedColumn={column}
-              fkOptions={fkOptions}
-              onApply={(cond) => {
-                onAddFilter(cond);
-                setEditorOpen(false);
-                close();
-              }}
-              onCancel={() => setEditorOpen(false)}
+      <MenuRow
+        icon={<ArrowUp className="h-[12px] w-[12px]" />}
+        onClick={() => setSortForColumn("asc")}
+      >
+        Sort A → Z
+      </MenuRow>
+      <MenuRow
+        icon={<ArrowDown className="h-[12px] w-[12px]" />}
+        onClick={() => setSortForColumn("desc")}
+      >
+        Sort Z → A
+      </MenuRow>
+      <Divider />
+      {showQuickPicker && (
+        <>
+          <div className="px-[6px] py-[4px]">
+            <CheckboxList
+              values={quickValues}
+              onChange={applyQuick}
+              column={column}
+              options={resolved.options}
+              labels={resolved.labels}
             />
-          </PopoverContent>
-        </Popover>
-        {hasAnyFilterOnColumn && (
-          <>
-            <Divider />
-            <MenuRow
-              icon={<X className="h-[12px] w-[12px]" />}
-              onClick={clearAllFiltersForColumn}
-            >
-              Clear filter
-            </MenuRow>
-          </>
-        )}
+          </div>
+          <Divider />
+        </>
+      )}
+      <Popover open={editorOpen} onOpenChange={setEditorOpen}>
+        <PopoverTrigger asChild>
+          <button
+            type="button"
+            className="w-full flex items-center gap-2 px-[10px] py-[5px] text-sap-data rounded-[3px] hover:bg-sap-row-hover text-left text-sap-emph"
+          >
+            <SlidersHorizontal className="h-[12px] w-[12px] text-sap-subtle" />
+            <span className="flex-1">Filter by condition…</span>
+          </button>
+        </PopoverTrigger>
+        <PopoverContent
+          align="start"
+          sideOffset={4}
+          className="p-0 w-auto border-sap-border bg-sap-surface"
+        >
+          <ConditionEditor
+            columns={columns}
+            lockedColumn={column}
+            fkOptions={fkOptions}
+            onApply={(cond) => {
+              onAddFilter(cond);
+              setEditorOpen(false);
+              close();
+            }}
+            onCancel={() => setEditorOpen(false)}
+          />
+        </PopoverContent>
+      </Popover>
+      {hasAnyFilterOnColumn && (
+        <>
+          <Divider />
+          <MenuRow
+            icon={<X className="h-[12px] w-[12px]" />}
+            onClick={clearAllFiltersForColumn}
+          >
+            Clear filter
+          </MenuRow>
+        </>
+      )}
     </>
   );
 }

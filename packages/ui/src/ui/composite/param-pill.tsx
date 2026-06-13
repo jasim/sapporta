@@ -55,7 +55,8 @@ export function ParamPill({
       className={cn(
         "inline-flex items-stretch h-sap-bar rounded-[5px] overflow-hidden border bg-sap-surface text-sap-data",
         borderColor,
-        isInteractive && "hover:bg-sap-row-hover transition-colors cursor-pointer",
+        isInteractive &&
+          "hover:bg-sap-row-hover transition-colors cursor-pointer",
         className,
       )}
     >

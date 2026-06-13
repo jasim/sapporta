@@ -1,9 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { isValidElement } from "react";
-import type {
-  Row,
-  TableSchema,
-} from "@sapporta/shared/contracts";
+import type { Row, TableSchema } from "@sapporta/shared/contracts";
 import { eqCondition } from "@sapporta/shared/filter";
 import type { GridRuntime, RestEndpointFactory } from "@sapporta/grid";
 import { ExpandCell } from "@sapporta/grid";

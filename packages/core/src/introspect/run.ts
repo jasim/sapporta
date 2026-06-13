@@ -53,9 +53,10 @@ export function dbRun(
   }
 
   if (opts.dryRun) {
-    const plan = sqlite
-      .prepare(`EXPLAIN QUERY PLAN ${rawSql}`)
-      .all() as Record<string, unknown>[];
+    const plan = sqlite.prepare(`EXPLAIN QUERY PLAN ${rawSql}`).all() as Record<
+      string,
+      unknown
+    >[];
     return {
       ok: true,
       data: plan,

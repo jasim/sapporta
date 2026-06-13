@@ -19,8 +19,7 @@ export type OutputFormat = "table" | "json";
 export function resolveOutputFormat(
   flags: Record<string, string>,
 ): OutputFormat {
-  const explicit =
-    flags["output-format"] ?? process.env.SAPPORTA_OUTPUT_FORMAT;
+  const explicit = flags["output-format"] ?? process.env.SAPPORTA_OUTPUT_FORMAT;
   if (explicit === "json") return "json";
   if (explicit === "table") return "table";
   // Auto-detect: non-TTY defaults to JSON for agent consumption
@@ -37,7 +36,10 @@ export function resolveOutputFormat(
  * This is the ONLY place in the codebase that should call console.log for
  * command output. Commands themselves must never print directly.
  */
-export function emitResult(result: OperationResult, format: OutputFormat): void {
+export function emitResult(
+  result: OperationResult,
+  format: OutputFormat,
+): void {
   if (format === "json") {
     console.log(JSON.stringify(result));
     return;
@@ -121,7 +123,9 @@ export function formatTable(rows: Record<string, unknown>[]): string {
   const header = columns.map((col, i) => col.padEnd(widths[i])).join("  ");
   const separator = widths.map((w) => "-".repeat(w)).join("  ");
   const body = rows.map((row) =>
-    columns.map((col, i) => String(row[col] ?? "NULL").padEnd(widths[i])).join("  "),
+    columns
+      .map((col, i) => String(row[col] ?? "NULL").padEnd(widths[i]))
+      .join("  "),
   );
 
   return [header, separator, ...body].join("\n");

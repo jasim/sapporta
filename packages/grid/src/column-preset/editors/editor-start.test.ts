@@ -45,9 +45,9 @@ function props(
 
 describe("preset editor start values", () => {
   it("initializes text edits from the raw value on click", () => {
-    expect(initialTextEditorValue(props({ trigger: "click" }, "existing"))).toBe(
-      "existing",
-    );
+    expect(
+      initialTextEditorValue(props({ trigger: "click" }, "existing")),
+    ).toBe("existing");
   });
 
   it("initializes text edits from the typed seed for type starts", () => {

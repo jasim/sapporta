@@ -34,7 +34,9 @@ describe("db describe-all", () => {
     expect(tableNames).toContain("invoices");
 
     // Check columns are populated
-    const accounts = tables.find((t: any) => t.table_name === "accounts") as any;
+    const accounts = tables.find(
+      (t: any) => t.table_name === "accounts",
+    ) as any;
     const colNames = accounts.columns.map((c: any) => c.column_name);
     expect(colNames).toContain("id");
     expect(colNames).toContain("name");
@@ -56,8 +58,12 @@ describe("db describe-all", () => {
 
     // FK info is embedded in the column descriptions
     const tables = result.meta?.tables as any[];
-    const invoices = tables.find((t: any) => t.table_name === "invoices") as any;
-    const fkCol = invoices.columns.find((c: any) => c.column_name === "account_id");
+    const invoices = tables.find(
+      (t: any) => t.table_name === "invoices",
+    ) as any;
+    const fkCol = invoices.columns.find(
+      (c: any) => c.column_name === "account_id",
+    );
     expect(fkCol.foreign_table).toBe("accounts");
     expect(fkCol.foreign_column).toBe("id");
   });

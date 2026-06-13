@@ -92,7 +92,9 @@ const MAX_MARKER_WALK = 100;
  * stays the single source of truth for path-and-marker knowledge.
  * cli/find-project-root.ts re-exports this.
  */
-export function findProjectRootFrom(startDir: string = process.cwd()): string | null {
+export function findProjectRootFrom(
+  startDir: string = process.cwd(),
+): string | null {
   let dir = startDir;
   for (let i = 0; i < MAX_MARKER_WALK; i++) {
     if (existsSync(join(dir, PROJECT_MARKER))) return dir;

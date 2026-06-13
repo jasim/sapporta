@@ -25,12 +25,12 @@ createGridRuntime({
 
 Common choices:
 
-| Goal | Interaction shape |
-| --- | --- |
-| Spreadsheet focus and editing | Active cell |
-| Spreadsheet range selection | Active cell + cell selection |
-| Highlight the row under the active cell | Active cell + active row |
-| Bulk actions on checked rows | Active cell or row cursor + row selection |
+| Goal                                        | Interaction shape                         |
+| ------------------------------------------- | ----------------------------------------- |
+| Spreadsheet focus and editing               | Active cell                               |
+| Spreadsheet range selection                 | Active cell + cell selection              |
+| Highlight the row under the active cell     | Active cell + active row                  |
+| Bulk actions on checked rows                | Active cell or row cursor + row selection |
 | Master-detail panel that follows navigation | Active row + selected rows that follow it |
 
 See [BASEGRID-INTERACTIONS.md](./BASEGRID-INTERACTIONS.md) for the interaction
@@ -122,7 +122,8 @@ When focus moves to another nested level, the inactive level root has
 look different.
 
 ```css
-.projectGrid [data-grid-part="root"][data-active="false"]
+.projectGrid
+  [data-grid-part="root"][data-active="false"]
   [data-grid-part="cell"][data-cell-status="focus"] {
   background: #f3f4f6;
   box-shadow: inset 0 0 0 1px #9ca3af;
@@ -183,15 +184,15 @@ Phantom rows are rows created by insertion flows before they are saved.
 />
 ```
 
-| Attribute | Meaning |
-| --- | --- |
-| `data-grid-part="row"` | Identifies a body row. |
-| `data-row-kind` | Row kind, such as `data` or `phantom`. |
-| `data-row-active="true"` | This row is the current row. |
-| `data-row-selected="true"` | This row is in the effective row selection. |
-| `data-row-interaction-status` | Combined row cursor and row selection status. |
-| `data-row-selectable` | Whether row-operation selection can target this row. |
-| `aria-selected="true"` | Present when the row is selected. |
+| Attribute                     | Meaning                                              |
+| ----------------------------- | ---------------------------------------------------- |
+| `data-grid-part="row"`        | Identifies a body row.                               |
+| `data-row-kind`               | Row kind, such as `data` or `phantom`.               |
+| `data-row-active="true"`      | This row is the current row.                         |
+| `data-row-selected="true"`    | This row is in the effective row selection.          |
+| `data-row-interaction-status` | Combined row cursor and row selection status.        |
+| `data-row-selectable`         | Whether row-operation selection can target this row. |
+| `aria-selected="true"`        | Present when the row is selected.                    |
 
 Prefer `data-row-active` and `data-row-selected` for styling. Use
 `data-row-interaction-status` only when one combined status value is genuinely
@@ -208,13 +209,13 @@ more convenient.
 />
 ```
 
-| Attribute | Meaning |
-| --- | --- |
-| `data-grid-part="cell"` | Identifies a body cell. |
-| `data-cell-status="focus"` | The active cell. |
+| Attribute                         | Meaning                       |
+| --------------------------------- | ----------------------------- |
+| `data-grid-part="cell"`           | Identifies a body cell.       |
+| `data-cell-status="focus"`        | The active cell.              |
 | `data-cell-status="in-selection"` | A cell in the selected range. |
-| `data-cell-status="editing"` | A cell with an open editor. |
-| `data-col-id` | Column id. |
+| `data-cell-status="editing"`      | A cell with an open editor.   |
+| `data-col-id`                     | Column id.                    |
 
 ### Level Attributes
 
@@ -227,12 +228,12 @@ more convenient.
 />
 ```
 
-| Attribute | Meaning |
-| --- | --- |
-| `data-grid-part="root"` | Identifies a grid level root. |
-| `data-grid-path` | Stable logical path for this level. |
-| `data-grid-depth` | Nesting depth, with root at `0`. |
-| `data-active` | Whether this level owns the active cursor. |
+| Attribute               | Meaning                                    |
+| ----------------------- | ------------------------------------------ |
+| `data-grid-part="root"` | Identifies a grid level root.              |
+| `data-grid-path`        | Stable logical path for this level.        |
+| `data-grid-depth`       | Nesting depth, with root at `0`.           |
+| `data-active`           | Whether this level owns the active cursor. |
 
 ## Precedence
 

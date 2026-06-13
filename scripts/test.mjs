@@ -25,12 +25,7 @@ const commands = {
   },
   "e2e-npm": {
     command: "vitest",
-    args: [
-      "run",
-      "--config",
-      "vitest.e2e.config.ts",
-      "e2e/init-npm.test.ts",
-    ],
+    args: ["run", "--config", "vitest.e2e.config.ts", "e2e/init-npm.test.ts"],
     env: { SAPPORTA_E2E_NPM: "1" },
   },
   "e2e-npm-docker": {
@@ -94,11 +89,9 @@ const selectedCommand = commands[commandName];
 
 if (!selectedCommand) {
   const names = Object.keys(commands).join(", ");
-  throw new Error(`Unknown test command "${commandName ?? ""}". Expected: ${names}`);
+  throw new Error(
+    `Unknown test command "${commandName ?? ""}". Expected: ${names}`,
+  );
 }
 
-await run(
-  selectedCommand.command,
-  selectedCommand.args,
-  selectedCommand.env,
-);
+await run(selectedCommand.command, selectedCommand.args, selectedCommand.env);

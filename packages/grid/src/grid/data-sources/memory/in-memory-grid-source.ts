@@ -102,10 +102,19 @@ export function inMemoryGridDataSource<F = unknown>(
     resolveChild(parentPath, parentRowKey, childLevelName) {
       const { arr: parentLevelArr, levelName: parentLevelName } =
         walkToParentLevel(tree, parentPath, schema);
-      const parent = findByRowKey(parentLevelArr, parentRowKey, parentLevelName, schema);
+      const parent = findByRowKey(
+        parentLevelArr,
+        parentRowKey,
+        parentLevelName,
+        schema,
+      );
       const children = parent.children?.[childLevelName];
       const initialNodes: TreeNode[] =
-        children === undefined ? [] : Array.isArray(children) ? children : [children];
+        children === undefined
+          ? []
+          : Array.isArray(children)
+            ? children
+            : [children];
       return buildLevelSource(childLevelName, initialNodes);
     },
 

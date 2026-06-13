@@ -19,9 +19,7 @@ export function tableExists(
   tableName: string,
 ): boolean {
   const row = sqlite
-    .prepare(
-      `SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?`,
-    )
+    .prepare(`SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?`)
     .get(tableName);
   return row !== undefined;
 }
@@ -35,9 +33,9 @@ export function columnExists(
   tableName: string,
   columnName: string,
 ): boolean {
-  const cols = sqlite.pragma(
-    `table_info("${tableName}")`,
-  ) as { name: string }[];
+  const cols = sqlite.pragma(`table_info("${tableName}")`) as {
+    name: string;
+  }[];
   return cols.some((c) => c.name === columnName);
 }
 
@@ -49,9 +47,9 @@ export function getTableColumns(
   sqlite: Database.Database,
   tableName: string,
 ): Set<string> {
-  const cols = sqlite.pragma(
-    `table_info("${tableName}")`,
-  ) as { name: string }[];
+  const cols = sqlite.pragma(`table_info("${tableName}")`) as {
+    name: string;
+  }[];
   return new Set(cols.map((c) => c.name));
 }
 
@@ -64,7 +62,10 @@ export function assertTableExists(
   tableName: string,
 ): void {
   if (!tableExists(sqlite, tableName)) {
-    throw new OperationError(`Table '${tableName}' not found`, ErrorCode.TABLE_NOT_FOUND);
+    throw new OperationError(
+      `Table '${tableName}' not found`,
+      ErrorCode.TABLE_NOT_FOUND,
+    );
   }
 }
 

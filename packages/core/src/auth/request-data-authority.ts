@@ -94,7 +94,9 @@ export function requestDataAuthority(
     rowAuthorities.workspaceUserScoped?.workspace.id,
   ].filter((id): id is string => id !== undefined);
   if (new Set(workspaceIds).size > 1) {
-    throw new Error("Request data authority contains conflicting workspace ids.");
+    throw new Error(
+      "Request data authority contains conflicting workspace ids.",
+    );
   }
   return { rowAuthorities };
 }

@@ -13,7 +13,9 @@ import type { SqlClient } from "../introspect/types.js";
  *
  * We achieve this by adding SqlClient methods directly onto the sqlite handle.
  */
-function createTestSql(sqlite: Database.Database): SqlClient & Database.Database {
+function createTestSql(
+  sqlite: Database.Database,
+): SqlClient & Database.Database {
   const extended = sqlite as any;
   extended.unsafe = (query: string, params?: any[]) => {
     return Promise.resolve(sqlite.prepare(query).all(...(params ?? [])));
@@ -47,7 +49,11 @@ describe("rows insert", () => {
   });
 
   it("inserts a single row", async () => {
-    const result = await rowsInsert(sql, "accounts", '{"name":"Cash","type":"asset"}');
+    const result = await rowsInsert(
+      sql,
+      "accounts",
+      '{"name":"Cash","type":"asset"}',
+    );
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;
@@ -76,7 +82,11 @@ describe("rows insert", () => {
   });
 
   it("returns inserted row data", async () => {
-    const result = await rowsInsert(sql, "accounts", '{"name":"Cash","type":"asset"}');
+    const result = await rowsInsert(
+      sql,
+      "accounts",
+      '{"name":"Cash","type":"asset"}',
+    );
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;
@@ -91,14 +101,16 @@ describe("rows insert", () => {
   });
 
   it("rejects invalid JSON", async () => {
-    await expect(
-      rowsInsert(sql, "accounts", "not json"),
-    ).rejects.toThrow();
+    await expect(rowsInsert(sql, "accounts", "not json")).rejects.toThrow();
   });
 
   it("rejects column names with injection characters", async () => {
     await expect(
-      rowsInsert(sql, "accounts", '{"name; DROP TABLE accounts":"Cash","type":"asset"}'),
+      rowsInsert(
+        sql,
+        "accounts",
+        '{"name; DROP TABLE accounts":"Cash","type":"asset"}',
+      ),
     ).rejects.toThrow("Invalid column name");
   });
 
@@ -111,7 +123,12 @@ describe("rows insert", () => {
   // -- Dry-run tests --
 
   it("dry-run validates successfully without inserting", async () => {
-    const result = await rowsInsert(sql, "accounts", '{"name":"Cash","type":"asset"}', true);
+    const result = await rowsInsert(
+      sql,
+      "accounts",
+      '{"name":"Cash","type":"asset"}',
+      true,
+    );
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;

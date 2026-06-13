@@ -174,21 +174,21 @@ describe("row access predicates", () => {
       .where(systemRowsPredicate(auth().dataAuthority, systemRows));
 
     expect(rows).toHaveLength(2);
-    expect(() => systemRowsPredicate(auth().dataAuthority, workspaceRows)).toThrow(
-      /Expected systemGlobal/,
-    );
+    expect(() =>
+      systemRowsPredicate(auth().dataAuthority, workspaceRows),
+    ).toThrow(/Expected systemGlobal/);
   });
 
   it("invalid helper/table combinations fail closed", () => {
-    expect(() => workspaceUserRowsPredicate(auth().dataAuthority, workspaceRows)).toThrow(
-      /Expected workspaceUserScoped/,
-    );
-    expect(() => workspaceRowsPredicate(auth().dataAuthority, systemRows)).toThrow(
-      /Expected workspaceGlobal/,
-    );
-    expect(() => workspaceUserRowsPredicate(workspaceRowsScope(), userRows)).toThrow(
-      /workspaceGlobalOnly/,
-    );
+    expect(() =>
+      workspaceUserRowsPredicate(auth().dataAuthority, workspaceRows),
+    ).toThrow(/Expected workspaceUserScoped/);
+    expect(() =>
+      workspaceRowsPredicate(auth().dataAuthority, systemRows),
+    ).toThrow(/Expected workspaceGlobal/);
+    expect(() =>
+      workspaceUserRowsPredicate(workspaceRowsScope(), userRows),
+    ).toThrow(/workspaceGlobalOnly/);
   });
 
   it("lookup predicate selection uses target table row scope", async () => {
@@ -322,10 +322,13 @@ describe("foreign-key auth validation", () => {
     const { db } = dbWithReferenceRows();
 
     await expect(
-      validateForeignKeyReferences(db, auth().dataAuthority, orders, { doc_id: "doc-2" }, [
-        privateDocs,
+      validateForeignKeyReferences(
+        db,
+        auth().dataAuthority,
         orders,
-      ]),
+        { doc_id: "doc-2" },
+        [privateDocs, orders],
+      ),
     ).rejects.toThrow(AuthPayloadPolicyError);
   });
 
@@ -375,10 +378,13 @@ describe("foreign-key auth validation", () => {
     const { db } = dbWithReferenceRows();
 
     await expect(
-      validateForeignKeyReferences(db, auth().dataAuthority, orders, { country_id: "US" }, [
-        countries,
+      validateForeignKeyReferences(
+        db,
+        auth().dataAuthority,
         orders,
-      ]),
+        { country_id: "US" },
+        [countries, orders],
+      ),
     ).rejects.toMatchObject({
       errors: [{ field: "country_id" }],
     });

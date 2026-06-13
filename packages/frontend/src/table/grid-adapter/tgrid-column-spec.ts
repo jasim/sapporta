@@ -1,7 +1,11 @@
 import type { EditTrigger } from "@sapporta/grid";
 import type { ComponentType } from "react";
 import type { ColumnWidth } from "@sapporta/grid/column-preset";
-import type { RowFieldName, TGridLevelId, TGridRowsByLevel } from "./tgrid-types";
+import type {
+  RowFieldName,
+  TGridLevelId,
+  TGridRowsByLevel,
+} from "./tgrid-types";
 import type {
   TGridCellContext,
   TGridCellEditorContext,
@@ -24,7 +28,9 @@ export type TableColumnOptions<
   maxWidth?: number;
   editable?: boolean;
   editTriggers?: readonly EditTrigger[];
-  renderCell?: ComponentType<TGridCellContext<RowsByLevel, AppServices, LevelId>>;
+  renderCell?: ComponentType<
+    TGridCellContext<RowsByLevel, AppServices, LevelId>
+  >;
   editor?: ComponentType<
     TGridCellEditorContext<RowsByLevel, AppServices, LevelId, K>
   >;
@@ -42,7 +48,9 @@ export type ClientColumnOptions<
   width?: number | ColumnWidth;
   editable?: boolean;
   editTriggers?: readonly EditTrigger[];
-  renderCell?: ComponentType<TGridCellContext<RowsByLevel, AppServices, LevelId>>;
+  renderCell?: ComponentType<
+    TGridCellContext<RowsByLevel, AppServices, LevelId>
+  >;
   editor?: ComponentType<
     TGridCellEditorContext<
       RowsByLevel,
@@ -59,7 +67,9 @@ export type TGridTableColumnSpec<
   RowsByLevel extends TGridRowsByLevel,
   AppServices,
   LevelId extends TGridLevelId<RowsByLevel>,
-  K extends RowFieldName<RowsByLevel[LevelId]> = RowFieldName<RowsByLevel[LevelId]>,
+  K extends RowFieldName<RowsByLevel[LevelId]> = RowFieldName<
+    RowsByLevel[LevelId]
+  >,
 > = {
   kind: "table";
   columnName: K;

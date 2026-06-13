@@ -1,5 +1,11 @@
 import { describe, expect, it, beforeEach, afterEach } from "vitest";
-import { mkdtempSync, writeFileSync, mkdirSync, rmSync, realpathSync } from "node:fs";
+import {
+  mkdtempSync,
+  writeFileSync,
+  mkdirSync,
+  rmSync,
+  realpathSync,
+} from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import {
@@ -48,7 +54,9 @@ describe("project-paths", () => {
   });
 
   it("projectRootFromDbPath goes two levels up", () => {
-    expect(projectRootFromDbPath("/store/proj1/data/sqlite.db")).toBe("/store/proj1");
+    expect(projectRootFromDbPath("/store/proj1/data/sqlite.db")).toBe(
+      "/store/proj1",
+    );
   });
 
   it("storeDbPath constructs multi-project database path", () => {
@@ -98,7 +106,9 @@ describe("projectRoot singleton", () => {
 
   it("setProjectRoot throws when called with a different value", () => {
     setProjectRoot("/some/project");
-    expect(() => setProjectRoot("/other/project")).toThrow(/single-project per process/);
+    expect(() => setProjectRoot("/other/project")).toThrow(
+      /single-project per process/,
+    );
   });
 
   it("projectRoot lazily resolves from cwd when not initialized", () => {

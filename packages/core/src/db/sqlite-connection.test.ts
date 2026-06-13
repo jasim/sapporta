@@ -28,7 +28,9 @@ describe("connectProject", () => {
   it("enforces foreign key constraints at runtime", () => {
     const { sqlite } = connectProject(":memory:");
     sqlite.exec(`CREATE TABLE parent (id INTEGER PRIMARY KEY)`);
-    sqlite.exec(`CREATE TABLE child (id INTEGER PRIMARY KEY, parent_id INTEGER REFERENCES parent(id))`);
+    sqlite.exec(
+      `CREATE TABLE child (id INTEGER PRIMARY KEY, parent_id INTEGER REFERENCES parent(id))`,
+    );
 
     // Inserting a child with a non-existent parent should fail
     expect(() => {

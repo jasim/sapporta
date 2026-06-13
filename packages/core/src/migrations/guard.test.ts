@@ -17,7 +17,9 @@ const sampleTable = table({
 
 describe("assertMigrationsReady", () => {
   it("reports pending migrations from Drizzle's journal", () => {
-    const projectRoot = projectWithJournal([{ tag: "0000_initial", when: 1760000000000 }]);
+    const projectRoot = projectWithJournal([
+      { tag: "0000_initial", when: 1760000000000 },
+    ]);
     const conn = createTestDb();
 
     expect(() =>
@@ -31,7 +33,9 @@ describe("assertMigrationsReady", () => {
   });
 
   it("reports applied ledger entries missing from disk", () => {
-    const projectRoot = projectWithJournal([{ tag: "0000_initial", when: 1760000000000 }]);
+    const projectRoot = projectWithJournal([
+      { tag: "0000_initial", when: 1760000000000 },
+    ]);
     const hash = migrationHash(projectRoot, 1760000000000);
     const conn = createTestDb();
     conn.sqlite.exec(`
@@ -42,7 +46,9 @@ describe("assertMigrationsReady", () => {
       );
     `);
     conn.sqlite
-      .prepare('INSERT INTO "__drizzle_migrations" (hash, created_at) VALUES (?, ?), (?, ?)')
+      .prepare(
+        'INSERT INTO "__drizzle_migrations" (hash, created_at) VALUES (?, ?), (?, ?)',
+      )
       .run(hash, 1760000000000, "def", 1760000001000);
 
     expect(() =>
@@ -52,11 +58,15 @@ describe("assertMigrationsReady", () => {
         sqlite: conn.sqlite,
         tables: [sampleTable],
       }),
-    ).toThrow(/Applied migration missing from disk:\n  created_at=1760000001000 hash=def/);
+    ).toThrow(
+      /Applied migration missing from disk:\n  created_at=1760000001000 hash=def/,
+    );
   });
 
   it("reports modified migration files after they have been applied", () => {
-    const projectRoot = projectWithJournal([{ tag: "0000_initial", when: 1760000000000 }]);
+    const projectRoot = projectWithJournal([
+      { tag: "0000_initial", when: 1760000000000 },
+    ]);
     const conn = createTestDb();
     conn.sqlite.exec(`
       CREATE TABLE "__drizzle_migrations" (
@@ -75,11 +85,15 @@ describe("assertMigrationsReady", () => {
         sqlite: conn.sqlite,
         tables: [sampleTable],
       }),
-    ).toThrow(/Applied migration hash differs from disk:\n  created_at=1760000000000 hash=stale-hash/);
+    ).toThrow(
+      /Applied migration hash differs from disk:\n  created_at=1760000000000 hash=stale-hash/,
+    );
   });
 
   it("passes when journal entries and ledger rows match", () => {
-    const projectRoot = projectWithJournal([{ tag: "0000_initial", when: 1760000000000 }]);
+    const projectRoot = projectWithJournal([
+      { tag: "0000_initial", when: 1760000000000 },
+    ]);
     const hash = migrationHash(projectRoot, 1760000000000);
     const conn = createTestDb();
     conn.sqlite.exec(`
@@ -90,7 +104,9 @@ describe("assertMigrationsReady", () => {
       );
     `);
     conn.sqlite
-      .prepare('INSERT INTO "__drizzle_migrations" (hash, created_at) VALUES (?, ?)')
+      .prepare(
+        'INSERT INTO "__drizzle_migrations" (hash, created_at) VALUES (?, ?)',
+      )
       .run(hash, 1760000000000);
 
     expect(() =>
@@ -104,7 +120,9 @@ describe("assertMigrationsReady", () => {
   });
 });
 
-function projectWithJournal(entries: Array<{ tag: string; when: number }>): string {
+function projectWithJournal(
+  entries: Array<{ tag: string; when: number }>,
+): string {
   const projectRoot = mkdtempSync(join(tmpdir(), "sapporta-migrations-"));
   const migrationsDir = join(projectRoot, "packages/api/migrations");
   mkdirSync(join(migrationsDir, "meta"), { recursive: true });

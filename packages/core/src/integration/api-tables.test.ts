@@ -6,7 +6,14 @@
  * ordered intentionally — later tests depend on rows created by earlier tests.
  */
 import { describe, it, expect, beforeAll } from "vitest";
-import { asAuth, createIntegrationApp, request, postJson, putJson, del } from "./setup.js";
+import {
+  asAuth,
+  createIntegrationApp,
+  request,
+  postJson,
+  putJson,
+  del,
+} from "./setup.js";
 
 beforeAll(async () => {
   await createIntegrationApp();
@@ -227,9 +234,21 @@ describe("/api/tables table operations", () => {
   describe("search", () => {
     beforeAll(async () => {
       const rows = [
-        { title: "Hono basics", body: "An intro to the Hono web framework", status: "published" },
-        { title: "Drizzle tips", body: "Sharper typing for SQLite schemas", status: "published" },
-        { title: "Secret notes", body: "Contains the word HONO in the body", status: "draft" },
+        {
+          title: "Hono basics",
+          body: "An intro to the Hono web framework",
+          status: "published",
+        },
+        {
+          title: "Drizzle tips",
+          body: "Sharper typing for SQLite schemas",
+          status: "published",
+        },
+        {
+          title: "Secret notes",
+          body: "Contains the word HONO in the body",
+          status: "draft",
+        },
         { title: "Unrelated", body: "Nothing to see here", status: "draft" },
       ];
       for (const row of rows) {
@@ -364,10 +383,14 @@ describe("/api/tables table operations", () => {
       };
       expect(created.data.workspace_id).toBe("workspace-2");
 
-      const defaultWorkspaceGet = await request(`/api/tables/accounts/${created.data.id}`);
+      const defaultWorkspaceGet = await request(
+        `/api/tables/accounts/${created.data.id}`,
+      );
       expect(defaultWorkspaceGet.status).toBe(404);
 
-      const workspaceTwoList = await workspaceTwo.request("/api/tables/accounts");
+      const workspaceTwoList = await workspaceTwo.request(
+        "/api/tables/accounts",
+      );
       expect(workspaceTwoList.status).toBe(200);
       const workspaceTwoBody = (await workspaceTwoList.json()) as {
         data: Array<{ name: string; workspace_id: string }>;
@@ -408,7 +431,11 @@ describe("/api/tables table operations", () => {
       });
       expect(userOneCreate.status).toBe(201);
       const userOneArticle = (await userOneCreate.json()) as {
-        data: { title: string; workspace_id: string; scoped_to_user_id: string };
+        data: {
+          title: string;
+          workspace_id: string;
+          scoped_to_user_id: string;
+        };
       };
       expect(userOneArticle.data.workspace_id).toBe("workspace-1");
       expect(userOneArticle.data.scoped_to_user_id).toBe("user-1");
@@ -421,12 +448,18 @@ describe("/api/tables table operations", () => {
       });
       expect(userTwoCreate.status).toBe(201);
       const userTwoArticle = (await userTwoCreate.json()) as {
-        data: { title: string; workspace_id: string; scoped_to_user_id: string };
+        data: {
+          title: string;
+          workspace_id: string;
+          scoped_to_user_id: string;
+        };
       };
       expect(userTwoArticle.data.workspace_id).toBe("workspace-1");
       expect(userTwoArticle.data.scoped_to_user_id).toBe("user-2");
 
-      const defaultList = await request("/api/tables/articles?filter[status][eq]=draft");
+      const defaultList = await request(
+        "/api/tables/articles?filter[status][eq]=draft",
+      );
       expect(defaultList.status).toBe(200);
       const defaultBody = (await defaultList.json()) as {
         data: Array<{ title: string }>;
@@ -435,7 +468,9 @@ describe("/api/tables table operations", () => {
       expect(defaultTitles).toContain("User One Draft");
       expect(defaultTitles).not.toContain("User Two Draft");
 
-      const userTwoMemberList = await userTwo.request("/api/tables/articles?filter[status][eq]=draft");
+      const userTwoMemberList = await userTwo.request(
+        "/api/tables/articles?filter[status][eq]=draft",
+      );
       expect(userTwoMemberList.status).toBe(200);
       const userTwoMemberBody = (await userTwoMemberList.json()) as {
         data: Array<{ title: string }>;
@@ -445,7 +480,9 @@ describe("/api/tables table operations", () => {
       expect(userTwoTitles).not.toContain("User One Draft");
 
       const otherWorkspace = asAuth({ workspaceId: "workspace-2" });
-      const otherWorkspaceList = await otherWorkspace.request("/api/tables/articles");
+      const otherWorkspaceList = await otherWorkspace.request(
+        "/api/tables/articles",
+      );
       expect(otherWorkspaceList.status).toBe(200);
       const otherWorkspaceBody = (await otherWorkspaceList.json()) as {
         data: Array<{ title: string }>;
@@ -463,11 +500,14 @@ describe("/api/tables table operations", () => {
       expect(accountRes.status).toBe(201);
       const account = (await accountRes.json()) as { data: { id: number } };
 
-      const sameWorkspaceJournal = await postJson("/api/tables/journal_entries", {
-        account_id: account.data.id,
-        description: "Visible account reference",
-        amount: 50,
-      });
+      const sameWorkspaceJournal = await postJson(
+        "/api/tables/journal_entries",
+        {
+          account_id: account.data.id,
+          description: "Visible account reference",
+          amount: 50,
+        },
+      );
       expect(sameWorkspaceJournal.status).toBe(201);
       const journal = (await sameWorkspaceJournal.json()) as {
         data: {
@@ -496,7 +536,8 @@ describe("/api/tables table operations", () => {
       expect(error.details).toContainEqual(
         expect.objectContaining({
           field: "account_id",
-          message: "Referenced row does not exist or is not visible in the active request scope.",
+          message:
+            "Referenced row does not exist or is not visible in the active request scope.",
         }),
       );
     });

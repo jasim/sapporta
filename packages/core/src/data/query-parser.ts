@@ -1,8 +1,22 @@
 import {
-  eq, ne, gt, gte, lt, lte, like,
-  isNull, isNotNull, inArray, notInArray,
-  asc, desc, and, or, sql,
-  type SQL, type AnyColumn,
+  eq,
+  ne,
+  gt,
+  gte,
+  lt,
+  lte,
+  like,
+  isNull,
+  isNotNull,
+  inArray,
+  notInArray,
+  asc,
+  desc,
+  and,
+  or,
+  sql,
+  type SQL,
+  type AnyColumn,
 } from "drizzle-orm";
 import type { TableDef } from "../schema/table.js";
 import { resolveColumnKind } from "../schema/resolve-kind.js";
@@ -134,17 +148,28 @@ function parseFilterConditionsTyped(
  *  values pass straight through to Drizzle. */
 function buildFilterSql(col: AnyColumn, cond: TypedFilterCondition): SQL {
   switch (cond.op) {
-    case "eq":         return eq(col, bind(cond.value));
-    case "neq":        return ne(col, bind(cond.value));
-    case "gt":         return gt(col, bind(cond.value));
-    case "gte":        return gte(col, bind(cond.value));
-    case "lt":         return lt(col, bind(cond.value));
-    case "lte":        return lte(col, bind(cond.value));
-    case "contains":   return likeWithEscape(col, `%${escapeLike(bindText(cond.value))}%`);
-    case "startswith": return likeWithEscape(col, `${escapeLike(bindText(cond.value))}%`);
-    case "endswith":   return likeWithEscape(col, `%${escapeLike(bindText(cond.value))}`);
-    case "in":         return inArray(col, cond.values.map(bind));
-    case "nin":        return notInArray(col, cond.values.map(bind));
+    case "eq":
+      return eq(col, bind(cond.value));
+    case "neq":
+      return ne(col, bind(cond.value));
+    case "gt":
+      return gt(col, bind(cond.value));
+    case "gte":
+      return gte(col, bind(cond.value));
+    case "lt":
+      return lt(col, bind(cond.value));
+    case "lte":
+      return lte(col, bind(cond.value));
+    case "contains":
+      return likeWithEscape(col, `%${escapeLike(bindText(cond.value))}%`);
+    case "startswith":
+      return likeWithEscape(col, `${escapeLike(bindText(cond.value))}%`);
+    case "endswith":
+      return likeWithEscape(col, `%${escapeLike(bindText(cond.value))}`);
+    case "in":
+      return inArray(col, cond.values.map(bind));
+    case "nin":
+      return notInArray(col, cond.values.map(bind));
     case "is":
       return cond.polarity === "null" ? isNull(col) : isNotNull(col);
   }
@@ -196,10 +221,7 @@ function buildSearchSql(
   return likeParts.length === 1 ? likeParts[0] : or(...likeParts)!;
 }
 
-function parseSortClauses(
-  raw: string | undefined,
-  schema: TableDef,
-): SQL[] {
+function parseSortClauses(raw: string | undefined, schema: TableDef): SQL[] {
   if (!raw) return [];
   return raw.split(",").map((field) => {
     const descending = field.startsWith("-");
