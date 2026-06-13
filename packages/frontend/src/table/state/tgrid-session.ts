@@ -117,6 +117,7 @@ export type TGridSession<
     levelId?: LevelId,
   ): TGridLevelQueryState<RowsByLevel[LevelId]>;
   reloadRows(levelId?: TGridLevelId<RowsByLevel>, path?: GridPath): void;
+  setErrorBanner(message: string | null): void;
   csvExportUrl(levelId?: TGridLevelId<RowsByLevel>): string;
   dispose(): void;
 };
@@ -156,7 +157,6 @@ class DefaultTGridSession<
     TGridLevelId<RowsByLevel>,
     StoreApi<TGridLevelQueryState<TGridTableRow>>
   >();
-
   readonly queryStore: StoreApi<
     TGridLevelQueryState<RowsByLevel[TGridLevelId<RowsByLevel>]>
   >;
@@ -296,6 +296,10 @@ class DefaultTGridSession<
     path: GridPath = this.rootGridPath,
   ): void {
     this.runtime.sourceFor(path).refetch();
+  }
+
+  setErrorBanner(message: string | null): void {
+    this.queryStore.getState().setErrorBanner(message);
   }
 
   csvExportUrl(levelId: TGridLevelId<RowsByLevel> = this.rootLevel): string {

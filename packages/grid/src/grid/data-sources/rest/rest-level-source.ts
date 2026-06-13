@@ -746,15 +746,7 @@ export function restLevelSource<F = unknown>(
     next.splice(idx, 1);
     nodes = next;
     emit();
-    opts.removeNode!({ rowKey }).then(
-      () => {
-        // No state change on success — the row is already gone.
-      },
-      () => {
-        // Same posture as createNode: leave the optimistic state in
-        // place; host policy decides recovery.
-      },
-    );
+    return opts.removeNode!({ rowKey });
   };
 
   const onReconcile: WritableLevelDataSource["onReconcile"] = (fn) => {

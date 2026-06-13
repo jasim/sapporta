@@ -1,10 +1,17 @@
-import { useSyncExternalStore } from "react";
+import { useCallback, useState, useSyncExternalStore } from "react";
 import { Trash2 } from "lucide-react";
-import { type GridPath, type GridRuntime } from "@sapporta/grid";
+import {
+  rowKeyOfRowId,
+  type GridPath,
+  type GridRuntime,
+  type RowKey,
+} from "@sapporta/grid";
 import { TopBarButton } from "@/shell/components/TopBar";
+import { errorMessage } from "@/platform/http";
 
 export type TableToolbarSession = {
   runtime: GridRuntime;
+  setErrorBanner: (message: string | null) => void;
 };
 
 export type TableToolbarDeleteRowActionProps = {
@@ -16,20 +23,72 @@ export type TableToolbarSelectionState =
   | { kind: "single"; count: 1 }
   | { kind: "multiple"; count: number };
 
+type TableToolbarDeleteRowTarget = {
+  path: GridPath;
+  rowKey: RowKey;
+};
+
 export function TableToolbarDeleteRowAction({
   session,
 }: TableToolbarDeleteRowActionProps) {
   const hasSelectedRow = useHasAnySelectedDataRow(session);
+  const { deleteSelectedRows, deleting } =
+    useDeleteSelectedTableToolbarRows(session);
 
   return (
     <TopBarButton
       tone="ghost"
       icon={<Trash2 className="h-[12px] w-[12px]" />}
-      disabled={!hasSelectedRow}
+      disabled={!hasSelectedRow || deleting}
+      onClick={deleteSelectedRows}
     >
       <span className="sr-only">Delete Row</span>
     </TopBarButton>
   );
+}
+
+export function useDeleteSelectedTableToolbarRows(
+  session: TableToolbarSession | undefined,
+): { deleteSelectedRows: () => void; deleting: boolean } {
+  const [deleting, setDeleting] = useState(false);
+
+  const deleteSelectedRows = useCallback(() => {
+    if (!session || deleting) return;
+    setDeleting(true);
+    void (async () => {
+      try {
+        await deleteSelectedTableToolbarRows(session);
+      } finally {
+        setDeleting(false);
+      }
+    })();
+  }, [deleting, session]);
+
+  return { deleteSelectedRows, deleting };
+}
+
+export async function deleteSelectedTableToolbarRows(
+  session: TableToolbarSession | undefined,
+): Promise<void> {
+  if (!session) return;
+  const targets = selectedTableToolbarDeleteTargets(session);
+  if (targets.length === 0) return;
+
+  const touchedPaths = new Set<GridPath>();
+  for (const target of targets) {
+    try {
+      await session.runtime.removeRow(target.path, target.rowKey);
+      touchedPaths.add(target.path);
+    } catch (err) {
+      touchedPaths.add(target.path);
+      refetchPaths(session.runtime, touchedPaths);
+      session.setErrorBanner(`Failed to delete row: ${errorMessage(err)}`);
+      return;
+    }
+  }
+
+  refetchPaths(session.runtime, touchedPaths);
+  clearTableToolbarSelection(session);
 }
 
 export function useTableToolbarSelection(
@@ -76,9 +135,16 @@ function useSelectedDataRowCount(
 function selectedDataRowCount(
   session: TableToolbarSession | undefined,
 ): number {
-  if (!session) return 0;
+  return selectedTableToolbarDeleteTargets(session).length;
+}
+
+export function selectedTableToolbarDeleteTargets(
+  session: TableToolbarSession | undefined,
+): Array<{ path: GridPath; rowKey: RowKey }> {
+  if (!session) return [];
   const runtime = session.runtime;
-  let count = 0;
+  const targets: Array<TableToolbarDeleteRowTarget & { depth: number }> = [];
+
   for (const path of runtime.registeredPaths()) {
     const rowInteraction = runtime.rowInteractionSnapshotFor(path);
     for (const rowId of rowInteraction.selectedRowIds) {
@@ -86,11 +152,17 @@ function selectedDataRowCount(
       // rows, footers, and rows filtered away from the displayed set should not
       // make the toolbar look ready to delete.
       if (runtime.displayedRowFor(path, rowId)?.kind === "data") {
-        count += 1;
+        targets.push({
+          path,
+          rowKey: rowKeyOfRowId(rowId),
+          depth: pathDepth(path),
+        });
       }
     }
   }
-  return count;
+
+  targets.sort((a, b) => b.depth - a.depth);
+  return targets.map(({ path, rowKey }) => ({ path, rowKey }));
 }
 
 function subscribeSelectedDataRows(
@@ -129,4 +201,14 @@ function subscribeSelectedDataRows(
   return () => {
     for (const unsub of unsubs) unsub();
   };
+}
+
+function pathDepth(path: GridPath): number {
+  return String(path).split(".").length;
+}
+
+function refetchPaths(runtime: GridRuntime, paths: ReadonlySet<GridPath>): void {
+  for (const path of paths) {
+    runtime.sourceFor(path).refetch();
+  }
 }

@@ -756,7 +756,7 @@ describe("GridRuntime", () => {
     const afterInsert = rt.displayedRowSequenceFor(rowsRoot);
     expect(afterInsert).not.toBe(before);
 
-    rt.removeRow(rowsRoot, "c");
+    await rt.removeRow(rowsRoot, "c");
 
     expect(listener).toHaveBeenCalledTimes(2);
     expect(rt.displayedRowSequenceFor(rowsRoot)).not.toBe(afterInsert);
@@ -1228,7 +1228,7 @@ describe("GridRuntime", () => {
       atIndex: 2,
     });
 
-    rt.removeRow(rowsRoot, "b");
+    await rt.removeRow(rowsRoot, "b");
     expect(rt.snapshotFor(rowsRoot).nodes.map((n) => n.columns.id)).toEqual([
       "a",
       "c",

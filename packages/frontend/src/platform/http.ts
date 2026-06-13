@@ -31,3 +31,24 @@ export async function parseErrorBody(response: Response): Promise<unknown> {
     return { error: response.statusText };
   }
 }
+
+export function errorMessage(
+  err: unknown,
+  fallback = "Request failed",
+): string {
+  if (err instanceof ApiError) {
+    const body = err.body;
+    if (isErrorBody(body)) return body.error;
+  }
+  if (err instanceof Error) return err.message;
+  return fallback;
+}
+
+function isErrorBody(body: unknown): body is { error: string } {
+  return (
+    body !== null &&
+    typeof body === "object" &&
+    "error" in body &&
+    typeof (body as { error: unknown }).error === "string"
+  );
+}

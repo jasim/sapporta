@@ -54,7 +54,7 @@ export type GridLevelCommands<TFilter = unknown> = {
   setPage: (page: number, pageSize: number) => void;
   refetch: () => void;
   createRow: (node: TreeNode, atIndex?: number) => Promise<unknown>;
-  removeRow: (rowKey: RowKey) => void;
+  removeRow: (rowKey: RowKey) => void | Promise<void>;
   writeCell: (coord: Coord, value: unknown) => void;
   commitPhantomRow: (rowKey: RowKey, atIndex?: number) => Promise<unknown>;
 };

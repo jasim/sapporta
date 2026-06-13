@@ -236,7 +236,7 @@ export type WritableLevelDataSource = Omit<
   // Atomic from the grid's view: every change applies or none does.
   applyChanges: (changes: CellChange[]) => void;
   createNode: (node: TreeNode, atIndex?: number) => Promise<CreateNodeResult>;
-  removeNode: (rowKey: RowKey) => void;
+  removeNode: (rowKey: RowKey) => void | Promise<void>;
   // Per-cell reconciliation channel. Fires once per `setCell` /
   // `applyChanges` entry when the optimistic write has been resolved
   // against authoritative state. Sync sources may skip emission (the

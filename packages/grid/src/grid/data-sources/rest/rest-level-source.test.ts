@@ -739,6 +739,36 @@ describe("restLevelSource — createNode", () => {
   });
 });
 
+describe("restLevelSource — removeNode", () => {
+  async function readyWritable(
+    extra: Partial<RestLevelSourceOpts<TestFilter>> = {},
+  ) {
+    const src = restLevelSource(
+      baseOpts({
+        patchCell: async () => ({ value: 0 }),
+        insertNode: async (req) => req.node,
+        removeNode: async () => {},
+        ...extra,
+      }),
+    );
+    if (!src.writable) throw new Error("expected writable source");
+    await flush();
+    await flush();
+    return src;
+  }
+
+  it("surfaces backend delete failures to the caller", async () => {
+    const src = await readyWritable({
+      removeNode: async () => {
+        throw new Error("delete denied");
+      },
+    });
+    if (!src.writable) throw new Error("writable");
+
+    await expect(src.removeNode("b")).rejects.toThrow("delete denied");
+  });
+});
+
 describe("restLevelSource — dispose", () => {
   it("dispose stops subscriber notifications and discards in-flight resolutions", async () => {
     const fetched = deferred<FetchPageResponse>();

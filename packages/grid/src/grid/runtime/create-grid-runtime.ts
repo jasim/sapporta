@@ -235,7 +235,7 @@ export type GridRuntime = {
     node: TreeNode,
     atIndex?: number,
   ) => Promise<CreateNodeResult>;
-  removeRow: (path: GridPath, rowKey: RowKey) => void;
+  removeRow: (path: GridPath, rowKey: RowKey) => Promise<void>;
   commitPhantomRow: (
     path: GridPath,
     rowKey: RowKey,
@@ -803,14 +803,14 @@ export function createGridRuntime(args: RuntimeArgs): GridRuntime {
     return result;
   }
 
-  function removeRow(path: GridPath, rowKey: RowKey): void {
+  async function removeRow(path: GridPath, rowKey: RowKey): Promise<void> {
     const src = requireWritable(path);
     const { node, index } = readNodeWithIndex(
       src.snapshot(),
       schemaForPath(path),
       rowKey,
     );
-    src.removeNode(rowKey);
+    await src.removeNode(rowKey);
     emitter.emit("mutationCommitted", {
       kind: "remove",
       path,

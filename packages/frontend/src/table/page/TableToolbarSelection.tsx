@@ -1,6 +1,7 @@
 import { Trash2, X } from "lucide-react";
 import {
   clearTableToolbarSelection,
+  useDeleteSelectedTableToolbarRows,
   type TableToolbarSelectionState,
 } from "./TableToolbarDeleteRowAction";
 import type { TableToolbarProps } from "./TableToolbar";
@@ -15,6 +16,9 @@ export function TableToolbarSelection({
   totalCount,
   selection,
 }: TableToolbarProps & { selection: TableToolbarSelectionState }) {
+  const { deleteSelectedRows, deleting } =
+    useDeleteSelectedTableToolbarRows(session);
+
   return (
     <div className="sticky top-0 z-[var(--sap-z-shell-sticky)] border-b border-sap-border-soft bg-sap-surface/95 px-4 py-3">
       <div className="flex min-w-0 items-center gap-3">
@@ -29,7 +33,8 @@ export function TableToolbarSelection({
         <CompactToolbarButton
           tone="danger"
           icon={<Trash2 className="h-4 w-4 shrink-0" />}
-          disabled={selection.kind === "none"}
+          disabled={selection.kind === "none" || deleting}
+          onClick={deleteSelectedRows}
         >
           Delete
         </CompactToolbarButton>
