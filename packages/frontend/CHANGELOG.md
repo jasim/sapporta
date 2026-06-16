@@ -1,5 +1,15 @@
 # @sapporta/frontend
 
+## 0.2.5
+
+### Patch Changes
+
+- first iteration of auth integration
+- Updated dependencies
+  - @sapporta/grid@0.2.5
+  - @sapporta/shared@0.1.5
+  - @sapporta/ui@0.2.5
+
 ## 0.2.4
 
 ### Patch Changes

@@ -1,5 +1,13 @@
 # sapporta
 
+## 0.2.4
+
+### Patch Changes
+
+- first iteration of auth integration
+- Updated dependencies
+  - @sapporta/server@0.2.5
+
 ## 0.2.3
 
 ### Patch Changes

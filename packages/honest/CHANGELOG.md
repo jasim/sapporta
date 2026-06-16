@@ -1,5 +1,11 @@
 # @sapporta/honest
 
+## 0.3.4
+
+### Patch Changes
+
+- first iteration of auth integration
+
 ## 0.3.3
 
 ### Patch Changes

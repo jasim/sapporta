@@ -1,5 +1,13 @@
 # @sapporta/grid
 
+## 0.2.5
+
+### Patch Changes
+
+- first iteration of auth integration
+- Updated dependencies
+  - @sapporta/ui@0.2.5
+
 ## 0.2.4
 
 ### Patch Changes
