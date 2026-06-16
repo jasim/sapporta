@@ -37,13 +37,7 @@ export function FilterCard({
 
   const column = columns.find((c) => c.name === condition.column) ?? null;
   const label = column?.label ?? condition.column;
-  const opLabel = column
-    ? findEntryForCondition(
-        inferFilterColumnType(column),
-        condition.op,
-        condition.op === "is" ? condition.polarity : null,
-      ).label
-    : condition.op;
+  const opLabel = summarizeOperator(condition, column);
   const valueSummary = summarizeValue(condition, column, fkOptions);
 
   return (
@@ -97,6 +91,24 @@ export function FilterCard({
       </PopoverContent>
     </Popover>
   );
+}
+
+export function summarizeOperator(
+  cond: FilterCondition,
+  column: ColumnSchema | null,
+): string {
+  // Keep single-choice list filters conversational:
+  // "Author is Jack Weatherford", not "Author is one of Jack Weatherford".
+  if (cond.op === "in" && cond.values.length === 1) return "is";
+  if (cond.op === "nin" && cond.values.length === 1) return "is not";
+
+  if (!column) return cond.op;
+
+  return findEntryForCondition(
+    inferFilterColumnType(column),
+    cond.op,
+    cond.op === "is" ? cond.polarity : null,
+  ).label;
 }
 
 function summarizeValue(
