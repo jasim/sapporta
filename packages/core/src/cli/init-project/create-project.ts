@@ -77,23 +77,22 @@ export function createProject(opts: CreateProjectOptions): CreateProjectResult {
 
   logInitDetail(
     progress,
+    "Checking npm registry access before resolving project package versions",
+  );
+  assertNpmRegistryReachable({
+    targetRoot: project.root,
+    runCommand,
+    progress: (message) => logInitDetail(progress, message),
+  });
+
+  logInitDetail(
+    progress,
     "Resolving Sapporta package versions for the new project's package.json files",
   );
   const files = renderScaffoldFiles(
     project,
     process.env.SAPPORTA_DEV_MODE_PACKAGE_ROOT,
   );
-
-  logInitDetail(
-    progress,
-    "Checking that npm can resolve the generated workspace dependencies before writing project files",
-  );
-  assertNpmRegistryReachable({
-    files,
-    targetRoot: project.root,
-    runCommand,
-    progress: (message) => logInitDetail(progress, message),
-  });
 
   const stagingRoot = stagingRootFor(
     project.root,

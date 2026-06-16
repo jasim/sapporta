@@ -65,6 +65,44 @@ describe("createProject", () => {
     expect(stagingDirs(parent)).toEqual([]);
   });
 
+  it("checks registry access before resolving scaffold packages", () => {
+    const parent = makeTempDir();
+    const target = join(parent, "acme-app");
+    const previousDevModePackageRoot =
+      process.env.SAPPORTA_DEV_MODE_PACKAGE_ROOT;
+    const runCommand = commandRunnerThatFails((command, args) => {
+      if (command === "pnpm" && args[0] === "view") {
+        return new Error("getaddrinfo ENOTFOUND registry.npmjs.org");
+      }
+      return undefined;
+    });
+
+    process.env.SAPPORTA_DEV_MODE_PACKAGE_ROOT = join(
+      parent,
+      "missing-sapporta-checkout",
+    );
+    try {
+      expect(() =>
+        createProject({
+          dir: target,
+          name: "acme-app",
+          runCommand,
+          verifySqlite: noopSqliteVerifier,
+        }),
+      ).toThrow(/minimal package lookup/);
+    } finally {
+      if (previousDevModePackageRoot === undefined) {
+        delete process.env.SAPPORTA_DEV_MODE_PACKAGE_ROOT;
+      } else {
+        process.env.SAPPORTA_DEV_MODE_PACKAGE_ROOT =
+          previousDevModePackageRoot;
+      }
+    }
+
+    expect(existsSync(target)).toBe(false);
+    expect(stagingDirs(parent)).toEqual([]);
+  });
+
   it("cleans staging and leaves the target absent when install fails", () => {
     const parent = makeTempDir();
     const target = join(parent, "acme-app");
@@ -111,9 +149,8 @@ describe("createProject", () => {
     expect(existsSync(join(target, "data"))).toBe(true);
     expect(existsSync(join(target, "packages/api/package.json"))).toBe(true);
     expect(commands).toContain("pnpm --version");
-    expect(commands).toContainEqual(
-      expect.stringMatching(/^pnpm view hono@.+ version --json$/),
-    );
+    expect(commands[0]).toBe("pnpm --version");
+    expect(commands[1]).toBe("pnpm view hono@latest version --json");
     expect(commands).toContain("pnpm install");
     expect(commands).toContain(
       "pnpm --filter ./packages/api db:generate --name initial_auth",

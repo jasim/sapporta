@@ -77,7 +77,6 @@ export type DependencyDefinition = {
 
 export type DependencyCatalog = {
   definitions: readonly DependencyDefinition[];
-  preflightPackage: PackageName;
   tokenByKey: ReadonlyMap<DependencyKey, TemplateToken>;
 };
 
@@ -250,7 +249,6 @@ export const DEPENDENCY_DEFINITIONS = [
 
 export const DEPENDENCY_CATALOG: DependencyCatalog = {
   definitions: DEPENDENCY_DEFINITIONS,
-  preflightPackage: "hono",
   tokenByKey: tokensForCatalog(DEPENDENCY_DEFINITIONS),
 };
 
@@ -281,20 +279,6 @@ export function tokensForCatalog(
       definition.token ? [[definition.key, definition.token]] : [],
     ),
   );
-}
-
-export function preflightDependencyDefinition(
-  catalog: DependencyCatalog = DEPENDENCY_CATALOG,
-): DependencyDefinition {
-  const definition = catalog.definitions.find(
-    (candidate) => candidate.packageName === catalog.preflightPackage,
-  );
-  if (!definition) {
-    throw new Error(
-      `Cannot find npm registry preflight package ${catalog.preflightPackage} in the dependency catalog.`,
-    );
-  }
-  return definition;
 }
 
 export function resolveProdSpecsFromMetadata(
