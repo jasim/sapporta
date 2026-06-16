@@ -4,12 +4,17 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { ErrorCode, OperationError } from "../../introspect/types.js";
-import { createProject, resolveOwningPackage } from "./create-project.js";
-import type { InitCommandRunner } from "./init-commands.js";
+import { createProject } from "./create-project.js";
+import { DEPENDENCY_CATALOG } from "./dependency-catalog.js";
+import type { InitCommandRunner } from "./init-shell.js";
+import { resolveOwningPackage } from "./package-metadata.js";
+import { initProjectPackagePaths } from "./paths.js";
+import { layoutForRoot, projectIdentityFromOptions } from "./project-layout.js";
+import { renderScaffoldFiles } from "./render-scaffold.js";
 import {
-  renderScaffoldFiles,
-  scaffoldProjectFromOptions,
-} from "./render-scaffold.js";
+  SCAFFOLD_MANIFEST,
+  validateTemplateInventory,
+} from "./scaffold-manifest.js";
 
 describe("resolveOwningPackage", () => {
   it("reads @sapporta/server metadata without resolving its ESM-only root export", () => {
@@ -140,10 +145,12 @@ function noopSqliteVerifier(): void {
 
 describe("renderScaffoldFiles", () => {
   it("replaces scaffold placeholders in generated project files", () => {
-    const project = scaffoldProjectFromOptions({
-      dir: "/tmp/acme-app",
-      name: "Acme App",
-    });
+    const project = layoutForRoot(
+      projectIdentityFromOptions({
+        dir: "/tmp/acme-app",
+        name: "Acme App",
+      }),
+    );
     const files = renderScaffoldFiles(project, undefined);
     const byDest = new Map(files.map((file) => [file.dest, file.content]));
     const unresolvedToken = /%%SAPPORTA:[A-Z0-9_]+%%/;
@@ -182,3 +189,66 @@ describe("renderScaffoldFiles", () => {
     }
   });
 });
+
+describe("scaffold template inventory", () => {
+  it("accounts for every template file as scaffolded or intentionally ignored", () => {
+    const initPaths = initProjectPackagePaths();
+    const templatePaths = listTemplateFiles(initPaths.templatesDir);
+
+    expect(
+      validateTemplateInventory(templatePaths, SCAFFOLD_MANIFEST, [
+        "authz/types.ts",
+        "packages/api/mailer.ts",
+        "packages/shared/AGENTS.md",
+        "tsconfig.json",
+        "dependency-package-snapshots/README.md",
+        "dependency-package-snapshots/cli/package.json",
+        "dependency-package-snapshots/frontend/package.json",
+        "dependency-package-snapshots/grid/package.json",
+        "dependency-package-snapshots/honest/package.json",
+        "dependency-package-snapshots/shared/package.json",
+        "dependency-package-snapshots/ui/package.json",
+      ]),
+    ).toEqual([]);
+  });
+
+  it("supplies every Sapporta template token used by scaffolded templates", () => {
+    const initPaths = initProjectPackagePaths();
+    const suppliedTokens = new Set([
+      "%%SAPPORTA:SLUG%%",
+      "%%SAPPORTA:NAME%%",
+      "%%SAPPORTA:BETTER_AUTH_DEV_SECRET%%",
+      ...DEPENDENCY_CATALOG.tokenByKey.values(),
+    ]);
+    const usedTokens = new Set(
+      SCAFFOLD_MANIFEST.flatMap((file) =>
+        [
+          ...readFileSync(initPaths.templatePath(file.src), "utf-8").matchAll(
+            /%%SAPPORTA:[A-Z0-9_]+%%/g,
+          ),
+        ].map((match) => match[0]),
+      ),
+    );
+
+    expect(
+      [...usedTokens].filter((token) => !suppliedTokens.has(token)),
+    ).toEqual([]);
+  });
+});
+
+function listTemplateFiles(root: string): string[] {
+  const files: string[] = [];
+  const visit = (dir: string, prefix: string): void => {
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      const relativePath = prefix ? `${prefix}/${entry.name}` : entry.name;
+      const absolutePath = join(dir, entry.name);
+      if (entry.isDirectory()) {
+        visit(absolutePath, relativePath);
+      } else if (entry.isFile()) {
+        files.push(relativePath);
+      }
+    }
+  };
+  visit(root, "");
+  return files.sort();
+}

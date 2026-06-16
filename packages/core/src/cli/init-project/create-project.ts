@@ -9,36 +9,28 @@ import {
 import { dirname, join } from "node:path";
 import { randomBytes } from "node:crypto";
 import { ErrorCode, OperationError } from "../../introspect/types.js";
-import { fromProjectRoot } from "../../project-paths.js";
 import { ensureBetterSqlite3Loads } from "./sqlite-native-repair.js";
 import {
+  errorMessage,
+  formatCommand,
   logInitDetail,
   logInitSection,
   noopProgress,
-  type ProgressLogger,
-} from "./init-progress.js";
-import {
-  formatCommand,
   runInitCommand,
-  type InitCommandRunner,
-} from "./init-commands.js";
-import {
-  errorMessage,
   InitSetupError,
+  type InitCommandRunner,
   type InitSetupStep,
-} from "./init-errors.js";
+  type ProgressLogger,
+} from "./init-shell.js";
 import { assertNpmRegistryReachable } from "./npm-registry-preflight.js";
 import {
-  renderScaffoldFiles,
-  resolveScaffoldPackages,
-  resolveOwningPackage,
-  scaffoldProjectFromOptions,
-  type ScaffoldPackages,
-  type ScaffoldProject,
-} from "./render-scaffold.js";
-
-export { resolveOwningPackage, resolveScaffoldPackages };
-export type { ScaffoldPackages };
+  layoutForRoot,
+  projectIdentityFromOptions,
+  scaffoldDirectoriesFor,
+  stagingRootFor,
+  type ProjectLayout,
+} from "./project-layout.js";
+import { renderScaffoldFiles } from "./render-scaffold.js";
 
 export interface CreateProjectOptions {
   /** Absolute path to the project root that should be published on success. */
@@ -76,7 +68,7 @@ export function createProject(opts: CreateProjectOptions): CreateProjectResult {
     opts.verifySqlite ??
     ((apiDir, sqliteProgress) =>
       ensureBetterSqlite3Loads(apiDir, sqliteProgress));
-  const project = scaffoldProjectFromOptions(opts);
+  const project = layoutForRoot(projectIdentityFromOptions(opts));
 
   logInitSection(progress, "Preparing the generated workspace scaffold");
   assertCanCreateProject(project);
@@ -103,72 +95,29 @@ export function createProject(opts: CreateProjectOptions): CreateProjectResult {
     progress: (message) => logInitDetail(progress, message),
   });
 
-  const stagingRoot = makeStagingRoot(project.root);
-  const stagedProject = scaffoldProjectFromOptions({
-    dir: stagingRoot,
-    name: project.name,
+  const stagingRoot = stagingRootFor(
+    project.root,
+    randomBytes(6).toString("hex"),
+  );
+  const stagedProject = layoutForRoot(
+    projectIdentityFromOptions({
+      dir: stagingRoot,
+      name: project.name,
+    }),
+  );
+  executeCreateProjectWorkflow({
+    requestedProject: project,
+    stagedProject,
+    files,
+    runCommand,
+    verifySqlite,
+    progress,
   });
-
-  try {
-    logInitSection(progress, "Creating the Sapporta project directory");
-    logInitDetail(progress, `Project directory: ${project.root}`);
-    logInitDetail(progress, `Staging directory: ${stagingRoot}`);
-    runSetupStep({
-      step: "scaffold-write",
-      command: "write generated project files",
-      project,
-      stagingRoot,
-      action: () => {
-        writeProjectMarker(stagedProject);
-        logInitDetail(
-          progress,
-          "Creating packages/api, packages/frontend, packages/shared, and support directories",
-        );
-        createScaffoldDirectories(stagedProject);
-        logInitDetail(
-          progress,
-          "Writing TypeScript, Vite, Drizzle, auth, and package configuration files",
-        );
-        writeScaffoldFiles(stagedProject.root, files);
-      },
-    });
-
-    installWorkspace(stagedProject.root, project, runCommand, progress);
-    logInitSection(progress, "Verifying SQLite native bindings");
-    runSetupStep({
-      step: "sqlite-native-bindings",
-      command: "better-sqlite3 smoke test and repair",
-      project,
-      stagingRoot,
-      action: () =>
-        verifySqlite(stagedProject.apiDir, (message) =>
-          logInitDetail(progress, message),
-        ),
-    });
-    generateInitialMigration(stagedProject.root, project, runCommand, progress);
-    runInitialMigration(stagedProject.root, project, runCommand, progress);
-    publishStagingDirectory(stagingRoot, project);
-  } catch (error) {
-    rmSync(stagingRoot, { recursive: true, force: true });
-    if (error instanceof OperationError) {
-      throw error;
-    }
-    throw new InitSetupError(
-      "scaffold-write",
-      [
-        "Sapporta init failed while preparing the staged project.",
-        `Staging directory: ${stagingRoot}`,
-        `Requested target was left untouched: ${project.root}`,
-        `Retry the full \`sapporta init ${project.name}\` command after fixing the failure.`,
-        `Cause: ${errorMessage(error)}`,
-      ].join("\n"),
-    );
-  }
 
   return { dir: project.root, name: project.name };
 }
 
-function assertCanCreateProject(project: ScaffoldProject): void {
+function assertCanCreateProject(project: ProjectLayout): void {
   const parentDir = dirname(project.root);
   if (!existsSync(parentDir) || !statSync(parentDir).isDirectory()) {
     throw new OperationError(
@@ -205,65 +154,239 @@ function assertPnpmAvailable(runCommand: InitCommandRunner): void {
   }
 }
 
-function makeStagingRoot(projectRoot: string): string {
-  return join(
-    dirname(projectRoot),
-    `.${projectRoot.split(/[\\/]/).at(-1) ?? "sapporta-project"}.sapporta-init-${process.pid}-${randomBytes(6).toString("hex")}`,
-  );
+type CreateProjectSetupOptions = {
+  requestedProject: ProjectLayout;
+  stagedProject: ProjectLayout;
+  files: ReturnType<typeof renderScaffoldFiles>;
+  runCommand: InitCommandRunner;
+  verifySqlite: (apiDir: string, progress: ProgressLogger) => void;
+  progress: ProgressLogger;
+};
+
+function executeCreateProjectWorkflow(opts: CreateProjectSetupOptions): void {
+  new CreateProjectSetup(opts).run();
 }
 
-function writeProjectMarker(project: ScaffoldProject): void {
-  const { dataDir, markerPath } = fromProjectRoot(project.root);
-  mkdirSync(dataDir, { recursive: true });
-  writeFileSync(
-    markerPath,
-    JSON.stringify({ name: project.name }, null, 2) + "\n",
-  );
-}
+class CreateProjectSetup {
+  constructor(private readonly opts: CreateProjectSetupOptions) {}
 
-function publishStagingDirectory(
-  stagingRoot: string,
-  project: ScaffoldProject,
-): void {
-  if (existsSync(project.root)) {
-    throw new OperationError(
-      `Cannot publish ${project.root}: the target path appeared while Sapporta init was running. Remove it or choose a different project name, then retry \`sapporta init ${project.name}\`.`,
-      ErrorCode.INIT_TARGET_EXISTS,
-    );
-  }
-  runSetupStep({
-    step: "atomic-publish",
-    command: `rename ${stagingRoot} to ${project.root}`,
-    project,
-    stagingRoot,
-    action: () => renameSync(stagingRoot, project.root),
-  });
-}
-
-function runSetupStep(opts: {
-  step: InitSetupStep;
-  command: string;
-  project: ScaffoldProject;
-  stagingRoot: string;
-  action: () => void;
-}): void {
-  try {
-    opts.action();
-  } catch (error) {
-    if (error instanceof OperationError) {
-      throw error;
+  run(): void {
+    try {
+      this.writeWorkspaceFiles();
+      this.installWorkspaceDependencies();
+      this.verifySqliteNativeBindings();
+      this.generateInitialAuthMigration();
+      this.applyInitialAuthMigration();
+      this.publishProjectDirectory();
+    } catch (error) {
+      this.removeStagingDirectory();
+      if (error instanceof OperationError) {
+        throw error;
+      }
+      throw new InitSetupError(
+        "scaffold-write",
+        [
+          "Sapporta init failed while preparing the staged project.",
+          `Staging directory: ${this.opts.stagedProject.root}`,
+          `Requested target was left untouched: ${this.opts.requestedProject.root}`,
+          `Retry the full \`sapporta init ${this.opts.requestedProject.name}\` command after fixing the failure.`,
+          `Cause: ${errorMessage(error)}`,
+        ].join("\n"),
+      );
     }
-    throw new InitSetupError(
-      opts.step,
-      [
-        `Sapporta init failed during ${formatStep(opts.step)}.`,
-        `Command: ${opts.command}`,
-        `Staging directory: ${opts.stagingRoot}`,
-        `Requested target was left untouched: ${opts.project.root}`,
-        `Retry the full \`sapporta init ${opts.project.name}\` command after fixing the failure.`,
-        `Cause: ${errorMessage(error)}`,
-      ].join("\n"),
-    );
+  }
+
+  private writeWorkspaceFiles(): void {
+    this.logSection({
+      title: "Creating the Sapporta project directory",
+      details: [
+        `Project directory: ${this.opts.requestedProject.root}`,
+        `Staging directory: ${this.opts.stagedProject.root}`,
+        "Creating packages/api, packages/frontend, packages/shared, and support directories",
+        "Writing TypeScript, Vite, Drizzle, auth, and package configuration files",
+      ],
+    });
+
+    this.runSetupStep({
+      step: "scaffold-write",
+      command: "write generated project files",
+      action: () => {
+        for (const directory of scaffoldDirectoriesFor(
+          this.opts.stagedProject.root,
+        )) {
+          mkdirSync(directory, { recursive: true });
+        }
+        this.writeFileWithParents(
+          this.opts.stagedProject.markerPath,
+          `${JSON.stringify({ name: this.opts.requestedProject.name }, null, 2)}\n`,
+        );
+        for (const file of this.opts.files) {
+          this.writeFileWithParents(
+            join(this.opts.stagedProject.root, file.dest),
+            file.content,
+          );
+        }
+      },
+    });
+  }
+
+  private installWorkspaceDependencies(): void {
+    this.runCommandStep({
+      step: "pnpm-install",
+      title: "Installing the generated workspace dependencies",
+      details: [
+        "Running pnpm install so the API, frontend, and shared packages can build",
+      ],
+      command: "pnpm",
+      args: ["install"],
+    });
+  }
+
+  private verifySqliteNativeBindings(): void {
+    this.logSection({
+      title: "Verifying SQLite native bindings",
+      details: [],
+    });
+    this.runSetupStep({
+      step: "sqlite-native-bindings",
+      command: "better-sqlite3 smoke test and repair",
+      action: () =>
+        this.opts.verifySqlite(this.opts.stagedProject.apiDir, (message) =>
+          logInitDetail(this.opts.progress, message),
+        ),
+    });
+  }
+
+  private generateInitialAuthMigration(): void {
+    this.runCommandStep({
+      step: "migration-generate",
+      title: "Generating the initial auth database migration",
+      details: [
+        "Running pnpm --filter ./packages/api db:generate --name initial_auth to create SQL from the generated API schema",
+      ],
+      command: "pnpm",
+      args: [
+        "--filter",
+        "./packages/api",
+        "db:generate",
+        "--name",
+        "initial_auth",
+      ],
+    });
+  }
+
+  private applyInitialAuthMigration(): void {
+    this.runCommandStep({
+      step: "migration-apply",
+      title: "Applying the initial auth database migration",
+      details: [
+        "Running pnpm --filter ./packages/api db:migrate so the development SQLite database matches the generated schema",
+      ],
+      command: "pnpm",
+      args: ["--filter", "./packages/api", "db:migrate"],
+    });
+  }
+
+  private publishProjectDirectory(): void {
+    this.logSection({
+      title: "Publishing the generated project directory",
+      details: [],
+    });
+
+    if (existsSync(this.opts.requestedProject.root)) {
+      throw new OperationError(
+        `Cannot publish ${this.opts.requestedProject.root}: the target path appeared while Sapporta init was running. Remove it or choose a different project name, then retry \`sapporta init ${this.opts.requestedProject.name}\`.`,
+        ErrorCode.INIT_TARGET_EXISTS,
+      );
+    }
+
+    this.runSetupStep({
+      step: "atomic-publish",
+      command: `rename ${this.opts.stagedProject.root} to ${this.opts.requestedProject.root}`,
+      action: () =>
+        renameSync(
+          this.opts.stagedProject.root,
+          this.opts.requestedProject.root,
+        ),
+    });
+  }
+
+  private runCommandStep(opts: {
+    step: InitSetupStep;
+    title: string;
+    details: readonly string[];
+    command: string;
+    args: readonly string[];
+  }): void {
+    this.logSection({
+      title: opts.title,
+      details: opts.details,
+    });
+    this.runSetupStep({
+      step: opts.step,
+      command: formatCommand(opts.command, opts.args),
+      action: () =>
+        this.opts.runCommand(opts.command, opts.args, {
+          cwd: this.opts.stagedProject.root,
+          stdio: "inherit",
+        }),
+    });
+  }
+
+  private runSetupStep(opts: {
+    step: InitSetupStep;
+    command: string;
+    action: () => void;
+  }): void {
+    try {
+      opts.action();
+    } catch (error) {
+      if (error instanceof OperationError) {
+        throw error;
+      }
+      throw new InitSetupError(
+        opts.step,
+        this.formatSetupFailure({
+          step: opts.step,
+          command: opts.command,
+          cause: errorMessage(error),
+        }),
+      );
+    }
+  }
+
+  private logSection(opts: {
+    title: string;
+    details: readonly string[];
+  }): void {
+    logInitSection(this.opts.progress, opts.title);
+    for (const detail of opts.details) {
+      logInitDetail(this.opts.progress, detail);
+    }
+  }
+
+  private writeFileWithParents(path: string, content: string): void {
+    mkdirSync(dirname(path), { recursive: true });
+    writeFileSync(path, content);
+  }
+
+  private removeStagingDirectory(): void {
+    rmSync(this.opts.stagedProject.root, { recursive: true, force: true });
+  }
+
+  private formatSetupFailure(opts: {
+    step: InitSetupStep;
+    command: string;
+    cause: string;
+  }): string {
+    return [
+      `Sapporta init failed during ${formatStep(opts.step)}.`,
+      `Command: ${opts.command}`,
+      `Staging directory: ${this.opts.stagedProject.root}`,
+      `Requested target was left untouched: ${this.opts.requestedProject.root}`,
+      `Retry the full \`sapporta init ${this.opts.requestedProject.name}\` command after fixing the failure.`,
+      `Cause: ${opts.cause}`,
+    ].join("\n");
   }
 }
 
@@ -284,102 +407,4 @@ function formatStep(step: InitSetupStep): string {
     case "atomic-publish":
       return "project directory publication";
   }
-}
-
-function createScaffoldDirectories(project: ScaffoldProject): void {
-  const { dataDir } = fromProjectRoot(project.root);
-  mkdirSync(dataDir, { recursive: true });
-  mkdirSync(join(project.root, "scripts"), { recursive: true });
-  mkdirSync(project.apiDir, { recursive: true });
-  mkdirSync(join(project.apiDir, "app"), { recursive: true });
-  mkdirSync(join(project.apiDir, "project-auth"), { recursive: true });
-  mkdirSync(join(project.apiDir, "schema"), { recursive: true });
-  mkdirSync(join(project.apiDir, "migrations"), { recursive: true });
-  mkdirSync(join(project.frontendDir, "src"), { recursive: true });
-  mkdirSync(join(project.sharedDir, "src", "contracts"), { recursive: true });
-}
-
-function writeScaffoldFiles(
-  projectRoot: string,
-  files: Array<{ dest: string; content: string }>,
-): void {
-  for (const file of files) {
-    const targetPath = join(projectRoot, file.dest);
-    mkdirSync(dirname(targetPath), { recursive: true });
-    writeFileSync(targetPath, file.content);
-  }
-}
-
-function installWorkspace(
-  projectRoot: string,
-  project: ScaffoldProject,
-  runCommand: InitCommandRunner,
-  progress: ProgressLogger,
-): void {
-  // pnpm presence was verified at the top of this function, so this is
-  // guaranteed to resolve. One pass installs the root workspace.
-  logInitSection(progress, "Installing the generated workspace dependencies");
-  const args = ["install"] as const;
-  logInitDetail(
-    progress,
-    "Running pnpm install so the API, frontend, and shared packages can build",
-  );
-  runSetupStep({
-    step: "pnpm-install",
-    command: formatCommand("pnpm", args),
-    project,
-    stagingRoot: projectRoot,
-    action: () =>
-      runCommand("pnpm", args, { cwd: projectRoot, stdio: "inherit" }),
-  });
-}
-
-function generateInitialMigration(
-  projectRoot: string,
-  project: ScaffoldProject,
-  runCommand: InitCommandRunner,
-  progress: ProgressLogger,
-): void {
-  logInitSection(progress, "Generating the initial auth database migration");
-  const args = [
-    "--filter",
-    "./packages/api",
-    "db:generate",
-    "--name",
-    "initial_auth",
-  ] as const;
-  logInitDetail(
-    progress,
-    "Running pnpm --filter ./packages/api db:generate --name initial_auth to create SQL from the generated API schema",
-  );
-  runSetupStep({
-    step: "migration-generate",
-    command: formatCommand("pnpm", args),
-    project,
-    stagingRoot: projectRoot,
-    action: () =>
-      runCommand("pnpm", args, { cwd: projectRoot, stdio: "inherit" }),
-  });
-}
-
-function runInitialMigration(
-  projectRoot: string,
-  project: ScaffoldProject,
-  runCommand: InitCommandRunner,
-  progress: ProgressLogger,
-): void {
-  logInitSection(progress, "Applying the initial auth database migration");
-  const args = ["--filter", "./packages/api", "db:migrate"] as const;
-  logInitDetail(
-    progress,
-    "Running pnpm --filter ./packages/api db:migrate so the development SQLite database matches the generated schema",
-  );
-  runSetupStep({
-    step: "migration-apply",
-    command: formatCommand("pnpm", args),
-    project,
-    stagingRoot: projectRoot,
-    action: () =>
-      runCommand("pnpm", args, { cwd: projectRoot, stdio: "inherit" }),
-  });
 }

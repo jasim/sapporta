@@ -18,9 +18,10 @@ export type CommandResult = Pick<
   "status" | "signal" | "stdout" | "stderr" | "error"
 >;
 
-function commandText(command: string, args: readonly string[]): string {
-  return [command, ...args].join(" ");
-}
+export type SqliteSmokeClassification =
+  | "success"
+  | "missing-native-binding"
+  | "command-failure";
 
 function runCommand(
   packageDir: string,
@@ -44,16 +45,19 @@ function assertSuccessfulCommand(
     throw result.error;
   }
   if (result.status !== 0) {
-    const output = [result.stdout, result.stderr]
-      .filter(Boolean)
-      .join("\n")
-      .trim();
-    throw new Error(
-      `${commandText(command, args)} failed with status ${result.status ?? `signal ${result.signal}`}${
-        output ? `:\n${output}` : ""
-      }`,
-    );
+    throw new Error(formatCommandFailure(result, command, args));
   }
+}
+
+export function classifySmokeResult(
+  result: CommandResult,
+): SqliteSmokeClassification {
+  if (result.status === 0) {
+    return "success";
+  }
+  return isMissingBetterSqlite3Binding(result)
+    ? "missing-native-binding"
+    : "command-failure";
 }
 
 export function isMissingBetterSqlite3Binding(result: CommandResult): boolean {
@@ -64,6 +68,24 @@ export function isMissingBetterSqlite3Binding(result: CommandResult): boolean {
     output.includes("Could not locate the bindings file") ||
     output.includes("better_sqlite3.node")
   );
+}
+
+function formatCommandFailure(
+  result: CommandResult,
+  command: string,
+  args: readonly string[],
+): string {
+  const output = [result.stdout, result.stderr]
+    .filter(Boolean)
+    .join("\n")
+    .trim();
+  return `${commandText(command, args)} failed with status ${
+    result.status ?? `signal ${result.signal}`
+  }${output ? `:\n${output}` : ""}`;
+}
+
+function commandText(command: string, args: readonly string[]): string {
+  return [command, ...args].join(" ");
 }
 
 export function resolveBetterSqlite3Install(packageDir: string): {
@@ -148,11 +170,12 @@ export function ensureBetterSqlite3Loads(
     "Checking better-sqlite3 can open an in-memory SQLite database from the generated API package",
   );
   const smokeResult = smokeTestBetterSqlite3(packageDir);
-  if (smokeResult.status === 0) {
+  const classification = classifySmokeResult(smokeResult);
+  if (classification === "success") {
     progress("better-sqlite3 loaded successfully; migrations can use SQLite");
     return;
   }
-  if (!isMissingBetterSqlite3Binding(smokeResult)) {
+  if (classification === "command-failure") {
     assertSuccessfulCommand(smokeResult, process.execPath, [
       "-e",
       SQLITE_SMOKE_SCRIPT,

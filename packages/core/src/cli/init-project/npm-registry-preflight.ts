@@ -1,8 +1,14 @@
 import { ErrorCode } from "../../introspect/types.js";
-import type { ProgressLogger } from "./init-progress.js";
-import { formatCommand, type InitCommandRunner } from "./init-commands.js";
-import { errorMessage, InitSetupError } from "./init-errors.js";
-import type { RenderedScaffoldFile } from "./render-scaffold.js";
+import {
+  errorMessage,
+  formatCommand,
+  InitSetupError,
+  type InitCommandRunner,
+  type ProgressLogger,
+} from "./init-shell.js";
+import type { RenderedScaffoldFile } from "./template-rendering.js";
+import { preflightDependencyDefinition } from "./dependency-catalog.js";
+import { projectNameForMessage } from "./project-layout.js";
 
 type PackageJsonForPreflight = {
   dependencies?: Record<string, string>;
@@ -22,7 +28,6 @@ const DEPENDENCY_FIELDS = [
   "devDependencies",
   "peerDependencies",
 ] as const;
-const REGISTRY_PREFLIGHT_PACKAGE = "hono";
 
 export function assertNpmRegistryReachable(
   opts: NpmRegistryPreflightOptions,
@@ -61,18 +66,19 @@ export function assertNpmRegistryReachable(
 function findRegistryPreflightDependency(
   files: readonly RenderedScaffoldFile[],
 ): { name: string; spec: string; resolutionSpec: string } {
+  const preflightDependency = preflightDependencyDefinition();
   const packages = files
     .filter((file) => file.dest.endsWith("package.json"))
     .map((file) => parsePackageJson(file.content, file.dest));
 
   for (const pkg of packages) {
     for (const field of DEPENDENCY_FIELDS) {
-      const spec = pkg[field]?.[REGISTRY_PREFLIGHT_PACKAGE];
+      const spec = pkg[field]?.[preflightDependency.packageName];
       if (spec) {
         return {
-          name: REGISTRY_PREFLIGHT_PACKAGE,
+          name: preflightDependency.packageName,
           spec,
-          resolutionSpec: `${REGISTRY_PREFLIGHT_PACKAGE}@${spec}`,
+          resolutionSpec: `${preflightDependency.packageName}@${spec}`,
         };
       }
     }
@@ -80,7 +86,7 @@ function findRegistryPreflightDependency(
 
   throw new InitSetupError(
     "npm-registry-preflight",
-    `Cannot run the npm registry preflight because the generated scaffold did not include ${REGISTRY_PREFLIGHT_PACKAGE}.`,
+    `Cannot run the npm registry preflight because the generated scaffold did not include ${preflightDependency.packageName}.`,
     ErrorCode.INIT_SETUP_FAILED,
   );
 }
@@ -94,9 +100,4 @@ function parsePackageJson(
     throw new Error(`${filename} must contain a JSON object.`);
   }
   return parsed as PackageJsonForPreflight;
-}
-
-function projectNameForMessage(targetRoot: string): string {
-  const parts = targetRoot.split(/[\\/]/).filter(Boolean);
-  return parts.at(-1) ?? targetRoot;
 }

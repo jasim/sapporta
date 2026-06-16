@@ -9,6 +9,7 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { afterEach, describe, expect, it } from "vitest";
 import {
+  classifySmokeResult,
   isMissingBetterSqlite3Binding,
   resolveBetterSqlite3Install,
   type CommandResult,
@@ -54,6 +55,35 @@ describe("isMissingBetterSqlite3Binding", () => {
     };
 
     expect(isMissingBetterSqlite3Binding(result)).toBe(false);
+  });
+});
+
+describe("classifySmokeResult", () => {
+  it("classifies smoke results", () => {
+    expect(
+      classifySmokeResult({
+        status: 0,
+        signal: null,
+        stdout: "",
+        stderr: "",
+      }),
+    ).toBe("success");
+    expect(
+      classifySmokeResult({
+        status: 1,
+        signal: null,
+        stdout: "",
+        stderr: "Could not locate the bindings file",
+      }),
+    ).toBe("missing-native-binding");
+    expect(
+      classifySmokeResult({
+        status: 1,
+        signal: null,
+        stdout: "",
+        stderr: "SyntaxError",
+      }),
+    ).toBe("command-failure");
   });
 });
 

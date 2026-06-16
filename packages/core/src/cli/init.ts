@@ -6,7 +6,7 @@ import {
   logInitDetail,
   logInitSection,
   type ProgressLogger,
-} from "./init-project/init-progress.js";
+} from "./init-project/init-shell.js";
 
 const VALID_DIR_NAME = /^[a-zA-Z0-9_][a-zA-Z0-9._-]*$/;
 

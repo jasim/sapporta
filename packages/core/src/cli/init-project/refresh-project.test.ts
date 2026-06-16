@@ -9,7 +9,9 @@ import {
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { mergePackageJson, refreshScaffoldProject } from "./refresh-project.js";
+import { mergePackageJson } from "./package-json-merge.js";
+import { planRefreshFile, summarizeRefreshPlan } from "./refresh-plan.js";
+import { refreshScaffoldProject } from "./refresh-project.js";
 
 const tempRoots: string[] = [];
 
@@ -169,6 +171,84 @@ describe("refreshScaffoldProject", () => {
     expect(existsSync(join(target, "packages/frontend/src/api.ts"))).toBe(
       false,
     );
+  });
+});
+
+describe("planRefreshFile", () => {
+  it("classifies overwrite, create, merge, skip, and unchanged without writing", () => {
+    const baseFile = {
+      src: "packages/api/boot.ts",
+      dest: "packages/api/boot.ts",
+      ownership: "framework" as const,
+      refreshPolicy: "overwrite" as const,
+      content: "new\n",
+    };
+    const decisions = [
+      planRefreshFile(baseFile, {
+        dest: baseFile.dest,
+        exists: true,
+        content: "old\n",
+      }),
+      planRefreshFile(baseFile, {
+        dest: baseFile.dest,
+        exists: false,
+      }),
+      planRefreshFile(
+        {
+          src: "package.json",
+          dest: "package.json",
+          ownership: "workspace",
+          refreshPolicy: "merge-package-json",
+          content: JSON.stringify({
+            dependencies: { "@sapporta/server": "new" },
+          }),
+        },
+        {
+          dest: "package.json",
+          exists: true,
+          content: JSON.stringify({
+            name: "local",
+            dependencies: { local: "1.0.0" },
+          }),
+        },
+      ),
+      planRefreshFile(
+        {
+          src: "README.md",
+          dest: "README.md",
+          ownership: "workspace",
+          refreshPolicy: "skip",
+          content: "new\n",
+        },
+        { dest: "README.md", exists: true, content: "old\n" },
+      ),
+      planRefreshFile(baseFile, {
+        dest: baseFile.dest,
+        exists: true,
+        content: "new\n",
+      }),
+    ];
+
+    expect(decisions.map((decision) => decision.kind)).toEqual([
+      "overwrite",
+      "create",
+      "merge",
+      "skip",
+      "unchanged",
+    ]);
+    expect(
+      summarizeRefreshPlan({
+        projectDir: "/tmp/acme-app",
+        mode: "dry-run",
+        decisions,
+      }),
+    ).toMatchObject({
+      overwritten: ["packages/api/boot.ts"],
+      created: ["packages/api/boot.ts"],
+      merged: ["package.json"],
+      skipped: ["README.md (workspace)"],
+      unchanged: ["packages/api/boot.ts"],
+    });
   });
 });
 
