@@ -244,6 +244,7 @@ describe("TGridColumnMapper.columnsFor", () => {
 
     expect(isValidElement(rendered)).toBe(true);
     expect(isValidElement(rendered) ? rendered.type : null).toBe(ExpandCell);
+    expect(columns[0].controlsRowExpansion).toBe(true);
   });
 });
 

@@ -220,6 +220,7 @@ describe("compileTGridRuntimeConfig", () => {
 
     expect(isValidElement(rendered)).toBe(true);
     expect(isValidElement(rendered) ? rendered.type : null).toBe(ExpandCell);
+    expect(col.controlsRowExpansion).toBe(true);
   });
 
   it("child endpoint applies the parent FK filter and default sort", async () => {

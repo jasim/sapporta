@@ -37,8 +37,14 @@ export function ExpandCell({
     runtime.coordinator.toggleExpand(path, row.id);
   }
 
+  const actionLabel = isExpanded ? "Collapse row" : "Expand row";
+
   return (
-    <span data-grid-part="expand-cell">
+    <span
+      data-grid-part="expand-cell"
+      data-expandable={showChevron ? "true" : undefined}
+      data-expanded={showChevron ? String(isExpanded) : undefined}
+    >
       {showChevron ? (
         <button
           type="button"
@@ -47,9 +53,10 @@ export function ExpandCell({
             e.stopPropagation();
           }}
           onClick={toggle}
-          aria-label={isExpanded ? "Collapse" : "Expand"}
+          aria-label={actionLabel}
           aria-expanded={isExpanded}
           data-grid-part="expand-chevron"
+          title={actionLabel}
         >
           {isExpanded ? (
             <ChevronDown aria-hidden="true" size={14} strokeWidth={1.75} />

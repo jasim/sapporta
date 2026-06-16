@@ -190,6 +190,7 @@ export function buildTGridColumnsForTable<
     const originalRenderer = first.renderCell;
     columns[0] = {
       ...first,
+      controlsRowExpansion: true,
       renderCell: (props) =>
         createElement(
           ExpandCell,

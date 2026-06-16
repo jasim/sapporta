@@ -89,6 +89,7 @@ export type ColumnSchema = {
   compare?: (a: unknown, b: unknown) => number;
   editCell?: ComponentType<CellEditorProps>;
   editTriggers?: readonly EditTrigger[];
+  controlsRowExpansion?: boolean;
   meta?: unknown;
 };
 

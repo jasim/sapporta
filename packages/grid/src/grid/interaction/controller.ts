@@ -254,6 +254,10 @@ export function createGridController(
         args.onNavigateCell?.(intent);
         return !!args.onNavigateCell;
       }
+      case "toggleFocusedRowExpansion": {
+        args.onNavigateCell?.(intent);
+        return !!args.onNavigateCell;
+      }
       case "startEdit":
         if (!focus) return false;
         if (intent.trigger === "type") {

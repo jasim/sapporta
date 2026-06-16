@@ -21,7 +21,10 @@ const reportSchema: GridSchema = {
   levels: {
     cat: {
       name: "cat",
-      columns: [testColumn("name", "Name"), testColumn("qty", "Qty")],
+      columns: [
+        { ...testColumn("name", "Name"), controlsRowExpansion: true },
+        testColumn("qty", "Qty"),
+      ],
       options: { rowKey: (n: TreeNode) => String(n.columns.name) },
       childLevels: ["items"],
     },
@@ -59,6 +62,13 @@ const tree: TreeNode[] = [
 ];
 
 function setupExpanded() {
+  const rt = setupCollapsed();
+  rt.coordinator.toggleExpand(root, makeRowId(root, "Fruit"));
+  rt.coordinator.toggleExpand(root, makeRowId(root, "Veg"));
+  return rt;
+}
+
+function setupCollapsed() {
   const ds = inMemoryGridDataSource({
     schema: reportSchema,
     tree,
@@ -67,10 +77,7 @@ function setupExpanded() {
       items: { sortMode: "none", filterMode: "none", paginationMode: "none" },
     },
   });
-  const rt = createGridRuntime({ schema: reportSchema, dataSource: ds });
-  rt.coordinator.toggleExpand(root, makeRowId(root, "Fruit"));
-  rt.coordinator.toggleExpand(root, makeRowId(root, "Veg"));
-  return rt;
+  return createGridRuntime({ schema: reportSchema, dataSource: ds });
 }
 
 function setupRowList() {
@@ -566,6 +573,42 @@ describe("GridCoordinator", () => {
       rowId: makeRowId(fruitItems, "Apple"),
       colId: "name",
     });
+  });
+
+  it("handleKey Enter toggles expansion from the focused expansion cell", () => {
+    const rt = setupCollapsed();
+    rt.cursorManager.applyCellCursor({
+      path: root,
+      rowId: makeRowId(root, "Fruit"),
+      colId: "name",
+    });
+
+    expect(
+      rt.controllerFor(root).handleKey({
+        key: "Enter",
+        ctrlKey: false,
+        metaKey: false,
+        shiftKey: false,
+        altKey: false,
+      } as KeyboardEvent),
+    ).toBe(true);
+    expect(
+      rt.coordinator
+        .getState()
+        .expansion.get(root)
+        ?.has(makeRowId(root, "Fruit")),
+    ).toBe(true);
+
+    expect(
+      rt.controllerFor(root).handleKey({
+        key: " ",
+        ctrlKey: false,
+        metaKey: false,
+        shiftKey: false,
+        altKey: false,
+      } as KeyboardEvent),
+    ).toBe(true);
+    expect(rt.coordinator.getState().expansion.get(root)).toBeUndefined();
   });
 
   it("handleKey ArrowUp from a parent enters the previous expanded child's last row", () => {

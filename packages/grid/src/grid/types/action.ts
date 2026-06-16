@@ -80,7 +80,8 @@ export type CellNavigationIntent =
   | { type: "startEdit"; trigger: NonTypedEditTrigger; initial?: never }
   | { type: "clearCellSelection" }
   | { type: "focusFirstCell" }
-  | { type: "toggleActiveRowSelection" };
+  | { type: "toggleActiveRowSelection" }
+  | { type: "toggleFocusedRowExpansion" };
 
 export type RowNavigationIntent =
   | { type: "moveActiveRow"; direction: "up" | "down"; extend: boolean }

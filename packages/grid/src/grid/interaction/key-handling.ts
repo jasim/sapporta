@@ -99,10 +99,6 @@ export function keyEventToCellIntent(
     return state.cellSelection ? { type: "clearCellSelection" } : null;
   }
 
-  if (e.key === " " && canToggleRows(config)) {
-    return { type: "toggleActiveRowSelection" };
-  }
-
   const direction = directionForKey(e);
   if (!state.liveCellFocus) {
     if (!direction) return null;
@@ -110,6 +106,25 @@ export function keyEventToCellIntent(
   }
 
   const focus = state.liveCellFocus;
+  const focusedRow = displayed.rowById.get(focus.rowId as RowId);
+  const column = schema.find((c) => c.id === focus.colId);
+
+  if (
+    (e.key === "Enter" || e.key === " ") &&
+    !e.shiftKey &&
+    !e.ctrlKey &&
+    !e.metaKey &&
+    !e.altKey &&
+    column?.controlsRowExpansion === true &&
+    focusedRow &&
+    capabilities(focusedRow.kind).canExpand
+  ) {
+    return { type: "toggleFocusedRowExpansion" };
+  }
+
+  if (e.key === " " && canToggleRows(config)) {
+    return { type: "toggleActiveRowSelection" };
+  }
 
   if (direction) {
     if (
@@ -178,11 +193,9 @@ export function keyEventToCellIntent(
     }
   }
 
-  const focusedRow = displayed.rowById.get(focus.rowId as RowId);
   if (!focusedRow) return null;
   const caps = capabilities(focusedRow.kind);
   if (!caps.editable) return null;
-  const column = schema.find((c) => c.id === focus.colId);
   if (!column?.editCell) return null;
 
   if (e.key === "F2" && triggerAllowed(column, "f2")) {

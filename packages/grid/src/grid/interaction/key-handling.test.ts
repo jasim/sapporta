@@ -315,6 +315,49 @@ describe("keyEventToCellIntent", () => {
     ).toEqual({ type: "startEdit", trigger: "enter" });
   });
 
+  it("Enter and Space toggle expansion on a row-expansion cell", () => {
+    const expansionColumns = [
+      { ...testColumn("a", "A"), controlsRowExpansion: true },
+      testColumn("b", "B"),
+    ];
+
+    expect(
+      keyEventToCellIntent(
+        ev("Enter"),
+        focusAt("r0", "a"),
+        displayed,
+        expansionColumns,
+        capabilitiesFor,
+      ),
+    ).toEqual({ type: "toggleFocusedRowExpansion" });
+    expect(
+      keyEventToCellIntent(
+        ev(" "),
+        focusAt("r0", "a"),
+        displayed,
+        expansionColumns,
+        capabilitiesFor,
+      ),
+    ).toEqual({ type: "toggleFocusedRowExpansion" });
+  });
+
+  it("keeps Enter as edit on ordinary cells", () => {
+    const expansionColumns = [
+      { ...testColumn("a", "A"), controlsRowExpansion: true },
+      testColumn("b", "B"),
+    ];
+
+    expect(
+      keyEventToCellIntent(
+        ev("Enter"),
+        focusAt("r0", "b"),
+        displayed,
+        expansionColumns,
+        capabilitiesFor,
+      ),
+    ).toEqual({ type: "startEdit", trigger: "enter" });
+  });
+
   it("printable key opens a 'type' edit and forwards the keystroke", () => {
     expect(
       keyEventToCellIntent(
