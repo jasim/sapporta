@@ -17,6 +17,7 @@ import {
 } from "./TableToolbarControls";
 
 export function TableToolbarCompact({
+  tableName,
   tableLabel,
   totalCount,
   columns,
@@ -32,6 +33,7 @@ export function TableToolbarCompact({
   onClearSort,
   onNewRecord,
   viewControl,
+  lookupForColumn,
 }: TableToolbarProps) {
   const [overflowOpen, setOverflowOpen] = useState(false);
 
@@ -87,8 +89,10 @@ export function TableToolbarCompact({
       </div>
 
       <FilterCardsBar
+        tableName={tableName}
         columns={[...columns]}
         filters={[...filters]}
+        lookupForColumn={lookupForColumn}
         onAdd={onAddFilter}
         onUpdate={onUpdateFilter}
         onRemove={onRemoveFilter}

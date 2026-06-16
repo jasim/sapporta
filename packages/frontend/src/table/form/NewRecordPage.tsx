@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { ArrowLeft, Loader2 } from "lucide-react";
 import type { TableSchema } from "@sapporta/shared/contracts";
 import { ApiError } from "@sapporta/shared/client";
+import type { LookupCapabilities } from "@sapporta/grid/column-preset";
 import { TopBar, TopBarButton } from "@/shell/components/TopBar";
 import { Button } from "@sapporta/ui";
 import { RecordFormField } from "@/table/form/RecordFormField";
@@ -13,10 +14,8 @@ import {
 } from "@/table/form/record-form-store";
 import { isRecordFormEditableColumn } from "@/table/form/field-policy";
 import { createRecord } from "@/table/actions/record-actions";
-import { fetchLookupEntriesForSearch } from "@/lookup/api/lookup";
-import type { FkOptionsMap } from "@/lookup/types";
-
-const EMPTY_FK_OPTIONS: FkOptionsMap = {};
+import { createTableLookupRegistry } from "@/table/lookup/table-lookup-registry";
+import { createColumnLookupResolver } from "@/table/lookup/column-lookup";
 
 export function NewRecordPage({ tableSchema }: { tableSchema: TableSchema }) {
   const navigate = useNavigate();
@@ -26,57 +25,34 @@ export function NewRecordPage({ tableSchema }: { tableSchema: TableSchema }) {
     () => createRecordFormStore(tableSchema),
     [tableSchema],
   );
-  const [fkOptions, setFkOptions] = useState<FkOptionsMap>(EMPTY_FK_OPTIONS);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const lookupRegistry = useMemo(
+    () => createTableLookupRegistry(),
+    [tableSchema],
+  );
+  const lookupResolver = useMemo(
+    () => createColumnLookupResolver(lookupRegistry),
+    [lookupRegistry],
+  );
+  const lookupsByColumn = useMemo(() => {
+    const lookups = new Map<string, LookupCapabilities>();
+    for (const col of tableSchema.columns) {
+      if (!isRecordFormEditableColumn(col) || !col.foreignKey) continue;
+      const lookup = lookupResolver.lookupForColumn({
+        tableName: tableSchema.name,
+        column: col,
+      });
+      if (lookup) lookups.set(col.name, lookup);
+    }
+    return lookups;
+  }, [lookupResolver, tableSchema]);
 
   useEffect(() => {
     setError(null);
   }, [tableSchema]);
 
-  useEffect(() => {
-    const fkColumns = tableSchema.columns.filter(
-      (c) => isRecordFormEditableColumn(c) && c.foreignKey != null,
-    );
-    if (fkColumns.length === 0) {
-      setFkOptions(EMPTY_FK_OPTIONS);
-      return;
-    }
-
-    let cancelled = false;
-    Promise.all(
-      fkColumns.map(async (col) => {
-        const fk = col.foreignKey;
-        if (fk == null) return null;
-        try {
-          const res = await fetchLookupEntriesForSearch({
-            tableName: fk.table,
-            searchText: "",
-            limit: 5000,
-          });
-          return {
-            columnName: col.name,
-            values: Object.fromEntries(
-              res.entries.map((entry) => [String(entry.value), entry.label]),
-            ),
-          };
-        } catch {
-          return null;
-        }
-      }),
-    ).then((entries) => {
-      if (cancelled) return;
-      const next: FkOptionsMap = {};
-      for (const entry of entries) {
-        if (entry) next[entry.columnName] = entry.values;
-      }
-      setFkOptions(next);
-    });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [tableSchema]);
+  useEffect(() => () => lookupRegistry.dispose(), [lookupRegistry]);
 
   const formColumns = useMemo(
     () => tableSchema.columns.filter(isRecordFormEditableColumn),
@@ -127,7 +103,7 @@ export function NewRecordPage({ tableSchema }: { tableSchema: TableSchema }) {
                 <RecordFormField
                   key={col.name}
                   column={col}
-                  fkOptions={fkOptions[col.name]}
+                  lookup={lookupsByColumn.get(col.name)}
                 />
               ))}
             </div>

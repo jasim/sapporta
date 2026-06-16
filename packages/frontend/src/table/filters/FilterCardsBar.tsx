@@ -4,17 +4,18 @@ import type {
   FilterCondition,
   NewFilterCondition,
 } from "@sapporta/shared/filter";
-import { cn, Popover, PopoverContent, PopoverTrigger } from "@sapporta/ui";
 import type { ColumnSchema } from "@sapporta/shared/contracts";
-import type { FkOptionsMap } from "@/lookup/types";
+import { cn, Popover, PopoverContent, PopoverTrigger } from "@sapporta/ui";
+import type { LookupForColumn } from "@/table/lookup/column-lookup";
 import { ConditionEditor } from "./ConditionEditor";
 import { FilterCard } from "./FilterCard";
 import { DateRangeCard, groupDateRanges } from "./DateRangeCard";
 
 export interface FilterCardsBarProps {
+  tableName?: string;
   columns: ColumnSchema[];
   filters: FilterCondition[];
-  fkOptions?: FkOptionsMap;
+  lookupForColumn?: LookupForColumn;
   onAdd: (cond: NewFilterCondition) => void;
   onUpdate: (id: string, patch: NewFilterCondition) => void;
   onRemove: (id: string) => void;
@@ -27,9 +28,10 @@ export interface FilterCardsBarProps {
  *  collapses to a single `+ Add filter` affordance. Each card owns its own
  *  ConditionEditor popover; the bar itself owns the "add" popover. */
 export function FilterCardsBar({
+  tableName,
   columns,
   filters,
-  fkOptions,
+  lookupForColumn,
   onAdd,
   onUpdate,
   onRemove,
@@ -71,8 +73,9 @@ export function FilterCardsBar({
           <FilterCard
             key={entry.condition.id}
             condition={entry.condition}
+            tableName={tableName}
             columns={filterableColumns}
-            fkOptions={fkOptions}
+            lookupForColumn={lookupForColumn}
             onUpdate={onUpdate}
             onRemove={onRemove}
             error={filterErrors?.[entry.condition.id] ?? null}
@@ -96,7 +99,8 @@ export function FilterCardsBar({
         >
           <ConditionEditor
             columns={filterableColumns}
-            fkOptions={fkOptions}
+            tableName={tableName}
+            lookupForColumn={lookupForColumn}
             onApply={(cond) => {
               onAdd(cond);
               setAddOpen(false);

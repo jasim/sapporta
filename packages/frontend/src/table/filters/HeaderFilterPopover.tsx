@@ -2,11 +2,9 @@
  * HeaderFilterPopover — thin popover shown from a column header chevron.
  * Contains:
  *
- *   - Sort A→Z / Sort Z→A
- *   - Quick-equality picker (CheckboxList) — only for columns with a known
- *     value set (enum, boolean, fk). The picker always emits `in`; the
- *     server treats `in [x]` identically to `eq x`.
- *   - "Filter by condition…" — opens the shared ConditionEditor with the
+ *   - Sort A->Z / Sort Z->A
+ *   - Quick-equality picker for columns with a known value source.
+ *   - "Filter by condition..." — opens the shared ConditionEditor with the
  *     column locked.
  *   - "Clear filter" — removes every condition on this column.
  */
@@ -18,19 +16,24 @@ import type {
   NewFilterCondition,
 } from "@sapporta/shared/filter";
 import type { ColumnSchema } from "@sapporta/shared/contracts";
-import type { FkOptionsMap } from "@/lookup/types";
 import type { SortDescriptor } from "@sapporta/grid";
+import type { LookupForColumn } from "@/table/lookup/column-lookup";
 import { Popover, PopoverContent, PopoverTrigger } from "@sapporta/ui";
 import { ConditionEditor } from "./ConditionEditor";
-import { CheckboxList } from "./inputs/CheckboxList";
-import { inferFilterColumnType, resolveColumnOptions } from "./column-catalog";
+import {
+  catalog,
+  inferFilterColumnType,
+  resolveColumnOptions,
+} from "./column-catalog";
 
 export interface HeaderFilterPopoverProps {
+  tableName?: string;
   column: ColumnSchema;
   columns: ColumnSchema[];
   filters: FilterCondition[];
-  fkOptions?: FkOptionsMap;
+  lookupForColumn?: LookupForColumn;
   sort: SortDescriptor[];
+  sortColumnId?: string;
   onSort: (sort: SortDescriptor[]) => void;
   onAddFilter: (cond: NewFilterCondition) => void;
   onUpdateFilter: (id: string, patch: NewFilterCondition) => void;
@@ -39,11 +42,13 @@ export interface HeaderFilterPopoverProps {
 }
 
 export interface HeaderFilterMenuContentProps {
+  tableName?: string;
   column: ColumnSchema;
   columns: ColumnSchema[];
   filters: FilterCondition[];
-  fkOptions?: FkOptionsMap;
+  lookupForColumn?: LookupForColumn;
   sort: SortDescriptor[];
+  sortColumnId?: string;
   onSort: (sort: SortDescriptor[]) => void;
   onAddFilter: (cond: NewFilterCondition) => void;
   onUpdateFilter: (id: string, patch: NewFilterCondition) => void;
@@ -52,11 +57,13 @@ export interface HeaderFilterMenuContentProps {
 }
 
 export function HeaderFilterPopover({
+  tableName,
   column,
   columns,
   filters,
-  fkOptions,
+  lookupForColumn,
   sort,
+  sortColumnId,
   onSort,
   onAddFilter,
   onUpdateFilter,
@@ -74,11 +81,13 @@ export function HeaderFilterPopover({
         className="p-1 w-[240px] border-sap-border bg-sap-surface"
       >
         <HeaderFilterMenuContent
+          tableName={tableName}
           column={column}
           columns={columns}
           filters={filters}
-          fkOptions={fkOptions}
+          lookupForColumn={lookupForColumn}
           sort={sort}
+          sortColumnId={sortColumnId}
           onSort={onSort}
           onAddFilter={onAddFilter}
           onUpdateFilter={onUpdateFilter}
@@ -91,26 +100,39 @@ export function HeaderFilterPopover({
 }
 
 export function HeaderFilterMenuContent({
+  tableName,
   column,
   columns,
   filters,
-  fkOptions,
+  lookupForColumn,
   onSort,
   onAddFilter,
   onUpdateFilter,
   onRemoveFilter,
   close,
+  sortColumnId,
 }: HeaderFilterMenuContentProps) {
   const [editorOpen, setEditorOpen] = useState(false);
 
   const type = inferFilterColumnType(column);
-  const resolved = resolveColumnOptions(column, fkOptions, type);
+  const columnName = column.name;
+  const resolved = resolveColumnOptions(column, type);
+  const lookup =
+    tableName && column.foreignKey
+      ? lookupForColumn?.({ tableName, column })
+      : undefined;
+  const quickEntry =
+    catalog[type].ops.find(
+      (entry) => entry.valueShape === "list" && entry.op === "in",
+    ) ?? null;
+  const QuickInput =
+    quickEntry?.valueShape === "list" ? quickEntry.Input : null;
 
   // The header's quick picker owns exactly one condition on this column:
   // the `in` condition (if any). Other operators live solely as cards.
   const quickCondition = filters.find(
     (f): f is FilterCondition & { op: "in" } =>
-      f.column === column.name && f.op === "in",
+      f.column === columnName && f.op === "in",
   );
   const quickValues = quickCondition ? quickCondition.values : [];
 
@@ -121,29 +143,31 @@ export function HeaderFilterMenuContent({
     }
     if (quickCondition) {
       onUpdateFilter(quickCondition.id, {
-        column: column.name,
+        column: columnName,
         op: "in",
         values: next,
       });
     } else {
-      onAddFilter({ column: column.name, op: "in", values: next });
+      onAddFilter({ column: columnName, op: "in", values: next });
     }
   }
 
   function setSortForColumn(direction: "asc" | "desc") {
-    onSort([{ colId: column.name, direction }]);
+    onSort([{ colId: sortColumnId ?? columnName, direction }]);
     close();
   }
 
   function clearAllFiltersForColumn() {
     for (const f of filters) {
-      if (f.column === column.name) onRemoveFilter(f.id);
+      if (f.column === columnName) onRemoveFilter(f.id);
     }
     close();
   }
 
-  const hasAnyFilterOnColumn = filters.some((f) => f.column === column.name);
-  const showQuickPicker = resolved !== null && resolved.options.length > 0;
+  const hasAnyFilterOnColumn = filters.some((f) => f.column === columnName);
+  const showQuickPicker =
+    quickEntry !== null &&
+    (type === "fk" || (resolved !== null && resolved.options.length > 0));
 
   return (
     <>
@@ -151,25 +175,28 @@ export function HeaderFilterMenuContent({
         icon={<ArrowUp className="h-[12px] w-[12px]" />}
         onClick={() => setSortForColumn("asc")}
       >
-        Sort A → Z
+        Sort A to Z
       </MenuRow>
       <MenuRow
         icon={<ArrowDown className="h-[12px] w-[12px]" />}
         onClick={() => setSortForColumn("desc")}
       >
-        Sort Z → A
+        Sort Z to A
       </MenuRow>
       <Divider />
       {showQuickPicker && (
         <>
           <div className="px-[6px] py-[4px]">
-            <CheckboxList
-              values={quickValues}
-              onChange={applyQuick}
-              column={column}
-              options={resolved.options}
-              labels={resolved.labels}
-            />
+            {QuickInput && (
+              <QuickInput
+                values={quickValues}
+                onChange={applyQuick}
+                column={column}
+                lookup={lookup}
+                options={resolved?.options}
+                labels={resolved?.labels}
+              />
+            )}
           </div>
           <Divider />
         </>
@@ -181,7 +208,7 @@ export function HeaderFilterMenuContent({
             className="w-full flex items-center gap-2 px-[10px] py-[5px] text-sap-data rounded-[3px] hover:bg-sap-row-hover text-left text-sap-emph"
           >
             <SlidersHorizontal className="h-[12px] w-[12px] text-sap-subtle" />
-            <span className="flex-1">Filter by condition…</span>
+            <span className="flex-1">Filter by condition...</span>
           </button>
         </PopoverTrigger>
         <PopoverContent
@@ -192,7 +219,8 @@ export function HeaderFilterMenuContent({
           <ConditionEditor
             columns={columns}
             lockedColumn={column}
-            fkOptions={fkOptions}
+            tableName={tableName}
+            lookupForColumn={lookupForColumn}
             onApply={(cond) => {
               onAddFilter(cond);
               setEditorOpen(false);
@@ -219,12 +247,12 @@ export function HeaderFilterMenuContent({
 
 function MenuRow({
   icon,
-  onClick,
   children,
+  onClick,
 }: {
   icon: React.ReactNode;
-  onClick: () => void;
   children: React.ReactNode;
+  onClick: () => void;
 }) {
   return (
     <button
@@ -239,5 +267,5 @@ function MenuRow({
 }
 
 function Divider() {
-  return <div className="my-[3px] border-t border-sap-border" />;
+  return <div className="my-1 border-t border-sap-border-soft" />;
 }

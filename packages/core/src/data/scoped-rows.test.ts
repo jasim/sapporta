@@ -187,6 +187,13 @@ describe("scopedRows", () => {
       "2": "Revenue",
       "3": "Rent",
     });
+    await expect(rows.lookup({ q: "re", limit: "1" })).resolves.toEqual({
+      "2": "Revenue",
+    });
+    await expect(rows.lookup({ limit: "2" })).resolves.toEqual({
+      "1": "Cash",
+      "2": "Revenue",
+    });
   });
 
   it("counts grouped rows inside row scope", async () => {

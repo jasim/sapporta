@@ -1,11 +1,15 @@
+import type { LookupCapabilities } from "@sapporta/grid/column-preset";
 import type { ColumnSchema } from "@sapporta/shared/contracts";
-import type { KeyedValues } from "@/lookup/types";
+
+export type KeyedValues = Record<string, string>;
+
 /** Props for inputs that edit a scalar string (eq, gt, contains, …). */
 export interface ScalarInputProps {
   value: string;
   onChange: (next: string) => void;
   column: ColumnSchema;
   autoFocus?: boolean;
+  lookup?: LookupCapabilities;
   /** Option set for inputs that render a fixed list (unused by scalar text
    *  inputs, but accepted so every input shares a uniform prop surface). */
   options?: string[];
@@ -18,6 +22,7 @@ export interface ListInputProps {
   onChange: (next: string[]) => void;
   column: ColumnSchema;
   autoFocus?: boolean;
+  lookup?: LookupCapabilities;
   options?: string[];
   labels?: KeyedValues;
 }

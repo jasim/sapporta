@@ -4,6 +4,7 @@ import type {
   NewFilterCondition,
 } from "@sapporta/shared/filter";
 import type { ColumnSchema } from "@sapporta/shared/contracts";
+import type { LookupForColumn } from "@/table/lookup/column-lookup";
 import {
   type TableToolbarSession,
   useTableToolbarSelection,
@@ -15,6 +16,7 @@ import { useResponsiveTableHeaderBand } from "./useResponsiveTableHeaderBand";
 
 export type TableToolbarProps = {
   session?: TableToolbarSession;
+  tableName?: string;
   tableLabel: string;
   totalCount: number;
   columns: readonly ColumnSchema[];
@@ -30,6 +32,7 @@ export type TableToolbarProps = {
   onClearSort: () => void;
   onNewRecord?: () => void;
   viewControl?: ReactNode;
+  lookupForColumn?: LookupForColumn;
 };
 
 // Standard table controls as plain props.

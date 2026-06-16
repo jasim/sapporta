@@ -10,10 +10,11 @@ import {
   type RuntimeLevelDataSource,
   type TreeNode,
 } from "@sapporta/grid";
+import { columnPreset } from "@sapporta/grid/column-preset";
+import type { ValueLookup } from "@sapporta/grid/lookup";
 import type { TGridSession } from "@/table/state/tgrid-session";
-import type { TableForeignKeyLookupBundle } from "./table-lookup-registry";
 import { startTGridLookupLoading } from "./tgrid-lookup-loading";
-import { createTGridColumnMapper } from "@/table/grid-adapter/tgrid-column-mapper";
+import type { TGridTableColumnMeta } from "@/table/grid-adapter/tgrid-column-mapper";
 
 const ordersPath = rootPath("orders");
 const linesPath = childPath(ordersPath, "42", "orders.lines");
@@ -40,28 +41,44 @@ const productColumn: TableColumnSchema = {
 function makeGridColumn(args: {
   table: string;
   column: TableColumnSchema;
+  valueLookup?: ValueLookup;
 }): ColumnSchema {
-  return {
+  const meta = {
+    table: args.table,
+    schema: args.column,
+    displayType: args.column.foreignKey ? "fk" : "number",
+  } satisfies TGridTableColumnMeta;
+
+  if (args.column.foreignKey && args.valueLookup) {
+    return columnPreset.foreignKey({
+      id: args.column.name,
+      name: args.column.name,
+      valueLookup: args.valueLookup,
+      meta,
+    });
+  }
+
+  return columnPreset.number({
     id: args.column.name,
     name: args.column.name,
-    renderCell: ({ value }) => String(value ?? ""),
-    meta: {
-      table: args.table,
-      schema: args.column,
-      displayType: args.column.foreignKey ? "fk" : "number",
-    },
-  };
+    meta,
+  });
 }
 
 function makeLevel(args: {
   name: string;
   table: string;
   columns: TableColumnSchema[];
+  valueLookupByColumn?: Record<string, ValueLookup>;
 }): LevelSchema {
   return {
     name: args.name,
     columns: args.columns.map((column) =>
-      makeGridColumn({ table: args.table, column }),
+      makeGridColumn({
+        table: args.table,
+        column,
+        valueLookup: args.valueLookupByColumn?.[column.name],
+      }),
     ),
     options: {},
     childLevels: [],
@@ -91,45 +108,19 @@ function makeSource(nodes: TreeNode[]) {
   return { source, unsubscribe };
 }
 
-function makeBundle(args: {
-  sourceTable: string;
-  sourceColumn: string;
-  targetTable: string;
+function makeValueLookup(args: {
   loadMissingEntries: (values: readonly unknown[]) => Promise<void>;
-}): TableForeignKeyLookupBundle {
+}): ValueLookup {
   return {
-    key: `${args.sourceTable}.${args.sourceColumn}->${args.targetTable}.id`,
-    sourceTable: args.sourceTable,
-    sourceColumn: args.sourceColumn,
-    targetTable: args.targetTable,
-    targetColumn: "id",
-    valueLookup: {
-      entryForValue: vi.fn(),
-      loadMissingEntries: args.loadMissingEntries,
-      subscribeToLookupChanges: vi.fn(() => () => {}),
-      dispose: vi.fn(),
-    },
-    searchLookup: {
-      cachedSearchResults: vi.fn(() => []),
-      loadSearchResults: vi.fn(async () => ({ entries: [] })),
-      subscribeToLookupChanges: vi.fn(() => () => {}),
-      dispose: vi.fn(),
-    },
+    entryForValue: vi.fn(),
+    loadMissingEntries: args.loadMissingEntries,
+    subscribeToLookupChanges: vi.fn(() => () => {}),
+    dispose: vi.fn(),
   };
 }
 
 describe("startTGridLookupLoading", () => {
   it("loads FK labels for every registered table path", () => {
-    const ordersLevel = makeLevel({
-      name: "orders",
-      table: "orders",
-      columns: [idColumn, customerColumn],
-    });
-    const linesLevel = makeLevel({
-      name: "orders.lines",
-      table: "lines",
-      columns: [idColumn, productColumn],
-    });
     const orderSource = makeSource([
       makeNode({ id: 42, customer_id: "2" }),
       makeNode({ id: 43, customer_id: "3" }),
@@ -140,30 +131,24 @@ describe("startTGridLookupLoading", () => {
     ]);
     const customerLoad = vi.fn(async () => {});
     const productLoad = vi.fn(async () => {});
-    const customerBundle = makeBundle({
-      sourceTable: "orders",
-      sourceColumn: "customer_id",
-      targetTable: "customers",
+    const customerLookup = makeValueLookup({
       loadMissingEntries: customerLoad,
     });
-    const productBundle = makeBundle({
-      sourceTable: "lines",
-      sourceColumn: "product_id",
-      targetTable: "products",
+    const productLookup = makeValueLookup({
       loadMissingEntries: productLoad,
     });
-    const lookupRegistry = {
-      bundleFor: vi.fn(({ sourceTable, column }) => {
-        if (sourceTable === "orders" && column.name === "customer_id") {
-          return customerBundle;
-        }
-        if (sourceTable === "lines" && column.name === "product_id") {
-          return productBundle;
-        }
-        return undefined;
-      }),
-      dispose: vi.fn(),
-    };
+    const ordersLevel = makeLevel({
+      name: "orders",
+      table: "orders",
+      columns: [idColumn, customerColumn],
+      valueLookupByColumn: { customer_id: customerLookup },
+    });
+    const linesLevel = makeLevel({
+      name: "orders.lines",
+      table: "lines",
+      columns: [idColumn, productColumn],
+      valueLookupByColumn: { product_id: productLookup },
+    });
     const runtime = {
       registeredPaths: () => [ordersPath, linesPath],
       sourceFor: (path: GridPath) =>
@@ -174,31 +159,12 @@ describe("startTGridLookupLoading", () => {
     } as unknown as GridRuntime;
     const session = {
       runtime,
-      lookupRegistry,
-      columnMapper: createTGridColumnMapper({ bundleFor: vi.fn() }),
-      levelInfoById: {
-        orders: { levelId: "orders", tableName: "orders", childSchemas: [] },
-        "orders.lines": {
-          levelId: "orders.lines",
-          tableName: "lines",
-          parent: { parentLevelId: "orders", foreignKey: "order_id" },
-          childSchemas: [],
-        },
-      },
     } as unknown as TGridSession;
 
     const stop = startTGridLookupLoading(session);
 
     expect(customerLoad).toHaveBeenCalledWith(["2", "3"]);
     expect(productLoad).toHaveBeenCalledWith(["5", "6"]);
-    expect(lookupRegistry.bundleFor).toHaveBeenCalledWith({
-      sourceTable: "orders",
-      column: customerColumn,
-    });
-    expect(lookupRegistry.bundleFor).toHaveBeenCalledWith({
-      sourceTable: "lines",
-      column: productColumn,
-    });
 
     stop();
     expect(orderSource.unsubscribe).toHaveBeenCalledOnce();

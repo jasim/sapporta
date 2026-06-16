@@ -1,6 +1,6 @@
 import { memo, useCallback } from "react";
 import type { ColumnSchema } from "@sapporta/shared/contracts";
-import type { KeyedValues } from "@/lookup/types";
+import type { LookupCapabilities } from "@sapporta/grid/column-preset";
 import { FormField } from "@/table/form/FormField";
 import {
   useRecordFieldValue,
@@ -9,10 +9,10 @@ import {
 
 interface RecordFormFieldProps {
   column: ColumnSchema;
-  fkOptions?: KeyedValues;
+  lookup?: LookupCapabilities;
 }
 
-function RecordFormFieldComponent({ column, fkOptions }: RecordFormFieldProps) {
+function RecordFormFieldComponent({ column, lookup }: RecordFormFieldProps) {
   const value = useRecordFieldValue(column.name);
   const setValue = useRecordFormSetValue();
   const onChange = useCallback(
@@ -25,7 +25,7 @@ function RecordFormFieldComponent({ column, fkOptions }: RecordFormFieldProps) {
       column={column}
       value={value}
       onChange={onChange}
-      fkOptions={fkOptions}
+      lookup={lookup}
     />
   );
 }
@@ -39,7 +39,5 @@ function areRecordFormFieldPropsEqual(
   previous: RecordFormFieldProps,
   next: RecordFormFieldProps,
 ): boolean {
-  return (
-    previous.column === next.column && previous.fkOptions === next.fkOptions
-  );
+  return previous.column === next.column && previous.lookup === next.lookup;
 }

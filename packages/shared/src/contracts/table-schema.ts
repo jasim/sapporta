@@ -62,6 +62,7 @@ export type ListRowsQuery = z.output<typeof listRowsQuerySchema>;
 export const lookupQuerySchema = z.object({
   ids: z.string().optional(),
   q: z.string().optional(),
+  limit: z.string().optional(),
 });
 export type LookupQuery = z.output<typeof lookupQuerySchema>;
 

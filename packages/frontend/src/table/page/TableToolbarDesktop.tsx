@@ -7,6 +7,7 @@ import { formatRecordCount, SearchInput } from "./TableToolbarControls";
 
 export function TableToolbarDesktop({
   session,
+  tableName,
   tableLabel,
   totalCount,
   columns,
@@ -22,6 +23,7 @@ export function TableToolbarDesktop({
   onClearSort,
   onNewRecord,
   viewControl,
+  lookupForColumn,
 }: TableToolbarProps) {
   return (
     <>
@@ -68,8 +70,10 @@ export function TableToolbarDesktop({
         }
       />
       <FilterCardsBar
+        tableName={tableName}
         columns={[...columns]}
         filters={[...filters]}
+        lookupForColumn={lookupForColumn}
         onAdd={onAddFilter}
         onUpdate={onUpdateFilter}
         onRemove={onRemoveFilter}

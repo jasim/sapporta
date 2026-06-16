@@ -1,9 +1,8 @@
 /**
  * ConditionEditor — the one filter authoring component in the app. Three
- * callers invoke it (header "Filter by condition…", card click, "+ Add
+ * callers invoke it (header "Filter by condition...", card click, "+ Add
  * filter"); it carries no per-caller knowledge. The column picker, operator
- * dropdown, and value input are all derived from the column-type catalog —
- * no `switch` on `columnType` or `op` lives here.
+ * dropdown, and value input are all derived from the column-type catalog.
  */
 
 import { useMemo, useState } from "react";
@@ -13,7 +12,7 @@ import type {
   NewFilterCondition,
 } from "@sapporta/shared/filter";
 import type { ColumnSchema } from "@sapporta/shared/contracts";
-import type { FkOptionsMap } from "@/lookup/types";
+import type { LookupForColumn } from "@/table/lookup/column-lookup";
 import {
   Select,
   SelectContent,
@@ -53,8 +52,8 @@ export interface ConditionEditorProps {
    *  per-cell filter icon so the draft opens with the clicked cell's value
    *  already filled in (scalar or list depending on the default operator). */
   seedValue?: unknown;
-  /** Controller fkOptions, keyed by column name — populated as rows load. */
-  fkOptions?: FkOptionsMap;
+  tableName?: string;
+  lookupForColumn?: LookupForColumn;
   /** Called on Apply with a fresh condition (no id yet — the controller
    *  mints one on addFilter, or preserves it on updateFilter). */
   onApply: (cond: NewFilterCondition) => void;
@@ -116,7 +115,8 @@ export function ConditionEditor({
   lockedColumn,
   initial,
   seedValue,
-  fkOptions,
+  tableName,
+  lookupForColumn,
   onApply,
   onCancel,
 }: ConditionEditorProps) {
@@ -170,9 +170,11 @@ export function ConditionEditor({
   })();
 
   const resolved =
-    draft.column && type
-      ? resolveColumnOptions(draft.column, fkOptions, type)
-      : null;
+    draft.column && type ? resolveColumnOptions(draft.column, type) : null;
+  const lookup =
+    draft.column && tableName
+      ? lookupForColumn?.({ tableName, column: draft.column })
+      : undefined;
 
   return (
     <div
@@ -182,8 +184,6 @@ export function ConditionEditor({
           e.stopPropagation();
           onCancel();
         } else if (e.key === "Enter" && canApply) {
-          // Commit on Enter from any scalar input; TagInput intercepts Enter
-          // for its own tag commit and won't bubble.
           e.stopPropagation();
           handleApply();
         }
@@ -209,23 +209,25 @@ export function ConditionEditor({
               sideOffset={4}
             >
               <Command>
-                <CommandInput placeholder="Search columns…" />
+                <CommandInput placeholder="Search columns..." />
                 <CommandList>
                   <CommandEmpty>No columns.</CommandEmpty>
                   <CommandGroup>
                     {columns.map((c) => {
                       const label = c.label;
+                      const name = c.name;
+                      const selected = draft.column?.name === name;
                       return (
                         <CommandItem
-                          key={c.name}
-                          value={`${label} ${c.name}`}
+                          key={name}
+                          value={`${label} ${name}`}
                           onSelect={() => {
-                            handleColumnChange(c.name);
+                            handleColumnChange(name);
                             setColumnPickerOpen(false);
                           }}
                         >
                           {label}
-                          {draft.column?.name === c.name && (
+                          {selected && (
                             <span className="ml-auto text-xs text-sap-muted">
                               ✓
                             </span>
@@ -267,6 +269,7 @@ export function ConditionEditor({
             value={draft.scalarValue}
             onChange={(next) => setDraft({ ...draft, scalarValue: next })}
             column={draft.column}
+            lookup={lookup}
             options={resolved?.options}
             labels={resolved?.labels}
             autoFocus={!!lockedColumn}
@@ -280,6 +283,7 @@ export function ConditionEditor({
             values={draft.listValues}
             onChange={(next) => setDraft({ ...draft, listValues: next })}
             column={draft.column}
+            lookup={lookup}
             options={resolved?.options}
             labels={resolved?.labels}
             autoFocus={!!lockedColumn}

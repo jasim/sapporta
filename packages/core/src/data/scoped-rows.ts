@@ -203,18 +203,26 @@ export function scopedRows(
 
     async lookup(input = {}) {
       // Lookup backs foreign-key pickers and autocomplete. Optional ids preserve
-      // selected labels; optional q filters visible labels in memory after the
-      // SQL row-ownership predicate has already narrowed the result set.
-      const { pkName, label } = rowLabeller(table);
+      // selected labels; optional q searches visible row-label columns.
+      const { pkName, labelColumns, label } = rowLabeller(table);
       const idsParam = input.ids;
       const searchText = input.q?.trim().toLocaleLowerCase() ?? "";
+      const limit = parseLookupLimit(input.limit);
 
       let rows: Record<string, unknown>[];
       if (idsParam === undefined) {
-        rows = (await db
+        const searchWhere =
+          searchText === ""
+            ? undefined
+            : lookupLabelSearchCondition(table, labelColumns, searchText);
+        const query = db
           .select()
           .from(table.drizzle)
-          .where(access.ownedRows())) as Record<string, unknown>[];
+          .where(access.ownedRows(searchWhere))
+          .orderBy(asc(pk.drizzlePk));
+        rows = (await (limit === undefined
+          ? query
+          : query.limit(limit))) as Record<string, unknown>[];
       } else {
         const ids = parseIds(idsParam);
         if (ids.length === 0) return {};
@@ -228,6 +236,7 @@ export function scopedRows(
       }
 
       const data: Record<string, string> = {};
+      let count = 0;
       for (const row of rows) {
         const rowLabel = label(row);
         if (
@@ -238,6 +247,10 @@ export function scopedRows(
           continue;
         }
         data[String(row[pkName])] = rowLabel;
+        count += 1;
+        if (idsParam === undefined && limit !== undefined) {
+          if (count >= limit) break;
+        }
       }
       return data;
     },
@@ -343,6 +356,41 @@ function parseIds(idsParam: string): string[] {
     .split(",")
     .map((value) => value.trim())
     .filter(Boolean);
+}
+
+function parseLookupLimit(limitParam: string | undefined): number | undefined {
+  if (limitParam === undefined || limitParam.trim() === "") return undefined;
+  const limit = Number(limitParam);
+  if (!Number.isInteger(limit) || limit < 1 || limit > 500) {
+    throw new QueryParseError(
+      "bad_limit",
+      `limit must be an integer in [1, 500], got ${JSON.stringify(limitParam)}`,
+    );
+  }
+  return limit;
+}
+
+function lookupLabelSearchCondition(
+  table: TableDef,
+  labelColumns: readonly string[],
+  searchText: string,
+): SQL | undefined {
+  const drizzleColumns = table.drizzle as unknown as Record<
+    string,
+    SQLiteColumn | undefined
+  >;
+  const pattern = `%${searchText}%`;
+  const labelExpression = labelColumns
+    .map((columnName) => drizzleColumns[columnName])
+    .filter((column): column is SQLiteColumn => column !== undefined)
+    .reduce<SQL | null>((expression, column) => {
+      const value = sql`coalesce(cast(${column} as text), '')`;
+      return expression === null
+        ? value
+        : sql`${expression} || ' ' || ${value}`;
+    }, null);
+  if (labelExpression === null) return undefined;
+  return sql`lower(${labelExpression}) like ${pattern}`;
 }
 
 function isPersistenceNotFoundError(err: unknown): boolean {

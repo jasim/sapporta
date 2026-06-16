@@ -4,16 +4,18 @@ import type {
   FilterCondition,
   NewFilterCondition,
 } from "@sapporta/shared/filter";
-import { Popover, PopoverContent, PopoverTrigger } from "@sapporta/ui";
 import type { ColumnSchema } from "@sapporta/shared/contracts";
-import type { FkOptionsMap } from "@/lookup/types";
+import { Popover, PopoverContent, PopoverTrigger } from "@sapporta/ui";
+import { useLookupValueLabels } from "@sapporta/grid";
+import type { LookupForColumn } from "@/table/lookup/column-lookup";
 import { ConditionEditor } from "./ConditionEditor";
 import { findEntryForCondition, inferFilterColumnType } from "./column-catalog";
 
 export interface FilterCardProps {
   condition: FilterCondition;
+  tableName?: string;
   columns: ColumnSchema[];
-  fkOptions?: FkOptionsMap;
+  lookupForColumn?: LookupForColumn;
   onUpdate: (id: string, patch: NewFilterCondition) => void;
   onRemove: (id: string) => void;
   /** Backend-reported error scoped to this condition (by id). Rendered
@@ -27,8 +29,9 @@ export interface FilterCardProps {
  *  trailing × removes it. */
 export function FilterCard({
   condition,
+  tableName,
   columns,
-  fkOptions,
+  lookupForColumn,
   onUpdate,
   onRemove,
   error,
@@ -38,7 +41,12 @@ export function FilterCard({
   const column = columns.find((c) => c.name === condition.column) ?? null;
   const label = column?.label ?? condition.column;
   const opLabel = summarizeOperator(condition, column);
-  const valueSummary = summarizeValue(condition, column, fkOptions);
+  const valueSummary = useFilterValueSummary(
+    condition,
+    tableName,
+    column,
+    lookupForColumn,
+  );
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -81,7 +89,8 @@ export function FilterCard({
           columns={columns}
           lockedColumn={column}
           initial={condition}
-          fkOptions={fkOptions}
+          tableName={tableName}
+          lookupForColumn={lookupForColumn}
           onApply={(patch) => {
             onUpdate(condition.id, patch);
             setOpen(false);
@@ -111,14 +120,19 @@ export function summarizeOperator(
   ).label;
 }
 
-function summarizeValue(
+function useFilterValueSummary(
   cond: FilterCondition,
+  tableName: string | undefined,
   column: ColumnSchema | null,
-  fkOptions?: FkOptionsMap,
+  lookupForColumn: LookupForColumn | undefined,
 ): string {
-  // The opLabel already reads "is empty" / "is not empty" for null-checks.
+  const values =
+    cond.op === "is" ? [] : "values" in cond ? cond.values : [cond.value];
+  const lookup =
+    tableName && column?.foreignKey
+      ? lookupForColumn?.({ tableName, column })
+      : undefined;
+  const labels = useLookupValueLabels(lookup?.valueLookup, values);
   if (cond.op === "is") return "";
-  const values = "values" in cond ? cond.values : [cond.value];
-  const lookup = column?.foreignKey ? fkOptions?.[cond.column] : undefined;
-  return values.map((v) => lookup?.[v] ?? v).join(", ");
+  return values.map((value) => labels[value] ?? value).join(", ");
 }

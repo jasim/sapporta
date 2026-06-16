@@ -1,7 +1,8 @@
-import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { CellEditorProps } from "../../grid/types/schema";
 import { ComboboxList } from "@sapporta/ui";
 import { lookupCapabilities, presetRuntime } from "../preset";
+import { useLookupOptions } from "../../grid/react/lookup";
 
 type RowId = string;
 
@@ -20,22 +21,17 @@ export function LookupValueEditor(props: CellEditorProps) {
   const rootRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
-    if (!searchLookup) return;
-    void searchLookup.loadSearchResults({
-      searchText,
-      limit: SEARCH_LIMIT,
-    });
-  }, [searchLookup, searchText]);
-
-  useEffect(() => {
     inputRef.current?.focus();
   }, []);
 
-  const options = useSyncExternalStore(
-    (listener) =>
-      searchLookup?.subscribeToLookupChanges(listener) ?? subscribeNoop(),
-    () => searchLookup?.cachedSearchResults({ searchText }) ?? EMPTY_RESULTS,
-  );
+  const selectedValue = props.value == null ? null : String(props.value);
+  const options = useLookupOptions({
+    valueLookup: capabilities?.valueLookup,
+    searchLookup,
+    selectedValues: selectedValue ? [selectedValue] : [],
+    searchText,
+    limit: SEARCH_LIMIT,
+  });
   const comboboxOptions = options.map((entry) => ({
     id: String(entry.value),
     label: entry.label,
@@ -76,7 +72,7 @@ export function LookupValueEditor(props: CellEditorProps) {
       }}
     >
       <ComboboxList
-        value={props.value == null ? null : (String(props.value) as RowId)}
+        value={selectedValue as RowId | null}
         options={comboboxOptions}
         onPick={(id) => {
           const entry = options.find((option) => String(option.value) === id);
@@ -93,10 +89,4 @@ export function LookupValueEditor(props: CellEditorProps) {
       />
     </div>
   );
-}
-
-const EMPTY_RESULTS: readonly [] = [];
-
-function subscribeNoop() {
-  return () => {};
 }

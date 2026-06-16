@@ -1,7 +1,7 @@
 /**
  * CellFilterAction — the "filter by this column" icon that appears on cell
  * hover. Click opens ConditionEditor with the column locked; the user enters
- * the operator and value. Mirrors the header chevron's "Filter by condition…"
+ * the operator and value. Mirrors the header chevron's "Filter by condition..."
  * flow but anchors to the cell instead of the header.
  */
 
@@ -9,23 +9,25 @@ import { useState } from "react";
 import { Filter } from "lucide-react";
 import type { NewFilterCondition } from "@sapporta/shared/filter";
 import type { ColumnSchema } from "@sapporta/shared/contracts";
-import type { FkOptionsMap } from "@/lookup/types";
+import type { LookupForColumn } from "@/table/lookup/column-lookup";
 import { Popover, PopoverContent, PopoverTrigger } from "@sapporta/ui";
 import { ConditionEditor } from "./ConditionEditor";
 
 export interface CellFilterActionProps {
+  tableName?: string;
   column: ColumnSchema;
   columns: ColumnSchema[];
   cellValue: unknown;
-  fkOptions?: FkOptionsMap;
+  lookupForColumn?: LookupForColumn;
   onAddFilter: (cond: NewFilterCondition) => void;
 }
 
 export function CellFilterAction({
+  tableName,
   column,
   columns,
   cellValue,
-  fkOptions,
+  lookupForColumn,
   onAddFilter,
 }: CellFilterActionProps) {
   const [open, setOpen] = useState(false);
@@ -51,7 +53,8 @@ export function CellFilterAction({
           columns={columns}
           lockedColumn={column}
           seedValue={cellValue}
-          fkOptions={fkOptions}
+          tableName={tableName}
+          lookupForColumn={lookupForColumn}
           onApply={(cond) => {
             onAddFilter(cond);
             setOpen(false);

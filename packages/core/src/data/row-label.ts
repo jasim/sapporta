@@ -23,6 +23,8 @@ import { findPkColumn } from "../schema/pk.js";
 export interface RowLabeller {
   /** SQL name of the primary key column. */
   readonly pkName: string;
+  /** SQL names used to build the display label. */
+  readonly labelColumns: readonly string[];
   /** Render a row as a human-readable label. */
   readonly label: (row: Record<string, unknown>) => string;
 }
@@ -57,19 +59,17 @@ export function findRowLabelColumns(schema: TableDef): string[] | null {
  */
 export function rowLabeller(schema: TableDef): RowLabeller {
   const pkName = findPkColumn(schema).name;
-  const labelCols = findRowLabelColumns(schema);
+  const labelCols = findRowLabelColumns(schema) ?? [pkName];
 
   const label = (row: Record<string, unknown>): string => {
-    if (labelCols) {
-      const parts: string[] = [];
-      for (const col of labelCols) {
-        const v = row[col];
-        if (v != null && v !== "") parts.push(String(v));
-      }
-      if (parts.length > 0) return parts.join(" ");
+    const parts: string[] = [];
+    for (const col of labelCols) {
+      const v = row[col];
+      if (v != null && v !== "") parts.push(String(v));
     }
+    if (parts.length > 0) return parts.join(" ");
     return String(row[pkName]);
   };
 
-  return { pkName, label };
+  return { pkName, labelColumns: labelCols, label };
 }

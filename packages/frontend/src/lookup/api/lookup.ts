@@ -18,10 +18,14 @@ export async function fetchLookup(
 export async function fetchLookupSearch(
   tableName: string,
   searchText: string,
+  limit?: number,
 ): Promise<LookupResponse> {
   return uiClient.lookup({
     params: { tableName },
-    query: { q: searchText },
+    query: {
+      q: searchText,
+      ...(limit === undefined ? {} : { limit: String(limit) }),
+    },
   });
 }
 
@@ -51,8 +55,12 @@ export async function fetchLookupEntriesForSearch(args: {
   searchText: string;
   limit: number;
 }): Promise<LookupSearchPage<string>> {
-  const response = await fetchLookupSearch(args.tableName, args.searchText);
+  const response = await fetchLookupSearch(
+    args.tableName,
+    args.searchText,
+    args.limit,
+  );
   return {
-    entries: lookupEntriesFromResponse(response).slice(0, args.limit),
+    entries: lookupEntriesFromResponse(response),
   };
 }

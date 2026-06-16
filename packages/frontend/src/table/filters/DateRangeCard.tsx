@@ -19,7 +19,7 @@ import type {
 import { Popover, PopoverContent, PopoverTrigger } from "@sapporta/ui";
 import { Input } from "@sapporta/ui";
 import type { ColumnSchema } from "@sapporta/shared/contracts";
-import { inferFilterColumnType } from "./column-catalog";
+import { inferDisplayType } from "@/table/model/column-types";
 
 /** A date-range pair. `gte` is always the lower bound, `lte` the upper. */
 export interface DateRange {
@@ -52,7 +52,8 @@ export function groupDateRanges(
       continue;
     }
     const col = columnsByName.get(cond.column);
-    if (!col || inferFilterColumnType(col) !== "date") {
+    const displayType = col ? inferDisplayType(col) : null;
+    if (!col || (displayType !== "date" && displayType !== "timestamp")) {
       out.push({ kind: "single", condition: cond });
       continue;
     }

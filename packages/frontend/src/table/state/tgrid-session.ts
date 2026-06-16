@@ -41,6 +41,10 @@ import {
   createTableLookupRegistry,
   type TableLookupRegistry,
 } from "@/table/lookup/table-lookup-registry";
+import {
+  createColumnLookupResolver,
+  type LookupForColumn,
+} from "@/table/lookup/column-lookup";
 import { buildTableRowsQuery } from "@/table/api/rows";
 import { getApiBase } from "@/platform/client";
 import type {
@@ -118,6 +122,7 @@ export type TGridSession<
   ): TGridLevelQueryState<RowsByLevel[LevelId]>;
   reloadRows(levelId?: TGridLevelId<RowsByLevel>, path?: GridPath): void;
   setErrorBanner(message: string | null): void;
+  lookupForColumn: LookupForColumn;
   csvExportUrl(levelId?: TGridLevelId<RowsByLevel>): string;
   dispose(): void;
 };
@@ -163,6 +168,7 @@ class DefaultTGridSession<
   readonly runtime: GridRuntime;
   readonly rootSource: RuntimeLevelDataSource;
   readonly lookupRegistry: TableLookupRegistry;
+  readonly lookupForColumn: LookupForColumn;
   readonly columnMapper: TGridColumnMapper;
   readonly levelInfoById: Record<TGridLevelId<RowsByLevel>, TGridLevelInfo>;
   readonly levels: TGridSessionContext<RowsByLevel, AppServices>["levels"];
@@ -175,6 +181,9 @@ class DefaultTGridSession<
     this.rootLevel = definition.rootLevel;
     this.rootTableName = definition.levels[definition.rootLevel].table.name;
     this.lookupRegistry = createTableLookupRegistry();
+    this.lookupForColumn = createColumnLookupResolver(
+      this.lookupRegistry,
+    ).lookupForColumn;
 
     const lookupResolver = createTGridLookupResolver(this.lookupRegistry);
     this.columnMapper = createTGridColumnMapper(lookupResolver);

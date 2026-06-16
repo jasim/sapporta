@@ -44,9 +44,17 @@ export function useTableToolbarProps<
   const sort = useStore(store, (state) => state.sort);
   const activeFilters = useStore(store, (state) => state.filters);
   const search = useStore(store, (state) => state.search);
+  const onAddFilter = (
+    condition: Parameters<TableToolbarProps["onAddFilter"]>[0],
+  ) => store.getState().addFilter(condition);
+  const onUpdateFilter: TableToolbarProps["onUpdateFilter"] = (id, patch) =>
+    store.getState().updateFilter(id, patch);
+  const onRemoveFilter: TableToolbarProps["onRemoveFilter"] = (id) =>
+    store.getState().removeFilter(id);
 
   return {
     session,
+    tableName: table.name,
     tableLabel: table.label ?? table.name,
     totalCount,
     columns: table.columns,
@@ -55,12 +63,13 @@ export function useTableToolbarProps<
     searchable: (table.search?.columns.length ?? 0) > 0,
     exportUrl: session.csvExportUrl(levelId),
     hasSort: sort.length > 0,
-    onAddFilter: (condition) => store.getState().addFilter(condition),
-    onUpdateFilter: (id, patch) => store.getState().updateFilter(id, patch),
-    onRemoveFilter: (id) => store.getState().removeFilter(id),
+    onAddFilter,
+    onUpdateFilter,
+    onRemoveFilter,
     onSearchChange: (query) => store.getState().setSearch(query),
     onClearSort: () => store.getState().clearSort(),
     onNewRecord,
+    lookupForColumn: session.lookupForColumn,
   };
 }
 

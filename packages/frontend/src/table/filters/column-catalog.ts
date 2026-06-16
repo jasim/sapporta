@@ -19,13 +19,13 @@
  */
 
 import type { ColumnSchema } from "@sapporta/shared/contracts";
-import type { KeyedValues, FkOptionsMap } from "@/lookup/types";
-import { inferDisplayType } from "@/table/model/column-types";
 import type { ListInputComponent, ScalarInputComponent } from "./inputs/types";
 import { TextInput, NumberInput, DateInput } from "./inputs/ScalarInput";
 import { TagInput } from "./inputs/TagInput";
 import { CheckboxList } from "./inputs/CheckboxList";
+import { LookupCheckboxList } from "./inputs/LookupCheckboxList";
 import type { ListOp, Polarity, ScalarOp } from "@sapporta/shared/filter";
+import { inferDisplayType } from "@/table/model/column-types";
 
 /** Filter-side column types — coarser than the render-side DisplayType. */
 export type FilterColumnType =
@@ -84,13 +84,15 @@ export function inferFilterColumnType(col: ColumnSchema): FilterColumnType {
  *  two paths can't drift. Returns `null` when the column has no fixed set. */
 export function resolveColumnOptions(
   column: ColumnSchema,
-  fkOptions: FkOptionsMap | undefined,
   type: FilterColumnType,
-): { options: string[]; labels?: KeyedValues } | null {
-  if (column.select?.options) return { options: column.select.options };
-  if (column.foreignKey) {
-    const lookup = fkOptions?.[column.name];
-    return { options: lookup ? Object.keys(lookup) : [], labels: lookup };
+): { options: string[]; labels?: Record<string, string> } | null {
+  if (column.select?.options) {
+    return {
+      options: column.select.options,
+      labels: Object.fromEntries(
+        column.select.options.map((option) => [option, option]),
+      ),
+    };
   }
   if (type === "boolean") return { options: ["true", "false"] };
   return null;
@@ -193,8 +195,8 @@ const enumType: ColumnTypeEntry = {
 const fk: ColumnTypeEntry = {
   defaultKey: "in",
   ops: [
-    list("in", "is one of", "in", CheckboxList),
-    list("nin", "is not one of", "nin", CheckboxList),
+    list("in", "is one of", "in", LookupCheckboxList),
+    list("nin", "is not one of", "nin", LookupCheckboxList),
     isEmpty,
     isNotEmpty,
   ],

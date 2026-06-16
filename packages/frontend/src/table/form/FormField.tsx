@@ -1,3 +1,5 @@
+import { useState } from "react";
+import { ChevronDown } from "lucide-react";
 import { Input } from "@sapporta/ui";
 import { Label } from "@sapporta/ui";
 import { Checkbox } from "@sapporta/ui";
@@ -8,9 +10,17 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@sapporta/ui";
+import {
+  Button,
+  ComboboxList,
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@sapporta/ui";
+import type { LookupCapabilities } from "@sapporta/grid/column-preset";
 import { inferDisplayType } from "@/table/model/column-types";
 import type { ColumnSchema } from "@sapporta/shared/contracts";
-import type { KeyedValues } from "@/lookup/types";
+import { useLookupOptions } from "@sapporta/grid";
 import {
   formatInstantForDateTimeLocalInput,
   formatPlainDateForDateInput,
@@ -22,15 +32,10 @@ interface FormFieldProps {
   column: ColumnSchema;
   value: unknown;
   onChange: (value: unknown) => void;
-  fkOptions?: KeyedValues;
+  lookup?: LookupCapabilities;
 }
 
-export function FormField({
-  column,
-  value,
-  onChange,
-  fkOptions,
-}: FormFieldProps) {
+export function FormField({ column, value, onChange, lookup }: FormFieldProps) {
   const type = inferDisplayType(column);
   const id = `field-${column.name}`;
 
@@ -117,22 +122,14 @@ export function FormField({
         />
       )}
 
-      {type === "fk" && fkOptions && Object.keys(fkOptions).length > 0 ? (
-        <Select
-          value={value != null ? String(value) : ""}
-          onValueChange={(v) => onChange(v || null)}
-        >
-          <SelectTrigger id={id}>
-            <SelectValue placeholder={`Select ${column.label}`} />
-          </SelectTrigger>
-          <SelectContent>
-            {Object.entries(fkOptions).map(([id, label]) => (
-              <SelectItem key={id} value={id}>
-                {label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+      {type === "fk" && lookup?.searchLookup ? (
+        <LookupFormField
+          id={id}
+          column={column}
+          value={value}
+          onChange={onChange}
+          lookup={lookup}
+        />
       ) : (
         type === "fk" && (
           <Input
@@ -162,5 +159,74 @@ export function FormField({
           />
         ))}
     </div>
+  );
+}
+
+function LookupFormField({
+  id,
+  column,
+  value,
+  onChange,
+  lookup,
+}: {
+  id: string;
+  column: ColumnSchema;
+  value: unknown;
+  onChange: (value: unknown) => void;
+  lookup: LookupCapabilities;
+}) {
+  const [open, setOpen] = useState(false);
+  const [searchText, setSearchText] = useState("");
+  const selectedValue = value == null || value === "" ? null : String(value);
+  const entries = useLookupOptions({
+    valueLookup: lookup.valueLookup,
+    searchLookup: lookup.searchLookup,
+    selectedValues: selectedValue ? [selectedValue] : [],
+    searchText,
+    limit: 50,
+  });
+  const options = entries.map((entry) => ({
+    id: String(entry.value),
+    label: entry.label,
+  }));
+
+  const selectedLabel = selectedValue
+    ? (entries.find((entry) => String(entry.value) === selectedValue)?.label ??
+      selectedValue)
+    : null;
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          id={id}
+          type="button"
+          variant="outline"
+          className="w-full justify-between font-normal"
+        >
+          <span className={selectedLabel ? "" : "text-sap-muted"}>
+            {selectedLabel ?? `Select ${column.label}`}
+          </span>
+          <ChevronDown className="h-4 w-4 opacity-50" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent
+        className="w-[--radix-popover-trigger-width] p-0"
+        align="start"
+        sideOffset={4}
+      >
+        <ComboboxList
+          value={selectedValue}
+          options={options}
+          onPick={(pickedId) => {
+            onChange(pickedId || null);
+            setOpen(false);
+          }}
+          searchText={searchText}
+          onSearchTextChange={setSearchText}
+          shouldFilter={false}
+        />
+      </PopoverContent>
+    </Popover>
   );
 }
