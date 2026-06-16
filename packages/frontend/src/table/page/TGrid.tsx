@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
+import { Table2 } from "lucide-react";
 import {
   trailingEdge,
   GridLevel,
@@ -180,7 +181,13 @@ function mergeTGridChrome({
         </>
       ),
     levelContainerClassName: (ctx) =>
-      cn(chrome.levelContainerClassName?.(ctx), ctx.path === root && className),
+      cn(
+        chrome.levelContainerClassName?.(ctx),
+        ctx.path === root && className,
+        ctx.path !== root &&
+          viewRelatedRows &&
+          "sapporta-table-grid--has-related-link",
+      ),
     levelContainerStyle: (ctx) => ({
       ...chrome.levelContainerStyle?.(ctx),
       ...(ctx.path === root ? style : undefined),
@@ -199,7 +206,7 @@ function renderCardsLevelHeader(
 
   return (
     <div
-      className="flex min-h-8 items-center justify-between gap-3 border-b border-sap-border/70 px-1 pb-2 pt-1"
+      className="relative flex min-h-8 items-center justify-between gap-3 border-b border-sap-border/70 px-1 pb-2 pt-1"
       data-grid-part="cards-level-header"
     >
       <div
@@ -210,15 +217,12 @@ function renderCardsLevelHeader(
         {compactLevelName(ctx.levelName)}
       </div>
       {link ? (
-        <a
-          href={link.href}
-          target={link.target}
-          rel={link.target === "_blank" ? "noreferrer" : undefined}
-          className="shrink-0 text-xs font-medium text-sap-accent hover:underline"
-          data-grid-part="cards-level-link"
-        >
-          {link.label}
-        </a>
+        <RelatedRowsIconLink
+          link={link}
+          ariaLabel={relatedRowsLinkLabel(link, ctx)}
+          className="absolute -left-9 top-0"
+          dataGridPart="cards-level-link"
+        />
       ) : null}
     </div>
   );
@@ -235,17 +239,49 @@ function renderRelatedRowsLink(
   if (!resolved) return null;
 
   return (
-    <div className="flex justify-end border-b border-sap-border bg-sap-surface-muted/40 px-3 py-1.5">
-      <a
-        href={resolved.href}
-        target={resolved.target}
-        rel={resolved.target === "_blank" ? "noreferrer" : undefined}
-        className="text-xs font-medium text-sap-accent hover:underline"
-      >
-        {resolved.label}
-      </a>
-    </div>
+    <RelatedRowsIconLink
+      link={resolved}
+      ariaLabel={relatedRowsLinkLabel(resolved, ctx)}
+      className="absolute -left-11 top-0.5 z-[var(--sap-z-grid-header)]"
+      dataGridPart="related-table-link"
+    />
   );
+}
+
+function RelatedRowsIconLink({
+  link,
+  ariaLabel,
+  className,
+  dataGridPart,
+}: {
+  link: { href: string; label: string; target: "_self" | "_blank" };
+  ariaLabel: string;
+  className?: string;
+  dataGridPart: string;
+}) {
+  return (
+    <a
+      href={link.href}
+      target={link.target}
+      rel={link.target === "_blank" ? "noreferrer" : undefined}
+      aria-label={ariaLabel}
+      title={ariaLabel}
+      className={cn(
+        "inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-[6px] border border-sap-border bg-sap-surface text-sap-soft shadow-sm hover:bg-sap-row-hover hover:text-sap-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sap-focus-ring",
+        className,
+      )}
+      data-grid-part={dataGridPart}
+    >
+      <Table2 aria-hidden="true" className="h-[15px] w-[15px]" />
+    </a>
+  );
+}
+
+function relatedRowsLinkLabel(
+  link: { label: string },
+  ctx: GridChromeContext,
+): string {
+  return `${link.label} (${compactLevelName(ctx.levelName)})`;
 }
 
 function resolveRelatedRowsLink(
@@ -291,7 +327,9 @@ function resolveRelatedRowsLink(
 
   return {
     href,
-    label: config.label ?? "View in table",
+    label:
+      config.label ??
+      `View ${relatedTable.label ?? relatedTable.name} in table`,
     target: config.target ?? "_self",
   };
 }

@@ -174,7 +174,17 @@
   .sapporta-table-grid[data-grid-presentation="cards"]
     [data-grid-part="cards-level-header"]
 ) {
-  margin-bottom: 10px;
+  margin-bottom: 6px;
+  min-height: 24px;
+  padding-bottom: 4px;
+  padding-top: 0;
+}
+
+:where(
+  .sapporta-table-grid [data-grid-part="related-table-link"],
+  .sapporta-table-grid [data-grid-part="cards-level-link"]
+) {
+  text-decoration: none;
 }
 
 @media (max-width: 640px) {
