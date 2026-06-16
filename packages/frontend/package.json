@@ -89,8 +89,7 @@
     "build": "vite build",
     "build:watch": "vite build --watch",
     "typecheck": "tsc --noEmit",
-    "typecheck:watch": "tsc --noEmit --watch --preserveWatchOutput",
-    "prepublishOnly": "pnpm build"
+    "typecheck:watch": "tsc --noEmit --watch --preserveWatchOutput"
   },
   "dependencies": {
     "@sapporta/grid": "workspace:*",

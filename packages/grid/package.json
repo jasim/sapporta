@@ -58,8 +58,7 @@
     "bench:runtime:gc": "tsx --expose-gc bench/runtime-bench.ts",
     "typecheck": "tsc --noEmit",
     "typecheck:watch": "tsc --noEmit --watch --preserveWatchOutput",
-    "test": "vitest run",
-    "prepublishOnly": "pnpm build"
+    "test": "vitest run"
   },
   "dependencies": {
     "@sapporta/ui": "workspace:*",

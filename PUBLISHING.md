@@ -10,7 +10,9 @@ Published packages:
 - `@sapporta/grid` — grid runtime and React grid components
 - `@sapporta/frontend` — default React admin frontend
 
-Uses [Changesets](https://github.com/changesets/changesets) for versioning and publishing.
+Uses [Changesets](https://github.com/changesets/changesets) for versioning.
+Publishing is handled by `scripts/release.mjs` so npm browser/passkey
+authentication can run interactively.
 
 The monorepo root package is private (`@sapporta/monorepo`) and is never published.
 
@@ -19,6 +21,9 @@ The monorepo root package is private (`@sapporta/monorepo`) and is never publish
 ```bash
 npm login
 ```
+
+Use the normal npm CLI login flow. For accounts that authenticate with a
+passkey, no OTP code is expected.
 
 ## Workflow
 
@@ -29,34 +34,43 @@ pnpm --filter @sapporta/server vendor
 pnpm install
 git add .
 git commit -m "Version packages for release"
-pnpm release            # 3. publish to npm and create git tags
-git push --follow-tags  # 4. push release commit + tags
+pnpm release            # 3. build and publish unpublished package versions
+git push                # 4. push release commit
 ```
 
-Step 3 runs `changeset publish`, which publishes packages whose local version is not yet on the registry. Publish runs `npm publish` from each package directory (not `npm publish <path>`, which npm misinterprets as a git URL). npm package versions are immutable, so a changed package must get a new version before it can be published again.
+Step 3 runs `scripts/release.mjs`. It builds the workspace, checks npm for each
+package's exact local version, skips versions that already exist, and publishes
+missing versions sequentially from their package directories with
+`pnpm publish`. Publishing from the package directory matters because
+`npm publish <path>` can be misinterpreted as a git URL. npm package versions
+are immutable, so a changed package must get a new version before it can be
+published again.
+
+The release script attaches stdin to the terminal when possible so npm can run
+the browser/passkey auth flow. Do not pass `--otp` for the normal passkey login
+case.
 
 Run the `vendor` step after `pnpm run version` because `@sapporta/server` ships snapshots of the dependency package manifests used by project scaffolding. If `pnpm install` needs to run in a non-interactive environment, use `CI=true pnpm install`.
 
 For CLI-related releases, prefer `sapporta` as the user-facing package. Keep `@sapporta/server` as the owner of the CLI implementation and publish it when exports, command behavior, templates, or server APIs change.
 
-If Changesets ever needs to be bypassed, publish manually in dependency order:
+To verify the publish path without uploading packages:
 
 ```bash
-pnpm --filter @sapporta/shared publish
-pnpm --filter @sapporta/honest publish
-pnpm --filter @sapporta/ui publish
-pnpm --filter @sapporta/grid publish
-pnpm --filter @sapporta/frontend publish
-pnpm --filter @sapporta/server publish
-pnpm --filter sapporta publish
+node scripts/release.mjs --dry-run
 ```
+
+The release script sorts workspace packages by internal dependencies before
+publishing. If the script ever needs to be bypassed, publish manually in the
+same dependency-aware order: shared dependencies first, then packages that
+depend on them, and the thin `sapporta` CLI package after `@sapporta/server`.
 
 ## Before publishing
 
 Build and typecheck the workspace:
 
 ```bash
-pnpm -r build
+pnpm build
 pnpm typecheck
 ```
 

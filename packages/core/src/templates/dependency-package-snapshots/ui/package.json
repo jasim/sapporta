@@ -46,8 +46,7 @@
     "build:watch": "vite build --watch",
     "typecheck:watch": "tsc --noEmit --watch --preserveWatchOutput",
     "preview": "vite preview",
-    "typecheck": "tsc --noEmit",
-    "prepublishOnly": "pnpm build"
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@radix-ui/react-slot": "^1.2.3",

@@ -11,6 +11,7 @@
     "check:peer-compat:latest": "node scripts/check-peer-compat.mjs latest-in-range",
     "check:scaffold-bundle": "node scripts/scaffold-bundle-report.mjs",
     "scaffold:refresh": "pnpm exec tsx scripts/refresh-scaffold-project.ts",
+    "build": "pnpm -r --sort --if-present build",
     "typecheck": "tsc --build",
     "pretest": "zx scripts/test.mjs prepare-unit",
     "test": "zx scripts/test.mjs unit",
@@ -25,7 +26,7 @@
     "sapporta": "node packages/core/bin/sapporta.mjs",
     "changeset": "changeset",
     "version": "changeset version",
-    "release": "changeset publish"
+    "release": "node scripts/release.mjs"
   },
   "devDependencies": {
     "@changesets/cli": "^2.30.0",

@@ -46,8 +46,7 @@
   "scripts": {
     "build": "zx ../../scripts/build-package.mjs",
     "build:watch": "tsc -p tsconfig.build.json --watch --preserveWatchOutput",
-    "typecheck": "tsc --noEmit",
-    "prepublishOnly": "pnpm build"
+    "typecheck": "tsc --noEmit"
   },
   "peerDependencies": {
     "@sapporta/rest-core": "3.52.2",
