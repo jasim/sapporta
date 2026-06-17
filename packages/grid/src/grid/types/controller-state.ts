@@ -7,6 +7,11 @@ import type { RowSelection } from "./row-selection";
 // reducer mutates. Stored in a per-path Zustand store. Effects live on a
 // sibling channel (controller.effects), not here.
 //
+// Path-local is the key invariant: this store describes one rendered grid
+// part, not the whole table tree. A page-level toolbar that wants "all selected
+// rows" must ask the runtime for registered paths and combine path-local
+// projections deliberately.
+//
 // Five fields, five responsibilities:
 //
 //   - `liveCellFocus`: the per-path mirror of the global cursor. Non-null on
@@ -27,10 +32,12 @@ import type { RowSelection } from "./row-selection";
 //     only in row-list mode; cell-grid mode derives active row from the cell
 //     cursor when configured.
 //
-//   - `rowSelection`: independent row operation targets. Meaningful only when
+//   - `rowSelection`: path-local independent row operation selection.
+//     Meaningful only when
 //     `interaction.selectedRows.sync.kind === "independent"`. When selected
 //     rows follow the active row, callers must read the effective value through
 //     `runtime.selectedRowsFor(path)` instead of reading this field directly.
+//     This is not a global table/page selection store.
 export type ControllerState = {
   liveCellFocus: Coord | null;
   cellSelection: CellSelectionState | null;

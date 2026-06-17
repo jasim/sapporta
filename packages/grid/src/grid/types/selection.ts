@@ -56,6 +56,9 @@ export function selectionIsSingleCell(s: CellSelectionState): boolean {
   return s.anchor.rowId === s.head.rowId && s.anchor.colId === s.head.colId;
 }
 
+// Project a cell selection to the rows it covers in one displayed path. This
+// is not row selection: it is a cell-selection-to-row projection that commands
+// may choose to use when computing row operation targets.
 export function rowsInSelection(
   s: CellSelectionState,
   displayed: DisplayedRows,

@@ -16,6 +16,19 @@
 //
 // The presets below are examples of valid compositions, not special cases in
 // the runtime. Consumers can build their own config from the same primitives.
+//
+// Vocabulary:
+//
+//   - cursor: where the next navigation action starts.
+//   - cell selection: a selected rectangle of cells inside one GridPath.
+//   - row selection: selected rows inside one GridPath, either stored
+//     independently or derived from active row.
+//   - active row: the row carrying row-level context.
+//   - row operation target: rows a command such as delete/export/bulk edit will
+//     affect. This is a command-level projection, not a controller field.
+//   - scope: the set of GridPaths a command includes. Interaction config
+//     describes behavior inside a path; multi-path aggregation is a caller
+//     decision.
 
 export type RowSelectionMode = "single" | "range" | "multi";
 

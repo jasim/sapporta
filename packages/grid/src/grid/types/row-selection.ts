@@ -11,6 +11,12 @@ import type { GridInteractionConfig, RowSelectionMode } from "./interaction";
 // "which rows are targets for delete/export/bulk action?". Keeping the two
 // values separate is what lets a checkbox column toggle operation targets
 // without stealing keyboard focus or changing routing.
+//
+// `RowSelection` is always interpreted for one GridPath at a time. Runtime
+// reads such as `selectedRowsFor(path)` and `selectedRowIds(path)` project that
+// path-local value through the path's displayed rows. There is intentionally no
+// table-wide row selection value in this type; callers that want a page-level
+// command target must aggregate across registered paths explicitly.
 export type RowCursor = {
   path: GridPath;
   rowId: RowId;
@@ -44,6 +50,9 @@ export type RowInteractionStatus =
 
 export type RowInteractionSnapshot = {
   activeRowId: RowId | null;
+  // Selected row ids for this path only. This does not include rows covered by
+  // a cell selection unless a command deliberately projects cells to row
+  // operation targets outside this snapshot.
   selectedRowIds: readonly RowId[];
   statusByRowId: ReadonlyMap<RowId, RowInteractionStatus>;
 };

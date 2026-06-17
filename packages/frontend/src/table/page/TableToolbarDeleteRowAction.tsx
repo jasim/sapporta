@@ -145,6 +145,13 @@ export function selectedTableToolbarDeleteTargets(
   const runtime = session.runtime;
   const targets: Array<TableToolbarDeleteRowTarget & { depth: number }> = [];
 
+  // Toolbar delete is a command-level aggregator over the rendered table tree.
+  // The runtime stores interaction state per GridPath; it does not expose a
+  // single whole-page row selection. Today this command reads path-local row
+  // selections from every registered path. If delete later accepts rows
+  // projected from cell selections or active-row fallback, keep that as an
+  // explicit operation-target policy instead of treating it as stored
+  // rowSelection.
   for (const path of runtime.registeredPaths()) {
     const rowInteraction = runtime.rowInteractionSnapshotFor(path);
     for (const rowId of rowInteraction.selectedRowIds) {

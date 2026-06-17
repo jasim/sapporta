@@ -65,6 +65,17 @@
 //     cursor, except for the explicitly cursor-shaped commands. This lets a
 //     checkbox column be ordinary presentation chrome on top of headless
 //     runtime primitives.
+//
+// Runtime row interaction reads are path-scoped. A `GridPath` names one
+// rendered grid part: the root level, an expanded child level under a row, or a
+// deeper descendant. The runtime can enumerate registered paths, but it does
+// not store one whole-table row selection. Page-level commands must choose
+// their scope and aggregate path-local projections explicitly.
+//
+// Row operation targets are a command-level idea. They may be sourced from
+// explicit row selection, rows covered by cell selection, or active-row
+// fallback, but that projection should stay separate from stored rowSelection
+// so cell-grid and row-list interaction state remain independent.
 
 import { capabilitiesFor } from "../types/capabilities";
 import {
