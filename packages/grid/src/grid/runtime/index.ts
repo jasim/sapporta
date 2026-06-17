@@ -1,3 +1,5 @@
+export { collectRowOperationTargets } from "./row-operation-targets";
+
 export {
   createGridRuntime,
   type GridRuntime,

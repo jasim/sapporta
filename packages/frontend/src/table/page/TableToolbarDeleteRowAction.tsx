@@ -1,7 +1,7 @@
 import { useCallback, useState, useSyncExternalStore } from "react";
 import { Trash2 } from "lucide-react";
 import {
-  rowKeyOfRowId,
+  collectRowOperationTargets,
   type GridPath,
   type GridRuntime,
   type RowKey,
@@ -145,26 +145,16 @@ export function selectedTableToolbarDeleteTargets(
   const runtime = session.runtime;
   const targets: Array<TableToolbarDeleteRowTarget & { depth: number }> = [];
 
-  // Toolbar delete is a command-level aggregator over the rendered table tree.
-  // The runtime stores interaction state per GridPath; it does not expose a
-  // single whole-page row selection. Today this command reads path-local row
-  // selections from every registered path. If delete later accepts rows
-  // projected from cell selections or active-row fallback, keep that as an
-  // explicit operation-target policy instead of treating it as stored
-  // rowSelection.
-  for (const path of runtime.registeredPaths()) {
-    const rowInteraction = runtime.rowInteractionSnapshotFor(path);
-    for (const rowId of rowInteraction.selectedRowIds) {
-      // Only persisted table rows are delete candidates. Draft rows, summary
-      // rows, footers, and rows filtered away from the displayed set should not
-      // make the toolbar look ready to delete.
-      if (runtime.displayedRowFor(path, rowId)?.kind === "data") {
-        targets.push({
-          path,
-          rowKey: rowKeyOfRowId(rowId),
-          depth: pathDepth(path),
-        });
-      }
+  for (const target of collectRowOperationTargets(runtime)) {
+    // Only persisted table rows are delete candidates. Draft rows, summary
+    // rows, footers, and rows filtered away from the displayed set should not
+    // make the toolbar look ready to delete.
+    if (target.row.kind === "data") {
+      targets.push({
+        path: target.path,
+        rowKey: target.rowKey,
+        depth: pathDepth(target.path),
+      });
     }
   }
 
@@ -193,6 +183,13 @@ function subscribeSelectedDataRows(
       // row changes clear the affordance when a selected row disappears or stops
       // being a persisted data row.
       unsubs.push(runtime.subscribeRowInteractionSnapshot(path, notify));
+      // Cell ranges can become row delete targets when no rows are selected.
+      // Notify receivers typically recompute toolbar enabled state and counts.
+      unsubs.push(
+        runtime.controllerFor(path).subscribe((state, previous) => {
+          if (state.cellSelection !== previous.cellSelection) notify();
+        }),
+      );
       unsubs.push(runtime.subscribeDisplayedRowSequence(path, notify));
     }
   }

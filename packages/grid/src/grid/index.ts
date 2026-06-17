@@ -365,6 +365,7 @@
 // runtime/, data-sources/, pipeline/, interaction/, schema/, and react/.
 
 export {
+  collectRowOperationTargets,
   createGridRuntime,
   createTableController,
   type GridRuntime,

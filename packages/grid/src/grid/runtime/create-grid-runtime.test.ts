@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { createGridRuntime } from "./create-grid-runtime";
+import { collectRowOperationTargets } from "./row-operation-targets";
 import { inMemoryGridDataSource } from "../data-sources/memory/in-memory-grid-source";
 import { inMemoryLevelSource } from "../data-sources/memory/in-memory-level-source";
 import type {
@@ -20,7 +21,9 @@ import {
 import type { PhantomRow, TreeNode } from "../types/level-row";
 import type { ColumnSchema, GridSchema, LevelSchema } from "../types/schema";
 import {
+  CELL_EDITING_GRID,
   CELL_GRID_WITH_ACTIVE_ROW,
+  CELL_GRID_WITH_INDEPENDENT_ROW_SELECTION,
   CELL_PRIMARY_WITH_SIDE_PANEL_ROW,
   ROW_MULTISELECT_LIST,
 } from "../types/interaction";
@@ -1354,6 +1357,86 @@ describe("GridRuntime", () => {
     expect(rowInteractionStatusFor(a, snapshot)).toBe("cursor-selected");
     expect(rowInteractionStatusFor(b, snapshot)).toBe("selected");
     expect(rowInteractionStatusFor(c, snapshot)).toBe("idle");
+  });
+
+  it("row operation targets project rows covered by cell selection", () => {
+    const rt = createGridRuntime({
+      schema: tableSchema,
+      dataSource: tableDataSource(),
+      interaction: CELL_EDITING_GRID,
+    });
+    const a = makeRowId(rowsRoot, "a");
+    const b = makeRowId(rowsRoot, "b");
+
+    rt.cursorManager.setCellRange(
+      rowsRoot,
+      { rowId: a, colId: "name" },
+      { rowId: b, colId: "qty" },
+    );
+
+    expect(
+      rt.rowOperationTargetsFor(rowsRoot).map((target) => ({
+        rowId: target.rowId,
+        rowKey: target.rowKey,
+      })),
+    ).toEqual([
+      { rowId: a, rowKey: "a" },
+      { rowId: b, rowKey: "b" },
+    ]);
+  });
+
+  it("row operation targets prefer explicit row selection over cell selection", () => {
+    const rt = createGridRuntime({
+      schema: tableSchema,
+      dataSource: tableDataSource(),
+      interaction: CELL_GRID_WITH_INDEPENDENT_ROW_SELECTION,
+    });
+    const a = makeRowId(rowsRoot, "a");
+    const b = makeRowId(rowsRoot, "b");
+
+    rt.cursorManager.setCellRange(
+      rowsRoot,
+      { rowId: a, colId: "name" },
+      { rowId: a, colId: "qty" },
+    );
+    rt.rowInteraction.setRowSelection(rowsRoot, {
+      kind: "single",
+      rowId: b,
+    });
+
+    expect(
+      rt.rowOperationTargetsFor(rowsRoot).map((target) => ({
+        rowId: target.rowId,
+        rowKey: target.rowKey,
+      })),
+    ).toEqual([{ rowId: b, rowKey: "b" }]);
+  });
+
+  it("collectRowOperationTargets reads all registered paths", () => {
+    const rt = createGridRuntime({
+      schema: reportSchema,
+      dataSource: reportDataSource(),
+      interaction: CELL_EDITING_GRID,
+    });
+    const fruit = makeRowId(reportRoot, "Fruit");
+    rt.coordinator.toggleExpand(reportRoot, fruit);
+    const itemsPath = childPath(reportRoot, "Fruit", "items") as GridPath;
+
+    rt.cursorManager.setCellRange(
+      itemsPath,
+      { rowId: makeRowId(itemsPath, "Apple"), colId: "name" },
+      { rowId: makeRowId(itemsPath, "Banana"), colId: "name" },
+    );
+
+    expect(
+      collectRowOperationTargets(rt).map((target) => ({
+        path: target.path,
+        rowKey: target.rowKey,
+      })),
+    ).toEqual([
+      { path: itemsPath, rowKey: "Apple" },
+      { path: itemsPath, rowKey: "Banana" },
+    ]);
   });
 
   it("selectedRowsFor preserves selection shape when projected row ids match", () => {

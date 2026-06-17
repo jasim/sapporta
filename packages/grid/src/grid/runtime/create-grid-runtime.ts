@@ -162,6 +162,7 @@ import { createPhantomChannel } from "../data-sources/phantom-channel";
 import { createEmitter, type GridEmitter, type GridEvents } from "./emitter";
 import type { PhantomChannel } from "../data-sources/types";
 import { createPhantomRowLifecycle } from "./phantom-row-lifecycle";
+import { rowsInSelection } from "../types/selection";
 
 export type RuntimeArgs = {
   schema: GridSchema;
@@ -170,6 +171,13 @@ export type RuntimeArgs = {
   initialPhantomsByPath?: Map<GridPath, PhantomRow[]>;
   phantomRows?: PhantomRowsConfig;
   on?: { [E in keyof GridEvents]?: (payload: GridEvents[E]) => void };
+};
+
+type RowOperationTarget = {
+  path: GridPath;
+  rowId: RowId;
+  rowKey: RowKey;
+  row: LevelRow;
 };
 
 export type GridRuntime = {
@@ -191,6 +199,7 @@ export type GridRuntime = {
   selectedRowsFor: (path: GridPath) => RowSelection;
   selectedRowIds: (path: GridPath) => readonly RowId[];
   rowInteractionSnapshotFor: (path: GridPath) => RowInteractionSnapshot;
+  rowOperationTargetsFor: (path: GridPath) => readonly RowOperationTarget[];
   subscribeActiveRow: (path: GridPath, fn: () => void) => () => void;
   subscribeSelectedRows: (path: GridPath, fn: () => void) => () => void;
   subscribeSelectedRowIds: (path: GridPath, fn: () => void) => () => void;
@@ -352,6 +361,7 @@ export function createGridRuntime(args: RuntimeArgs): GridRuntime {
   const selectedRowIdSnapshots = new Map<GridPath, readonly RowId[]>();
   const rowInteractionSnapshots = new Map<GridPath, RowInteractionSnapshot>();
   const emptyRowIds: readonly RowId[] = [];
+  const emptyRowOperationTargets: readonly RowOperationTarget[] = [];
 
   // Memoized `LevelSchema` per path. The path's level name is a function
   // of the path string, so the entry is stable for the runtime's
@@ -985,6 +995,45 @@ export function createGridRuntime(args: RuntimeArgs): GridRuntime {
     return next;
   }
 
+  function rowOperationTargetsForPath(
+    path: GridPath,
+  ): readonly RowOperationTarget[] {
+    // Command target projection for one path. Toolbar actions use this to turn
+    // stored row selection, or a cell range when no rows are selected, into the
+    // rows the command should affect.
+    const explicit = rowOperationTargetsFromRowIds(path, selectedRowIds(path));
+    if (explicit.length > 0) return explicit;
+
+    const selection = controllerCursorPortFor(path).getState().cellSelection;
+    if (!selection) return emptyRowOperationTargets;
+    return rowOperationTargetsFromRowIds(
+      path,
+      rowsInSelection(selection, displayedRowsFor(path)),
+    );
+  }
+
+  function rowOperationTargetsFromRowIds(
+    path: GridPath,
+    rowIds: readonly RowId[],
+  ): readonly RowOperationTarget[] {
+    // Resolve candidate ids through displayed row state so commands only target
+    // rows that still exist, are visible, and are valid row-operation targets.
+    if (rowIds.length === 0) return emptyRowOperationTargets;
+    const displayed = displayedRowsFor(path);
+    const targets: RowOperationTarget[] = [];
+    for (const rowId of rowIds) {
+      const row = displayed.rowById.get(rowId);
+      if (!row?.rowSelectable) continue;
+      targets.push({
+        path,
+        rowId,
+        rowKey: rowKeyOfRowId(rowId),
+        row,
+      });
+    }
+    return targets.length === 0 ? emptyRowOperationTargets : targets;
+  }
+
   function subscribeActiveRow(path: GridPath, fn: () => void): () => void {
     if (
       interaction.mode === "cell-grid" &&
@@ -1190,6 +1239,7 @@ export function createGridRuntime(args: RuntimeArgs): GridRuntime {
     selectedRowsFor: selectedRowsForPath,
     selectedRowIds,
     rowInteractionSnapshotFor: rowInteractionSnapshotForPath,
+    rowOperationTargetsFor: rowOperationTargetsForPath,
     subscribeActiveRow,
     subscribeSelectedRows,
     subscribeSelectedRowIds,

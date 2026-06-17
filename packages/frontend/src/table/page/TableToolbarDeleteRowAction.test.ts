@@ -3,8 +3,10 @@ import {
   childPath,
   makeRowId,
   rootPath,
+  rowKeyOfRowId,
   type GridPath,
   type GridRuntime,
+  type LevelRow,
   type RowId,
 } from "@sapporta/grid";
 import {
@@ -91,18 +93,43 @@ function makeSession(args: {
     setErrorBanner: args.setErrorBanner ?? vi.fn(),
     runtime: {
       registeredPaths: () => args.paths,
+      rowOperationTargetsFor: (path: GridPath) =>
+        (args.selectedByPath.get(path) ?? []).map((rowId) => ({
+          path,
+          rowId,
+          rowKey: rowKeyOfRowId(rowId),
+          row: displayedRowFor(args.dataRowIds, rowId),
+        })),
       rowInteractionSnapshotFor: (path: GridPath) => ({
         activeRowId: null,
         selectedRowIds: args.selectedByPath.get(path) ?? [],
         statusByRowId: new Map(),
       }),
       displayedRowFor: (_path: GridPath, rowId: RowId) =>
-        args.dataRowIds.has(rowId)
-          ? ({ kind: "data" } as never)
-          : ({ kind: "footer" } as never),
+        displayedRowFor(args.dataRowIds, rowId),
       rowInteraction: { clearRowSelection },
       removeRow: args.removeRow ?? vi.fn(async () => {}),
       sourceFor: () => ({ refetch }),
     } as unknown as GridRuntime,
+  };
+}
+
+function displayedRowFor(dataRowIds: Set<RowId>, rowId: RowId): LevelRow {
+  if (dataRowIds.has(rowId)) {
+    return {
+      kind: "data",
+      id: rowId,
+      rowSelectable: true,
+      columns: {},
+      hasChildren: false,
+      source: { levelName: "test", columns: {} },
+    };
+  }
+  return {
+    kind: "footer",
+    id: rowId,
+    rowSelectable: false,
+    columns: {},
+    source: { rowKey: rowKeyOfRowId(rowId), columns: {} },
   };
 }
