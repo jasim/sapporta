@@ -1,11 +1,34 @@
-import type { ReactNode } from "react";
+import { useEffect, useMemo, type ReactNode } from "react";
+import {
+  CELL_GRID_WITH_ACTIVE_ROW,
+  childPath,
+  createGridRuntime,
+  ExpandCell,
+  GridLevel,
+  GridRuntimeProvider,
+  inMemoryGridDataSource,
+  makeRowId,
+  rootPath,
+  trailingEdge,
+  type CellRenderProps,
+  type ColumnSchema,
+  type GridPath,
+  type GridSchema,
+  type GridLevelChrome,
+  type GridRuntime,
+  type InMemoryLevelOpts,
+  type LevelRow,
+  type TreeNode,
+} from "@sapporta/grid";
+import { columnPreset, type ColumnWidth } from "@sapporta/grid/column-preset";
 import type {
-  GridColumn,
-  GridFooterRow,
-  GridReportNode,
-  GridReportResult as GridReportResultData,
-} from "@sapporta/shared/report-grid";
+  GridDataset,
+  GridDatasetColumn,
+  GridDatasetFooterRow,
+  GridDatasetNode,
+} from "@sapporta/shared/grid-dataset";
 import { cn } from "@sapporta/ui";
+import "./ReportGrid.css";
 
 export type ReportGridLink = {
   label: string;
@@ -16,19 +39,19 @@ export type ReportGridLink = {
 };
 
 export type ReportGridLinkContext<TInput = unknown> = {
-  result: GridReportResultData;
-  node: GridReportNode;
+  dataset: GridDataset;
+  node: GridDatasetNode;
   levelName: string;
-  input: TInput;
-  ancestors: GridReportNode[];
-  column?: GridColumn;
+  input: TInput | undefined;
+  ancestors: GridDatasetNode[];
+  column?: GridDatasetColumn;
   value?: unknown;
 };
 
 export type ReportGridFooterLinkContext<TInput = unknown> = {
-  result: GridReportResultData;
-  footerRow: GridFooterRow;
-  input: TInput;
+  dataset: GridDataset;
+  footerRow: GridDatasetFooterRow;
+  input: TInput | undefined;
 };
 
 export type ReportGridLinkResolvers<TInput = unknown> = Record<
@@ -39,285 +62,370 @@ export type ReportGridLinkResolvers<TInput = unknown> = Record<
       string,
       (context: ReportGridLinkContext<TInput>) => ReportGridLink[]
     >;
-    footer?: (context: ReportGridFooterLinkContext<TInput>) => ReportGridLink[];
+    footer?: (
+      context: ReportGridFooterLinkContext<TInput>,
+    ) => ReportGridLink[];
   }
 >;
 
-interface ReportGridProps {
-  result: GridReportResultData;
-  nodes: GridReportNode[];
-  levelColumns: Record<string, GridColumn[]>;
-  levelName?: string;
-  footerRows?: GridFooterRow[];
-  levelOptions?: Record<string, { defaultCollapsed?: boolean }>;
-  links?: ReportGridLinkResolvers;
-  linkContext?: unknown;
-  ancestors?: GridReportNode[];
+interface ReportGridProps<TInput = unknown> {
+  dataset: GridDataset;
+  links?: ReportGridLinkResolvers<TInput>;
+  input?: TInput;
 }
 
-export function ReportGrid(props: ReportGridProps) {
-  const levelName = props.levelName ?? props.nodes[0]?.levelName;
-  const columns = visibleColumns(
-    levelName ? (props.levelColumns[levelName] ?? []) : [],
+export function ReportGrid<TInput = unknown>({
+  dataset,
+  links,
+  input,
+}: ReportGridProps<TInput>) {
+  const model = useMemo(
+    () => buildReportGridModel(dataset, links, input),
+    [dataset, links, input],
   );
+  const runtime = useMemo(
+    () => {
+      const next = createGridRuntime({
+        schema: model.schema,
+        dataSource: model.dataSource,
+        interaction: CELL_GRID_WITH_ACTIVE_ROW,
+      });
+      expandDefaultReportRows(next, dataset);
+      return next;
+    },
+    [model],
+  );
+  const chrome = useMemo<GridLevelChrome>(() => {
+    const base = columnPreset.chrome();
+    return {
+      ...base,
+      levelContainerClassName: (context) =>
+        cn(
+          base.levelContainerClassName?.(context),
+          "sapporta-report-tgrid__level",
+        ),
+      levelContainerStyle: base.levelContainerStyle,
+      renderLevelHeader: base.renderLevelHeader,
+    };
+  }, []);
+
+  useEffect(() => () => runtime.dispose(), [runtime]);
 
   return (
-    <div className="min-w-full text-sap-data">
-      {columns.length > 0 ? (
-        <div
-          className="sticky top-0 z-10 grid border-b border-sap-border bg-sap-chip text-sap-micro font-medium uppercase tracking-sap-label text-sap-subtle"
-          style={{ gridTemplateColumns: templateColumns(columns) }}
-        >
-          {columns.map((column) => (
-            <div key={column.name} className="px-[10px] py-[7px]">
-              {column.label}
-            </div>
-          ))}
-        </div>
-      ) : null}
-      <div>
-        {props.nodes.map((node, index) => (
-          <ReportGridNode
-            key={`${node.levelName}:${index}`}
-            result={props.result}
-            node={node}
-            levelColumns={props.levelColumns}
-            links={props.links}
-            linkContext={props.linkContext}
-            ancestors={props.ancestors ?? []}
-            depth={props.ancestors?.length ?? 0}
-          />
-        ))}
-        {props.footerRows?.map((footerRow, index) => (
-          <ReportFooter
-            key={`footer:${index}`}
-            result={props.result}
-            footerRow={footerRow}
-            columns={columns}
-            links={props.links?.[levelName ?? ""]?.footer}
-            linkContext={props.linkContext}
-          />
-        ))}
-      </div>
+    <div className="sapporta-report-tgrid min-w-full">
+      <GridRuntimeProvider runtime={runtime}>
+        <GridLevel
+          path={rootPath(dataset.rootLevel)}
+          chrome={chrome}
+          presentation="tabular"
+        />
+      </GridRuntimeProvider>
     </div>
   );
 }
 
-export interface ReportGridResultProps<TInput = unknown> {
-  result: GridReportResultData;
+export interface ReportGridDatasetProps<TInput = unknown> {
+  dataset: GridDataset;
   links?: ReportGridLinkResolvers<TInput>;
   linkContext?: { input: TInput };
 }
 
-export function ReportGridResult<TInput = unknown>({
-  result,
+export function ReportGridDataset<TInput = unknown>({
+  dataset,
   links,
   linkContext,
-}: ReportGridResultProps<TInput>) {
+}: ReportGridDatasetProps<TInput>) {
   return (
-    <ReportGrid
-      result={result}
-      nodes={result.data}
-      levelColumns={result.levelColumns}
-      footerRows={result.footerRows}
-      levelOptions={result.levelOptions}
-      links={links as ReportGridLinkResolvers}
-      linkContext={linkContext?.input}
-    />
+    <ReportGrid dataset={dataset} links={links} input={linkContext?.input} />
   );
 }
 
-function ReportGridNode({
-  result,
-  node,
-  levelColumns,
-  links,
-  linkContext,
-  ancestors,
-  depth,
+function buildReportGridModel<TInput>(
+  dataset: GridDataset,
+  links: ReportGridLinkResolvers<TInput> | undefined,
+  input: TInput | undefined,
+): {
+  schema: GridSchema;
+  dataSource: ReturnType<typeof inMemoryGridDataSource>;
+} {
+  const levels: GridSchema["levels"] = {};
+  const sourceLevels: Record<string, InMemoryLevelOpts> = {};
+
+  for (const [levelName, level] of Object.entries(dataset.levels)) {
+    const visible = level.columns.filter(
+      (column) => column.visuallyHidden !== true,
+    );
+    const columns = visible.map((column) =>
+      gridColumnForDatasetColumn({
+        dataset,
+        column,
+        links,
+        input,
+      }),
+    );
+
+    if (level.childLevels.length > 0 && columns.length > 0) {
+      columns[0] = expandableColumn(columns[0]);
+    }
+
+    levels[levelName] = {
+      name: level.label ?? levelName,
+      columns,
+      options: {
+        rowKey: (node, localIdx) => node.rowKey ?? String(localIdx),
+        defaultCollapsed: level.defaultCollapsed,
+      },
+      childLevels: [...level.childLevels],
+    };
+    sourceLevels[levelName] = {
+      sortMode: "client",
+      filterMode: "none",
+      paginationMode: "none",
+      readonly: true,
+      footerRows:
+        levelName === dataset.rootLevel ? dataset.footerRows : undefined,
+    };
+  }
+
+  const schema = {
+    rootLevel: dataset.rootLevel,
+    levels,
+  } satisfies GridSchema;
+
+  return {
+    schema,
+    dataSource: inMemoryGridDataSource({
+      schema,
+      tree: dataset.nodes as TreeNode[],
+      levels: sourceLevels,
+    }),
+  };
+}
+
+function expandDefaultReportRows(runtime: GridRuntime, dataset: GridDataset) {
+  expandNodesAtPath({
+    runtime,
+    dataset,
+    levelName: dataset.rootLevel,
+    path: rootPath(dataset.rootLevel),
+    nodes: dataset.nodes,
+  });
+}
+
+function expandNodesAtPath({
+  runtime,
+  dataset,
+  levelName,
+  path,
+  nodes,
 }: {
-  result: GridReportResultData;
-  node: GridReportNode;
-  levelColumns: Record<string, GridColumn[]>;
-  links?: ReportGridLinkResolvers;
-  linkContext?: unknown;
-  ancestors: GridReportNode[];
-  depth: number;
+  runtime: GridRuntime;
+  dataset: GridDataset;
+  levelName: string;
+  path: GridPath;
+  nodes: GridDatasetNode[];
 }) {
-  const columns = visibleColumns(levelColumns[node.levelName] ?? []);
-  const rowLinks =
-    links?.[node.levelName]?.row?.({
-      result,
-      node,
-      levelName: node.levelName,
-      input: linkContext,
-      ancestors,
-    }) ?? [];
+  if (dataset.levels[levelName]?.defaultCollapsed === true) return;
 
-  return (
-    <div>
-      <div
-        className={cn(
-          "grid border-b border-sap-border hover:bg-sap-chip/60",
-          node.kind && "bg-sap-chip/40 font-medium",
-        )}
-        style={{ gridTemplateColumns: templateColumns(columns) }}
-      >
-        {columns.map((column, columnIndex) => {
-          const value = node.columns[column.name] ?? node.rollup?.[column.name];
-          const cellLinks =
-            links?.[node.levelName]?.cell?.[column.name]?.({
-              result,
-              node,
-              levelName: node.levelName,
-              input: linkContext,
-              ancestors,
-              column,
-              value,
-            }) ?? [];
-          return (
-            <div
-              key={column.name}
-              className={cn(
-                "min-w-0 px-[10px] py-[7px]",
-                column.kind === "number" && "text-right mono",
-                column.strong && "font-semibold",
-              )}
-              style={{
-                paddingLeft:
-                  columnIndex === 0 ? `${10 + depth * 18}px` : undefined,
-              }}
-            >
-              {renderValue(value, column, cellLinks, rowLinks)}
-            </div>
-          );
-        })}
-      </div>
-      {Object.entries(node.children ?? {}).map(([childLevelName, child]) => {
-        const childNodes = Array.isArray(child) ? child : child ? [child] : [];
-        return (
-          <ReportGrid
-            key={childLevelName}
-            result={result}
-            nodes={childNodes}
-            levelName={childLevelName}
-            levelColumns={levelColumns}
-            footerRows={node.childFooterRows?.[childLevelName]}
-            links={links}
-            linkContext={linkContext}
-            ancestors={[...ancestors, node]}
-          />
-        );
-      })}
-    </div>
-  );
+  for (const node of nodes) {
+    const childEntries = Object.entries(node.children ?? {});
+    if (childEntries.length === 0) continue;
+
+    runtime.coordinator.toggleExpand(path, makeRowId(path, node.rowKey));
+    for (const [childLevelName, childNodes] of childEntries) {
+      expandNodesAtPath({
+        runtime,
+        dataset,
+        levelName: childLevelName,
+        path: childPath(path, node.rowKey, childLevelName),
+        nodes: childNodes,
+      });
+    }
+  }
 }
 
-function ReportFooter({
-  result,
-  footerRow,
-  columns,
+function gridColumnForDatasetColumn<TInput>({
+  dataset,
+  column,
   links,
-  linkContext,
+  input,
 }: {
-  result: GridReportResultData;
-  footerRow: GridFooterRow;
-  columns: GridColumn[];
-  links?: (context: ReportGridFooterLinkContext) => ReportGridLink[];
-  linkContext?: unknown;
-}) {
-  const footerLinks =
-    links?.({
-      result,
-      footerRow,
-      input: linkContext,
-    }) ?? [];
+  dataset: GridDataset;
+  column: GridDatasetColumn;
+  links: ReportGridLinkResolvers<TInput> | undefined;
+  input: TInput | undefined;
+}): ColumnSchema {
+  const options = {
+    id: column.id,
+    name: column.label,
+    width: widthForColumn(column),
+    editable: false,
+    sortable: column.sortable ?? true,
+    editTriggers: [],
+    colorRule: column.colorRule,
+    zeroDisplay: column.zeroDisplay,
+    strong: column.strong,
+    display: column.textDisplay,
+    meta: { reportColumn: column, displayType: column.kind },
+  };
 
-  return (
-    <div
-      className="grid border-b border-sap-border bg-sap-chip font-semibold"
-      style={{ gridTemplateColumns: templateColumns(columns) }}
-    >
-      {columns.map((column, index) => (
-        <div
-          key={column.name}
-          className={cn(
-            "px-[10px] py-[7px]",
-            column.kind === "number" && "text-right mono",
-          )}
-        >
-          {renderValue(
-            index === 0 && footerRow.columns[column.name] === undefined
-              ? footerRow.label
-              : footerRow.columns[column.name],
-            column,
-            footerLinks,
-            [],
-          )}
-        </div>
-      ))}
-    </div>
-  );
+  let gridColumn: ColumnSchema;
+  if (column.kind === "number" && column.displayFormat === "currency") {
+    gridColumn = columnPreset.currency(options);
+  } else if (
+    column.kind === "number" &&
+    column.displayFormat === "percentage"
+  ) {
+    gridColumn = columnPreset.percentage(options);
+  } else if (column.kind === "number") {
+    gridColumn = columnPreset.number(options);
+  } else if (column.kind === "boolean") {
+    gridColumn = columnPreset.boolean(options);
+  } else if (column.kind === "date" || column.kind === "timestamp") {
+    gridColumn = columnPreset.date(options);
+  } else {
+    gridColumn = columnPreset.text(options);
+  }
+
+  const renderCell = gridColumn.renderCell;
+  return {
+    ...gridColumn,
+    renderCell: (props: CellRenderProps) =>
+      renderReportCell({
+        props,
+        content: renderCell(props),
+        dataset,
+        column,
+        links,
+        input,
+      }),
+  };
 }
 
-function visibleColumns(columns: GridColumn[]): GridColumn[] {
-  return columns.filter((column) => column.visuallyHidden !== true);
+function expandableColumn(column: ColumnSchema): ColumnSchema {
+  const renderCell = column.renderCell;
+  return {
+    ...column,
+    controlsRowExpansion: true,
+    renderCell: (props) => (
+      <ExpandCell row={props.row} path={props.path}>
+        {renderCell(props)}
+      </ExpandCell>
+    ),
+  };
 }
 
-function templateColumns(columns: readonly GridColumn[]): string {
-  if (columns.length === 0) return "1fr";
-  return columns.map((column) => trackForColumn(column)).join(" ");
-}
-
-function trackForColumn(column: GridColumn): string {
-  if (column.width) return `${column.width}ch`;
-  const min = column.minWidth ?? (column.kind === "number" ? 10 : 12);
-  const max = column.maxWidth ? `${column.maxWidth}ch` : "1fr";
-  return `minmax(${min}ch, ${max})`;
-}
-
-function renderValue(
-  value: unknown,
-  column: GridColumn,
-  cellLinks: ReportGridLink[],
-  rowLinks: ReportGridLink[],
-): ReactNode {
-  const text = formatValue(value, column);
-  const link = cellLinks[0] ?? rowLinks[0];
-  if (!link) return text;
+function renderReportCell<TInput>({
+  props,
+  content,
+  dataset,
+  column,
+  links,
+  input,
+}: {
+  props: CellRenderProps;
+  content: ReactNode;
+  dataset: GridDataset;
+  column: GridDatasetColumn;
+  links: ReportGridLinkResolvers<TInput> | undefined;
+  input: TInput | undefined;
+}): ReactNode {
+  const levelName =
+    trailingEdge(props.path)?.childLevelName ?? dataset.rootLevel;
+  const footerRow = footerRowFor(props.row);
+  const footerLinks = footerRow
+    ? (links?.[levelName]?.footer?.({ dataset, footerRow, input }) ?? [])
+    : [];
+  const node = nodeForRow(props.row);
+  const ancestors = node ? ancestorsForPath(dataset, props.path) : [];
+  const rowLinks = node
+    ? (links?.[levelName]?.row?.({
+        dataset,
+        node,
+        levelName,
+        input,
+        ancestors,
+      }) ?? [])
+    : [];
+  const cellLinks = node
+    ? (links?.[levelName]?.cell?.[column.id]?.({
+        dataset,
+        node,
+        levelName,
+        input,
+        ancestors,
+        column,
+        value: props.value,
+      }) ?? [])
+    : [];
+  const link =
+    (cellLinks.length > 0 ? cellLinks : footerLinks)[0] ?? rowLinks[0];
+  if (!link) return content;
   return (
     <a
       href={link.href}
       target={link.target}
-      className="text-sap-brand hover:underline"
+      className="min-w-0 text-sap-brand hover:underline"
       rel={link.target === "_blank" ? "noreferrer" : undefined}
+      title={link.label}
     >
-      {text}
+      {content}
     </a>
   );
 }
 
-function formatValue(value: unknown, column: GridColumn): string {
-  if (value === null || value === undefined || value === "") return "";
-  if (column.kind === "number") {
-    const number = Number(value);
-    if (Number.isFinite(number)) {
-      if (number === 0 && column.zeroDisplay === "blank") return "";
-      if (number === 0 && column.zeroDisplay === "dot") return ".";
-      if (column.displayFormat === "currency") {
-        return new Intl.NumberFormat(undefined, {
-          minimumFractionDigits: 2,
-          maximumFractionDigits: 2,
-        }).format(number);
-      }
-      if (column.displayFormat === "percentage") {
-        return new Intl.NumberFormat(undefined, {
-          style: "percent",
-          maximumFractionDigits: 2,
-        }).format(number);
-      }
-      return new Intl.NumberFormat().format(number);
-    }
+function widthForColumn(column: GridDatasetColumn): ColumnWidth | undefined {
+  if (column.width) return { track: `${column.width}ch` };
+  if (column.minWidth || column.maxWidth) {
+    const min = column.minWidth ? column.minWidth * 8 : undefined;
+    const max = column.maxWidth ? column.maxWidth * 8 : undefined;
+    return { min, max };
   }
-  return String(value);
+  return undefined;
+}
+
+function footerRowFor(row: LevelRow): GridDatasetFooterRow | null {
+  if (row.kind !== "footer") return null;
+  return row.source;
+}
+
+function nodeForRow(row: LevelRow): GridDatasetNode | null {
+  if (row.kind === "footer" || row.kind === "phantom") return null;
+  return row.source as GridDatasetNode;
+}
+
+function ancestorsForPath(
+  dataset: GridDataset,
+  path: GridPath,
+): GridDatasetNode[] {
+  const edges = edgesForPath(path);
+  const ancestors: GridDatasetNode[] = [];
+  let nodes: GridDatasetNode[] = dataset.nodes;
+
+  for (const edge of edges) {
+    const parent = nodes.find((node) => node.rowKey === edge.parentRowKey);
+    if (!parent) return ancestors;
+    ancestors.push(parent);
+    nodes = parent.children?.[edge.childLevelName] ?? [];
+  }
+
+  return ancestors;
+}
+
+function edgesForPath(path: GridPath): Array<{
+  parentRowKey: string;
+  childLevelName: string;
+}> {
+  const reversed: Array<{ parentRowKey: string; childLevelName: string }> = [];
+  let cursor = path;
+  let edge = trailingEdge(cursor);
+  while (edge) {
+    reversed.push({
+      parentRowKey: edge.parentRowKey,
+      childLevelName: edge.childLevelName,
+    });
+    cursor = edge.parentPath;
+    edge = trailingEdge(cursor);
+  }
+  return reversed.reverse();
 }

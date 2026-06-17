@@ -1,10 +1,10 @@
 import type { LevelOptions, TreeNode } from "../../types/level-row";
 import type { ProtoRow } from "../types";
 
-// Default rowKey: position-based. Stable enough for small static fixtures and
-// for tests; consumers with a real PK should override `levelOptions.rowKey`.
-export function defaultRowKey(_node: TreeNode, localIdx: number): string {
-  return String(localIdx);
+// Default rowKey: prefer a source-provided rowKey, then fall back to the local
+// index for small static fixtures and tests.
+export function defaultRowKey(node: TreeNode, localIdx: number): string {
+  return node.rowKey ?? String(localIdx);
 }
 
 // Foundation step: TreeNode[] → ProtoRow[] (data rows only, no rollups

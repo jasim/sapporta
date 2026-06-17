@@ -1,7 +1,6 @@
-import { useStore } from "zustand";
 import { ChevronDown, ChevronRight } from "lucide-react";
-import type { MouseEvent, ReactNode } from "react";
-import type { GridPath, RowId } from "../../types/identity";
+import { useSyncExternalStore, type MouseEvent, type ReactNode } from "react";
+import type { GridPath } from "../../types/identity";
 import type { LevelRow } from "../../types/level-row";
 import { capabilitiesFor } from "../../types/capabilities";
 import { useGridRuntime } from "../GridRuntimeProvider";
@@ -22,9 +21,12 @@ export function ExpandCell({
   children?: ReactNode;
 }) {
   const runtime = useGridRuntime();
-  const isExpanded = useStore(
-    runtime.coordinator,
-    (s) => s.expansion.get(path)?.has(row.id as RowId) ?? false,
+  const isExpanded = useSyncExternalStore(
+    runtime.coordinator.subscribe,
+    () =>
+      runtime.coordinator.getState().expansion.get(path)?.has(row.id) ?? false,
+    () =>
+      runtime.coordinator.getState().expansion.get(path)?.has(row.id) ?? false,
   );
 
   const caps = capabilitiesFor(row.kind);

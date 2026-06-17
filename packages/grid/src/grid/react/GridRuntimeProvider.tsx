@@ -57,6 +57,7 @@ export function useLevelSnapshot(path: GridPath): LevelSnapshot {
   return useSyncExternalStore(
     (cb) => runtime.sourceFor(path).subscribe(cb),
     () => runtime.snapshotFor(path),
+    () => runtime.snapshotFor(path),
   );
 }
 
@@ -68,6 +69,7 @@ export function usePhantoms(path: GridPath): PhantomRow[] {
   return useSyncExternalStore(
     (cb) => runtime.phantoms.subscribe(path, cb),
     () => runtime.phantoms.get(path),
+    () => runtime.phantoms.get(path),
   );
 }
 
@@ -78,6 +80,7 @@ export function useDisplayedRowSequence(path: GridPath): DisplayedRowSequence {
   return useSyncExternalStore(
     (cb) => runtime.subscribeDisplayedRowSequence(path, cb),
     () => runtime.displayedRowSequenceFor(path),
+    () => runtime.displayedRowSequenceFor(path),
   );
 }
 
@@ -85,6 +88,15 @@ export function useDisplayedRow(path: GridPath, rowId: RowId): LevelRow {
   const runtime = useGridRuntime();
   return useSyncExternalStore(
     (cb) => runtime.subscribeDisplayedRow(path, rowId, cb),
+    () => {
+      const row = runtime.displayedRowFor(path, rowId);
+      if (!row) {
+        throw new Error(
+          `GridRuntime: displayed row "${rowId}" no longer exists at path "${path}".`,
+        );
+      }
+      return row;
+    },
     () => {
       const row = runtime.displayedRowFor(path, rowId);
       if (!row) {

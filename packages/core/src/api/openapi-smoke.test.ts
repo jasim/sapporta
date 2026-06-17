@@ -14,9 +14,9 @@
 import { describe, it, expect } from "vitest";
 import { z } from "zod";
 import {
-  gridReportResultSchema,
-  type GridReportResult,
-} from "@sapporta/shared/report-grid";
+  gridDatasetSchema,
+  type GridDataset,
+} from "@sapporta/shared/grid-dataset";
 import { initContract } from "./index.js";
 import { createIntegrationApp } from "../integration/setup.js";
 
@@ -118,7 +118,7 @@ describe("openapi smoke — built-in sub-apps in /openapi.json", () => {
       metadata: { tags: ["reports"] },
       query: z.object({ asOfDate: z.string() }),
       responses: {
-        200: gridReportResultSchema,
+        200: gridDatasetSchema,
       },
     });
 
@@ -128,49 +128,38 @@ describe("openapi smoke — built-in sub-apps in /openapi.json", () => {
           const result = {
             name: "trial-balance",
             label: "Trial Balance",
-            columns: [
-              { name: "account", label: "Account" },
-              {
-                name: "debit",
-                label: "Debit",
-                kind: "number",
-                displayFormat: "currency",
-                zeroDisplay: "blank",
+            rootLevel: "account",
+            levels: {
+              account: {
+                columns: [
+                  { id: "account", label: "Account", kind: "text" },
+                  {
+                    id: "asOfDate",
+                    label: "As of Date",
+                    kind: "date",
+                    visuallyHidden: true,
+                  },
+                  {
+                    id: "debit",
+                    label: "Debit",
+                    kind: "number",
+                    displayFormat: "currency",
+                    zeroDisplay: "blank",
+                  },
+                  {
+                    id: "credit",
+                    label: "Credit",
+                    kind: "number",
+                    displayFormat: "currency",
+                    zeroDisplay: "blank",
+                  },
+                ],
+                childLevels: [],
               },
-              {
-                name: "credit",
-                label: "Credit",
-                kind: "number",
-                displayFormat: "currency",
-                zeroDisplay: "blank",
-              },
-            ],
-            levelColumns: {
-              account: [
-                { name: "account", label: "Account" },
-                {
-                  name: "asOfDate",
-                  label: "As of Date",
-                  visuallyHidden: true,
-                },
-                {
-                  name: "debit",
-                  label: "Debit",
-                  kind: "number",
-                  displayFormat: "currency",
-                  zeroDisplay: "blank",
-                },
-                {
-                  name: "credit",
-                  label: "Credit",
-                  kind: "number",
-                  displayFormat: "currency",
-                  zeroDisplay: "blank",
-                },
-              ],
             },
-            data: [
+            nodes: [
               {
+                rowKey: "cash",
                 levelName: "account",
                 columns: {
                   account: "Cash",
@@ -182,11 +171,11 @@ describe("openapi smoke — built-in sub-apps in /openapi.json", () => {
             ],
             footerRows: [
               {
-                label: "Grand Total",
-                columns: { debit: 125, credit: 0 },
+                rowKey: "grand-total",
+                columns: { account: "Grand Total", debit: 125, credit: 0 },
               },
             ],
-          } satisfies GridReportResult;
+          } satisfies GridDataset;
 
           return { status: 200, body: result };
         });
@@ -204,11 +193,13 @@ describe("openapi smoke — built-in sub-apps in /openapi.json", () => {
       "/api/reports/trial-balance?asOfDate=2026-06-12",
     );
     expect(reportResponse.status).toBe(200);
-    const body = gridReportResultSchema.parse(await reportResponse.json());
+    const body = gridDatasetSchema.parse(await reportResponse.json());
     expect(body).toMatchObject({
       name: "trial-balance",
-      data: [
+      rootLevel: "account",
+      nodes: [
         {
+          rowKey: "cash",
           levelName: "account",
           columns: { account: "Cash", asOfDate: "2026-06-12" },
         },

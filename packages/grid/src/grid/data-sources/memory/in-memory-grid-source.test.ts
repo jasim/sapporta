@@ -119,6 +119,57 @@ describe("inMemoryGridDataSource", () => {
     expect(snap.nodes[1].columns.id).toBe("ord-2");
   });
 
+  it("can construct read-only level sources for immutable trees", () => {
+    const ds = inMemoryGridDataSource(
+      baseOpts({
+        levels: {
+          orders: { ...allClient, readonly: true },
+          lines: { ...allClient, readonly: true },
+          notes: { ...allClient, readonly: true },
+        },
+      }),
+    );
+    const rootSource = ds.rootSource();
+    const childSource = ds.resolveChild(root, "ord-1", "lines");
+
+    expect(rootSource.writable).toBe(false);
+    expect(childSource.writable).toBe(false);
+    expect("setCell" in rootSource).toBe(false);
+    expect("setCell" in childSource).toBe(false);
+  });
+
+  it("publishes root and child footer rows from static tree data", () => {
+    const tree = fixtureTree();
+    tree[0] = {
+      ...tree[0],
+      childFooterRows: {
+        lines: [{ rowKey: "lines-total", columns: { amount: 30 } }],
+      },
+    };
+    const ds = inMemoryGridDataSource(
+      baseOpts({
+        tree,
+        levels: {
+          orders: {
+            ...allClient,
+            footerRows: [
+              { rowKey: "orders-total", columns: { customer: "Total" } },
+            ],
+          },
+          lines: allClient,
+          notes: allClient,
+        },
+      }),
+    );
+
+    expect(ds.rootSource().snapshot().footerRows).toEqual([
+      { rowKey: "orders-total", columns: { customer: "Total" } },
+    ]);
+    expect(
+      ds.resolveChild(root, "ord-1", "lines").snapshot().footerRows,
+    ).toEqual([{ rowKey: "lines-total", columns: { amount: 30 } }]);
+  });
+
   it("resolveChild walks to the parent and returns its children", () => {
     const tree = fixtureTree();
     const ds = inMemoryGridDataSource(baseOpts({ tree }));

@@ -21,7 +21,7 @@ export interface ReportSummaryStatsProps {
  * UI "shouts". Renders evenly-spaced stat cards inside a report frame:
  * small uppercase label on top, large mono value below.
  *
- * Apps can render this above `ReportGridResult` for report-specific totals.
+ * Apps can render this above `ReportGridDataset` for report-specific totals.
  * Framework-generic — `tone` maps to the semantic accent tokens
  * (positive/negative/brand) so non-accounting apps can use the same primitive.
  */

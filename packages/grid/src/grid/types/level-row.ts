@@ -59,6 +59,7 @@ export type LevelOptions = {
 };
 
 export type TreeNode = {
+  rowKey?: RowKey;
   levelName: string;
   columns: Record<ColId, unknown>;
   rollup?: Record<ColId, unknown>;

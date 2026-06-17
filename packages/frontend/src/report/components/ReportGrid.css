@@ -1,0 +1,35 @@
+.sapporta-report-tgrid {
+  background: var(--sap-surface);
+}
+
+.sapporta-report-tgrid
+  :where(
+    [data-grid-part="row"][data-row-kind="footer"],
+    [data-grid-part="row"][data-row-kind="rollup"],
+    [data-grid-part="row"][data-row-kind="subtotal"],
+    [data-grid-part="row"][data-row-kind="opening"],
+    [data-grid-part="row"][data-row-kind="closing"]
+  ) {
+  --grid-row-base-background: var(--sap-chip);
+
+  font-weight: 650;
+}
+
+.sapporta-report-tgrid
+  :where([data-grid-part="row"][data-row-kind="footer"]) {
+  border-top: 1px solid var(--sap-border);
+}
+
+.sapporta-report-tgrid :where([data-row-kind="footer"] [data-grid-part="cell"]) {
+  color: var(--sap-fg);
+}
+
+.sapporta-report-tgrid
+  :where([data-row-kind="opening"] [data-grid-part="cell"]) {
+  color: var(--sap-fg-muted);
+}
+
+.sapporta-report-tgrid
+  :where([data-grid-depth]:not([data-grid-depth="0"])) {
+  margin-left: 18px;
+}

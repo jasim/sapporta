@@ -9,8 +9,8 @@ import { valueKindSchema } from "./value-kind-schema.js";
  * `TableSchema[]`. Single source of truth — both sides import the type
  * from here.
  *
- * Table metadata and route-based report grids use separate wire types.
- * Report grid columns live in `@sapporta/shared/report-grid`.
+ * Table metadata and route-based grid datasets use separate wire types.
+ * Grid dataset columns live in `@sapporta/shared/grid-dataset`.
  */
 
 /** Maps target (table filter / report param) name → source column name on

@@ -1,41 +1,56 @@
 import { describe, expect, it } from "vitest";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { ReportGridResult, type ReportGridLinkResolvers } from "./ReportGrid";
-import type { GridReportResult } from "@sapporta/shared/report-grid";
+import { ReportGridDataset, type ReportGridLinkResolvers } from "./ReportGrid";
+import type { GridDataset } from "@sapporta/shared/grid-dataset";
 
-describe("ReportGridResult", () => {
+describe("ReportGridDataset", () => {
   it("renders nested rows with app-owned row and cell links", () => {
-    const result = {
+    const dataset = {
       name: "account-ledger",
       label: "Account Ledger",
-      columns: [
-        { name: "account_id", label: "Account ID", visuallyHidden: true },
-        { name: "name", label: "Account" },
-      ],
-      levelColumns: {
-        account: [
-          { name: "account_id", label: "Account ID", visuallyHidden: true },
-          { name: "name", label: "Account" },
-        ],
-        entry: [
-          { name: "journal_id", label: "Journal ID", visuallyHidden: true },
-          { name: "description", label: "Description" },
-          {
-            name: "amount",
-            label: "Amount",
-            kind: "number",
-            displayFormat: "currency",
-          },
-        ],
+      rootLevel: "account",
+      levels: {
+        account: {
+          columns: [
+            {
+              id: "account_id",
+              label: "Account ID",
+              kind: "text",
+              visuallyHidden: true,
+            },
+            { id: "name", label: "Account", kind: "text" },
+          ],
+          childLevels: ["entry"],
+        },
+        entry: {
+          columns: [
+            {
+              id: "journal_id",
+              label: "Journal ID",
+              kind: "text",
+              visuallyHidden: true,
+            },
+            { id: "description", label: "Description", kind: "text" },
+            {
+              id: "amount",
+              label: "Amount",
+              kind: "number",
+              displayFormat: "currency",
+            },
+          ],
+          childLevels: [],
+        },
       },
-      data: [
+      nodes: [
         {
+          rowKey: "acct-1",
           levelName: "account",
           columns: { account_id: "acct-1", name: "Cash" },
           children: {
             entry: [
               {
+                rowKey: "journal-1",
                 levelName: "entry",
                 columns: {
                   journal_id: "journal-1",
@@ -47,7 +62,7 @@ describe("ReportGridResult", () => {
           },
         },
       ],
-    } satisfies GridReportResult;
+    } satisfies GridDataset;
 
     const links = {
       account: {
@@ -73,7 +88,7 @@ describe("ReportGridResult", () => {
     } satisfies ReportGridLinkResolvers;
 
     const html = renderToStaticMarkup(
-      createElement(ReportGridResult, { result, links }),
+      createElement(ReportGridDataset, { dataset, links }),
     );
 
     expect(html).toContain('href="/tables/accounts/acct-1"');
@@ -84,32 +99,33 @@ describe("ReportGridResult", () => {
   });
 
   it("renders footer links from app-owned resolvers", () => {
-    const result = {
+    const dataset = {
       name: "trial-balance",
       label: "Trial Balance",
-      columns: [
-        { name: "account", label: "Account" },
-        { name: "debit", label: "Debit", kind: "number" },
-      ],
-      levelColumns: {
-        account: [
-          { name: "account", label: "Account" },
-          { name: "debit", label: "Debit", kind: "number" },
-        ],
+      rootLevel: "account",
+      levels: {
+        account: {
+          columns: [
+            { id: "account", label: "Account", kind: "text" },
+            { id: "debit", label: "Debit", kind: "number" },
+          ],
+          childLevels: [],
+        },
       },
-      data: [
+      nodes: [
         {
+          rowKey: "cash",
           levelName: "account",
           columns: { account: "Cash", debit: 125 },
         },
       ],
       footerRows: [
         {
-          label: "Grand Total",
-          columns: { debit: 125 },
+          rowKey: "grand-total",
+          columns: { account: "Grand Total", debit: 125 },
         },
       ],
-    } satisfies GridReportResult;
+    } satisfies GridDataset;
 
     const links = {
       account: {
@@ -124,7 +140,7 @@ describe("ReportGridResult", () => {
     } satisfies ReportGridLinkResolvers;
 
     const html = renderToStaticMarkup(
-      createElement(ReportGridResult, { result, links }),
+      createElement(ReportGridDataset, { dataset, links }),
     );
 
     expect(html).toContain('href="/reports/trial-balance/detail"');

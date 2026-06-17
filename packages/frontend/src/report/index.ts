@@ -1,11 +1,11 @@
 export {
   ReportGrid,
-  ReportGridResult,
+  ReportGridDataset,
   type ReportGridFooterLinkContext,
+  type ReportGridDatasetProps,
   type ReportGridLink,
   type ReportGridLinkContext,
   type ReportGridLinkResolvers,
-  type ReportGridResultProps,
 } from "./components/ReportGrid";
 export {
   ReportSummaryStats,

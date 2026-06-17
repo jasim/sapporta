@@ -82,6 +82,7 @@ export type InMemoryLevelSourceOpts<F = unknown> = {
   initialFilter?: F;
   initialPage?: number;
   initialPageSize?: number;
+  footerRows?: FooterRow[];
   aggregator?: InMemoryAggregator;
   // The host's grammar-to-predicate compiler — the trust boundary for
   // filtering. The host owns `F`, the host owns the compiler, the grid
@@ -216,7 +217,7 @@ function buildCore<F>(opts: InMemoryLevelSourceOpts<F>): Core<F> {
     }
 
     let publishedNodes: TreeNode[] = pipelineNodes;
-    let footerRows: FooterRow[] | undefined;
+    let footerRows: FooterRow[] | undefined = opts.footerRows?.slice();
     if (opts.aggregator) {
       const result = opts.aggregator(pipelineNodes, opts.columns);
       if (result.perRowRollup.size > 0) {
@@ -227,7 +228,9 @@ function buildCore<F>(opts: InMemoryLevelSourceOpts<F>): Core<F> {
           return { ...n, rollup: { ...(n.rollup ?? {}), ...rollup } };
         });
       }
-      if (result.footerRows.length > 0) footerRows = result.footerRows;
+      if (result.footerRows.length > 0) {
+        footerRows = [...(footerRows ?? []), ...result.footerRows];
+      }
     }
 
     // Reuse prior `nodes` / `footerRows` references when the content is

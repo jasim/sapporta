@@ -1,5 +1,10 @@
-import { Fragment, useMemo, type CSSProperties, type ReactNode } from "react";
-import { useStore } from "zustand";
+import {
+  Fragment,
+  useMemo,
+  useSyncExternalStore,
+  type CSSProperties,
+  type ReactNode,
+} from "react";
 import type { ColId, GridPath } from "../types/identity";
 import type { ColumnSchema } from "../types/schema";
 import { EmptyLevel } from "./EmptyLevel";
@@ -102,7 +107,11 @@ function DisplayedRowsBody({
   // should re-render only the owning `GridRow`, not this mapper.
   const sequence = useDisplayedRowSequence(path);
   const rowInteraction = useRowInteractionSnapshot(path);
-  const expansion = useStore(runtime.coordinator, (s) => s.expansion.get(path));
+  const expansion = useSyncExternalStore(
+    runtime.coordinator.subscribe,
+    () => runtime.coordinator.getState().expansion.get(path),
+    () => runtime.coordinator.getState().expansion.get(path),
+  );
 
   return (
     <div data-grid-part="body" role="rowgroup">

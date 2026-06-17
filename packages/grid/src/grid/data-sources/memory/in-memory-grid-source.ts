@@ -32,10 +32,11 @@
 import { defaultRowKey } from "../../pipeline/stages/build-data";
 import { decomposePath } from "../../types/identity";
 import type { GridPath, RowKey } from "../../types/identity";
-import type { TreeNode } from "../../types/level-row";
+import type { FooterRow, TreeNode } from "../../types/level-row";
 import type { GridSchema } from "../../types/schema";
 import {
   inMemoryLevelSource,
+  inMemoryReadonlyLevelSource,
   type InMemoryLevelSourceOpts,
 } from "./in-memory-level-source";
 import type { GridDataSource, LevelDataSource } from "../types";
@@ -43,7 +44,9 @@ import type { GridDataSource, LevelDataSource } from "../types";
 export type InMemoryLevelOpts<F = unknown> = Omit<
   InMemoryLevelSourceOpts<F>,
   "initialNodes" | "columns" | "options"
->;
+> & {
+  readonly?: boolean;
+};
 
 export type InMemoryGridDataSourceOpts<F = unknown> = {
   schema: GridSchema;
@@ -68,6 +71,7 @@ export function inMemoryGridDataSource<F = unknown>(
   function buildLevelSource(
     levelName: string,
     initialNodes: TreeNode[],
+    footerRows?: FooterRow[],
   ): LevelDataSource {
     const levelSchema = schema.levels[levelName];
     if (!levelSchema) {
@@ -81,12 +85,17 @@ export function inMemoryGridDataSource<F = unknown>(
         `inMemoryGridDataSource: opts.levels has no entry for level '${levelName}'`,
       );
     }
-    const src = inMemoryLevelSource<F>({
+    const { readonly: readonlySource, ...sourceOpts } = levelOpts;
+    const args = {
       initialNodes,
       options: levelSchema.options,
       columns: levelSchema.columns,
-      ...levelOpts,
-    });
+      ...sourceOpts,
+      footerRows: footerRows ?? sourceOpts.footerRows,
+    };
+    const src = readonlySource
+      ? inMemoryReadonlyLevelSource<F>(args)
+      : inMemoryLevelSource<F>(args);
     handed.push(src);
     return src;
   }
@@ -109,13 +118,14 @@ export function inMemoryGridDataSource<F = unknown>(
         schema,
       );
       const children = parent.children?.[childLevelName];
+      const footerRows = parent.childFooterRows?.[childLevelName];
       const initialNodes: TreeNode[] =
         children === undefined
           ? []
           : Array.isArray(children)
             ? children
             : [children];
-      return buildLevelSource(childLevelName, initialNodes);
+      return buildLevelSource(childLevelName, initialNodes, footerRows);
     },
 
     dispose() {
