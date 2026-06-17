@@ -73,7 +73,7 @@
     },
     "./report": {
       "types": "./dist/report/index.d.ts",
-      "import": "./dist/report/index.js"
+      "import": "./dist/report.js"
     },
     "./layout": {
       "types": "./dist/shell/components/SidebarShell.d.ts",
