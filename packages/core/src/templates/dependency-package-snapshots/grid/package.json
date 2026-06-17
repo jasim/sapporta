@@ -2,7 +2,7 @@
   "name": "@sapporta/grid",
   "version": "0.2.5",
   "type": "module",
-  "description": "Sapporta grid runtime, React grid components, column presets, and lookup cache primitives.",
+  "description": "Sapporta grid runtime, React grid components, column presets, and lookup primitives.",
   "keywords": [
     "sapporta",
     "grid",
@@ -48,6 +48,10 @@
     "./lookup": {
       "types": "./dist/lookup/index.d.ts",
       "import": "./dist/lookup.js"
+    },
+    "./lookup/react": {
+      "types": "./dist/lookup/react/index.d.ts",
+      "import": "./dist/lookup/react.js"
     },
     "./index.css": "./dist/index.css"
   },

@@ -130,6 +130,8 @@ export const SCAFFOLD_MANIFEST: ScaffoldManifest = [
   scaffoldFile("Dockerfile", "workspace"),
   scaffoldFile(".dockerignore", "workspace"),
   scaffoldFile("README.md", "workspace"),
+  scaffoldFile("AGENTS.md", "workspace"),
+  scaffoldFile("CLAUDE.md", "workspace"),
   scaffoldFile("DEPLOYMENT.md", "workspace"),
   scaffoldFileAt("gitignore", ".gitignore", "workspace"),
   scaffoldFile("packages/frontend/package.json", "workspace"),
@@ -151,6 +153,7 @@ export const SCAFFOLD_MANIFEST: ScaffoldManifest = [
   scaffoldFile("packages/shared/src/contracts/index.ts", "example"),
   scaffoldFile("packages/shared/src/contracts/hello.ts", "example"),
   scaffoldFile("packages/shared/src/contracts/public-api-sample.ts", "example"),
+  scaffoldFile("packages/shared/AGENTS.md", "workspace"),
   scaffoldFile("packages/shared/CLAUDE.md", "workspace"),
 ];
 

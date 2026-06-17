@@ -193,6 +193,14 @@ describe("renderScaffoldFiles", () => {
     const unresolvedToken = /%%SAPPORTA:[A-Z0-9_]+%%/;
 
     expect(byDest.get("README.md")).toContain("# Acme App");
+    expect(byDest.get("README.md")).toContain("Uses [Sapporta]");
+    expect(byDest.get("AGENTS.md")).toContain("shadcn/ui conventions");
+    expect(byDest.get("AGENTS.md")).toContain("The `/api/hello` example");
+    expect(byDest.get("AGENTS.md")).toContain("createSapportaMailer()");
+    expect(byDest.get("CLAUDE.md")).toBe(
+      "Please read the instructions in AGENTS.md.\n",
+    );
+    expect(byDest.has("packages/shared/AGENTS.md")).toBe(true);
     expect(byDest.get("package.json")).toContain('"name": "Acme App"');
     expect(byDest.get(".env.development")).toMatch(
       /BETTER_AUTH_SECRET=[A-Za-z0-9_-]{43}/,
@@ -236,7 +244,6 @@ describe("scaffold template inventory", () => {
       validateTemplateInventory(templatePaths, SCAFFOLD_MANIFEST, [
         "authz/types.ts",
         "packages/api/mailer.ts",
-        "packages/shared/AGENTS.md",
         "tsconfig.json",
         "dependency-package-snapshots/README.md",
         "dependency-package-snapshots/cli/package.json",
