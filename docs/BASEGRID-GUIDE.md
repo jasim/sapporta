@@ -75,6 +75,35 @@ The data source owns row data. The runtime never stores your row array. When a
 cell changes, BaseGrid calls the source through a runtime write method, and the
 source publishes a new snapshot.
 
+## Build a Custom Grid Screen
+
+Use built-in table and report components when they fit the screen. Reach for
+BaseGrid when your screen owns its own row shape, loading behavior, hierarchy,
+editing rules, side panels, or toolbar behavior.
+
+A custom grid screen usually needs two pieces:
+
+1. a live grid instance that prepares the schema, data source, and interaction
+   behavior
+2. a React view that renders that live grid
+
+Create the live grid outside the visible grid view. In React, create it from an
+effect-backed hook, wait until it exists, then pass it to the view. This keeps
+the grid stable while React mounts, unmounts, and replays effects in
+development.
+
+Avoid creating the runtime directly inside the rendered grid component:
+
+```tsx
+const runtime = useMemo(() => createGridRuntime(...), [...]);
+useEffect(() => () => runtime.dispose(), [runtime]);
+```
+
+That can break in React development mode. React may replay effects while
+keeping memoized values, so the visible grid can keep using a runtime that has
+already been disposed. The usual symptom is a grid that appears briefly, then
+clears with `GridRuntime has been disposed.`
+
 ## Your First Flat Grid
 
 Start with a flat task grid. BaseGrid rows are `TreeNode` objects. A node has a
@@ -784,7 +813,7 @@ The practical guidance is simple:
 This is the usual shape of a BaseGrid screen:
 
 ```tsx
-import { useMemo } from "react";
+import { useEffect, useState } from "react";
 import {
   CELL_GRID_WITH_INDEPENDENT_ROW_SELECTION,
   GridLevel,
@@ -795,6 +824,8 @@ import {
   rowSelectionColumn,
   select,
   text,
+  type GridPath,
+  type GridRuntime,
   type GridSchema,
   type TreeNode,
 } from "@sapporta/ui";
@@ -835,39 +866,75 @@ const schema: GridSchema = {
   },
 };
 
-export function ProjectPlanner({ tree }: { tree: TreeNode[] }) {
-  const runtime = useMemo(() => {
-    const dataSource = inMemoryGridDataSource({
-      schema,
-      tree,
-      levels: {
-        projects: {
-          sortMode: "client",
-          filterMode: "none",
-          paginationMode: "none",
-        },
-        tasks: {
-          sortMode: "client",
-          filterMode: "none",
-          paginationMode: "none",
-        },
-      },
-    });
+type ProjectGridSession = {
+  runtime: GridRuntime;
+  rootPath: GridPath;
+  dispose(): void;
+};
 
-    return createGridRuntime({
-      schema,
-      dataSource,
-      interaction: CELL_GRID_WITH_INDEPENDENT_ROW_SELECTION,
-    });
+function createProjectGridSession(tree: TreeNode[]): ProjectGridSession {
+  const dataSource = inMemoryGridDataSource({
+    schema,
+    tree,
+    levels: {
+      projects: {
+        sortMode: "client",
+        filterMode: "none",
+        paginationMode: "none",
+      },
+      tasks: {
+        sortMode: "client",
+        filterMode: "none",
+        paginationMode: "none",
+      },
+    },
+  });
+
+  const runtime = createGridRuntime({
+    schema,
+    dataSource,
+    interaction: CELL_GRID_WITH_INDEPENDENT_ROW_SELECTION,
+  });
+
+  return {
+    runtime,
+    rootPath: rootPath("projects"),
+    dispose: () => runtime.dispose(),
+  };
+}
+
+function useProjectGridSession(tree: TreeNode[]): ProjectGridSession | null {
+  const [session, setSession] = useState<ProjectGridSession | null>(null);
+
+  useEffect(() => {
+    const next = createProjectGridSession(tree);
+    setSession(next);
+
+    return () => {
+      next.dispose();
+      setSession((current) => (current === next ? null : current));
+    };
   }, [tree]);
 
+  return session;
+}
+
+export function ProjectPlanner({ tree }: { tree: TreeNode[] }) {
+  const session = useProjectGridSession(tree);
+
+  if (!session) return null;
+
+  return <ProjectGridView session={session} />;
+}
+
+function ProjectGridView({ session }: { session: ProjectGridSession }) {
   return (
-    <GridRuntimeProvider runtime={runtime}>
-      <div className="project-planner">
-        <GridLevel path={rootPath("projects")} />
-        <ProjectDetailPanel path={rootPath("projects")} />
-      </div>
-    </GridRuntimeProvider>
+    <div className="project-planner">
+      <GridRuntimeProvider runtime={session.runtime}>
+        <GridLevel path={session.rootPath} />
+        <ProjectDetailPanel path={session.rootPath} />
+      </GridRuntimeProvider>
+    </div>
   );
 }
 ```

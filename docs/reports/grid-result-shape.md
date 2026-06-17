@@ -22,6 +22,10 @@ import type {
 `GridReportResult` is a renderer wire shape. It does not describe how to query
 data, authorize the route, or place reports in navigation.
 
+This shape is for report data. If you are building a different custom
+grid-like screen, start with the
+[BaseGrid guide](../BASEGRID-GUIDE.md#build-a-custom-grid-screen) instead.
+
 Columns should include hidden identifiers when the frontend needs them for
 navigation:
 

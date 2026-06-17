@@ -131,7 +131,7 @@ npx skills add https://github.com/jasim/sapporta-skills --global
 - [CLI](./docs/cli.md) - inspect and work with running Sapporta apps from the command line
 - [Deployment](./docs/deployment.md) - build, migrate, configure, and run Sapporta apps in production
 - [Custom Table Grids](./docs/TGRID-USAGE.md) - build custom React table workflows on Sapporta table APIs
-- [BaseGrid](./docs/BASEGRID-GUIDE.md) - use the lower-level grid runtime without Sapporta table CRUD
+- [BaseGrid](./docs/BASEGRID-GUIDE.md) - build a custom grid screen when table or report components do not fit
 - [Server Package](./packages/core/README.md) - use `@sapporta/server`, `scopedRows`, and CLI-backed project commands
 - [Shared Package](./packages/shared/README.md) - use shared contracts, filters, date helpers, and client types
 - [Honest](./packages/honest/README.md) - use the Hono + ts-rest adapter directly

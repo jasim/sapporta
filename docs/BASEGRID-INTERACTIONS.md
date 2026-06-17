@@ -7,6 +7,11 @@ BaseGrid's interaction system controls how the keyboard and mouse navigate a gri
 
 These are separate values. A checkbox click can toggle a row into a selection without moving the keyboard cursor. An Arrow key can move the cursor without changing which rows are selected. The interaction config you pass to the runtime determines which of these concepts exist and how they behave.
 
+If you are starting a custom grid screen, read
+[Building a Grid from Scratch with BaseGrid](./BASEGRID-GUIDE.md#build-a-custom-grid-screen)
+first. This page helps you choose keyboard, cursor, and selection behavior after
+the screen has a live grid setup.
+
 ## Quick Chooser
 
 | Desired UX                                                    | Preset                                      | Notes                                                            |

@@ -29,6 +29,11 @@ The definition is the blueprint. The session owns live resources: query stores,
 lookup caches, compiled columns, the grid runtime, endpoint wiring, and export
 helpers. The React component only mounts a session into the grid UI.
 
+If your screen is not backed by Sapporta table APIs, use BaseGrid directly and
+follow the same live-grid shape: create the live grid from a hook, render after
+it exists, and dispose it when the screen unmounts. See
+[Building a Grid from Scratch with BaseGrid](./BASEGRID-GUIDE.md#build-a-custom-grid-screen).
+
 ## Minimal Example
 
 ```tsx
@@ -454,6 +459,9 @@ A session is the live grid instance. In React, create it with
 `useTGridSession`. The hook returns `null` until the session is mounted and
 disposes the old session when the definition identity changes or the component
 unmounts.
+
+Use this same lifecycle shape for custom BaseGrid screens: create the live grid
+in a hook, render after it exists, and dispose it when the screen unmounts.
 
 ```tsx
 const session = useTGridSession(ordersGrid, {

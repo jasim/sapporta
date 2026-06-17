@@ -127,6 +127,12 @@ function toTrialBalanceResult(
 
 Render the route result in an app screen.
 
+For normal reports, use Sapporta's report component. If you are building a
+different grid-like screen with its own row shape, loading behavior, hierarchy,
+editing rules, or side panels, start with the
+[BaseGrid guide](../BASEGRID-GUIDE.md#build-a-custom-grid-screen) instead of
+copying report internals.
+
 ```tsx
 import { useEffect, useState } from "react";
 import { ReportGridResult, ReportScreenFrame } from "@sapporta/frontend/report";

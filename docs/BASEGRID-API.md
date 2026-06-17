@@ -659,6 +659,12 @@ for custom sources.
 
 ## Runtime Construction
 
+`createGridRuntime` creates a live object with subscriptions and disposable
+resources. If you create a runtime for a React screen, create it from an
+effect-backed hook and render the grid after the runtime exists. See
+[Build a Custom Grid Screen](./BASEGRID-GUIDE.md#build-a-custom-grid-screen)
+for the recommended screen shape.
+
 ```ts
 type RuntimeArgs = {
   schema: GridSchema;
@@ -689,7 +695,7 @@ const runtime = createGridRuntime({
 });
 ```
 
-Dispose runtimes you create outside normal component lifetime:
+Dispose runtimes you create outside React:
 
 ```ts
 const runtime = createGridRuntime({ schema, dataSource });
@@ -1140,8 +1146,10 @@ For a new BaseGrid, build in this order:
 2. Create `ColumnSchema[]`, preferably with ColumnPreset helpers first.
 3. Create a `GridSchema` with root and child levels.
 4. Start with `inMemoryGridDataSource` or implement `GridDataSource`.
-5. Create the runtime with `createGridRuntime`.
-6. Render `<GridRuntimeProvider>` and `<GridLevel path={rootPath(...)} />`.
+5. Create the runtime in the screen's live grid setup. In React, do this from
+   an effect-backed hook and render after it exists.
+6. Render `<GridRuntimeProvider>` and `<GridLevel path={rootPath(...)} />` from
+   a view that receives the live grid.
 7. Add runtime event handlers for saves, reconciliation, and status changes.
 8. Add interaction config, row selection columns, and host UI.
 9. Move to a custom data source when persistence or server-managed query state
