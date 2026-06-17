@@ -1,5 +1,5 @@
-import type { ColId, GridPath, GridRuntime } from "../../grid";
-import type { ValueLookup } from "./value-lookup";
+import type { ColId, GridPath, GridRuntime } from "../grid";
+import type { ValueLookup } from "./cache/value-lookup";
 
 export type GridValueLookupColumn = {
   colId: ColId;

@@ -3,8 +3,7 @@ import { isValidElement } from "react";
 import type { ColumnSchema, TableSchema } from "@sapporta/shared/contracts";
 import { ExpandCell } from "@sapporta/grid";
 import { preset } from "@sapporta/grid/column-preset";
-import { StaticSearchLookup } from "@sapporta/grid/lookup";
-import { StaticValueLookup } from "@sapporta/grid/lookup";
+import { StaticSearchLookup, StaticValueLookup } from "@sapporta/grid/lookup";
 import {
   createTGridColumnMapper,
   tableColumnPresetWidth,

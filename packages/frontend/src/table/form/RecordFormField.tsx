@@ -1,6 +1,6 @@
 import { memo, useCallback } from "react";
 import type { ColumnSchema } from "@sapporta/shared/contracts";
-import type { LookupCapabilities } from "@sapporta/grid/column-preset";
+import type { LookupCapabilities } from "@sapporta/grid/lookup";
 import { FormField } from "@/table/form/FormField";
 import {
   useRecordFieldValue,

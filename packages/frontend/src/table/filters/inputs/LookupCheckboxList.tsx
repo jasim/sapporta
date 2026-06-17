@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Check, Search } from "lucide-react";
-import { useLookupOptions } from "@sapporta/grid";
+import { useLookupOptions } from "@sapporta/grid/lookup/react";
 import type { ListInputProps } from "./types";
 
 const SEARCH_LIMIT = 50;

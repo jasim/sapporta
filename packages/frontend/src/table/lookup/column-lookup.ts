@@ -1,4 +1,4 @@
-import type { LookupCapabilities } from "@sapporta/grid/column-preset";
+import type { LookupCapabilities } from "@sapporta/grid/lookup";
 import type { ColumnSchema } from "@sapporta/shared/contracts";
 import type { TableLookupRegistry } from "./table-lookup-registry";
 

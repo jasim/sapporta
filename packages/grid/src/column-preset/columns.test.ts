@@ -3,8 +3,7 @@ import { describe, expect, it } from "vitest";
 import type { CellEditorProps } from "../grid/types/schema";
 import { rootPath, childPath } from "../grid/types/identity";
 import { TextCell } from "./cells/TextCell";
-import { StaticSearchLookup } from "../lookup/cache/search-lookup";
-import { StaticValueLookup } from "../lookup/cache/value-lookup";
+import { StaticSearchLookup, StaticValueLookup } from "../lookup";
 import {
   foreignKey,
   columnPreset,

@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { ArrowLeft, Loader2 } from "lucide-react";
 import type { TableSchema } from "@sapporta/shared/contracts";
 import { ApiError } from "@sapporta/shared/client";
-import type { LookupCapabilities } from "@sapporta/grid/column-preset";
+import type { LookupCapabilities } from "@sapporta/grid/lookup";
 import { TopBar, TopBarButton } from "@/shell/components/TopBar";
 import { Button } from "@sapporta/ui";
 import { RecordFormField } from "@/table/form/RecordFormField";

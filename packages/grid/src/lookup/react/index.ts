@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useSyncExternalStore } from "react";
-import type { SearchLookup } from "../../lookup/cache/search-lookup";
+import type { SearchLookup } from "../cache/search-lookup";
 import type {
   LookupEntry,
   LookupValue,
   ValueLookup,
-} from "../../lookup/cache/value-lookup";
+} from "../cache/value-lookup";
 
 const EMPTY_LOOKUP_ENTRIES: readonly LookupEntry[] = [];
 

@@ -12,6 +12,10 @@ export default defineConfig({
         __dirname,
         "./packages/grid/src/column-preset/index.ts",
       ),
+      "@sapporta/grid/lookup/react": path.resolve(
+        __dirname,
+        "./packages/grid/src/lookup/react/index.ts",
+      ),
       "@sapporta/grid/lookup": path.resolve(
         __dirname,
         "./packages/grid/src/lookup/index.ts",

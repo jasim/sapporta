@@ -19,7 +19,7 @@ import { DateCell } from "./cells/DateCell";
 import { BooleanCell } from "./cells/BooleanCell";
 import { SelectCell } from "./cells/SelectCell";
 import { LookupValueCell } from "./cells/LookupValueCell";
-import type { LookupValue } from "../lookup/cache/value-lookup";
+import type { LookupValue } from "../lookup";
 
 export function renderWithPresetRuntime<TMeta = unknown>(
   runtime: ColumnPresetRuntime<TMeta>,

@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import type { CellEditorProps } from "../../grid/types/schema";
 import { ComboboxList } from "@sapporta/ui";
 import { lookupCapabilities, presetRuntime } from "../preset";
-import { useLookupOptions } from "../../grid/react/lookup";
+import { useLookupOptions } from "../../lookup/react";
 
 type RowId = string;
 

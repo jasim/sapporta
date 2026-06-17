@@ -17,10 +17,10 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@sapporta/ui";
-import type { LookupCapabilities } from "@sapporta/grid/column-preset";
+import type { LookupCapabilities } from "@sapporta/grid/lookup";
 import { inferDisplayType } from "@/table/model/column-types";
 import type { ColumnSchema } from "@sapporta/shared/contracts";
-import { useLookupOptions } from "@sapporta/grid";
+import { useLookupOptions } from "@sapporta/grid/lookup/react";
 import {
   formatInstantForDateTimeLocalInput,
   formatPlainDateForDateInput,

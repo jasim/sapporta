@@ -17,6 +17,7 @@
       "@sapporta/grid": ["../grid/src/index.ts"],
       "@sapporta/grid/column-preset": ["../grid/src/column-preset/index.ts"],
       "@sapporta/grid/lookup": ["../grid/src/lookup/index.ts"],
+      "@sapporta/grid/lookup/react": ["../grid/src/lookup/react/index.ts"],
       "@sapporta/ui": ["../ui/src/index.ts"]
     }
   },

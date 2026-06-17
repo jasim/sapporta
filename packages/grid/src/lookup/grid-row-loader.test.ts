@@ -6,9 +6,9 @@ import {
   type GridRuntime,
   type RuntimeLevelDataSource,
   type TreeNode,
-} from "../../grid";
+} from "../grid";
 import { startLoadingValueLookupEntriesForGridRows } from "./grid-row-loader";
-import type { ValueLookup } from "./value-lookup";
+import type { ValueLookup } from "./cache/value-lookup";
 
 const root = rootPath("orders");
 

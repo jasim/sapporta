@@ -9,8 +9,7 @@ import type {
   TextDisplayMode,
   ZeroDisplay,
 } from "./types";
-import type { SearchLookup } from "../lookup/cache/search-lookup";
-import type { ValueLookup } from "../lookup/cache/value-lookup";
+import type { LookupCapabilities } from "../lookup";
 import type { ColumnPresetRuntime } from "./runtime";
 
 export const GRID_COLUMN_PRESET_RUNTIME: unique symbol = Symbol(
@@ -65,11 +64,6 @@ export type BooleanPreset = PresetBase & { kind: "boolean" };
 export type SelectPreset = PresetBase & {
   kind: "select";
   select: { options: readonly SelectOption[] };
-};
-
-export type LookupCapabilities = {
-  valueLookup: ValueLookup;
-  searchLookup?: SearchLookup;
 };
 
 export type LookupPreset = PresetBase & {

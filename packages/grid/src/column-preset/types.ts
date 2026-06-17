@@ -9,8 +9,7 @@ import type { ColId, Coord, GridPath, RowKey } from "../grid/types/identity";
 import type { SortDescriptor } from "../grid/pipeline/types";
 import type { LevelSnapshot } from "../grid/data-sources/types";
 import type { TreeNode } from "../grid/types/level-row";
-import type { SearchLookup } from "../lookup/cache/search-lookup";
-import type { ValueLookup } from "../lookup/cache/value-lookup";
+import type { SearchLookup, ValueLookup } from "../lookup";
 import type { ColumnPreset } from "./preset";
 
 export type BuiltInColumnPresetKind =

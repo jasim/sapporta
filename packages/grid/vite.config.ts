@@ -29,6 +29,7 @@ export default defineConfig({
         grid: path.resolve(__dirname, "src/grid/index.ts"),
         "column-preset": path.resolve(__dirname, "src/column-preset/index.ts"),
         lookup: path.resolve(__dirname, "src/lookup/index.ts"),
+        "lookup/react": path.resolve(__dirname, "src/lookup/react/index.ts"),
       },
       formats: ["es"],
     },

@@ -25,6 +25,7 @@ export {
   lookupCapabilities,
 } from "./preset";
 export type * from "./preset";
+export type { LookupCapabilities } from "../lookup";
 export type * from "./runtime";
 export type * from "./types";
 export { normalizeOptions } from "./lookup";

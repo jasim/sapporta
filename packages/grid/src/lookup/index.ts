@@ -17,4 +17,5 @@ export {
 export {
   startLoadingValueLookupEntriesForGridRows,
   type GridValueLookupColumn,
-} from "./cache/grid-row-loader";
+} from "./grid-row-loader";
+export type { LookupCapabilities } from "./types";

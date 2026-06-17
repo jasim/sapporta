@@ -2,7 +2,7 @@ import { useSyncExternalStore } from "react";
 import type { CellRenderProps } from "../../grid/types/schema";
 import type { ForeignKeyPreset, LookupPreset } from "../preset";
 import type { ColumnPresetCellRenderRuntime } from "../runtime";
-import type { LookupValue, ValueLookup } from "../../lookup/cache/value-lookup";
+import type { LookupValue, ValueLookup } from "../../lookup";
 
 export function LookupValueCell({
   value,
