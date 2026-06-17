@@ -5,7 +5,11 @@ import type {
 } from "@sapporta/shared/contracts";
 import type { ColId, ColumnSchema as GridColumnSchema } from "@sapporta/grid";
 import { ExpandCell } from "@sapporta/grid";
-import { columnPreset, type ColumnWidth } from "@sapporta/grid/column-preset";
+import {
+  columnPreset,
+  columnPresetWidthForSizing,
+  type ColumnWidth,
+} from "@sapporta/grid/column-preset";
 import { inferDisplayType, type DisplayType } from "@/table/model/column-types";
 import type { TableForeignKeyLookupBundle } from "@/table/lookup/table-lookup-registry";
 import type { TableColumnName } from "./tgrid-types";
@@ -171,17 +175,7 @@ function columnFor(
 export function tableColumnPresetWidth(
   column: TableColumnSchema,
 ): ColumnWidth | undefined {
-  if (column.width != null) {
-    return { track: `calc(${column.width}ch + 1rem)` };
-  }
-  if (column.minWidth != null || column.maxWidth != null) {
-    const min =
-      column.minWidth != null ? `calc(${column.minWidth}ch + 1rem)` : "0";
-    const max =
-      column.maxWidth != null ? `calc(${column.maxWidth}ch + 1rem)` : "1fr";
-    return { track: `minmax(${min}, ${max})` };
-  }
-  return undefined;
+  return columnPresetWidthForSizing(column);
 }
 
 function tgridTableColumnMetaOf(

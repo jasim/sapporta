@@ -6,6 +6,7 @@ import { TextCell } from "./cells/TextCell";
 import { StaticSearchLookup, StaticValueLookup } from "../lookup";
 import {
   foreignKey,
+  columnPresetWidthForSizing,
   columnPreset,
   identifier,
   kind,
@@ -163,6 +164,16 @@ describe("columnPreset columns", () => {
       : null;
     expect(className).toEqual(expect.stringContaining("textCell"));
     expect(className).not.toEqual(expect.stringContaining("multiLineTextCell"));
+  });
+
+  it("converts character sizing hints to preset width tracks", () => {
+    expect(columnPresetWidthForSizing({ width: 12 })).toEqual({
+      track: "calc(12ch + 1rem)",
+    });
+    expect(columnPresetWidthForSizing({ minWidth: 8, maxWidth: 20 })).toEqual({
+      track: "minmax(calc(8ch + 1rem), calc(20ch + 1rem))",
+    });
+    expect(columnPresetWidthForSizing({})).toBeUndefined();
   });
 
   it("lookupValue and foreignKey store lookup capabilities", () => {

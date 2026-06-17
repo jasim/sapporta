@@ -117,6 +117,39 @@ export type LevelRow =
       source: PhantomRow;
     };
 
+export type TreeBackedLevelRow = Extract<
+  LevelRow,
+  { kind: "data" | "rollup" | "opening" | "closing" | "subtotal" }
+>;
+
+export type FooterLevelRow = Extract<LevelRow, { kind: "footer" }>;
+
+export function isTreeBackedRow(row: LevelRow): row is TreeBackedLevelRow {
+  switch (row.kind) {
+    case "data":
+    case "rollup":
+    case "opening":
+    case "closing":
+    case "subtotal":
+      return true;
+    case "footer":
+    case "phantom":
+      return false;
+  }
+}
+
+export function treeNodeForRow(row: LevelRow): TreeNode | null {
+  return isTreeBackedRow(row) ? row.source : null;
+}
+
+export function isFooterRow(row: LevelRow): row is FooterLevelRow {
+  return row.kind === "footer";
+}
+
+export function footerSourceForRow(row: LevelRow): FooterRow | null {
+  return isFooterRow(row) ? row.source : null;
+}
+
 export type DisplayedRowRef = {
   id: RowId;
   kind: LevelRowKind;

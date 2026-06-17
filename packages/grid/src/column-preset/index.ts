@@ -30,5 +30,9 @@ export type * from "./runtime";
 export type * from "./types";
 export { normalizeOptions } from "./lookup";
 export { trackForColumn, templateColumns } from "./width";
+export {
+  columnPresetWidthForSizing,
+  type CharacterColumnSizing,
+} from "./sizing";
 export { chrome } from "./header/chrome";
 export { ColumnPresetHeader } from "./header/ColumnPresetHeader";

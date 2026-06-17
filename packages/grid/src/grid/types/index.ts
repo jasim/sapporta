@@ -7,10 +7,13 @@ export type {
   RowId,
   Coord,
   CellCursor,
+  PathEdge,
+  PathDecomposition,
 } from "./identity";
 export {
   rootPath,
   childPath,
+  decomposePath,
   trailingEdge,
   parseChildPath,
   makeRowId,
@@ -40,6 +43,8 @@ export type {
   LevelOptions,
   LevelRow,
   LevelRowKind,
+  TreeBackedLevelRow,
+  FooterLevelRow,
   FooterRow,
   PhantomRow,
   PhantomRowState,
@@ -47,6 +52,12 @@ export type {
   DisplayedRowRef,
   DisplayedRowSequence,
   DisplayedRows,
+} from "./level-row";
+export {
+  isTreeBackedRow,
+  treeNodeForRow,
+  isFooterRow,
+  footerSourceForRow,
 } from "./level-row";
 
 export type { RowCapabilities } from "./capabilities";

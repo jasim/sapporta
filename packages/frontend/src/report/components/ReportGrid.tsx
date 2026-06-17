@@ -4,6 +4,7 @@ import {
   childPath,
   createGridRuntime,
   ExpandCell,
+  footerSourceForRow,
   GridLevel,
   GridRuntimeProvider,
   inMemoryGridDataSource,
@@ -17,10 +18,12 @@ import {
   type GridLevelChrome,
   type GridRuntime,
   type InMemoryLevelOpts,
-  type LevelRow,
   type TreeNode,
 } from "@sapporta/grid";
-import { columnPreset, type ColumnWidth } from "@sapporta/grid/column-preset";
+import {
+  columnPreset,
+  columnPresetWidthForSizing,
+} from "@sapporta/grid/column-preset";
 import type {
   GridDataset,
   GridDatasetColumn,
@@ -28,6 +31,10 @@ import type {
   GridDatasetNode,
 } from "@sapporta/shared/grid-dataset";
 import { cn } from "@sapporta/ui";
+import {
+  gridDatasetAncestorsForPath,
+  gridDatasetNodeForRow,
+} from "@/grid-dataset/path";
 import "./ReportGrid.css";
 
 export type ReportGridLink = {
@@ -258,7 +265,7 @@ function gridColumnForDatasetColumn<TInput>({
   const options = {
     id: column.id,
     name: column.label,
-    width: widthForColumn(column),
+    width: columnPresetWidthForSizing(column),
     editable: false,
     sortable: column.sortable ?? true,
     editTriggers: [],
@@ -332,12 +339,14 @@ function renderReportCell<TInput>({
 }): ReactNode {
   const levelName =
     trailingEdge(props.path)?.childLevelName ?? dataset.rootLevel;
-  const footerRow = footerRowFor(props.row);
+  const footerRow = footerSourceForRow(props.row);
   const footerLinks = footerRow
     ? (links?.[levelName]?.footer?.({ dataset, footerRow, input }) ?? [])
     : [];
-  const node = nodeForRow(props.row);
-  const ancestors = node ? ancestorsForPath(dataset, props.path) : [];
+  const node = gridDatasetNodeForRow(props.row);
+  const ancestors = node
+    ? gridDatasetAncestorsForPath(dataset, props.path)
+    : [];
   const rowLinks = node
     ? (links?.[levelName]?.row?.({
         dataset,
@@ -372,60 +381,4 @@ function renderReportCell<TInput>({
       {content}
     </a>
   );
-}
-
-function widthForColumn(column: GridDatasetColumn): ColumnWidth | undefined {
-  if (column.width) return { track: `${column.width}ch` };
-  if (column.minWidth || column.maxWidth) {
-    const min = column.minWidth ? column.minWidth * 8 : undefined;
-    const max = column.maxWidth ? column.maxWidth * 8 : undefined;
-    return { min, max };
-  }
-  return undefined;
-}
-
-function footerRowFor(row: LevelRow): GridDatasetFooterRow | null {
-  if (row.kind !== "footer") return null;
-  return row.source;
-}
-
-function nodeForRow(row: LevelRow): GridDatasetNode | null {
-  if (row.kind === "footer" || row.kind === "phantom") return null;
-  return row.source as GridDatasetNode;
-}
-
-function ancestorsForPath(
-  dataset: GridDataset,
-  path: GridPath,
-): GridDatasetNode[] {
-  const edges = edgesForPath(path);
-  const ancestors: GridDatasetNode[] = [];
-  let nodes: GridDatasetNode[] = dataset.nodes;
-
-  for (const edge of edges) {
-    const parent = nodes.find((node) => node.rowKey === edge.parentRowKey);
-    if (!parent) return ancestors;
-    ancestors.push(parent);
-    nodes = parent.children?.[edge.childLevelName] ?? [];
-  }
-
-  return ancestors;
-}
-
-function edgesForPath(path: GridPath): Array<{
-  parentRowKey: string;
-  childLevelName: string;
-}> {
-  const reversed: Array<{ parentRowKey: string; childLevelName: string }> = [];
-  let cursor = path;
-  let edge = trailingEdge(cursor);
-  while (edge) {
-    reversed.push({
-      parentRowKey: edge.parentRowKey,
-      childLevelName: edge.childLevelName,
-    });
-    cursor = edge.parentPath;
-    edge = trailingEdge(cursor);
-  }
-  return reversed.reverse();
 }
