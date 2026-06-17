@@ -201,6 +201,9 @@ describe("renderScaffoldFiles", () => {
       "Please read the instructions in AGENTS.md.\n",
     );
     expect(byDest.has("packages/shared/AGENTS.md")).toBe(true);
+    expect(byDest.get("packages/shared/package.json")).toMatch(
+      /"@sapporta\/shared": "\^?\d+\.\d+\.\d+"/,
+    );
     expect(byDest.get("package.json")).toContain('"name": "Acme App"');
     expect(byDest.get(".env.development")).toMatch(
       /BETTER_AUTH_SECRET=[A-Za-z0-9_-]{43}/,
@@ -232,6 +235,21 @@ describe("renderScaffoldFiles", () => {
     for (const file of files) {
       expect(file.content, file.dest).not.toMatch(unresolvedToken);
     }
+  });
+
+  it("renders shared library dependency for dev-root scaffolds", () => {
+    const project = layoutForRoot(
+      projectIdentityFromOptions({
+        dir: "/tmp/acme-app",
+        name: "Acme App",
+      }),
+    );
+    const files = renderScaffoldFiles(project, process.cwd());
+    const byDest = new Map(files.map((file) => [file.dest, file.content]));
+
+    expect(byDest.get("packages/shared/package.json")).toContain(
+      `"@sapporta/shared": "link://${process.cwd()}/packages/shared"`,
+    );
   });
 });
 

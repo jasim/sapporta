@@ -34,10 +34,11 @@ silently when one side changes:
 
 ## Allowed runtime dependencies
 
-Only `zod`, `@sapporta/rest-core`, and `@js-temporal/polyfill`. They are
-pure-TypeScript with no I/O and no runtime side effects, and they're
-required for the contract-as-shared-source-of-truth pattern. Do not add
-other runtime deps without revisiting the leaf-package boundary above.
+Only `zod`, `@sapporta/rest-core`, `@sapporta/shared`, and
+`@js-temporal/polyfill`. They are pure-TypeScript with no I/O and no runtime
+side effects, and they're required for the contract-as-shared-source-of-truth
+pattern. Do not add other runtime deps without revisiting the leaf-package
+boundary above.
 
 Use Temporal for all time and date work. Do not use `Date`, `dayjs`, or
 `date-fns` for parsing, arithmetic, comparison, or formatting.

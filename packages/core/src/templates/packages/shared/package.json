@@ -19,6 +19,7 @@
   "dependencies": {
     "@js-temporal/polyfill": "%%SAPPORTA:TEMPORAL_VERSION%%",
     "@sapporta/rest-core": "%%SAPPORTA:SAPPORTA_REST_CORE_VERSION%%",
+    "@sapporta/shared": "%%SAPPORTA:SHARED_SPEC%%",
     "zod": "%%SAPPORTA:ZOD_VERSION%%"
   },
   "devDependencies": {
