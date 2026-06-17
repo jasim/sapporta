@@ -1,11 +1,17 @@
 export {
   ReportGrid,
   ReportGridDataset,
+  ReportGridView,
+  createReportGridSession,
+  useReportGridSession,
+  type CreateReportGridSessionArgs,
   type ReportGridFooterLinkContext,
   type ReportGridDatasetProps,
   type ReportGridLink,
   type ReportGridLinkContext,
   type ReportGridLinkResolvers,
+  type ReportGridProps,
+  type ReportGridSession,
 } from "./components/ReportGrid";
 export {
   ReportSummaryStats,

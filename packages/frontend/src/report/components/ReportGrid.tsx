@@ -1,4 +1,4 @@
-import { useEffect, useMemo, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import {
   CELL_GRID_WITH_ACTIVE_ROW,
   childPath,
@@ -69,13 +69,24 @@ export type ReportGridLinkResolvers<TInput = unknown> = Record<
       string,
       (context: ReportGridLinkContext<TInput>) => ReportGridLink[]
     >;
-    footer?: (
-      context: ReportGridFooterLinkContext<TInput>,
-    ) => ReportGridLink[];
+    footer?: (context: ReportGridFooterLinkContext<TInput>) => ReportGridLink[];
   }
 >;
 
-interface ReportGridProps<TInput = unknown> {
+export type ReportGridSession = {
+  dataset: GridDataset;
+  runtime: GridRuntime;
+  root: GridPath;
+  dispose(): void;
+};
+
+export type CreateReportGridSessionArgs<TInput = unknown> = {
+  dataset: GridDataset;
+  links?: ReportGridLinkResolvers<TInput>;
+  input?: TInput;
+};
+
+export interface ReportGridProps<TInput = unknown> {
   dataset: GridDataset;
   links?: ReportGridLinkResolvers<TInput>;
   input?: TInput;
@@ -86,23 +97,72 @@ export function ReportGrid<TInput = unknown>({
   links,
   input,
 }: ReportGridProps<TInput>) {
-  const model = useMemo(
-    () => buildReportGridModel(dataset, links, input),
-    [dataset, links, input],
+  const session = useReportGridSession({ dataset, links, input });
+
+  if (!session) {
+    return (
+      <div className="sapporta-report-tgrid min-w-full text-sap-muted">
+        Loading report...
+      </div>
+    );
+  }
+
+  return <ReportGridView session={session} />;
+}
+
+export function useReportGridSession<TInput = unknown>({
+  dataset,
+  links,
+  input,
+}: CreateReportGridSessionArgs<TInput>): ReportGridSession | null {
+  const [session, setSession] = useState<ReportGridSession | null>(null);
+
+  useEffect(() => {
+    const next = createReportGridSession({ dataset, links, input });
+    setSession(next);
+    return () => {
+      next.dispose();
+      setSession((current) => (current === next ? null : current));
+    };
+  }, [dataset, links, input]);
+
+  return session;
+}
+
+export function createReportGridSession<TInput = unknown>({
+  dataset,
+  links,
+  input,
+}: CreateReportGridSessionArgs<TInput>): ReportGridSession {
+  const model = buildReportGridModel(dataset, links, input);
+  const runtime = createGridRuntime({
+    schema: model.schema,
+    dataSource: model.dataSource,
+    interaction: CELL_GRID_WITH_ACTIVE_ROW,
+  });
+  expandDefaultReportRows(runtime, dataset);
+  return {
+    dataset,
+    runtime,
+    root: rootPath(dataset.rootLevel),
+    dispose: () => runtime.dispose(),
+  };
+}
+
+export function ReportGridView({ session }: { session: ReportGridSession }) {
+  const chrome = useReportGridChrome();
+
+  return (
+    <div className="sapporta-report-tgrid min-w-full">
+      <GridRuntimeProvider runtime={session.runtime}>
+        <GridLevel path={session.root} chrome={chrome} presentation="tabular" />
+      </GridRuntimeProvider>
+    </div>
   );
-  const runtime = useMemo(
-    () => {
-      const next = createGridRuntime({
-        schema: model.schema,
-        dataSource: model.dataSource,
-        interaction: CELL_GRID_WITH_ACTIVE_ROW,
-      });
-      expandDefaultReportRows(next, dataset);
-      return next;
-    },
-    [model],
-  );
-  const chrome = useMemo<GridLevelChrome>(() => {
+}
+
+function useReportGridChrome(): GridLevelChrome {
+  return useMemo<GridLevelChrome>(() => {
     const base = columnPreset.chrome();
     return {
       ...base,
@@ -115,20 +175,6 @@ export function ReportGrid<TInput = unknown>({
       renderLevelHeader: base.renderLevelHeader,
     };
   }, []);
-
-  useEffect(() => () => runtime.dispose(), [runtime]);
-
-  return (
-    <div className="sapporta-report-tgrid min-w-full">
-      <GridRuntimeProvider runtime={runtime}>
-        <GridLevel
-          path={rootPath(dataset.rootLevel)}
-          chrome={chrome}
-          presentation="tabular"
-        />
-      </GridRuntimeProvider>
-    </div>
-  );
 }
 
 export interface ReportGridDatasetProps<TInput = unknown> {
