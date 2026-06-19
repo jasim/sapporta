@@ -19,7 +19,7 @@ Project-local install:
 
 ```bash
 npm install -D sapporta
-npm exec sapporta -- check
+npm exec sapporta -- describe
 ```
 
 The package is intentionally thin. It provides the `sapporta` executable and delegates command behavior to `@sapporta/server`.

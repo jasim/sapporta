@@ -83,7 +83,7 @@ The public CLI package is `sapporta`. `@sapporta/server` keeps the command imple
 
 The CLI exposes resource-centered commands and routes all data commands through the HTTP API server. The CLI is a regular API consumer, not a privileged path.
 
-**Requires a running server** (`pnpm dev` or `pnpm start` from the project) for all API commands, including project management (project list/add/remove). Local commands (init, check, describe) work without a server.
+**Requires a running server** (`pnpm dev` or `pnpm start` from the project) for API-backed commands. `init` works without a server.
 
 ### CLI Self-Introspection
 

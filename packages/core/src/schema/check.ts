@@ -8,10 +8,25 @@ export type SchemaIssue = {
   message: string;
 };
 
+export class SchemaValidationError extends Error {
+  public readonly issues: readonly SchemaIssue[];
+
+  constructor(issues: readonly SchemaIssue[]) {
+    super(
+      `Schema validation failed: ${issues
+        .map((issue) => `${issue.table}.${issue.column}: ${issue.message}`)
+        .join("; ")}`,
+    );
+    this.name = "SchemaValidationError";
+    this.issues = issues;
+  }
+}
+
 /**
- * Check schema definitions for nullable numeric columns that should be NOT NULL.
+ * Fails boot when schema definitions use column shapes Sapporta cannot safely
+ * serve over its generated APIs.
  *
- * Three categories of nullable numeric columns:
+ * Nullable numeric columns fall into three categories:
  *
  * 1. **FK columns** (e.g. `parent_id`) — nullable because the relationship is
  *    optional. Never aggregated. Auto-detected from Drizzle foreign key metadata.
@@ -26,7 +41,7 @@ export type SchemaIssue = {
  * This checker flags category 2 — nullable numerics that are not FK columns and
  * not explicitly marked as non-additive.
  */
-export function checkSchemaDefinitions(tables: TableDef[]): SchemaIssue[] {
+export function assertSchemaDefinitions(tables: readonly TableDef[]): void {
   const issues: SchemaIssue[] = [];
 
   for (const table of tables) {
@@ -86,5 +101,7 @@ export function checkSchemaDefinitions(tables: TableDef[]): SchemaIssue[] {
     }
   }
 
-  return issues;
+  if (issues.length > 0) {
+    throw new SchemaValidationError(issues);
+  }
 }

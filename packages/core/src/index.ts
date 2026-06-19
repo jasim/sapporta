@@ -35,6 +35,13 @@ export type {
 export { loadSchemas } from "./schema/loader.js";
 export type { SchemaLoadResult } from "./schema/loader.js";
 
+// Schema validation
+export {
+  assertSchemaDefinitions,
+  SchemaValidationError,
+} from "./schema/check.js";
+export type { SchemaIssue } from "./schema/check.js";
+
 // Migration readiness
 export { assertMigrationsReady } from "./migrations/guard.js";
 

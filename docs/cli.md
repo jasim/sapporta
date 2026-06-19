@@ -1,15 +1,14 @@
 # Sapporta CLI
 
-The Sapporta CLI can validate local project files and call a running Sapporta
-app. Use it to inspect the app's API, work with tables, and run data commands
-against the same built-in routes your users call from the browser.
+The Sapporta CLI creates projects and calls a running Sapporta app. Use it to
+inspect the app's API, work with tables, and run data commands against the same
+built-in routes your users call from the browser.
 
 ## Local Commands
 
 These commands read local project files and do not need a running server:
 
 ```bash
-pnpm exec sapporta check
 pnpm exec sapporta init my-app
 ```
 

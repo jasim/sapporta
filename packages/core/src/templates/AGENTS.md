@@ -9,7 +9,6 @@ APIs, auth-aware row access, and a React app shell.
 - `pnpm dev` starts the API and frontend in watch mode.
 - `pnpm build` compiles the shared package, API, and frontend.
 - `pnpm start` runs the production server after `pnpm build`.
-- `pnpm exec sapporta check` validates local project files.
 - `pnpm exec sapporta describe` inspects the running API.
 
 Prefer the project-local CLI form: `pnpm exec sapporta ...`.
@@ -34,7 +33,8 @@ pnpm --filter ./packages/api db:check
 ```
 
 Review generated SQL before applying it. The server checks migration readiness at
-startup but does not apply migrations automatically.
+startup, validates table definitions, and does not apply migrations
+automatically.
 
 ## Backend routes
 

@@ -2,7 +2,7 @@
 
 ## After Modifying Schema, Reports, or Actions
 
-Always run `sapporta check` after creating or modifying files in a project's `schema/`, `reports/`, or `actions/` directories. Fix all issues before considering work complete.
+After creating or modifying project schema files, run the app's normal build, migration generation/check flow, and startup path. Sapporta validates table definitions at server boot.
 
 When creating or modifying reports, schemas, or actions, invoke the `/sapporta` skill to get specialist guidance and ensure all validation steps are followed.
 

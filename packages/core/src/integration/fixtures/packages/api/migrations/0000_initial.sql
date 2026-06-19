@@ -2,7 +2,7 @@ CREATE TABLE `accounts` (
   `id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
   `name` text NOT NULL,
   `type` text NOT NULL,
-  `balance` integer,
+  `balance` integer DEFAULT 0 NOT NULL,
   `workspace_id` text NOT NULL,
   `created_at` text,
   `updated_at` text

@@ -1,7 +1,6 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { Command } from "commander";
-import { check } from "./check.js";
 import { init } from "./init.js";
 import { describeAll, describeOne } from "./describe.js";
 import { ROUTES, registerRoutes } from "./routes.js";
@@ -110,20 +109,8 @@ async function main() {
     return;
   }
 
-  // ── Local commands (no server needed) ────────────────────────────────
+  // ── Commands intercepted before Commander runs ──────────────────────
   // Intercepted before Commander runs — these handle their own flag parsing.
-
-  if (firstArg === "check") {
-    const format: OutputFormat = "table";
-    try {
-      const result = await check(rawArgs.slice(1));
-      emitResult(result, format);
-      if (result.ok && result.meta?.hasIssues) process.exit(1);
-    } catch (err: any) {
-      handleError(err, format);
-    }
-    return;
-  }
 
   if (firstArg === "init") {
     const format: OutputFormat = "table";
@@ -199,8 +186,8 @@ async function main() {
     "after",
     `
 Local commands (no server required):
-  check                                Validate project definitions
   init <name>                          Create a new project directory
+API discovery:
   describe [route]                     List endpoints or describe one`,
   );
 
