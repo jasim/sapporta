@@ -22,6 +22,7 @@ export const articles = table({
   meta: {
     label: "Articles",
     rowScope: "workspaceUserScoped",
+    rowLabelColumns: ["title"],
     selects: [
       {
         type: "select",

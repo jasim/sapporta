@@ -13,6 +13,7 @@ const sampleTable = table({
   drizzle: sqliteTable("sample", {
     id: integer("id").primaryKey({ autoIncrement: true }),
   }),
+  meta: { rowLabelColumns: ["id"] },
 });
 
 describe("assertMigrationsReady", () => {

@@ -18,6 +18,7 @@ const ordersTable: TableSchema = {
   name: "orders",
   label: "Orders",
   immutable: false,
+  rowLabelColumns: ["customer"],
   columns: [
     { name: "id", label: "ID", primary: true, kind: "number" },
     { name: "customer", label: "Customer", kind: "text" },

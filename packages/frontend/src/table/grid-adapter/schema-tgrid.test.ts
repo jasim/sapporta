@@ -7,6 +7,7 @@ const ordersTable: TableSchema = {
   name: "orders",
   label: "Orders",
   immutable: false,
+  rowLabelColumns: ["customer"],
   columns: [
     { name: "id", label: "ID", primary: true, kind: "number" },
     { name: "customer", label: "Customer", kind: "text" },
@@ -26,6 +27,7 @@ const linesTable: TableSchema = {
   name: "order_lines",
   label: "Order lines",
   immutable: false,
+  rowLabelColumns: ["line_no"],
   columns: [
     { name: "id", label: "ID", primary: true, kind: "number" },
     { name: "order_id", label: "Order", kind: "number" },

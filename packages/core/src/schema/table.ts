@@ -107,10 +107,8 @@ export interface SapportaMeta {
   label: string;
   /** Columns whose values build a row's human-readable label — used in FK
    *  dropdowns, lookup responses, and anywhere a row is referenced rather
-   *  than displayed in full. Multiple columns are concatenated with a space.
-   *  When unset, a heuristic picks the first text column that is neither
-   *  the PK nor an FK. */
-  rowLabelColumns?: string[];
+   *  than displayed in full. Multiple columns are concatenated with a space. */
+  rowLabelColumns: readonly [string, ...string[]];
   /** Select/enum columns */
   selects: SelectMeta[];
   /** Whether records are immutable (no update/delete) */
@@ -186,8 +184,8 @@ export interface TableDef {
 export interface TableOptions {
   /** The Drizzle sqliteTable definition */
   drizzle: SQLiteTableWithColumns<any>;
-  /** Optional sapporta metadata */
-  meta?: SapportaTableInputMeta;
+  /** Sapporta metadata */
+  meta: SapportaTableInputMeta;
 }
 
 const AUTO_MANAGED_TIMESTAMP_COLUMN_NAMES = new Set([
@@ -202,10 +200,25 @@ export function isAutoManagedTimestampColumn(name: string): boolean {
 function normalizeSapportaMeta(
   sqlName: string,
   columnNames: readonly string[],
-  input: SapportaTableInputMeta | undefined,
+  input: SapportaTableInputMeta,
   factoryColumns: ReadonlyMap<string, FactoryColumnMeta>,
 ): SapportaMeta {
-  const userColumns = input?.columns ?? {};
+  if (input.rowLabelColumns.length === 0) {
+    throw new Error(
+      `Table "${sqlName}" must declare at least one row label column.`,
+    );
+  }
+
+  const knownColumns = new Set(columnNames);
+  for (const name of input.rowLabelColumns) {
+    if (!knownColumns.has(name)) {
+      throw new Error(
+        `Table "${sqlName}" rowLabelColumns includes unknown column "${name}".`,
+      );
+    }
+  }
+
+  const userColumns = input.columns ?? {};
   const columns: Record<string, ColumnMeta> = {};
 
   for (const name of columnNames) {
@@ -223,12 +236,12 @@ function normalizeSapportaMeta(
 
   return {
     ...input,
-    label: input?.label ?? sqlName,
-    selects: input?.selects ?? [],
-    immutable: input?.immutable ?? false,
-    rowScope: input?.rowScope ?? "workspaceUserScoped",
-    references: input?.references ?? {},
-    children: input?.children ?? [],
+    label: input.label ?? sqlName,
+    selects: input.selects ?? [],
+    immutable: input.immutable ?? false,
+    rowScope: input.rowScope ?? "workspaceUserScoped",
+    references: input.references ?? {},
+    children: input.children ?? [],
     columns,
   };
 }
@@ -240,7 +253,7 @@ function normalizeSapportaMeta(
  * ```ts
  * const accounts = table({
  *   drizzle: sqliteTable("accounts", { ... }),
- *   meta: { label: "Accounts" }
+ *   meta: { label: "Accounts", rowLabelColumns: ["name"] }
  * });
  * ```
  */

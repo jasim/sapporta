@@ -11,15 +11,15 @@ const accountsTable = sqliteTable("accounts", {
 
 const accounts = table({
   drizzle: accountsTable,
-  meta: { label: "Accounts" },
+  meta: { label: "Accounts", rowLabelColumns: ["name"] },
 });
 
 describe("findRowLabelColumns", () => {
-  it("returns first text non-PK column", () => {
+  it("returns declared row label columns", () => {
     expect(findRowLabelColumns(accounts)).toEqual(["name"]);
   });
 
-  it("skips FK columns", () => {
+  it("supports FK tables when a semantic label column is declared", () => {
     const invoicesTable = sqliteTable("invoices", {
       id: integer("id").primaryKey({ autoIncrement: true }),
       account_id: integer("account_id")
@@ -27,17 +27,23 @@ describe("findRowLabelColumns", () => {
         .references(() => accountsTable.id),
       description: text("description").notNull(),
     });
-    const invoices = table({ drizzle: invoicesTable, meta: {} });
+    const invoices = table({
+      drizzle: invoicesTable,
+      meta: { rowLabelColumns: ["description"] },
+    });
     expect(findRowLabelColumns(invoices)).toEqual(["description"]);
   });
 
-  it("returns null when no text column exists", () => {
+  it("allows minimal tables to declare their primary key as the label", () => {
     const numbersTable = sqliteTable("numbers", {
       id: integer("id").primaryKey({ autoIncrement: true }),
       value: integer("value").notNull(),
     });
-    const numbers = table({ drizzle: numbersTable, meta: {} });
-    expect(findRowLabelColumns(numbers)).toBeNull();
+    const numbers = table({
+      drizzle: numbersTable,
+      meta: { rowLabelColumns: ["id"] },
+    });
+    expect(findRowLabelColumns(numbers)).toEqual(["id"]);
   });
 
   it("honors meta.rowLabelColumns override", () => {
@@ -70,5 +76,18 @@ describe("rowLabeller", () => {
     expect(label({ id: 1, first_name: "Ada", last_name: "Lovelace" })).toBe(
       "Ada Lovelace",
     );
+  });
+
+  it("falls back to the primary key when declared label values are empty", () => {
+    const peopleTable = sqliteTable("empty_label_people", {
+      id: integer("id").primaryKey({ autoIncrement: true }),
+      name: text("name"),
+    });
+    const people = table({
+      drizzle: peopleTable,
+      meta: { rowLabelColumns: ["name"] },
+    });
+
+    expect(rowLabeller(people).label({ id: 42, name: "" })).toBe("42");
   });
 });

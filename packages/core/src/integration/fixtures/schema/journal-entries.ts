@@ -21,6 +21,7 @@ export const journalEntries = table({
   meta: {
     label: "Journal Entries",
     rowScope: "workspaceUserScoped",
+    rowLabelColumns: ["description"],
     references: {
       account_id: { table: "accounts", column: "id" },
     },

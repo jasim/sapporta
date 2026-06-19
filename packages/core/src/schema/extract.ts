@@ -106,10 +106,10 @@ export function extractSchemas(defs: readonly TableDef[]): TableSchema[] {
       return colSchema;
     });
 
-    // Parent PK — needed to synthesize row-level drill-into links and as the
-    // guaranteed row-label fallback for tables without a text label column.
+    // Parent PK — needed to synthesize row-level drill-into links. Row-label
+    // columns are declared in table metadata so references display useful text.
     const parentPkName = findPkColumn(schema).name;
-    const rowLabelColumns = findRowLabelColumns(schema) ?? [parentPkName];
+    const rowLabelColumns = [...findRowLabelColumns(schema)];
 
     // Resolve children
     const children: ChildSchema[] = [];

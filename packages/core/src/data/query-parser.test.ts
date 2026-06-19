@@ -26,18 +26,24 @@ const ordersTable = sqliteTable("orders", {
   created_at: timestamp("created_at").notNull(),
 });
 
-const orders = table({ drizzle: ordersTable });
+const orders = table({
+  drizzle: ordersTable,
+  meta: { rowLabelColumns: ["customer"] },
+});
 const searchableOrders = table({
   drizzle: ordersTable,
-  meta: { search: { columns: ["customer", "status"] } },
+  meta: {
+    rowLabelColumns: ["customer"],
+    search: { columns: ["customer", "status"] },
+  },
 });
 const singleSearchOrders = table({
   drizzle: ordersTable,
-  meta: { search: { columns: ["customer"] } },
+  meta: { rowLabelColumns: ["customer"], search: { columns: ["customer"] } },
 });
 const badSearchTable = table({
   drizzle: ordersTable,
-  meta: { search: { columns: ["nope"] } },
+  meta: { rowLabelColumns: ["customer"], search: { columns: ["nope"] } },
 });
 
 describe("parseQuery()", () => {

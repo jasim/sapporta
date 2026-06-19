@@ -9,7 +9,11 @@ export const agentsTable = sqliteTable("agents", {
 
 export const agents = table({
   drizzle: agentsTable,
-  meta: { label: "Agents", rowScope: "workspaceGlobal" },
+  meta: {
+    label: "Agents",
+    rowScope: "workspaceGlobal",
+    rowLabelColumns: ["name"],
+  },
 });
 
 export default agents;

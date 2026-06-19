@@ -15,6 +15,7 @@ const accountsTable = sqliteTable("accounts", {
 const accounts = table({
   drizzle: accountsTable,
   meta: {
+    rowLabelColumns: ["name"],
     selects: [
       {
         type: "select",

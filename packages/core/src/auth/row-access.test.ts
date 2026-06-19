@@ -92,15 +92,15 @@ const systemRowsTable = sqliteTable("system_rows", {
 
 const userRows = table({
   drizzle: userRowsTable,
-  meta: { rowScope: "workspaceUserScoped" },
+  meta: { rowScope: "workspaceUserScoped", rowLabelColumns: ["label"] },
 });
 const workspaceRows = table({
   drizzle: workspaceRowsTable,
-  meta: { rowScope: "workspaceGlobal" },
+  meta: { rowScope: "workspaceGlobal", rowLabelColumns: ["label"] },
 });
 const systemRows = table({
   drizzle: systemRowsTable,
-  meta: { rowScope: "systemGlobal" },
+  meta: { rowScope: "systemGlobal", rowLabelColumns: ["label"] },
 });
 
 describe("row access predicates", () => {
@@ -261,7 +261,7 @@ describe("foreign-key auth validation", () => {
       workspace_id: text("workspace_id").notNull(),
       name: text("name").notNull(),
     }),
-    meta: { rowScope: "workspaceGlobal" },
+    meta: { rowScope: "workspaceGlobal", rowLabelColumns: ["name"] },
   });
   const privateDocs = table({
     drizzle: sqliteTable("private_docs", {
@@ -270,14 +270,14 @@ describe("foreign-key auth validation", () => {
       scoped_to_user_id: text("scoped_to_user_id").notNull(),
       title: text("title").notNull(),
     }),
-    meta: { rowScope: "workspaceUserScoped" },
+    meta: { rowScope: "workspaceUserScoped", rowLabelColumns: ["title"] },
   });
   const countries = table({
     drizzle: sqliteTable("countries", {
       id: text("id").primaryKey(),
       name: text("name").notNull(),
     }),
-    meta: { rowScope: "systemGlobal" },
+    meta: { rowScope: "systemGlobal", rowLabelColumns: ["name"] },
   });
 
   it("rejects cross-workspace FK values", async () => {
@@ -290,6 +290,7 @@ describe("foreign-key auth validation", () => {
       }),
       meta: {
         rowScope: "workspaceUserScoped",
+        rowLabelColumns: ["id"],
         references: { customer_id: { table: "customers" } },
       },
     });
@@ -316,6 +317,7 @@ describe("foreign-key auth validation", () => {
       }),
       meta: {
         rowScope: "workspaceUserScoped",
+        rowLabelColumns: ["id"],
         references: { doc_id: { table: "private_docs" } },
       },
     });
@@ -343,6 +345,7 @@ describe("foreign-key auth validation", () => {
       }),
       meta: {
         rowScope: "workspaceUserScoped",
+        rowLabelColumns: ["id"],
         references: {
           customer_id: { table: "customers" },
           country_id: { table: "countries" },
@@ -372,6 +375,7 @@ describe("foreign-key auth validation", () => {
       }),
       meta: {
         rowScope: "workspaceUserScoped",
+        rowLabelColumns: ["id"],
         references: { country_id: { table: "countries", clientCanSet: false } },
       },
     });
@@ -451,7 +455,7 @@ describe("row-security guards", () => {
       id: text("id").primaryKey(),
       name: text("name").notNull(),
     }),
-    meta: { rowScope: "systemGlobal" },
+    meta: { rowScope: "systemGlobal", rowLabelColumns: ["name"] },
   });
 
   const invoices = table({
@@ -461,7 +465,7 @@ describe("row-security guards", () => {
       scoped_to_user_id: text("scoped_to_user_id").notNull(),
       label: text("label").notNull(),
     }),
-    meta: { rowScope: "workspaceUserScoped" },
+    meta: { rowScope: "workspaceUserScoped", rowLabelColumns: ["label"] },
   });
 
   it("adds trusted ownership fields and rejects client ownership fields", () => {
@@ -548,6 +552,7 @@ describe("row-security guards", () => {
       }),
       meta: {
         rowScope: "workspaceUserScoped",
+        rowLabelColumns: ["id"],
         references: { country_id: { table: "countries", clientCanSet: false } },
       },
     });
@@ -573,6 +578,7 @@ describe("row-security guards", () => {
       }),
       meta: {
         rowScope: "workspaceUserScoped",
+        rowLabelColumns: ["id"],
         references: { invoice_id: { table: "invoices", clientCanSet: false } },
       },
     });

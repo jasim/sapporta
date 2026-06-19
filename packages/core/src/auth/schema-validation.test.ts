@@ -50,6 +50,7 @@ describe("auth schema validation", () => {
       drizzle: sqliteTable("accounts", {
         id: integer("id").primaryKey({ autoIncrement: true }),
       }),
+      meta: { rowLabelColumns: ["id"] },
     });
 
     const issues = checkAuthSchemaDefinitions([accounts]);
@@ -66,14 +67,14 @@ describe("auth schema validation", () => {
       drizzle: sqliteTable("customers", {
         id: integer("id").primaryKey({ autoIncrement: true }),
       }),
-      meta: { rowScope: "workspaceGlobal" },
+      meta: { rowScope: "workspaceGlobal", rowLabelColumns: ["id"] },
     });
     const workspaceUserScoped = table({
       drizzle: sqliteTable("orders", {
         id: integer("id").primaryKey({ autoIncrement: true }),
         workspace_id: text("workspace_id").notNull(),
       }),
-      meta: { rowScope: "workspaceUserScoped" },
+      meta: { rowScope: "workspaceUserScoped", rowLabelColumns: ["id"] },
     });
 
     const issues = checkAuthSchemaDefinitions([
@@ -92,7 +93,7 @@ describe("auth schema validation", () => {
       drizzle: sqliteTable("accounts", {
         id: integer("id").primaryKey({ autoIncrement: true }),
       }),
-      meta: { rowScope: "tenantScoped" as never },
+      meta: { rowScope: "tenantScoped" as never, rowLabelColumns: ["id"] },
     });
 
     const issues = checkAuthSchemaDefinitions([accounts]);
@@ -113,6 +114,7 @@ describe("auth schema validation", () => {
       }),
       meta: {
         rowScope: "workspaceUserScoped",
+        rowLabelColumns: ["id"],
         columns: { workspace_id: { clientEditable: true } },
       },
     });
@@ -130,20 +132,20 @@ describe("auth schema validation", () => {
         id: integer("id").primaryKey({ autoIncrement: true }),
         workspace_id: text("workspace_id").notNull(),
       }),
-      meta: { rowScope: "workspaceGlobal" },
+      meta: { rowScope: "workspaceGlobal", rowLabelColumns: ["id"] },
     });
     const userRows = table({
       drizzle: sqliteTable("user_rows", {
         id: integer("id").primaryKey({ autoIncrement: true }),
         ...scopedColumns(),
       }),
-      meta: { rowScope: "workspaceUserScoped" },
+      meta: { rowScope: "workspaceUserScoped", rowLabelColumns: ["id"] },
     });
     const systemRows = table({
       drizzle: sqliteTable("system_rows", {
         id: integer("id").primaryKey({ autoIncrement: true }),
       }),
-      meta: { rowScope: "systemGlobal" },
+      meta: { rowScope: "systemGlobal", rowLabelColumns: ["id"] },
     });
 
     expect(
@@ -163,11 +165,11 @@ describe("auth schema validation", () => {
     });
     const accounts = table({
       drizzle: accountsTable,
-      meta: { rowScope: "workspaceGlobal" },
+      meta: { rowScope: "workspaceGlobal", rowLabelColumns: ["id"] },
     });
     const invoices = table({
       drizzle: invoicesTable,
-      meta: { rowScope: "workspaceGlobal" },
+      meta: { rowScope: "workspaceGlobal", rowLabelColumns: ["id"] },
     });
 
     const result = resolveTableReferences(invoices, [accounts, invoices]);
@@ -189,7 +191,7 @@ describe("auth schema validation", () => {
         id: integer("id").primaryKey({ autoIncrement: true }),
         workspace_id: text("workspace_id").notNull(),
       }),
-      meta: { rowScope: "workspaceGlobal" },
+      meta: { rowScope: "workspaceGlobal", rowLabelColumns: ["id"] },
     });
     const invoices = table({
       drizzle: sqliteTable("invoices", {
@@ -199,6 +201,7 @@ describe("auth schema validation", () => {
       }),
       meta: {
         rowScope: "workspaceGlobal",
+        rowLabelColumns: ["id"],
         references: {
           account_id: { table: "accounts", column: "id", clientCanSet: false },
         },
@@ -226,6 +229,7 @@ describe("auth schema validation", () => {
       }),
       meta: {
         rowScope: "workspaceGlobal",
+        rowLabelColumns: ["id"],
         references: { account_id: { table: "accounts" } },
       },
     });
@@ -243,7 +247,7 @@ describe("auth schema validation", () => {
         id: integer("id").primaryKey({ autoIncrement: true }),
         workspace_id: text("workspace_id").notNull(),
       }),
-      meta: { rowScope: "workspaceGlobal" },
+      meta: { rowScope: "workspaceGlobal", rowLabelColumns: ["id"] },
     });
     const invoices = table({
       drizzle: sqliteTable("invoices", {
@@ -252,6 +256,7 @@ describe("auth schema validation", () => {
       }),
       meta: {
         rowScope: "workspaceGlobal",
+        rowLabelColumns: ["id"],
         references: { account_id: { table: "accounts" } },
       },
     });
@@ -276,7 +281,7 @@ describe("auth schema validation", () => {
         id: integer("id").primaryKey({ autoIncrement: true }),
         workspace_id: text("workspace_id").notNull(),
       }),
-      meta: { rowScope: "workspaceGlobal" },
+      meta: { rowScope: "workspaceGlobal", rowLabelColumns: ["id"] },
     });
     const invoicesTable = sqliteTable("invoices", {
       id: integer("id").primaryKey({ autoIncrement: true }),
@@ -285,12 +290,13 @@ describe("auth schema validation", () => {
     });
     const accounts = table({
       drizzle: accountsTable,
-      meta: { rowScope: "workspaceGlobal" },
+      meta: { rowScope: "workspaceGlobal", rowLabelColumns: ["id"] },
     });
     const invoices = table({
       drizzle: invoicesTable,
       meta: {
         rowScope: "workspaceGlobal",
+        rowLabelColumns: ["id"],
         references: { account_id: { table: "customers" } },
       },
     });
@@ -330,11 +336,11 @@ describe("auth schema validation", () => {
     );
     const headers = table({
       drizzle: orderHeaders,
-      meta: { rowScope: "workspaceGlobal" },
+      meta: { rowScope: "workspaceGlobal", rowLabelColumns: ["id"] },
     });
     const lines = table({
       drizzle: orderLines,
-      meta: { rowScope: "workspaceGlobal" },
+      meta: { rowScope: "workspaceGlobal", rowLabelColumns: ["id"] },
     });
 
     const result = resolveTableReferences(lines, [headers, lines]);
@@ -350,7 +356,7 @@ describe("auth schema validation", () => {
         id: integer("id").primaryKey({ autoIncrement: true }),
         workspace_id: text("workspace_id").notNull(),
       }),
-      meta: { rowScope: "workspaceGlobal" },
+      meta: { rowScope: "workspaceGlobal", rowLabelColumns: ["id"] },
     });
     const invoices = table({
       drizzle: sqliteTable("invoices", {
@@ -360,6 +366,7 @@ describe("auth schema validation", () => {
       }),
       meta: {
         rowScope: "workspaceGlobal",
+        rowLabelColumns: ["id"],
         references: { account_id: { table: "accounts", clientCanSet: false } },
       },
     });
@@ -393,7 +400,7 @@ describe("auth schema validation", () => {
     });
     const orders = table({
       drizzle: ordersTable,
-      meta: { rowScope: "workspaceUserScoped" },
+      meta: { rowScope: "workspaceUserScoped", rowLabelColumns: ["id"] },
     });
 
     const values = trustedInsertValuesForDataAuthority(dataAuthority, orders);

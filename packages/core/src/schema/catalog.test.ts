@@ -9,6 +9,7 @@ function makeTable(name: string) {
       id: integer("id").primaryKey({ autoIncrement: true }),
       name: text("name").notNull(),
     }),
+    meta: { rowLabelColumns: ["name"] },
   });
 }
 

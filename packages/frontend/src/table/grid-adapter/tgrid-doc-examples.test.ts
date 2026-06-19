@@ -52,6 +52,7 @@ const invoicesTable: TableSchema = {
   name: "invoices",
   label: "Invoices",
   immutable: false,
+  rowLabelColumns: ["customer_id"],
   columns: [
     { name: "id", label: "ID", kind: "text", primary: true },
     { name: "customer_id", label: "Customer", kind: "text" },
@@ -72,6 +73,7 @@ const invoiceItemsTable: TableSchema = {
   name: "invoice_items",
   label: "Invoice items",
   immutable: false,
+  rowLabelColumns: ["item_id"],
   columns: [
     { name: "id", label: "ID", kind: "text", primary: true },
     { name: "invoice_id", label: "Invoice", kind: "text" },

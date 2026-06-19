@@ -15,6 +15,7 @@ export const accounts = table({
   drizzle: accountsTable,
   meta: {
     label: "Accounts",
+    rowLabelColumns: ["name"],
     selects: [
       {
         type: "select",

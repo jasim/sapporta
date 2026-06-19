@@ -49,7 +49,7 @@ describe("strict calendar validity", () => {
     });
     const events_def = table({
       drizzle: events,
-      meta: { rowScope: "systemGlobal" },
+      meta: { rowScope: "systemGlobal", rowLabelColumns: ["occurred_on"] },
     });
 
     // Impossible date routed through the server's filter parse → 400.
@@ -96,7 +96,7 @@ describe("LIKE escaping — user wildcards match literally", () => {
   });
   const promos_def = table({
     drizzle: promos,
-    meta: { rowScope: "systemGlobal" },
+    meta: { rowScope: "systemGlobal", rowLabelColumns: ["name"] },
   });
 
   async function setup() {
@@ -151,7 +151,7 @@ describe("timestamp precision normalization", () => {
     });
     const events_def = table({
       drizzle: events,
-      meta: { rowScope: "systemGlobal" },
+      meta: { rowScope: "systemGlobal", rowLabelColumns: ["description"] },
     });
 
     const { db, sqlite } = createTestDb();

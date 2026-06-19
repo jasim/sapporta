@@ -110,7 +110,11 @@ describe("scopedRows", () => {
     });
     const ledger = table({
       drizzle: ledgerTable,
-      meta: { immutable: true, rowScope: "systemGlobal" },
+      meta: {
+        immutable: true,
+        rowScope: "systemGlobal",
+        rowLabelColumns: ["description"],
+      },
     });
 
     const { db, sqlite } = createTestDb();
@@ -143,7 +147,7 @@ describe("scopedRows", () => {
     });
     const documents = table({
       drizzle: documentsTable,
-      meta: { rowScope: "workspaceGlobal" },
+      meta: { rowScope: "workspaceGlobal", rowLabelColumns: ["title"] },
     });
 
     const { db, sqlite } = createTestDb();

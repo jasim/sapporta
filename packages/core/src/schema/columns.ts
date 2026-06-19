@@ -61,8 +61,8 @@ function register(name: string, meta: ColumnMeta): void {
  *
  *     const t1 = sqliteTable("a", { created_at: timestamp("created_at") });
  *     const t2 = sqliteTable("b", { created_at: timestamp("created_at") });
- *     const a = table({ drizzle: t1 });  // consumes only t1 metadata
- *     const b = table({ drizzle: t2 });  // t2 metadata remains queued
+ *     const a = table({ drizzle: t1, meta: { rowLabelColumns: ["created_at"] } });
+ *     const b = table({ drizzle: t2, meta: { rowLabelColumns: ["created_at"] } });
  *
  * Factories run synchronously while `sqliteTable(...)` builds its columns, so
  * a table's entries form a contiguous queue segment. The drain stops at the

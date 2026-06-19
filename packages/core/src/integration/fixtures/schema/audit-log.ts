@@ -15,7 +15,12 @@ export const auditLogTable = sqliteTable("audit_log", {
 
 export const auditLog = table({
   drizzle: auditLogTable,
-  meta: { label: "Audit Log", immutable: true, rowScope: "systemGlobal" },
+  meta: {
+    label: "Audit Log",
+    immutable: true,
+    rowScope: "systemGlobal",
+    rowLabelColumns: ["event"],
+  },
 });
 
 export default auditLog;

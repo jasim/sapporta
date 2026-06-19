@@ -26,6 +26,7 @@ const accounts = table({
     balance: integer("balance"),
   }),
   meta: {
+    rowLabelColumns: ["name"],
     selects: [
       { type: "select", column: "type", options: ["asset", "liability"] },
     ],
@@ -38,6 +39,7 @@ const txns = table({
     account_id: integer("account_id").notNull(),
     amount: integer("amount").notNull(),
   }),
+  meta: { rowLabelColumns: ["id"] },
 });
 
 const accountsWithChildren = table({

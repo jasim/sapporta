@@ -32,12 +32,12 @@ const orderLinesTable = sqliteTable("order_lines", {
 
 const orders = table({
   drizzle: ordersTable,
-  meta: { rowScope: "workspaceGlobal" },
+  meta: { rowScope: "workspaceGlobal", rowLabelColumns: ["label"] },
 });
 
 const orderLines = table({
   drizzle: orderLinesTable,
-  meta: { rowScope: "workspaceGlobal" },
+  meta: { rowScope: "workspaceGlobal", rowLabelColumns: ["description"] },
 });
 
 describe("makeAuthorizedTableHandlers", () => {

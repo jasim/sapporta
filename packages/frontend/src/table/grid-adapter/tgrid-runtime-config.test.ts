@@ -35,6 +35,7 @@ describe("compileTGridRuntimeConfig", () => {
     name: "orders",
     label: "Orders",
     immutable: false,
+    rowLabelColumns: ["customer"],
     columns: [
       { name: "id", label: "ID", primary: true, kind: "number" },
       { name: "customer", label: "Customer", kind: "text" },
@@ -52,6 +53,7 @@ describe("compileTGridRuntimeConfig", () => {
     name: "lines",
     label: "Lines",
     immutable: false,
+    rowLabelColumns: ["sku"],
     columns: [
       { name: "id", label: "ID", primary: true, kind: "number" },
       { name: "order_id", label: "Order", kind: "number" },
@@ -66,6 +68,7 @@ describe("compileTGridRuntimeConfig", () => {
     name: "allocations",
     label: "Allocations",
     immutable: true,
+    rowLabelColumns: ["warehouse"],
     columns: [
       { name: "id", label: "ID", primary: true, kind: "number" },
       { name: "line_id", label: "Line", kind: "number" },

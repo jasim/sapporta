@@ -32,6 +32,7 @@ function table(columns: ColumnSchema[], immutable = false): TableSchema {
     name: "things",
     label: "Things",
     immutable,
+    rowLabelColumns: ["name"],
     columns,
     children: [],
   };

@@ -12,6 +12,7 @@ describe("buildZodSchema()", () => {
         id: integer("id").primaryKey({ autoIncrement: true }),
         name: text("name").notNull(),
       }),
+      meta: { rowLabelColumns: ["name"] },
     });
 
     const zodSchema = buildZodSchema(schema);
@@ -26,6 +27,7 @@ describe("buildZodSchema()", () => {
         id: integer("id").primaryKey({ autoIncrement: true }),
         notes: text("notes"),
       }),
+      meta: { rowLabelColumns: ["notes"] },
     });
 
     const zodSchema = buildZodSchema(schema);
@@ -41,6 +43,7 @@ describe("buildZodSchema()", () => {
           .notNull()
           .$defaultFn(() => Temporal.Now.instant()),
       }),
+      meta: { rowLabelColumns: ["id"] },
     });
 
     const zodSchema = buildZodSchema(schema);
@@ -55,6 +58,7 @@ describe("buildZodSchema()", () => {
         status: text("status").notNull(),
       }),
       meta: {
+        rowLabelColumns: ["status"],
         selects: [
           { type: "select", column: "status", options: ["active", "inactive"] },
         ],
@@ -76,7 +80,7 @@ describe("buildZodSchema()", () => {
         id: integer("id").primaryKey({ autoIncrement: true }),
         name: text("name").notNull(),
       }),
-      meta: { validation: customSchema },
+      meta: { rowLabelColumns: ["name"], validation: customSchema },
     });
 
     const zodSchema = buildZodSchema(schema);
@@ -92,6 +96,7 @@ describe("validate()", () => {
         id: integer("id").primaryKey({ autoIncrement: true }),
         name: text("name").notNull(),
       }),
+      meta: { rowLabelColumns: ["name"] },
     });
 
     expect(validate(schema, { name: "hello" })).toEqual([]);
@@ -104,6 +109,7 @@ describe("validate()", () => {
         name: text("name").notNull(),
         count: integer("count").notNull(),
       }),
+      meta: { rowLabelColumns: ["name"] },
     });
 
     const errors = validate(schema, {});

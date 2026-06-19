@@ -10,6 +10,7 @@ const PRODUCTS_SCHEMA: TableSchema = {
   name: "products",
   label: "Products",
   immutable: false,
+  rowLabelColumns: ["name"],
   children: [],
   columns: [
     { name: "id", label: "ID", primary: true, hasDefault: true },
@@ -26,6 +27,7 @@ const CATEGORIES_SCHEMA: TableSchema = {
   name: "categories",
   label: "Categories",
   immutable: false,
+  rowLabelColumns: ["name"],
   children: [],
   columns: [
     { name: "id", label: "ID", primary: true, hasDefault: true },

@@ -96,7 +96,7 @@ export const tableSchemaSchema = z.object({
   columns: z.array(columnSchemaSchema),
   children: z.array(childSchemaSchema),
   rowLinks: z.array(reportLinkSchema).optional(),
-  rowLabelColumns: z.array(z.string()).optional(),
+  rowLabelColumns: z.array(z.string()).nonempty(),
   rowCount: z.number().optional(),
   search: z.object({ columns: z.array(z.string()) }).optional(),
 });

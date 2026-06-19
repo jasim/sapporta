@@ -32,6 +32,7 @@ const booksTable: TableSchema = {
   name: "books",
   label: "Books",
   immutable: false,
+  rowLabelColumns: ["title"],
   columns: [
     { name: "id", label: "ID", primary: true, kind: "number" },
     { name: "title", label: "Title", kind: "text" },

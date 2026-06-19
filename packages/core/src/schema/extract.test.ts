@@ -20,6 +20,7 @@ const accounts = table({
   drizzle: accountsTable,
   meta: {
     label: "Accounts",
+    rowLabelColumns: ["name"],
     selects: [
       {
         type: "select",
@@ -41,7 +42,7 @@ const invoicesTable = sqliteTable("invoices", {
 
 const invoices = table({
   drizzle: invoicesTable,
-  meta: { label: "Invoices" },
+  meta: { label: "Invoices", rowLabelColumns: ["id"] },
 });
 
 // Immutable table
@@ -52,7 +53,7 @@ const ledgerTable = sqliteTable("ledger", {
 
 const ledger = table({
   drizzle: ledgerTable,
-  meta: { immutable: true },
+  meta: { immutable: true, rowLabelColumns: ["description"] },
 });
 
 // Table with money columns — factories stamp kind + displayFormat, so no
@@ -68,6 +69,7 @@ const transactions = table({
   drizzle: transactionsTable,
   meta: {
     label: "Transactions",
+    rowLabelColumns: ["description"],
   },
 });
 
@@ -85,7 +87,7 @@ describe("extractSchemas", () => {
     expect(result[0].rowLabelColumns).toEqual(["name"]);
   });
 
-  it("falls back to the primary key for row labels without text columns", () => {
+  it("exports declared primary-key row labels for minimal tables", () => {
     const result = extractSchemas([invoices]);
     expect(result[0].rowLabelColumns).toEqual(["id"]);
   });
@@ -180,6 +182,7 @@ describe("extractSchemas", () => {
     const docs = table({
       drizzle: docsTable,
       meta: {
+        rowLabelColumns: ["body"],
         columns: {
           body: { textDisplay: "multiLine" },
         },
@@ -199,6 +202,7 @@ describe("extractSchemas", () => {
     const balances = table({
       drizzle: balancesTable,
       meta: {
+        rowLabelColumns: ["id"],
         columns: {
           balance: {
             colorRule: "signed",
@@ -240,6 +244,7 @@ describe("extractSchemas", () => {
     const audit = table({
       drizzle: customTable,
       meta: {
+        rowLabelColumns: ["id"],
         columns: {
           created_at: { visuallyHidden: false },
         },
@@ -273,12 +278,13 @@ describe("extractSchemas", () => {
       drizzle: ordersTable,
       meta: {
         label: "Orders",
+        rowLabelColumns: ["customer"],
         children: [{ table: "line_items", foreignKey: "order_id" }],
       },
     });
     const lineItems = table({
       drizzle: lineItemsTable,
-      meta: { label: "Line Items" },
+      meta: { label: "Line Items", rowLabelColumns: ["product"] },
     });
 
     const result = extractSchemas([orders, lineItems]);
@@ -326,7 +332,10 @@ describe("extractSchemas", () => {
       id: integer("id").primaryKey({ autoIncrement: true }),
       name: text("name").notNull(),
     });
-    const t = table({ drizzle: standalone, meta: { label: "Standalone" } });
+    const t = table({
+      drizzle: standalone,
+      meta: { label: "Standalone", rowLabelColumns: ["name"] },
+    });
     const [result] = extractSchemas([t]);
     expect(result.rowLinks).toBeUndefined();
   });
@@ -341,7 +350,10 @@ describe("search config surfacing", () => {
     });
     const docs = table({
       drizzle: searchableTable,
-      meta: { search: { columns: ["title", "body"] } },
+      meta: {
+        rowLabelColumns: ["title"],
+        search: { columns: ["title", "body"] },
+      },
     });
     const [result] = extractSchemas([docs]);
     expect(result.search).toEqual({ columns: ["title", "body"] });

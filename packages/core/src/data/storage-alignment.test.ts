@@ -37,7 +37,7 @@ describe("storage alignment — numbers", () => {
   });
   const accounts_def = table({
     drizzle: accounts,
-    meta: { rowScope: "systemGlobal" },
+    meta: { rowScope: "systemGlobal", rowLabelColumns: ["id"] },
   });
 
   async function setup() {
@@ -79,7 +79,7 @@ describe("storage alignment — dates", () => {
   });
   const events_def = table({
     drizzle: events,
-    meta: { rowScope: "systemGlobal" },
+    meta: { rowScope: "systemGlobal", rowLabelColumns: ["occurred_on"] },
   });
 
   async function setup() {
@@ -135,7 +135,7 @@ describe("storage alignment — timestamps", () => {
   });
   const audits_def = table({
     drizzle: audits,
-    meta: { rowScope: "systemGlobal" },
+    meta: { rowScope: "systemGlobal", rowLabelColumns: ["at"] },
   });
 
   it("canonicalized timestamps sort chronologically", async () => {
@@ -174,7 +174,7 @@ describe("storage alignment — booleans", () => {
   });
   const toggles_def = table({
     drizzle: toggles,
-    meta: { rowScope: "systemGlobal" },
+    meta: { rowScope: "systemGlobal", rowLabelColumns: ["id"] },
   });
 
   it("true/false round-trip through INTEGER 0/1", async () => {
@@ -210,7 +210,7 @@ describe("storage alignment — null vs empty string", () => {
   });
   const notes_def = table({
     drizzle: notes,
-    meta: { rowScope: "systemGlobal" },
+    meta: { rowScope: "systemGlobal", rowLabelColumns: ["body"] },
   });
 
   it("'' and null are distinct; no silent coercion between them", async () => {
@@ -246,7 +246,7 @@ describe("URL round-trip — encoded filters execute and match", () => {
   });
   const accounts_def = table({
     drizzle: accounts,
-    meta: { rowScope: "systemGlobal" },
+    meta: { rowScope: "systemGlobal", rowLabelColumns: ["id"] },
   });
 
   it("UI-encoded filters flow through decodeFilters + parseFilters into rows", async () => {

@@ -103,7 +103,8 @@ For user-owned invoices:
 
 ```ts
 meta: {
-  rowScope: "workspaceUserScoped";
+  rowScope: "workspaceUserScoped",
+  rowLabelColumns: ["invoice_number"],
 }
 ```
 
@@ -124,6 +125,7 @@ export const invoicesTable = sqliteTable("invoices", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   workspace_id: text("workspace_id").notNull(),
   scoped_to_user_id: text("scoped_to_user_id").notNull(),
+  invoice_number: text("invoice_number").notNull(),
   customer_id: integer("customer_id").notNull(),
   total: integer("total").notNull(),
   status: text("status").notNull(),
@@ -134,6 +136,7 @@ export const invoices = table({
   meta: {
     label: "Invoices",
     rowScope: "workspaceUserScoped",
+    rowLabelColumns: ["invoice_number"],
     references: {
       customer_id: { table: "customers" },
     },
@@ -607,6 +610,7 @@ export const invoiceLinesTable = sqliteTable("invoice_lines", {
   scoped_to_user_id: text("scoped_to_user_id").notNull(),
   invoice_id: integer("invoice_id").notNull(),
   product_id: integer("product_id").notNull(),
+  description: text("description").notNull(),
   quantity: integer("quantity").notNull(),
   line_total: integer("line_total").notNull(),
 });
@@ -616,6 +620,7 @@ export const invoiceLines = table({
   meta: {
     label: "Invoice Lines",
     rowScope: "workspaceUserScoped",
+    rowLabelColumns: ["description"],
     references: {
       invoice_id: { table: "invoices", clientCanSet: false },
       product_id: { table: "products" },
@@ -630,6 +635,7 @@ line payloads:
 ```ts
 const createInvoiceBody = z.object({
   invoice: z.object({
+    invoice_number: z.string(),
     customer_id: z.number(),
     total: z.number(),
     status: z.string(),
@@ -637,6 +643,7 @@ const createInvoiceBody = z.object({
   lines: z.array(
     z.object({
       product_id: z.number(),
+      description: z.string(),
       quantity: z.number(),
       line_total: z.number(),
     }),

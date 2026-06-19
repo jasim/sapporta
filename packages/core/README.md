@@ -157,7 +157,10 @@ Each schema file should export the raw Drizzle table and the Sapporta wrapper:
 
 ```ts
 export const accountsTable = sqliteTable("accounts", { ... });
-export const accounts = table({ drizzle: accountsTable, meta: { label: "Accounts" } });
+export const accounts = table({
+  drizzle: accountsTable,
+  meta: { label: "Accounts", rowLabelColumns: ["name"] },
+});
 ```
 
 Change schema, run Drizzle Kit generate, review SQL, run Drizzle Kit migrate, start server. The server only verifies migration readiness at boot.

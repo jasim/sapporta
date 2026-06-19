@@ -16,6 +16,7 @@ export const accounts = table({
   meta: {
     label: "Accounts",
     rowScope: "workspaceGlobal",
+    rowLabelColumns: ["name"],
     selects: [
       {
         type: "select",

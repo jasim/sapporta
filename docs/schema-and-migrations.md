@@ -17,7 +17,7 @@ export const accountsTable = sqliteTable("accounts", {
 });
 export const accounts = table({
   drizzle: accountsTable,
-  meta: { label: "Accounts" },
+  meta: { label: "Accounts", rowLabelColumns: ["name"] },
 });
 ```
 
