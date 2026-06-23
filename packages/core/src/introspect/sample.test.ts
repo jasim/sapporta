@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import Database from "better-sqlite3";
 import { dbSample } from "./sample.js";
+import { ErrorCode, OperationError } from "./types.js";
 
 describe("db sample", () => {
   let sqlite: Database.Database;
@@ -55,6 +56,19 @@ describe("db sample", () => {
     );
   });
 
+  it("throws TABLE_NOT_FOUND when the table does not exist", () => {
+    try {
+      dbSample(sqlite, "missing");
+      throw new Error("Expected dbSample to throw.");
+    } catch (err) {
+      expect(err).toBeInstanceOf(OperationError);
+      expect(err).toMatchObject({
+        code: ErrorCode.TABLE_NOT_FOUND,
+        message: "Table 'missing' not found",
+      });
+    }
+  });
+
   it("selects specific fields with --fields", () => {
     const result = dbSample(sqlite, "accounts", 5, ["name"]);
 
@@ -63,5 +77,18 @@ describe("db sample", () => {
     expect(result.data).toHaveLength(5);
     // Should only have the 'name' column (plus id from ORDER BY isn't added)
     expect(Object.keys(result.data[0])).toEqual(["name"]);
+  });
+
+  it("throws INVALID_COLUMN_NAME when a requested field does not exist", () => {
+    try {
+      dbSample(sqlite, "accounts", 5, ["missing"]);
+      throw new Error("Expected dbSample to throw.");
+    } catch (err) {
+      expect(err).toBeInstanceOf(OperationError);
+      expect(err).toMatchObject({
+        code: ErrorCode.INVALID_COLUMN_NAME,
+        message: "Unknown column(s) in 'accounts': missing",
+      });
+    }
   });
 });

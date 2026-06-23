@@ -8,6 +8,7 @@
 import type Database from "better-sqlite3";
 import type { OperationResult } from "./types.js";
 import { validateTableName, validateColumnNames } from "./sql-safety.js";
+import { assertTableExists, validatePayloadColumns } from "./db-helpers.js";
 
 /**
  * Return sample rows from a table, optionally selecting specific columns.
@@ -23,10 +24,12 @@ export function dbSample(
   fields?: string[],
 ): OperationResult {
   validateTableName(tableName);
+  assertTableExists(sqlite, tableName);
 
   let selectClause = "*";
   if (fields && fields.length > 0) {
     validateColumnNames(fields);
+    validatePayloadColumns(sqlite, tableName, fields);
     selectClause = fields.map((f) => `"${f}"`).join(", ");
   }
 

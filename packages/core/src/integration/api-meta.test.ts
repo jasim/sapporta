@@ -82,6 +82,16 @@ describe("/api/meta", () => {
       expect(Array.isArray(body)).toBe(true);
     });
 
+    it("GET /api/meta/tables/nonexistent/indexes returns 404", async () => {
+      const res = await request("/api/meta/tables/nonexistent/indexes");
+      expect(res.status).toBe(404);
+
+      expect(await res.json()).toEqual({
+        error: "Table 'nonexistent' not found",
+        code: "TABLE_NOT_FOUND",
+      });
+    });
+
     it("GET /api/meta/tables/accounts/sample returns sample rows", async () => {
       await postJson("/api/tables/accounts", {
         name: "SampleAccount",
@@ -94,6 +104,16 @@ describe("/api/meta", () => {
       const body = await res.json();
       expect(Array.isArray(body)).toBe(true);
       expect(body.length).toBeGreaterThan(0);
+    });
+
+    it("GET /api/meta/tables/nonexistent/sample returns 404", async () => {
+      const res = await request("/api/meta/tables/nonexistent/sample");
+      expect(res.status).toBe(404);
+
+      expect(await res.json()).toEqual({
+        error: "Table 'nonexistent' not found",
+        code: "TABLE_NOT_FOUND",
+      });
     });
 
     it("GET /api/meta/enums returns 404 (SQLite has no native enum type)", async () => {

@@ -8,6 +8,8 @@
 
 import type Database from "better-sqlite3";
 import type { OperationResult } from "./types.js";
+import { assertTableExists } from "./db-helpers.js";
+import { validateTableName } from "./sql-safety.js";
 
 /** Row from PRAGMA index_list("tableName") */
 interface PragmaIndexList {
@@ -45,6 +47,9 @@ export function describeIndexes(
   sqlite: Database.Database,
   tableName: string,
 ): IndexDescription[] {
+  validateTableName(tableName);
+  assertTableExists(sqlite, tableName);
+
   const indexes = sqlite.pragma(
     `index_list("${tableName}")`,
   ) as PragmaIndexList[];

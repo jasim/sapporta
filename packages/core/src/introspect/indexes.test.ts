@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import Database from "better-sqlite3";
 import { dbIndexes } from "./indexes.js";
+import { ErrorCode, OperationError } from "./types.js";
 
 describe("db indexes", () => {
   let sqlite: Database.Database;
@@ -29,13 +30,28 @@ describe("db indexes", () => {
   });
 
   it("shows message when no indexes", () => {
-    const result = dbIndexes(sqlite, "nonexistent");
+    sqlite.exec(
+      "CREATE TABLE accounts (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL);",
+    );
+
+    const result = dbIndexes(sqlite, "accounts");
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.data).toHaveLength(0);
-    expect(result.meta?.message).toBe(
-      "No indexes found for table 'nonexistent'.",
-    );
+    expect(result.meta?.message).toBe("No indexes found for table 'accounts'.");
+  });
+
+  it("throws TABLE_NOT_FOUND when the table does not exist", () => {
+    try {
+      dbIndexes(sqlite, "nonexistent");
+      throw new Error("Expected dbIndexes to throw.");
+    } catch (err) {
+      expect(err).toBeInstanceOf(OperationError);
+      expect(err).toMatchObject({
+        code: ErrorCode.TABLE_NOT_FOUND,
+        message: "Table 'nonexistent' not found",
+      });
+    }
   });
 });
