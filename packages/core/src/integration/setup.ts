@@ -68,6 +68,7 @@ export async function createIntegrationApp(
   } = {},
 ): Promise<{
   app: Hono<SapportaEnv>;
+  conn: ReturnType<typeof createTestDb>;
 }> {
   const conn = createTestDb();
   migrate(conn.db, {
@@ -114,7 +115,7 @@ export async function createIntegrationApp(
   app.route("/api", apiApp);
   mountOpenApi(app, sapporta, sapportaApi, apiApp);
 
-  return { app };
+  return { app, conn };
 }
 
 /** Make a GET request to the test app. */

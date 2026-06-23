@@ -21,6 +21,7 @@ import {
 import type { TableDef } from "../schema/table.js";
 import { resolveColumnKind } from "../schema/resolve-kind.js";
 import { QueryParseError } from "../db/errors.js";
+import { parseBoundedInteger } from "../validation/bounded-integer.js";
 import {
   decodeFilters,
   parseFilters,
@@ -238,15 +239,13 @@ function parseSortClauses(raw: string | undefined, schema: TableDef): SQL[] {
 }
 
 function parseLimit(raw: string | undefined): number {
-  if (raw === undefined) return DEFAULT_LIMIT;
-  const n = Number(raw);
-  if (!Number.isInteger(n) || n < 1 || n > MAX_LIMIT) {
-    throw new QueryParseError(
-      "bad_limit",
-      `limit must be an integer in [1, ${MAX_LIMIT}], got ${JSON.stringify(raw)}`,
-    );
-  }
-  return n;
+  return parseBoundedInteger(raw, {
+    name: "limit",
+    min: 1,
+    max: MAX_LIMIT,
+    defaultValue: DEFAULT_LIMIT,
+    makeError: (message) => new QueryParseError("bad_limit", message),
+  });
 }
 
 function parsePage(raw: string | undefined): number {

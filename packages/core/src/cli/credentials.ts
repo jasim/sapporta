@@ -13,7 +13,7 @@ export interface CliCredentials {
 }
 
 export function resolveCliCredentials(
-  flags: Record<string, string | string[] | undefined>,
+  flags: Record<string, unknown>,
   env: Record<string, string | undefined> = process.env,
 ): CliCredentials {
   return {
@@ -23,7 +23,7 @@ export function resolveCliCredentials(
 }
 
 export function resolveApiUrl(
-  flags: Record<string, string | string[] | undefined>,
+  flags: Record<string, unknown>,
   env: Record<string, string | undefined> = process.env,
 ): string {
   const explicit = readScalarFlag(flags["api-url"]);
@@ -32,7 +32,7 @@ export function resolveApiUrl(
 }
 
 export function resolveApiToken(
-  flags: Record<string, string | string[] | undefined>,
+  flags: Record<string, unknown>,
   env: Record<string, string | undefined> = process.env,
 ): { apiToken?: string } {
   const explicit = readScalarFlag(flags["api-token"]);
@@ -40,8 +40,6 @@ export function resolveApiToken(
   return token && token.length > 0 ? { apiToken: token } : {};
 }
 
-function readScalarFlag(
-  value: string | string[] | undefined,
-): string | undefined {
+function readScalarFlag(value: unknown): string | undefined {
   return typeof value === "string" && value.length > 0 ? value : undefined;
 }

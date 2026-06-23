@@ -30,6 +30,7 @@ describe("CLI route table", () => {
     expect(route).toBeDefined();
     expect(route!.path).toBe("/api/meta/tables");
     expect(route!.method).toBe("GET");
+    expect(route!.queryFlags).toEqual(["detail"]);
   });
 
   it("tables indexes → GET /api/meta/tables/:table/indexes", () => {
@@ -53,13 +54,6 @@ describe("CLI route table", () => {
     expect(route!.method).toBe("GET");
   });
 
-  it("enums → GET /api/meta/enums", () => {
-    const route = findRoute(["enums"]);
-    expect(route).toBeDefined();
-    expect(route!.path).toBe("/api/meta/enums");
-    expect(route!.method).toBe("GET");
-  });
-
   it("db exec-sql → POST /api/meta/sql", () => {
     const route = findRoute(["db", "exec-sql"]);
     expect(route).toBeDefined();
@@ -69,6 +63,12 @@ describe("CLI route table", () => {
 
   it("schema sync is not a Sapporta command", () => {
     expect(findRoute(["schema", "sync"])).toBeUndefined();
+  });
+
+  it("stale metadata mutation commands are not Sapporta commands", () => {
+    expect(findRoute(["tables", "update"])).toBeUndefined();
+    expect(findRoute(["tables", "drop"])).toBeUndefined();
+    expect(findRoute(["enums"])).toBeUndefined();
   });
 
   it("rows → GET /api/tables/:table", () => {

@@ -11,8 +11,19 @@
  * The action handler substitutes positional params into the URL and calls httpRequest().
  */
 import { z } from "zod";
+import { ErrorCode, OperationError } from "../introspect/types.js";
+import { parseOptionalBoundedInteger } from "../validation/bounded-integer.js";
 
 // ── Route Definition ────────────────────────────────────────────────────────
+
+export type CliBodyFlagParser = (raw: string, flagName: string) => unknown;
+
+export interface CliBodyFlag {
+  /** Request body field name. Defaults to the CLI flag name. */
+  field?: string;
+  /** Parse the CLI string into the request body's typed value. */
+  parse?: CliBodyFlagParser;
+}
 
 export interface CliRoute {
   /** CLI segments in verb-first order.
@@ -30,25 +41,22 @@ export interface CliRoute {
   bodyField?: string;
   /** Flags that become URL query params (for GET requests) */
   queryFlags?: string[];
+  /** Flags parsed into request body fields for schema-built commands. */
+  bodyFlags?: Record<string, CliBodyFlag>;
+  /** Accept bracketed filter flags such as `filter[name][eq]`. */
+  allowFilterFlags?: boolean;
+  /** Body fields that must be present before sending an HTTP request. */
+  requiredBodyFields?: string[];
   /** Map positional args (after the pattern) to body fields. */
   positionalArgs?: { field: string }[];
   /** Whether this command mutates data */
   mutating?: boolean;
 
-  /**
-   * Maps CLI flag names to request body field names.
-   *
-   * CLI users type --db <url>, but the API schema may expect
-   * database_path. The flagMap bridges this: { db: "database_path" } renames
-   * the flag before the body is assembled.
-   */
-  flagMap?: Record<string, string>;
-
   /** Extract rows from the API response for --output-format table rendering */
-  extractData: (res: any) => Record<string, unknown>[];
+  extractData: (res: unknown) => Record<string, unknown>[];
   /** Optional header text printed before the table in --output-format table mode */
   formatHeader?: (
-    res: any,
+    res: unknown,
     params: Record<string, string>,
   ) => string | undefined;
 }
@@ -56,29 +64,55 @@ export interface CliRoute {
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
 /** Flatten a TableSchema into a summary row for the table listing. */
-function tableListRow(t: any) {
+function tableListRow(t: Record<string, unknown>) {
   return {
-    name: t.name,
-    label: t.label,
-    columns: t.columns?.length ?? 0,
-    source: t.source,
+    name: t.name ?? "",
+    label: t.label ?? "",
+    columns: Array.isArray(t.columns) ? t.columns.length : 0,
+    source: t.source ?? "",
     rowCount: t.rowCount ?? "",
   };
 }
 
 /** Flatten columns for single-table describe output. */
-function tableDescribeRows(res: any) {
-  if (!res.columns) return [res];
-  return res.columns.map((col: any) => ({
-    column: col.name,
-    type: col.dataType ?? "",
-    notNull: col.notNull ? "YES" : "",
-    pk: col.primary ? "YES" : "",
-    fk: col.foreignKey
-      ? `→ ${col.foreignKey.table}.${col.foreignKey.column}`
-      : "",
-    default: col.hasDefault ? "YES" : "",
-  }));
+function tableDescribeRows(res: unknown): Record<string, unknown>[] {
+  if (!isRecord(res)) return [];
+  if (!Array.isArray(res.columns)) return [res];
+  return res.columns.filter(isRecord).map((col) => {
+    const foreignKey = isRecord(col.foreignKey) ? col.foreignKey : null;
+    return {
+      column: col.name,
+      type: col.dataType ?? "",
+      notNull: col.notNull ? "YES" : "",
+      pk: col.primary ? "YES" : "",
+      fk: foreignKey
+        ? `→ ${String(foreignKey.table)}.${String(foreignKey.column)}`
+        : "",
+      default: col.hasDefault ? "YES" : "",
+    };
+  });
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function recordArray(value: unknown): Record<string, unknown>[] {
+  return Array.isArray(value) ? value.filter(isRecord) : [];
+}
+
+function readRecord(value: unknown, key: string): Record<string, unknown> | null {
+  if (!isRecord(value)) return null;
+  const item = value[key];
+  return isRecord(item) ? item : null;
+}
+
+function readRecordArray(
+  value: unknown,
+  key: string,
+): Record<string, unknown>[] {
+  if (!isRecord(value)) return [];
+  return recordArray(value[key]);
 }
 
 // ── Route Table ─────────────────────────────────────────────────────────────
@@ -95,7 +129,8 @@ export const ROUTES: CliRoute[] = [
     method: "GET",
     path: "/api/meta/tables",
     params: [],
-    extractData: (res) => (res.tables ?? []).map(tableListRow),
+    queryFlags: ["detail"],
+    extractData: (res) => readRecordArray(res, "tables").map(tableListRow),
   },
   {
     pattern: ["tables", "show", ":table"],
@@ -104,8 +139,10 @@ export const ROUTES: CliRoute[] = [
     path: "/api/meta/tables/:table",
     params: ["table"],
     extractData: tableDescribeRows,
-    formatHeader: (res) =>
-      res.name ? `Table: ${res.name} (${res.label})` : undefined,
+    formatHeader: (res) => {
+      if (!isRecord(res) || typeof res.name !== "string") return undefined;
+      return `Table: ${res.name} (${String(res.label ?? "")})`;
+    },
   },
   {
     pattern: ["tables", "indexes", ":table"],
@@ -113,7 +150,10 @@ export const ROUTES: CliRoute[] = [
     method: "GET",
     path: "/api/meta/tables/:table/indexes",
     params: ["table"],
-    extractData: (res) => res.data ?? res ?? [],
+    extractData: (res) => {
+      const data = readRecordArray(res, "data");
+      return data.length > 0 ? data : recordArray(res);
+    },
   },
   {
     pattern: ["tables", "sample", ":table"],
@@ -122,42 +162,11 @@ export const ROUTES: CliRoute[] = [
     path: "/api/meta/tables/:table/sample",
     params: ["table"],
     queryFlags: ["limit", "fields"],
-    extractData: (res) => res.data ?? res ?? [],
+    extractData: (res) => {
+      const data = readRecordArray(res, "data");
+      return data.length > 0 ? data : recordArray(res);
+    },
   },
-  {
-    pattern: ["tables", "update", ":table"],
-    description: "Update table metadata",
-    method: "PATCH",
-    path: "/api/meta/tables/:table",
-    params: ["table"],
-    bodyField: "data",
-    mutating: true,
-    inputSchema: z.object({
-      name: z.string().optional().describe("New table name (rename)"),
-      label: z.string().optional().describe("Display label"),
-      row_label_columns: z
-        .array(z.string())
-        .min(1)
-        .optional()
-        .describe(
-          "Columns whose values build a row's label in FK dropdowns and lookups (concatenated with a space)",
-        ),
-      immutable: z.boolean().optional().describe("Prevent updates and deletes"),
-      position: z.number().optional().describe("Sort position in sidebar"),
-    }),
-    extractData: (res) => [res],
-  },
-  {
-    pattern: ["tables", "drop", ":table"],
-    description: "Drop a UI-managed table",
-    method: "DELETE",
-    path: "/api/meta/tables/:table",
-    params: ["table"],
-    queryFlags: ["confirm"],
-    mutating: true,
-    extractData: (res) => [res],
-  },
-
   // ── Row data ──────────────────────────────────────────────────────────
   {
     pattern: ["rows", ":table"],
@@ -165,13 +174,13 @@ export const ROUTES: CliRoute[] = [
     method: "GET",
     path: "/api/tables/:table",
     params: ["table"],
-    queryFlags: ["limit", "page", "sort", "order"],
-    extractData: (res) => res.data ?? [],
+    queryFlags: ["limit", "page", "sort", "q"],
+    allowFilterFlags: true,
+    extractData: (res) => readRecordArray(res, "data"),
     formatHeader: (res) => {
+      if (!isRecord(res) || !isRecord(res.meta)) return undefined;
       const m = res.meta;
-      return m
-        ? `Page ${m.page}/${m.pages} (${m.total} total rows)`
-        : undefined;
+      return `Page ${String(m.page)}/${String(m.pages)} (${String(m.total)} total rows)`;
     },
   },
   {
@@ -180,7 +189,10 @@ export const ROUTES: CliRoute[] = [
     method: "GET",
     path: "/api/tables/:table/:id",
     params: ["table", "id"],
-    extractData: (res) => (res.data ? [res.data] : []),
+    extractData: (res) => {
+      const data = readRecord(res, "data");
+      return data ? [data] : [];
+    },
   },
   {
     pattern: ["rows", "insert", ":table"],
@@ -191,8 +203,9 @@ export const ROUTES: CliRoute[] = [
     bodyField: "data",
     mutating: true,
     extractData: (res) => {
-      const d = res.data;
-      return Array.isArray(d) ? d : d ? [d] : [];
+      if (!isRecord(res)) return [];
+      if (Array.isArray(res.data)) return recordArray(res.data);
+      return isRecord(res.data) ? [res.data] : [];
     },
   },
   {
@@ -203,7 +216,10 @@ export const ROUTES: CliRoute[] = [
     params: ["table", "id"],
     bodyField: "data",
     mutating: true,
-    extractData: (res) => (res.data ? [res.data] : []),
+    extractData: (res) => {
+      const data = readRecord(res, "data");
+      return data ? [data] : [];
+    },
   },
   {
     pattern: ["rows", "delete", ":table", ":id"],
@@ -212,17 +228,10 @@ export const ROUTES: CliRoute[] = [
     path: "/api/tables/:table/:id",
     params: ["table", "id"],
     mutating: true,
-    extractData: (res) => (res.data ? [res.data] : []),
-  },
-
-  // ── Enums ─────────────────────────────────────────────────────────────
-  {
-    pattern: ["enums"],
-    description: "List enum definitions",
-    method: "GET",
-    path: "/api/meta/enums",
-    params: [],
-    extractData: (res) => res.data ?? res ?? [],
+    extractData: (res) => {
+      const data = readRecord(res, "data");
+      return data ? [data] : [];
+    },
   },
 
   // ── Database ──────────────────────────────────────────────────────────
@@ -236,6 +245,10 @@ export const ROUTES: CliRoute[] = [
     mutating: true,
     inputSchema: z.object({
       sql: z.string().describe("SQL statement to run"),
+      params: z
+        .array(z.unknown())
+        .optional()
+        .describe("Positional values bound to placeholders in the SQL"),
       limit: z
         .number()
         .optional()
@@ -247,9 +260,55 @@ export const ROUTES: CliRoute[] = [
           "For writes: validate via EXPLAIN QUERY PLAN without executing",
         ),
     }),
-    extractData: (res) => (Array.isArray(res) ? res : (res.data ?? [res])),
+    bodyFlags: {
+      limit: { parse: parseSqlLimitFlag },
+      params: { parse: parseParamsFlag },
+      "dry-run": { field: "dryRun", parse: parseBooleanFlag },
+    },
+    requiredBodyFields: ["sql"],
+    extractData: (res) => {
+      if (Array.isArray(res)) return recordArray(res);
+      const data = readRecordArray(res, "data");
+      if (data.length > 0) return data;
+      return isRecord(res) ? [res] : [];
+    },
   },
 ];
+
+function parseSqlLimitFlag(raw: string): number | undefined {
+  return parseOptionalBoundedInteger(raw, {
+    name: "limit",
+    min: 1,
+    max: 1000,
+    makeError: (message) => new OperationError(message, ErrorCode.BAD_LIMIT),
+  });
+}
+
+function parseBooleanFlag(raw: string, flagName: string): boolean {
+  if (raw === "true") return true;
+  if (raw === "false") return false;
+  throw new OperationError(
+    `--${flagName} must be true or false, got ${JSON.stringify(raw)}`,
+    ErrorCode.VALIDATION_FAILED,
+  );
+}
+
+function parseParamsFlag(raw: string, flagName: string): unknown[] {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw) as unknown;
+  } catch {
+    throw new OperationError(
+      `Invalid JSON for --${flagName}`,
+      ErrorCode.INVALID_JSON,
+    );
+  }
+  if (Array.isArray(parsed)) return parsed;
+  throw new OperationError(
+    `--${flagName} must be a JSON array`,
+    ErrorCode.VALIDATION_FAILED,
+  );
+}
 
 // ── Commander registration ──────────────────────────────────────────────────
 

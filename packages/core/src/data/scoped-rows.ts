@@ -33,7 +33,8 @@ import type { BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
 import { getTableConfig, type SQLiteColumn } from "drizzle-orm/sqlite-core";
 import type { RowId } from "@sapporta/shared/row-id";
 import type { SapportaAuthContext } from "../auth/context.js";
-import { QueryParseError } from "../db/errors.js";
+import { QueryParseError, ValidationError } from "../db/errors.js";
+import { parseOptionalBoundedInteger } from "../validation/bounded-integer.js";
 import { findPkColumn } from "../schema/pk.js";
 import type { TableDef } from "../schema/table.js";
 import { savePipeline } from "./save-pipeline.js";
@@ -145,6 +146,11 @@ export function scopedRows(
       // Accept either a single client payload or a batch, but prepare each row
       // independently so row-security can stamp trusted scope fields.
       const records = Array.isArray(input) ? input : [input];
+      if (records.length === 0) {
+        throw new ValidationError([
+          { field: "body", message: "Expected at least one row" },
+        ]);
+      }
       const results: Record<string, unknown>[] = [];
       for (const record of records) {
         const prepared = await access.insertValues(db, record);
@@ -359,15 +365,12 @@ function parseIds(idsParam: string): string[] {
 }
 
 function parseLookupLimit(limitParam: string | undefined): number | undefined {
-  if (limitParam === undefined || limitParam.trim() === "") return undefined;
-  const limit = Number(limitParam);
-  if (!Number.isInteger(limit) || limit < 1 || limit > 500) {
-    throw new QueryParseError(
-      "bad_limit",
-      `limit must be an integer in [1, 500], got ${JSON.stringify(limitParam)}`,
-    );
-  }
-  return limit;
+  return parseOptionalBoundedInteger(limitParam, {
+    name: "limit",
+    min: 1,
+    max: 500,
+    makeError: (message) => new QueryParseError("bad_limit", message),
+  });
 }
 
 function lookupLabelSearchCondition(

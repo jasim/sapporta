@@ -4,8 +4,13 @@ import type { BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
 import type Database from "better-sqlite3";
 import type { SapportaAuthContext } from "../auth/index.js";
 import { logger, requestLogger } from "../db/logger.js";
-import { OperationError } from "../introspect/types.js";
-import { ERROR_CODE_STATUS } from "./error-codes.js";
+import { classifySqliteError } from "../db/errors.js";
+import { ErrorCode, OperationError } from "../introspect/types.js";
+import {
+  apiErrorResponse,
+  classifiedSqliteErrorResponse,
+  operationErrorResponse,
+} from "./error-response.js";
 import { normalizeHttpException } from "./http-exceptions.js";
 
 /**
@@ -31,12 +36,6 @@ export interface SapportaEnv extends Env {
     sqlite: Database.Database;
     auth: SapportaAuthContext;
   };
-}
-
-type HttpErrorStatus = 400 | 401 | 403 | 404 | 409 | 422 | 500;
-
-function statusForCode(code: string): HttpErrorStatus {
-  return (ERROR_CODE_STATUS[code] ?? 500) as HttpErrorStatus;
 }
 
 export function installRequestLogging<E extends SapportaEnv>(
@@ -119,14 +118,19 @@ export function installSapportaErrorHandler<E extends SapportaEnv>(
     const httpException = normalizeHttpException(err);
     if (httpException) {
       if (httpException.response) return httpException.response;
-      return c.json({ error: httpException.message }, httpException.status);
+      return apiErrorResponse(c, {
+        error: httpException.message,
+        status: httpException.status,
+      });
     }
 
     if (err instanceof OperationError) {
-      return c.json(
-        { error: err.message, code: err.code },
-        statusForCode(err.code),
-      );
+      return operationErrorResponse(c, err);
+    }
+
+    const sqliteError = classifySqliteError(err, "framework");
+    if (sqliteError) {
+      return classifiedSqliteErrorResponse(c, sqliteError);
     }
 
     log.error("unhandled request error", {
@@ -137,8 +141,8 @@ export function installSapportaErrorHandler<E extends SapportaEnv>(
     });
 
     const message = err instanceof Error ? err.message : String(err);
-    const code = (err as { code?: string }).code ?? "INTERNAL";
-    return c.json({ error: message, code }, 500);
+    const code = (err as { code?: string }).code ?? ErrorCode.INTERNAL;
+    return apiErrorResponse(c, { error: message, code, status: 500 });
   });
 
   return app;

@@ -53,15 +53,15 @@ describe("installSapportaDefaults", () => {
     });
   });
 
-  it("preserves a sqlite-style error.code on the JSON body", async () => {
+  it("classifies sqlite-style errors without leaking their raw code", async () => {
     const err = Object.assign(new Error("constraint failed"), {
       code: "SQLITE_CONSTRAINT_NOTNULL",
     });
     const res = await appThatThrows(err).request("/boom");
-    expect(res.status).toBe(500);
+    expect(res.status).toBe(422);
     expect(await res.json()).toEqual({
       error: "constraint failed",
-      code: "SQLITE_CONSTRAINT_NOTNULL",
+      code: "VALIDATION_FAILED",
     });
   });
 

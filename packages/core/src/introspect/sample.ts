@@ -6,9 +6,10 @@
 // names via isSafeIdentifier() before interpolating into SQL.
 
 import type Database from "better-sqlite3";
-import type { OperationResult } from "./types.js";
+import { ErrorCode, OperationError, type OperationResult } from "./types.js";
 import { validateTableName, validateColumnNames } from "./sql-safety.js";
 import { assertTableExists, validatePayloadColumns } from "./db-helpers.js";
+import { assertBoundedInteger } from "../validation/bounded-integer.js";
 
 /**
  * Return sample rows from a table, optionally selecting specific columns.
@@ -25,6 +26,7 @@ export function dbSample(
 ): OperationResult {
   validateTableName(tableName);
   assertTableExists(sqlite, tableName);
+  validateSampleLimit(limit);
 
   let selectClause = "*";
   if (fields && fields.length > 0) {
@@ -50,4 +52,13 @@ export function dbSample(
     data: rows,
     meta: { rowCount: rows.length, limit },
   };
+}
+
+function validateSampleLimit(limit: number): void {
+  assertBoundedInteger(limit, {
+    name: "limit",
+    min: 1,
+    max: 1000,
+    makeError: (message) => new OperationError(message, ErrorCode.BAD_LIMIT),
+  });
 }

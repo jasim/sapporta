@@ -17,9 +17,13 @@ export type OutputFormat = "table" | "json";
  * defaults to JSON so agents get structured data without needing to pass flags.
  */
 export function resolveOutputFormat(
-  flags: Record<string, string>,
+  flags: Record<string, unknown>,
 ): OutputFormat {
-  const explicit = flags["output-format"] ?? process.env.SAPPORTA_OUTPUT_FORMAT;
+  const flagValue = flags["output-format"];
+  const explicit =
+    typeof flagValue === "string"
+      ? flagValue
+      : process.env.SAPPORTA_OUTPUT_FORMAT;
   if (explicit === "json") return "json";
   if (explicit === "table") return "table";
   // Auto-detect: non-TTY defaults to JSON for agent consumption
@@ -82,8 +86,8 @@ export function emitResult(
  * callers can safely pass values as query params or compare against
  * string literals without worrying about type inference.
  */
-export function parseFlags(argv: string[]): Record<string, any> {
-  const result: Record<string, any> = { _: [] };
+export function parseFlags(argv: string[]): Record<string, unknown> {
+  const result: Record<string, unknown> & { _: string[] } = { _: [] };
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
     if (arg === "--") break;

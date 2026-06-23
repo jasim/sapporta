@@ -58,11 +58,16 @@ export type OperationFailure = {
  */
 export const ErrorCode = {
   TABLE_NOT_FOUND: "TABLE_NOT_FOUND",
+  FORBIDDEN: "FORBIDDEN",
   INVALID_TABLE_NAME: "INVALID_TABLE_NAME",
   INVALID_COLUMN_NAME: "INVALID_COLUMN_NAME",
   INVALID_JSON: "INVALID_JSON",
+  INVALID_SQL: "INVALID_SQL",
   DANGEROUS_SQL: "DANGEROUS_SQL",
+  BAD_LIMIT: "BAD_LIMIT",
   SELECT_ONLY: "SELECT_ONLY",
+  CONFLICT: "CONFLICT",
+  ROW_NOT_FOUND: "ROW_NOT_FOUND",
   PROJECT_NOT_FOUND: "PROJECT_NOT_FOUND",
   REPORT_NOT_FOUND: "REPORT_NOT_FOUND",
   VALIDATION_FAILED: "VALIDATION_FAILED",
@@ -73,6 +78,8 @@ export const ErrorCode = {
   APP_SERVER_UNREACHABLE: "APP_SERVER_UNREACHABLE",
   INTERNAL: "INTERNAL",
 } as const;
+
+export type ErrorCodeValue = (typeof ErrorCode)[keyof typeof ErrorCode];
 
 /**
  * Typed error that carries a machine-readable error code.

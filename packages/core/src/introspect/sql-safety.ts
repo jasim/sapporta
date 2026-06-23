@@ -21,7 +21,16 @@ export function requireSelect(sql: string): void {
  */
 export function rejectDangerousSQL(sql: string): void {
   const trimmed = sql.trim().toUpperCase();
-  const dangerous = ["DROP DATABASE", "TRUNCATE", "DROP SCHEMA"];
+  const dangerous = [
+    "DROP DATABASE",
+    "TRUNCATE",
+    "DROP SCHEMA",
+    "DROP TABLE",
+    "DROP INDEX",
+    "DROP VIEW",
+    "DROP TRIGGER",
+    "ALTER TABLE",
+  ];
 
   for (const pattern of dangerous) {
     if (trimmed.includes(pattern)) {

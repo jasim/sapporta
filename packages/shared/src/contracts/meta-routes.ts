@@ -14,7 +14,7 @@ const c = initContract();
 const sqlBodySchema = z.object({
   sql: z.string(),
   params: z.array(z.unknown()).optional(),
-  limit: z.number().int().positive().optional(),
+  limit: z.number().int().positive().max(1000).optional(),
   dryRun: z.boolean().optional(),
 });
 
@@ -95,5 +95,8 @@ export const sqlRoute = c.mutation({
   responses: {
     200: z.array(z.record(z.string(), z.unknown())),
     400: errorBodySchema,
+    409: errorBodySchema,
+    422: errorBodySchema,
+    500: errorBodySchema,
   },
 });

@@ -14,6 +14,7 @@ import type { TableCatalog } from "../schema/catalog.js";
 import type { TableDef } from "../schema/table.js";
 import type { HttpMethod, RouteHandler, TsRestApi } from "@sapporta/honest";
 import { countRoute, lookupRoute } from "@sapporta/shared/contracts";
+import { ErrorCode } from "../introspect/types.js";
 import {
   createRoute,
   deleteRoute,
@@ -22,6 +23,7 @@ import {
   listRoute,
   updateRoute,
 } from "./table-contracts.js";
+import { jsonErrorResponse } from "./error-response.js";
 
 export interface TablesDocContext {
   tables: readonly TableDef[];
@@ -46,15 +48,10 @@ export interface TableHandlers<E extends Env> {
 
 function tableNotFound<E extends Env>(c: Context<E>): Response {
   const tableName = c.req.param("tableName");
-  return c.json(
-    {
-      error: tableName
-        ? `Table "${tableName}" not found`
-        : "Table name required",
-      code: "TABLE_NOT_FOUND",
-    },
-    404,
-  );
+  return jsonErrorResponse({
+    error: tableName ? `Table "${tableName}" not found` : "Table name required",
+    code: ErrorCode.TABLE_NOT_FOUND,
+  });
 }
 
 function asGenericHandler<R extends AppRoute, E extends Env>(

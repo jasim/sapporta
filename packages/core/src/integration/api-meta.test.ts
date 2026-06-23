@@ -68,6 +68,10 @@ describe("/api/meta", () => {
     it("GET /api/meta/tables/nonexistent returns 404", async () => {
       const res = await request("/api/meta/tables/nonexistent");
       expect(res.status).toBe(404);
+      expect(await res.json()).toEqual({
+        error: 'Table "nonexistent" not found',
+        code: "TABLE_NOT_FOUND",
+      });
     });
   });
 
@@ -106,6 +110,31 @@ describe("/api/meta", () => {
       expect(body.length).toBeGreaterThan(0);
     });
 
+    it("GET /api/meta/tables/accounts/sample trims requested fields", async () => {
+      await postJson("/api/tables/accounts", {
+        name: "FieldTrimAccount",
+        type: "asset",
+      });
+
+      const res = await request(
+        "/api/meta/tables/accounts/sample?fields=name,%20type&limit=1",
+      );
+      expect(res.status).toBe(200);
+
+      const body = await res.json();
+      expect(Object.keys(body[0]).sort()).toEqual(["name", "type"]);
+    });
+
+    it("GET /api/meta/tables/accounts/sample rejects bad limits", async () => {
+      for (const limit of ["abc", "0", "-1", "1.9"]) {
+        const res = await request(
+          `/api/meta/tables/accounts/sample?limit=${encodeURIComponent(limit)}`,
+        );
+        expect(res.status).toBe(400);
+        expect(await res.json()).toMatchObject({ code: "BAD_LIMIT" });
+      }
+    });
+
     it("GET /api/meta/tables/nonexistent/sample returns 404", async () => {
       const res = await request("/api/meta/tables/nonexistent/sample");
       expect(res.status).toBe(404);
@@ -142,6 +171,22 @@ describe("/api/meta", () => {
       expect(body[0].name).toBe("SQLTestAccount");
     });
 
+    it("POST /api/meta/sql binds params", async () => {
+      await postJson("/api/tables/accounts", {
+        name: "BoundParamAccount",
+        type: "asset",
+      });
+
+      const res = await postJson("/api/meta/sql", {
+        sql: "SELECT name FROM accounts WHERE name = ?",
+        params: ["BoundParamAccount"],
+      });
+      expect(res.status).toBe(200);
+
+      const body = await res.json();
+      expect(body).toEqual([{ name: "BoundParamAccount" }]);
+    });
+
     it("POST /api/meta/sql runs an INSERT and a follow-up SELECT sees it", async () => {
       const res = await postJson("/api/meta/sql", {
         sql: "INSERT INTO accounts (name, type, workspace_id) VALUES ('ExecTest', 'liability', 'workspace-1')",
@@ -160,6 +205,46 @@ describe("/api/meta", () => {
         sql: "DROP DATABASE sapporta",
       });
       expect(res.status).toBe(400);
+    });
+
+    it("POST /api/meta/sql rejects DROP TABLE", async () => {
+      const res = await postJson("/api/meta/sql", {
+        sql: "DROP TABLE accounts",
+      });
+      expect(res.status).toBe(400);
+      expect(await res.json()).toMatchObject({ code: "DANGEROUS_SQL" });
+    });
+
+    it("POST /api/meta/sql classifies SQL syntax errors as 400", async () => {
+      const res = await postJson("/api/meta/sql", {
+        sql: "SELECT FROM",
+      });
+      expect(res.status).toBe(400);
+      expect(await res.json()).toMatchObject({ code: "INVALID_SQL" });
+    });
+
+    it("POST /api/meta/sql classifies unique conflicts as 409", async () => {
+      const first = await postJson("/api/meta/sql", {
+        sql: "INSERT INTO agents (id, name, workspace_id) VALUES (?, ?, ?)",
+        params: ["agent-conflict", "First", "workspace-1"],
+      });
+      expect(first.status).toBe(200);
+
+      const second = await postJson("/api/meta/sql", {
+        sql: "INSERT INTO agents (id, name, workspace_id) VALUES (?, ?, ?)",
+        params: ["agent-conflict", "Second", "workspace-1"],
+      });
+      expect(second.status).toBe(409);
+      expect(await second.json()).toMatchObject({ code: "CONFLICT" });
+    });
+
+    it("GET /api/meta/tables treats catalog/database drift as a 500", async () => {
+      const { conn } = await createIntegrationApp();
+      conn.sqlite.exec("DROP TABLE accounts");
+
+      const res = await request("/api/meta/tables");
+      expect(res.status).toBe(500);
+      expect(await res.json()).toMatchObject({ code: "INTERNAL" });
     });
   });
 });

@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import Database from "better-sqlite3";
 import { dbRun } from "./run.js";
+import { ErrorCode, OperationError } from "./types.js";
 
 describe("dbRun", () => {
   let sqlite: Database.Database;
@@ -66,6 +67,28 @@ describe("dbRun", () => {
     expect(result.meta?.limit).toBe(1);
   });
 
+  it("binds positional params for reads", () => {
+    const result = dbRun(sqlite, "SELECT name FROM accounts WHERE type = ?", {
+      params: ["asset"],
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.data).toEqual([{ name: "Cash" }]);
+  });
+
+  it("rejects invalid read limits", () => {
+    for (const limit of [Number.NaN, 0, -1, 1.9, 1001]) {
+      try {
+        dbRun(sqlite, "SELECT * FROM accounts", { limit });
+        throw new Error("Expected dbRun to throw.");
+      } catch (err) {
+        expect(err).toBeInstanceOf(OperationError);
+        expect(err).toMatchObject({ code: ErrorCode.BAD_LIMIT });
+      }
+    }
+  });
+
   it("does not set truncated when under limit", () => {
     const result = dbRun(sqlite, "SELECT * FROM accounts ORDER BY id", {
       limit: 10,
@@ -123,6 +146,18 @@ describe("dbRun", () => {
     expect(rows).toHaveLength(1);
   });
 
+  it("binds positional params for writes", () => {
+    const result = dbRun(
+      sqlite,
+      "INSERT INTO accounts (name, type) VALUES (?, ?)",
+      { params: ["Receivable", "asset"] },
+    );
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.meta?.rowCount).toBe(1);
+  });
+
   // -- Dangerous SQL rejection --
 
   it("rejects DROP DATABASE", () => {
@@ -139,6 +174,30 @@ describe("dbRun", () => {
     expect(() => dbRun(sqlite, "DROP SCHEMA public CASCADE")).toThrow(
       "DROP SCHEMA",
     );
+  });
+
+  it("rejects DROP TABLE", () => {
+    expect(() => dbRun(sqlite, "DROP TABLE accounts")).toThrow("DROP TABLE");
+  });
+
+  it("classifies SQL syntax errors as INVALID_SQL", () => {
+    try {
+      dbRun(sqlite, "SELECT FROM");
+      throw new Error("Expected dbRun to throw.");
+    } catch (err) {
+      expect(err).toBeInstanceOf(OperationError);
+      expect(err).toMatchObject({ code: ErrorCode.INVALID_SQL });
+    }
+  });
+
+  it("classifies unique constraint failures as CONFLICT", () => {
+    try {
+      dbRun(sqlite, "INSERT INTO accounts (id, name, type) VALUES (1, 'X', 'x')");
+      throw new Error("Expected dbRun to throw.");
+    } catch (err) {
+      expect(err).toBeInstanceOf(OperationError);
+      expect(err).toMatchObject({ code: ErrorCode.CONFLICT });
+    }
   });
 
   // -- Dry-run (writes only) --

@@ -12,7 +12,9 @@
 // EXPLAIN QUERY PLAN to validate without executing.
 
 import type Database from "better-sqlite3";
-import type { OperationResult } from "./types.js";
+import { classifySqliteError } from "../db/errors.js";
+import { parseOptionalBoundedInteger } from "../validation/bounded-integer.js";
+import { ErrorCode, OperationError, type OperationResult } from "./types.js";
 import { rejectDangerousSQL } from "./sql-safety.js";
 
 export interface DbRunOptions {
@@ -20,6 +22,8 @@ export interface DbRunOptions {
   limit?: number;
   /** For writes: validate via EXPLAIN QUERY PLAN instead of executing. */
   dryRun?: boolean;
+  /** Positional values bound to placeholders in the SQL statement. */
+  params?: readonly unknown[];
 }
 
 export function dbRun(
@@ -29,52 +33,67 @@ export function dbRun(
 ): OperationResult {
   rejectDangerousSQL(rawSql);
 
-  const stmt = sqlite.prepare(rawSql);
+  try {
+    const stmt = sqlite.prepare(rawSql);
+    const params = opts.params ?? [];
 
-  if (stmt.reader) {
-    const { limit } = opts;
-    let effectiveSql = rawSql;
-    if (limit !== undefined) {
-      effectiveSql = `SELECT * FROM (${rawSql}) LIMIT ${limit}`;
+    if (stmt.reader) {
+      const limit = parseSqlLimit(opts.limit);
+      const effectiveSql =
+        limit === undefined ? rawSql : `SELECT * FROM (${rawSql}) LIMIT ?`;
+      const effectiveParams: readonly unknown[] =
+        limit === undefined ? params : [...params, limit];
+      const rows = sqlite.prepare(effectiveSql).all(effectiveParams) as Record<
+        string,
+        unknown
+      >[];
+      const truncated = limit !== undefined && rows.length >= limit;
+      return {
+        ok: true,
+        data: rows,
+        meta: {
+          rowCount: rows.length,
+          ...(truncated && { truncated: true, limit }),
+        },
+      };
     }
-    const rows = sqlite.prepare(effectiveSql).all() as Record<
-      string,
-      unknown
-    >[];
-    const truncated = limit !== undefined && rows.length >= limit;
+
+    if (opts.dryRun) {
+      const plan = sqlite
+        .prepare(`EXPLAIN QUERY PLAN ${rawSql}`)
+        .all(params) as Record<string, unknown>[];
+      return {
+        ok: true,
+        data: plan,
+        meta: {
+          message: "Dry run: SQL is valid (EXPLAIN QUERY PLAN succeeded)",
+          dryRun: true,
+          tableOutputHandled: true,
+        },
+      };
+    }
+
+    const info = stmt.run(params);
     return {
       ok: true,
-      data: rows,
+      data: [],
       meta: {
-        rowCount: rows.length,
-        ...(truncated && { truncated: true, limit }),
+        rowCount: info.changes,
+        ...(info.changes === 0 && { message: "OK (0 rows)" }),
       },
     };
+  } catch (err) {
+    const classified = classifySqliteError(err, "sql");
+    if (!classified) throw err;
+    throw new OperationError(classified.message, classified.code);
   }
+}
 
-  if (opts.dryRun) {
-    const plan = sqlite.prepare(`EXPLAIN QUERY PLAN ${rawSql}`).all() as Record<
-      string,
-      unknown
-    >[];
-    return {
-      ok: true,
-      data: plan,
-      meta: {
-        message: "Dry run: SQL is valid (EXPLAIN QUERY PLAN succeeded)",
-        dryRun: true,
-        tableOutputHandled: true,
-      },
-    };
-  }
-
-  const info = stmt.run();
-  return {
-    ok: true,
-    data: [],
-    meta: {
-      rowCount: info.changes,
-      ...(info.changes === 0 && { message: "OK (0 rows)" }),
-    },
-  };
+function parseSqlLimit(limit: number | undefined): number | undefined {
+  return parseOptionalBoundedInteger(limit, {
+    name: "limit",
+    min: 1,
+    max: 1000,
+    makeError: (message) => new OperationError(message, ErrorCode.BAD_LIMIT),
+  });
 }

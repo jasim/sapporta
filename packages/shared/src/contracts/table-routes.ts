@@ -70,6 +70,7 @@ export const createRowRoute = c.mutation({
   responses: {
     201: z.object({ data: z.union([rowSchema, z.array(rowSchema)]) }),
     404: errorBodySchema,
+    409: errorBodySchema,
     422: errorBodySchema,
     500: errorBodySchema,
   },
@@ -86,7 +87,9 @@ export const updateRowRoute = c.mutation({
     200: singleRowSchema,
     403: errorBodySchema,
     404: errorBodySchema,
+    409: errorBodySchema,
     422: errorBodySchema,
+    500: errorBodySchema,
   },
 });
 

@@ -174,6 +174,18 @@ describe("/api/tables table operations", () => {
 
       const body = await res.json();
       expect(body.error).toBe("Validation failed");
+      expect(body.code).toBe("VALIDATION_FAILED");
+    });
+
+    it("rejects empty batch inserts with 422", async () => {
+      const res = await postJson("/api/tables/accounts", []);
+      expect(res.status).toBe(422);
+
+      const body = await res.json();
+      expect(body).toMatchObject({
+        error: "Validation failed",
+        code: "VALIDATION_FAILED",
+      });
     });
   });
 
@@ -356,6 +368,24 @@ describe("/api/tables table operations", () => {
       expect(body.data[uuid2]).toBe("Bravo");
     });
 
+    it("POST duplicate UUID returns 409", async () => {
+      const res = await postJson("/api/tables/agents", {
+        id: uuid2,
+        name: "Duplicate Bravo",
+      });
+      expect(res.status).toBe(409);
+      expect(await res.json()).toMatchObject({ code: "CONFLICT" });
+    });
+
+    it("PUT duplicate UUID returns 409", async () => {
+      const res = await putJson(`/api/tables/agents/${uuid1}`, {
+        id: uuid2,
+        name: "Alpha Conflicts",
+      });
+      expect(res.status).toBe(409);
+      expect(await res.json()).toMatchObject({ code: "CONFLICT" });
+    });
+
     it("POST without an id is rejected (no DB default for text PK)", async () => {
       const res = await postJson("/api/tables/agents", { name: "No ID" });
       expect(res.status).toBe(422);
@@ -417,7 +447,7 @@ describe("/api/tables table operations", () => {
         code: string;
         details: Array<{ field: string }>;
       };
-      expect(body.code).toBe("validation_failed");
+      expect(body.code).toBe("VALIDATION_FAILED");
       expect(body.details.map((detail) => detail.field)).toEqual(
         expect.arrayContaining(["workspace_id", "scoped_to_user_id"]),
       );

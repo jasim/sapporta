@@ -120,23 +120,11 @@ sapporta tables indexes <name>
 
 # Show sample rows from a table
 sapporta tables sample <name> --limit 10 --fields name,type
-
-# Update table properties
-sapporta tables update <name> --data '{"label":"New Label"}'
-
-# Rename a table
-sapporta tables update <name> --data '{"name":"new_name"}'
-
-# Drop a UI-managed table
-sapporta tables drop <name> --confirm true
 ```
 
-### Enum and Database Commands
+### Database Commands
 
 ```bash
-# List enum definitions
-sapporta enums
-
 # Run any SQL statement — reads return rows, writes report row counts
 sapporta db exec-sql "SELECT * FROM accounts"
 sapporta db exec-sql --input-body-json '{"sql": "SELECT * FROM accounts", "limit": 50}'

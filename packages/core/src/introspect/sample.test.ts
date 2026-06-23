@@ -39,6 +39,18 @@ describe("db sample", () => {
     expect(result.meta?.limit).toBe(2);
   });
 
+  it("rejects invalid limits", () => {
+    for (const limit of [Number.NaN, 0, -1, 1.9]) {
+      try {
+        dbSample(sqlite, "accounts", limit);
+        throw new Error("Expected dbSample to throw.");
+      } catch (err) {
+        expect(err).toBeInstanceOf(OperationError);
+        expect(err).toMatchObject({ code: ErrorCode.BAD_LIMIT });
+      }
+    }
+  });
+
   it("shows empty message for empty table", () => {
     sqlite.exec("DELETE FROM accounts");
 

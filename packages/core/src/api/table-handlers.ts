@@ -28,8 +28,18 @@ import {
 } from "../data/scoped-rows.js";
 import { cellToString, csvEscape } from "../data/csv.js";
 import { findPkColumn } from "../schema/pk.js";
-import { QueryParseError, ValidationError } from "../db/errors.js";
+import {
+  classifySqliteError,
+  QueryParseError,
+  ValidationError,
+} from "../db/errors.js";
 import { logger } from "../db/logger.js";
+import { ErrorCode } from "../introspect/types.js";
+import {
+  apiErrorResponse,
+  classifiedSqliteErrorResponse,
+  jsonErrorResponse,
+} from "./error-response.js";
 import type { TableHandlers } from "./mount-tables.js";
 import type { SapportaEnv } from "./server.js";
 import {
@@ -43,10 +53,10 @@ import type { TableDef } from "../schema/table.js";
 const log = logger.child({ module: "table-handlers" });
 
 function tableNotFoundResponse(tableName: string): Response {
-  return Response.json(
-    { error: `Table "${tableName}" not found`, code: "TABLE_NOT_FOUND" },
-    { status: 404 },
-  );
+  return jsonErrorResponse({
+    error: `Table "${tableName}" not found`,
+    code: ErrorCode.TABLE_NOT_FOUND,
+  });
 }
 
 type GeneratedTableAction = "read" | "export" | "create" | "update" | "delete";
@@ -209,17 +219,18 @@ async function handleMasterDetailCreate<E extends SapportaEnv>(
 ): Promise<Response> {
   const { $details, ...masterData } = body;
   if (!isDetailsSpec($details)) {
-    return c.json(
-      {
-        error: "$details must have: table (string), fk (string), rows (array)",
-      },
-      400,
-    );
+    return apiErrorResponse(c, {
+      error: "$details must have: table (string), fk (string), rows (array)",
+      status: 400,
+    });
   }
 
   const detailDef = catalog.get($details.table);
   if (!detailDef) {
-    return c.json({ error: `Detail table "${$details.table}" not found` }, 404);
+    return apiErrorResponse(c, {
+      error: `Detail table "${$details.table}" not found`,
+      code: ErrorCode.TABLE_NOT_FOUND,
+    });
   }
   // Parent and child rows are both creates, so both tables need an explicit
   // create grant. The shared auth context still stamps and validates each table
@@ -263,19 +274,24 @@ function tableReadErrorResponse<E extends Env>(
   err: unknown,
 ): Response {
   if (err instanceof RowNotFoundError) {
-    return c.json({ error: "Not found" }, 404);
+    return apiErrorResponse(c, {
+      error: "Not found",
+      code: ErrorCode.ROW_NOT_FOUND,
+    });
   }
   if (err instanceof QueryParseError) {
-    return c.json(
-      {
-        error: err.message,
-        code: err.code,
-      },
-      400,
-    );
+    return apiErrorResponse(c, {
+      error: err.message,
+      code: err.code,
+      status: 400,
+    });
   }
   if (err instanceof RowScopePolicyError) {
-    return c.json({ error: "Forbidden", code: err.code }, 403);
+    return apiErrorResponse(c, {
+      error: "Forbidden",
+      code: err.code,
+      status: 403,
+    });
   }
   throw err;
 }
@@ -286,37 +302,55 @@ function tableWriteErrorResponse<E extends Env>(
   err: unknown,
 ): Response {
   if (err instanceof ImmutableTableOperationError) {
-    return c.json({ error: "Records in this table are immutable" }, 403);
+    return apiErrorResponse(c, {
+      error: "Records in this table are immutable",
+      code: ErrorCode.FORBIDDEN,
+    });
   }
   if (err instanceof RowNotFoundError) {
-    return c.json({ error: "Not found" }, 404);
+    return apiErrorResponse(c, {
+      error: "Not found",
+      code: ErrorCode.ROW_NOT_FOUND,
+    });
   }
   if (err instanceof RowScopePolicyError) {
-    return c.json({ error: "Forbidden", code: err.code }, 403);
+    return apiErrorResponse(c, {
+      error: "Forbidden",
+      code: err.code,
+      status: 403,
+    });
   }
   if (err instanceof AuthPayloadPolicyError) {
     log.warn("Auth payload policy failed", {
       table: table.sqlName,
       errors: err.errors,
     });
-    return c.json(
-      {
-        error: "Validation failed",
-        code: "validation_failed",
-        details: err.errors,
-      },
-      422,
-    );
+    return apiErrorResponse(c, {
+      error: "Validation failed",
+      code: ErrorCode.VALIDATION_FAILED,
+      details: err.errors,
+    });
   }
   if (err instanceof ValidationError) {
     log.warn("Write validation failed", {
       table: table.sqlName,
       errors: err.errors,
     });
-    return c.json({ error: "Validation failed", details: err.errors }, 422);
+    return apiErrorResponse(c, {
+      error: "Validation failed",
+      code: ErrorCode.VALIDATION_FAILED,
+      details: err.errors,
+    });
   }
   if (err instanceof Error && err.message.includes("not found")) {
-    return c.json({ error: "Not found" }, 404);
+    return apiErrorResponse(c, {
+      error: "Not found",
+      code: ErrorCode.ROW_NOT_FOUND,
+    });
+  }
+  const classified = classifySqliteError(err, "write");
+  if (classified) {
+    return classifiedSqliteErrorResponse(c, classified);
   }
   throw err;
 }

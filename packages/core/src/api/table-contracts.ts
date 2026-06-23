@@ -93,6 +93,7 @@ export function createRoute(def: TableDef, tables: readonly TableDef[]) {
     responses: {
       201: tableCreateResultSchemaFor(def, tables),
       404: errorBodySchema,
+      409: errorBodySchema,
       422: errorBodySchema,
       500: errorBodySchema,
     },
@@ -111,7 +112,9 @@ export function updateRoute(def: TableDef) {
       200: z.object({ data: tableRowSchemaFor(def) }),
       403: errorBodySchema,
       404: errorBodySchema,
+      409: errorBodySchema,
       422: errorBodySchema,
+      500: errorBodySchema,
     },
   });
 }

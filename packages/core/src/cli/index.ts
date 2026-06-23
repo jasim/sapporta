@@ -58,9 +58,10 @@ function readCliPackageVersion(): string {
  * Emit an error and exit. In table mode, prints to stderr like before.
  * In JSON mode, emits a structured error envelope to stdout.
  */
-function handleError(err: any, format: OutputFormat): never {
+function handleError(err: unknown, format: OutputFormat): never {
   const code = err instanceof OperationError ? err.code : ErrorCode.INTERNAL;
-  const result = { ok: false as const, error: err.message, code };
+  const message = err instanceof Error ? err.message : String(err);
+  const result = { ok: false as const, error: message, code };
   emitResult(result, format);
   process.exit(err instanceof OperationError ? 1 : 2);
 }
@@ -73,7 +74,7 @@ function handleError(err: any, format: OutputFormat): never {
 async function runApiCommand(
   route: Parameters<typeof buildRequest>[0],
   params: Record<string, string>,
-  allFlags: Record<string, any>,
+  allFlags: Record<string, unknown>,
 ): Promise<void> {
   const format = resolveOutputFormat(allFlags);
 
@@ -118,7 +119,7 @@ async function main() {
       const result = await init(rawArgs.slice(1));
       emitResult(result, format);
       if (!result.ok) process.exit(1);
-    } catch (err: any) {
+    } catch (err: unknown) {
       handleError(err, format);
     }
     return;
@@ -140,7 +141,7 @@ async function main() {
               credentials.apiToken,
             );
       emitResult(result, format);
-    } catch (err: any) {
+    } catch (err: unknown) {
       handleError(err, format);
     }
     return;
@@ -177,7 +178,7 @@ async function main() {
     const format = resolveOutputFormat(allFlags);
     try {
       await runApiCommand(route, params, allFlags);
-    } catch (err: any) {
+    } catch (err: unknown) {
       handleError(err, format);
     }
   });
