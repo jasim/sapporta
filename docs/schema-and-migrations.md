@@ -23,6 +23,10 @@ export const accounts = sapportaTable({
 
 `drizzle.config.ts` points Drizzle Kit at `packages/api/schema/**/*.ts`. Drizzle Kit scans top-level exported Drizzle runtime objects such as `accountsTable`; Sapporta loads the `TableDef` exports such as `accounts`.
 
+See [Schema Metadata](schema-metadata.md) for the full `sapportaTable()` metadata
+surface: row labels, row scope, enum selects, search, child relationships,
+column display hints, and generated API behavior.
+
 Sapporta defaults omitted `meta.rowScope` to `workspaceUserScoped`, so ordinary
 tables need the conventional `workspace_id` and `scoped_to_user_id` columns
 before migrations are generated. See [Sapporta Auth](auth.md).
