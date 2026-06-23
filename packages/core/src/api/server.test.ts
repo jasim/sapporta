@@ -13,6 +13,7 @@ import {
   installSapportaDefaults,
   type SapportaEnv,
 } from "./server.js";
+import { normalizeHttpException } from "./http-exceptions.js";
 import { OperationError } from "../introspect/types.js";
 
 type HonoHttpExceptionConstructor = new (
@@ -121,6 +122,27 @@ describe("installSapportaDefaults", () => {
     expect(res.status).toBe(401);
     expect(await res.json()).toEqual({
       error: "Project auth rejected",
+      code: "unauthenticated",
+    });
+  });
+
+  it("honors structurally equivalent Hono HTTPException responses", async () => {
+    const response = Response.json(
+      { error: "Sign in first", code: "unauthenticated" },
+      { status: 401 },
+    );
+    const err = {
+      message: "",
+      status: 401,
+      res: response,
+      getResponse: () => response,
+    };
+
+    const normalized = normalizeHttpException(err);
+
+    expect(normalized?.status).toBe(401);
+    expect(await normalized?.response?.json()).toEqual({
+      error: "Sign in first",
       code: "unauthenticated",
     });
   });

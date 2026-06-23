@@ -12,8 +12,9 @@ export type NormalizedHttpException = {
   response?: Response;
 };
 
-type ForeignHonoHttpException = Error & {
+type ForeignHonoHttpException = {
   status: HttpExceptionStatus;
+  message: string;
   res?: Response;
   getResponse: () => Response;
 };
@@ -51,20 +52,21 @@ export function normalizeHttpException(
 function foreignHonoHttpException(
   err: unknown,
 ): ForeignHonoHttpException | null {
-  if (!(err instanceof Error)) return null;
-
   const candidate = err as {
+    message?: unknown;
     status?: unknown;
     res?: unknown;
     getResponse?: unknown;
   };
+  if (!candidate || typeof candidate !== "object") return null;
   if (
+    typeof candidate.message !== "string" ||
     !isHttpExceptionStatus(candidate.status) ||
     typeof candidate.getResponse !== "function"
   ) {
     return null;
   }
-  if (candidate.res !== undefined && !(candidate.res instanceof Response)) {
+  if (candidate.res !== undefined && !isResponse(candidate.res)) {
     return null;
   }
 
@@ -76,16 +78,24 @@ function responseFromHonoException(err: {
 }): Response | undefined {
   try {
     const response = err.getResponse();
-    if (
-      !(response instanceof Response) ||
-      !isHttpExceptionStatus(response.status)
-    ) {
+    if (!isResponse(response) || !isHttpExceptionStatus(response.status)) {
       return undefined;
     }
     return response;
   } catch {
     return undefined;
   }
+}
+
+function isResponse(value: unknown): value is Response {
+  return (
+    value instanceof Response ||
+    (typeof value === "object" &&
+      value !== null &&
+      "status" in value &&
+      "headers" in value &&
+      typeof (value as { clone?: unknown }).clone === "function")
+  );
 }
 
 function httpExceptionStatusFromNumber(status: number): HttpExceptionStatus {
