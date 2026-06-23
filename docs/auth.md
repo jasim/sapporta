@@ -119,7 +119,12 @@ Define the Drizzle table with explicit scope columns, then wrap it with
 Sapporta metadata:
 
 ```ts
-import { integer, sqliteTable, table, text } from "@sapporta/server/table";
+import {
+  integer,
+  sqliteTable,
+  sapportaTable,
+  text,
+} from "@sapporta/server/table";
 
 export const invoicesTable = sqliteTable("invoices", {
   id: integer("id").primaryKey({ autoIncrement: true }),
@@ -131,7 +136,7 @@ export const invoicesTable = sqliteTable("invoices", {
   status: text("status").notNull(),
 });
 
-export const invoices = table({
+export const invoices = sapportaTable({
   drizzle: invoicesTable,
   meta: {
     label: "Invoices",
@@ -148,7 +153,7 @@ export const invoices = table({
 workspace/user boundary. The client does not submit those columns. Sapporta
 writes them from the current auth context.
 
-`table()` currently defaults an omitted `rowScope` to
+`sapportaTable()` currently defaults an omitted `rowScope` to
 `workspaceUserScoped`, the strictest scope. Keep examples and production schemas
 explicit anyway; auth boundaries are design decisions, not incidental defaults.
 
@@ -615,7 +620,7 @@ export const invoiceLinesTable = sqliteTable("invoice_lines", {
   line_total: integer("line_total").notNull(),
 });
 
-export const invoiceLines = table({
+export const invoiceLines = sapportaTable({
   drizzle: invoiceLinesTable,
   meta: {
     label: "Invoice Lines",

@@ -41,7 +41,12 @@ packages/shared/    contracts and types shared by backend and frontend
 Sapporta tables are Drizzle tables wrapped with Sapporta metadata. Schema files live in `packages/api/schema/`.
 
 ```ts
-import { integer, sqliteTable, table, text } from "@sapporta/server/table";
+import {
+  integer,
+  sqliteTable,
+  sapportaTable,
+  text,
+} from "@sapporta/server/table";
 
 export const customersTable = sqliteTable("customers", {
   id: integer("id").primaryKey({ autoIncrement: true }),
@@ -50,7 +55,7 @@ export const customersTable = sqliteTable("customers", {
   email: text("email"),
 });
 
-export const customers = table({
+export const customers = sapportaTable({
   drizzle: customersTable,
   meta: {
     label: "Customers",

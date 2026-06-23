@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { sqliteTable, text, integer } from "drizzle-orm/sqlite-core";
-import { table } from "../schema/table.js";
+import { sapportaTable } from "../schema/table.js";
 import { savePipeline, insertRow, updateRow } from "./save-pipeline.js";
 import { ValidationError } from "../db/errors.js";
 import { createTestDb } from "../testing/test-utils.js";
@@ -12,7 +12,7 @@ const accountsTable = sqliteTable("accounts", {
   balance: integer("balance"),
 });
 
-const accounts = table({
+const accounts = sapportaTable({
   drizzle: accountsTable,
   meta: {
     rowLabelColumns: ["name"],

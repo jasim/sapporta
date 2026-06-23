@@ -19,7 +19,7 @@ import {
   integer,
   text as drizzleText,
 } from "drizzle-orm/sqlite-core";
-import { table } from "../schema/table.js";
+import { sapportaTable } from "../schema/table.js";
 import type { TableDef } from "../schema/table.js";
 import { timestamp, date } from "../schema/columns.js";
 import { parseQuery } from "./query-parser.js";
@@ -47,7 +47,7 @@ describe("strict calendar validity", () => {
       id: integer("id").primaryKey({ autoIncrement: true }),
       occurred_on: date("occurred_on").notNull(),
     });
-    const events_def = table({
+    const events_def = sapportaTable({
       drizzle: events,
       meta: { rowScope: "systemGlobal", rowLabelColumns: ["occurred_on"] },
     });
@@ -94,7 +94,7 @@ describe("LIKE escaping — user wildcards match literally", () => {
     id: integer("id").primaryKey({ autoIncrement: true }),
     name: drizzleText("name").notNull(),
   });
-  const promos_def = table({
+  const promos_def = sapportaTable({
     drizzle: promos,
     meta: { rowScope: "systemGlobal", rowLabelColumns: ["name"] },
   });
@@ -149,7 +149,7 @@ describe("timestamp precision normalization", () => {
       description: drizzleText("description").notNull(),
       occurred_at: timestamp("occurred_at").notNull(),
     });
-    const events_def = table({
+    const events_def = sapportaTable({
       drizzle: events,
       meta: { rowScope: "systemGlobal", rowLabelColumns: ["description"] },
     });

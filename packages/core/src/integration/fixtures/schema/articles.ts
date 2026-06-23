@@ -1,4 +1,4 @@
-import { table, timestamp } from "@sapporta/server/table";
+import { sapportaTable, timestamp } from "@sapporta/server/table";
 import { sqliteTable, text, integer } from "drizzle-orm/sqlite-core";
 
 /**
@@ -17,7 +17,7 @@ export const articlesTable = sqliteTable("articles", {
   updated_at: timestamp("updated_at"),
 });
 
-export const articles = table({
+export const articles = sapportaTable({
   drizzle: articlesTable,
   meta: {
     label: "Articles",

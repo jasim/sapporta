@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
-import { table } from "../schema/table.js";
+import { sapportaTable } from "../schema/table.js";
 import { findRowLabelColumns, rowLabeller } from "./row-label.js";
 
 const accountsTable = sqliteTable("accounts", {
@@ -9,7 +9,7 @@ const accountsTable = sqliteTable("accounts", {
   type: text("type").notNull(),
 });
 
-const accounts = table({
+const accounts = sapportaTable({
   drizzle: accountsTable,
   meta: { label: "Accounts", rowLabelColumns: ["name"] },
 });
@@ -27,7 +27,7 @@ describe("findRowLabelColumns", () => {
         .references(() => accountsTable.id),
       description: text("description").notNull(),
     });
-    const invoices = table({
+    const invoices = sapportaTable({
       drizzle: invoicesTable,
       meta: { rowLabelColumns: ["description"] },
     });
@@ -39,7 +39,7 @@ describe("findRowLabelColumns", () => {
       id: integer("id").primaryKey({ autoIncrement: true }),
       value: integer("value").notNull(),
     });
-    const numbers = table({
+    const numbers = sapportaTable({
       drizzle: numbersTable,
       meta: { rowLabelColumns: ["id"] },
     });
@@ -52,7 +52,7 @@ describe("findRowLabelColumns", () => {
       first_name: text("first_name").notNull(),
       last_name: text("last_name").notNull(),
     });
-    const orders = table({
+    const orders = sapportaTable({
       drizzle: ordersTable,
       meta: { rowLabelColumns: ["first_name", "last_name"] },
     });
@@ -67,7 +67,7 @@ describe("rowLabeller", () => {
       first_name: text("first_name").notNull(),
       last_name: text("last_name").notNull(),
     });
-    const people = table({
+    const people = sapportaTable({
       drizzle: peopleTable,
       meta: { rowLabelColumns: ["first_name", "last_name"] },
     });
@@ -83,7 +83,7 @@ describe("rowLabeller", () => {
       id: integer("id").primaryKey({ autoIncrement: true }),
       name: text("name"),
     });
-    const people = table({
+    const people = sapportaTable({
       drizzle: peopleTable,
       meta: { rowLabelColumns: ["name"] },
     });

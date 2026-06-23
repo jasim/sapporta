@@ -1,15 +1,7 @@
 import { describe, expect, it } from "vitest";
-import {
-  integer,
-  real,
-  sqliteTable,
-  text,
-} from "drizzle-orm/sqlite-core";
-import {
-  assertSchemaDefinitions,
-  SchemaValidationError,
-} from "./check.js";
-import { table } from "./table.js";
+import { integer, real, sqliteTable, text } from "drizzle-orm/sqlite-core";
+import { assertSchemaDefinitions, SchemaValidationError } from "./check.js";
+import { sapportaTable } from "./table.js";
 
 describe("assertSchemaDefinitions", () => {
   it("accepts non-null numerics, nullable FKs, and explicit non-additive numerics", () => {
@@ -25,11 +17,11 @@ describe("assertSchemaDefinitions", () => {
       rating_override: real("rating_override"),
     });
 
-    const categories = table({
+    const categories = sapportaTable({
       drizzle: categoriesTable,
       meta: { rowLabelColumns: ["name"] },
     });
-    const products = table({
+    const products = sapportaTable({
       drizzle: productsTable,
       meta: {
         rowLabelColumns: ["name"],
@@ -41,7 +33,7 @@ describe("assertSchemaDefinitions", () => {
   });
 
   it("throws a structured error for nullable additive numerics", () => {
-    const accounts = table({
+    const accounts = sapportaTable({
       drizzle: sqliteTable("schema_check_accounts", {
         id: integer("id").primaryKey({ autoIncrement: true }),
         name: text("name").notNull(),
@@ -50,17 +42,20 @@ describe("assertSchemaDefinitions", () => {
       meta: { rowLabelColumns: ["name"] },
     });
 
-    expectSchemaIssues(() => assertSchemaDefinitions([accounts]), [
-      {
-        table: "schema_check_accounts",
-        column: "balance",
-        message: expect.stringContaining("Nullable numeric column"),
-      },
-    ]);
+    expectSchemaIssues(
+      () => assertSchemaDefinitions([accounts]),
+      [
+        {
+          table: "schema_check_accounts",
+          column: "balance",
+          message: expect.stringContaining("Nullable numeric column"),
+        },
+      ],
+    );
   });
 
   it("throws a structured error for Date-mode timestamps", () => {
-    const events = table({
+    const events = sapportaTable({
       drizzle: sqliteTable("schema_check_events", {
         id: integer("id").primaryKey({ autoIncrement: true }),
         name: text("name").notNull(),
@@ -69,13 +64,16 @@ describe("assertSchemaDefinitions", () => {
       meta: { rowLabelColumns: ["name"] },
     });
 
-    expectSchemaIssues(() => assertSchemaDefinitions([events]), [
-      {
-        table: "schema_check_events",
-        column: "occurred_at",
-        message: expect.stringContaining("Timestamp column using Date mode"),
-      },
-    ]);
+    expectSchemaIssues(
+      () => assertSchemaDefinitions([events]),
+      [
+        {
+          table: "schema_check_events",
+          column: "occurred_at",
+          message: expect.stringContaining("Timestamp column using Date mode"),
+        },
+      ],
+    );
   });
 });
 

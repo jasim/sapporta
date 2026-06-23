@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { Hono } from "hono";
 import { sqliteTable, text, integer } from "drizzle-orm/sqlite-core";
-import { timestamp, money, table } from "./table.js";
+import { timestamp, money, sapportaTable } from "./table.js";
 import { Temporal } from "@sapporta/shared/temporal";
 import { schemaApi, extractSchemas, extractSchema } from "./extract.js";
 
@@ -16,7 +16,7 @@ const accountsTable = sqliteTable("accounts", {
     .$defaultFn(() => Temporal.Now.instant()),
 });
 
-const accounts = table({
+const accounts = sapportaTable({
   drizzle: accountsTable,
   meta: {
     label: "Accounts",
@@ -40,7 +40,7 @@ const invoicesTable = sqliteTable("invoices", {
   amount: integer("amount").notNull(),
 });
 
-const invoices = table({
+const invoices = sapportaTable({
   drizzle: invoicesTable,
   meta: { label: "Invoices", rowLabelColumns: ["id"] },
 });
@@ -51,7 +51,7 @@ const ledgerTable = sqliteTable("ledger", {
   description: text("description").notNull(),
 });
 
-const ledger = table({
+const ledger = sapportaTable({
   drizzle: ledgerTable,
   meta: { immutable: true, rowLabelColumns: ["description"] },
 });
@@ -65,7 +65,7 @@ const transactionsTable = sqliteTable("transactions", {
   credit: money("credit"),
 });
 
-const transactions = table({
+const transactions = sapportaTable({
   drizzle: transactionsTable,
   meta: {
     label: "Transactions",
@@ -179,7 +179,7 @@ describe("extractSchemas", () => {
       id: integer("id").primaryKey({ autoIncrement: true }),
       body: text("body").notNull(),
     });
-    const docs = table({
+    const docs = sapportaTable({
       drizzle: docsTable,
       meta: {
         rowLabelColumns: ["body"],
@@ -199,7 +199,7 @@ describe("extractSchemas", () => {
       id: integer("id").primaryKey({ autoIncrement: true }),
       balance: integer("balance").notNull(),
     });
-    const balances = table({
+    const balances = sapportaTable({
       drizzle: balancesTable,
       meta: {
         rowLabelColumns: ["id"],
@@ -221,7 +221,7 @@ describe("extractSchemas", () => {
   });
 
   it("auto-hides created_at and updated_at columns", () => {
-    // Hidden by default in table() so the UI table views don't show noisy timestamps.
+    // Hidden by default in sapportaTable() so the UI table views don't show noisy timestamps.
     const result = extractSchemas([accounts]);
     const cols = result[0].columns;
 
@@ -241,7 +241,7 @@ describe("extractSchemas", () => {
         .notNull()
         .$defaultFn(() => Temporal.Now.instant()),
     });
-    const audit = table({
+    const audit = sapportaTable({
       drizzle: customTable,
       meta: {
         rowLabelColumns: ["id"],
@@ -274,7 +274,7 @@ describe("extractSchemas", () => {
       updated_at: timestamp("updated_at"),
     });
 
-    const orders = table({
+    const orders = sapportaTable({
       drizzle: ordersTable,
       meta: {
         label: "Orders",
@@ -282,7 +282,7 @@ describe("extractSchemas", () => {
         children: [{ table: "line_items", foreignKey: "order_id" }],
       },
     });
-    const lineItems = table({
+    const lineItems = sapportaTable({
       drizzle: lineItemsTable,
       meta: { label: "Line Items", rowLabelColumns: ["product"] },
     });
@@ -332,7 +332,7 @@ describe("extractSchemas", () => {
       id: integer("id").primaryKey({ autoIncrement: true }),
       name: text("name").notNull(),
     });
-    const t = table({
+    const t = sapportaTable({
       drizzle: standalone,
       meta: { label: "Standalone", rowLabelColumns: ["name"] },
     });
@@ -348,7 +348,7 @@ describe("search config surfacing", () => {
       title: text("title").notNull(),
       body: text("body").notNull(),
     });
-    const docs = table({
+    const docs = sapportaTable({
       drizzle: searchableTable,
       meta: {
         rowLabelColumns: ["title"],

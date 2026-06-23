@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
 import { integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
 import { createTableCatalog } from "../schema/catalog.js";
-import { table } from "../schema/table.js";
+import { sapportaTable } from "../schema/table.js";
 import { createTestDb } from "../testing/test-utils.js";
 import {
   AuthPayloadPolicyError,
@@ -90,15 +90,15 @@ const systemRowsTable = sqliteTable("system_rows", {
   label: text("label").notNull(),
 });
 
-const userRows = table({
+const userRows = sapportaTable({
   drizzle: userRowsTable,
   meta: { rowScope: "workspaceUserScoped", rowLabelColumns: ["label"] },
 });
-const workspaceRows = table({
+const workspaceRows = sapportaTable({
   drizzle: workspaceRowsTable,
   meta: { rowScope: "workspaceGlobal", rowLabelColumns: ["label"] },
 });
-const systemRows = table({
+const systemRows = sapportaTable({
   drizzle: systemRowsTable,
   meta: { rowScope: "systemGlobal", rowLabelColumns: ["label"] },
 });
@@ -255,7 +255,7 @@ describe("foreign-key auth validation", () => {
     return handle;
   }
 
-  const customers = table({
+  const customers = sapportaTable({
     drizzle: sqliteTable("customers", {
       id: text("id").primaryKey(),
       workspace_id: text("workspace_id").notNull(),
@@ -263,7 +263,7 @@ describe("foreign-key auth validation", () => {
     }),
     meta: { rowScope: "workspaceGlobal", rowLabelColumns: ["name"] },
   });
-  const privateDocs = table({
+  const privateDocs = sapportaTable({
     drizzle: sqliteTable("private_docs", {
       id: text("id").primaryKey(),
       workspace_id: text("workspace_id").notNull(),
@@ -272,7 +272,7 @@ describe("foreign-key auth validation", () => {
     }),
     meta: { rowScope: "workspaceUserScoped", rowLabelColumns: ["title"] },
   });
-  const countries = table({
+  const countries = sapportaTable({
     drizzle: sqliteTable("countries", {
       id: text("id").primaryKey(),
       name: text("name").notNull(),
@@ -281,7 +281,7 @@ describe("foreign-key auth validation", () => {
   });
 
   it("rejects cross-workspace FK values", async () => {
-    const orders = table({
+    const orders = sapportaTable({
       drizzle: sqliteTable("orders", {
         id: integer("id").primaryKey({ autoIncrement: true }),
         workspace_id: text("workspace_id").notNull(),
@@ -308,7 +308,7 @@ describe("foreign-key auth validation", () => {
   });
 
   it("rejects current-user-invisible FK values", async () => {
-    const orders = table({
+    const orders = sapportaTable({
       drizzle: sqliteTable("orders", {
         id: integer("id").primaryKey({ autoIncrement: true }),
         workspace_id: text("workspace_id").notNull(),
@@ -335,7 +335,7 @@ describe("foreign-key auth validation", () => {
   });
 
   it("passes valid workspace and system-global FK values", async () => {
-    const orders = table({
+    const orders = sapportaTable({
       drizzle: sqliteTable("orders", {
         id: integer("id").primaryKey({ autoIncrement: true }),
         workspace_id: text("workspace_id").notNull(),
@@ -366,7 +366,7 @@ describe("foreign-key auth validation", () => {
   });
 
   it("rejects clientCanSet false before validating target rows", async () => {
-    const orders = table({
+    const orders = sapportaTable({
       drizzle: sqliteTable("orders", {
         id: integer("id").primaryKey({ autoIncrement: true }),
         workspace_id: text("workspace_id").notNull(),
@@ -450,7 +450,7 @@ describe("row-security guards", () => {
     return handle;
   }
 
-  const countries = table({
+  const countries = sapportaTable({
     drizzle: sqliteTable("countries", {
       id: text("id").primaryKey(),
       name: text("name").notNull(),
@@ -458,7 +458,7 @@ describe("row-security guards", () => {
     meta: { rowScope: "systemGlobal", rowLabelColumns: ["name"] },
   });
 
-  const invoices = table({
+  const invoices = sapportaTable({
     drizzle: sqliteTable("invoices", {
       id: text("id").primaryKey(),
       workspace_id: text("workspace_id").notNull(),
@@ -543,7 +543,7 @@ describe("row-security guards", () => {
   });
 
   it("rejects client-submitted non-client-settable references", async () => {
-    const orders = table({
+    const orders = sapportaTable({
       drizzle: sqliteTable("orders", {
         id: integer("id").primaryKey({ autoIncrement: true }),
         workspace_id: text("workspace_id").notNull(),
@@ -569,7 +569,7 @@ describe("row-security guards", () => {
   });
 
   it("allows server-authored references and still validates final visibility", async () => {
-    const lines = table({
+    const lines = sapportaTable({
       drizzle: sqliteTable("lines", {
         id: integer("id").primaryKey({ autoIncrement: true }),
         workspace_id: text("workspace_id").notNull(),

@@ -157,7 +157,7 @@ Each schema file should export the raw Drizzle table and the Sapporta wrapper:
 
 ```ts
 export const accountsTable = sqliteTable("accounts", { ... });
-export const accounts = table({
+export const accounts = sapportaTable({
   drizzle: accountsTable,
   meta: { label: "Accounts", rowLabelColumns: ["name"] },
 });
@@ -242,7 +242,7 @@ Each namespace has a distinct prefix — route ordering no longer matters.
 
 ## Core Modules
 
-- **Table definition**: `table()` in `src/schema/table.ts` wraps Drizzle `sqliteTable` with Sapporta metadata
+- **Table definition**: `sapportaTable()` in `src/schema/table.ts` wraps Drizzle `sqliteTable` with Sapporta metadata
 - **Schema loading**: `loadSchemas()` dynamically imports all `.ts` files from a schema directory
 - **Migrations**: native Drizzle Kit `generate` and `migrate`; Sapporta only checks readiness at boot
 - **Meta API**: `mount-meta.ts` mounts schema introspection, DB introspection, and the SQL proxy

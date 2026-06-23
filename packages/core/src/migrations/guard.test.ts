@@ -6,10 +6,10 @@ import { describe, expect, it } from "vitest";
 import { sqliteTable, integer } from "drizzle-orm/sqlite-core";
 import { readMigrationFiles } from "drizzle-orm/migrator";
 import { createTestDb } from "../testing/test-utils.js";
-import { table } from "../schema/table.js";
+import { sapportaTable } from "../schema/table.js";
 import { assertMigrationsReady } from "./guard.js";
 
-const sampleTable = table({
+const sampleTable = sapportaTable({
   drizzle: sqliteTable("sample", {
     id: integer("id").primaryKey({ autoIncrement: true }),
   }),

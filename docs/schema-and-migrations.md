@@ -15,7 +15,7 @@ export const accountsTable = sqliteTable("accounts", {
   scoped_to_user_id: text("scoped_to_user_id").notNull(),
   name: text("name").notNull(),
 });
-export const accounts = table({
+export const accounts = sapportaTable({
   drizzle: accountsTable,
   meta: { label: "Accounts", rowLabelColumns: ["name"] },
 });

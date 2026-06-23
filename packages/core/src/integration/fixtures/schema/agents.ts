@@ -1,4 +1,4 @@
-import { table } from "@sapporta/server/table";
+import { sapportaTable } from "@sapporta/server/table";
 import { sqliteTable, text } from "drizzle-orm/sqlite-core";
 
 export const agentsTable = sqliteTable("agents", {
@@ -7,7 +7,7 @@ export const agentsTable = sqliteTable("agents", {
   workspace_id: text("workspace_id").notNull(),
 });
 
-export const agents = table({
+export const agents = sapportaTable({
   drizzle: agentsTable,
   meta: {
     label: "Agents",

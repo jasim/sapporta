@@ -100,7 +100,8 @@ export interface ColumnMeta {
 
 /** Normalized Sapporta metadata attached to a TableDef.
  *
- * Public callers provide sparse `SapportaTableInputMeta`; `table()` fills the
+ * Public callers provide sparse `SapportaTableInputMeta`; `sapportaTable()`
+ * fills the
  * runtime defaults so downstream code can trust these table-level fields. */
 export interface SapportaMeta {
   /** Display label for the table */
@@ -148,7 +149,7 @@ type SapportaMetaDefaultedField =
   | "children"
   | "columns";
 
-/** Sparse public metadata accepted by `table()`.
+/** Sparse public metadata accepted by `sapportaTable()`.
  *
  * These fields are optional at the authoring boundary and normalized into
  * `SapportaMeta` before the TableDef is returned. */
@@ -180,7 +181,7 @@ export interface TableDef {
   meta: SapportaMeta;
 }
 
-/** Options for the table() function */
+/** Options for the sapportaTable() function */
 export interface TableOptions {
   /** The Drizzle sqliteTable definition */
   drizzle: SQLiteTableWithColumns<any>;
@@ -251,18 +252,18 @@ function normalizeSapportaMeta(
  *
  * Usage:
  * ```ts
- * const accounts = table({
+ * const accounts = sapportaTable({
  *   drizzle: sqliteTable("accounts", { ... }),
  *   meta: { label: "Accounts", rowLabelColumns: ["name"] }
  * });
  * ```
  */
-export function table(options: TableOptions): TableDef {
+export function sapportaTable(options: TableOptions): TableDef {
   const config = getTableConfig(options.drizzle);
-  // `table()` is the join point for the public API: it combines the user's
-  // separate Drizzle definition with their Sapporta metadata. It also drains
-  // factory metadata from `money()`, `date()`, etc. and folds that into
-  // ordinary `meta.columns` data on the returned TableDef.
+  // This is the join point for the public API: it combines the user's separate
+  // Drizzle definition with their Sapporta metadata. It also drains factory
+  // metadata from `money()`, `date()`, etc. and folds that into ordinary
+  // `meta.columns` data on the returned TableDef.
   const columnNames = config.columns.map((c) => c.name);
   const drained = drainPendingColumnMeta(columnNames);
   return {

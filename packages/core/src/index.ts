@@ -20,7 +20,7 @@ export type {
 } from "./api/server.js";
 
 // Table definition
-export { table } from "./schema/table.js";
+export { sapportaTable } from "./schema/table.js";
 export type {
   TableDef,
   TableOptions,

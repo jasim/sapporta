@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
-import { table } from "../schema/table.js";
+import { sapportaTable } from "../schema/table.js";
 import { ValidationError } from "../db/errors.js";
 import { createTestAuthContext } from "../testing/auth-context.js";
 import { createTestDb } from "../testing/test-utils.js";
@@ -17,7 +17,7 @@ const accountsTable = sqliteTable("accounts", {
   balance: integer("balance"),
 });
 
-const accounts = table({
+const accounts = sapportaTable({
   drizzle: accountsTable,
   meta: {
     rowScope: "systemGlobal",
@@ -108,7 +108,7 @@ describe("scopedRows", () => {
       id: integer("id").primaryKey({ autoIncrement: true }),
       description: text("description").notNull(),
     });
-    const ledger = table({
+    const ledger = sapportaTable({
       drizzle: ledgerTable,
       meta: {
         immutable: true,
@@ -145,7 +145,7 @@ describe("scopedRows", () => {
       workspace_id: text("workspace_id").notNull(),
       title: text("title").notNull(),
     });
-    const documents = table({
+    const documents = sapportaTable({
       drizzle: documentsTable,
       meta: { rowScope: "workspaceGlobal", rowLabelColumns: ["title"] },
     });

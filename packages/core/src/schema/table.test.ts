@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
-import { table } from "./table.js";
+import { sapportaTable } from "./table.js";
 
 describe("table metadata", () => {
   it("requires at least one row label column at runtime", () => {
@@ -9,7 +9,7 @@ describe("table metadata", () => {
     });
 
     expect(() =>
-      table({
+      sapportaTable({
         drizzle: accountsTable,
         meta: {
           rowLabelColumns: [] as unknown as [string, ...string[]],
@@ -25,7 +25,7 @@ describe("table metadata", () => {
     });
 
     expect(() =>
-      table({
+      sapportaTable({
         drizzle: accountsTable,
         meta: { rowLabelColumns: ["display_name"] },
       }),

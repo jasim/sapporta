@@ -7,7 +7,7 @@ import {
 } from "drizzle-orm/sqlite-core";
 import type { SQL } from "drizzle-orm";
 import { timestamp } from "../schema/table.js";
-import { table } from "../schema/table.js";
+import { sapportaTable } from "../schema/table.js";
 import { parseQuery } from "./query-parser.js";
 
 const dialect = new SQLiteSyncDialect();
@@ -26,22 +26,22 @@ const ordersTable = sqliteTable("orders", {
   created_at: timestamp("created_at").notNull(),
 });
 
-const orders = table({
+const orders = sapportaTable({
   drizzle: ordersTable,
   meta: { rowLabelColumns: ["customer"] },
 });
-const searchableOrders = table({
+const searchableOrders = sapportaTable({
   drizzle: ordersTable,
   meta: {
     rowLabelColumns: ["customer"],
     search: { columns: ["customer", "status"] },
   },
 });
-const singleSearchOrders = table({
+const singleSearchOrders = sapportaTable({
   drizzle: ordersTable,
   meta: { rowLabelColumns: ["customer"], search: { columns: ["customer"] } },
 });
-const badSearchTable = table({
+const badSearchTable = sapportaTable({
   drizzle: ordersTable,
   meta: { rowLabelColumns: ["customer"], search: { columns: ["nope"] } },
 });

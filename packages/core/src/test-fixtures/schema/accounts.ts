@@ -1,5 +1,5 @@
 import { sqliteTable, text, integer } from "drizzle-orm/sqlite-core";
-import { table } from "../../schema/table.js";
+import { sapportaTable } from "../../schema/table.js";
 
 // SQLite has no native enum type. Enum values are expressed as
 // text({ enum: [...] }) directly in the column definition.
@@ -11,7 +11,7 @@ export const accountsTable = sqliteTable("accounts", {
   }).notNull(),
 });
 
-export const accounts = table({
+export const accounts = sapportaTable({
   drizzle: accountsTable,
   meta: {
     label: "Accounts",

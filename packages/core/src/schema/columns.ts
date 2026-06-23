@@ -16,11 +16,11 @@
  *       opened: date("opened"),             // text(...) + kind "date"
  *     })
  *
- * Meta is captured via a module-level pending queue that `table()`
+ * Meta is captured via a module-level pending queue that `sapportaTable()`
  * drains on invocation. This is safe for the synchronous-declaration
  * idiom — the schema definition runs start-to-finish before the next
- * `table()` call — and fragile only if factory calls are interleaved
- * across `table()` calls, which no reasonable declaration style does.
+ * `sapportaTable()` call — and fragile only if factory calls are interleaved
+ * across `sapportaTable()` calls, which no reasonable declaration style does.
  *
  * See docs/DATA-TYPE-PRINCIPLES.md §3, Phase 2.
  */
@@ -42,10 +42,10 @@ import {
 
 // The user-facing API keeps Drizzle schema and Sapporta metadata separate:
 // users write a real `sqliteTable(...)`, then pass it with Sapporta `meta` to
-// `table({ drizzle, meta })`. Column factories must therefore keep returning
+// `sapportaTable({ drizzle, meta })`. Column factories must therefore keep returning
 // plain Drizzle builders, while still carrying Sapporta-only semantics such as
 // `kind` and `displayFormat`. This queue is the temporary side channel that
-// lets `table()` combine those two authored pieces into one TableDef.
+// lets `sapportaTable()` combine those two authored pieces into one TableDef.
 const pending: Array<{ name: string; meta: ColumnMeta }> = [];
 
 function register(name: string, meta: ColumnMeta): void {
@@ -55,14 +55,14 @@ function register(name: string, meta: ColumnMeta): void {
 /**
  * Move queued factory metadata into the table currently being wrapped.
  * Column names keep metadata for later tables in the queue, so two tables
- * declared before their `table()` wrappers still receive the right entries.
+ * declared before their `sapportaTable()` wrappers still receive the right entries.
  *
  * Example:
  *
  *     const t1 = sqliteTable("a", { created_at: timestamp("created_at") });
  *     const t2 = sqliteTable("b", { created_at: timestamp("created_at") });
- *     const a = table({ drizzle: t1, meta: { rowLabelColumns: ["created_at"] } });
- *     const b = table({ drizzle: t2, meta: { rowLabelColumns: ["created_at"] } });
+ *     const a = sapportaTable({ drizzle: t1, meta: { rowLabelColumns: ["created_at"] } });
+ *     const b = sapportaTable({ drizzle: t2, meta: { rowLabelColumns: ["created_at"] } });
  *
  * Factories run synchronously while `sqliteTable(...)` builds its columns, so
  * a table's entries form a contiguous queue segment. The drain stops at the

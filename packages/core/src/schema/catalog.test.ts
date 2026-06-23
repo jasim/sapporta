@@ -1,10 +1,10 @@
 import { describe, it, expect } from "vitest";
 import { sqliteTable, text, integer } from "drizzle-orm/sqlite-core";
-import { table } from "./table.js";
+import { sapportaTable } from "./table.js";
 import { createTableCatalog } from "./catalog.js";
 
 function makeTable(name: string) {
-  return table({
+  return sapportaTable({
     drizzle: sqliteTable(name, {
       id: integer("id").primaryKey({ autoIncrement: true }),
       name: text("name").notNull(),

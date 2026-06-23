@@ -13,7 +13,7 @@
 
 import { describe, expect, it } from "vitest";
 import { integer, sqliteTable } from "drizzle-orm/sqlite-core";
-import { table } from "../schema/table.js";
+import { sapportaTable } from "../schema/table.js";
 import type { TableDef } from "../schema/table.js";
 import {
   bool,
@@ -35,7 +35,7 @@ describe("storage alignment — numbers", () => {
     id: integer("id").primaryKey({ autoIncrement: true }),
     balance: money("balance").notNull(),
   });
-  const accounts_def = table({
+  const accounts_def = sapportaTable({
     drizzle: accounts,
     meta: { rowScope: "systemGlobal", rowLabelColumns: ["id"] },
   });
@@ -77,7 +77,7 @@ describe("storage alignment — dates", () => {
     id: integer("id").primaryKey({ autoIncrement: true }),
     occurred_on: date("occurred_on").notNull(),
   });
-  const events_def = table({
+  const events_def = sapportaTable({
     drizzle: events,
     meta: { rowScope: "systemGlobal", rowLabelColumns: ["occurred_on"] },
   });
@@ -133,7 +133,7 @@ describe("storage alignment — timestamps", () => {
     id: integer("id").primaryKey({ autoIncrement: true }),
     at: timestamp("at").notNull(),
   });
-  const audits_def = table({
+  const audits_def = sapportaTable({
     drizzle: audits,
     meta: { rowScope: "systemGlobal", rowLabelColumns: ["at"] },
   });
@@ -172,7 +172,7 @@ describe("storage alignment — booleans", () => {
     id: integer("id").primaryKey({ autoIncrement: true }),
     is_active: bool("is_active").notNull(),
   });
-  const toggles_def = table({
+  const toggles_def = sapportaTable({
     drizzle: toggles,
     meta: { rowScope: "systemGlobal", rowLabelColumns: ["id"] },
   });
@@ -208,7 +208,7 @@ describe("storage alignment — null vs empty string", () => {
     id: integer("id").primaryKey({ autoIncrement: true }),
     body: text("body"),
   });
-  const notes_def = table({
+  const notes_def = sapportaTable({
     drizzle: notes,
     meta: { rowScope: "systemGlobal", rowLabelColumns: ["body"] },
   });
@@ -244,7 +244,7 @@ describe("URL round-trip — encoded filters execute and match", () => {
     balance: money("balance").notNull(),
     opened_on: date("opened_on").notNull(),
   });
-  const accounts_def = table({
+  const accounts_def = sapportaTable({
     drizzle: accounts,
     meta: { rowScope: "systemGlobal", rowLabelColumns: ["id"] },
   });

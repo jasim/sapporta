@@ -9,7 +9,7 @@ import {
   workspaceGlobalOnlyAuthority,
 } from "../auth/index.js";
 import { createTableCatalog } from "../schema/catalog.js";
-import { table } from "../schema/table.js";
+import { sapportaTable } from "../schema/table.js";
 import { createTestDb } from "../testing/test-utils.js";
 import { createRoute } from "./table-contracts.js";
 import { makeAuthorizedTableHandlers } from "./table-handlers.js";
@@ -30,12 +30,12 @@ const orderLinesTable = sqliteTable("order_lines", {
   workspace_id: text("workspace_id").notNull(),
 });
 
-const orders = table({
+const orders = sapportaTable({
   drizzle: ordersTable,
   meta: { rowScope: "workspaceGlobal", rowLabelColumns: ["label"] },
 });
 
-const orderLines = table({
+const orderLines = sapportaTable({
   drizzle: orderLinesTable,
   meta: { rowScope: "workspaceGlobal", rowLabelColumns: ["description"] },
 });

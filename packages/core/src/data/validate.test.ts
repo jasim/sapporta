@@ -1,13 +1,13 @@
 import { describe, it, expect } from "vitest";
 import { sqliteTable, text, integer } from "drizzle-orm/sqlite-core";
 import { z } from "zod";
-import { table, timestamp } from "../schema/table.js";
+import { sapportaTable, timestamp } from "../schema/table.js";
 import { validate, buildZodSchema } from "./validate.js";
 import { Temporal } from "@sapporta/shared/temporal";
 
 describe("buildZodSchema()", () => {
   it("infers string fields as required", () => {
-    const schema = table({
+    const schema = sapportaTable({
       drizzle: sqliteTable("test_strings", {
         id: integer("id").primaryKey({ autoIncrement: true }),
         name: text("name").notNull(),
@@ -22,7 +22,7 @@ describe("buildZodSchema()", () => {
   });
 
   it("makes nullable columns nullable", () => {
-    const schema = table({
+    const schema = sapportaTable({
       drizzle: sqliteTable("test_nullable", {
         id: integer("id").primaryKey({ autoIncrement: true }),
         notes: text("notes"),
@@ -36,7 +36,7 @@ describe("buildZodSchema()", () => {
   });
 
   it("makes columns with defaults optional", () => {
-    const schema = table({
+    const schema = sapportaTable({
       drizzle: sqliteTable("test_defaults", {
         id: integer("id").primaryKey({ autoIncrement: true }),
         created_at: timestamp("created_at")
@@ -52,7 +52,7 @@ describe("buildZodSchema()", () => {
   });
 
   it("validates select options", () => {
-    const schema = table({
+    const schema = sapportaTable({
       drizzle: sqliteTable("test_selects", {
         id: integer("id").primaryKey({ autoIncrement: true }),
         status: text("status").notNull(),
@@ -75,7 +75,7 @@ describe("buildZodSchema()", () => {
       name: z.string().min(3),
     });
 
-    const schema = table({
+    const schema = sapportaTable({
       drizzle: sqliteTable("test_custom", {
         id: integer("id").primaryKey({ autoIncrement: true }),
         name: text("name").notNull(),
@@ -91,7 +91,7 @@ describe("buildZodSchema()", () => {
 
 describe("validate()", () => {
   it("returns empty array for valid records", () => {
-    const schema = table({
+    const schema = sapportaTable({
       drizzle: sqliteTable("test_valid", {
         id: integer("id").primaryKey({ autoIncrement: true }),
         name: text("name").notNull(),
@@ -103,7 +103,7 @@ describe("validate()", () => {
   });
 
   it("returns field errors for invalid records", () => {
-    const schema = table({
+    const schema = sapportaTable({
       drizzle: sqliteTable("test_invalid", {
         id: integer("id").primaryKey({ autoIncrement: true }),
         name: text("name").notNull(),

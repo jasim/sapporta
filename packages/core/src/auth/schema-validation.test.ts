@@ -5,7 +5,7 @@ import {
   sqliteTable,
   text,
 } from "drizzle-orm/sqlite-core";
-import { table } from "../schema/table.js";
+import { sapportaTable } from "../schema/table.js";
 import {
   checkAuthSchemaDefinitions,
   clientPayloadPolicyIssues,
@@ -46,7 +46,7 @@ function scopedColumns() {
 
 describe("auth schema validation", () => {
   it("defaults omitted rowScope to current-user workspace scope", () => {
-    const accounts = table({
+    const accounts = sapportaTable({
       drizzle: sqliteTable("accounts", {
         id: integer("id").primaryKey({ autoIncrement: true }),
       }),
@@ -63,13 +63,13 @@ describe("auth schema validation", () => {
   });
 
   it("enforces required workspace and scoped-user columns", () => {
-    const workspaceGlobal = table({
+    const workspaceGlobal = sapportaTable({
       drizzle: sqliteTable("customers", {
         id: integer("id").primaryKey({ autoIncrement: true }),
       }),
       meta: { rowScope: "workspaceGlobal", rowLabelColumns: ["id"] },
     });
-    const workspaceUserScoped = table({
+    const workspaceUserScoped = sapportaTable({
       drizzle: sqliteTable("orders", {
         id: integer("id").primaryKey({ autoIncrement: true }),
         workspace_id: text("workspace_id").notNull(),
@@ -89,7 +89,7 @@ describe("auth schema validation", () => {
   });
 
   it("rejects unknown row scope values before request-time policy checks", () => {
-    const accounts = table({
+    const accounts = sapportaTable({
       drizzle: sqliteTable("accounts", {
         id: integer("id").primaryKey({ autoIncrement: true }),
       }),
@@ -107,7 +107,7 @@ describe("auth schema validation", () => {
   });
 
   it("rejects client-editable system-managed scope columns", () => {
-    const orders = table({
+    const orders = sapportaTable({
       drizzle: sqliteTable("orders", {
         id: integer("id").primaryKey({ autoIncrement: true }),
         ...scopedColumns(),
@@ -127,21 +127,21 @@ describe("auth schema validation", () => {
   });
 
   it("accepts valid workspace and system scoped tables", () => {
-    const workspaceRows = table({
+    const workspaceRows = sapportaTable({
       drizzle: sqliteTable("workspace_rows", {
         id: integer("id").primaryKey({ autoIncrement: true }),
         workspace_id: text("workspace_id").notNull(),
       }),
       meta: { rowScope: "workspaceGlobal", rowLabelColumns: ["id"] },
     });
-    const userRows = table({
+    const userRows = sapportaTable({
       drizzle: sqliteTable("user_rows", {
         id: integer("id").primaryKey({ autoIncrement: true }),
         ...scopedColumns(),
       }),
       meta: { rowScope: "workspaceUserScoped", rowLabelColumns: ["id"] },
     });
-    const systemRows = table({
+    const systemRows = sapportaTable({
       drizzle: sqliteTable("system_rows", {
         id: integer("id").primaryKey({ autoIncrement: true }),
       }),
@@ -163,11 +163,11 @@ describe("auth schema validation", () => {
       workspace_id: text("workspace_id").notNull(),
       account_id: integer("account_id").references(() => accountsTable.id),
     });
-    const accounts = table({
+    const accounts = sapportaTable({
       drizzle: accountsTable,
       meta: { rowScope: "workspaceGlobal", rowLabelColumns: ["id"] },
     });
-    const invoices = table({
+    const invoices = sapportaTable({
       drizzle: invoicesTable,
       meta: { rowScope: "workspaceGlobal", rowLabelColumns: ["id"] },
     });
@@ -186,14 +186,14 @@ describe("auth schema validation", () => {
   });
 
   it("resolves references from meta.references", () => {
-    const accounts = table({
+    const accounts = sapportaTable({
       drizzle: sqliteTable("accounts", {
         id: integer("id").primaryKey({ autoIncrement: true }),
         workspace_id: text("workspace_id").notNull(),
       }),
       meta: { rowScope: "workspaceGlobal", rowLabelColumns: ["id"] },
     });
-    const invoices = table({
+    const invoices = sapportaTable({
       drizzle: sqliteTable("invoices", {
         id: integer("id").primaryKey({ autoIncrement: true }),
         workspace_id: text("workspace_id").notNull(),
@@ -221,7 +221,7 @@ describe("auth schema validation", () => {
   });
 
   it("fails unresolved references to unregistered tables", () => {
-    const invoices = table({
+    const invoices = sapportaTable({
       drizzle: sqliteTable("invoices", {
         id: integer("id").primaryKey({ autoIncrement: true }),
         workspace_id: text("workspace_id").notNull(),
@@ -242,14 +242,14 @@ describe("auth schema validation", () => {
   });
 
   it("fails references whose source column is not on the table", () => {
-    const accounts = table({
+    const accounts = sapportaTable({
       drizzle: sqliteTable("accounts", {
         id: integer("id").primaryKey({ autoIncrement: true }),
         workspace_id: text("workspace_id").notNull(),
       }),
       meta: { rowScope: "workspaceGlobal", rowLabelColumns: ["id"] },
     });
-    const invoices = table({
+    const invoices = sapportaTable({
       drizzle: sqliteTable("invoices", {
         id: integer("id").primaryKey({ autoIncrement: true }),
         workspace_id: text("workspace_id").notNull(),
@@ -276,7 +276,7 @@ describe("auth schema validation", () => {
       id: integer("id").primaryKey({ autoIncrement: true }),
       workspace_id: text("workspace_id").notNull(),
     });
-    const customers = table({
+    const customers = sapportaTable({
       drizzle: sqliteTable("customers", {
         id: integer("id").primaryKey({ autoIncrement: true }),
         workspace_id: text("workspace_id").notNull(),
@@ -288,11 +288,11 @@ describe("auth schema validation", () => {
       workspace_id: text("workspace_id").notNull(),
       account_id: integer("account_id").references(() => accountsTable.id),
     });
-    const accounts = table({
+    const accounts = sapportaTable({
       drizzle: accountsTable,
       meta: { rowScope: "workspaceGlobal", rowLabelColumns: ["id"] },
     });
-    const invoices = table({
+    const invoices = sapportaTable({
       drizzle: invoicesTable,
       meta: {
         rowScope: "workspaceGlobal",
@@ -334,11 +334,11 @@ describe("auth schema validation", () => {
         }),
       ],
     );
-    const headers = table({
+    const headers = sapportaTable({
       drizzle: orderHeaders,
       meta: { rowScope: "workspaceGlobal", rowLabelColumns: ["id"] },
     });
-    const lines = table({
+    const lines = sapportaTable({
       drizzle: orderLines,
       meta: { rowScope: "workspaceGlobal", rowLabelColumns: ["id"] },
     });
@@ -351,14 +351,14 @@ describe("auth schema validation", () => {
   });
 
   it("rejects clientCanSet false and system-managed client fields", () => {
-    const accounts = table({
+    const accounts = sapportaTable({
       drizzle: sqliteTable("accounts", {
         id: integer("id").primaryKey({ autoIncrement: true }),
         workspace_id: text("workspace_id").notNull(),
       }),
       meta: { rowScope: "workspaceGlobal", rowLabelColumns: ["id"] },
     });
-    const invoices = table({
+    const invoices = sapportaTable({
       drizzle: sqliteTable("invoices", {
         id: integer("id").primaryKey({ autoIncrement: true }),
         workspace_id: text("workspace_id").notNull(),
@@ -398,7 +398,7 @@ describe("auth schema validation", () => {
       workspaceId: text("workspace_id").notNull(),
       scopedToUserId: text("scoped_to_user_id").notNull(),
     });
-    const orders = table({
+    const orders = sapportaTable({
       drizzle: ordersTable,
       meta: { rowScope: "workspaceUserScoped", rowLabelColumns: ["id"] },
     });

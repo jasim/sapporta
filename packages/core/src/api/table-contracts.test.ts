@@ -11,14 +11,14 @@
  */
 import { describe, it, expect } from "vitest";
 import { sqliteTable, integer, text } from "drizzle-orm/sqlite-core";
-import { table } from "../schema/table.js";
+import { sapportaTable } from "../schema/table.js";
 import { listRoute, createRoute } from "./table-contracts.js";
 import {
   tableRowSchemaFor,
   tableCreateBodySchemaFor,
 } from "./table-schemas.js";
 
-const accounts = table({
+const accounts = sapportaTable({
   drizzle: sqliteTable("accounts", {
     id: integer("id").primaryKey({ autoIncrement: true }),
     name: text("name").notNull(),
@@ -33,7 +33,7 @@ const accounts = table({
   },
 });
 
-const txns = table({
+const txns = sapportaTable({
   drizzle: sqliteTable("txns", {
     id: integer("id").primaryKey({ autoIncrement: true }),
     account_id: integer("account_id").notNull(),
@@ -42,7 +42,7 @@ const txns = table({
   meta: { rowLabelColumns: ["id"] },
 });
 
-const accountsWithChildren = table({
+const accountsWithChildren = sapportaTable({
   drizzle: accounts.drizzle,
   meta: {
     ...accounts.meta,
