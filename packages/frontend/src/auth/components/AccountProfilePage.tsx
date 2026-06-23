@@ -10,6 +10,18 @@ import {
   UserRound,
 } from "lucide-react";
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
+import {
+  Button,
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  Input,
+  Label,
+} from "@sapporta/ui";
 import type { AuthToken } from "@sapporta/shared/contracts";
 import {
   createAuthToken,
@@ -105,10 +117,15 @@ export function AccountProfilePage() {
   );
 }
 
+type ExpirationChoice = "never" | "date";
+
 function AgentAccessTokens() {
   const [tokens, setTokens] = useState<AuthToken[]>([]);
+  const [isCreateFormOpen, setCreateFormOpen] = useState(false);
   const [name, setName] = useState("codex-local");
   const [expiresAt, setExpiresAt] = useState("");
+  const [expirationChoice, setExpirationChoice] =
+    useState<ExpirationChoice>("never");
   // The raw bearer token is returned only when it is created. Keep it in this
   // view long enough for the user to copy it into an agent or CI secret; token
   // list responses show metadata only.
@@ -137,12 +154,16 @@ function AgentAccessTokens() {
     try {
       const created = await createAuthToken({
         name,
-        ...(expiresAt ? { expiresAt: new Date(expiresAt).toISOString() } : {}),
+        ...(expirationChoice === "date" && expiresAt
+          ? { expiresAt: new Date(expiresAt).toISOString() }
+          : {}),
       });
       setRawToken(created.rawToken);
       setTokens((current) => [created.token, ...current]);
       setName("codex-local");
       setExpiresAt("");
+      setExpirationChoice("never");
+      setCreateFormOpen(false);
     } catch (err) {
       setError(errorMessage(err));
     } finally {
@@ -175,59 +196,130 @@ function AgentAccessTokens() {
 
   return (
     <section className="mt-8">
-      <header className="mb-3 flex items-center gap-2">
-        <KeyRound className="h-4 w-4 text-sap-subtle" strokeWidth={1.7} />
-        <h2 className="text-[17px] font-[680] text-sap-fg">
-          Agent access tokens
-        </h2>
+      <header className="mb-3 flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <KeyRound className="h-4 w-4 text-sap-subtle" strokeWidth={1.7} />
+          <h2 className="text-[17px] font-[680] text-sap-fg">
+            Agent access tokens
+          </h2>
+        </div>
+        {!isCreateFormOpen ? (
+          <Button
+            type="button"
+            className="bg-sap-brand text-white hover:bg-sap-brand/90"
+            onClick={() => setCreateFormOpen(true)}
+          >
+            <Plus className="h-4 w-4" strokeWidth={1.9} />
+            Create new access token
+          </Button>
+        ) : null}
       </header>
 
-      <form
-        className="grid gap-3 border-y border-sap-border-soft py-4 sm:grid-cols-[minmax(0,1fr)_210px_36px]"
-        onSubmit={submit}
-      >
-        <input
-          className="h-9 min-w-0 rounded-[7px] border border-sap-border bg-sap-panel px-3 text-sap-body text-sap-fg outline-none focus:border-sap-brand"
-          value={name}
-          onChange={(event) => setName(event.target.value)}
-          placeholder="Token name"
-          required
-        />
-        <input
-          className="h-9 min-w-0 rounded-[7px] border border-sap-border bg-sap-panel px-3 text-sap-body text-sap-fg outline-none focus:border-sap-brand"
-          type="datetime-local"
-          value={expiresAt}
-          onChange={(event) => setExpiresAt(event.target.value)}
-          aria-label="Expiration"
-        />
-        <button
-          className="flex h-9 w-9 items-center justify-center rounded-[7px] bg-sap-brand text-white disabled:opacity-60"
-          type="submit"
-          title="Create token"
-          disabled={pending || name.trim().length === 0}
+      {isCreateFormOpen ? (
+        <form
+          className="grid gap-4 border-y border-sap-border-soft py-4"
+          onSubmit={submit}
         >
-          <Plus className="h-4 w-4" strokeWidth={1.9} />
-        </button>
-      </form>
+          <div className="space-y-2">
+            <Label htmlFor="agent-token-name">Token name</Label>
+            <Input
+              id="agent-token-name"
+              className="border-sap-border bg-sap-surface text-sap-fg focus-visible:ring-sap-brand"
+              value={name}
+              onChange={(event) => setName(event.target.value)}
+              required
+            />
+            <p className="text-sap-data text-sap-muted">
+              Use a name that tells you where this token will be used.
+            </p>
+          </div>
 
-      {rawToken ? (
-        <div className="mt-4 grid gap-2 border-y border-sap-border-soft py-3 sm:grid-cols-[minmax(0,1fr)_36px]">
-          <input
-            className="h-9 min-w-0 rounded-[7px] border border-sap-border bg-sap-panel px-3 font-mono text-[12px] text-sap-fg outline-none"
-            value={rawToken}
-            readOnly
-            aria-label="New agent access token"
-          />
-          <button
-            className="flex h-9 w-9 items-center justify-center rounded-[7px] border border-sap-border bg-sap-panel text-sap-muted hover:text-sap-fg"
-            type="button"
-            title="Copy token"
-            onClick={copyRawToken}
-          >
-            <Copy className="h-4 w-4" strokeWidth={1.8} />
-          </button>
-        </div>
+          <fieldset className="space-y-3">
+            <legend className="text-sm font-medium leading-none text-sap-fg">
+              Expiration
+            </legend>
+            <p className="text-sap-data text-sap-muted">
+              Choose whether this token should expire automatically.
+            </p>
+            <label className="flex items-start gap-3 text-sap-body text-sap-fg">
+              <input
+                className="mt-[3px] h-4 w-4 accent-sap-brand"
+                type="radio"
+                name="agent-token-expiration"
+                value="never"
+                checked={expirationChoice === "never"}
+                onChange={() => setExpirationChoice("never")}
+              />
+              <span>
+                <span className="block font-medium">Never expires</span>
+                <span className="block text-sap-data text-sap-muted">
+                  Keep this token active until you revoke it.
+                </span>
+              </span>
+            </label>
+            <label className="flex items-start gap-3 text-sap-body text-sap-fg">
+              <input
+                className="mt-[3px] h-4 w-4 accent-sap-brand"
+                type="radio"
+                name="agent-token-expiration"
+                value="date"
+                checked={expirationChoice === "date"}
+                onChange={() => setExpirationChoice("date")}
+              />
+              <span>
+                <span className="block font-medium">Expires on a date</span>
+                <span className="block text-sap-data text-sap-muted">
+                  Set a specific date and time for this token to stop working.
+                </span>
+              </span>
+            </label>
+            {expirationChoice === "date" ? (
+              <div className="space-y-2 pl-7">
+                <Label htmlFor="agent-token-expires-at">Expiration date</Label>
+                <Input
+                  id="agent-token-expires-at"
+                  className="max-w-[260px] border-sap-border bg-sap-surface text-sap-fg focus-visible:ring-sap-brand"
+                  type="datetime-local"
+                  value={expiresAt}
+                  onChange={(event) => setExpiresAt(event.target.value)}
+                  required
+                />
+              </div>
+            ) : null}
+          </fieldset>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              type="submit"
+              className="bg-sap-brand text-white hover:bg-sap-brand/90"
+              disabled={
+                pending ||
+                name.trim().length === 0 ||
+                (expirationChoice === "date" && expiresAt.length === 0)
+              }
+            >
+              Create token
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              className="border-sap-border bg-sap-surface text-sap-muted hover:text-sap-fg"
+              onClick={() => {
+                setCreateFormOpen(false);
+                setError(null);
+              }}
+            >
+              Cancel
+            </Button>
+          </div>
+        </form>
       ) : null}
+
+      <CreatedTokenDialog
+        rawToken={rawToken}
+        onClose={() => setRawToken(null)}
+        onCopy={copyRawToken}
+      />
 
       {error ? (
         <p className="mt-3 text-sap-data text-red-600">{error}</p>
@@ -258,7 +350,7 @@ function AgentAccessTokens() {
                 {token.lastUsedAt ? formatDate(token.lastUsedAt) : "Never used"}
               </div>
               <button
-                className="flex h-9 w-9 items-center justify-center rounded-[7px] border border-sap-border bg-sap-panel text-sap-muted hover:text-red-600 disabled:opacity-50"
+                className="flex h-9 w-9 items-center justify-center rounded-[7px] border border-sap-border bg-sap-surface text-sap-muted hover:text-red-600 disabled:opacity-50"
                 type="button"
                 title="Revoke token"
                 disabled={pending || token.revokedAt !== null}
@@ -271,6 +363,81 @@ function AgentAccessTokens() {
         )}
       </div>
     </section>
+  );
+}
+
+function CreatedTokenDialog({
+  rawToken,
+  onClose,
+  onCopy,
+}: {
+  rawToken: string | null;
+  onClose: () => void;
+  onCopy: () => void;
+}) {
+  return (
+    <Dialog
+      open={rawToken !== null}
+      onOpenChange={(open) => {
+        if (!open) onClose();
+      }}
+    >
+      <DialogContent className="max-w-[420px] border-sap-border bg-sap-surface p-5 text-sap-fg">
+        <DialogHeader className="pr-6">
+          <div className="flex items-start gap-3 text-left">
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[7px] bg-sap-active-nav text-sap-brand">
+              <KeyRound className="h-4 w-4" strokeWidth={1.8} />
+            </span>
+            <div className="min-w-0">
+              <DialogTitle className="text-[16px] font-[680]">
+                New access token created
+              </DialogTitle>
+              <DialogDescription className="mt-2 text-sap-body text-sap-muted">
+                Copy this token now. It will not be shown again after this
+                popup is closed.
+              </DialogDescription>
+            </div>
+          </div>
+        </DialogHeader>
+
+        <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_36px]">
+          <Input
+            aria-label="New agent access token"
+            className="min-w-0 border-sap-border bg-sap-surface font-mono text-[12px] text-sap-fg"
+            value={rawToken ?? ""}
+            readOnly
+          />
+          <button
+            className="flex h-9 w-9 items-center justify-center rounded-[7px] border border-sap-border bg-sap-surface text-sap-muted hover:text-sap-fg"
+            type="button"
+            title="Copy token"
+            onClick={onCopy}
+          >
+            <Copy className="h-4 w-4" strokeWidth={1.8} />
+          </button>
+        </div>
+
+        <DialogFooter>
+          <DialogClose asChild>
+            <Button
+              type="button"
+              variant="outline"
+              className="border-sap-border bg-sap-surface text-sap-muted hover:text-sap-fg"
+            >
+              Close
+            </Button>
+          </DialogClose>
+          <Button
+            type="button"
+            className="bg-sap-brand text-white hover:bg-sap-brand/90"
+            onClick={onCopy}
+          >
+            <Copy className="h-4 w-4" strokeWidth={1.8} />
+            Copy token
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 

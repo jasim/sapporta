@@ -9,6 +9,18 @@ export {
   CommandItem,
   CommandList,
 } from "./primitives/command";
+export {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogOverlay,
+  DialogPortal,
+  DialogTitle,
+  DialogTrigger,
+} from "./primitives/dialog";
 export { Input } from "./primitives/input";
 export { Label } from "./primitives/label";
 export { Popover, PopoverContent, PopoverTrigger } from "./primitives/popover";
