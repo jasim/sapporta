@@ -21,6 +21,10 @@ export default defineConfig({
         "./packages/grid/src/lookup/index.ts",
       ),
       "@sapporta/grid": path.resolve(__dirname, "./packages/grid/src/index.ts"),
+      "@sapporta/shared/validation": path.resolve(
+        __dirname,
+        "./packages/shared/src/validation/index.ts",
+      ),
       "@sapporta/server/table": path.resolve(
         __dirname,
         "./packages/core/src/schema/table.ts",

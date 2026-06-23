@@ -43,6 +43,7 @@
     "./daterange": "./dist/daterange.js",
     "./grid-dataset": "./dist/grid-dataset/index.js",
     "./row-id": "./dist/row-id.js",
+    "./validation": "./dist/validation/index.js",
     "./contracts": "./dist/contracts/index.js",
     "./client": "./dist/client/index.js",
     "./package.json": "./package.json"

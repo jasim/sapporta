@@ -2,6 +2,7 @@ import path from "node:path";
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
+import { parseBoundedInteger } from "@sapporta/shared/validation";
 
 // Dev topology: Vite serves the SPA on :5173 and transparently proxies
 // /api/* to the Hono backend on PORT (default 3000) — frontend code uses
@@ -51,9 +52,10 @@ export default defineConfig({
 function parseIntegerEnv(name: string, fallback: number): number {
   const value = process.env[name];
   if (value === undefined || value === "") return fallback;
-  const parsed = Number.parseInt(value, 10);
-  if (!Number.isInteger(parsed) || String(parsed) !== value) {
-    throw new Error(`${name} must be an integer.`);
-  }
-  return parsed;
+  return parseBoundedInteger(value, {
+    name,
+    min: 0,
+    defaultValue: fallback,
+    makeError: () => new Error(`${name} must be an integer.`),
+  });
 }

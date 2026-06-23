@@ -239,8 +239,20 @@ describe("parseQuery()", () => {
       );
     });
 
+    it("bad_limit — non-canonical integer", () => {
+      expect(() => parseQuery({ limit: "01" }, orders)).toThrow(
+        expect.objectContaining({ code: "bad_limit" }),
+      );
+    });
+
     it("bad_page — non-numeric", () => {
       expect(() => parseQuery({ page: "abc" }, orders)).toThrow(
+        expect.objectContaining({ code: "bad_page" }),
+      );
+    });
+
+    it("bad_page — non-canonical integer", () => {
+      expect(() => parseQuery({ page: "01" }, orders)).toThrow(
         expect.objectContaining({ code: "bad_page" }),
       );
     });

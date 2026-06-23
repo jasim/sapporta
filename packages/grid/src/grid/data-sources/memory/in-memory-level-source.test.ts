@@ -150,6 +150,15 @@ describe("inMemoryLevelSource (writable)", () => {
     expect(snap.nodes[0].columns.id).toBe("r20");
   });
 
+  it("setPage rejects non-integer pagination windows", () => {
+    const src = inMemoryLevelSource(
+      baseOpts({ initialPage: 0, initialPageSize: 10 }),
+    );
+
+    expect(() => src.setPage(1.5, 10)).toThrow(/page must be an integer/);
+    expect(() => src.setPage(1, 0)).toThrow(/pageSize must be an integer/);
+  });
+
   it("setCell mutates the matching node and allocates a new nodes ref", () => {
     const src = inMemoryLevelSource(baseOpts());
     const before = src.snapshot();

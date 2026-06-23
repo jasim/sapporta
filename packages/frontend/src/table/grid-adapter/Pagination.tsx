@@ -1,6 +1,7 @@
 import { useEffect, useId, useMemo, useState } from "react";
 import type { FormEvent, MouseEvent } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
+import { parseOptionalBoundedInteger } from "@sapporta/shared/validation";
 import { visiblePaginationItems } from "./visible-pagination-items";
 
 export interface PaginationProps {
@@ -77,8 +78,8 @@ export function Pagination({
 
   function handleSubmit(event: FormEvent<HTMLFormElement>): void {
     event.preventDefault();
-    const parsed = Number.parseInt(draftPage, 10);
-    goToPage(Number.isNaN(parsed) ? page : parsed);
+    const parsed = parsePageJump(draftPage);
+    goToPage(parsed ?? page);
   }
 
   return (
@@ -185,4 +186,16 @@ export function Pagination({
       </ol>
     </nav>
   );
+}
+
+function parsePageJump(raw: string): number | undefined {
+  try {
+    return parseOptionalBoundedInteger(raw, {
+      name: "page",
+      min: 1,
+      makeError: (message) => new Error(message),
+    });
+  } catch {
+    return undefined;
+  }
 }

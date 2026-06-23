@@ -4,6 +4,7 @@ import {
   eqCondition,
   type FilterCondition,
 } from "@sapporta/shared/filter";
+import { parseBoundedInteger } from "@sapporta/shared/validation";
 import type { ColId, SortDescriptor } from "@sapporta/grid";
 import { parseSortString, stringifySortOrder } from "@sapporta/grid";
 
@@ -125,8 +126,7 @@ export function parseTableSearchParams(
   searchParams: URLSearchParams,
   validColIds: ReadonlySet<ColId>,
 ): TableUrlState {
-  const pageStr = searchParams.get("page");
-  const page = pageStr ? Math.max(1, parseInt(pageStr, 10) || 1) : 1;
+  const page = parseTablePage(searchParams.get("page"));
 
   // `has("sort")` distinguishes URL-silent (undefined) from explicit empty
   // (`?sort=` -> []). Downstream layers use this to decide whether the URL
@@ -143,4 +143,17 @@ export function parseTableSearchParams(
   const filters = decodeFilters(searchParams);
 
   return { page, sort, filters, search };
+}
+
+function parseTablePage(raw: string | null): number {
+  try {
+    return parseBoundedInteger(raw ?? undefined, {
+      name: "page",
+      min: 1,
+      defaultValue: 1,
+      makeError: (message) => new Error(message),
+    });
+  } catch {
+    return 1;
+  }
 }

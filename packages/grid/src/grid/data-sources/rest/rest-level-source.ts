@@ -48,6 +48,7 @@
 // host sees `agreed` or `diverged`.
 
 import { defaultRowKey } from "../../pipeline/stages/build-data";
+import { assertBoundedInteger } from "@sapporta/shared/validation";
 import type { ColId, RowKey } from "../../types/identity";
 import type { FooterRow, TreeNode } from "../../types/level-row";
 import type { RowPredicate, SortDescriptor } from "../../pipeline/types";
@@ -371,6 +372,7 @@ export function restLevelSource<F = unknown>(
     },
     setPage(p, ps) {
       if (hostOwned) return;
+      assertPageWindow(p, ps);
       if (page === p && pageSize === ps) return;
       page = p;
       pageSize = ps;
@@ -772,4 +774,17 @@ export function restLevelSource<F = unknown>(
     onReconcile,
   };
   return writableSource;
+}
+
+function assertPageWindow(page: number, pageSize: number): void {
+  assertBoundedInteger(page, {
+    name: "page",
+    min: 0,
+    makeError: (message) => new Error(message),
+  });
+  assertBoundedInteger(pageSize, {
+    name: "pageSize",
+    min: 1,
+    makeError: (message) => new Error(message),
+  });
 }

@@ -9,7 +9,7 @@ import type Database from "better-sqlite3";
 import { ErrorCode, OperationError, type OperationResult } from "./types.js";
 import { validateTableName, validateColumnNames } from "./sql-safety.js";
 import { assertTableExists, validatePayloadColumns } from "./db-helpers.js";
-import { assertBoundedInteger } from "../validation/bounded-integer.js";
+import { assertBoundedInteger } from "@sapporta/shared/validation";
 
 /**
  * Return sample rows from a table, optionally selecting specific columns.

@@ -51,7 +51,7 @@ function parsePresentBoundedInteger(
   raw: string | number,
   options: BoundedIntegerOptions,
 ): number {
-  const value = typeof raw === "number" ? raw : Number(raw);
+  const value = typeof raw === "number" ? raw : parseDecimalInteger(raw);
   if (!Number.isInteger(value) || value < options.min) {
     throw options.makeError(errorMessage(raw, options));
   }
@@ -59,6 +59,11 @@ function parsePresentBoundedInteger(
     throw options.makeError(errorMessage(raw, options));
   }
   return value;
+}
+
+function parseDecimalInteger(raw: string): number {
+  const value = Number.parseInt(raw, 10);
+  return Number.isInteger(value) && String(value) === raw ? value : Number.NaN;
 }
 
 function errorMessage(raw: string | number, options: BoundedIntegerOptions) {

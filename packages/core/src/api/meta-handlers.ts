@@ -17,7 +17,7 @@ import {
   OperationError,
   type OperationResult,
 } from "../introspect/types.js";
-import { parseOptionalBoundedInteger } from "../validation/bounded-integer.js";
+import { parseOptionalBoundedInteger } from "@sapporta/shared/validation";
 import {
   apiErrorResponse,
   operationErrorResponse,

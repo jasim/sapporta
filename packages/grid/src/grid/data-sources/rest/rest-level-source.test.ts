@@ -159,6 +159,15 @@ describe("restLevelSource — read surface", () => {
     ]);
   });
 
+  it("setPage rejects non-integer pagination windows", () => {
+    const src = restLevelSource(
+      baseOpts({ initialPagination: { page: 0, pageSize: 10 } }),
+    );
+
+    expect(() => src.setPage(1.5, 10)).toThrow(/page must be an integer/);
+    expect(() => src.setPage(1, 0)).toThrow(/pageSize must be an integer/);
+  });
+
   it("setSort with serverManaged.sort=false updates state without refetching", async () => {
     const fetchPage = vi.fn(async () => ({
       nodes: fixtureNodes(),

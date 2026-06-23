@@ -34,7 +34,7 @@ import { getTableConfig, type SQLiteColumn } from "drizzle-orm/sqlite-core";
 import type { RowId } from "@sapporta/shared/row-id";
 import type { SapportaAuthContext } from "../auth/context.js";
 import { QueryParseError, ValidationError } from "../db/errors.js";
-import { parseOptionalBoundedInteger } from "../validation/bounded-integer.js";
+import { parseOptionalBoundedInteger } from "@sapporta/shared/validation";
 import { findPkColumn } from "../schema/pk.js";
 import type { TableDef } from "../schema/table.js";
 import { savePipeline } from "./save-pipeline.js";

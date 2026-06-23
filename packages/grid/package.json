@@ -65,6 +65,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@sapporta/shared": "workspace:*",
     "@sapporta/ui": "workspace:*",
     "lucide-react": "^0.513.0"
   },

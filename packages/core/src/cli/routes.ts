@@ -12,7 +12,7 @@
  */
 import { z } from "zod";
 import { ErrorCode, OperationError } from "../introspect/types.js";
-import { parseOptionalBoundedInteger } from "../validation/bounded-integer.js";
+import { parseOptionalBoundedInteger } from "@sapporta/shared/validation";
 
 // ── Route Definition ────────────────────────────────────────────────────────
 

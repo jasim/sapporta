@@ -9,6 +9,25 @@ import type { ColId } from "@sapporta/grid";
 
 const COLS: ReadonlySet<ColId> = new Set(["name", "created_at"] as ColId[]);
 
+describe("parseTableSearchParams - page", () => {
+  test("defaults to page 1 when absent", () => {
+    const r = parseTableSearchParams(new URLSearchParams(""), COLS);
+    expect(r.page).toBe(1);
+  });
+
+  test("parses canonical positive integer pages", () => {
+    const r = parseTableSearchParams(new URLSearchParams("page=12"), COLS);
+    expect(r.page).toBe(12);
+  });
+
+  test("falls back to page 1 for malformed pages", () => {
+    for (const query of ["page=0", "page=01", "page=12abc", "page=1.5"]) {
+      const r = parseTableSearchParams(new URLSearchParams(query), COLS);
+      expect(r.page).toBe(1);
+    }
+  });
+});
+
 describe("parseTableSearchParams - sort", () => {
   test("no sort key -> undefined (URL silent)", () => {
     const r = parseTableSearchParams(new URLSearchParams(""), COLS);

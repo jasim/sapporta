@@ -165,6 +165,9 @@ importers:
 
   packages/grid:
     dependencies:
+      "@sapporta/shared":
+        specifier: workspace:*
+        version: link:../shared
       "@sapporta/ui":
         specifier: workspace:*
         version: link:../ui

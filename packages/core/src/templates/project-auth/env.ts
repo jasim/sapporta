@@ -1,4 +1,5 @@
 import type { HealthPolicy } from "@sapporta/server";
+import { parseBoundedInteger } from "@sapporta/shared/validation";
 
 export type Origin = string & { readonly __origin: unique symbol };
 export type PublicBaseUrl = Origin & {
@@ -163,11 +164,12 @@ function readRequiredIntegerEnv(
 }
 
 function parseIntegerEnv(value: string, name: string): number {
-  const parsed = Number.parseInt(value, 10);
-  if (!Number.isInteger(parsed) || String(parsed) !== value) {
-    throw new Error(`${name} must be an integer.`);
-  }
-  return parsed;
+  return parseBoundedInteger(value, {
+    name,
+    min: 0,
+    defaultValue: 0,
+    makeError: () => new Error(`${name} must be an integer.`),
+  });
 }
 
 function parsePublicBaseUrl(value: string): PublicBaseUrl {

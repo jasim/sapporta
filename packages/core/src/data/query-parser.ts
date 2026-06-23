@@ -21,7 +21,7 @@ import {
 import type { TableDef } from "../schema/table.js";
 import { resolveColumnKind } from "../schema/resolve-kind.js";
 import { QueryParseError } from "../db/errors.js";
-import { parseBoundedInteger } from "../validation/bounded-integer.js";
+import { parseBoundedInteger } from "@sapporta/shared/validation";
 import {
   decodeFilters,
   parseFilters,
@@ -249,15 +249,12 @@ function parseLimit(raw: string | undefined): number {
 }
 
 function parsePage(raw: string | undefined): number {
-  if (raw === undefined) return 1;
-  const n = Number(raw);
-  if (!Number.isInteger(n) || n < 1) {
-    throw new QueryParseError(
-      "bad_page",
-      `page must be a positive integer, got ${JSON.stringify(raw)}`,
-    );
-  }
-  return n;
+  return parseBoundedInteger(raw, {
+    name: "page",
+    min: 1,
+    defaultValue: 1,
+    makeError: (message) => new QueryParseError("bad_page", message),
+  });
 }
 
 // Escape \, %, _ in a user-supplied substring so LIKE treats them literally.

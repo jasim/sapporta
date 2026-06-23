@@ -13,7 +13,7 @@
 
 import type Database from "better-sqlite3";
 import { classifySqliteError } from "../db/errors.js";
-import { parseOptionalBoundedInteger } from "../validation/bounded-integer.js";
+import { parseOptionalBoundedInteger } from "@sapporta/shared/validation";
 import { ErrorCode, OperationError, type OperationResult } from "./types.js";
 import { rejectDangerousSQL } from "./sql-safety.js";
 
