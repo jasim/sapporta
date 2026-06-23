@@ -385,14 +385,18 @@ describe("fetchOpenApiSpec", () => {
     }
   });
 
-  it("propagates the ECONNREFUSED friendly error", async () => {
+  it("propagates the unreachable-server error", async () => {
     vi.mocked(httpRequest).mockRejectedValueOnce(
-      new Error(
-        "Cannot connect to Sapporta server at http://localhost:3000. Is the server running?",
+      new OperationError(
+        "Unable to reach the Sapporta app server at http://localhost:3000/api/openapi.json. Check that the server is running and that this process has permission to make network requests. In sandboxed coding-agent environments, rerun with network permissions enabled.",
+        "APP_SERVER_UNREACHABLE",
       ),
     );
-    await expect(fetchOpenApiSpec("http://localhost:3000")).rejects.toThrow(
-      /Is the server running\?/,
-    );
+    await expect(
+      fetchOpenApiSpec("http://localhost:3000"),
+    ).rejects.toMatchObject({
+      code: "APP_SERVER_UNREACHABLE",
+      message: /network permissions enabled/,
+    });
   });
 });

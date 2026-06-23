@@ -61,6 +61,10 @@ describe("schema TGrid helpers", () => {
       foreignKey: "order_id",
       defaultSort: "line_no",
     });
+    expect(definition.levels.orders.includedColumnNames).toBeUndefined();
+    expect(definition.levels["orders.order_lines"].includedColumnNames).toEqual(
+      ["line_no"],
+    );
   });
 
   it("applies root query defaults", () => {

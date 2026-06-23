@@ -59,13 +59,17 @@ export type TableRowsClient = {
 
 // Declaration for one table level in a TGrid definition.
 // `table`, `parent`, and `childLevels` describe the rows a user can expand
-// through. `columns`, `query`, and `rowsClient` describe how this level behaves.
+// through. `includedColumnNames`, `columns`, `query`, and `rowsClient` describe
+// how this level behaves.
 export type TGridLevelConfig<
   RowsByLevel extends TGridRowsByLevel,
   AppServices = unknown,
   LevelId extends TGridLevelId<RowsByLevel> = TGridLevelId<RowsByLevel>,
 > = {
   table: TableSchema;
+  // Default table projection for generated columns at this level. Explicit
+  // `columns.table(...)` entries may still include table fields outside it.
+  includedColumnNames?: readonly TableColumnName[];
   columns?:
     | TGridColumnSpecBuilder<RowsByLevel, AppServices, LevelId>
     | readonly TGridColumnSpec<RowsByLevel, AppServices, LevelId>[];

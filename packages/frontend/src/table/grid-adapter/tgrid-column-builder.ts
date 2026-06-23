@@ -130,7 +130,10 @@ export function buildTGridColumnsForTable<
     // column shows up first at this level.
     if (spec.kind === "remainingTable") {
       const excluded = new Set(spec.exclude ?? []);
-      for (const column of args.table.columns) {
+      for (const column of tableColumnsForProjection(
+        args.table,
+        args.includedColumnNames,
+      )) {
         if (column.visuallyHidden) continue;
         if (usedTableColumns.has(column.name)) continue;
         if (excluded.has(column.name as RowFieldName<RowsByLevel[LevelId]>))
@@ -201,6 +204,15 @@ export function buildTGridColumnsForTable<
   }
 
   return { columns, saveCellValueByColumn };
+}
+
+function tableColumnsForProjection(
+  table: TableSchema,
+  includedColumnNames: readonly TableColumnName[] | undefined,
+): TableColumnSchema[] {
+  if (!includedColumnNames) return table.columns;
+  const included = new Set(includedColumnNames);
+  return table.columns.filter((column) => included.has(column.name));
 }
 
 function tableColumnByName(

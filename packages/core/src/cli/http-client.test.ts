@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
+import { ErrorCode, OperationError } from "../introspect/types.js";
 import { httpRequest } from "./http-client.js";
 
 describe("httpRequest", () => {
@@ -113,5 +114,41 @@ describe("httpRequest", () => {
     const data = result.data as { error: string; code: string };
     expect(data.code).toBe("NON_JSON_RESPONSE");
     expect(data.error).toBe("x".repeat(500) + "…");
+  });
+
+  it("throws a structured unreachable-server error when fetch cannot reach the app", async () => {
+    globalThis.fetch = vi.fn().mockRejectedValue(
+      new TypeError("fetch failed", {
+        cause: Object.assign(new Error("connect ECONNREFUSED"), {
+          code: "ECONNREFUSED",
+        }),
+      }),
+    );
+
+    try {
+      await httpRequest("http://localhost:3000", "GET", "/api/openapi.json");
+      throw new Error("Expected httpRequest to fail.");
+    } catch (err) {
+      expect(err).toBeInstanceOf(OperationError);
+      expect(err).toMatchObject({
+        code: ErrorCode.APP_SERVER_UNREACHABLE,
+        message:
+          "Unable to reach the Sapporta app server at http://localhost:3000/api/openapi.json. Check that the server is running and that this process has permission to make network requests. In sandboxed coding-agent environments, rerun with network permissions enabled.",
+      });
+    }
+  });
+
+  it("includes query params in the unreachable-server URL", async () => {
+    globalThis.fetch = vi.fn().mockRejectedValue(new TypeError("fetch failed"));
+
+    await expect(
+      httpRequest("http://localhost:3000", "GET", "/api/tables/books", {
+        queryParams: { search: "Austen" },
+      }),
+    ).rejects.toMatchObject({
+      code: ErrorCode.APP_SERVER_UNREACHABLE,
+      message:
+        "Unable to reach the Sapporta app server at http://localhost:3000/api/tables/books?search=Austen. Check that the server is running and that this process has permission to make network requests. In sandboxed coding-agent environments, rerun with network permissions enabled.",
+    });
   });
 });

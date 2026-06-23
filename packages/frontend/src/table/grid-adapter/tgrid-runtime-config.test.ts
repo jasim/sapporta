@@ -194,6 +194,103 @@ describe("compileTGridRuntimeConfig", () => {
     ).toEqual(["warehouse"]);
   });
 
+  it("uses the level projection when default table columns are generated", () => {
+    const lookupResolver: TGridLookupResolver = {
+      bundleFor: () => undefined,
+    };
+    const config = compileTGridRuntimeConfig<RowsByLevel>({
+      rootLevel: "orders",
+      levels: {
+        orders: {
+          table: orderSchema,
+          childLevels: ["orders.lines"],
+        },
+        "orders.lines": {
+          table: lineSchema,
+          includedColumnNames: ["line_no", "sku"],
+          parent: {
+            level: "orders",
+            foreignKey: "order_id",
+            defaultSort: "line_no",
+          },
+          childLevels: [],
+        },
+        "orders.lines.allocations": {
+          table: allocationSchema,
+          parent: { level: "orders.lines", foreignKey: "line_id" },
+          childLevels: [],
+        },
+      },
+      columnMapper: createTGridColumnMapper(lookupResolver),
+      hostQueryState: () => ({
+        page: 1,
+        pageSize: 25,
+        sort: [],
+        filters: [],
+        search: null,
+      }),
+    });
+
+    expect(config.gridSchema.levels.orders.columns.map((c) => c.id)).toEqual([
+      "id",
+      "customer",
+    ]);
+    expect(
+      config.gridSchema.levels["orders.lines"].columns.map((c) => c.id),
+    ).toEqual(["line_no", "sku"]);
+  });
+
+  it("uses the level projection for remaining table columns", () => {
+    const lookupResolver: TGridLookupResolver = {
+      bundleFor: () => undefined,
+    };
+    const lineColumns = createTGridColumnsBuilder<
+      RowsByLevel,
+      unknown,
+      "orders.lines"
+    >("orders.lines");
+    const config = compileTGridRuntimeConfig<RowsByLevel>({
+      rootLevel: "orders",
+      levels: {
+        orders: {
+          table: orderSchema,
+          childLevels: ["orders.lines"],
+        },
+        "orders.lines": {
+          table: lineSchema,
+          includedColumnNames: ["line_no", "sku"],
+          parent: {
+            level: "orders",
+            foreignKey: "order_id",
+            defaultSort: "line_no",
+          },
+          childLevels: [],
+          columns: [
+            lineColumns.table("order_id"),
+            lineColumns.remainingTable(),
+          ],
+        },
+        "orders.lines.allocations": {
+          table: allocationSchema,
+          parent: { level: "orders.lines", foreignKey: "line_id" },
+          childLevels: [],
+        },
+      },
+      columnMapper: createTGridColumnMapper(lookupResolver),
+      hostQueryState: () => ({
+        page: 1,
+        pageSize: 25,
+        sort: [],
+        filters: [],
+        search: null,
+      }),
+    });
+
+    expect(
+      config.gridSchema.levels["orders.lines"].columns.map((c) => c.id),
+    ).toEqual(["order_id", "line_no", "sku"]);
+  });
+
   it("builds emitted columns through column-preset constructors", () => {
     const config = build();
 

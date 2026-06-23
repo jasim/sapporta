@@ -161,7 +161,7 @@ export function compileTGridRuntimeConfig<
       table,
       specs: resolveColumns(levelId, config.columns),
       levelId,
-      includedColumnNames: undefined,
+      includedColumnNames: config.includedColumnNames,
       immutable: table.immutable ?? false,
       expandable: config.childLevels.length > 0,
       columnMapper: args.columnMapper,

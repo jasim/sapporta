@@ -7,6 +7,8 @@
  * endpoints can still be called and protected endpoints return the server's
  * structured auth error.
  */
+import { isFetchNetworkError } from "@sapporta/shared/client";
+import { ErrorCode, OperationError } from "../introspect/types.js";
 
 export interface HttpResult {
   status: number;
@@ -53,10 +55,15 @@ export async function httpRequest(
       headers,
       ...(opts?.body !== undefined ? { body: JSON.stringify(opts.body) } : {}),
     });
-  } catch (err: any) {
-    if (err.code === "ECONNREFUSED" || err.cause?.code === "ECONNREFUSED") {
-      throw new Error(
-        `Cannot connect to Sapporta server at ${baseUrl}. Is the server running?`,
+  } catch (err: unknown) {
+    if (isFetchNetworkError(err)) {
+      throw new OperationError(
+        [
+          `Unable to reach the Sapporta app server at ${url.toString()}.`,
+          "Check that the server is running and that this process has permission to make network requests.",
+          "In sandboxed coding-agent environments, rerun with network permissions enabled.",
+        ].join(" "),
+        ErrorCode.APP_SERVER_UNREACHABLE,
       );
     }
     throw err;

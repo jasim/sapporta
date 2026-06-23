@@ -29,6 +29,7 @@ export type TableGridGraphNode = {
     parentLevelId: string;
     foreignKey: string;
     defaultSort: string;
+    columns: readonly string[];
   };
   children: readonly TableGridGraphLevelRelation[];
 };
@@ -64,6 +65,7 @@ export function buildTableGridGraphFromSchema(args: {
       parentLevelId: string;
       foreignKey: string;
       defaultSort: string;
+      columns: readonly string[];
     },
     ancestorTables: readonly string[] = [],
   ): void => {
@@ -108,6 +110,7 @@ export function buildTableGridGraphFromSchema(args: {
           parentLevelId: levelId,
           foreignKey: child.foreignKey,
           defaultSort: child.defaultSort,
+          columns: child.columns,
         },
         nextAncestors,
       );
@@ -170,6 +173,7 @@ export function buildSessionLevelsFromTableGridGraph(args: {
       childLevels: level.children.map((child) => child.childLevelId),
       ...(level.parent
         ? {
+            includedColumnNames: level.parent.columns,
             parent: {
               level: level.parent.parentLevelId,
               foreignKey: level.parent.foreignKey,
