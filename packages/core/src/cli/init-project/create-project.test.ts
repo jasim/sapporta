@@ -126,6 +126,29 @@ describe("createProject", () => {
     expect(stagingDirs(parent)).toEqual([]);
   });
 
+  it("cleans staging and leaves the target absent when the initial commit fails", () => {
+    const parent = makeTempDir();
+    const target = join(parent, "acme-app");
+    const runCommand = commandRunnerThatFails((command, args) => {
+      if (command === "git" && args[0] === "commit") {
+        return new Error("missing git identity");
+      }
+      return undefined;
+    });
+
+    expect(() =>
+      createProject({
+        dir: target,
+        name: "acme-app",
+        runCommand,
+        verifySqlite: noopSqliteVerifier,
+      }),
+    ).toThrow(/initial Git commit/);
+
+    expect(existsSync(target)).toBe(false);
+    expect(stagingDirs(parent)).toEqual([]);
+  });
+
   it("publishes the target after all setup steps succeed", () => {
     const parent = makeTempDir();
     const target = join(parent, "acme-app");
@@ -156,6 +179,15 @@ describe("createProject", () => {
       "pnpm --filter ./packages/api db:generate --name initial_auth",
     );
     expect(commands).toContain("pnpm --filter ./packages/api db:migrate");
+    const migrationApplyIndex = commands.indexOf(
+      "pnpm --filter ./packages/api db:migrate",
+    );
+    expect(commands.slice(migrationApplyIndex + 1, migrationApplyIndex + 4))
+      .toEqual([
+        "git init",
+        "git add .",
+        "git commit -m Create Sapporta project",
+      ]);
   });
 });
 

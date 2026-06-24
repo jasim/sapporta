@@ -176,6 +176,7 @@ class CreateProjectSetup {
       this.verifySqliteNativeBindings();
       this.generateInitialAuthMigration();
       this.applyInitialAuthMigration();
+      this.createInitialGitCommit();
       this.publishProjectDirectory();
     } catch (error) {
       this.removeStagingDirectory();
@@ -283,6 +284,34 @@ class CreateProjectSetup {
       ],
       command: "pnpm",
       args: ["--filter", "./packages/api", "db:migrate"],
+    });
+  }
+
+  private createInitialGitCommit(): void {
+    this.runCommandStep({
+      step: "git-init",
+      title: "Initializing the project Git repository",
+      details: [
+        "Running git init so the generated project starts with version history",
+      ],
+      command: "git",
+      args: ["init"],
+    });
+    this.runCommandStep({
+      step: "git-add",
+      title: "Staging the generated project files",
+      details: ["Running git add . to stage the generated app files"],
+      command: "git",
+      args: ["add", "."],
+    });
+    this.runCommandStep({
+      step: "git-commit",
+      title: "Creating the initial project commit",
+      details: [
+        'Running git commit -m "Create Sapporta project" for the generated app',
+      ],
+      command: "git",
+      args: ["commit", "-m", "Create Sapporta project"],
     });
   }
 
@@ -397,6 +426,12 @@ function formatStep(step: InitSetupStep): string {
       return "project scaffold writing";
     case "pnpm-install":
       return "dependency installation";
+    case "git-init":
+      return "Git repository initialization";
+    case "git-add":
+      return "initial Git staging";
+    case "git-commit":
+      return "initial Git commit";
     case "sqlite-native-bindings":
       return "SQLite native binding verification";
     case "migration-generate":
