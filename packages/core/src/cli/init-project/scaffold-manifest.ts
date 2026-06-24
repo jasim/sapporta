@@ -126,6 +126,7 @@ export const SCAFFOLD_MANIFEST: ScaffoldManifest = [
   scaffoldFile(".env.development", "workspace"),
   scaffoldFile(".env.production.example", "workspace"),
   scaffoldFile("scripts/dev.mjs", "workspace"),
+  scaffoldFile("scripts/clean-dist.mjs", "workspace"),
   scaffoldFile("pnpm-workspace.yaml", "workspace"),
   scaffoldFile("Dockerfile", "workspace"),
   scaffoldFile(".dockerignore", "workspace"),
