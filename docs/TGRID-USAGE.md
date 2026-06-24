@@ -598,8 +598,35 @@ schemas, router state, and its own route path.
 />
 ```
 
+Pass row-query and view options directly when the route should keep the standard
+table page but adjust its defaults or controls.
+
+```tsx
+<SchemaTableGridView
+  source={{ table: tableSchema, tablesByName }}
+  route={{ path: "/invoices", searchParams, navigate }}
+  rootRows={{
+    pageSize: 15,
+    fixedFilters: [eqCondition("status", "draft")],
+    initialSort: [{ colId: "invoice_date", direction: "desc" }],
+  }}
+  relatedRows={{ pageSize: 25 }}
+  interaction={ROW_PRIMARY_MASTER_DETAIL}
+  toolbar={({ props }) => <TableToolbar {...props} />}
+  pagination={({ props }) => <Pagination {...props} />}
+/>
+```
+
+`rootRows` accepts the root table's page size, initial page, sort, filters,
+search value, fixed filters, and URL-sync setting. URL sync is enabled by
+default; pass `rootRows={{ urlSync: false }}` only when the table controls
+should not update the route. `relatedRows` applies the same query defaults to
+expanded child rows. Use `toolbar={false}` or `pagination={false}` to hide the
+standard controls, or pass render functions to replace them.
+
 Use `buildSchemaTGridConfig` when a schema table needs definition-level
-customization before rendering with `TableGridView`.
+customization before rendering with `TableGridView`, such as custom columns,
+row clients, or a different level graph.
 
 ```tsx
 const config = buildSchemaTGridConfig({
