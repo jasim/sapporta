@@ -109,6 +109,26 @@ describe("openapi smoke — built-in sub-apps in /openapi.json", () => {
     expect(offenders).toEqual([]);
   });
 
+  it("documents authorization failures for protected meta routes", async () => {
+    const app = await createServedApp();
+    const res = await app.request("/api/openapi.json");
+    const spec = (await res.json()) as {
+      paths: Record<
+        string,
+        Record<string, { responses?: Record<string, unknown> }>
+      >;
+    };
+
+    expect(spec.paths["/api/meta/tables"].get.responses).toHaveProperty("403");
+    expect(
+      spec.paths["/api/meta/tables/{name}/indexes"].get.responses,
+    ).toHaveProperty("403");
+    expect(
+      spec.paths["/api/meta/tables/{name}/sample"].get.responses,
+    ).toHaveProperty("403");
+    expect(spec.paths["/api/meta/sql"].post.responses).toHaveProperty("403");
+  });
+
   it("serves app-owned report routes through the app API and OpenAPI", async () => {
     const c = initContract();
     const trialBalanceRoute = c.query({

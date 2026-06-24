@@ -37,6 +37,7 @@ export const listTablesRoute = c.query({
   query: z.object({ detail: z.enum(["full"]).optional() }),
   responses: {
     200: z.object({ tables: z.array(tableSchemaSchema) }),
+    403: errorBodySchema,
   },
 });
 
@@ -61,6 +62,7 @@ export const tableIndexesRoute = c.query({
   responses: {
     200: z.array(z.record(z.string(), z.unknown())),
     400: errorBodySchema,
+    403: errorBodySchema,
     404: errorBodySchema,
   },
 });
@@ -78,6 +80,7 @@ export const tableSampleRoute = c.query({
   responses: {
     200: z.array(z.record(z.string(), z.unknown())),
     400: errorBodySchema,
+    403: errorBodySchema,
     404: errorBodySchema,
   },
 });
