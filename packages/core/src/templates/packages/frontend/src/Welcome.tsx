@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { type ReactNode, useEffect, useState } from "react";
 import {
   fetchAuthContext,
   useAuthStore,
@@ -16,82 +16,66 @@ import {
 
 const sapportaDocsUrl = "https://github.com/jasim/sapporta/tree/main/docs";
 
-const projectReferences = `Read these before implementation:
+const projectReferences = `Before changing the app, review:
 - [README.md](README.md)
 - [AGENTS.md](AGENTS.md)
 - [Sapporta coding-agent skill](https://github.com/jasim/sapporta-skills/tree/main/skills/sapporta)`;
 
 const appIdeas = [
   {
-    id: "bookkeeping",
-    label: "Double-entry books",
-    eyebrow: "Accounting",
-    description: "Accounts, journals, ledgers, trial balance, and statements.",
-    prompt: `Build a double-entry bookkeeping application.
+    id: "tasks",
+    label: "Task Management",
+    eyebrow: "Productivity",
+    description:
+      "Plan projects, assign work, track due dates, and review progress.",
+    prompt: `Build a simple task management application.
 
-The application should manage accounts, journals, journal entries, customers, vendors, invoices, invoice line items, payments, and tax categories. Users should be able to move from an account to its ledger entries and from an invoice to its line items and payments.
+Keep the first version focused and easy to understand: include the core workflows that make the app useful, and avoid exhaustive features or deep customization.
 
-Include workflows for posting journal entries and creating invoices with line items. Include reports for trial balance, account ledger, monthly income and expenses, accounts receivable aging, and customer balances. Populate the application with realistic sample accounting data so the first run shows working ledgers, invoices, payments, and reports.`,
+The application should manage projects, tasks, people, task assignments, labels, and comments. Tasks should have a title, description, status, priority, due date, assignee, and project.
+
+Include workflows for creating a task, assigning it, changing its status, and adding a comment. Include reports for open tasks, overdue tasks, tasks by assignee, and tasks by project. Populate the application with realistic sample projects, people, tasks, labels, and comments so the first run shows an active todo app.`,
   },
   {
     id: "invoices",
-    label: "Invoice operations",
+    label: "Invoicing",
     eyebrow: "Business",
-    description: "Customers, quotes, invoices, payments, and receivables.",
-    prompt: `Build an invoice operations application.
+    description:
+      "Create quotes and invoices, record payments, and monitor unpaid balances.",
+    prompt: `Build an invoicing application.
+
+Keep the first version focused and easy to understand: include the core workflows that make the app useful, and avoid exhaustive features or deep customization.
 
 The application should manage customers, contacts, products or services, quotes, quote line items, invoices, invoice line items, payments, and payment allocations. Invoice totals should come from line items, and invoice status should move from draft to sent to paid.
 
 Include a workflow where a user can enter an invoice and its line items together. Include reports for monthly revenue, unpaid invoices, overdue receivables, customer payment history, and product or service sales. Populate the application with realistic sample customers, products or services, invoices, payments, and receivables activity so the first run feels complete.`,
   },
   {
-    id: "inventory",
-    label: "Inventory control",
-    eyebrow: "Operations",
-    description:
-      "Items, suppliers, stock moves, reorder points, and purchase orders.",
-    prompt: `Build an inventory control application.
-
-The application should manage items, item categories, suppliers, warehouses or locations, stock movements, purchase orders, purchase order lines, receiving records, and reorder rules. Users should be able to open an item and review its movements, suppliers, purchase history, and current location balances.
-
-Include workflows for recording stock receipts, adjustments, transfers, and purchase orders with lines. Include reports for current stock on hand, low-stock items, inventory valuation, supplier purchase history, and movement activity by month. Populate the application with realistic sample items, suppliers, purchase orders, stock movements, and inventory balances so the first run demonstrates the workflow.`,
-  },
-  {
     id: "meals",
-    label: "Meal tracking",
-    eyebrow: "Personal data",
-    description: "Foods, meals, calories, macros, and daily nutrition totals.",
+    label: "Meal Tracking",
+    eyebrow: "Personal Database",
+    description:
+      "Log meals, track nutrition targets, and review daily and weekly totals.",
     prompt: `Build a meal and nutrition tracking application.
+
+Keep the first version focused and easy to understand: include the core workflows that make the app useful, and avoid exhaustive features or deep customization.
 
 The application should manage foods, serving units, meals, meal items, daily targets, body measurements, and nutrition goals. Track calories, protein, carbs, fat, fiber, and serving sizes. Users should be able to move from a day to its meals and from a food to its usage history.
 
 Include workflows for logging a meal with multiple foods and copying a previous meal into today. Include reports for daily nutrition totals, weekly averages, macro balance, calorie trend, and foods eaten most often. Populate the application with realistic sample foods, meals, targets, and nutrition logs so the first run shows meaningful daily and weekly totals.`,
   },
-  {
-    id: "membership",
-    label: "Membership CRM",
-    eyebrow: "Business",
-    description: "Members, households, dues, renewals, events, and attendance.",
-    prompt: `Build a membership CRM.
-
-The application should manage members, households or organizations, memberships, dues schedules, payments, events, event registrations, attendance, notes, and tags. Model renewals and membership status clearly, with relationships from members to payments, events, and notes.
-
-Include workflows for registering a new member, recording dues payments, renewing memberships, and taking event attendance. Include reports for active members, renewal pipeline, overdue dues, event attendance, and monthly membership income. Populate the application with realistic sample members, households, dues, payments, events, and attendance records so the first run shows an active organization.`,
-  },
-  {
-    id: "assets",
-    label: "Asset maintenance",
-    eyebrow: "Personal or business",
-    description: "Equipment, service logs, schedules, costs, and reminders.",
-    prompt: `Build an asset maintenance application.
-
-The application should manage assets, asset categories, locations, vendors, maintenance tasks, service logs, parts, part usage, warranties, and recurring schedules. Users should be able to open an asset and see its service history, upcoming work, vendors, parts, and total cost.
-
-Include workflows for recording a completed service visit and scheduling future maintenance. Include reports for upcoming maintenance, overdue tasks, maintenance cost by asset, vendor spend, and service history by month. Populate the application with realistic sample assets, vendors, service logs, parts, and schedules so the first run shows current and historical maintenance activity.`,
-  },
 ] as const;
 
 type AppIdea = (typeof appIdeas)[number];
+
+const navButtonClass =
+  "inline-flex h-9 items-center justify-center gap-2 rounded-[2px] bg-transparent px-3 text-sap-data font-semibold text-sap-soft hover:bg-sap-row-hover hover:text-sap-fg disabled:opacity-70";
+
+const primaryButtonClass =
+  "inline-flex h-9 items-center justify-center gap-2 rounded-[2px] bg-sap-fg px-3 text-sap-data font-semibold text-sap-bg hover:opacity-90";
+
+const eyebrowClass =
+  "text-sap-label font-bold uppercase tracking-sap-section text-sap-link";
 
 // Replace this screen with the first dashboard, workflow, or form your app
 // needs after the app has its own primary surface.
@@ -100,8 +84,7 @@ export function Welcome() {
   const authStatus = useAuthStore((s) => s.status);
   const authContext = useAuthStore((s) => s.context);
   const authError = useAuthStore((s) => s.error);
-  const [selectedIdeaId, setSelectedIdeaId] =
-    useState<AppIdea["id"]>("bookkeeping");
+  const [selectedIdeaId, setSelectedIdeaId] = useState<AppIdea["id"]>("tasks");
   const [copyStatus, setCopyStatus] = useState<CopyStatus>("idle");
   const [viewMode, setViewMode] = useState<ViewMode>("onboarding");
   const [diagnostics, setDiagnostics] = useState<DiagnosticResult[]>([]);
@@ -151,48 +134,42 @@ ${projectReferences}`;
   }
 
   return (
-    <div className="flex-1 overflow-y-auto bg-sap-surface">
-      <div className="mx-auto max-w-[980px] px-5 py-8 sm:px-8 lg:px-10">
+    <div className="flex-1 overflow-y-auto bg-sap-bg text-sap-fg">
+      <div className="mx-auto max-w-[96rem] px-5 py-6 sm:px-10 lg:px-16">
         {viewMode === "diagnostics" ? (
           <>
-            <header className="border-b border-sap-border pb-7">
-              <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
-                <div className="max-w-[720px]">
-                  <div className="text-sap-label font-semibold uppercase tracking-sap-section text-sap-brand">
-                    Project diagnostics
-                  </div>
-                  <h1 className="mt-3 text-[34px] font-semibold leading-tight tracking-sap-display text-sap-fg sm:text-[40px]">
-                    Check the frontend, API, schema, and auth connection.
-                  </h1>
-                  <p className="mt-4 max-w-[680px] text-sap-body leading-7 text-sap-soft">
-                    These checks help identify the common failure points when
-                    the frontend has rendered but cannot load metadata, call the
-                    API, or refresh the authenticated workspace context.
-                  </p>
-                </div>
-                <div className="flex shrink-0 flex-wrap gap-2">
-                  <button
-                    className="inline-flex h-9 items-center justify-center rounded-[7px] border border-sap-border bg-sap-panel px-3 text-sap-data font-medium text-sap-fg hover:bg-sap-row-hover"
-                    type="button"
-                    onClick={() => setViewMode("onboarding")}
-                  >
-                    Onboarding
-                  </button>
-                  <button
-                    className="inline-flex h-9 items-center justify-center gap-2 rounded-[7px] border border-sap-border bg-sap-panel px-3 text-sap-data font-medium text-sap-fg hover:bg-sap-row-hover disabled:opacity-70"
-                    type="button"
-                    onClick={runDiagnostics}
-                    disabled={diagnosticsRunning}
-                  >
-                    <SearchCheck className="h-3.5 w-3.5" strokeWidth={1.8} />
-                    {diagnosticsRunning ? "Running" : "Run again"}
-                  </button>
-                </div>
-              </div>
+            <PageNav>
+              <button
+                className={navButtonClass}
+                type="button"
+                onClick={() => setViewMode("onboarding")}
+              >
+                Welcome
+              </button>
+              <button
+                className={navButtonClass}
+                type="button"
+                onClick={runDiagnostics}
+                disabled={diagnosticsRunning}
+              >
+                <SearchCheck className="h-3.5 w-3.5" strokeWidth={1.8} />
+                {diagnosticsRunning ? "Running" : "Run again"}
+              </button>
+            </PageNav>
+
+            <header className="max-w-[58rem] pb-8 pt-10 sm:pt-14">
+              <div className={eyebrowClass}>Project diagnostics</div>
+              <h1 className="mt-4 text-[42px] font-[830] leading-[0.96] text-sap-fg sm:text-[64px]">
+                Check the frontend, API, schema, and auth connection.
+              </h1>
+              <p className="mt-6 max-w-[42rem] text-[17px] leading-7 text-sap-soft">
+                Use these checks when the page renders but metadata, custom API
+                routes, or the workspace context need attention.
+              </p>
             </header>
 
-            <section className="py-7">
-              <div className="grid gap-2">
+            <section className="border-t border-sap-border py-8">
+              <div className="grid max-w-[58rem] gap-2">
                 {diagnostics.map((result) => (
                   <DiagnosticRow key={result.id} result={result} />
                 ))}
@@ -201,69 +178,57 @@ ${projectReferences}`;
           </>
         ) : (
           <>
-            <header className="border-b border-sap-border pb-7">
-              <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
-                <div className="max-w-[720px]">
-                  <div className="text-sap-label font-semibold uppercase tracking-sap-section text-sap-brand">
-                    Welcome
-                  </div>
-                  <h1 className="mt-3 text-[34px] font-semibold leading-tight tracking-sap-display text-sap-fg sm:text-[40px]">
-                    Use a coding agent to extend this Sapporta project.
-                  </h1>
-                  <p className="mt-4 max-w-[680px] text-sap-body leading-7 text-sap-soft">
-                    Select an application pattern to generate a starting prompt.
-                    The prompt describes the target data model, workflows, and
-                    reports, then points the agent to the project documentation
-                    and Sapporta skill for implementation details.
-                  </p>
-                </div>
-                <div className="flex shrink-0 flex-wrap gap-2">
-                  <a
-                    className="inline-flex h-9 items-center justify-center gap-2 rounded-[7px] border border-sap-border bg-sap-panel px-3 text-sap-data font-medium text-sap-fg hover:bg-sap-row-hover"
-                    href={sapportaDocsUrl}
-                    rel="noreferrer"
-                    target="_blank"
-                  >
-                    Docs
-                    <ExternalLink className="h-3.5 w-3.5" strokeWidth={1.8} />
-                  </a>
-                  <button
-                    className="inline-flex h-9 items-center justify-center gap-2 rounded-[7px] border border-sap-border bg-sap-panel px-3 text-sap-data font-medium text-sap-fg hover:bg-sap-row-hover"
-                    type="button"
-                    onClick={openDiagnostics}
-                  >
-                    <Stethoscope className="h-3.5 w-3.5" strokeWidth={1.8} />
-                    Diagnostics
-                  </button>
-                </div>
-              </div>
+            <PageNav>
+              <a
+                className={navButtonClass}
+                href={sapportaDocsUrl}
+                rel="noreferrer"
+                target="_blank"
+              >
+                Docs
+                <ExternalLink className="h-3.5 w-3.5" strokeWidth={1.8} />
+              </a>
+              <button
+                className={navButtonClass}
+                type="button"
+                onClick={openDiagnostics}
+              >
+                <Stethoscope className="h-3.5 w-3.5" strokeWidth={1.8} />
+                Diagnostics
+              </button>
+            </PageNav>
+
+            <header className="max-w-[44rem] pb-8 pt-10 sm:pt-14">
+              <h1 className="text-[21px] font-[830] leading-[0.96] text-sap-fg sm:text-[32px]">
+                Build your database app
+              </h1>
+              <p className="mt-4 text-[17px] leading-7 text-sap-soft">
+                Choose a starter prompt, and copy it into your coding agent.
+              </p>
             </header>
 
-            <main className="grid gap-8 py-8 lg:grid-cols-[320px_minmax(0,1fr)]">
+            <main className="max-w-[58rem] py-6">
               <section>
-                <div className="mb-3 text-sap-label font-semibold uppercase tracking-sap-section text-sap-brand">
-                  Choose a prompt
-                </div>
-                <div className="grid gap-2">
+                <div className="grid gap-2 sm:grid-cols-3">
                   {appIdeas.map((idea) => (
                     <button
                       className={[
-                        "w-full rounded-md border px-4 py-3 text-left transition-colors",
+                        "rounded-[4px] px-4 py-4 text-left ring-1 transition-colors",
                         selectedIdea.id === idea.id
-                          ? "border-sap-brand bg-sap-active-nav text-sap-fg"
-                          : "border-sap-border bg-sap-panel text-sap-fg hover:bg-sap-row-hover",
+                          ? "bg-sap-active-nav text-sap-fg ring-sap-border-strong"
+                          : "bg-sap-sidebar text-sap-soft ring-sap-border-soft hover:bg-sap-row-hover hover:text-sap-fg",
                       ].join(" ")}
                       key={idea.id}
                       type="button"
                       onClick={() => setSelectedIdeaId(idea.id)}
                     >
-                      <div className="text-sap-micro font-semibold uppercase tracking-sap-label text-sap-muted">
+                      <div className="text-sap-micro font-bold uppercase tracking-sap-label text-sap-muted">
                         {idea.eyebrow}
                       </div>
-                      <div className="mt-1 text-sap-body font-semibold">
+                      <div className="mt-1 text-[15px] font-[720] leading-5">
                         {idea.label}
                       </div>
-                      <div className="mt-1 text-sap-data leading-5 text-sap-soft">
+                      <div className="mt-1 text-sap-body leading-5 text-sap-muted">
                         {idea.description}
                       </div>
                     </button>
@@ -271,18 +236,16 @@ ${projectReferences}`;
                 </div>
               </section>
 
-              <section className="min-w-0">
-                <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <section className="mt-8 min-w-0">
+                <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
                   <div>
-                    <div className="text-sap-label font-semibold uppercase tracking-sap-section text-sap-brand">
-                      Agent prompt
-                    </div>
-                    <h2 className="mt-1 text-[22px] font-semibold leading-tight text-sap-fg">
+                    <div className={eyebrowClass}>Prompt</div>
+                    <h2 className="mt-2 text-[26px] font-[760] leading-tight text-sap-fg">
                       {selectedIdea.label}
                     </h2>
                   </div>
                   <button
-                    className="inline-flex h-9 items-center justify-center gap-2 rounded-[7px] bg-sap-brand px-3 text-sap-data font-semibold text-sap-bg hover:opacity-90"
+                    className={primaryButtonClass}
                     type="button"
                     onClick={copyAgentPrompt}
                   >
@@ -295,12 +258,12 @@ ${projectReferences}`;
                       ? "Copied"
                       : copyStatus === "error"
                         ? "Copy failed"
-                        : "Copy prompt"}
+                        : "Copy Prompt"}
                   </button>
                 </div>
 
-                <div className="overflow-hidden rounded-md border border-sap-border bg-sap-panel">
-                  <pre className="mono max-h-[520px] overflow-auto whitespace-pre-wrap p-5 text-[13px] leading-6 text-sap-fg">
+                <div className="overflow-hidden rounded-[4px] bg-sap-sidebar">
+                  <pre className="mono max-h-[560px] overflow-auto whitespace-pre-wrap p-5 text-[13px] leading-6 text-sap-fg">
                     {activePrompt}
                   </pre>
                 </div>
@@ -309,6 +272,19 @@ ${projectReferences}`;
           </>
         )}
       </div>
+    </div>
+  );
+}
+
+function PageNav({ children }: { children: ReactNode }) {
+  return (
+    <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+      <div className="text-sap-label font-[780] uppercase leading-none text-sap-subtle">
+        Sapporta
+      </div>
+      <nav className="flex flex-wrap gap-2" aria-label="Welcome actions">
+        {children}
+      </nav>
     </div>
   );
 }
@@ -336,7 +312,7 @@ function DiagnosticRow({ result }: { result: DiagnosticResult }) {
         : "text-sap-negative";
 
   return (
-    <div className="grid gap-3 rounded-md border border-sap-border bg-sap-panel px-4 py-3 sm:grid-cols-[120px_minmax(0,1fr)]">
+    <div className="grid gap-3 rounded-[2px] border border-sap-border bg-sap-surface px-4 py-3 sm:grid-cols-[120px_minmax(0,1fr)]">
       <div
         className={`flex items-center gap-2 text-sap-data font-semibold ${statusClass}`}
       >
