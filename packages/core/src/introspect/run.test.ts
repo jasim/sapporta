@@ -114,6 +114,64 @@ describe("dbRun", () => {
     expect(rows).toHaveLength(2);
   });
 
+  it("rejects UPDATE RETURNING by default and does not change data", () => {
+    expect(() =>
+      dbRun(
+        sqlite,
+        "UPDATE accounts SET name = 'Bypassed' WHERE name = 'Cash' RETURNING id, name",
+      ),
+    ).toThrow("allowDangerous");
+
+    const row = sqlite
+      .prepare("SELECT name FROM accounts WHERE id = 1")
+      .get() as { name: string };
+    expect(row.name).toBe("Cash");
+  });
+
+  it("rejects INSERT RETURNING by default and does not change data", () => {
+    expect(() =>
+      dbRun(
+        sqlite,
+        "INSERT INTO accounts (name, type) VALUES ('Bypassed', 'asset') RETURNING id, name",
+      ),
+    ).toThrow("allowDangerous");
+
+    const rows = sqlite
+      .prepare("SELECT * FROM accounts WHERE name = 'Bypassed'")
+      .all();
+    expect(rows).toHaveLength(0);
+  });
+
+  it("rejects DELETE RETURNING by default and does not change data", () => {
+    expect(() =>
+      dbRun(
+        sqlite,
+        "DELETE FROM accounts WHERE name = 'Cash' RETURNING id, name",
+      ),
+    ).toThrow("allowDangerous");
+
+    const rows = sqlite.prepare("SELECT * FROM accounts").all();
+    expect(rows).toHaveLength(2);
+  });
+
+  it("rejects writable PRAGMA by default and restores query_only", () => {
+    expect(() => dbRun(sqlite, "PRAGMA user_version = 7")).toThrow(
+      "allowDangerous",
+    );
+
+    const version = sqlite.pragma("user_version") as Array<{
+      user_version: number;
+    }>;
+    expect(version[0]?.user_version).toBe(0);
+
+    const result = dbRun(
+      sqlite,
+      "INSERT INTO accounts (name, type) VALUES ('AfterReject', 'asset')",
+      { allowDangerous: true },
+    );
+    expect(result.ok).toBe(true);
+  });
+
   it("executes INSERT with allowDangerous and reports row count", () => {
     const result = dbRun(
       sqlite,

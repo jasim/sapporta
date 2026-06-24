@@ -10,6 +10,9 @@
 // Dangerous statements (DROP DATABASE, TRUNCATE, DROP SCHEMA) are rejected
 // up front. `dryRun` is meaningful only for writes — it uses
 // EXPLAIN QUERY PLAN to validate without executing.
+//
+// Read-only mode is enforced with SQLite's PRAGMA query_only. If/when Sapporta
+// adds PostgreSQL support, use a BEGIN READ ONLY transaction for this layer.
 
 import type Database from "better-sqlite3";
 import { classifySqliteError } from "../db/errors.js";
@@ -36,66 +39,111 @@ export function dbRun(
   rejectDangerousSQL(rawSql);
 
   try {
-    const stmt = sqlite.prepare(rawSql);
-    const params = opts.params ?? [];
-
-    if (stmt.reader) {
-      const limit = parseSqlLimit(opts.limit);
-      const effectiveSql =
-        limit === undefined ? rawSql : `SELECT * FROM (${rawSql}) LIMIT ?`;
-      const effectiveParams: readonly unknown[] =
-        limit === undefined ? params : [...params, limit];
-      const rows = sqlite.prepare(effectiveSql).all(effectiveParams) as Record<
-        string,
-        unknown
-      >[];
-      const truncated = limit !== undefined && rows.length >= limit;
-      return {
-        ok: true,
-        data: rows,
-        meta: {
-          rowCount: rows.length,
-          ...(truncated && { truncated: true, limit }),
-        },
-      };
+    if (opts.allowDangerous === true) {
+      return runPreparedSql(sqlite, rawSql, opts);
     }
-
-    if (opts.allowDangerous !== true) {
-      throw new OperationError(
-        "SQL statement is mutating. Pass allowDangerous: true to execute non-reader SQL.",
-        ErrorCode.SELECT_ONLY,
-      );
-    }
-
-    if (opts.dryRun) {
-      const plan = sqlite
-        .prepare(`EXPLAIN QUERY PLAN ${rawSql}`)
-        .all(params) as Record<string, unknown>[];
-      return {
-        ok: true,
-        data: plan,
-        meta: {
-          message: "Dry run: SQL is valid (EXPLAIN QUERY PLAN succeeded)",
-          dryRun: true,
-          tableOutputHandled: true,
-        },
-      };
-    }
-
-    const info = stmt.run(params);
-    return {
-      ok: true,
-      data: [],
-      meta: {
-        rowCount: info.changes,
-        ...(info.changes === 0 && { message: "OK (0 rows)" }),
-      },
-    };
+    return runWithSqliteQueryOnly(sqlite, () =>
+      runPreparedSql(sqlite, rawSql, opts),
+    );
   } catch (err) {
+    if (isSqliteReadonlyError(err)) {
+      throw mutatingSqlError();
+    }
     const classified = classifySqliteError(err, "sql");
     if (!classified) throw err;
     throw new OperationError(classified.message, classified.code);
   }
+}
+
+function runPreparedSql(
+  sqlite: Database.Database,
+  rawSql: string,
+  opts: DbRunOptions,
+): OperationResult {
+  const stmt = sqlite.prepare(rawSql);
+  const params = opts.params ?? [];
+
+  if (stmt.reader) {
+    const limit = parseSqlLimit(opts.limit);
+    const effectiveSql =
+      limit === undefined ? rawSql : `SELECT * FROM (${rawSql}) LIMIT ?`;
+    const effectiveParams: readonly unknown[] =
+      limit === undefined ? params : [...params, limit];
+    const rows = sqlite.prepare(effectiveSql).all(effectiveParams) as Record<
+      string,
+      unknown
+    >[];
+    const truncated = limit !== undefined && rows.length >= limit;
+    return {
+      ok: true,
+      data: rows,
+      meta: {
+        rowCount: rows.length,
+        ...(truncated && { truncated: true, limit }),
+      },
+    };
+  }
+
+  if (opts.allowDangerous !== true) {
+    throw mutatingSqlError();
+  }
+
+  if (opts.dryRun) {
+    const plan = sqlite
+      .prepare(`EXPLAIN QUERY PLAN ${rawSql}`)
+      .all(params) as Record<string, unknown>[];
+    return {
+      ok: true,
+      data: plan,
+      meta: {
+        message: "Dry run: SQL is valid (EXPLAIN QUERY PLAN succeeded)",
+        dryRun: true,
+        tableOutputHandled: true,
+      },
+    };
+  }
+
+  const info = stmt.run(params);
+  return {
+    ok: true,
+    data: [],
+    meta: {
+      rowCount: info.changes,
+      ...(info.changes === 0 && { message: "OK (0 rows)" }),
+    },
+  };
+}
+
+function runWithSqliteQueryOnly<T>(
+  sqlite: Database.Database,
+  fn: () => T,
+): T {
+  const previous = readQueryOnly(sqlite);
+  sqlite.pragma("query_only = ON");
+  try {
+    return fn();
+  } finally {
+    sqlite.pragma(`query_only = ${previous ? "ON" : "OFF"}`);
+  }
+}
+
+function readQueryOnly(sqlite: Database.Database): boolean {
+  const rows = sqlite.pragma("query_only") as Array<{ query_only: number }>;
+  return rows[0]?.query_only === 1;
+}
+
+function isSqliteReadonlyError(err: unknown): boolean {
+  return (
+    err instanceof Error &&
+    (err as { code?: unknown }).code === "SQLITE_READONLY"
+  );
+}
+
+function mutatingSqlError(): OperationError {
+  return new OperationError(
+    "SQL statement is mutating. Pass allowDangerous: true to execute non-reader SQL.",
+    ErrorCode.SELECT_ONLY,
+  );
 }
 
 function parseSqlLimit(limit: number | undefined): number | undefined {
