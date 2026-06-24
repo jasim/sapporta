@@ -204,17 +204,17 @@ interface SampleFieldProjection {
 function resolveSampleProjection(
   table: TableDef,
   fields: readonly string[] | undefined,
-): SampleFieldProjection[] | undefined {
-  if (fields === undefined) return undefined;
-
+): SampleFieldProjection[] {
   const columnsByName = new Map<string, SQLiteColumn>();
   for (const column of getTableConfig(table.drizzle).columns) {
     columnsByName.set(column.name, column);
   }
 
+  const requestedFields =
+    fields ?? getTableConfig(table.drizzle).columns.map((column) => column.name);
   const projection: SampleFieldProjection[] = [];
   const unknownFields: string[] = [];
-  for (const field of fields) {
+  for (const field of requestedFields) {
     const column = columnsByName.get(field);
     if (!column) {
       unknownFields.push(field);
@@ -238,10 +238,8 @@ function resolveSampleProjection(
 
 function projectSampleRows(
   rows: readonly Record<string, unknown>[],
-  projection: readonly SampleFieldProjection[] | undefined,
+  projection: readonly SampleFieldProjection[],
 ): Record<string, unknown>[] {
-  if (projection === undefined) return [...rows];
-
   return rows.map((row) => {
     const projected: Record<string, unknown> = {};
     for (const field of projection) {
