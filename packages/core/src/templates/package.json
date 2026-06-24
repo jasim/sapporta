@@ -4,10 +4,12 @@
   "type": "module",
   "packageManager": "pnpm@11.1.1",
   "scripts": {
-    "predev": "pnpm --filter ./packages/shared build",
+    "clean": "node scripts/clean-dist.mjs",
+    "predev": "pnpm run clean && pnpm --filter ./packages/shared build",
     "dev": "node --env-file=.env.development scripts/dev.mjs",
     "dev:server": "pnpm --filter ./packages/api dev",
     "dev:ui": "pnpm --filter ./packages/frontend dev",
+    "prebuild": "pnpm run clean",
     "build": "pnpm --filter ./packages/shared build && pnpm --filter ./packages/api build && pnpm --filter ./packages/frontend build",
     "start": "pnpm --filter ./packages/api start"
   },
