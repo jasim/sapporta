@@ -95,6 +95,7 @@ export function makeMetaHandlers<E extends SapportaEnv>(
     },
 
     getTable: ({ c, request }) => {
+      requireAuthContext(c);
       const schema = extractSchema(catalog.tables, request.params.name);
       if (!schema)
         return apiErrorResponse(c, {
