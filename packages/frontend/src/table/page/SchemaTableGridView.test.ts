@@ -3,7 +3,10 @@
 import { act, createElement, type ReactElement } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { ROW_PRIMARY_MASTER_DETAIL } from "@sapporta/grid";
+import {
+  ROW_PRIMARY_MASTER_DETAIL,
+  type GridInteractionConfig,
+} from "@sapporta/grid";
 import type { TableSchema } from "@sapporta/shared/contracts";
 import type { TGridDefinition } from "@/table/grid-adapter/tgrid-runtime-config";
 import type { SchemaTableRowsByLevel } from "@/table/grid-adapter/schema-tgrid";
@@ -180,6 +183,59 @@ describe("SchemaTableGridView", () => {
     });
   });
 
+  it("keeps the grid definition stable when row option objects are recreated", async () => {
+    const navigate = vi.fn();
+    const source = {
+      table: ordersTable,
+      tablesByName: { orders: ordersTable, order_lines: orderLinesTable },
+    };
+    const route = {
+      path: "/orders-workbench",
+      searchParams: new URLSearchParams(),
+      navigate,
+    };
+    const renderView = (): ReactElement =>
+      createElement(SchemaTableGridView, {
+        source,
+        route,
+        registerAs: "orders",
+        rootRows: { pageSize: 15, initialSearch: "open" },
+        relatedRows: { pageSize: 25, initialPage: 3 },
+        interaction: {
+          mode: "row-list",
+          activeCell: { kind: "none" },
+          selectedCells: { kind: "none" },
+          activeRow: {
+            kind: "from-row-cursor",
+            keyboard: {
+              arrows: "move-active-row",
+              shiftArrows: "move-active-row",
+              expansion: "left-right-enter",
+            },
+          },
+          selectedRows: {
+            kind: "enabled",
+            mode: "single",
+            sync: { kind: "follows-active-row" },
+            keyboard: { space: "ignore" },
+          },
+        } satisfies GridInteractionConfig,
+      });
+
+    mounted = await render(renderView());
+    expect(tableGridViewSpy).toHaveBeenCalledTimes(1);
+    const firstDefinition = tableGridViewSpy.mock.calls[0]?.[0].definition;
+
+    await act(async () => {
+      mounted?.root.render(renderView());
+    });
+
+    expect(tableGridViewSpy).toHaveBeenCalledTimes(2);
+    expect(tableGridViewSpy.mock.calls[1]?.[0].definition).toBe(
+      firstDefinition,
+    );
+  });
+
   it("applies related row options to child levels", async () => {
     const props = await renderSchemaTableGridView({
       relatedRows: {
@@ -200,7 +256,9 @@ describe("SchemaTableGridView", () => {
       interaction: ROW_PRIMARY_MASTER_DETAIL,
     });
 
-    expect(props.definition.interaction).toBe(ROW_PRIMARY_MASTER_DETAIL);
+    expect(props.definition.interaction).toStrictEqual(
+      ROW_PRIMARY_MASTER_DETAIL,
+    );
   });
 
   it("forwards table view controls to TableGridView", async () => {

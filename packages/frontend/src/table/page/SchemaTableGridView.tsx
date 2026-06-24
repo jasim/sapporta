@@ -42,6 +42,121 @@ const schemaTableGridDefaultRootRows: SchemaTableRootRowsOptions = {
   urlSync: true,
 };
 
+function definedRowOptions(
+  options: SchemaTableRootRowsOptions,
+): SchemaTableRootRowsOptions | undefined {
+  const entries = Object.entries(options).filter(
+    ([, value]) => value !== undefined,
+  );
+
+  return entries.length === 0
+    ? undefined
+    : (Object.fromEntries(entries) as SchemaTableRootRowsOptions);
+}
+
+function useStableRowOptions({
+  options,
+  defaults = {},
+}: {
+  options?: SchemaTableRootRowsOptions;
+  defaults?: SchemaTableRootRowsOptions;
+}): SchemaTableRootRowsOptions | undefined {
+  const pageSize = options?.pageSize ?? defaults.pageSize;
+  const initialPage = options?.initialPage ?? defaults.initialPage;
+  const initialSort = options?.initialSort ?? defaults.initialSort;
+  const initialFilters = options?.initialFilters ?? defaults.initialFilters;
+  const initialSearch =
+    options?.initialSearch !== undefined
+      ? options.initialSearch
+      : defaults.initialSearch;
+  const fixedFilters = options?.fixedFilters ?? defaults.fixedFilters;
+  const urlSync = options?.urlSync ?? defaults.urlSync;
+
+  return useMemo(
+    () =>
+      definedRowOptions({
+        pageSize,
+        initialPage,
+        initialSort,
+        initialFilters,
+        initialSearch,
+        fixedFilters,
+        urlSync,
+      }),
+    [
+      fixedFilters,
+      initialFilters,
+      initialPage,
+      initialSearch,
+      initialSort,
+      pageSize,
+      urlSync,
+    ],
+  );
+}
+
+function useStableInteractionOptions(
+  interaction?: GridInteractionConfig,
+): GridInteractionConfig | undefined {
+  const mode = interaction?.mode;
+  const selectedCellsKind = interaction?.selectedCells.kind;
+  const activeRowKind = interaction?.activeRow.kind;
+  const cellGridTabularArrows =
+    interaction?.mode === "cell-grid"
+      ? interaction.activeCell.keyboard.arrows.tabular
+      : undefined;
+  const cellGridCardsArrows =
+    interaction?.mode === "cell-grid"
+      ? interaction.activeCell.keyboard.arrows.cards
+      : undefined;
+  const rowListArrows =
+    interaction?.mode === "row-list"
+      ? interaction.activeRow.keyboard.arrows
+      : undefined;
+  const rowListShiftArrows =
+    interaction?.mode === "row-list"
+      ? interaction.activeRow.keyboard.shiftArrows
+      : undefined;
+  const rowListExpansion =
+    interaction?.mode === "row-list"
+      ? interaction.activeRow.keyboard.expansion
+      : undefined;
+  const selectedRowsKind = interaction?.selectedRows.kind;
+  const selectedRowsMode =
+    interaction?.selectedRows.kind === "enabled"
+      ? interaction.selectedRows.mode
+      : undefined;
+  const selectedRowsSync =
+    interaction?.selectedRows.kind === "enabled"
+      ? interaction.selectedRows.sync.kind
+      : undefined;
+  const selectedRowsSpace =
+    interaction?.selectedRows.kind === "enabled"
+      ? interaction.selectedRows.keyboard.space
+      : undefined;
+
+  // The config object may be inline; the finite interaction fields are the
+  // dependency contract.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  return useMemo(
+    () => interaction,
+    [
+      cellGridCardsArrows,
+      cellGridTabularArrows,
+      activeRowKind,
+      mode,
+      selectedCellsKind,
+      rowListArrows,
+      rowListExpansion,
+      rowListShiftArrows,
+      selectedRowsKind,
+      selectedRowsMode,
+      selectedRowsSpace,
+      selectedRowsSync,
+    ],
+  );
+}
+
 export function SchemaTableGridView({
   source,
   route,
@@ -64,18 +179,21 @@ export function SchemaTableGridView({
     }),
     [source.table.name, source.tablesByName],
   );
+  const rootRowOptions = useStableRowOptions({
+    options: rootRows,
+    defaults: schemaTableGridDefaultRootRows,
+  });
+  const relatedRowOptions = useStableRowOptions({ options: relatedRows });
+  const interactionOptions = useStableInteractionOptions(interaction);
   const definition = useMemo(
     () =>
       defineSchemaTGrid({
         source: gridSource,
-        rootRows: {
-          ...schemaTableGridDefaultRootRows,
-          ...rootRows,
-        },
-        relatedRows,
-        interaction,
+        rootRows: rootRowOptions,
+        relatedRows: relatedRowOptions,
+        interaction: interactionOptions,
       }),
-    [gridSource, interaction, relatedRows, rootRows],
+    [gridSource, interactionOptions, relatedRowOptions, rootRowOptions],
   );
 
   return (
