@@ -1,19 +1,27 @@
 /**
- * Route component for /p/:projectId/tables/:tableName
- *
- * The route owns table-grid shell effects and delegates the table surface to
- * the table page.
+ * Renders the standard table screen for the `tables/:tableName` route.
+ * Pass `gridOptionsByTable` to tune individual tables.
  */
 
 import { useEffect } from "react";
 import { useParams } from "react-router-dom";
 import { useSchemaStore } from "@/schema-catalog/state/schema-store";
-import { TablePage } from "@/table/page/TablePage";
+import {
+  TablePage,
+  type TablePageGridOptions,
+} from "@/table/page/TablePage";
 
-export function TableRoute() {
+export type TableGridOptionsByTable = Record<string, TablePageGridOptions>;
+
+export type TableRouteProps = {
+  gridOptionsByTable?: TableGridOptionsByTable;
+};
+
+export function TableRoute({ gridOptionsByTable }: TableRouteProps) {
   const { tableName } = useParams<{ tableName: string }>();
   const { loaded, tables } = useSchemaStore();
   const tableSchema = tables.find((t) => t.name === tableName);
+  const gridOptions = tableName ? gridOptionsByTable?.[tableName] : undefined;
 
   useEffect(() => {
     if (!tableName || !tableSchema) return;
@@ -29,5 +37,11 @@ export function TableRoute() {
     );
   }
 
-  return <TablePage key={tableName} tableName={tableName} />;
+  return (
+    <TablePage
+      key={tableName}
+      tableName={tableName}
+      gridOptions={gridOptions}
+    />
+  );
 }

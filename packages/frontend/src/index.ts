@@ -38,7 +38,11 @@ export {
 export { BootLoader } from "@/app/boot/BootLoader";
 export { HomeRedirect } from "@/app/boot/HomeRedirect";
 export { NotFoundView } from "@/app/boot/NotFoundView";
-export { TableRoute } from "@/table/route/TableRoute";
+export {
+  TableRoute,
+  type TableGridOptionsByTable,
+  type TableRouteProps,
+} from "@/table/route/TableRoute";
 export { NewRecordRoute } from "@/table/route/NewRecordRoute";
 export { NewRecordPage } from "@/table/form/NewRecordPage";
 export { RecordFormField } from "@/table/form/RecordFormField";

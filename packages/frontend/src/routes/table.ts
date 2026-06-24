@@ -1,1 +1,5 @@
-export { TableRoute } from "@/table/route/TableRoute";
+export {
+  TableRoute,
+  type TableGridOptionsByTable,
+  type TableRouteProps,
+} from "@/table/route/TableRoute";

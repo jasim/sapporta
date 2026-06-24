@@ -3,13 +3,26 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import type { TableSchema } from "@sapporta/shared/contracts";
 import { useSchemaStore } from "@/schema-catalog/state/schema-store";
 import { navigateToNewRecord } from "@/table/actions/record-actions";
-import { SchemaTableGridView } from "./SchemaTableGridView";
+import {
+  SchemaTableGridView,
+  type SchemaTableGridViewProps,
+} from "./SchemaTableGridView";
 
-// Built-in table route for `/tables/:tableName`.
-// It is intentionally small: the route supplies schema, URL state, navigation,
-// and the "new record" action, while the reusable table view owns the shared
-// table controls.
-export function TablePage({ tableName }: { tableName: string }) {
+export type TablePageGridOptions = Omit<
+  // These values come from the current table route. Pass grid options for
+  // behavior you want to tune, such as row loading, toolbar, or pagination.
+  SchemaTableGridViewProps,
+  "source" | "route" | "registerAs" | "onNewRecord"
+>;
+
+export type TablePageProps = {
+  tableName: string;
+  gridOptions?: TablePageGridOptions;
+};
+
+// Standard `/tables/:tableName` page. Pass gridOptions to adjust the table
+// view while keeping the usual URL, schema, and New record behavior.
+export function TablePage({ tableName, gridOptions }: TablePageProps) {
   const tableSchema = useSchemaStore((s) =>
     s.tables.find((t) => t.name === tableName),
   );
@@ -28,6 +41,7 @@ export function TablePage({ tableName }: { tableName: string }) {
       tableName={tableName}
       tableSchema={tableSchema}
       tables={tables}
+      gridOptions={gridOptions}
     />
   );
 }
@@ -36,10 +50,12 @@ function TablePageWithSession({
   tableName,
   tableSchema,
   tables,
+  gridOptions,
 }: {
   tableName: string;
   tableSchema: TableSchema;
   tables: readonly TableSchema[];
+  gridOptions?: TablePageGridOptions;
 }) {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
@@ -58,6 +74,7 @@ function TablePageWithSession({
 
   return (
     <SchemaTableGridView
+      {...gridOptions}
       source={{
         table: tableSchema,
         tablesByName,
@@ -69,7 +86,7 @@ function TablePageWithSession({
           ? undefined
           : () => navigateToNewRecord(tableSchema.name)
       }
-      viewRelatedRows
+      viewRelatedRows={gridOptions?.viewRelatedRows ?? true}
     />
   );
 }

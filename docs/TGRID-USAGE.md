@@ -5,13 +5,13 @@ application declare a level graph, column layout, custom renderers, custom save
 handlers, query controls, and app services while still using the standard table
 row APIs by default.
 
-Use the generated `TableRoute` for generic CRUD screens. Use TGrid when a
+Use `TableRoute` for ordinary CRUD screens. Use TGrid when a
 workflow needs a custom table experience: nested rows, computed columns,
 workflow-specific editors, a custom toolbar, or save behavior that has to call
 application services.
 
 In Sapporta projects, custom TGrid views should follow the same field policy
-as generated forms: omit system-managed scope fields and use lookup controls
+as standard forms: omit system-managed scope fields and use lookup controls
 only for resolved references. See [Sapporta Auth](auth.md).
 
 ## The Shape
@@ -25,9 +25,9 @@ A TGrid has four public pieces:
   React.
 - `<TGrid session={session} />` renders the session.
 
-The definition is the blueprint. The session owns live resources: query stores,
-lookup caches, compiled columns, the grid runtime, endpoint wiring, and export
-helpers. The React component only mounts a session into the grid UI.
+The definition describes the grid. The session holds the live state for query
+stores, lookup caches, compiled columns, endpoint calls, and exports. The React
+component renders that session in the grid UI.
 
 If your screen is not backed by Sapporta table APIs, use BaseGrid directly and
 follow the same live-grid shape: create the live grid from a hook, render after
@@ -582,12 +582,37 @@ const grid = defineTGrid<RowsByLevel>({
 For child inserts, TGrid adds the parent foreign-key value before calling
 `rowsClient.create`.
 
-## Schema-Driven Table Pages
+## Standard Table Route Configuration
 
-For app-owned routes that should render a schema table with Sapporta's standard
-toolbar, pagination, URL sync, lookup labels, nested rows, and CSV export, start
-with `SchemaTableGridView`. The route supplies the table schema, all loaded
-schemas, router state, and its own route path.
+Use `TableRoute` options when your app uses `/tables/:tableName` pages and only
+needs to tune table behavior for a specific table.
+
+```tsx
+import { TableRoute, type TableGridOptionsByTable } from "@sapporta/frontend";
+
+const tableGridOptions = {
+  invoices: {
+    rootRows: { pageSize: 15 },
+    relatedRows: { pageSize: 25 },
+  },
+} satisfies TableGridOptionsByTable;
+
+<Route
+  path="tables/:tableName"
+  element={<TableRoute gridOptionsByTable={tableGridOptions} />}
+/>;
+```
+
+Use this path when you want to adjust table defaults while keeping the standard
+URL behavior, New record action, toolbar, pagination, nested rows, lookup labels,
+and CSV export.
+
+## Custom Schema Table Routes
+
+For custom routes that should render a schema table with Sapporta's standard
+toolbar, pagination, URL behavior, lookup labels, nested rows, and CSV export,
+start with `SchemaTableGridView`. Pass the current table schema, all loaded
+schemas, router state, and the route path for the page.
 
 ```tsx
 <SchemaTableGridView
@@ -624,9 +649,15 @@ should not update the route. `relatedRows` applies the same query defaults to
 expanded child rows. Use `toolbar={false}` or `pagination={false}` to hide the
 standard controls, or pass render functions to replace them.
 
-Use `buildSchemaTGridConfig` when a schema table needs definition-level
-customization before rendering with `TableGridView`, such as custom columns,
-row clients, or a different level graph.
+Use `SchemaTableGridView` when you need a custom route path or workflow page. If
+you are still showing ordinary `/tables/:tableName` pages, prefer `TableRoute`
+options.
+
+## Advanced Custom Grid Composition
+
+Use `buildSchemaTGridConfig` when a schema table needs deeper changes before
+rendering with `TableGridView`, such as custom columns, row clients, or a
+different expandable table graph.
 
 ```tsx
 const config = buildSchemaTGridConfig({
@@ -649,23 +680,27 @@ config.levels.invoices.columns = (columns) => [
 const definition = defineTGrid(config);
 ```
 
-The config uses the same level declarations as `defineTGrid`, so the page can
-customize columns, query defaults, or row clients in ordinary TypeScript. Use
-`defineTGrid` directly when the page should show a different set of expandable
-tables.
+The config follows the same shape as `defineTGrid`, so you can customize
+columns, query defaults, or row clients in ordinary TypeScript. Use
+`defineTGrid` directly when the page should show a different expandable table
+graph.
 
 Keep route state in the view. `TableGridView` reads the current URL when the page
 loads and keeps browser back/forward navigation in sync with the visible table.
 
 ## Public Helpers
 
-These helpers are exported from `@sapporta/ui`:
+These helpers are exported from `@sapporta/frontend`:
 
-- `SchemaTableGridView` renders a schema table as a standard app-owned grid
-  route.
+- `TableRoute` renders a standard table route and accepts per-table grid
+  options.
+- `TablePage` renders a standard table page when a route already has the table
+  name.
+- `SchemaTableGridView` renders a schema table for a custom route or workflow
+  page.
 - `defineSchemaTGrid(...)` creates the default schema-derived grid definition.
-- `buildSchemaTGridConfig(...)` creates schema-derived level declarations that a
-  page can customize before calling `defineTGrid(...)`.
+- `buildSchemaTGridConfig(...)` creates schema-derived grid settings that a page
+  can customize before calling `defineTGrid(...)`.
 - `TableGridView` renders a standard table surface from a `TGridDefinition`.
 - `defineTGrid(...)` declares a fully custom typed level graph.
 - `useTGridCell(...)`, `useTGridCellEditor(...)`, and related context types

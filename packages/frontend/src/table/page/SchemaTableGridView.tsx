@@ -18,10 +18,15 @@ export type SchemaTableGridViewSource = {
 };
 
 export type SchemaTableGridViewProps = {
+  /** Pass the table to show and any loaded schemas needed for expandable rows. */
   source: SchemaTableGridViewSource;
+  /** Pass the current page path and router helpers so table controls update the URL. */
   route: TableGridRoute;
+  /** Use a stable name, usually the table name, for this table page. */
   registerAs?: string;
+  /** Provide this when the page should show a New record action. */
   onNewRecord?: () => void;
+  /** Tune row expansion, row loading, interaction, controls, and styling. */
   viewRelatedRows?: ViewRelatedRowsOption;
   rootRows?: SchemaTableRootRowsOptions;
   relatedRows?: SchemaTableRelatedRowsOptions;

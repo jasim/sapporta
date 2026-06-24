@@ -118,7 +118,7 @@ describe("SchemaTableGridView", () => {
     tableGridViewSpy.mockClear();
   });
 
-  it("creates a schema definition and renders TableGridView at the route path", async () => {
+  it("renders a schema table grid at the route path", async () => {
     const navigate = vi.fn();
     mounted = await render(
       createElement(SchemaTableGridView, {
@@ -195,7 +195,7 @@ describe("SchemaTableGridView", () => {
     });
   });
 
-  it("passes interaction config to the generated definition", async () => {
+  it("applies the selected row interaction mode", async () => {
     const props = await renderSchemaTableGridView({
       interaction: ROW_PRIMARY_MASTER_DETAIL,
     });

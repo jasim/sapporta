@@ -50,7 +50,11 @@ export type {
   ViewRelatedRowsContext,
   ViewRelatedRowsOption,
 } from "./page/TGrid";
-export { TablePage } from "./page/TablePage";
+export {
+  TablePage,
+  type TablePageGridOptions,
+  type TablePageProps,
+} from "./page/TablePage";
 export {
   SchemaTableGridView,
   type SchemaTableGridViewSource,
@@ -78,7 +82,11 @@ export * from "./page/table-toolbar-binding";
 export * from "./page/tgrid-lifecycle";
 export * from "./page/tgrid-source-status";
 export { NewRecordRoute } from "./route/NewRecordRoute";
-export { TableRoute } from "./route/TableRoute";
+export {
+  TableRoute,
+  type TableGridOptionsByTable,
+  type TableRouteProps,
+} from "./route/TableRoute";
 export * from "./state/tgrid-level-query-state";
 export {
   createTGridSession,
