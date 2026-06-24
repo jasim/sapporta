@@ -153,6 +153,7 @@ export function mountSapportaFramework(
     makeMetaHandlers(
       catalog,
       sqlite,
+      db,
       { dir: apiDistDir, name, slug },
       {
         requireAuthContext: options.auth.requireAuthContext,

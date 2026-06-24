@@ -57,6 +57,12 @@ export interface TestAuthOverrides {
   canManageUnrestrictedAccess?: boolean;
   memberId?: string;
   role?: WorkspaceRole;
+  deniedAbilities?: TestDeniedAbility[];
+}
+
+export interface TestDeniedAbility {
+  action: string;
+  subject: string;
 }
 
 export type TestRequestInit = RequestInit & {
@@ -235,6 +241,7 @@ function createTestAuth(
     ability: allowAllAbility({
       canManageUnrestrictedAccess:
         overrides.canManageUnrestrictedAccess ?? roles.includes("owner"),
+      deniedAbilities: overrides.deniedAbilities ?? [],
     }),
     catalog,
   });
@@ -242,10 +249,18 @@ function createTestAuth(
 
 function allowAllAbility(options: {
   canManageUnrestrictedAccess: boolean;
+  deniedAbilities: readonly TestDeniedAbility[];
 }): SapportaAbility {
   return {
     can: (action, subject) => {
-      if (action === "manage" && subject === "sapporta_unrestricted_access") {
+      if (
+        options.deniedAbilities.some(
+          (denied) => denied.action === action && denied.subject === subject,
+        )
+      ) {
+        return false;
+      }
+      if (action === "manage" && subject === UNRESTRICTED_META_SUBJECT) {
         return options.canManageUnrestrictedAccess;
       }
       return true;

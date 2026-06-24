@@ -158,6 +158,63 @@ describe("/api/meta", () => {
       expect(body.length).toBeGreaterThan(0);
     });
 
+    it("GET /api/meta/tables/accounts/sample scopes rows to the caller", async () => {
+      await postJson("/api/tables/accounts", {
+        name: "VisibleSampleAccount",
+        type: "asset",
+      });
+      await postJson(
+        "/api/tables/accounts",
+        {
+          name: "HiddenSampleAccount",
+          type: "liability",
+        },
+        { workspaceId: "workspace-2" },
+      );
+
+      const res = await request(
+        "/api/meta/tables/accounts/sample?fields=name&limit=1000",
+      );
+      expect(res.status).toBe(200);
+
+      const body = (await res.json()) as Array<{ name: string }>;
+      const names = body.map((row) => row.name);
+      expect(names).toContain("VisibleSampleAccount");
+      expect(names).not.toContain("HiddenSampleAccount");
+    });
+
+    it("GET /api/meta/tables/:name/sample rejects unregistered SQLite tables", async () => {
+      const { conn } = await createIntegrationApp();
+      conn.sqlite.exec(`
+        CREATE TABLE internal_only (
+          id integer PRIMARY KEY AUTOINCREMENT,
+          secret text NOT NULL
+        );
+        INSERT INTO internal_only (secret) VALUES ('hidden');
+      `);
+
+      const res = await request("/api/meta/tables/internal_only/sample");
+      expect(res.status).toBe(404);
+      expect(await res.json()).toEqual({
+        error: 'Table "internal_only" not found',
+        code: "TABLE_NOT_FOUND",
+      });
+    });
+
+    it("GET /api/meta/tables/accounts/sample requires read ability", async () => {
+      const res = await request("/api/meta/tables/accounts/sample", {
+        auth: {
+          deniedAbilities: [{ action: "read", subject: "accounts" }],
+        },
+      });
+
+      expect(res.status).toBe(403);
+      expect(await res.json()).toEqual({
+        error: "Forbidden",
+        code: "forbidden",
+      });
+    });
+
     it("GET /api/meta/tables/accounts/sample trims requested fields", async () => {
       await postJson("/api/tables/accounts", {
         name: "FieldTrimAccount",
@@ -171,6 +228,17 @@ describe("/api/meta", () => {
 
       const body = await res.json();
       expect(Object.keys(body[0]).sort()).toEqual(["name", "type"]);
+    });
+
+    it("GET /api/meta/tables/accounts/sample rejects unknown requested fields", async () => {
+      const res = await request(
+        "/api/meta/tables/accounts/sample?fields=name,secret",
+      );
+
+      expect(res.status).toBe(400);
+      expect(await res.json()).toMatchObject({
+        code: "INVALID_COLUMN_NAME",
+      });
     });
 
     it("GET /api/meta/tables/accounts/sample rejects bad limits", async () => {
@@ -188,7 +256,7 @@ describe("/api/meta", () => {
       expect(res.status).toBe(404);
 
       expect(await res.json()).toEqual({
-        error: "Table 'nonexistent' not found",
+        error: 'Table "nonexistent" not found',
         code: "TABLE_NOT_FOUND",
       });
     });

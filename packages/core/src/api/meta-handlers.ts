@@ -5,12 +5,13 @@
  */
 
 import type Database from "better-sqlite3";
+import type { BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
+import { getTableConfig, type SQLiteColumn } from "drizzle-orm/sqlite-core";
 import type { Context } from "hono";
 import type { TableCatalog } from "../schema/catalog.js";
 import { extractSchemas, extractSchema } from "../schema/extract.js";
 import { dbRun } from "../introspect/run.js";
 import { dbIndexes } from "../introspect/indexes.js";
-import { dbSample } from "../introspect/sample.js";
 import { dbDescribeAll } from "../introspect/describe-all.js";
 import {
   ErrorCode,
@@ -18,15 +19,19 @@ import {
   type OperationResult,
 } from "../introspect/types.js";
 import { parseOptionalBoundedInteger } from "@sapporta/shared/validation";
+import { columnPropertyName } from "../auth/row-scope.js";
+import { RowScopePolicyError, type SapportaAuthContext } from "../auth/index.js";
+import { QueryParseError } from "../db/errors.js";
+import { scopedRows } from "../data/scoped-rows.js";
+import type { SapportaAuthGuard, SapportaEnv } from "./server.js";
+import type { TableDef } from "../schema/table.js";
 import {
   apiErrorResponse,
   operationErrorResponse,
   operationResultResponse,
 } from "./error-response.js";
 import type { MetaHandlers } from "./mount-meta.js";
-import type { SapportaAuthGuard, SapportaEnv } from "./server.js";
 import { forbidUnless } from "../auth/forbid.js";
-import type { SapportaAuthContext } from "../auth/index.js";
 
 const UNRESTRICTED_META_SUBJECT = "sapporta_unrestricted_access";
 
@@ -53,6 +58,7 @@ export interface AuthorizedMetaHandlersOptions<E extends SapportaEnv> {
 export function makeMetaHandlers<E extends SapportaEnv>(
   catalog: TableCatalog,
   sqlite: Database.Database,
+  db: BetterSQLite3Database,
   project: { dir: string; name: string; slug: string },
   options: AuthorizedMetaHandlersOptions<E>,
 ): MetaHandlers<E> {
@@ -105,12 +111,42 @@ export function makeMetaHandlers<E extends SapportaEnv>(
       );
     },
 
-    tableSample: ({ c, request }) => {
-      const limit = parseSampleLimit(request.query?.limit);
-      const fields = parseSampleFields(request.query?.fields);
-      return withOperationError(c, () =>
-        dbSample(sqlite, request.params.name, limit, fields),
-      );
+    tableSample: async ({ c, request }) => {
+      try {
+        const def = catalog.get(request.params.name);
+        if (!def) return tableNotFoundResponse(c, request.params.name);
+
+        const auth = requireAuthContext(c);
+        forbidUnless(c, auth.ability.can("read", def.sqlName));
+
+        const limit = parseSampleLimit(request.query?.limit) ?? 5;
+        const fields = parseSampleFields(request.query?.fields);
+        const projection = resolveSampleProjection(def, fields);
+        const result = await scopedRows(db, auth, def).list({
+          limit: String(limit),
+        });
+
+        return c.json(projectSampleRows(result.data, projection));
+      } catch (err) {
+        if (err instanceof OperationError) {
+          return operationErrorResponse(c, err);
+        }
+        if (err instanceof QueryParseError) {
+          return apiErrorResponse(c, {
+            error: err.message,
+            code: err.code,
+            status: 400,
+          });
+        }
+        if (err instanceof RowScopePolicyError) {
+          return apiErrorResponse(c, {
+            error: "Forbidden",
+            code: err.code,
+            status: 403,
+          });
+        }
+        throw err;
+      }
     },
 
     // ── SQL proxy ────────────────────────────────────────────────────
@@ -140,12 +176,77 @@ function requireUnrestrictedMetaAccess<E extends SapportaEnv>(
   forbidUnless(c, hasUnrestrictedMetaAccess(auth));
 }
 
+function tableNotFoundResponse<E extends SapportaEnv>(
+  c: Context<E>,
+  tableName: string,
+): Response {
+  return apiErrorResponse(c, {
+    error: `Table "${tableName}" not found`,
+    code: ErrorCode.TABLE_NOT_FOUND,
+  });
+}
+
 function parseSampleLimit(raw: string | undefined): number | undefined {
   return parseOptionalBoundedInteger(raw, {
     name: "limit",
     min: 1,
     max: 1000,
     makeError: (message) => new OperationError(message, ErrorCode.BAD_LIMIT),
+  });
+}
+
+interface SampleFieldProjection {
+  responseName: string;
+  rowName: string;
+}
+
+function resolveSampleProjection(
+  table: TableDef,
+  fields: readonly string[] | undefined,
+): SampleFieldProjection[] | undefined {
+  if (fields === undefined) return undefined;
+
+  const columnsByName = new Map<string, SQLiteColumn>();
+  for (const column of getTableConfig(table.drizzle).columns) {
+    columnsByName.set(column.name, column);
+  }
+
+  const projection: SampleFieldProjection[] = [];
+  const unknownFields: string[] = [];
+  for (const field of fields) {
+    const column = columnsByName.get(field);
+    if (!column) {
+      unknownFields.push(field);
+      continue;
+    }
+    projection.push({
+      responseName: field,
+      rowName: columnPropertyName(table, column) ?? field,
+    });
+  }
+
+  if (unknownFields.length > 0) {
+    throw new OperationError(
+      `Unknown column(s) in '${table.sqlName}': ${unknownFields.join(", ")}`,
+      ErrorCode.INVALID_COLUMN_NAME,
+    );
+  }
+
+  return projection;
+}
+
+function projectSampleRows(
+  rows: readonly Record<string, unknown>[],
+  projection: readonly SampleFieldProjection[] | undefined,
+): Record<string, unknown>[] {
+  if (projection === undefined) return [...rows];
+
+  return rows.map((row) => {
+    const projected: Record<string, unknown> = {};
+    for (const field of projection) {
+      projected[field.responseName] = row[field.rowName];
+    }
+    return projected;
   });
 }
 
