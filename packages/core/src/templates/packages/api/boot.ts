@@ -98,7 +98,7 @@ app.use("/api/*", projectAuth.rejectAnonymousMiddleware);
 const sapportaApi = mountSapportaFramework(app, sapporta, {
   conn,
   auth: {
-    requireFrameworkAccess: projectAuth.requireAuthContext,
+    requireAuthContext: projectAuth.requireAuthContext,
   },
 });
 

@@ -42,6 +42,7 @@ const FIXTURES_SOURCE_DIR = resolve(import.meta.dirname, "fixtures");
 let app: Hono<SapportaEnv>;
 
 const TEST_AUTH_HEADER = "x-sapporta-test-auth";
+const UNRESTRICTED_META_SUBJECT = "sapporta_unrestricted_access";
 
 export interface TestAuthOverrides {
   sessionId?: string;
@@ -110,7 +111,7 @@ export async function createIntegrationApp(
   const sapportaApi = mountSapportaFramework(app, sapporta, {
     conn,
     auth: {
-      requireFrameworkAccess: (c) => c.get("auth"),
+      requireAuthContext: (c) => c.get("auth"),
     },
   });
   app.route("/api", apiApp);
@@ -210,6 +211,9 @@ function createTestAuth(
     name: overrides.workspaceName ?? `Workspace ${workspaceId}`,
     slug: overrides.workspaceSlug ?? workspaceId,
   };
+  const roles = [
+    overrides.role ?? (overrides.isOwner === false ? "member" : "owner"),
+  ];
 
   return createAuthContext({
     principal: {
@@ -217,9 +221,7 @@ function createTestAuth(
       user,
       membership: {
         id: overrides.memberId ?? `member-${userId}-${workspaceId}`,
-        roles: [
-          overrides.role ?? (overrides.isOwner === false ? "member" : "owner"),
-        ],
+        roles,
       },
     },
     dataAuthority: requestDataAuthority({
@@ -232,7 +234,7 @@ function createTestAuth(
     }),
     ability: allowAllAbility({
       canManageUnrestrictedAccess:
-        overrides.canManageUnrestrictedAccess ?? true,
+        overrides.canManageUnrestrictedAccess ?? roles.includes("owner"),
     }),
     catalog,
   });

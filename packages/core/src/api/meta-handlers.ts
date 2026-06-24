@@ -26,6 +26,9 @@ import {
 import type { MetaHandlers } from "./mount-meta.js";
 import type { SapportaAuthGuard, SapportaEnv } from "./server.js";
 import { forbidUnless } from "../auth/forbid.js";
+import type { SapportaAuthContext } from "../auth/index.js";
+
+const UNRESTRICTED_META_SUBJECT = "sapporta_unrestricted_access";
 
 function resultToResponse(c: Context, result: OperationResult): Response {
   return operationResultResponse(c, result);
@@ -42,33 +45,44 @@ function withOperationError(c: Context, fn: () => OperationResult): Response {
   }
 }
 
+export interface AuthorizedMetaHandlersOptions<E extends SapportaEnv> {
+  /** Project-owned auth guard that returns the request auth context. */
+  requireAuthContext: SapportaAuthGuard<E>;
+}
+
 export function makeMetaHandlers<E extends SapportaEnv>(
   catalog: TableCatalog,
   sqlite: Database.Database,
   project: { dir: string; name: string; slug: string },
-  options: { guard: SapportaAuthGuard<E> },
+  options: AuthorizedMetaHandlersOptions<E>,
 ): MetaHandlers<E> {
+  const requireAuthContext = options.requireAuthContext;
+
   return {
     // ── Project identity ─────────────────────────────────────────────
     projectInfo: ({ c }) => c.json({ name: project.name, slug: project.slug }),
 
     // ── Introspection ────────────────────────────────────────────────
     listTables: ({ c, request }) => {
+      const auth = requireAuthContext(c);
       if (request.query?.detail === "full") {
+        requireUnrestrictedMetaAccess(c, auth);
         return withOperationError(c, () => dbDescribeAll(sqlite));
       }
       const data = extractSchemas(catalog.tables);
-      for (const table of data) {
-        try {
-          const row = sqlite
-            .prepare(`SELECT COUNT(*) AS cnt FROM "${table.name}"`)
-            .get() as { cnt: number } | undefined;
-          table.rowCount = row?.cnt ?? 0;
-        } catch {
-          throw new OperationError(
-            `Registered table "${table.name}" is missing from the database. Run migrations before using this app.`,
-            ErrorCode.INTERNAL,
-          );
+      if (hasUnrestrictedMetaAccess(auth)) {
+        for (const table of data) {
+          try {
+            const row = sqlite
+              .prepare(`SELECT COUNT(*) AS cnt FROM "${table.name}"`)
+              .get() as { cnt: number } | undefined;
+            table.rowCount = row?.cnt ?? 0;
+          } catch {
+            throw new OperationError(
+              `Registered table "${table.name}" is missing from the database. Run migrations before using this app.`,
+              ErrorCode.INTERNAL,
+            );
+          }
         }
       }
       return c.json({ tables: data });
@@ -84,8 +98,12 @@ export function makeMetaHandlers<E extends SapportaEnv>(
       return c.json(schema);
     },
 
-    tableIndexes: ({ c, request }) =>
-      withOperationError(c, () => dbIndexes(sqlite, request.params.name)),
+    tableIndexes: ({ c, request }) => {
+      requireUnrestrictedMetaAccess(c, requireAuthContext(c));
+      return withOperationError(c, () =>
+        dbIndexes(sqlite, request.params.name),
+      );
+    },
 
     tableSample: ({ c, request }) => {
       const limit = parseSampleLimit(request.query?.limit);
@@ -97,11 +115,8 @@ export function makeMetaHandlers<E extends SapportaEnv>(
 
     // ── SQL proxy ────────────────────────────────────────────────────
     sql: ({ c, request }) => {
-      const auth = options.guard(c);
-      forbidUnless(
-        c,
-        auth.ability.can("manage", "sapporta_unrestricted_access"),
-      );
+      const auth = requireAuthContext(c);
+      requireUnrestrictedMetaAccess(c, auth);
       return withOperationError(c, () =>
         dbRun(sqlite, request.body.sql, {
           limit: request.body.limit,
@@ -112,6 +127,17 @@ export function makeMetaHandlers<E extends SapportaEnv>(
       );
     },
   };
+}
+
+function hasUnrestrictedMetaAccess(auth: SapportaAuthContext): boolean {
+  return auth.ability.can("manage", UNRESTRICTED_META_SUBJECT);
+}
+
+function requireUnrestrictedMetaAccess<E extends SapportaEnv>(
+  c: Context<E>,
+  auth: SapportaAuthContext,
+): void {
+  forbidUnless(c, hasUnrestrictedMetaAccess(auth));
 }
 
 function parseSampleLimit(raw: string | undefined): number | undefined {

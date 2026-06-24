@@ -71,7 +71,7 @@ export type SapportaFrameworkApi = TsRestApi<SapportaEnv, FrameworkDocCtx>;
 export interface MountSapportaFrameworkOptions {
   conn: ProjectDbConnection;
   auth: {
-    requireFrameworkAccess: SapportaAuthGuard;
+    requireAuthContext: SapportaAuthGuard;
   };
 }
 
@@ -143,7 +143,7 @@ export function mountSapportaFramework(
   const { sqlite, db } = conn;
   const { name, slug, apiDistDir, catalog } = project;
 
-  installFrameworkRoutePolicy(app, options.auth.requireFrameworkAccess);
+  installFrameworkRoutePolicy(app, options.auth.requireAuthContext);
 
   // Contract paths already carry the /meta and /tables prefix, so
   // mounting at /api yields the full URLs.
@@ -155,7 +155,7 @@ export function mountSapportaFramework(
       sqlite,
       { dir: apiDistDir, name, slug },
       {
-        guard: options.auth.requireFrameworkAccess,
+        requireAuthContext: options.auth.requireAuthContext,
       },
     ),
   );
@@ -163,7 +163,7 @@ export function mountSapportaFramework(
     api,
     catalog,
     makeAuthorizedTableHandlers(catalog, db, {
-      guard: options.auth.requireFrameworkAccess,
+      guard: options.auth.requireAuthContext,
     }),
   );
   app.route("/api", api);

@@ -5,7 +5,7 @@
  * and a SQL escape hatch.
  */
 import { describe, it, expect, beforeAll } from "vitest";
-import { createIntegrationApp, request, postJson } from "./setup.js";
+import { asAuth, createIntegrationApp, request, postJson } from "./setup.js";
 
 beforeAll(async () => {
   await createIntegrationApp();
@@ -39,8 +39,24 @@ describe("/api/meta", () => {
       expect(accounts.rowCount).toBeGreaterThanOrEqual(0);
     });
 
+    it("GET /api/meta/tables omits row counts for ordinary callers", async () => {
+      const ordinary = asAuth({ isOwner: false });
+
+      const res = await ordinary.request("/api/meta/tables");
+      expect(res.status).toBe(200);
+
+      const body = await res.json();
+      const accounts = body.tables.find(
+        (table: { name: string }) => table.name === "accounts",
+      );
+      expect(accounts).toBeDefined();
+      expect(accounts).not.toHaveProperty("rowCount");
+    });
+
     it("GET /api/meta/tables/accounts returns single table with columns and selects", async () => {
-      const res = await request("/api/meta/tables/accounts");
+      const ordinary = asAuth({ isOwner: false });
+
+      const res = await ordinary.request("/api/meta/tables/accounts");
       expect(res.status).toBe(200);
 
       const body = await res.json();
@@ -78,6 +94,38 @@ describe("/api/meta", () => {
   // ── DB introspection ──────────────────────────────────────────────
 
   describe("DB introspection", () => {
+    it("GET /api/meta/tables?detail=full rejects ordinary callers", async () => {
+      const ordinary = asAuth({ isOwner: false });
+
+      const res = await ordinary.request("/api/meta/tables?detail=full");
+      expect(res.status).toBe(403);
+      expect(await res.json()).toEqual({
+        error: "Forbidden",
+        code: "forbidden",
+      });
+    });
+
+    it("GET /api/meta/tables?detail=full allows elevated callers", async () => {
+      const res = await request("/api/meta/tables?detail=full");
+      expect(res.status).toBe(200);
+
+      const body = await res.json();
+      expect(Array.isArray(body)).toBe(true);
+      expect(body.length).toBeGreaterThan(0);
+      expect(body[0].table_name).toBeDefined();
+    });
+
+    it("GET /api/meta/tables/accounts/indexes rejects ordinary callers", async () => {
+      const ordinary = asAuth({ isOwner: false });
+
+      const res = await ordinary.request("/api/meta/tables/accounts/indexes");
+      expect(res.status).toBe(403);
+      expect(await res.json()).toEqual({
+        error: "Forbidden",
+        code: "forbidden",
+      });
+    });
+
     it("GET /api/meta/tables/accounts/indexes returns index list", async () => {
       const res = await request("/api/meta/tables/accounts/indexes");
       expect(res.status).toBe(200);
