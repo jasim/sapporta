@@ -5,7 +5,7 @@
  */
 
 import type Database from "better-sqlite3";
-import type { Context, Env } from "hono";
+import type { Context } from "hono";
 import type { TableCatalog } from "../schema/catalog.js";
 import { extractSchemas, extractSchema } from "../schema/extract.js";
 import { dbRun } from "../introspect/run.js";
@@ -24,6 +24,8 @@ import {
   operationResultResponse,
 } from "./error-response.js";
 import type { MetaHandlers } from "./mount-meta.js";
+import type { SapportaAuthGuard, SapportaEnv } from "./server.js";
+import { forbidUnless } from "../auth/forbid.js";
 
 function resultToResponse(c: Context, result: OperationResult): Response {
   return operationResultResponse(c, result);
@@ -40,10 +42,11 @@ function withOperationError(c: Context, fn: () => OperationResult): Response {
   }
 }
 
-export function makeMetaHandlers<E extends Env>(
+export function makeMetaHandlers<E extends SapportaEnv>(
   catalog: TableCatalog,
   sqlite: Database.Database,
   project: { dir: string; name: string; slug: string },
+  options: { guard: SapportaAuthGuard<E> },
 ): MetaHandlers<E> {
   return {
     // ── Project identity ─────────────────────────────────────────────
@@ -93,14 +96,21 @@ export function makeMetaHandlers<E extends Env>(
     },
 
     // ── SQL proxy ────────────────────────────────────────────────────
-    sql: ({ c, request }) =>
-      withOperationError(c, () =>
+    sql: ({ c, request }) => {
+      const auth = options.guard(c);
+      forbidUnless(
+        c,
+        auth.ability.can("manage", "sapporta_unrestricted_access"),
+      );
+      return withOperationError(c, () =>
         dbRun(sqlite, request.body.sql, {
           limit: request.body.limit,
           dryRun: request.body.dryRun,
+          allowDangerous: request.body.allowDangerous,
           params: request.body.params,
         }),
-      ),
+      );
+    },
   };
 }
 

@@ -16,6 +16,7 @@ const sqlBodySchema = z.object({
   params: z.array(z.unknown()).optional(),
   limit: z.number().int().positive().max(1000).optional(),
   dryRun: z.boolean().optional(),
+  allowDangerous: z.boolean().optional(),
 });
 
 export const projectInfoRoute = c.query({
@@ -86,7 +87,7 @@ export const sqlRoute = c.mutation({
   path: "/meta/sql",
   summary: "Run a SQL statement (auto-dispatches reads vs writes)",
   description:
-    "Escape hatch for ad-hoc SQL. Statements that return rows (SELECT, WITH, PRAGMA, EXPLAIN) return those rows; everything else runs as a mutation and reports the row-change count. Use `params` for placeholders — never string-concatenate user input into `sql`.",
+    "Escape hatch for ad-hoc SQL. Statements that return rows (SELECT, WITH, PRAGMA, EXPLAIN) return those rows. Mutating statements require `allowDangerous: true` and report the row-change count. Use `params` for placeholders — never string-concatenate user input into `sql`.",
   metadata: {
     tags: ["meta"],
     extensions: { "x-sapporta-risk": "escape-hatch" },
@@ -95,6 +96,7 @@ export const sqlRoute = c.mutation({
   responses: {
     200: z.array(z.record(z.string(), z.unknown())),
     400: errorBodySchema,
+    403: errorBodySchema,
     409: errorBodySchema,
     422: errorBodySchema,
     500: errorBodySchema,

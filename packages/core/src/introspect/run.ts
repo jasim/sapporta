@@ -22,6 +22,8 @@ export interface DbRunOptions {
   limit?: number;
   /** For writes: validate via EXPLAIN QUERY PLAN instead of executing. */
   dryRun?: boolean;
+  /** Allow non-reader statements to run. Dangerous DDL is still blocked. */
+  allowDangerous?: boolean;
   /** Positional values bound to placeholders in the SQL statement. */
   params?: readonly unknown[];
 }
@@ -56,6 +58,13 @@ export function dbRun(
           ...(truncated && { truncated: true, limit }),
         },
       };
+    }
+
+    if (opts.allowDangerous !== true) {
+      throw new OperationError(
+        "SQL statement is mutating. Pass allowDangerous: true to execute non-reader SQL.",
+        ErrorCode.SELECT_ONLY,
+      );
     }
 
     if (opts.dryRun) {

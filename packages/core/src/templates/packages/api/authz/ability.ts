@@ -27,6 +27,7 @@ export function buildAbility(ctx: AppAuthFacts): AppAbility {
     ctx.principal.kind === "user" &&
     ctx.principal.membership.roles.includes("owner")
   ) {
+    can("manage", "sapporta_unrestricted_access");
     // This allows owner actions; row security still limits database rows to the
     // request's trusted ownership facts.
     can("manage", "all");

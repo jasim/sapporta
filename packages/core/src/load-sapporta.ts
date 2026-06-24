@@ -150,7 +150,14 @@ export function mountSapportaFramework(
   const api = new TsRestApi<SapportaEnv, FrameworkDocCtx>();
   mountMeta(
     api,
-    makeMetaHandlers(catalog, sqlite, { dir: apiDistDir, name, slug }),
+    makeMetaHandlers(
+      catalog,
+      sqlite,
+      { dir: apiDistDir, name, slug },
+      {
+        guard: options.auth.requireFrameworkAccess,
+      },
+    ),
   );
   mountTables(
     api,

@@ -53,6 +53,7 @@ export interface TestAuthOverrides {
   workspaceName?: string;
   workspaceSlug?: string;
   isOwner?: boolean;
+  canManageUnrestrictedAccess?: boolean;
   memberId?: string;
   role?: WorkspaceRole;
 }
@@ -229,13 +230,25 @@ function createTestAuth(
         user,
       }),
     }),
-    ability: allowAllAbility(),
+    ability: allowAllAbility({
+      canManageUnrestrictedAccess:
+        overrides.canManageUnrestrictedAccess ?? true,
+    }),
     catalog,
   });
 }
 
-function allowAllAbility(): SapportaAbility {
-  return { can: () => true };
+function allowAllAbility(options: {
+  canManageUnrestrictedAccess: boolean;
+}): SapportaAbility {
+  return {
+    can: (action, subject) => {
+      if (action === "manage" && subject === "sapporta_unrestricted_access") {
+        return options.canManageUnrestrictedAccess;
+      }
+      return true;
+    },
+  };
 }
 
 function requestInitWithAuth(init: TestRequestInit): RequestInit {

@@ -102,10 +102,23 @@ describe("dbRun", () => {
 
   // -- Write path (auto-dispatched when stmt doesn't return rows) --
 
-  it("executes INSERT and reports row count", () => {
+  it("rejects INSERT by default and does not change data", () => {
+    expect(() =>
+      dbRun(
+        sqlite,
+        "INSERT INTO accounts (name, type) VALUES ('Equity', 'equity')",
+      ),
+    ).toThrow("allowDangerous");
+
+    const rows = sqlite.prepare("SELECT * FROM accounts").all();
+    expect(rows).toHaveLength(2);
+  });
+
+  it("executes INSERT with allowDangerous and reports row count", () => {
     const result = dbRun(
       sqlite,
       "INSERT INTO accounts (name, type) VALUES ('Equity', 'equity')",
+      { allowDangerous: true },
     );
 
     expect(result.ok).toBe(true);
@@ -118,6 +131,7 @@ describe("dbRun", () => {
     const result = dbRun(
       sqlite,
       "UPDATE accounts SET name = 'Petty Cash' WHERE name = 'Cash'",
+      { allowDangerous: true },
     );
 
     expect(result.ok).toBe(true);
@@ -129,6 +143,7 @@ describe("dbRun", () => {
     const result = dbRun(
       sqlite,
       "UPDATE accounts SET name = 'x' WHERE name = 'missing'",
+      { allowDangerous: true },
     );
 
     expect(result.ok).toBe(true);
@@ -137,7 +152,9 @@ describe("dbRun", () => {
   });
 
   it("executes DELETE", () => {
-    const result = dbRun(sqlite, "DELETE FROM accounts WHERE name = 'Cash'");
+    const result = dbRun(sqlite, "DELETE FROM accounts WHERE name = 'Cash'", {
+      allowDangerous: true,
+    });
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;
@@ -150,7 +167,7 @@ describe("dbRun", () => {
     const result = dbRun(
       sqlite,
       "INSERT INTO accounts (name, type) VALUES (?, ?)",
-      { params: ["Receivable", "asset"] },
+      { params: ["Receivable", "asset"], allowDangerous: true },
     );
 
     expect(result.ok).toBe(true);
@@ -192,7 +209,13 @@ describe("dbRun", () => {
 
   it("classifies unique constraint failures as CONFLICT", () => {
     try {
-      dbRun(sqlite, "INSERT INTO accounts (id, name, type) VALUES (1, 'X', 'x')");
+      dbRun(
+        sqlite,
+        "INSERT INTO accounts (id, name, type) VALUES (1, 'X', 'x')",
+        {
+          allowDangerous: true,
+        },
+      );
       throw new Error("Expected dbRun to throw.");
     } catch (err) {
       expect(err).toBeInstanceOf(OperationError);
@@ -206,7 +229,7 @@ describe("dbRun", () => {
     const result = dbRun(
       sqlite,
       "INSERT INTO accounts (name, type) VALUES ('Equity', 'equity')",
-      { dryRun: true },
+      { dryRun: true, allowDangerous: true },
     );
 
     expect(result.ok).toBe(true);
@@ -220,7 +243,10 @@ describe("dbRun", () => {
 
   it("dry-run still rejects dangerous SQL", () => {
     expect(() =>
-      dbRun(sqlite, "DROP DATABASE sapporta", { dryRun: true }),
+      dbRun(sqlite, "DROP DATABASE sapporta", {
+        dryRun: true,
+        allowDangerous: true,
+      }),
     ).toThrow("DROP DATABASE");
   });
 });

@@ -171,6 +171,21 @@ describe("/api/meta", () => {
       expect(body[0].name).toBe("SQLTestAccount");
     });
 
+    it("POST /api/meta/sql returns 403 without unrestricted access", async () => {
+      const res = await postJson(
+        "/api/meta/sql",
+        {
+          sql: "SELECT name FROM accounts",
+        },
+        { canManageUnrestrictedAccess: false },
+      );
+      expect(res.status).toBe(403);
+      expect(await res.json()).toEqual({
+        error: "Forbidden",
+        code: "forbidden",
+      });
+    });
+
     it("POST /api/meta/sql binds params", async () => {
       await postJson("/api/tables/accounts", {
         name: "BoundParamAccount",
@@ -187,9 +202,24 @@ describe("/api/meta", () => {
       expect(body).toEqual([{ name: "BoundParamAccount" }]);
     });
 
-    it("POST /api/meta/sql runs an INSERT and a follow-up SELECT sees it", async () => {
+    it("POST /api/meta/sql rejects an INSERT without allowDangerous", async () => {
+      const res = await postJson("/api/meta/sql", {
+        sql: "INSERT INTO accounts (name, type, workspace_id) VALUES ('RejectedExecTest', 'liability', 'workspace-1')",
+      });
+      expect(res.status).toBe(400);
+      expect(await res.json()).toMatchObject({ code: "SELECT_ONLY" });
+
+      const check = await postJson("/api/meta/sql", {
+        sql: "SELECT name FROM accounts WHERE name = 'RejectedExecTest'",
+      });
+      const rows = await check.json();
+      expect(rows).toHaveLength(0);
+    });
+
+    it("POST /api/meta/sql runs an INSERT with allowDangerous", async () => {
       const res = await postJson("/api/meta/sql", {
         sql: "INSERT INTO accounts (name, type, workspace_id) VALUES ('ExecTest', 'liability', 'workspace-1')",
+        allowDangerous: true,
       });
       expect(res.status).toBe(200);
 
@@ -210,6 +240,7 @@ describe("/api/meta", () => {
     it("POST /api/meta/sql rejects DROP TABLE", async () => {
       const res = await postJson("/api/meta/sql", {
         sql: "DROP TABLE accounts",
+        allowDangerous: true,
       });
       expect(res.status).toBe(400);
       expect(await res.json()).toMatchObject({ code: "DANGEROUS_SQL" });
@@ -227,12 +258,14 @@ describe("/api/meta", () => {
       const first = await postJson("/api/meta/sql", {
         sql: "INSERT INTO agents (id, name, workspace_id) VALUES (?, ?, ?)",
         params: ["agent-conflict", "First", "workspace-1"],
+        allowDangerous: true,
       });
       expect(first.status).toBe(200);
 
       const second = await postJson("/api/meta/sql", {
         sql: "INSERT INTO agents (id, name, workspace_id) VALUES (?, ?, ?)",
         params: ["agent-conflict", "Second", "workspace-1"],
+        allowDangerous: true,
       });
       expect(second.status).toBe(409);
       expect(await second.json()).toMatchObject({ code: "CONFLICT" });
