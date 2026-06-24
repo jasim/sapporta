@@ -27,6 +27,8 @@ export function buildAbility(ctx: AppAuthFacts): AppAbility {
     ctx.principal.kind === "user" &&
     ctx.principal.membership.roles.includes("owner")
   ) {
+    // `manage all` below would also include this unrestricted access subject.
+    // Keep the explicit grant so the owner role's raw system access is visible.
     can("manage", "sapporta_unrestricted_access");
 
     // This allows owner actions; row security still limits database rows to the
