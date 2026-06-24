@@ -136,19 +136,61 @@ describe("buildRequest", () => {
     );
     expect(route).toBeDefined();
 
-    const req = buildRequest(route!, {}, {
-      _: ["SELECT name FROM accounts WHERE type = ?"],
-      limit: "10",
-      params: '["asset"]',
-      "dry-run": "true",
-    });
+    const req = buildRequest(
+      route!,
+      {},
+      {
+        _: ["SELECT name FROM accounts WHERE type = ?"],
+        limit: "10",
+        params: '["asset"]',
+        "dry-run": "true",
+        allowDangerous: "true",
+      },
+    );
 
     expect(req.body).toEqual({
       sql: "SELECT name FROM accounts WHERE type = ?",
       limit: 10,
       params: ["asset"],
       dryRun: true,
+      allowDangerous: true,
     });
+  });
+
+  it("parses false for the allowDangerous body flag", () => {
+    const route = ROUTES.find(
+      (candidate) => candidate.pattern.join(" ") === "db exec-sql",
+    );
+    expect(route).toBeDefined();
+
+    const req = buildRequest(
+      route!,
+      {},
+      {
+        _: ["SELECT 1"],
+        allowDangerous: "false",
+      },
+    );
+
+    expect(req.body).toEqual({
+      sql: "SELECT 1",
+      allowDangerous: false,
+    });
+  });
+
+  it("throws VALIDATION_FAILED for invalid allowDangerous values", () => {
+    const route = ROUTES.find(
+      (candidate) => candidate.pattern.join(" ") === "db exec-sql",
+    );
+    expect(route).toBeDefined();
+
+    try {
+      buildRequest(route!, {}, { _: ["SELECT 1"], allowDangerous: "yes" });
+      throw new Error("Expected buildRequest to throw.");
+    } catch (err) {
+      expect(err).toBeInstanceOf(OperationError);
+      expect(err).toMatchObject({ code: ErrorCode.VALIDATION_FAILED });
+    }
   });
 
   it("throws BAD_LIMIT for invalid typed limit body flags", () => {

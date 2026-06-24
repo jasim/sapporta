@@ -259,11 +259,16 @@ export const ROUTES: CliRoute[] = [
         .describe(
           "For writes: validate via EXPLAIN QUERY PLAN without executing",
         ),
+      allowDangerous: z
+        .boolean()
+        .optional()
+        .describe("Allow non-reader SQL statements to execute"),
     }),
     bodyFlags: {
       limit: { parse: parseSqlLimitFlag },
       params: { parse: parseParamsFlag },
       "dry-run": { field: "dryRun", parse: parseBooleanFlag },
+      allowDangerous: { parse: parseBooleanFlag },
     },
     requiredBodyFields: ["sql"],
     extractData: (res) => {
