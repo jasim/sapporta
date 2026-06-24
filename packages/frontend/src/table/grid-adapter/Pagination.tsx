@@ -58,6 +58,15 @@ export function Pagination({
     if (clamped !== page) onPageChange(clamped);
   }
 
+  function commitPageJump(): void {
+    const parsed = parsePageJump(draftPage, pages);
+    if (parsed === undefined) {
+      setDraftPage(String(safePage));
+      return;
+    }
+    goToPage(parsed);
+  }
+
   function handleLinkClick(
     event: MouseEvent<HTMLAnchorElement>,
     nextPage: number,
@@ -78,8 +87,7 @@ export function Pagination({
 
   function handleSubmit(event: FormEvent<HTMLFormElement>): void {
     event.preventDefault();
-    const parsed = parsePageJump(draftPage);
-    goToPage(parsed ?? page);
+    commitPageJump();
   }
 
   return (
@@ -110,7 +118,7 @@ export function Pagination({
             id={pageJumpId}
             value={draftPage}
             onChange={(event) => setDraftPage(event.target.value)}
-            onBlur={() => setDraftPage(String(safePage))}
+            onBlur={commitPageJump}
             inputMode="numeric"
             aria-label={`Page number, 1 through ${pages}`}
             className="mono h-9 w-[64px] rounded-[5px] border border-sap-border bg-sap-surface px-[9px] text-center text-sap-meta text-sap-fg shadow-[inset_0_0_0_1px_var(--sap-border-soft)] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
@@ -188,11 +196,12 @@ export function Pagination({
   );
 }
 
-function parsePageJump(raw: string): number | undefined {
+function parsePageJump(raw: string, pages: number): number | undefined {
   try {
     return parseOptionalBoundedInteger(raw, {
       name: "page",
       min: 1,
+      max: pages,
       makeError: (message) => new Error(message),
     });
   } catch {
