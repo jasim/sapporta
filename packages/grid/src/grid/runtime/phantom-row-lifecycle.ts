@@ -10,7 +10,7 @@ import {
   makeRowId,
   phantomKeyFromDisplayedRowId,
 } from "../types/identity";
-import type { LevelDataSource } from "../data-sources/types";
+import type { LevelDataSource, LevelSnapshot } from "../data-sources/types";
 import type { LevelSchema } from "../types/schema";
 import type { PhantomRow, PhantomRowsConfig } from "../types/level-row";
 
@@ -47,6 +47,7 @@ export type PhantomRowLifecycleDeps = {
   schemaAt: (path: GridPath) => LevelSchema;
   getPhantoms: (path: GridPath) => readonly PhantomRow[];
   addPhantom: (path: GridPath, phantom: PhantomRow) => void;
+  removePhantom: (path: GridPath, rowKey: RowKey) => void;
   setPhantomCell: (
     path: GridPath,
     rowKey: RowKey,
@@ -75,7 +76,9 @@ export function createPhantomRowLifecycle(
     if (!lifecycleEnabled) return false;
     const source = deps.getSource(path);
     if (!source || !source.writable) return false;
-    if (source.snapshot().status !== "ready") return false;
+    const snapshot = source.snapshot();
+    if (snapshot.status !== "ready") return false;
+    if (!isDatasourceAppendBoundary(snapshot)) return false;
     return deps.schemaAt(path).options.allowPhantoms === true;
   }
 
@@ -89,6 +92,7 @@ export function createPhantomRowLifecycle(
   }
 
   function ensureBlankPhantom(path: GridPath): PhantomRow | null {
+    removeBlankPhantomsOutsideAppendBoundary(path);
     if (!eligible(path)) return null;
     const existing = blankEditingPhantom(path);
     if (existing) return existing;
@@ -115,8 +119,24 @@ export function createPhantomRowLifecycle(
 
   function ensureBlankForEmptyPath(path: GridPath): PhantomRow | null {
     const source = deps.getSource(path);
-    if (!source || source.snapshot().nodes.length !== 0) return null;
+    if (!source) return null;
+    const snapshot = source.snapshot();
+    removeBlankPhantomsOutsideAppendBoundary(path);
+    if (snapshot.nodes.length !== 0) return null;
     return ensureBlankPhantom(path);
+  }
+
+  function removeBlankPhantomsOutsideAppendBoundary(path: GridPath): void {
+    const source = deps.getSource(path);
+    if (!source) return;
+    const snapshot = source.snapshot();
+    if (snapshot.status !== "ready") return;
+    if (isDatasourceAppendBoundary(snapshot)) return;
+    for (const phantom of deps.getPhantoms(path)) {
+      if (phantom.state.kind === "editing" && isBlank(phantom.columns)) {
+        deps.removePhantom(path, phantom.rowKey);
+      }
+    }
   }
 
   function colForPolicy(
@@ -211,4 +231,31 @@ export function defaultIsBlank(columns: Record<ColId, unknown>): boolean {
   return Object.values(columns).every(
     (value) => value === null || value === undefined || value === "",
   );
+}
+
+function isDatasourceAppendBoundary(snapshot: LevelSnapshot): boolean {
+  const pagination = snapshot.pagination;
+  if (!pagination) return true;
+
+  const visibleCount = snapshot.nodes.length;
+  if (visibleCount === 0) {
+    // An empty later page is not a place to append; it means the source window
+    // is past real rows. Without a total, the first page is the datasource's
+    // only valid empty append location.
+    if (pagination.totalCount === undefined) return pagination.page === 0;
+    return pagination.page === 0 && pagination.totalCount === 0;
+  }
+
+  if (!Number.isFinite(pagination.pageSize)) return true;
+
+  if (pagination.totalCount === undefined) {
+    // Without a total, a short page is the only signal that the datasource
+    // ended. A full page may still have another page after it.
+    return visibleCount < pagination.pageSize;
+  }
+
+  // With a total, compare the current page window end to the datasource count,
+  // not to the number of rows currently displayed.
+  const pageStart = pagination.page * pagination.pageSize;
+  return pageStart + visibleCount >= pagination.totalCount;
 }

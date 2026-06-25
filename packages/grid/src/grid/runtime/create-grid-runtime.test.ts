@@ -192,6 +192,71 @@ function writableSourceWithCreate(
   };
 }
 
+function writableSourceFromSnapshot(
+  snapshot: LevelSnapshot,
+): WritableLevelDataSource {
+  return {
+    writable: true,
+    snapshot: () => snapshot,
+    subscribe: () => () => {},
+    setSort: () => {},
+    setFilter: () => {},
+    setPage: () => {},
+    refetch: () => {},
+    dispose: () => {},
+    setCell: () => {},
+    applyChanges: () => {},
+    createNode: async (node, atIndex) => ({
+      node,
+      atIndex: atIndex ?? snapshot.nodes.length,
+    }),
+    removeNode: () => {},
+    onReconcile: () => () => {},
+  };
+}
+
+function mutableWritableSource(
+  initialSnapshot: LevelSnapshot,
+): {
+  source: WritableLevelDataSource;
+  publish: (snapshot: LevelSnapshot) => void;
+} {
+  let snapshot = initialSnapshot;
+  const subscribers = new Set<() => void>();
+  const source: WritableLevelDataSource = {
+    writable: true,
+    snapshot: () => snapshot,
+    subscribe: (fn) => {
+      subscribers.add(fn);
+      return () => {
+        subscribers.delete(fn);
+      };
+    },
+    setSort: () => {},
+    setFilter: () => {},
+    setPage: () => {},
+    refetch: () => {},
+    dispose: () => {
+      subscribers.clear();
+    },
+    setCell: () => {},
+    applyChanges: () => {},
+    createNode: async (node, atIndex) => ({
+      node,
+      atIndex: atIndex ?? snapshot.nodes.length,
+    }),
+    removeNode: () => {},
+    onReconcile: () => () => {},
+  };
+  return {
+    source,
+    publish: (nextSnapshot) => {
+      snapshot = nextSnapshot;
+      for (const fn of subscribers) fn();
+    },
+  };
+}
+
 function reportDataSource(): GridDataSource {
   return inMemoryGridDataSource({
     schema: reportSchema,
@@ -993,6 +1058,146 @@ describe("GridRuntime", () => {
     });
     expect(rt.phantoms.get(rowsRoot)).toHaveLength(1);
     expect(rt.cursorManager.currentCellCursor()).toEqual(firstTarget);
+  });
+
+  it("ArrowDown at a non-final page boundary does not create a phantom", () => {
+    const source = writableSourceFromSnapshot({
+      status: "ready",
+      nodes: tableNodes(),
+      pagination: { page: 0, pageSize: 2, totalCount: 3 },
+      serverManaged: { sort: true, filter: true, pagination: true },
+    });
+    const rt = createGridRuntime({
+      schema: tableSchema,
+      dataSource: dataSourceWithRoot(source),
+      phantomRows: {},
+    });
+    const lastPageRowCursor = {
+      path: rowsRoot,
+      rowId: makeRowId(rowsRoot, "b"),
+      colId: "qty",
+    };
+    rt.cursorManager.moveCellCursorTo(lastPageRowCursor);
+
+    rt.coordinator.navigateCell(rowsRoot, {
+      type: "moveRow",
+      direction: "down",
+      colPolicy: "preserve",
+      extend: false,
+    });
+
+    expect(rt.phantoms.get(rowsRoot)).toHaveLength(0);
+    expect(rt.cursorManager.currentCellCursor()).toEqual(lastPageRowCursor);
+  });
+
+  it("ArrowDown at the final datasource row of a paginated source creates a phantom", () => {
+    const source = writableSourceFromSnapshot({
+      status: "ready",
+      nodes: [
+        { levelName: "rows", columns: { id: "c", name: "Cherry", qty: 3 } },
+      ],
+      pagination: { page: 1, pageSize: 2, totalCount: 3 },
+      serverManaged: { sort: true, filter: true, pagination: true },
+    });
+    const rt = createGridRuntime({
+      schema: tableSchema,
+      dataSource: dataSourceWithRoot(source),
+      phantomRows: {},
+    });
+    rt.cursorManager.moveCellCursorTo({
+      path: rowsRoot,
+      rowId: makeRowId(rowsRoot, "c"),
+      colId: "qty",
+    });
+
+    rt.coordinator.navigateCell(rowsRoot, {
+      type: "moveRow",
+      direction: "down",
+      colPolicy: "preserve",
+      extend: false,
+    });
+
+    expect(rt.phantoms.get(rowsRoot)).toHaveLength(1);
+    const target = rt.cursorManager.currentCellCursor();
+    expect(target).not.toBeNull();
+    expect(rt.displayedRowFor(rowsRoot, target!.rowId)?.kind).toBe("phantom");
+  });
+
+  it("does not eagerly create an empty-path phantom for an empty non-final page", () => {
+    const source = writableSourceFromSnapshot({
+      status: "ready",
+      nodes: [],
+      pagination: { page: 1, pageSize: 2, totalCount: 3 },
+      serverManaged: { sort: true, filter: true, pagination: true },
+    });
+    const rt = createGridRuntime({
+      schema: tableSchema,
+      dataSource: dataSourceWithRoot(source),
+      phantomRows: {},
+    });
+
+    expect(rt.phantoms.get(rowsRoot)).toHaveLength(0);
+    expect(rt.displayedRowsFor(rowsRoot).rows).toHaveLength(0);
+  });
+
+  it("creates an empty-path phantom on the first page when total count is unknown", () => {
+    const source = writableSourceFromSnapshot({
+      status: "ready",
+      nodes: [],
+      pagination: { page: 0, pageSize: 2 },
+      serverManaged: { sort: true, filter: true, pagination: true },
+    });
+
+    const rt = createGridRuntime({
+      schema: tableSchema,
+      dataSource: dataSourceWithRoot(source),
+      phantomRows: {},
+    });
+
+    expect(rt.phantoms.get(rowsRoot)).toHaveLength(1);
+    expect(rt.displayedRowsFor(rowsRoot).rows.map((row) => row.kind)).toEqual([
+      "phantom",
+    ]);
+  });
+
+  it("removes a blank append phantom when the source leaves the append boundary", () => {
+    const source = mutableWritableSource({
+      status: "ready",
+      nodes: [
+        { levelName: "rows", columns: { id: "c", name: "Cherry", qty: 3 } },
+      ],
+      pagination: { page: 1, pageSize: 2, totalCount: 3 },
+      serverManaged: { sort: true, filter: true, pagination: true },
+    });
+    const rt = createGridRuntime({
+      schema: tableSchema,
+      dataSource: dataSourceWithRoot(source.source),
+      phantomRows: {},
+    });
+    rt.cursorManager.moveCellCursorTo({
+      path: rowsRoot,
+      rowId: makeRowId(rowsRoot, "c"),
+      colId: "qty",
+    });
+    rt.coordinator.navigateCell(rowsRoot, {
+      type: "moveRow",
+      direction: "down",
+      colPolicy: "preserve",
+      extend: false,
+    });
+    expect(rt.phantoms.get(rowsRoot)).toHaveLength(1);
+
+    source.publish({
+      status: "ready",
+      nodes: tableNodes(),
+      pagination: { page: 0, pageSize: 2, totalCount: 3 },
+      serverManaged: { sort: true, filter: true, pagination: true },
+    });
+
+    expect(rt.phantoms.get(rowsRoot)).toHaveLength(0);
+    expect(
+      rt.displayedRowsFor(rowsRoot).rows.some((row) => row.kind === "phantom"),
+    ).toBe(false);
   });
 
   it("leaving a nonblank phantom row creates one authoritative row", async () => {

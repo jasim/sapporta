@@ -337,6 +337,7 @@ export function createGridRuntime(args: RuntimeArgs): GridRuntime {
     schemaAt: (path) => schemaForPath(path),
     getPhantoms: (path) => phantoms.get(path),
     addPhantom: (path, phantom) => phantoms.add(path, phantom),
+    removePhantom: (path, rowKey) => phantoms.remove(path, rowKey),
     setPhantomCell: (path, rowKey, colId, value) =>
       phantoms.setCell(path, rowKey, colId, value),
     setPhantomState: (path, rowKey, state) =>
