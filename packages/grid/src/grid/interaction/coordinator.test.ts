@@ -7,13 +7,17 @@ import type { GridPath, RowId } from "../types/identity";
 import type { TreeNode } from "../types/level-row";
 import type { GridSchema } from "../types/schema";
 import { ROW_MULTISELECT_LIST } from "../types/interaction";
+import { withRowExpansionColumn } from "../react/cells/ExpandableCellFrame";
 
 const TestEditor = () => null;
 const testColumn = (id: string, name: string) => ({
   id,
   name,
   renderCell: ({ value }: { value: unknown }) => String(value ?? ""),
-  editCell: TestEditor,
+  edit: {
+    editor: TestEditor,
+    startsOn: ["enter", "f2", "type", "doubleClick"] as const,
+  },
 });
 
 const reportSchema: GridSchema = {
@@ -22,7 +26,7 @@ const reportSchema: GridSchema = {
     cat: {
       name: "cat",
       columns: [
-        { ...testColumn("name", "Name"), controlsRowExpansion: true },
+        withRowExpansionColumn(testColumn("name", "Name")),
         testColumn("qty", "Qty"),
       ],
       options: { rowKey: (n: TreeNode) => String(n.columns.name) },

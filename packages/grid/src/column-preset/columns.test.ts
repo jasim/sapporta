@@ -26,13 +26,12 @@ describe("columnPreset columns", () => {
     const column = identifier({ id: "id", name: "ID" });
     const p = preset(column);
 
-    expect(column.editCell).toBeUndefined();
-    expect(column.editTriggers).toEqual([]);
+    expect(column.edit).toBeUndefined();
     expect(typeof column.renderCell).toBe("function");
     expect(p?.kind).toBe("identifier");
     expect(p?.layout.align).toBe("left");
     expect(p?.layout.width).toBe("compact");
-    expect(presetRuntime(column)?.editBehavior.editable).toBe(false);
+    expect(presetRuntime(column)?.edit).toBeUndefined();
   });
 
   it("number stores numeric preset facts without leaking into meta", () => {
@@ -77,6 +76,7 @@ describe("columnPreset columns", () => {
         hasChildren: false,
         source: { levelName: "books", columns: { amount: 0 } },
       },
+      activation: null,
     });
 
     expect(isValidElement(rendered)).toBe(true);
@@ -127,6 +127,7 @@ describe("columnPreset columns", () => {
           hasChildren: false,
           source: { levelName: "books", columns: { quote: "line 1" } },
         },
+        activation: null,
       });
 
       expect(isValidElement(rendered)).toBe(true);
@@ -156,6 +157,7 @@ describe("columnPreset columns", () => {
         hasChildren: false,
         source: { levelName: "books", columns: { title: "A short title" } },
       },
+      activation: null,
     });
 
     expect(isValidElement(rendered)).toBe(true);
@@ -231,7 +233,7 @@ describe("columnPreset columns", () => {
     expect(p && "meta" in p).toBe(false);
     expect(p && "valueCodec" in p).toBe(false);
     expect(p && "cellView" in p).toBe(false);
-    expect(p && "editBehavior" in p).toBe(false);
+    expect(p && "edit" in p).toBe(false);
     expect(p && "headerBehavior" in p).toBe(false);
     expect(presetRuntime(column)?.valueCodec.parse).toBe(parser);
   });

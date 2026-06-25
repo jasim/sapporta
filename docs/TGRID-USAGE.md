@@ -77,7 +77,7 @@ const invoicesGrid = defineTGrid<RowsByLevel>({
         invoiceColumns.table("customer_id", { header: "Customer" }),
         invoiceColumns.table("invoice_date", {
           header: "Date",
-          editable: false,
+          edit: "none",
         }),
         invoiceColumns.table("status", {
           header: "Payment",
@@ -235,7 +235,7 @@ const invoicesGrid = defineTGrid<RowsByLevel, AppServices>({
         }),
         itemColumns.table("balance_stock", {
           header: "Stock",
-          editable: false,
+          edit: "none",
         }),
         itemColumns.client("stock_hold", {
           header: "Hold",

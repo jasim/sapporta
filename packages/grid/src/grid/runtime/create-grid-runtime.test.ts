@@ -61,14 +61,20 @@ const cols: ColumnSchema[] = [
     id: "name",
     name: "Name",
     renderCell: ({ value }) => String(value ?? ""),
-    editCell: TestEditor,
+    edit: {
+      editor: TestEditor,
+      startsOn: ["enter", "f2", "type", "doubleClick"],
+    },
   },
   {
     id: "qty",
     name: "Qty",
     renderCell: ({ value }) => String(value ?? ""),
     compare: (a, b) => (Number(a) || 0) - (Number(b) || 0),
-    editCell: TestEditor,
+    edit: {
+      editor: TestEditor,
+      startsOn: ["enter", "f2", "type", "doubleClick"],
+    },
   },
 ];
 

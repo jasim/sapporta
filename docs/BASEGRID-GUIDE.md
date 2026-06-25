@@ -126,16 +126,16 @@ import {
 } from "@sapporta/ui";
 
 const taskColumns = [
-  text({ id: "title", name: "Task", editable: true, width: "fill" }),
+  text({ id: "title", name: "Task", edit: "default", width: "fill" }),
   select({
     id: "status",
     name: "Status",
-    editable: true,
+    edit: "default",
     width: "enum",
     options: ["todo", "doing", "done"],
   }),
-  number({ id: "estimate", name: "Estimate", editable: true }),
-  date({ id: "dueDate", name: "Due", editable: true }),
+  number({ id: "estimate", name: "Estimate", edit: "default" }),
+  date({ id: "dueDate", name: "Due", edit: "default" }),
 ];
 
 const schema: GridSchema = {
@@ -222,22 +222,22 @@ import {
 
 const columns = [
   identifier({ id: "id", name: "ID", width: "compact" }),
-  text({ id: "title", name: "Title", editable: true, width: "fill" }),
+  text({ id: "title", name: "Title", edit: "default", width: "fill" }),
   select({
     id: "status",
     name: "Status",
-    editable: true,
+    edit: "default",
     options: [
       { value: "todo", label: "To do" },
       { value: "doing", label: "Doing" },
       { value: "done", label: "Done" },
     ],
   }),
-  number({ id: "estimate", name: "Estimate", editable: true }),
+  number({ id: "estimate", name: "Estimate", edit: "default" }),
   percentage({ id: "completion", name: "Complete" }),
   currency({ id: "budget", name: "Budget" }),
   date({ id: "dueDate", name: "Due" }),
-  boolean({ id: "blocked", name: "Blocked", editable: true }),
+  boolean({ id: "blocked", name: "Blocked", edit: "default" }),
 ];
 ```
 
@@ -252,7 +252,7 @@ const StatusBadge = ({ value }: { value: unknown }) => (
 );
 
 const columns: ColumnSchema[] = [
-  text({ id: "title", name: "Title", editable: true }),
+  text({ id: "title", name: "Title", edit: "default" }),
   {
     id: "statusBadge",
     name: "Status",
@@ -293,13 +293,13 @@ styling outside your renderer.
 
 ## Editing Cells
 
-Preset columns become editable when you pass `editable: true`.
+Preset columns become editable when you pass `edit: "default"`.
 
 ```ts
 const editableColumns = [
-  text({ id: "title", name: "Task", editable: true }),
-  number({ id: "estimate", name: "Estimate", editable: true }),
-  date({ id: "dueDate", name: "Due", editable: true }),
+  text({ id: "title", name: "Task", edit: "default" }),
+  number({ id: "estimate", name: "Estimate", edit: "default" }),
+  date({ id: "dueDate", name: "Due", edit: "default" }),
 ];
 ```
 
@@ -367,8 +367,10 @@ const statusColumn: ColumnSchema = {
   id: "status",
   name: "Status",
   renderCell: ({ value }) => String(value ?? ""),
-  editCell: StatusEditor,
-  editTriggers: ["click", "enter", "type", "f2"],
+  edit: {
+    editor: StatusEditor,
+    startsOn: ["enter", "f2", "type", "doubleClick"],
+  },
 };
 ```
 
@@ -390,7 +392,7 @@ const schema: GridSchema = {
     projects: {
       name: "projects",
       columns: [
-        text({ id: "name", name: "Project", editable: true }),
+        text({ id: "name", name: "Project", edit: "default" }),
         select({ id: "status", name: "Status", options: ["active", "done"] }),
       ],
       childLevels: ["tasks"],
@@ -490,7 +492,7 @@ import {
 
 const taskColumns = [
   rowSelectionColumn(),
-  text({ id: "title", name: "Task", editable: true }),
+  text({ id: "title", name: "Task", edit: "default" }),
   select({ id: "status", name: "Status", options: ["todo", "doing", "done"] }),
 ];
 
@@ -837,11 +839,11 @@ const schema: GridSchema = {
       name: "projects",
       columns: [
         rowSelectionColumn(),
-        text({ id: "name", name: "Project", editable: true, width: "fill" }),
+        text({ id: "name", name: "Project", edit: "default", width: "fill" }),
         select({
           id: "status",
           name: "Status",
-          editable: true,
+          edit: "default",
           options: ["active", "paused", "done"],
         }),
       ],
@@ -852,11 +854,11 @@ const schema: GridSchema = {
       name: "tasks",
       columns: [
         rowSelectionColumn(),
-        text({ id: "title", name: "Task", editable: true, width: "fill" }),
+        text({ id: "title", name: "Task", edit: "default", width: "fill" }),
         select({
           id: "status",
           name: "Status",
-          editable: true,
+          edit: "default",
           options: ["todo", "doing", "done"],
         }),
       ],

@@ -985,8 +985,9 @@ type CellNavigationIntent =
       colPolicy: "preserve";
       extend: boolean;
     }
-  | { type: "startEdit"; trigger: "type"; initial: string }
-  | { type: "startEdit"; trigger: NonTypedEditTrigger; initial?: never }
+  | { type: "startEdit"; coord: Coord; trigger: "type"; initial: string }
+  | { type: "startEdit"; coord: Coord; trigger: NonTypedCellEditGesture }
+  | { type: "activateCell"; coord: Coord; trigger: CellActivationTrigger }
   | { type: "clearCellSelection" }
   | { type: "focusFirstCell" }
   | { type: "toggleActiveRowSelection" };

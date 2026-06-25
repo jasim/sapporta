@@ -14,13 +14,19 @@ const cols: ColumnSchema[] = [
     id: "a",
     name: "A",
     renderCell: ({ value }) => String(value ?? ""),
-    editCell: TestEditor,
+    edit: {
+      editor: TestEditor,
+      startsOn: ["enter", "f2", "type", "doubleClick"],
+    },
   },
   {
     id: "b",
     name: "B",
     renderCell: ({ value }) => String(value ?? ""),
-    editCell: TestEditor,
+    edit: {
+      editor: TestEditor,
+      startsOn: ["enter", "f2", "type", "doubleClick"],
+    },
   },
 ];
 
@@ -145,7 +151,6 @@ describe("GridController — verbs", () => {
           id: "a",
           name: "A",
           renderCell: ({ value }) => String(value ?? ""),
-          editTriggers: ["f2"],
         },
       ],
       capabilitiesFor,
@@ -156,7 +161,7 @@ describe("GridController — verbs", () => {
     expect(c.getState().editing).toBe(null);
   });
 
-  it("does not let direct startEdit bypass editTriggers", () => {
+  it("does not let direct startEdit bypass edit.startsOn", () => {
     const c = createGridController({
       path,
       interaction: CELL_EDITING_GRID,
@@ -166,8 +171,7 @@ describe("GridController — verbs", () => {
           id: "a",
           name: "A",
           renderCell: ({ value }) => String(value ?? ""),
-          editCell: TestEditor,
-          editTriggers: ["enter"],
+          edit: { editor: TestEditor, startsOn: ["enter"] },
         },
       ],
       capabilitiesFor,

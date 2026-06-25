@@ -17,7 +17,10 @@ const columns: ColumnSchema[] = [
     id: "a",
     name: "A",
     renderCell: ({ value }) => String(value ?? ""),
-    editCell: TestEditor,
+    edit: {
+      editor: TestEditor,
+      startsOn: ["enter", "f2", "type", "doubleClick"],
+    },
   },
 ];
 
@@ -64,16 +67,16 @@ describe("reduceController START_EDIT", () => {
     });
   });
 
-  it("stores no typed seed for click-started edits", () => {
+  it("stores no typed seed for double-click-started edits", () => {
     expect(
       start({
         type: "START_EDIT",
         coord: { rowId, colId: "a" },
-        trigger: "click",
+        trigger: "doubleClick",
       }),
     ).toEqual({
       coord: { rowId: "rows#r0", colId: "a" },
-      trigger: "click",
+      trigger: "doubleClick",
     });
   });
 

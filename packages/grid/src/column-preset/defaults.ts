@@ -1,8 +1,9 @@
 import type { ComponentType, ReactNode } from "react";
 import type {
+  CellEditBehavior,
+  CellEditGesture,
   CellEditorProps,
   CellRenderProps,
-  EditTrigger,
 } from "../grid/types/schema";
 import type { ColumnAlign, ColumnPresetKind, ColumnWidth } from "./types";
 import type { ColumnPreset } from "./preset";
@@ -26,9 +27,8 @@ import { renderWithPresetRuntime } from "./render";
 export type KindDefaults = {
   align: ColumnAlign;
   width: ColumnWidth;
-  editable: boolean;
+  edit?: (preset: ColumnPreset) => CellEditBehavior;
   sortable: boolean;
-  editTriggers: readonly EditTrigger[];
   format: (value: unknown) => string;
   parse?: (value: string, props: CellEditorProps) => unknown;
   compare: (a: unknown, b: unknown) => number;
@@ -51,7 +51,7 @@ const numberCompare = (a: unknown, b: unknown) => {
 export function defaultsFor(kind: ColumnPresetKind): KindDefaults {
   switch (kind) {
     case "identifier":
-      return base({ align: "left", width: "compact", editable: false });
+      return base({ align: "left", width: "compact", edit: undefined });
     case "number":
       return base({
         align: "right",
@@ -118,9 +118,11 @@ function base(overrides: Partial<KindDefaults>): KindDefaults {
   return {
     align: "left",
     width: "fill",
-    editable: true,
     sortable: true,
-    editTriggers: ["click", "enter", "type", "f2"],
+    edit: (preset) => ({
+      editor: (overrides.editor ?? (() => TextEditor))(preset),
+      startsOn: DEFAULT_PRESET_EDIT_GESTURES,
+    }),
     format: formatText,
     parse: parseText,
     compare: textCompare,
@@ -129,3 +131,10 @@ function base(overrides: Partial<KindDefaults>): KindDefaults {
     ...overrides,
   };
 }
+
+export const DEFAULT_PRESET_EDIT_GESTURES: readonly CellEditGesture[] = [
+  "enter",
+  "f2",
+  "type",
+  "doubleClick",
+];

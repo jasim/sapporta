@@ -1,7 +1,10 @@
 import { createElement, type ComponentType } from "react";
 import type {
+  CellActivation,
+  CellActivationContext,
   CellEditorProps,
   CellRenderProps,
+  CellEditBehavior,
   ColId,
   ColumnSchema as GridColumnSchema,
   GridPath,
@@ -9,7 +12,7 @@ import type {
   RowKey,
 } from "@sapporta/grid";
 import { rowKeyOfRowId } from "@sapporta/grid";
-import { ExpandCell } from "@sapporta/grid";
+import { withRowExpansionColumn } from "@sapporta/grid";
 import { columnPreset, type ColumnWidth } from "@sapporta/grid/column-preset";
 import type {
   ColumnSchema as TableColumnSchema,
@@ -35,6 +38,7 @@ import {
   tgridCellEditorContext,
   tgridSessionContext,
   type TGridCellContext,
+  type TGridCellActivation,
   type TGridCellEditorContext,
   type TGridCellWriteHandler,
   type TGridColumnContext,
@@ -189,18 +193,7 @@ export function buildTGridColumnsForTable<
   }
 
   if (args.expandable && columns.length > 0) {
-    const first = columns[0];
-    const originalRenderer = first.renderCell;
-    columns[0] = {
-      ...first,
-      controlsRowExpansion: true,
-      renderCell: (props) =>
-        createElement(
-          ExpandCell,
-          { row: props.row, path: props.path },
-          originalRenderer(props),
-        ),
-    };
+    columns[0] = withRowExpansionColumn(columns[0]);
   }
 
   return { columns, saveCellValueByColumn };
@@ -270,23 +263,27 @@ function customizeTableColumn<
   };
   const next: GridColumnSchema = { ...gridColumn };
   if (options.label) next.name = options.label;
-  if (options.editable === false) {
-    next.editCell = undefined;
-    next.editTriggers = [];
-  }
-  if (options.editTriggers) next.editTriggers = options.editTriggers;
-  if (options.renderCell) {
-    next.renderCell = typedRenderCell(
+  if (options.edit !== undefined) {
+    next.edit = typedEdit(
       levelId,
-      options.renderCell,
+      next.edit,
+      options.edit,
       columnContext,
       sessionContext,
     );
   }
-  if (options.editor) {
-    next.editCell = typedEditor(
+  if (options.activation) {
+    next.activation = typedActivation(
       levelId,
-      options.editor,
+      options.activation,
+      columnContext,
+      sessionContext,
+    );
+  }
+  if (options.renderCell) {
+    next.renderCell = typedRenderCell(
+      levelId,
+      options.renderCell,
       columnContext,
       sessionContext,
     );
@@ -307,8 +304,7 @@ function clientColumnFor<
     id: spec.id as ColId,
     name: spec.options.label ?? defaultColumnLabel(spec.id),
     width: normalizeClientColumnWidth(spec.options.width),
-    editable: spec.options.editable ?? Boolean(spec.options.editor),
-    editTriggers: spec.options.editTriggers,
+    edit: spec.options.edit === "default" ? "default" : "none",
     renderCell: () => null,
     meta: {
       kind: "client",
@@ -319,8 +315,24 @@ function clientColumnFor<
     id: gridColumn.id,
     gridColumn,
   };
+  const edit = typedEdit(
+    levelId,
+    gridColumn.edit,
+    spec.options.edit,
+    columnContext,
+    sessionContext,
+  );
   return {
     ...gridColumn,
+    edit,
+    activation: spec.options.activation
+      ? typedActivation(
+          levelId,
+          spec.options.activation,
+          columnContext,
+          sessionContext,
+        )
+      : gridColumn.activation,
     renderCell: spec.options.renderCell
       ? typedRenderCell(
           levelId,
@@ -329,9 +341,6 @@ function clientColumnFor<
           sessionContext,
         )
       : gridColumn.renderCell,
-    editCell: spec.options.editor
-      ? typedEditor(levelId, spec.options.editor, columnContext, sessionContext)
-      : gridColumn.editCell,
   };
 }
 
@@ -369,6 +378,94 @@ function typedRenderCell<
         createElement(RenderCell, context),
       ),
     );
+  };
+}
+
+function typedActivation<
+  RowsByLevel extends TGridRowsByLevel,
+  AppServices,
+  LevelId extends TGridLevelId<RowsByLevel>,
+>(
+  levelId: LevelId,
+  activation: TGridCellActivation<RowsByLevel, AppServices, LevelId>,
+  column: TGridColumnContext<RowsByLevel[LevelId]>,
+  sessionContext: () => TGridSessionContext<RowsByLevel, AppServices>,
+): CellActivation {
+  const describe = activation.describe;
+  return {
+    startsOn: activation.startsOn,
+    describe:
+      typeof describe === "string"
+        ? describe
+        : (ctx) =>
+            describe(
+              typedActivationContext(levelId, ctx, column, sessionContext),
+            ),
+    run: (ctx) =>
+      activation.run(
+        typedActivationContext(levelId, ctx, column, sessionContext),
+      ),
+  };
+}
+
+function typedActivationContext<
+  RowsByLevel extends TGridRowsByLevel,
+  AppServices,
+  LevelId extends TGridLevelId<RowsByLevel>,
+>(
+  levelId: LevelId,
+  ctx: CellActivationContext,
+  column: TGridColumnContext<RowsByLevel[LevelId]>,
+  sessionContext: () => TGridSessionContext<RowsByLevel, AppServices>,
+) {
+  return {
+    ...cellContextFor(
+      levelId,
+      { ...ctx, activation: null },
+      column,
+      sessionContext(),
+    ),
+    trigger: ctx.trigger,
+    actions: ctx.actions,
+  };
+}
+
+function typedEdit<
+  RowsByLevel extends TGridRowsByLevel,
+  AppServices,
+  LevelId extends TGridLevelId<RowsByLevel>,
+  K extends RowFieldName<RowsByLevel[LevelId]>,
+>(
+  levelId: LevelId,
+  current: CellEditBehavior | undefined,
+  edit:
+    | TableColumnOptions<RowsByLevel, AppServices, LevelId, K>["edit"]
+    | TGridClientColumnSpec<
+        RowsByLevel,
+        AppServices,
+        LevelId
+      >["options"]["edit"],
+  column: TGridColumnContext<RowsByLevel[LevelId]>,
+  sessionContext: () => TGridSessionContext<RowsByLevel, AppServices>,
+): CellEditBehavior | undefined {
+  if (edit === undefined) return current;
+  if (edit === "none") return undefined;
+  if (edit === "default") return current;
+  const editor =
+    edit.editor === undefined || edit.editor === "default"
+      ? current?.editor
+      : typedEditor(
+          levelId,
+          edit.editor as ComponentType<
+            TGridCellEditorContext<RowsByLevel, AppServices, LevelId, K>
+          >,
+          column,
+          sessionContext,
+        );
+  if (!editor) return undefined;
+  return {
+    editor,
+    startsOn: edit.startsOn ?? current?.startsOn ?? [],
   };
 }
 
@@ -439,7 +536,9 @@ function cellContextFor<
   LevelId extends TGridLevelId<RowsByLevel>,
 >(
   levelId: LevelId,
-  props: CellRenderProps | CellEditorProps,
+  props:
+    | Pick<CellRenderProps, "path" | "value" | "row" | "activation">
+    | CellEditorProps,
   column: TGridColumnContext<RowsByLevel[LevelId]>,
   session: TGridSessionContext<RowsByLevel, AppServices>,
 ): TGridCellContext<RowsByLevel, AppServices, LevelId> {
@@ -452,6 +551,7 @@ function cellContextFor<
     column,
     runtime: session.runtime,
     appServices: session.appServices,
+    activation: "activation" in props ? props.activation : null,
   };
 }
 

@@ -1,5 +1,9 @@
 import type { Coord } from "./identity";
-import type { EditTrigger, NonTypedEditTrigger } from "./schema";
+import type {
+  CellActivationTrigger,
+  CellEditGesture,
+  NonTypedCellEditGesture,
+} from "./schema";
 
 export type NavigationDirection =
   | "up"
@@ -27,7 +31,7 @@ export type StartEditAction =
   | {
       type: "START_EDIT";
       coord: Coord;
-      trigger: NonTypedEditTrigger;
+      trigger: NonTypedCellEditGesture;
       initial?: never;
     };
 
@@ -76,12 +80,19 @@ export type CellNavigationIntent =
       colPolicy: "preserve";
       extend: boolean;
     }
-  | { type: "startEdit"; trigger: "type"; initial: string }
-  | { type: "startEdit"; trigger: NonTypedEditTrigger; initial?: never }
+  | { type: "startEdit"; coord: Coord; trigger: "type"; initial: string }
+  | {
+      type: "startEdit";
+      coord: Coord;
+      trigger: NonTypedCellEditGesture;
+      initial?: never;
+    }
+  | { type: "activateCell"; coord: Coord; trigger: CellActivationTrigger }
   | { type: "clearCellSelection" }
   | { type: "focusFirstCell" }
-  | { type: "toggleActiveRowSelection" }
-  | { type: "toggleFocusedRowExpansion" };
+  | { type: "toggleActiveRowSelection" };
+
+export type CellEditorStartTrigger = CellEditGesture;
 
 export type RowNavigationIntent =
   | { type: "moveActiveRow"; direction: "up" | "down"; extend: boolean }

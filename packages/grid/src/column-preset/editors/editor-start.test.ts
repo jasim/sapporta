@@ -19,7 +19,7 @@ function column(id: string): ColumnSchema {
 function props(
   start:
     | { trigger: "type"; typedSeed: string }
-    | { trigger: "click" | "enter" | "f2" },
+    | { trigger: "doubleClick" | "enter" | "f2" },
   value: unknown,
 ): CellEditorProps {
   const c = column("a");
@@ -44,9 +44,9 @@ function props(
 }
 
 describe("preset editor start values", () => {
-  it("initializes text edits from the raw value on click", () => {
+  it("initializes text edits from the raw value on double-click", () => {
     expect(
-      initialTextEditorValue(props({ trigger: "click" }, "existing")),
+      initialTextEditorValue(props({ trigger: "doubleClick" }, "existing")),
     ).toBe("existing");
   });
 
@@ -59,16 +59,18 @@ describe("preset editor start values", () => {
   });
 
   it("initializes nullish text values as blank for non-type starts", () => {
-    expect(initialTextEditorValue(props({ trigger: "click" }, null))).toBe("");
-    expect(initialTextEditorValue(props({ trigger: "click" }, undefined))).toBe(
-      "",
-    );
+    expect(
+      initialTextEditorValue(props({ trigger: "doubleClick" }, null)),
+    ).toBe("");
+    expect(
+      initialTextEditorValue(props({ trigger: "doubleClick" }, undefined)),
+    ).toBe("");
   });
 
   it("initializes numeric edits from raw model values", () => {
-    expect(initialNumericEditorValue(props({ trigger: "click" }, 1234.5))).toBe(
-      "1234.5",
-    );
+    expect(
+      initialNumericEditorValue(props({ trigger: "doubleClick" }, 1234.5)),
+    ).toBe("1234.5");
     expect(
       initialNumericEditorValue(
         props({ trigger: "type", typedSeed: "7" }, 1234.5),
@@ -87,7 +89,7 @@ describe("preset editor start values", () => {
 
   it("initializes date edits from the raw value unless type-started", () => {
     expect(
-      initialDateEditorValue(props({ trigger: "click" }, "2026-05-15")),
+      initialDateEditorValue(props({ trigger: "doubleClick" }, "2026-05-15")),
     ).toBe("2026-05-15");
     expect(
       initialDateEditorValue(

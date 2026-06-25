@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { isValidElement } from "react";
 import type { ColumnSchema, TableSchema } from "@sapporta/shared/contracts";
-import { ExpandCell } from "@sapporta/grid";
+import { ExpandableCellFrame } from "@sapporta/grid";
 import { preset } from "@sapporta/grid/column-preset";
 import { StaticSearchLookup, StaticValueLookup } from "@sapporta/grid/lookup";
 import {
@@ -112,8 +112,8 @@ describe("TGridColumnMapper.columnsFor", () => {
 
     expect(columns.map((c) => c.id)).toEqual(["name", "created_at"]);
     expect(columns[0].name).toBe("Name");
-    expect(columns[0].editCell).toBeDefined();
-    expect(columns[1].editCell).toBeUndefined();
+    expect(columns[0].edit).toBeDefined();
+    expect(columns[1].edit).toBeUndefined();
     expect(columns[0].meta).toMatchObject({
       table: "things",
       displayType: "text",
@@ -128,8 +128,7 @@ describe("TGridColumnMapper.columnsFor", () => {
       expandable: false,
     });
 
-    expect(columns[0].editCell).toBeUndefined();
-    expect(columns[0].editTriggers).toEqual([]);
+    expect(columns[0].edit).toBeUndefined();
   });
 
   it("maps textDisplay into the text preset display", () => {
@@ -240,11 +239,14 @@ describe("TGridColumnMapper.columnsFor", () => {
         hasChildren: false,
         source: { levelName: "things", columns: { id: 1 } },
       },
+      activation: null,
     });
 
     expect(isValidElement(rendered)).toBe(true);
-    expect(isValidElement(rendered) ? rendered.type : null).toBe(ExpandCell);
-    expect(columns[0].controlsRowExpansion).toBe(true);
+    expect(isValidElement(rendered) ? rendered.type : null).toBe(
+      ExpandableCellFrame,
+    );
+    expect(columns[0].activation).toBeDefined();
   });
 });
 

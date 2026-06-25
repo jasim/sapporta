@@ -88,7 +88,7 @@ export function CellEditorOverlay({
 
   const column = schema.find((c) => c.id === editing.coord.colId);
   if (!column) return null;
-  const Editor = column.editCell;
+  const Editor = column.edit?.editor;
   if (!Editor) return null;
   const row = runtime.displayedRowsFor(path).rowById.get(editing.coord.rowId);
   if (!row) return null;

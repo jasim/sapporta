@@ -21,7 +21,10 @@ const testColumn = (id: string, name: string): ColumnSchema => ({
   id,
   name,
   renderCell: ({ value }) => String(value ?? ""),
-  editCell: TestEditor,
+  edit: {
+    editor: TestEditor,
+    startsOn: ["enter", "f2", "type", "doubleClick"],
+  },
 });
 const cols: ColumnSchema[] = [
   testColumn("a", "A"),
@@ -300,7 +303,11 @@ describe("keyEventToCellIntent", () => {
         cols,
         capabilitiesFor,
       ),
-    ).toEqual({ type: "startEdit", trigger: "f2" });
+    ).toEqual({
+      type: "startEdit",
+      coord: { rowId: "rows#r0", colId: "a" },
+      trigger: "f2",
+    });
   });
 
   it("Enter opens an edit", () => {
@@ -312,12 +319,27 @@ describe("keyEventToCellIntent", () => {
         cols,
         capabilitiesFor,
       ),
-    ).toEqual({ type: "startEdit", trigger: "enter" });
+    ).toEqual({
+      type: "startEdit",
+      coord: { rowId: "rows#r0", colId: "a" },
+      trigger: "enter",
+    });
   });
 
-  it("Enter and Space toggle expansion on a row-expansion cell", () => {
+  it("Enter and Space activate cells that own those gestures", () => {
     const expansionColumns = [
-      { ...testColumn("a", "A"), controlsRowExpansion: true },
+      {
+        ...testColumn("a", "A"),
+        edit: {
+          editor: TestEditor,
+          startsOn: ["f2", "type", "doubleClick"] as const,
+        },
+        activation: {
+          startsOn: ["enter", "space"] as const,
+          describe: "Expand row",
+          run: () => {},
+        },
+      },
       testColumn("b", "B"),
     ];
 
@@ -329,7 +351,11 @@ describe("keyEventToCellIntent", () => {
         expansionColumns,
         capabilitiesFor,
       ),
-    ).toEqual({ type: "toggleFocusedRowExpansion" });
+    ).toEqual({
+      type: "activateCell",
+      coord: { rowId: "rows#r0", colId: "a" },
+      trigger: { kind: "keyboard", gesture: "enter" },
+    });
     expect(
       keyEventToCellIntent(
         ev(" "),
@@ -338,12 +364,23 @@ describe("keyEventToCellIntent", () => {
         expansionColumns,
         capabilitiesFor,
       ),
-    ).toEqual({ type: "toggleFocusedRowExpansion" });
+    ).toEqual({
+      type: "activateCell",
+      coord: { rowId: "rows#r0", colId: "a" },
+      trigger: { kind: "keyboard", gesture: "space" },
+    });
   });
 
   it("keeps Enter as edit on ordinary cells", () => {
     const expansionColumns = [
-      { ...testColumn("a", "A"), controlsRowExpansion: true },
+      {
+        ...testColumn("a", "A"),
+        activation: {
+          startsOn: ["space"] as const,
+          describe: "Expand row",
+          run: () => {},
+        },
+      },
       testColumn("b", "B"),
     ];
 
@@ -355,7 +392,11 @@ describe("keyEventToCellIntent", () => {
         expansionColumns,
         capabilitiesFor,
       ),
-    ).toEqual({ type: "startEdit", trigger: "enter" });
+    ).toEqual({
+      type: "startEdit",
+      coord: { rowId: "rows#r0", colId: "b" },
+      trigger: "enter",
+    });
   });
 
   it("printable key opens a 'type' edit and forwards the keystroke", () => {
@@ -367,7 +408,12 @@ describe("keyEventToCellIntent", () => {
         cols,
         capabilitiesFor,
       ),
-    ).toEqual({ type: "startEdit", trigger: "type", initial: "z" });
+    ).toEqual({
+      type: "startEdit",
+      coord: { rowId: "rows#r0", colId: "a" },
+      trigger: "type",
+      initial: "z",
+    });
   });
 
   it("does not open a 'type' edit on Ctrl+letter", () => {
@@ -382,9 +428,12 @@ describe("keyEventToCellIntent", () => {
     ).toBe(null);
   });
 
-  it("respects column.editTriggers — opt out of 'type'", () => {
+  it("respects column.edit.startsOn — opt out of 'type'", () => {
     const restricted: ColumnSchema[] = [
-      { ...testColumn("a", "A"), editTriggers: ["click", "f2", "enter"] },
+      {
+        ...testColumn("a", "A"),
+        edit: { editor: TestEditor, startsOn: ["f2", "enter"] },
+      },
       testColumn("b", "B"),
       testColumn("c", "C"),
     ];
@@ -405,16 +454,19 @@ describe("keyEventToCellIntent", () => {
         restricted,
         capabilitiesFor,
       ),
-    ).toEqual({ type: "startEdit", trigger: "f2" });
+    ).toEqual({
+      type: "startEdit",
+      coord: { rowId: "rows#r0", colId: "a" },
+      trigger: "f2",
+    });
   });
 
-  it("does not treat editTriggers as editability without an editor", () => {
+  it("does not treat renderability as editability without edit behavior", () => {
     const noEditor: ColumnSchema[] = [
       {
         id: "a",
         name: "A",
         renderCell: ({ value }) => String(value ?? ""),
-        editTriggers: ["f2", "enter", "type"],
       },
     ];
 

@@ -44,14 +44,14 @@ import { createStore, type StoreApi } from "zustand/vanilla";
 import {
   keyEventToCellIntent,
   keyEventToRowIntent,
+  pointerEventToCellIntent,
   type CellKeyboardPresentation,
 } from "./key-handling";
 import type {
+  CellActivationTrigger,
   ColumnSchema,
-  EditTrigger,
-  NonTypedEditTrigger,
+  NonTypedCellEditGesture,
 } from "../types/schema";
-import { triggerAllowed } from "../types/schema";
 import type { ControllerState } from "../types/controller-state";
 import type { DisplayedRows, LevelRowKind } from "../types/level-row";
 import type { RowCapabilities } from "../types/capabilities";
@@ -71,8 +71,13 @@ import { reduceController } from "./reducer";
 export interface GridControllerPublicVerbs {
   startEdit: {
     (coord: Coord, trigger: "type", initial: string): void;
-    (coord: Coord, trigger: NonTypedEditTrigger): void;
+    (coord: Coord, trigger: NonTypedCellEditGesture): void;
   };
+  activateCell: (coord: Coord, trigger: CellActivationTrigger) => void;
+  handleCellPointer: (
+    coord: Coord,
+    gesture: "click" | "doubleClick",
+  ) => boolean;
   cancelEdit: () => void;
   // commitEdit closes the editor, performs the cell write, and (when
   // `commit !== "stay"`) fires a movement intent in the requested
@@ -138,6 +143,7 @@ export type CreateControllerArgs = {
   // path's writable `LevelDataSource.setCell` via `writeCell`, where
   // `mutationCommitted` is emitted.
   writeValue?: (coord: Coord, newValue: unknown) => void;
+  activateCell?: (coord: Coord, trigger: CellActivationTrigger) => void;
 };
 
 const INITIAL: ControllerState = {
@@ -228,6 +234,23 @@ export function createGridController(
     }
     dispatch({ type: "START_EDIT", coord, trigger });
   };
+  store.activateCell = (coord, trigger) => {
+    args.activateCell?.(coord, trigger);
+  };
+  store.handleCellPointer = (coord, gesture) => {
+    if (args.interaction.mode !== "cell-grid") return false;
+    const row = args.getDisplayed().rowById.get(coord.rowId);
+    const column = args.getSchema().find((c) => c.id === coord.colId);
+    if (!row || !column) return false;
+    const intent = pointerEventToCellIntent({
+      column,
+      rowId: coord.rowId,
+      editable: args.capabilitiesFor(row.kind).editable,
+      gesture,
+    });
+    if (!intent) return false;
+    return applyCellIntent(intent);
+  };
   store.cancelEdit = () => dispatch({ type: "CANCEL_EDIT" });
   store.clearCellSelection = () => {
     args.clearCellRange?.(args.path);
@@ -254,23 +277,21 @@ export function createGridController(
         args.onNavigateCell?.(intent);
         return !!args.onNavigateCell;
       }
-      case "toggleFocusedRowExpansion": {
-        args.onNavigateCell?.(intent);
-        return !!args.onNavigateCell;
-      }
+      case "activateCell":
+        args.activateCell?.(intent.coord, intent.trigger);
+        return !!args.activateCell;
       case "startEdit":
-        if (!focus) return false;
         if (intent.trigger === "type") {
           dispatch({
             type: "START_EDIT",
-            coord: focus,
+            coord: intent.coord,
             trigger: intent.trigger,
             initial: intent.initial,
           });
         } else {
           dispatch({
             type: "START_EDIT",
-            coord: focus,
+            coord: intent.coord,
             trigger: intent.trigger,
           });
         }
@@ -356,11 +377,10 @@ export function createGridController(
 // Cursor placement hint for editor mounts. The trigger that opened the editor
 // determines what the cursor should do: a typed open positions at the end
 // (the keystroke is the initial value), every other trigger selects all.
-export function cursorForTrigger(trigger: EditTrigger): "atEnd" | "selectAll" {
+export function cursorForTrigger(
+  trigger: "type" | NonTypedCellEditGesture,
+): "atEnd" | "selectAll" {
   return trigger === "type" ? "atEnd" : "selectAll";
 }
 
-// Re-exported so consumers (the table-controller wrapper, mostly) can ask
-// "would this trigger open an editor on this column?"
-export { triggerAllowed };
 export type { GridEffect };

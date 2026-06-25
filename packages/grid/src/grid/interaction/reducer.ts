@@ -1,5 +1,5 @@
 import type { ColumnSchema } from "../types/schema";
-import { triggerAllowed } from "../types/schema";
+import { editStartsOn } from "../types/schema";
 import type { ControllerState } from "../types/controller-state";
 import type { DisplayedRows, LevelRowKind } from "../types/level-row";
 import type { RowCapabilities } from "../types/capabilities";
@@ -57,8 +57,8 @@ function transitionFor(
       if (!row) return null;
       if (!ctx.capabilitiesFor(row.kind).editable) return null;
       const column = ctx.schema.find((c) => c.id === action.coord.colId);
-      if (!column?.editCell) return null;
-      if (!triggerAllowed(column, action.trigger)) return null;
+      if (!column?.edit) return null;
+      if (!editStartsOn(column, action.trigger)) return null;
       const editStart =
         action.trigger === "type"
           ? { trigger: action.trigger, typedSeed: action.initial }

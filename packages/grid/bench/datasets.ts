@@ -122,7 +122,6 @@ function buildColumns(count: number): ColumnSchema[] {
       name: id,
       renderCell: ({ value }): ReactNode => String(value ?? ""),
       compare: (a, b) => String(a ?? "").localeCompare(String(b ?? "")),
-      editCell: undefined,
     };
   });
 }

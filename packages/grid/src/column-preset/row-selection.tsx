@@ -31,7 +31,7 @@ export function rowSelectionColumn(
     id: options?.id ?? "__row_selection",
     name: options?.name ?? "",
     width: options?.width ?? "compact",
-    editable: false,
+    edit: "none",
     sortable: false,
     renderCell: (props) => <RowSelectionCell {...props} />,
   });

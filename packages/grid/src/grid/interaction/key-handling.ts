@@ -12,7 +12,7 @@ import type {
   CellGridInteractionConfig,
   RowListInteractionConfig,
 } from "../types/interaction";
-import { triggerAllowed } from "../types/schema";
+import { activationStartsOn, editStartsOn } from "../types/schema";
 
 // Keyboard parsing is intentionally split by interaction domain.
 //
@@ -109,19 +109,6 @@ export function keyEventToCellIntent(
   const focusedRow = displayed.rowById.get(focus.rowId as RowId);
   const column = schema.find((c) => c.id === focus.colId);
 
-  if (
-    (e.key === "Enter" || e.key === " ") &&
-    !e.shiftKey &&
-    !e.ctrlKey &&
-    !e.metaKey &&
-    !e.altKey &&
-    column?.controlsRowExpansion === true &&
-    focusedRow &&
-    capabilities(focusedRow.kind).canExpand
-  ) {
-    return { type: "toggleFocusedRowExpansion" };
-  }
-
   if (e.key === " " && canToggleRows(config)) {
     return { type: "toggleActiveRowSelection" };
   }
@@ -194,20 +181,76 @@ export function keyEventToCellIntent(
   }
 
   if (!focusedRow) return null;
+  if (
+    column &&
+    e.key === "Enter" &&
+    !e.shiftKey &&
+    !e.ctrlKey &&
+    !e.metaKey &&
+    !e.altKey &&
+    activationStartsOn(column, "enter")
+  ) {
+    return {
+      type: "activateCell",
+      coord: focus,
+      trigger: { kind: "keyboard", gesture: "enter" },
+    };
+  }
+  if (
+    column &&
+    e.key === " " &&
+    !e.shiftKey &&
+    !e.ctrlKey &&
+    !e.metaKey &&
+    !e.altKey &&
+    activationStartsOn(column, "space")
+  ) {
+    return {
+      type: "activateCell",
+      coord: focus,
+      trigger: { kind: "keyboard", gesture: "space" },
+    };
+  }
+
   const caps = capabilities(focusedRow.kind);
   if (!caps.editable) return null;
-  if (!column?.editCell) return null;
+  if (!column?.edit) return null;
 
-  if (e.key === "F2" && triggerAllowed(column, "f2")) {
-    return { type: "startEdit", trigger: "f2" };
+  if (e.key === "F2" && editStartsOn(column, "f2")) {
+    return { type: "startEdit", coord: focus, trigger: "f2" };
   }
-  if (isHardEditCommit(e) && triggerAllowed(column, "enter")) {
-    return { type: "startEdit", trigger: "enter" };
+  if (isHardEditCommit(e) && editStartsOn(column, "enter")) {
+    return { type: "startEdit", coord: focus, trigger: "enter" };
   }
-  if (isPrintableKey(e) && triggerAllowed(column, "type")) {
-    return { type: "startEdit", trigger: "type", initial: e.key };
+  if (isPrintableKey(e) && editStartsOn(column, "type")) {
+    return { type: "startEdit", coord: focus, trigger: "type", initial: e.key };
   }
 
+  return null;
+}
+
+export function pointerEventToCellIntent(args: {
+  column: ColumnSchema;
+  rowId: RowId;
+  editable: boolean;
+  gesture: "click" | "doubleClick";
+}): CellNavigationIntent | null {
+  const coord = { rowId: args.rowId, colId: args.column.id };
+  if (activationStartsOn(args.column, args.gesture)) {
+    return {
+      type: "activateCell",
+      coord,
+      trigger: { kind: "pointer", gesture: args.gesture },
+    };
+  }
+  if (
+    args.gesture === "doubleClick" &&
+    args.editable &&
+    args.column.edit &&
+    editStartsOn(args.column, "doubleClick")
+  ) {
+    return { type: "startEdit", coord, trigger: "doubleClick" };
+  }
   return null;
 }
 

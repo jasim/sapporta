@@ -120,7 +120,15 @@ import type {
   PhantomRowsConfig,
   TreeNode,
 } from "../types/level-row";
-import type { GridSchema, LevelSchema } from "../types/schema";
+import type {
+  CellActionApi,
+  CellActivationContext,
+  CellRenderActivation,
+  CellActivationTrigger,
+  GridSchema,
+  LevelSchema,
+} from "../types/schema";
+import { describeCellActivation } from "../types/schema";
 import { defaultRowKey } from "../pipeline/stages/build-data";
 import type {
   CellChange,
@@ -142,8 +150,9 @@ import {
 } from "../displayed-rows";
 import {
   buildSchemaTopology,
+  normalizeGridSchema,
   type SchemaTopology,
-} from "../schema/schema-topology";
+} from "../schema";
 import {
   createGridController,
   type GridControllerPublic,
@@ -224,6 +233,11 @@ export type GridRuntime = {
   ) => void;
   snapshotFor: (path: GridPath) => LevelSnapshot;
   controllerFor: (path: GridPath) => GridControllerPublic;
+  cellActivationFor: (
+    path: GridPath,
+    coord: Coord,
+    trigger?: CellActivationTrigger,
+  ) => CellRenderActivation | null;
   // Schema at a given path. Works for any well-formed GridPath, even when
   // no source has yet been registered for it — the level name is decoded
   // from the path and looked up in `schemaTopology`.
@@ -290,7 +304,8 @@ type PendingPhantomCreate = {
 };
 
 export function createGridRuntime(args: RuntimeArgs): GridRuntime {
-  const { schema, dataSource } = args;
+  const { dataSource } = args;
+  const schema = normalizeGridSchema(args.schema);
   const interaction = normalizeInteraction(args.interaction);
   const schemaTopology = buildSchemaTopology(schema);
 
@@ -898,6 +913,9 @@ export function createGridRuntime(args: RuntimeArgs): GridRuntime {
       writeValue: (coord, newValue) => {
         writeCell(path, coord, newValue);
       },
+      activateCell: (coord, trigger) => {
+        activateCell(path, coord, trigger);
+      },
     });
     controllers.set(path, c);
     const unsub = c.subscribe((s, prev) => {
@@ -921,6 +939,109 @@ export function createGridRuntime(args: RuntimeArgs): GridRuntime {
   function controllerFor(path: GridPath): GridControllerPublic {
     assertLive();
     return controllerCursorPortFor(path);
+  }
+
+  function activationActions(): CellActionApi {
+    return {
+      rowExpansion: {
+        canToggle: ({ path, row }) =>
+          schemaForPath(path).childLevels.length > 0 &&
+          capabilitiesFor(row.kind).canExpand,
+        isExpanded: ({ path, rowId }) =>
+          coordinator.getState().expansion.get(path)?.has(rowId) ?? false,
+        toggle: ({ path, rowId }) => {
+          const row = displayedRowsFor(path).rowById.get(rowId);
+          if (!row) return;
+          if (!activationActions().rowExpansion.canToggle({ path, row }))
+            return;
+          coordinator.toggleExpand(path, rowId);
+        },
+      },
+    };
+  }
+
+  function activateCell(
+    path: GridPath,
+    coord: Coord,
+    trigger: CellActivationTrigger,
+  ): void {
+    assertLive();
+    const target = activationTarget(path, coord, trigger);
+    if (!target) return;
+    const { activation, context } = target;
+    const state = describeCellActivation(activation, context);
+    if (state.availability.kind === "disabled") return;
+    try {
+      const result = activation.run(context);
+      if (isPromiseLike(result)) {
+        void result.catch((error: unknown) => {
+          emitter.emit("cellActivationError", {
+            path,
+            coord,
+            trigger,
+            error,
+          });
+        });
+      }
+    } catch (error) {
+      emitter.emit("cellActivationError", {
+        path,
+        coord,
+        trigger,
+        error,
+      });
+    }
+  }
+
+  function cellActivationFor(
+    path: GridPath,
+    coord: Coord,
+    trigger: CellActivationTrigger = {
+      kind: "pointer",
+      gesture: "click",
+    },
+  ): CellRenderActivation | null {
+    const target = activationTarget(path, coord, trigger);
+    if (!target) return null;
+    const state = describeCellActivation(target.activation, target.context);
+    return {
+      label: state.label,
+      availability: state.availability,
+      run: () => activateCell(path, coord, trigger),
+    };
+  }
+
+  function activationTarget(
+    path: GridPath,
+    coord: Coord,
+    trigger: CellActivationTrigger,
+  ): {
+    activation: NonNullable<LevelSchema["columns"][number]["activation"]>;
+    context: CellActivationContext;
+  } | null {
+    const column = schemaForPath(path).columns.find(
+      (c) => c.id === coord.colId,
+    );
+    if (!column?.activation) return null;
+    const row = displayedRowsFor(path).rowById.get(coord.rowId);
+    if (!row) return null;
+    const value = row.columns[column.id];
+    return {
+      activation: column.activation,
+      context: {
+        trigger,
+        value,
+        row,
+        column: {
+          id: column.id,
+          name: column.name,
+          meta: column.meta,
+        },
+        path,
+        coord,
+        actions: activationActions(),
+      },
+    };
   }
 
   function activeRowForPath(path: GridPath): RowCursor | null {
@@ -1253,6 +1374,7 @@ export function createGridRuntime(args: RuntimeArgs): GridRuntime {
     invalidateDisplayedRows,
     snapshotFor,
     controllerFor,
+    cellActivationFor,
     schemaAt: schemaForPath,
     materializedChildren,
     sourceFor,
@@ -1288,6 +1410,15 @@ function readCellValue(
     }
   }
   return undefined;
+}
+
+function isPromiseLike(value: unknown): value is PromiseLike<unknown> {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "then" in value &&
+    typeof value.then === "function"
+  );
 }
 
 function readNodeWithIndex(

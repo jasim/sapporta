@@ -1,4 +1,4 @@
-import type { EditTrigger } from "@sapporta/grid";
+import type { CellEditGesture } from "@sapporta/grid";
 import type { ComponentType } from "react";
 import type { ColumnWidth } from "@sapporta/grid/column-preset";
 import type {
@@ -9,6 +9,7 @@ import type {
 import type {
   TGridCellContext,
   TGridCellEditorContext,
+  TGridCellActivation,
   TGridCellWriteHandler,
 } from "./tgrid-cell-context";
 
@@ -26,13 +27,20 @@ export type TableColumnOptions<
   width?: number;
   minWidth?: number;
   maxWidth?: number;
-  editable?: boolean;
-  editTriggers?: readonly EditTrigger[];
+  edit?:
+    | "default"
+    | "none"
+    | {
+        editor?:
+          | "default"
+          | ComponentType<
+              TGridCellEditorContext<RowsByLevel, AppServices, LevelId, K>
+            >;
+        startsOn?: readonly CellEditGesture[];
+      };
+  activation?: TGridCellActivation<RowsByLevel, AppServices, LevelId>;
   renderCell?: ComponentType<
     TGridCellContext<RowsByLevel, AppServices, LevelId>
-  >;
-  editor?: ComponentType<
-    TGridCellEditorContext<RowsByLevel, AppServices, LevelId, K>
   >;
   saveCellValue?: TGridCellWriteHandler<RowsByLevel, AppServices, LevelId, K>;
 };
@@ -46,18 +54,25 @@ export type ClientColumnOptions<
 > = {
   label?: string;
   width?: number | ColumnWidth;
-  editable?: boolean;
-  editTriggers?: readonly EditTrigger[];
+  edit?:
+    | "default"
+    | "none"
+    | {
+        editor?:
+          | "default"
+          | ComponentType<
+              TGridCellEditorContext<
+                RowsByLevel,
+                AppServices,
+                LevelId,
+                RowFieldName<RowsByLevel[LevelId]>
+              >
+            >;
+        startsOn?: readonly CellEditGesture[];
+      };
+  activation?: TGridCellActivation<RowsByLevel, AppServices, LevelId>;
   renderCell?: ComponentType<
     TGridCellContext<RowsByLevel, AppServices, LevelId>
-  >;
-  editor?: ComponentType<
-    TGridCellEditorContext<
-      RowsByLevel,
-      AppServices,
-      LevelId,
-      RowFieldName<RowsByLevel[LevelId]>
-    >
   >;
 };
 

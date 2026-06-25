@@ -1,6 +1,4 @@
-import { createElement } from "react";
 import type { CellRenderProps, ColumnSchema } from "../grid/types/schema";
-import { CellFrame } from "./cells/CellFrame";
 import { defaultsFor } from "./defaults";
 import { normalizeOptions } from "./lookup";
 import {
@@ -106,12 +104,8 @@ function constructColumn<TMeta>(
     name: options.name,
     compare: runtime.valueCodec.compare,
     renderCell: runtime.cellView.renderCell,
-    editCell: runtime.editBehavior.editable
-      ? runtime.editBehavior.editor
-      : undefined,
-    editTriggers: runtime.editBehavior.editable
-      ? runtime.editBehavior.editTriggers
-      : [],
+    edit: runtime.edit,
+    activation: runtime.activation,
     meta: options.meta,
   };
   out[GRID_COLUMN_PRESET_RUNTIME] = runtime;
@@ -206,6 +200,7 @@ function normalizePresetRuntime<TMeta>(
   const defaults = defaultsFor(columnPreset.kind);
   let runtime: ColumnPresetRuntime<TMeta>;
   const renderCell = createRenderCell(options, () => runtime);
+  const edit = resolvePresetEdit(options, columnPreset);
 
   runtime = {
     preset: columnPreset,
@@ -217,13 +212,9 @@ function normalizePresetRuntime<TMeta>(
     },
     cellView: {
       renderCell,
-      renderCellAction: options.renderCellAction,
     },
-    editBehavior: {
-      editable: options.editable ?? defaults.editable,
-      editor: options.editor ?? defaults.editor?.(columnPreset),
-      editTriggers: options.editTriggers ?? defaults.editTriggers,
-    },
+    edit,
+    activation: options.activation,
     headerBehavior: {
       sortable: options.sortable ?? defaults.sortable,
       renderColumnHeader: options.renderColumnHeader,
@@ -238,26 +229,33 @@ function createRenderCell<TMeta>(
   options: ColumnPresetOptions<TMeta>,
   fallback: () => ColumnPresetRuntime<TMeta>,
 ) {
-  if (options.renderCell && !options.renderCellAction) {
+  if (options.renderCell) {
     return options.renderCell;
   }
 
   return (props: CellRenderProps) => {
     const runtime = presetRuntime<TMeta>(props.column) ?? fallback();
-    const render = options.renderCell
-      ? (cellProps: CellRenderProps) => options.renderCell!(cellProps)
-      : renderWithPresetRuntime(runtime);
+    return renderWithPresetRuntime(runtime)(props);
+  };
+}
 
-    if (!options.renderCellAction) return render(props);
-    if (!options.renderCell) {
-      return renderWithPresetRuntime(runtime)(props);
-    }
-
-    return createElement(CellFrame, {
-      ...props,
-      action: options.renderCellAction,
-      children: render(props),
-    });
+function resolvePresetEdit<TMeta>(
+  options: ColumnPresetOptions<TMeta>,
+  columnPreset: ColumnPreset,
+): ColumnSchema["edit"] {
+  const defaults = defaultsFor(columnPreset.kind);
+  const option = options.edit ?? "default";
+  if (option === "none") return undefined;
+  const defaultEdit = defaults.edit?.(columnPreset);
+  if (option === "default") return defaultEdit;
+  const editor =
+    option.editor === undefined || option.editor === "default"
+      ? defaultEdit?.editor
+      : option.editor;
+  if (!editor) return undefined;
+  return {
+    editor,
+    startsOn: option.startsOn ?? defaultEdit?.startsOn ?? [],
   };
 }
 

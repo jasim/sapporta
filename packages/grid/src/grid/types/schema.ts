@@ -29,22 +29,24 @@
 // flips from "focus" to "editing" for class purposes only, and the overlay
 // mounts in parallel.
 //
-// `column.editTriggers` declares which gestures can open a supplied editor
-// (default: all of click, enter, type, f2). It does not make a column
-// editable on its own.
+// `column.edit` declares which gestures can open a supplied editor. Absence
+// means the cell cannot enter edit mode.
+// `column.activation` declares which gestures run a cell action. Renderers get
+// a narrow activation affordance; keyboard and pointer input are owned by the
+// grid.
 // `column.meta` is opaque to the grid — consumers use it for FK targets,
 // link configs, or anything else. Domain features built on top of the grid
 // (FK chips, link adornments, schema-derived context menu entries) are
 // consumer-side: they live outside `grid/`, attach data via `column.meta`,
-// and supply `renderCell` / `editCell` / context-menu contributors.
+// and supply `renderCell` / `edit` / context-menu contributors.
 
 import type { ComponentType, ReactNode } from "react";
 import type { CommitTarget } from "./action";
-import type { ColId, GridPath } from "./identity";
+import type { ColId, Coord, GridPath, RowId } from "./identity";
 import type { LevelOptions, LevelRow } from "./level-row";
 
-export type EditTrigger = "click" | "enter" | "type" | "f2";
-export type NonTypedEditTrigger = Exclude<EditTrigger, "type">;
+export type CellEditGesture = "enter" | "f2" | "type" | "doubleClick";
+export type NonTypedCellEditGesture = Exclude<CellEditGesture, "type">;
 
 export type CellEditorStart =
   | {
@@ -52,21 +54,82 @@ export type CellEditorStart =
       typedSeed: string;
     }
   | {
-      trigger: NonTypedEditTrigger;
+      trigger: NonTypedCellEditGesture;
     };
 
-export const ALL_EDIT_TRIGGERS: readonly EditTrigger[] = [
-  "click",
+export const DEFAULT_CELL_EDIT_GESTURES: readonly CellEditGesture[] = [
   "enter",
-  "type",
   "f2",
+  "type",
+  "doubleClick",
 ] as const;
+
+export type CellEditBehavior = {
+  editor: ComponentType<CellEditorProps>;
+  startsOn: readonly CellEditGesture[];
+};
+
+export type CellActivationGesture = "enter" | "space" | "click" | "doubleClick";
+
+export type CellAvailability =
+  | { kind: "enabled" }
+  | { kind: "disabled"; reason?: string };
+
+export type CellActivationState = {
+  label: string;
+  availability: CellAvailability;
+};
+
+export type CellActivationDescription =
+  | string
+  | ((ctx: CellActivationContext) => CellActivationState);
+
+export type CellActivationTrigger =
+  | { kind: "keyboard"; gesture: "enter" | "space" }
+  | { kind: "pointer"; gesture: "click" | "doubleClick" };
+
+export type CellActivationColumnContext = {
+  id: ColId;
+  name: string;
+  meta?: unknown;
+};
+
+export type CellActionApi = {
+  rowExpansion: {
+    canToggle: (target: { path: GridPath; row: LevelRow }) => boolean;
+    isExpanded: (target: { path: GridPath; rowId: RowId }) => boolean;
+    toggle: (target: { path: GridPath; rowId: RowId }) => void;
+  };
+};
+
+export type CellActivationContext = {
+  trigger: CellActivationTrigger;
+  value: unknown;
+  row: LevelRow;
+  column: CellActivationColumnContext;
+  path: GridPath;
+  coord: Coord;
+  actions: CellActionApi;
+};
+
+export type CellActivation = {
+  startsOn: readonly CellActivationGesture[];
+  describe: CellActivationDescription;
+  run: (ctx: CellActivationContext) => void | Promise<void>;
+};
+
+export type CellRenderActivation = {
+  label: string;
+  availability: CellAvailability;
+  run: () => void;
+};
 
 export type CellRenderProps = {
   value: unknown;
   row: LevelRow;
   column: ColumnSchema;
   path: GridPath;
+  activation: CellRenderActivation | null;
 };
 
 export type CellEditorProps = CellEditorStart & {
@@ -87,21 +150,36 @@ export type ColumnSchema = {
   name: string;
   renderCell: (props: CellRenderProps) => ReactNode;
   compare?: (a: unknown, b: unknown) => number;
-  editCell?: ComponentType<CellEditorProps>;
-  editTriggers?: readonly EditTrigger[];
-  controlsRowExpansion?: boolean;
+  edit?: CellEditBehavior;
+  activation?: CellActivation;
   meta?: unknown;
 };
 
-export function triggersFor(column: ColumnSchema): readonly EditTrigger[] {
-  return column.editTriggers ?? ALL_EDIT_TRIGGERS;
+export function editStartsOn(
+  column: ColumnSchema,
+  gesture: CellEditGesture,
+): boolean {
+  return column.edit?.startsOn.includes(gesture) ?? false;
 }
 
-export function triggerAllowed(
+export function activationStartsOn(
   column: ColumnSchema,
-  trigger: EditTrigger,
+  gesture: CellActivationGesture,
 ): boolean {
-  return triggersFor(column).includes(trigger);
+  return column.activation?.startsOn.includes(gesture) ?? false;
+}
+
+export function describeCellActivation(
+  activation: CellActivation,
+  context: CellActivationContext,
+): CellActivationState {
+  if (typeof activation.describe === "string") {
+    return {
+      label: activation.describe,
+      availability: { kind: "enabled" },
+    };
+  }
+  return activation.describe(context);
 }
 
 // Level/grid schema — static shape of a grid, separate from data.

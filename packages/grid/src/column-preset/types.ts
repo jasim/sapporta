@@ -1,9 +1,11 @@
 import type { ComponentType, ReactNode } from "react";
 import type {
+  CellActivation,
+  CellEditBehavior,
+  CellEditGesture,
   CellEditorProps,
   CellRenderProps,
   ColumnSchema,
-  EditTrigger,
 } from "../grid/types/schema";
 import type { ColId, Coord, GridPath, RowKey } from "../grid/types/identity";
 import type { SortDescriptor } from "../grid/pipeline/types";
@@ -97,13 +99,21 @@ export type PresetChromeOptions<TMeta = unknown, TFilter = unknown> = {
   ) => Partial<GridLevelCommands<TFilter>>;
 };
 
+export type ColumnPresetEditOption =
+  | "default"
+  | "none"
+  | {
+      editor?: "default" | ComponentType<CellEditorProps>;
+      startsOn?: readonly CellEditGesture[];
+    };
+
 export type ColumnPresetOptions<TMeta = unknown> = {
   kind?: ColumnPresetKind;
   id: ColId;
   name: string;
   align?: ColumnAlign;
   width?: ColumnWidth;
-  editable?: boolean;
+  edit?: ColumnPresetEditOption;
   sortable?: boolean;
   format?: (value: unknown) => string;
   parse?: (value: string, props: CellEditorProps) => unknown;
@@ -113,11 +123,11 @@ export type ColumnPresetOptions<TMeta = unknown> = {
   renderColumnHeaderMenu?: (
     props: ColumnHeaderMenuProps<TMeta, unknown>,
   ) => ReactNode;
-  renderCellAction?: (props: CellRenderProps) => ReactNode;
-  editor?: ComponentType<CellEditorProps>;
-  editTriggers?: readonly EditTrigger[];
+  activation?: CellActivation;
   meta?: TMeta;
 };
+
+export type ColumnPresetResolvedEdit = CellEditBehavior | undefined;
 
 export type NumberColumnOptions<TMeta = unknown> =
   ColumnPresetOptions<TMeta> & {

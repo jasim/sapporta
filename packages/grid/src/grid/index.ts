@@ -356,8 +356,8 @@
 //     windowed nodes" survives unchanged. Don't generalize prematurely.
 //   - Domain features (FK chips, link adornments, schema-derived context
 //     menus). Consumer-side: they live outside `grid/`, attach data via
-//     `column.meta`, and supply `renderCell` / `editCell` / context-
-//     menu contributors.
+//     `column.meta`, and supply `renderCell` / `edit` / activation /
+//     context-menu contributors.
 //
 // =====================================================================
 
@@ -396,7 +396,10 @@ export {
   useSelectedRows,
   useRowInteractionSnapshot,
   GridLevel,
-  ExpandCell,
+  CellActivationButton,
+  ExpandableCellFrame,
+  rowExpansionActivation,
+  withRowExpansionColumn,
   type GridChromeContext,
   type GridLevelChrome,
   type GridPresentation,
@@ -447,8 +450,19 @@ export type {
   PathEdge,
   PathDecomposition,
   ColumnSchema,
-  EditTrigger,
-  NonTypedEditTrigger,
+  CellEditGesture,
+  NonTypedCellEditGesture,
+  CellEditBehavior,
+  CellActivationGesture,
+  CellActivation,
+  CellActivationContext,
+  CellActivationColumnContext,
+  CellActivationDescription,
+  CellActivationState,
+  CellActivationTrigger,
+  CellActionApi,
+  CellAvailability,
+  CellRenderActivation,
   CellEditorStart,
   CellRenderProps,
   CellEditorProps,
@@ -508,9 +522,10 @@ export {
   pathOfRowId,
   rowKeyOfRowId,
   coordsEqual,
-  ALL_EDIT_TRIGGERS,
-  triggersFor,
-  triggerAllowed,
+  DEFAULT_CELL_EDIT_GESTURES,
+  editStartsOn,
+  activationStartsOn,
+  describeCellActivation,
   isTreeBackedRow,
   treeNodeForRow,
   isFooterRow,

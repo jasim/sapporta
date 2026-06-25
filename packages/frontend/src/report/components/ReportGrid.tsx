@@ -3,7 +3,6 @@ import {
   CELL_GRID_WITH_ACTIVE_ROW,
   childPath,
   createGridRuntime,
-  ExpandCell,
   footerSourceForRow,
   GridLevel,
   GridRuntimeProvider,
@@ -11,6 +10,7 @@ import {
   makeRowId,
   rootPath,
   trailingEdge,
+  withRowExpansionColumn,
   type CellRenderProps,
   type ColumnSchema,
   type GridPath,
@@ -312,9 +312,8 @@ function gridColumnForDatasetColumn<TInput>({
     id: column.id,
     name: column.label,
     width: columnPresetWidthForSizing(column),
-    editable: false,
+    edit: "none" as const,
     sortable: column.sortable ?? true,
-    editTriggers: [],
     colorRule: column.colorRule,
     zeroDisplay: column.zeroDisplay,
     strong: column.strong,
@@ -356,16 +355,7 @@ function gridColumnForDatasetColumn<TInput>({
 }
 
 function expandableColumn(column: ColumnSchema): ColumnSchema {
-  const renderCell = column.renderCell;
-  return {
-    ...column,
-    controlsRowExpansion: true,
-    renderCell: (props) => (
-      <ExpandCell row={props.row} path={props.path}>
-        {renderCell(props)}
-      </ExpandCell>
-    ),
-  };
+  return withRowExpansionColumn(column);
 }
 
 function renderReportCell<TInput>({

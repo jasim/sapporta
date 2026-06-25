@@ -29,5 +29,10 @@ export { EffectRunner } from "./EffectRunner";
 export { GridRow } from "./cells/GridRow";
 export { GridDataCell } from "./cells/GridDataCell";
 export { CellShell } from "./cells/CellShell";
-export { ExpandCell } from "./cells/ExpandCell";
+export { CellActivationButton } from "./cells/CellActivationButton";
+export {
+  ExpandableCellFrame,
+  rowExpansionActivation,
+  withRowExpansionColumn,
+} from "./cells/ExpandableCellFrame";
 export { CellEditorOverlay } from "./cells/CellEditorOverlay";

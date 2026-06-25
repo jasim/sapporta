@@ -28,15 +28,31 @@ export {
 
 export type {
   ColumnSchema,
-  EditTrigger,
-  NonTypedEditTrigger,
+  CellEditGesture,
+  NonTypedCellEditGesture,
+  CellEditBehavior,
+  CellActivationGesture,
+  CellActivation,
+  CellActivationContext,
+  CellActivationColumnContext,
+  CellActivationDescription,
+  CellActivationState,
+  CellActivationTrigger,
+  CellActionApi,
+  CellAvailability,
+  CellRenderActivation,
   CellEditorStart,
   CellRenderProps,
   CellEditorProps,
   LevelSchema,
   GridSchema,
 } from "./schema";
-export { ALL_EDIT_TRIGGERS, triggersFor, triggerAllowed } from "./schema";
+export {
+  DEFAULT_CELL_EDIT_GESTURES,
+  editStartsOn,
+  activationStartsOn,
+  describeCellActivation,
+} from "./schema";
 
 export type {
   TreeNode,

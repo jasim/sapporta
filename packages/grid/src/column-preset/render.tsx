@@ -12,7 +12,6 @@ import type {
   PercentagePreset,
   SelectPreset,
 } from "./preset";
-import { CellFrame } from "./cells/CellFrame";
 import { TextCell } from "./cells/TextCell";
 import { NumericCell } from "./cells/NumericCell";
 import { DateCell } from "./cells/DateCell";
@@ -24,15 +23,7 @@ import type { LookupValue } from "../lookup";
 export function renderWithPresetRuntime<TMeta = unknown>(
   runtime: ColumnPresetRuntime<TMeta>,
 ): (props: CellRenderProps) => ReactNode {
-  return (props) => {
-    const content = renderContent(runtime, props);
-    if (!runtime.cellView.renderCellAction) return content;
-    return (
-      <CellFrame {...props} action={runtime.cellView.renderCellAction}>
-        {content}
-      </CellFrame>
-    );
-  };
+  return (props) => renderContent(runtime, props);
 }
 
 function renderContent<TMeta = unknown>(

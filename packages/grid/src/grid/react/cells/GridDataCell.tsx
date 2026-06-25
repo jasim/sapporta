@@ -2,13 +2,11 @@ import { useStore } from "zustand";
 import type { MouseEvent } from "react";
 import type { GridPath } from "../../types/identity";
 import type { ColumnSchema } from "../../types/schema";
-import { triggerAllowed } from "../../types/schema";
 import type { LevelRow } from "../../types/level-row";
 import type { CellSelectionStatus } from "../../types/selection";
 import { selectionContainsCoord } from "../../types/selection";
 import type { ControllerState } from "../../types/controller-state";
 import type { ColId } from "../../types/identity";
-import { capabilitiesFor } from "../../types/capabilities";
 import { CellShell } from "./CellShell";
 import { useGridRuntime } from "../GridRuntimeProvider";
 
@@ -61,33 +59,30 @@ export function GridDataCell({
       runtime.cursorManager.extendCellSelectionTo({ path, ...coord });
     } else {
       runtime.cursorManager.moveCellCursorTo({ path, ...coord });
-      if (
-        triggerAllowed(column, "click") &&
-        capabilitiesFor(row.kind).editable
-      ) {
-        // Single click does not auto-edit by default; double-click does.
-      }
     }
+  }
+
+  function onClick() {
+    if (runtime.interaction.mode !== "cell-grid") return;
+    const coord = { rowId: row.id, colId: column.id };
+    if (controller.handleCellPointer(coord, "click")) return;
   }
 
   function onDoubleClick() {
     if (runtime.interaction.mode !== "cell-grid") return;
-    if (!capabilitiesFor(row.kind).editable) return;
-    if (!column.editCell) return;
-    if (!triggerAllowed(column, "click")) return;
-    // Ensure the cursor lands on this cell before opening the editor —
-    // the cursor manager is the single seam for path changes.
     const coord = { rowId: row.id, colId: column.id };
     runtime.cursorManager.moveCellCursorTo({ path, ...coord });
-    controller.startEdit(coord, "click");
+    controller.handleCellPointer(coord, "doubleClick");
   }
 
   const value = row.columns[column.id];
+  const coord = { rowId: row.id, colId: column.id };
   const content = column.renderCell({
     value,
     row,
     column,
     path,
+    activation: runtime.cellActivationFor(path, coord),
   });
 
   return (
@@ -95,6 +90,7 @@ export function GridDataCell({
       status={status}
       column={column}
       onMouseDown={onMouseDown}
+      onClick={onClick}
       onDoubleClick={onDoubleClick}
     >
       {content}

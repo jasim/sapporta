@@ -145,7 +145,7 @@ function buildOrderItemColumns(
       label: "Qty",
       saveCellValue: saveQuantity,
     }),
-    columns.table("balance_stock", { label: "Stock", editable: false }),
+    columns.table("balance_stock", { label: "Stock", edit: "none" }),
     columns.client("stock_hold", {
       label: "Hold",
       width: 120,
@@ -169,7 +169,7 @@ describe("TGRID-USAGE examples", () => {
           },
           columns: (columns) => [
             columns.table("customer_id", { label: "Customer" }),
-            columns.table("invoice_date", { label: "Date", editable: false }),
+            columns.table("invoice_date", { label: "Date", edit: "none" }),
             columns.table("status", {
               label: "Payment",
               renderCell: PaymentStatusCell,
@@ -239,7 +239,7 @@ describe("TGRID-USAGE examples", () => {
           childLevels: [],
           query: { owner: "host", pageSize: 50 },
           columns: (columns) => [
-            columns.table("customer_id", { editable: false }),
+            columns.table("customer_id", { edit: "none" }),
           ],
         },
       },

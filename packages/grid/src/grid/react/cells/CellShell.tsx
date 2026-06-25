@@ -14,6 +14,7 @@ export function CellShell(props: {
   column: ColumnSchema;
   children: ReactNode;
   onMouseDown?: (e: MouseEvent) => void;
+  onClick?: (e: MouseEvent) => void;
   onDoubleClick?: (e: MouseEvent) => void;
 }) {
   return (
@@ -23,6 +24,7 @@ export function CellShell(props: {
       data-cell-status={props.status}
       data-col-id={props.column.id}
       onMouseDown={props.onMouseDown}
+      onClick={props.onClick}
       onDoubleClick={props.onDoubleClick}
     >
       <div data-grid-part="cell-content">{props.children}</div>

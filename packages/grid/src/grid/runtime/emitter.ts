@@ -31,6 +31,7 @@ import type { LevelStatus, ReconcileEvent } from "../data-sources/types";
 import type { TreeNode } from "../types/level-row";
 import type { CellSelectionState } from "../types/selection";
 import type { RowSelection } from "../types/row-selection";
+import type { CellActivationTrigger } from "../types/schema";
 
 export type MutationCommittedEvent =
   | {
@@ -76,6 +77,12 @@ export type GridEvents = {
     atIndex: number;
   };
   phantomRowCreateFailed: { path: GridPath; rowKey: RowKey; reason: string };
+  cellActivationError: {
+    path: GridPath;
+    coord: Coord;
+    trigger: CellActivationTrigger;
+    error: unknown;
+  };
 };
 
 type EventName = keyof GridEvents;

@@ -383,16 +383,6 @@ export function createGridCoordinator(
       return;
     }
     const current = cursorManager.currentCellCursor();
-    if (intent.type === "toggleFocusedRowExpansion") {
-      if (!current || current.path !== fromPath) return;
-      if (runtime.schemaAt(current.path).childLevels.length === 0) return;
-      const row = runtime.displayedRowsFor(current.path).rowById.get(
-        current.rowId,
-      );
-      if (!row || !args.capabilitiesFor(row.kind).canExpand) return;
-      store.toggleExpand(current.path, current.rowId);
-      return;
-    }
     const target = resolveMovement(intent, fromPath, current, runtime);
     if (!target) return;
     const extend = "extend" in intent && intent.extend;

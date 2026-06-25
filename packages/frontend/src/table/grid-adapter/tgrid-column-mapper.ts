@@ -1,10 +1,9 @@
-import { createElement } from "react";
 import type {
   ColumnSchema as TableColumnSchema,
   TableSchema,
 } from "@sapporta/shared/contracts";
 import type { ColId, ColumnSchema as GridColumnSchema } from "@sapporta/grid";
-import { ExpandCell } from "@sapporta/grid";
+import { withRowExpansionColumn } from "@sapporta/grid";
 import {
   columnPreset,
   columnPresetWidthForSizing,
@@ -72,18 +71,7 @@ function columnsFor(
     );
 
   if (options.expandable && columns.length > 0) {
-    const first = columns[0];
-    const originalRenderer = first.renderCell;
-    columns[0] = {
-      ...first,
-      controlsRowExpansion: true,
-      renderCell: (props) =>
-        createElement(
-          ExpandCell,
-          { row: props.row, path: props.path },
-          originalRenderer(props),
-        ),
-    };
+    columns[0] = withRowExpansionColumn(columns[0]);
   }
 
   return columns;
@@ -107,7 +95,7 @@ function columnFor(
   const common = {
     id: column.name as ColId,
     name: column.label,
-    editable,
+    edit: editable ? ("default" as const) : ("none" as const),
     width: tableColumnPresetWidth(column),
     meta: {
       table: tableName,
@@ -120,7 +108,7 @@ function columnFor(
     case "pk":
       return columnPreset.identifier({
         ...common,
-        editable: false,
+        edit: "none",
       });
     case "fk": {
       const bundle = lookupResolver.bundleFor({ tableName, column });
@@ -146,7 +134,7 @@ function columnFor(
     case "timestamp":
       return columnPreset.date({
         ...common,
-        editable: false,
+        edit: "none",
       });
     case "number":
       return columnPreset.number(common);

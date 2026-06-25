@@ -1,8 +1,9 @@
-import type { ComponentType, ReactNode } from "react";
+import type { ReactNode } from "react";
 import type {
+  CellActivation,
+  CellEditBehavior,
   CellEditorProps,
   CellRenderProps,
-  EditTrigger,
 } from "../grid/types/schema";
 import type { ColumnHeaderMenuProps, ColumnHeaderProps } from "./types";
 import type { ColumnPreset } from "./preset";
@@ -15,13 +16,6 @@ export type ColumnPresetValueCodec = {
 
 export type ColumnPresetCellView = {
   renderCell: (props: CellRenderProps) => ReactNode;
-  renderCellAction?: (props: CellRenderProps) => ReactNode;
-};
-
-export type ColumnPresetEditBehavior = {
-  editable: boolean;
-  editor?: ComponentType<CellEditorProps>;
-  editTriggers: readonly EditTrigger[];
 };
 
 export type ColumnPresetHeaderBehavior<TMeta = unknown> = {
@@ -37,7 +31,8 @@ export type ColumnPresetRuntime<TMeta = unknown> = {
   meta?: TMeta;
   valueCodec: ColumnPresetValueCodec;
   cellView: ColumnPresetCellView;
-  editBehavior: ColumnPresetEditBehavior;
+  edit?: CellEditBehavior;
+  activation?: CellActivation;
   headerBehavior: ColumnPresetHeaderBehavior<TMeta>;
 };
 

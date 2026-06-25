@@ -5,10 +5,15 @@ import {
   type ReactNode,
 } from "react";
 import type {
+  CellActionApi,
+  CellActivationState,
+  CellActivationTrigger,
+  CellActivationGesture,
   GridPath,
   GridRuntime,
   RowKey,
   CommitTarget,
+  CellRenderActivation,
 } from "@sapporta/grid";
 import type {
   TableSchema,
@@ -81,6 +86,32 @@ export type TGridCellContext<
   column: TGridColumnContext<RowsByLevel[LevelId]>;
   runtime: GridRuntime;
   appServices: AppServices;
+  activation: CellRenderActivation | null;
+};
+
+export type TGridCellActivationContext<
+  RowsByLevel extends TGridRowsByLevel,
+  AppServices,
+  LevelId extends TGridLevelId<RowsByLevel>,
+> = TGridCellContext<RowsByLevel, AppServices, LevelId> & {
+  trigger: CellActivationTrigger;
+  actions: CellActionApi;
+};
+
+export type TGridCellActivation<
+  RowsByLevel extends TGridRowsByLevel,
+  AppServices,
+  LevelId extends TGridLevelId<RowsByLevel>,
+> = {
+  startsOn: readonly CellActivationGesture[];
+  describe:
+    | string
+    | ((
+        ctx: TGridCellActivationContext<RowsByLevel, AppServices, LevelId>,
+      ) => CellActivationState);
+  run: (
+    ctx: TGridCellActivationContext<RowsByLevel, AppServices, LevelId>,
+  ) => void | Promise<void>;
 };
 
 // Editor-only slice of cell context with commit and cancel actions.

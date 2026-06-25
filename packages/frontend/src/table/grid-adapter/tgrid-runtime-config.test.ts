@@ -3,7 +3,7 @@ import { isValidElement } from "react";
 import type { Row, TableSchema } from "@sapporta/shared/contracts";
 import { eqCondition } from "@sapporta/shared/filter";
 import type { GridRuntime, RestEndpointFactory } from "@sapporta/grid";
-import { ExpandCell } from "@sapporta/grid";
+import { ExpandableCellFrame } from "@sapporta/grid";
 import { preset } from "@sapporta/grid/column-preset";
 import { compileTGridRuntimeConfig } from "./tgrid-runtime-config";
 import type { TableRowsClient } from "./tgrid-level-config";
@@ -301,7 +301,7 @@ describe("compileTGridRuntimeConfig", () => {
     }
   });
 
-  it("wraps the first visible column of expandable levels with ExpandCell", () => {
+  it("wraps the first visible column of expandable levels with ExpandableCellFrame", () => {
     const config = build();
     const col = config.gridSchema.levels.orders.columns[0];
     const rendered = col.renderCell?.({
@@ -316,11 +316,14 @@ describe("compileTGridRuntimeConfig", () => {
         hasChildren: false,
         source: { levelName: "orders", columns: { id: 1 } },
       },
+      activation: null,
     });
 
     expect(isValidElement(rendered)).toBe(true);
-    expect(isValidElement(rendered) ? rendered.type : null).toBe(ExpandCell);
-    expect(col.controlsRowExpansion).toBe(true);
+    expect(isValidElement(rendered) ? rendered.type : null).toBe(
+      ExpandableCellFrame,
+    );
+    expect(col.activation).toBeDefined();
   });
 
   it("child endpoint applies the parent FK filter and default sort", async () => {

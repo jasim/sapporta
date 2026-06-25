@@ -259,8 +259,8 @@ type ColumnSchema = {
   name: string;
   renderCell: (props: CellRenderProps) => ReactNode;
   compare?: (a: unknown, b: unknown) => number;
-  editCell?: ComponentType<CellEditorProps>;
-  editTriggers?: readonly EditTrigger[];
+  edit?: CellEditBehavior;
+  activation?: CellActivation;
   meta?: unknown;
 };
 
@@ -269,6 +269,7 @@ type CellRenderProps = {
   row: LevelRow;
   column: ColumnSchema;
   path: GridPath;
+  activation: CellRenderActivation | null;
 };
 
 type CellEditorProps = CellEditorStart & {
@@ -281,7 +282,20 @@ type CellEditorProps = CellEditorStart & {
   onCancel: () => void;
 };
 
-type EditTrigger = "click" | "enter" | "type" | "f2";
+type CellEditGesture = "enter" | "f2" | "type" | "doubleClick";
+
+type CellEditBehavior = {
+  editor: ComponentType<CellEditorProps>;
+  startsOn: readonly CellEditGesture[];
+};
+
+type CellActivationGesture = "enter" | "space" | "click" | "doubleClick";
+
+type CellActivation = {
+  startsOn: readonly CellActivationGesture[];
+  describe: string | ((ctx: CellActivationContext) => CellActivationState);
+  run: (ctx: CellActivationContext) => void | Promise<void>;
+};
 ```
 
 ### Raw Column Example
@@ -326,8 +340,10 @@ const titleColumn: ColumnSchema = {
   id: "title",
   name: "Title",
   renderCell: ({ value }) => String(value ?? ""),
-  editCell: TextEditor,
-  editTriggers: ["click", "enter", "type", "f2"],
+  edit: {
+    editor: TextEditor,
+    startsOn: ["enter", "f2", "type", "doubleClick"],
+  },
 };
 ```
 
@@ -381,15 +397,19 @@ type ColumnPresetOptions<TMeta = unknown> = {
   name: string;
   align?: "left" | "right" | "center";
   width?: ColumnWidth;
-  editable?: boolean;
+  edit?:
+    | "default"
+    | "none"
+    | {
+        editor?: "default" | ComponentType<CellEditorProps>;
+        startsOn?: readonly CellEditGesture[];
+      };
+  activation?: CellActivation;
   sortable?: boolean;
   format?: (value: unknown) => string;
   parse?: (value: string, props: CellEditorProps) => unknown;
   compare?: (a: unknown, b: unknown) => number;
   renderCell?: (props: CellRenderProps) => ReactNode;
-  renderCellAction?: (props: CellRenderProps) => ReactNode;
-  editor?: ComponentType<CellEditorProps>;
-  editTriggers?: readonly EditTrigger[];
   meta?: TMeta;
 };
 ```
@@ -415,7 +435,7 @@ type ColumnWidth =
 const status = select({
   id: "status",
   name: "Status",
-  editable: true,
+  edit: "default",
   width: "enum",
   options: [
     { value: "todo", label: "To do" },
@@ -431,7 +451,7 @@ const status = select({
 const estimate = number({
   id: "estimate",
   name: "Estimate",
-  editable: true,
+  edit: "default",
   width: "numeric",
   zeroDisplay: "blank",
 });
@@ -473,7 +493,7 @@ selection APIs.
 ```ts
 const columns = [
   rowSelectionColumn(),
-  text({ id: "title", name: "Title", editable: true }),
+  text({ id: "title", name: "Title", edit: "default" }),
 ];
 ```
 
