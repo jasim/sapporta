@@ -469,6 +469,9 @@ export function createGridRuntime(args: RuntimeArgs): GridRuntime {
       src.subscribe(() => {
         onSourceSnapshotChanged(root);
         invalidateDisplayedRows(root, { type: "source" });
+        // After a keyboard page turn, the cursor should land on rows from the
+        // page the app just loaded. Recompute displayed rows first so the
+        // landing target comes from the current page, not the previous one.
         resolvePendingPageBoundaryNavigation(root);
       }),
     );
@@ -505,6 +508,8 @@ export function createGridRuntime(args: RuntimeArgs): GridRuntime {
         src.subscribe(() => {
           onSourceSnapshotChanged(childPath);
           invalidateDisplayedRows(childPath, { type: "source" });
+          // Expanded child tables page independently. A parent refresh should
+          // not finish a pending page turn inside a child table, or vice versa.
           resolvePendingPageBoundaryNavigation(childPath);
         }),
       );
@@ -674,6 +679,9 @@ export function createGridRuntime(args: RuntimeArgs): GridRuntime {
     assertLive();
     const src = sources.get(navigation.path);
     if (!src) return false;
+    // While a page is loading, repeated key presses should not skip ahead based
+    // on old page counts. Wait until the app's latest rows are settled before
+    // accepting another boundary turn.
     if (src.snapshot().status !== "ready") return false;
     const pageNavigation = src.pageBoundaryNavigation;
     if (!pageNavigation) return false;
@@ -682,6 +690,9 @@ export function createGridRuntime(args: RuntimeArgs): GridRuntime {
         ? pageNavigation.canGoNext()
         : pageNavigation.canGoPrevious();
     if (!canTurn) return false;
+    // Apps may store page state locally, in route state, or behind custom
+    // controls. Use the same page-turn hook as those controls, then finish the
+    // keyboard move when the new rows arrive.
     pendingPageBoundaryNavigation = navigation;
     if (navigation.direction === "next") {
       pageNavigation.goNext();
@@ -696,6 +707,9 @@ export function createGridRuntime(args: RuntimeArgs): GridRuntime {
     if (!pending || pending.path !== path) return;
 
     const snapshot = snapshotFor(path);
+    // Keep the requested landing while the next page loads. If the load fails,
+    // leave the cursor where the user started instead of moving it during a
+    // later, unrelated refresh.
     if (snapshot.status === "loading") return;
     if (snapshot.status !== "ready") {
       pendingPageBoundaryNavigation = null;
@@ -733,6 +747,9 @@ export function createGridRuntime(args: RuntimeArgs): GridRuntime {
     pending: Extract<PendingPageBoundaryNavigation, { kind: "cell" }>,
   ): CellCursor | null {
     const displayed = displayedRowsFor(pending.path);
+    // On the next page, continue at the first focusable row; on the previous
+    // page, continue at the last. Keep the same column rule the user gets from
+    // Tab, Arrow, and Page keys inside the current page.
     const row =
       pending.direction === "next"
         ? firstFocusableRow(displayed, capabilitiesFor)
@@ -750,6 +767,9 @@ export function createGridRuntime(args: RuntimeArgs): GridRuntime {
     pending: Extract<PendingPageBoundaryNavigation, { kind: "row" }>,
   ): RowCursor | null {
     const rows = displayedRowsFor(pending.path).rows;
+    // Row-list pages can include visible rows that are not operation targets.
+    // After paging, land on the first or last selectable row so bulk actions
+    // and keyboard focus keep pointing at rows the app can actually use.
     if (pending.direction === "next") {
       const row = rows.find((candidate) => candidate.rowSelectable);
       return row ? { path: pending.path, rowId: row.id } : null;

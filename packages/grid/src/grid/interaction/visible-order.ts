@@ -247,6 +247,9 @@ function deltaOverflow(
   const first = firstReachableIndex(steps, isReachable);
   const last = lastReachableIndex(steps, isReachable);
   if (first < 0 || last < 0) return delta < 0 ? "previous" : "next";
+  // From the middle of a short page, PageDown should first land on the last
+  // reachable row the user can see. Only a second PageDown from that edge
+  // should ask the app for another page.
   if (delta < 0 && fromIndex <= first) return "previous";
   if (delta > 0 && fromIndex >= last) return "next";
   return null;

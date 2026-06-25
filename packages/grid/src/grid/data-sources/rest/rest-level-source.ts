@@ -351,6 +351,9 @@ export function restLevelSource<F = unknown>(
     | PageBoundaryNavigation
     | undefined {
     if (hostOwned) return undefined;
+    // For a REST-backed table that owns its paging controls, boundary keys
+    // should behave like the visible pagination buttons: enabled only when the
+    // current page has finished loading and another page is known to exist.
     return {
       canGoPrevious: () => status === "ready" && page > 0,
       canGoNext: () => {

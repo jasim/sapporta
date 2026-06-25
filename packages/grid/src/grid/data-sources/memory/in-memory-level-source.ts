@@ -350,6 +350,9 @@ function buildCore<F>(opts: InMemoryLevelSourceOpts<F>): Core<F> {
         ? {
             canGoPrevious: () => page > 0,
             canGoNext: () => {
+              // In-memory tables can filter and sort before paging. Use the
+              // same published row window the user sees when deciding whether
+              // PageDown can move to another page.
               ensureFresh();
               const totalCount = cachedSnapshot!.pagination?.totalCount ?? 0;
               return Number.isFinite(pageSize)

@@ -364,6 +364,10 @@ export function createGridCoordinator(
       { capabilitiesFor: args.capabilitiesFor },
     );
     if (result.target) return result.target;
+    // A table may show footer or subtotal rows that are not real keyboard
+    // targets. Treat those rows the same for in-page movement and page turns,
+    // so pressing Down at the last editable row behaves predictably. Creating
+    // a phantom row is the fallback only when the app cannot page forward.
     if (
       result.overflow &&
       runtime.requestPageBoundaryNavigation({
@@ -442,6 +446,9 @@ export function createGridCoordinator(
         intent.direction,
       );
       if (result.target) return result.target;
+      // In a row-list, keyboard focus follows rows the app can operate on.
+      // A visible footer at the edge should not block a page turn, and it
+      // should not become the row cursor's landing target.
       if (
         result.overflow &&
         runtime.requestPageBoundaryNavigation({
@@ -475,6 +482,9 @@ export function createGridCoordinator(
         },
       );
       if (result.target) return result.target;
+      // Page-sized row-list jumps should not skip the rest of the current
+      // page. First land on the nearest selectable edge row; a later jump from
+      // that edge can ask the app for the adjacent page.
       if (
         result.overflow &&
         runtime.requestPageBoundaryNavigation({

@@ -220,6 +220,8 @@ class DefaultTGridSession<
         };
       },
       setHostPage: (levelId, page) => {
+        // Keyboard page turns should behave exactly like the page buttons a
+        // table view renders, including route sync and page-number clamping.
         this.queryStoresByLevel.get(levelId)?.getState().setPage(page);
       },
       sessionContext: this.currentSessionContext,
