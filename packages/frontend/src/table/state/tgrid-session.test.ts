@@ -279,6 +279,91 @@ describe("TGridSession", () => {
     }
   });
 
+  it("PageDown clamps within the loaded host-owned page before changing pages", async () => {
+    const rowsClient: TableRowsClient = {
+      fetch: vi.fn(async ({ page }) => ({
+        data:
+          page === 1
+            ? [
+                { id: 1, customer: "Acme", status: "open" },
+                { id: 2, customer: "Beta", status: "open" },
+              ]
+            : [{ id: 3, customer: "Core", status: "open" }],
+        meta: { total: 3, page, limit: 2, pages: 2 },
+      })),
+      create: vi.fn(async (_table, data) => ({ data })),
+      update: vi.fn(async (_table, _id, data) => ({ data })),
+      remove: vi.fn(async (_table, id) => ({ data: { id } })),
+    };
+    const definition = defineTGrid<RowsByLevel>({
+      rootLevel: "orders",
+      levels: {
+        orders: {
+          table: ordersTable,
+          childLevels: [],
+          query: { owner: "host", pageSize: 2 },
+          rowsClient,
+        },
+      },
+    });
+    const onQueryUrlChange = vi.fn();
+    const session = createTGridSession<RowsByLevel>(definition, {
+      onQueryUrlChange,
+    });
+
+    try {
+      await flush();
+      const path = rootPath("orders");
+      session.runtime.cursorManager.moveCellCursorTo({
+        path,
+        rowId: makeRowId(path, "1"),
+        colId: "customer",
+      });
+
+      session.runtime.controllerFor(path).handleKey({
+        key: "PageDown",
+        ctrlKey: false,
+        metaKey: false,
+        shiftKey: false,
+        altKey: false,
+      } as KeyboardEvent);
+      await flush();
+
+      expect(session.getQueryState().page).toBe(1);
+      expect(onQueryUrlChange).not.toHaveBeenCalled();
+      expect(session.runtime.coordinator.getState().cellCursor).toEqual({
+        path,
+        rowId: makeRowId(path, "2"),
+        colId: "customer",
+      });
+
+      session.runtime.controllerFor(path).handleKey({
+        key: "PageDown",
+        ctrlKey: false,
+        metaKey: false,
+        shiftKey: false,
+        altKey: false,
+      } as KeyboardEvent);
+      await flush();
+
+      expect(session.getQueryState().page).toBe(2);
+      expect(onQueryUrlChange).toHaveBeenCalledWith({
+        level: "orders",
+        page: 2,
+        sort: [],
+        filters: [],
+        search: null,
+      });
+      expect(session.runtime.coordinator.getState().cellCursor).toEqual({
+        path,
+        rowId: makeRowId(path, "3"),
+        colId: "customer",
+      });
+    } finally {
+      session.dispose();
+    }
+  });
+
   it("does not advance host-owned page navigation again while the source is loading", async () => {
     const page2 = deferred<Awaited<ReturnType<TableRowsClient["fetch"]>>>();
     const page3 = deferred<Awaited<ReturnType<TableRowsClient["fetch"]>>>();

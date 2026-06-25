@@ -175,12 +175,24 @@ function pagedRuntime(
   interaction?: GridInteractionConfig,
   footerRows?: FooterRow[],
 ) {
-  return createGridRuntime({
-    schema: reportSchema,
-    dataSource: pagedRootDataSource([
+  return pagedRuntimeWithPages(
+    [
       [{ levelName: "cat", columns: { name: "Fruit" } }],
       [{ levelName: "cat", columns: { name: "Veg" } }],
-    ], footerRows),
+    ],
+    interaction,
+    footerRows,
+  );
+}
+
+function pagedRuntimeWithPages(
+  pages: TreeNode[][],
+  interaction?: GridInteractionConfig,
+  footerRows?: FooterRow[],
+) {
+  return createGridRuntime({
+    schema: reportSchema,
+    dataSource: pagedRootDataSource(pages, footerRows),
     interaction,
   });
 }
@@ -378,8 +390,14 @@ describe("GridCoordinator", () => {
     expect(rt.sourceFor(root).snapshot().pagination?.page).toBe(0);
   });
 
-  it("PageDown overflow turns the page instead of clamping to the last loaded row", () => {
-    const rt = pagedRuntime();
+  it("PageDown first clamps to the last loaded cell, then turns to the next page", () => {
+    const rt = pagedRuntimeWithPages([
+      [
+        { levelName: "cat", columns: { name: "Fruit" } },
+        { levelName: "cat", columns: { name: "Apple" } },
+      ],
+      [{ levelName: "cat", columns: { name: "Veg" } }],
+    ]);
     const first = {
       path: root,
       rowId: makeRowId(root, "Fruit"),
@@ -395,10 +413,73 @@ describe("GridCoordinator", () => {
       altKey: false,
     } as KeyboardEvent);
 
-    expect(rt.coordinator.getState().cellCursor?.rowId).toBe(
-      makeRowId(root, "Veg"),
-    );
+    expect(rt.coordinator.getState().cellCursor).toEqual({
+      path: root,
+      rowId: makeRowId(root, "Apple"),
+      colId: "name",
+    });
+    expect(rt.sourceFor(root).snapshot().pagination?.page).toBe(0);
+
+    rt.controllerFor(root).handleKey({
+      key: "PageDown",
+      ctrlKey: false,
+      metaKey: false,
+      shiftKey: false,
+      altKey: false,
+    } as KeyboardEvent);
+
+    expect(rt.coordinator.getState().cellCursor).toEqual({
+      path: root,
+      rowId: makeRowId(root, "Veg"),
+      colId: "name",
+    });
     expect(rt.sourceFor(root).snapshot().pagination?.page).toBe(1);
+  });
+
+  it("PageUp first clamps to the first loaded cell, then turns to the previous page", () => {
+    const rt = pagedRuntimeWithPages([
+      [{ levelName: "cat", columns: { name: "Fruit" } }],
+      [
+        { levelName: "cat", columns: { name: "Apple" } },
+        { levelName: "cat", columns: { name: "Veg" } },
+      ],
+    ]);
+    rt.sourceFor(root).pageBoundaryNavigation?.goNext();
+    rt.cursorManager.moveCellCursorTo({
+      path: root,
+      rowId: makeRowId(root, "Veg"),
+      colId: "name",
+    });
+
+    rt.controllerFor(root).handleKey({
+      key: "PageUp",
+      ctrlKey: false,
+      metaKey: false,
+      shiftKey: false,
+      altKey: false,
+    } as KeyboardEvent);
+
+    expect(rt.coordinator.getState().cellCursor).toEqual({
+      path: root,
+      rowId: makeRowId(root, "Apple"),
+      colId: "name",
+    });
+    expect(rt.sourceFor(root).snapshot().pagination?.page).toBe(1);
+
+    rt.controllerFor(root).handleKey({
+      key: "PageUp",
+      ctrlKey: false,
+      metaKey: false,
+      shiftKey: false,
+      altKey: false,
+    } as KeyboardEvent);
+
+    expect(rt.coordinator.getState().cellCursor).toEqual({
+      path: root,
+      rowId: makeRowId(root, "Fruit"),
+      colId: "name",
+    });
+    expect(rt.sourceFor(root).snapshot().pagination?.page).toBe(0);
   });
 
   it("ArrowDown from the last focusable row before a footer turns to the next page", () => {
@@ -454,6 +535,97 @@ describe("GridCoordinator", () => {
       type: "scrollRowIntoView",
       rowId: second,
     });
+  });
+
+  it("row-list PageDown first clamps to the last loaded row, then turns to the next page", () => {
+    const rt = pagedRuntimeWithPages(
+      [
+        [
+          { levelName: "cat", columns: { name: "Fruit" } },
+          { levelName: "cat", columns: { name: "Apple" } },
+        ],
+        [{ levelName: "cat", columns: { name: "Veg" } }],
+      ],
+      ROW_MULTISELECT_LIST,
+    );
+    rt.cursorManager.moveRowCursorTo({
+      path: root,
+      rowId: makeRowId(root, "Fruit"),
+    });
+
+    rt.controllerFor(root).handleKey({
+      key: "PageDown",
+      ctrlKey: false,
+      metaKey: false,
+      shiftKey: false,
+      altKey: false,
+    } as KeyboardEvent);
+
+    expect(rt.coordinator.getState().rowCursor).toEqual({
+      path: root,
+      rowId: makeRowId(root, "Apple"),
+    });
+    expect(rt.sourceFor(root).snapshot().pagination?.page).toBe(0);
+
+    rt.controllerFor(root).handleKey({
+      key: "PageDown",
+      ctrlKey: false,
+      metaKey: false,
+      shiftKey: false,
+      altKey: false,
+    } as KeyboardEvent);
+
+    expect(rt.coordinator.getState().rowCursor).toEqual({
+      path: root,
+      rowId: makeRowId(root, "Veg"),
+    });
+    expect(rt.sourceFor(root).snapshot().pagination?.page).toBe(1);
+  });
+
+  it("row-list PageUp first clamps to the first loaded row, then turns to the previous page", () => {
+    const rt = pagedRuntimeWithPages(
+      [
+        [{ levelName: "cat", columns: { name: "Fruit" } }],
+        [
+          { levelName: "cat", columns: { name: "Apple" } },
+          { levelName: "cat", columns: { name: "Veg" } },
+        ],
+      ],
+      ROW_MULTISELECT_LIST,
+    );
+    rt.sourceFor(root).pageBoundaryNavigation?.goNext();
+    rt.cursorManager.moveRowCursorTo({
+      path: root,
+      rowId: makeRowId(root, "Veg"),
+    });
+
+    rt.controllerFor(root).handleKey({
+      key: "PageUp",
+      ctrlKey: false,
+      metaKey: false,
+      shiftKey: false,
+      altKey: false,
+    } as KeyboardEvent);
+
+    expect(rt.coordinator.getState().rowCursor).toEqual({
+      path: root,
+      rowId: makeRowId(root, "Apple"),
+    });
+    expect(rt.sourceFor(root).snapshot().pagination?.page).toBe(1);
+
+    rt.controllerFor(root).handleKey({
+      key: "PageUp",
+      ctrlKey: false,
+      metaKey: false,
+      shiftKey: false,
+      altKey: false,
+    } as KeyboardEvent);
+
+    expect(rt.coordinator.getState().rowCursor).toEqual({
+      path: root,
+      rowId: makeRowId(root, "Fruit"),
+    });
+    expect(rt.sourceFor(root).snapshot().pagination?.page).toBe(0);
   });
 
   it("row-list ArrowDown from the last selectable row before a footer turns to the next page", () => {

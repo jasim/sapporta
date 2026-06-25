@@ -460,7 +460,83 @@ describe("resolveVisibleRowNavigation", () => {
     expect(result).toEqual({ target: null, overflow: "previous" });
   });
 
-  it("PageDown uses focusable reachability for next overflow", () => {
+  it("PageDown clamps to the last focusable row before next overflow", () => {
+    const rt = fakeRuntimeWithRows([
+      dataRow("Fruit"),
+      dataRow("Apple"),
+      dataRow("Banana"),
+      footerRow("total"),
+    ]);
+
+    expect(
+      resolveVisibleRowNavigation(
+        rt,
+        rt.coordinator,
+        { path: root, rowId: makeRowId(root, "Fruit"), colId: "name" },
+        { delta: 10 },
+        "preserve",
+        deps,
+      ),
+    ).toEqual({
+      target: {
+        path: root,
+        rowId: makeRowId(root, "Banana"),
+        colId: "name",
+      },
+      overflow: null,
+    });
+
+    expect(
+      resolveVisibleRowNavigation(
+        rt,
+        rt.coordinator,
+        { path: root, rowId: makeRowId(root, "Banana"), colId: "name" },
+        { delta: 10 },
+        "preserve",
+        deps,
+      ),
+    ).toEqual({ target: null, overflow: "next" });
+  });
+
+  it("PageUp clamps to the first focusable row before previous overflow", () => {
+    const rt = fakeRuntimeWithRows([
+      footerRow("opening-total"),
+      dataRow("Fruit"),
+      dataRow("Apple"),
+      dataRow("Banana"),
+    ]);
+
+    expect(
+      resolveVisibleRowNavigation(
+        rt,
+        rt.coordinator,
+        { path: root, rowId: makeRowId(root, "Banana"), colId: "name" },
+        { delta: -10 },
+        "preserve",
+        deps,
+      ),
+    ).toEqual({
+      target: {
+        path: root,
+        rowId: makeRowId(root, "Fruit"),
+        colId: "name",
+      },
+      overflow: null,
+    });
+
+    expect(
+      resolveVisibleRowNavigation(
+        rt,
+        rt.coordinator,
+        { path: root, rowId: makeRowId(root, "Fruit"), colId: "name" },
+        { delta: -10 },
+        "preserve",
+        deps,
+      ),
+    ).toEqual({ target: null, overflow: "previous" });
+  });
+
+  it("PageDown overflows next from the last focusable row before a footer", () => {
     const rt = fakeRuntimeWithRows([
       dataRow("Fruit"),
       footerRow("total"),
@@ -478,7 +554,7 @@ describe("resolveVisibleRowNavigation", () => {
     expect(result).toEqual({ target: null, overflow: "next" });
   });
 
-  it("PageUp uses focusable reachability for previous overflow", () => {
+  it("PageUp overflows previous from the first focusable row after a footer", () => {
     const rt = fakeRuntimeWithRows([
       footerRow("opening-total"),
       dataRow("Fruit"),
@@ -530,7 +606,19 @@ describe("resolveRowSelectableNavigation", () => {
     expect(result).toEqual({ target: null, overflow: "previous" });
   });
 
-  it("PageDown and PageUp use row-selectable reachability", () => {
+  it("PageDown and PageUp clamp to row-selectable edges before overflow", () => {
+    const afterClamp = fakeRuntimeWithRows([
+      dataRow("Fruit"),
+      dataRow("Apple"),
+      dataRow("Banana"),
+      footerRow("total"),
+    ]);
+    const beforeClamp = fakeRuntimeWithRows([
+      footerRow("opening-total"),
+      dataRow("Fruit"),
+      dataRow("Apple"),
+      dataRow("Banana"),
+    ]);
     const after = fakeRuntimeWithRows([
       dataRow("Fruit"),
       footerRow("total"),
@@ -540,6 +628,28 @@ describe("resolveRowSelectableNavigation", () => {
       dataRow("Fruit"),
     ]);
 
+    expect(
+      resolveRowSelectableNavigation(
+        afterClamp,
+        afterClamp.coordinator,
+        { path: root, rowId: makeRowId(root, "Fruit") },
+        { delta: 10 },
+      ),
+    ).toEqual({
+      target: { path: root, rowId: makeRowId(root, "Banana") },
+      overflow: null,
+    });
+    expect(
+      resolveRowSelectableNavigation(
+        beforeClamp,
+        beforeClamp.coordinator,
+        { path: root, rowId: makeRowId(root, "Banana") },
+        { delta: -10 },
+      ),
+    ).toEqual({
+      target: { path: root, rowId: makeRowId(root, "Fruit") },
+      overflow: null,
+    });
     expect(
       resolveRowSelectableNavigation(
         after,

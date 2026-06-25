@@ -247,9 +247,8 @@ function deltaOverflow(
   const first = firstReachableIndex(steps, isReachable);
   const last = lastReachableIndex(steps, isReachable);
   if (first < 0 || last < 0) return delta < 0 ? "previous" : "next";
-  const targetIndex = fromIndex + delta;
-  if (delta < 0 && targetIndex < first) return "previous";
-  if (delta > 0 && targetIndex > last) return "next";
+  if (delta < 0 && fromIndex <= first) return "previous";
+  if (delta > 0 && fromIndex >= last) return "next";
   return null;
 }
 
