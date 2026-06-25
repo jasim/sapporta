@@ -71,6 +71,57 @@ const tree: TreeNode[] = [
   },
 ];
 
+const booksSchema: GridSchema = {
+  rootLevel: "books",
+  levels: {
+    books: {
+      name: "books",
+      columns: [
+        withRowExpansionColumn(testColumn("title", "Title")),
+        testColumn("author", "Author"),
+      ],
+      options: { rowKey: (n: TreeNode) => String(n.columns.id) },
+      childLevels: ["quotes"],
+    },
+    quotes: {
+      name: "quotes",
+      columns: [testColumn("text", "Quote")],
+      options: { rowKey: (n: TreeNode) => String(n.columns.id) },
+      childLevels: [],
+    },
+  },
+};
+
+const booksRoot = rootPath("books");
+const duneQuotes = childPath(booksRoot, "book-2", "quotes");
+
+const booksTree: TreeNode[] = [
+  {
+    levelName: "books",
+    columns: { id: "book-1", title: "Kindred", author: "Octavia Butler" },
+  },
+  {
+    levelName: "books",
+    columns: { id: "book-2", title: "Dune", author: "Frank Herbert" },
+    children: {
+      quotes: [
+        {
+          levelName: "quotes",
+          columns: { id: "quote-1", text: "Fear is the mind-killer." },
+        },
+        {
+          levelName: "quotes",
+          columns: { id: "quote-2", text: "The sleeper must awaken." },
+        },
+      ],
+    },
+  },
+  {
+    levelName: "books",
+    columns: { id: "book-3", title: "Piranesi", author: "Susanna Clarke" },
+  },
+];
+
 function setupExpanded() {
   const rt = setupCollapsed();
   rt.coordinator.toggleExpand(root, makeRowId(root, "Fruit"));
@@ -103,6 +154,31 @@ function setupRowList() {
     }),
     interaction: ROW_MULTISELECT_LIST,
   });
+}
+
+function setupPagedBooks() {
+  const rt = createGridRuntime({
+    schema: booksSchema,
+    dataSource: inMemoryGridDataSource({
+      schema: booksSchema,
+      tree: booksTree,
+      levels: {
+        books: {
+          sortMode: "none",
+          filterMode: "none",
+          paginationMode: "client",
+          initialPageSize: 2,
+        },
+        quotes: {
+          sortMode: "none",
+          filterMode: "none",
+          paginationMode: "none",
+        },
+      },
+    }),
+  });
+  rt.coordinator.toggleExpand(booksRoot, makeRowId(booksRoot, "book-2"));
+  return rt;
 }
 
 function pagedRootDataSource(
@@ -388,6 +464,36 @@ describe("GridCoordinator", () => {
       colId: "name",
     });
     expect(rt.sourceFor(root).snapshot().pagination?.page).toBe(0);
+  });
+
+  it("ArrowDown from the last child row of the last root page row turns the root page", () => {
+    const rt = setupPagedBooks();
+    expect(rt.sourceFor(booksRoot).snapshot().pagination?.page).toBe(0);
+    expect(
+      rt.displayedRowsFor(duneQuotes).rows.map((row) => row.columns.text),
+    ).toEqual(["Fear is the mind-killer.", "The sleeper must awaken."]);
+
+    rt.cursorManager.moveCellCursorTo({
+      path: duneQuotes,
+      rowId: makeRowId(duneQuotes, "quote-2"),
+      colId: "text",
+    });
+    rt.controllerFor(duneQuotes).flushEffects();
+
+    rt.controllerFor(duneQuotes).handleKey({
+      key: "ArrowDown",
+      ctrlKey: false,
+      metaKey: false,
+      shiftKey: false,
+      altKey: false,
+    } as KeyboardEvent);
+
+    expect(rt.sourceFor(booksRoot).snapshot().pagination?.page).toBe(1);
+    expect(rt.coordinator.getState().cellCursor).toEqual({
+      path: booksRoot,
+      rowId: makeRowId(booksRoot, "book-3"),
+      colId: "title",
+    });
   });
 
   it("PageDown first clamps to the last loaded cell, then turns to the next page", () => {

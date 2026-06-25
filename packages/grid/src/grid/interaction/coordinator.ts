@@ -37,7 +37,13 @@
 // For the four-channel invariant this wires into, see `index.ts`.
 
 import { createStore, type StoreApi } from "zustand/vanilla";
-import type { CellCursor, ColId, GridPath, RowId } from "../types/identity";
+import {
+  trailingEdge,
+  type CellCursor,
+  type ColId,
+  type GridPath,
+  type RowId,
+} from "../types/identity";
 import type { RowCursor } from "../types/row-selection";
 import type { LevelRowKind } from "../types/level-row";
 import type { RowCapabilities } from "../types/capabilities";
@@ -101,6 +107,10 @@ export type CreateCoordinatorArgs = {
   // the new paths on the next sample.
   onExpand?: (path: GridPath, rowId: RowId) => void;
 };
+
+type PageBoundaryRequest = Parameters<
+  GridRuntime["requestPageBoundaryNavigation"]
+>[0];
 
 export function createGridCoordinator(
   args: CreateCoordinatorArgs,
@@ -248,6 +258,36 @@ export function createGridCoordinator(
     return schema[nextIdx]?.id ?? null;
   }
 
+  function pageBoundaryCandidatePaths(path: GridPath): GridPath[] {
+    // When focus is inside expanded detail rows, the page the user sees may
+    // belong to an ancestor table. Example: a book row is expanded and focus is
+    // on that book's last quote. Pressing Down should first give the quote list
+    // a chance to page if quotes are independently paged, then give the books
+    // table a chance to show the next page of books.
+    const paths: GridPath[] = [];
+    let current: GridPath | null = path;
+    while (current) {
+      paths.push(current);
+      current = trailingEdge(current)?.parentPath ?? null;
+    }
+    return paths;
+  }
+
+  function requestPageBoundaryNavigation(
+    runtime: GridRuntime,
+    navigation: PageBoundaryRequest,
+  ): boolean {
+    // Ask nearest-to-farthest so nested tables keep their own paging behavior.
+    // If the focused detail list cannot page, the request climbs to the parent
+    // table instead of falling through to append-row behavior too early.
+    for (const path of pageBoundaryCandidatePaths(navigation.path)) {
+      if (runtime.requestPageBoundaryNavigation({ ...navigation, path })) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   function intentForCommit(
     target: Exclude<CommitTarget, "stay">,
     current: CellCursor,
@@ -370,7 +410,7 @@ export function createGridCoordinator(
     // a phantom row is the fallback only when the app cannot page forward.
     if (
       result.overflow &&
-      runtime.requestPageBoundaryNavigation({
+      requestPageBoundaryNavigation(runtime, {
         kind: "cell",
         path: fromPath,
         direction: result.overflow,
@@ -451,7 +491,7 @@ export function createGridCoordinator(
       // should not become the row cursor's landing target.
       if (
         result.overflow &&
-        runtime.requestPageBoundaryNavigation({
+        requestPageBoundaryNavigation(runtime, {
           kind: "row",
           path: fromPath,
           direction: result.overflow,
@@ -487,7 +527,7 @@ export function createGridCoordinator(
       // that edge can ask the app for the adjacent page.
       if (
         result.overflow &&
-        runtime.requestPageBoundaryNavigation({
+        requestPageBoundaryNavigation(runtime, {
           kind: "row",
           path: fromPath,
           direction: result.overflow,

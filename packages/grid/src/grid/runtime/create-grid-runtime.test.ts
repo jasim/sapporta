@@ -147,6 +147,30 @@ const reportTree: TreeNode[] = [
   },
 ];
 
+const booksSchema: GridSchema = {
+  rootLevel: "books",
+  levels: {
+    books: {
+      name: "books",
+      columns: [textColumn("title", "Title")],
+      options: {
+        rowKey: (n: TreeNode) => String(n.columns.id),
+        allowPhantoms: true,
+      },
+      childLevels: ["quotes"],
+    },
+    quotes: {
+      name: "quotes",
+      columns: [textColumn("text", "Quote")],
+      options: {
+        rowKey: (n: TreeNode) => String(n.columns.id),
+        allowPhantoms: true,
+      },
+      childLevels: [],
+    },
+  },
+};
+
 function tableDataSource() {
   return inMemoryGridDataSource({
     schema: tableSchema,
@@ -1405,6 +1429,111 @@ describe("GridRuntime", () => {
     ).toEqual(["c"]);
     expect(mutationCommitted).toHaveBeenCalledTimes(1);
     expect(phantomRowCommitted).toHaveBeenCalledTimes(1);
+  });
+
+  it("leaving a nonblank child-level phantom row creates one child row", async () => {
+    const booksRoot = rootPath("books");
+    const quotesPath = childPath(booksRoot, "book-1", "quotes");
+    const createQuoteNode = vi.fn<WritableLevelDataSource["createNode"]>(
+      async (node, atIndex) => ({
+        node: {
+          levelName: "quotes",
+          columns: { id: "quote-3", ...node.columns },
+        },
+        atIndex: atIndex ?? 2,
+      }),
+    );
+    const phantomRowCommitted = vi.fn();
+    const rt = createGridRuntime({
+      schema: booksSchema,
+      dataSource: {
+        rootSource: () =>
+          writableSourceWithCreate(vi.fn(), [
+            {
+              levelName: "books",
+              columns: { id: "book-1", title: "Dune" },
+            },
+          ]),
+        resolveChild: (parentPath, parentRowKey, childLevelName) => {
+          expect(parentPath).toBe(booksRoot);
+          expect(parentRowKey).toBe("book-1");
+          expect(childLevelName).toBe("quotes");
+          return writableSourceWithCreate(createQuoteNode, [
+            {
+              levelName: "quotes",
+              columns: { id: "quote-1", text: "Fear is the mind-killer." },
+            },
+            {
+              levelName: "quotes",
+              columns: { id: "quote-2", text: "The sleeper must awaken." },
+            },
+          ]);
+        },
+        dispose: () => {},
+      },
+      phantomRows: {},
+      on: { phantomRowCommitted },
+    });
+    rt.coordinator.toggleExpand(booksRoot, makeRowId(booksRoot, "book-1"));
+
+    rt.cursorManager.moveCellCursorTo({
+      path: quotesPath,
+      rowId: makeRowId(quotesPath, "quote-2"),
+      colId: "text",
+    });
+    rt.coordinator.navigateCell(quotesPath, {
+      type: "moveRow",
+      direction: "down",
+      colPolicy: "preserve",
+      extend: false,
+    });
+
+    expect(rt.phantoms.get(booksRoot)).toHaveLength(0);
+    const quotePhantoms = rt.phantoms.get(quotesPath);
+    expect(quotePhantoms).toHaveLength(1);
+    const phantomRow = quotePhantoms[0];
+    const phantomRowId = makeRowId(
+      quotesPath,
+      displayedPhantomRowKey(phantomRow.rowKey),
+    );
+    expect(rt.cursorManager.currentCellCursor()).toEqual({
+      path: quotesPath,
+      rowId: phantomRowId,
+      colId: "text",
+    });
+    expect(rt.displayedRowFor(quotesPath, phantomRowId)?.kind).toBe("phantom");
+
+    rt.writeCell(
+      quotesPath,
+      { rowId: phantomRowId, colId: "text" },
+      "The mystery of life isn't a problem to solve.",
+    );
+    expect(createQuoteNode).not.toHaveBeenCalled();
+
+    rt.cursorManager.clearCellCursor();
+    await flushMicrotasks();
+
+    expect(createQuoteNode).toHaveBeenCalledTimes(1);
+    expect(createQuoteNode).toHaveBeenCalledWith(
+      {
+        levelName: "quotes",
+        columns: { text: "The mystery of life isn't a problem to solve." },
+      },
+      undefined,
+    );
+    expect(rt.phantoms.get(quotesPath)).toHaveLength(0);
+    expect(phantomRowCommitted).toHaveBeenCalledWith({
+      path: quotesPath,
+      rowKey: phantomRow.rowKey,
+      node: {
+        levelName: "quotes",
+        columns: {
+          id: "quote-3",
+          text: "The mystery of life isn't a problem to solve.",
+        },
+      },
+      atIndex: 2,
+    });
   });
 
   it("double commitPhantomRow reuses the pending create", async () => {
