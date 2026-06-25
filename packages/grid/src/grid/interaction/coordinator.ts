@@ -49,7 +49,11 @@ import type {
 } from "../types/action";
 import type { GridRuntime } from "../runtime/create-grid-runtime";
 import type { CursorManager } from "./cursor-manager";
-import { nextRowSelectablePosition, nextVisibleRow } from "./visible-order";
+import {
+  nextRowSelectablePosition,
+  nextVisibleRow,
+  pageBoundaryDirectionForRowMovement,
+} from "./visible-order";
 import { firstFocusableRow } from "../types/level-row-traversal";
 
 export type CoordinatorState = {
@@ -360,6 +364,30 @@ export function createGridCoordinator(
       move.colPolicy,
       { capabilitiesFor: args.capabilitiesFor },
     );
+    const pageBoundaryDirection =
+      move.direction === "up" ||
+      move.direction === "down" ||
+      typeof move.direction === "object"
+        ? pageBoundaryDirectionForRowMovement(
+            runtime,
+            coordinatorStore,
+            { path: fromPath, rowId: cursor.rowId },
+            move.direction,
+          )
+        : null;
+    if (
+      pageBoundaryDirection &&
+      runtime.requestPageBoundaryNavigation({
+        kind: "cell",
+        path: fromPath,
+        direction: pageBoundaryDirection,
+        colId: cursor.colId,
+        colPolicy: move.colPolicy,
+        extend: move.extend,
+      })
+    ) {
+      return null;
+    }
     if (target) return target;
     return move.direction === "down"
       ? runtime.phantomBoundaryCellTarget(
@@ -425,6 +453,23 @@ export function createGridCoordinator(
         rowCursor,
         intent.direction,
       );
+      const pageBoundaryDirection = pageBoundaryDirectionForRowMovement(
+        runtime,
+        coordinatorStore,
+        rowCursor,
+        intent.direction,
+      );
+      if (
+        pageBoundaryDirection &&
+        runtime.requestPageBoundaryNavigation({
+          kind: "row",
+          path: fromPath,
+          direction: pageBoundaryDirection,
+          extend: intent.extend,
+        })
+      ) {
+        return null;
+      }
       if (target) return target;
       return intent.direction === "down"
         ? runtime.phantomBoundaryRowTarget(fromPath)
@@ -439,9 +484,33 @@ export function createGridCoordinator(
       );
     }
     if (intent.type === "moveActiveRowDelta") {
-      return nextRowSelectablePosition(runtime, coordinatorStore, rowCursor, {
-        delta: intent.delta,
-      });
+      const direction = { delta: intent.delta };
+      const target = nextRowSelectablePosition(
+        runtime,
+        coordinatorStore,
+        rowCursor,
+        {
+          delta: intent.delta,
+        },
+      );
+      const pageBoundaryDirection = pageBoundaryDirectionForRowMovement(
+        runtime,
+        coordinatorStore,
+        rowCursor,
+        direction,
+      );
+      if (
+        pageBoundaryDirection &&
+        runtime.requestPageBoundaryNavigation({
+          kind: "row",
+          path: fromPath,
+          direction: pageBoundaryDirection,
+          extend: intent.extend,
+        })
+      ) {
+        return null;
+      }
+      return target;
     }
     return null;
   }

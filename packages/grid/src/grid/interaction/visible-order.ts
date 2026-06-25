@@ -250,6 +250,26 @@ export function nextVisibleRow(
   return makeCursor(target, runtime, from.colId, colPolicy);
 }
 
+export function pageBoundaryDirectionForRowMovement(
+  runtime: GridRuntime,
+  coordinator: GridCoordinatorPublic,
+  from: VisibleRowPosition,
+  direction: "up" | "down" | { delta: number },
+): "previous" | "next" | null {
+  const steps = collect(runtime, coordinator);
+  const idx = indexOfStep(steps, from.path, from.rowId);
+  if (idx < 0) return null;
+  if (direction === "up") return idx === 0 ? "previous" : null;
+  if (direction === "down") {
+    return idx === steps.length - 1 ? "next" : null;
+  }
+  if (direction.delta < 0 && idx + direction.delta < 0) return "previous";
+  if (direction.delta > 0 && idx + direction.delta >= steps.length) {
+    return "next";
+  }
+  return null;
+}
+
 export function nextRowSelectablePosition(
   runtime: GridRuntime,
   coordinator: GridCoordinatorPublic,

@@ -97,6 +97,7 @@ type CompileTGridRuntimeConfigArgs<
   hostQueryState?: (
     levelId: TGridLevelId<RowsByLevel>,
   ) => TGridRowQueryState | undefined;
+  setHostPage?: (levelId: TGridLevelId<RowsByLevel>, page: number) => void;
   sessionContext?: () => TGridSessionContext<RowsByLevel, AppServices>;
 };
 
@@ -221,6 +222,10 @@ export function compileTGridRuntimeConfig<
       rowQueryState:
         queryConfig.owner === "host"
           ? () => args.hostQueryState?.(levelId)
+          : undefined,
+      setHostPage:
+        queryConfig.owner === "host"
+          ? (page) => args.setHostPage?.(levelId, page)
           : undefined,
       rowsClient,
       saveCellValueByColumn: columnBuild.saveCellValueByColumn,
@@ -349,6 +354,7 @@ function makeEndpointFactory(args: {
   };
   queryConfig: TGridLevelQueryConfig;
   rowQueryState?: () => TGridRowQueryState | undefined;
+  setHostPage?: (page: number) => void;
   rowsClient: TableRowsClient;
   saveCellValueByColumn: ReadonlyMap<
     ColId,
@@ -367,6 +373,8 @@ function makeEndpointFactory(args: {
     const parentRowKey = args.parent
       ? parentKeyFor(args.levelId, args.parent.parentLevelId, ctx.ancestors)
       : null;
+    let latestTotalCount: number | undefined;
+    let latestLoadedRowCount = 0;
     return {
       serverManaged: { sort: true, filter: true, pagination: true },
       query: makeQuery(
@@ -386,11 +394,40 @@ function makeEndpointFactory(args: {
           filters: req.filter?.conditions ?? [],
           search: req.filter?.search ?? undefined,
         } satisfies FetchTableRowsParams);
+        latestTotalCount = res.meta.total;
+        latestLoadedRowCount = res.data.length;
         return {
           nodes: buildTableTreeNodes(res.data, args.levelId),
           totalCount: res.meta.total,
         };
       },
+      pageBoundaryNavigation:
+        args.queryConfig.owner === "host" && args.setHostPage
+          ? {
+              canGoPrevious: () => {
+                const q = args.rowQueryState?.();
+                return q !== undefined && q.page > 1;
+              },
+              canGoNext: () => {
+                const q = args.rowQueryState?.();
+                if (!q) return false;
+                if (latestTotalCount !== undefined) {
+                  return q.page * q.pageSize < latestTotalCount;
+                }
+                return latestLoadedRowCount >= q.pageSize;
+              },
+              goPrevious: () => {
+                const q = args.rowQueryState?.();
+                if (!q || q.page <= 1) return;
+                args.setHostPage?.(q.page - 1);
+              },
+              goNext: () => {
+                const q = args.rowQueryState?.();
+                if (!q) return;
+                args.setHostPage?.(q.page + 1);
+              },
+            }
+          : undefined,
       patchCell: async (req) => {
         const saveCellValue = args.saveCellValueByColumn.get(req.colId);
         if (saveCellValue) {

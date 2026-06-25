@@ -150,6 +150,27 @@ describe("inMemoryLevelSource (writable)", () => {
     expect(snap.nodes[0].columns.id).toBe("r20");
   });
 
+  it("exposes page-boundary navigation when pagination is active", () => {
+    const many: TreeNode[] = Array.from({ length: 12 }, (_, i) => ({
+      levelName: "items",
+      columns: { id: `r${i}`, amount: i, name: `n${i}` },
+    }));
+    const src = inMemoryLevelSource(
+      baseOpts({ initialNodes: many, initialPage: 0, initialPageSize: 5 }),
+    );
+
+    expect(src.pageBoundaryNavigation?.canGoPrevious()).toBe(false);
+    expect(src.pageBoundaryNavigation?.canGoNext()).toBe(true);
+
+    src.pageBoundaryNavigation?.goNext();
+    expect(src.snapshot().pagination?.page).toBe(1);
+    expect(src.snapshot().nodes[0].columns.id).toBe("r5");
+
+    src.pageBoundaryNavigation?.goPrevious();
+    expect(src.snapshot().pagination?.page).toBe(0);
+    expect(src.snapshot().nodes[0].columns.id).toBe("r0");
+  });
+
   it("setPage rejects non-integer pagination windows", () => {
     const src = inMemoryLevelSource(
       baseOpts({ initialPage: 0, initialPageSize: 10 }),

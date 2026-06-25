@@ -59,6 +59,7 @@ import type {
   LevelDataSource,
   LevelSnapshot,
   LevelStatus,
+  PageBoundaryNavigation,
   PatchCellRequest,
   PatchCellResponse,
   ReadonlyLevelDataSource,
@@ -107,6 +108,8 @@ export type RestLevelSourceOpts<F = unknown> = {
   // schema's `LevelOptions.rowKey`; hosts wiring `restLevelSource` directly
   // can override. Defaults to array index.
   rowKey?: (node: TreeNode, localIdx: number) => RowKey;
+
+  pageBoundaryNavigation?: PageBoundaryNavigation;
 };
 
 export function restLevelSource<F = unknown>(
@@ -328,8 +331,46 @@ export function restLevelSource<F = unknown>(
     );
   }
 
+  function setSourceOwnedPage(p: number, ps: number): void {
+    if (hostOwned) return;
+    assertPageWindow(p, ps);
+    if (page === p && pageSize === ps) return;
+    page = p;
+    pageSize = ps;
+    if (opts.serverManaged.pagination) {
+      refetch();
+    } else {
+      emit();
+    }
+  }
+
   // Initial fetch — every REST source starts in `loading`.
   refetch();
+
+  function sourceOwnedPageBoundaryNavigation():
+    | PageBoundaryNavigation
+    | undefined {
+    if (hostOwned) return undefined;
+    return {
+      canGoPrevious: () => page > 0,
+      canGoNext: () => {
+        if (status !== "ready") return false;
+        if (!Number.isFinite(pageSize)) return false;
+        if (totalCount !== undefined) {
+          return (page + 1) * pageSize < totalCount;
+        }
+        return nodes.length >= pageSize;
+      },
+      goPrevious: () => {
+        if (page <= 0) return;
+        setSourceOwnedPage(page - 1, pageSize);
+      },
+      goNext: () => {
+        if (!Number.isFinite(pageSize)) return;
+        setSourceOwnedPage(page + 1, pageSize);
+      },
+    };
+  }
 
   const read: ReadonlyLevelDataSource = {
     writable: false,
@@ -371,18 +412,11 @@ export function restLevelSource<F = unknown>(
       }
     },
     setPage(p, ps) {
-      if (hostOwned) return;
-      assertPageWindow(p, ps);
-      if (page === p && pageSize === ps) return;
-      page = p;
-      pageSize = ps;
-      if (opts.serverManaged.pagination) {
-        refetch();
-      } else {
-        emit();
-      }
+      setSourceOwnedPage(p, ps);
     },
     refetch,
+    pageBoundaryNavigation:
+      opts.pageBoundaryNavigation ?? sourceOwnedPageBoundaryNavigation(),
     dispose() {
       disposed = true;
       // Bump tokens so any still-pending resolution short-circuits.
@@ -766,6 +800,7 @@ export function restLevelSource<F = unknown>(
     setFilter: read.setFilter,
     setPage: read.setPage,
     refetch: read.refetch,
+    pageBoundaryNavigation: read.pageBoundaryNavigation,
     dispose: read.dispose,
     setCell,
     applyChanges,

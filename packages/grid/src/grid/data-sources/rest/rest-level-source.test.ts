@@ -159,6 +159,31 @@ describe("restLevelSource — read surface", () => {
     ]);
   });
 
+  it("exposes source-owned page-boundary navigation", async () => {
+    const fetchPage = vi.fn(async (req: FetchPageRequest) => ({
+      nodes: fixtureNodes().slice(0, req.pageSize),
+      totalCount: 30,
+    }));
+    const src = restLevelSource(
+      baseOpts({
+        fetchPage,
+        initialPagination: { page: 0, pageSize: 10 },
+      }),
+    );
+    await flush();
+
+    expect(src.pageBoundaryNavigation?.canGoPrevious()).toBe(false);
+    expect(src.pageBoundaryNavigation?.canGoNext()).toBe(true);
+
+    src.pageBoundaryNavigation?.goNext();
+    expect(fetchPage).toHaveBeenLastCalledWith({ page: 1, pageSize: 10 });
+    await flush();
+    expect(src.snapshot().pagination?.page).toBe(1);
+
+    src.pageBoundaryNavigation?.goPrevious();
+    expect(fetchPage).toHaveBeenLastCalledWith({ page: 0, pageSize: 10 });
+  });
+
   it("setPage rejects non-integer pagination windows", () => {
     const src = restLevelSource(
       baseOpts({ initialPagination: { page: 0, pageSize: 10 } }),

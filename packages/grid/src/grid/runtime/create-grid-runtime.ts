@@ -94,6 +94,7 @@ import type {
   RowId,
   RowKey,
 } from "../types/identity";
+import type { ColPolicy } from "../types/action";
 import type { GridInteractionConfig } from "../types/interaction";
 import { normalizeInteraction } from "../interaction/normalize-interaction";
 import type {
@@ -148,10 +149,7 @@ import {
   type DisplayedRowsStore,
   type DisplayedRowsViewState,
 } from "../displayed-rows";
-import {
-  buildSchemaTopology,
-  type SchemaTopology,
-} from "../schema";
+import { buildSchemaTopology, type SchemaTopology } from "../schema";
 import {
   createGridController,
   type GridControllerPublic,
@@ -171,6 +169,10 @@ import { createEmitter, type GridEmitter, type GridEvents } from "./emitter";
 import type { PhantomChannel } from "../data-sources/types";
 import { createPhantomRowLifecycle } from "./phantom-row-lifecycle";
 import { rowsInSelection } from "../types/selection";
+import {
+  firstFocusableRow,
+  lastFocusableRow,
+} from "../types/level-row-traversal";
 
 export type RuntimeArgs = {
   schema: GridSchema;
@@ -280,6 +282,9 @@ export type GridRuntime = {
     colPolicy: "preserve" | "first" | "last",
   ) => CellCursor | null;
   phantomBoundaryRowTarget: (path: GridPath) => RowCursor | null;
+  requestPageBoundaryNavigation: (
+    navigation: PendingPageBoundaryNavigation,
+  ) => boolean;
 
   on: GridEmitter["on"];
   dispose: () => void;
@@ -301,6 +306,22 @@ type PendingPhantomCreate = {
   node: TreeNode;
   atIndex?: number;
 };
+
+type PendingPageBoundaryNavigation =
+  | {
+      kind: "cell";
+      path: GridPath;
+      direction: "next" | "previous";
+      colId: ColId;
+      colPolicy: ColPolicy;
+      extend: boolean;
+    }
+  | {
+      kind: "row";
+      path: GridPath;
+      direction: "next" | "previous";
+      extend: boolean;
+    };
 
 export function createGridRuntime(args: RuntimeArgs): GridRuntime {
   const { schema, dataSource } = args;
@@ -331,6 +352,8 @@ export function createGridRuntime(args: RuntimeArgs): GridRuntime {
   const reconcileUnsubs = new Map<GridPath, () => void>();
   const lastStatusByPath = new Map<GridPath, LevelStatus>();
   const pendingPhantomCreates = new Map<string, PendingPhantomCreate>();
+  let pendingPageBoundaryNavigation: PendingPageBoundaryNavigation | null =
+    null;
   const phantomLifecycle = createPhantomRowLifecycle({
     config: args.phantomRows,
     getSource: (path) => sources.get(path),
@@ -446,6 +469,7 @@ export function createGridRuntime(args: RuntimeArgs): GridRuntime {
       src.subscribe(() => {
         onSourceSnapshotChanged(root);
         invalidateDisplayedRows(root, { type: "source" });
+        resolvePendingPageBoundaryNavigation(root);
       }),
     );
     if (src.writable) {
@@ -481,6 +505,7 @@ export function createGridRuntime(args: RuntimeArgs): GridRuntime {
         src.subscribe(() => {
           onSourceSnapshotChanged(childPath);
           invalidateDisplayedRows(childPath, { type: "source" });
+          resolvePendingPageBoundaryNavigation(childPath);
         }),
       );
       if (src.writable) {
@@ -643,6 +668,111 @@ export function createGridRuntime(args: RuntimeArgs): GridRuntime {
     if (next !== current) controller.setRowSelection(next);
   }
 
+  function requestPageBoundaryNavigation(
+    navigation: PendingPageBoundaryNavigation,
+  ): boolean {
+    assertLive();
+    const src = sources.get(navigation.path);
+    const pageNavigation = src?.pageBoundaryNavigation;
+    if (!pageNavigation) return false;
+    const canTurn =
+      navigation.direction === "next"
+        ? pageNavigation.canGoNext()
+        : pageNavigation.canGoPrevious();
+    if (!canTurn) return false;
+    pendingPageBoundaryNavigation = navigation;
+    if (navigation.direction === "next") {
+      pageNavigation.goNext();
+    } else {
+      pageNavigation.goPrevious();
+    }
+    return true;
+  }
+
+  function resolvePendingPageBoundaryNavigation(path: GridPath): void {
+    const pending = pendingPageBoundaryNavigation;
+    if (!pending || pending.path !== path) return;
+
+    const snapshot = snapshotFor(path);
+    if (snapshot.status === "loading") return;
+    if (snapshot.status !== "ready") {
+      pendingPageBoundaryNavigation = null;
+      return;
+    }
+
+    if (pending.kind === "cell") {
+      const target = pendingPageBoundaryCellTarget(pending);
+      pendingPageBoundaryNavigation = null;
+      if (!target) return;
+      if (pending.extend) {
+        cursorManager.extendCellSelectionTo(target);
+      } else {
+        cursorManager.moveCellCursorTo(target);
+      }
+      controllerCursorPortFor(target.path).revealCell({
+        rowId: target.rowId,
+        colId: target.colId,
+      });
+      return;
+    }
+
+    const target = pendingPageBoundaryRowTarget(pending);
+    pendingPageBoundaryNavigation = null;
+    if (!target) return;
+    if (pending.extend) {
+      cursorManager.extendRowSelectionToCursor(target);
+    } else {
+      cursorManager.moveRowCursorTo(target);
+    }
+    controllerCursorPortFor(target.path).revealRow(target.rowId);
+  }
+
+  function pendingPageBoundaryCellTarget(
+    pending: Extract<PendingPageBoundaryNavigation, { kind: "cell" }>,
+  ): CellCursor | null {
+    const displayed = displayedRowsFor(pending.path);
+    const row =
+      pending.direction === "next"
+        ? firstFocusableRow(displayed, capabilitiesFor)
+        : lastFocusableRow(displayed, capabilitiesFor);
+    if (!row) return null;
+    const colId = resolvePendingPageBoundaryColumn(
+      schemaForPath(pending.path),
+      pending.colId,
+      pending.colPolicy,
+    );
+    return colId ? { path: pending.path, rowId: row.id, colId } : null;
+  }
+
+  function pendingPageBoundaryRowTarget(
+    pending: Extract<PendingPageBoundaryNavigation, { kind: "row" }>,
+  ): RowCursor | null {
+    const rows = displayedRowsFor(pending.path).rows;
+    if (pending.direction === "next") {
+      const row = rows.find((candidate) => candidate.rowSelectable);
+      return row ? { path: pending.path, rowId: row.id } : null;
+    }
+    for (let index = rows.length - 1; index >= 0; index -= 1) {
+      const row = rows[index];
+      if (row.rowSelectable) return { path: pending.path, rowId: row.id };
+    }
+    return null;
+  }
+
+  function resolvePendingPageBoundaryColumn(
+    levelSchema: LevelSchema,
+    sourceColId: ColId,
+    policy: ColPolicy,
+  ): ColId | null {
+    const columns = levelSchema.columns;
+    if (columns.length === 0) return null;
+    if (policy === "first") return columns[0].id;
+    if (policy === "last") return columns[columns.length - 1].id;
+    return columns.some((column) => column.id === sourceColId)
+      ? sourceColId
+      : columns[0].id;
+  }
+
   function sourceFor(path: GridPath): RuntimeLevelDataSource {
     assertLive();
     const src = sources.get(path);
@@ -682,6 +812,26 @@ export function createGridRuntime(args: RuntimeArgs): GridRuntime {
         assertLive();
         src.refetch();
       },
+      pageBoundaryNavigation: src.pageBoundaryNavigation
+        ? {
+            canGoPrevious: () => {
+              assertLive();
+              return src.pageBoundaryNavigation?.canGoPrevious() ?? false;
+            },
+            canGoNext: () => {
+              assertLive();
+              return src.pageBoundaryNavigation?.canGoNext() ?? false;
+            },
+            goPrevious: () => {
+              assertLive();
+              src.pageBoundaryNavigation?.goPrevious();
+            },
+            goNext: () => {
+              assertLive();
+              src.pageBoundaryNavigation?.goNext();
+            },
+          }
+        : undefined,
       onReconcile(fn) {
         assertLive();
         if (!src.writable) return () => {};
@@ -1342,6 +1492,7 @@ export function createGridRuntime(args: RuntimeArgs): GridRuntime {
     rowInteractionSnapshots.clear();
     schemaCache.clear();
     lastStatusByPath.clear();
+    pendingPageBoundaryNavigation = null;
     dataSource.dispose();
     emitter.clear();
   }
@@ -1384,6 +1535,7 @@ export function createGridRuntime(args: RuntimeArgs): GridRuntime {
     commitPhantomRow,
     phantomBoundaryCellTarget: phantomLifecycle.boundaryCellTarget,
     phantomBoundaryRowTarget: phantomLifecycle.boundaryRowTarget,
+    requestPageBoundaryNavigation,
     on: emitter.on,
     dispose,
   };

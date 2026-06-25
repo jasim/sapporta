@@ -55,6 +55,7 @@ import { defaultRowKey } from "../../pipeline/stages/build-data";
 import { assertBoundedInteger } from "@sapporta/shared/validation";
 import type {
   LevelSnapshot,
+  PageBoundaryNavigation,
   ReadonlyLevelDataSource,
   ReconcileEvent,
   WritableLevelDataSource,
@@ -290,6 +291,16 @@ function buildCore<F>(opts: InMemoryLevelSourceOpts<F>): Core<F> {
     return idx;
   }
 
+  function setClientPage(p: number, ps: number): void {
+    if (opts.paginationMode === "none") return;
+    assertPageWindow(p, ps);
+    if (page === p && pageSize === ps) return;
+    page = p;
+    pageSize = ps;
+    invalidate();
+    notify();
+  }
+
   function applyOne(rowKey: RowKey, colId: ColId, value: unknown): void {
     const baseIdx = lookupBaseIdx(rowKey);
     const node = baseNodes[baseIdx];
@@ -329,17 +340,32 @@ function buildCore<F>(opts: InMemoryLevelSourceOpts<F>): Core<F> {
       notify();
     },
     setPage(p, ps) {
-      if (opts.paginationMode === "none") return;
-      assertPageWindow(p, ps);
-      if (page === p && pageSize === ps) return;
-      page = p;
-      pageSize = ps;
-      invalidate();
-      notify();
+      setClientPage(p, ps);
     },
     refetch() {
       // No upstream — refetch is a no-op for in-memory sources.
     },
+    pageBoundaryNavigation:
+      opts.paginationMode === "client"
+        ? {
+            canGoPrevious: () => page > 0,
+            canGoNext: () => {
+              ensureFresh();
+              const totalCount = cachedSnapshot!.pagination?.totalCount ?? 0;
+              return Number.isFinite(pageSize)
+                ? (page + 1) * pageSize < totalCount
+                : false;
+            },
+            goPrevious: () => {
+              if (page <= 0) return;
+              setClientPage(page - 1, pageSize);
+            },
+            goNext: () => {
+              if (!Number.isFinite(pageSize)) return;
+              setClientPage(page + 1, pageSize);
+            },
+          }
+        : undefined,
     dispose() {
       disposed = true;
       subs.clear();
@@ -428,6 +454,7 @@ export function inMemoryLevelSource<F = unknown>(
     setFilter: core.read.setFilter,
     setPage: core.read.setPage,
     refetch: core.read.refetch,
+    pageBoundaryNavigation: core.read.pageBoundaryNavigation,
     dispose: core.read.dispose,
     setCell: core.setCell,
     applyChanges: core.applyChanges,
@@ -452,6 +479,7 @@ export function inMemoryReadonlyLevelSource<F = unknown>(
     setFilter: core.read.setFilter,
     setPage: core.read.setPage,
     refetch: core.read.refetch,
+    pageBoundaryNavigation: core.read.pageBoundaryNavigation,
     dispose: core.read.dispose,
   };
 }

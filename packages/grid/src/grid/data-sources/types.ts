@@ -177,6 +177,13 @@ export type ReconcileEvent =
       priorValue: unknown;
     };
 
+export type PageBoundaryNavigation = {
+  canGoPrevious(): boolean;
+  canGoNext(): boolean;
+  goPrevious(): void;
+  goNext(): void;
+};
+
 // Read surface — every source has this. Sources that cannot mutate stop
 // here. The grid statically knows not to show edit affordances for them.
 //
@@ -206,6 +213,7 @@ export type ReadonlyLevelDataSource = {
   setFilter: (f?: unknown) => void;
   setPage: (page: number, pageSize: number) => void;
   refetch: () => void;
+  pageBoundaryNavigation?: PageBoundaryNavigation;
   // Tear down the source. After dispose, `subscribe` callbacks must NOT
   // fire — the source is expected to drop its subscriber list on dispose
   // rather than emit a final synthetic event.

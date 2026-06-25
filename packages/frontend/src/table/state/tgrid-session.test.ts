@@ -1,8 +1,10 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { TableSchema } from "@sapporta/shared/contracts";
 import { eqCondition } from "@sapporta/shared/filter";
+import { makeRowId, rootPath } from "@sapporta/grid";
 import { createTGridSession } from "./tgrid-session";
 import { defineTGrid } from "@/table/grid-adapter/tgrid-runtime-config";
+import type { TableRowsClient } from "@/table/grid-adapter/tgrid-level-config";
 
 type OrderRow = {
   id: number;
@@ -26,6 +28,10 @@ const ordersTable: TableSchema = {
   ],
   children: [],
 };
+
+async function flush(): Promise<void> {
+  for (let i = 0; i < 5; i += 1) await Promise.resolve();
+}
 
 describe("TGridSession", () => {
   it("uses level initial filters when no route query seed is provided", () => {
@@ -189,6 +195,71 @@ describe("TGridSession", () => {
       expect(url.pathname).toBe("/api/tables/orders/export.csv");
       expect(url.searchParams.get("filter[status][eq]")).toBe("open");
       expect(url.searchParams.get("filter[customer][eq]")).toBe("ACME");
+    } finally {
+      session.dispose();
+    }
+  });
+
+  it("uses the query-store page path for keyboard page-boundary navigation", async () => {
+    const rowsClient: TableRowsClient = {
+      fetch: vi.fn(async ({ page }) => ({
+        data:
+          page === 1
+            ? [{ id: 1, customer: "Acme", status: "open" }]
+            : [{ id: 2, customer: "Beta", status: "open" }],
+        meta: { total: 2, page, limit: 1, pages: 2 },
+      })),
+      create: vi.fn(async (_table, data) => ({ data })),
+      update: vi.fn(async (_table, _id, data) => ({ data })),
+      remove: vi.fn(async (_table, id) => ({ data: { id } })),
+    };
+    const definition = defineTGrid<RowsByLevel>({
+      rootLevel: "orders",
+      levels: {
+        orders: {
+          table: ordersTable,
+          childLevels: [],
+          query: { owner: "host", pageSize: 1 },
+          rowsClient,
+        },
+      },
+    });
+    const onQueryUrlChange = vi.fn();
+    const session = createTGridSession<RowsByLevel>(definition, {
+      onQueryUrlChange,
+    });
+
+    try {
+      await flush();
+      const path = rootPath("orders");
+      session.runtime.cursorManager.moveCellCursorTo({
+        path,
+        rowId: makeRowId(path, "1"),
+        colId: "customer",
+      });
+
+      session.runtime.controllerFor(path).handleKey({
+        key: "ArrowDown",
+        ctrlKey: false,
+        metaKey: false,
+        shiftKey: false,
+        altKey: false,
+      } as KeyboardEvent);
+      await flush();
+
+      expect(session.getQueryState().page).toBe(2);
+      expect(onQueryUrlChange).toHaveBeenCalledWith({
+        level: "orders",
+        page: 2,
+        sort: [],
+        filters: [],
+        search: null,
+      });
+      expect(session.runtime.coordinator.getState().cellCursor).toEqual({
+        path,
+        rowId: makeRowId(path, "2"),
+        colId: "customer",
+      });
     } finally {
       session.dispose();
     }

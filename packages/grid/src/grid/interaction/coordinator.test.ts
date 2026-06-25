@@ -2,10 +2,16 @@ import { describe, expect, it } from "vitest";
 import { createGridRuntime } from "../runtime/create-grid-runtime";
 import type { GridRuntime } from "../runtime/create-grid-runtime";
 import { inMemoryGridDataSource } from "../data-sources/memory/in-memory-grid-source";
+import type {
+  GridDataSource,
+  LevelDataSource,
+  LevelSnapshot,
+} from "../data-sources/types";
 import { childPath, makeRowId, rootPath } from "../types/identity";
 import type { GridPath, RowId } from "../types/identity";
 import type { TreeNode } from "../types/level-row";
 import type { GridSchema } from "../types/schema";
+import type { GridInteractionConfig } from "../types/interaction";
 import { ROW_MULTISELECT_LIST } from "../types/interaction";
 import { withRowExpansionColumn } from "../react/cells/ExpandableCellFrame";
 
@@ -96,6 +102,80 @@ function setupRowList() {
       },
     }),
     interaction: ROW_MULTISELECT_LIST,
+  });
+}
+
+function pagedRootDataSource(pages: TreeNode[][]): GridDataSource {
+  let page = 0;
+  let snapshot: LevelSnapshot = {
+    status: "ready",
+    nodes: pages[page],
+    pagination: { page, pageSize: 1, totalCount: pages.length },
+    serverManaged: { sort: true, filter: true, pagination: true },
+  };
+  const subscribers = new Set<() => void>();
+  const publish = () => {
+    snapshot = {
+      status: "ready",
+      nodes: pages[page],
+      pagination: { page, pageSize: 1, totalCount: pages.length },
+      serverManaged: { sort: true, filter: true, pagination: true },
+    };
+    for (const subscriber of subscribers) subscriber();
+  };
+  const source: LevelDataSource = {
+    writable: false,
+    snapshot: () => snapshot,
+    subscribe: (fn) => {
+      subscribers.add(fn);
+      return () => {
+        subscribers.delete(fn);
+      };
+    },
+    setSort: () => {},
+    setFilter: () => {},
+    setPage: (nextPage) => {
+      page = nextPage;
+      publish();
+    },
+    refetch: () => {},
+    pageBoundaryNavigation: {
+      canGoPrevious: () => page > 0,
+      canGoNext: () => page < pages.length - 1,
+      goPrevious: () => {
+        if (page > 0) {
+          page -= 1;
+          publish();
+        }
+      },
+      goNext: () => {
+        if (page < pages.length - 1) {
+          page += 1;
+          publish();
+        }
+      },
+    },
+    dispose: () => {
+      subscribers.clear();
+    },
+  };
+  return {
+    rootSource: () => source,
+    resolveChild: () => {
+      throw new Error("not used");
+    },
+    dispose: source.dispose,
+  };
+}
+
+function pagedRuntime(interaction?: GridInteractionConfig) {
+  return createGridRuntime({
+    schema: reportSchema,
+    dataSource: pagedRootDataSource([
+      [{ levelName: "cat", columns: { name: "Fruit" } }],
+      [{ levelName: "cat", columns: { name: "Veg" } }],
+    ]),
+    interaction,
   });
 }
 
@@ -230,6 +310,116 @@ describe("GridCoordinator", () => {
     expect(rowList.controllerFor(root).effects.getState()).toContainEqual({
       type: "scrollRowIntoView",
       rowId: secondRowId,
+    });
+  });
+
+  it("ArrowDown at the last loaded cell turns to the next page and focuses its first row", () => {
+    const rt = pagedRuntime();
+    const first = {
+      path: root,
+      rowId: makeRowId(root, "Fruit"),
+      colId: "name" as const,
+    };
+    rt.cursorManager.moveCellCursorTo(first);
+    rt.controllerFor(root).flushEffects();
+
+    rt.controllerFor(root).handleKey({
+      key: "ArrowDown",
+      ctrlKey: false,
+      metaKey: false,
+      shiftKey: false,
+      altKey: false,
+    } as KeyboardEvent);
+
+    const second = makeRowId(root, "Veg");
+    expect(rt.coordinator.getState().cellCursor).toEqual({
+      path: root,
+      rowId: second,
+      colId: "name",
+    });
+    expect(rt.sourceFor(root).snapshot().pagination?.page).toBe(1);
+    expect(rt.controllerFor(root).effects.getState()).toContainEqual({
+      type: "scrollFocusIntoView",
+      coord: { rowId: second, colId: "name" },
+    });
+  });
+
+  it("ArrowUp at the first loaded cell turns to the previous page and focuses its last row", () => {
+    const rt = pagedRuntime();
+    rt.sourceFor(root).pageBoundaryNavigation?.goNext();
+    const second = {
+      path: root,
+      rowId: makeRowId(root, "Veg"),
+      colId: "name" as const,
+    };
+    rt.cursorManager.moveCellCursorTo(second);
+    rt.controllerFor(root).flushEffects();
+
+    rt.controllerFor(root).handleKey({
+      key: "ArrowUp",
+      ctrlKey: false,
+      metaKey: false,
+      shiftKey: false,
+      altKey: false,
+    } as KeyboardEvent);
+
+    const first = makeRowId(root, "Fruit");
+    expect(rt.coordinator.getState().cellCursor).toEqual({
+      path: root,
+      rowId: first,
+      colId: "name",
+    });
+    expect(rt.sourceFor(root).snapshot().pagination?.page).toBe(0);
+  });
+
+  it("PageDown overflow turns the page instead of clamping to the last loaded row", () => {
+    const rt = pagedRuntime();
+    const first = {
+      path: root,
+      rowId: makeRowId(root, "Fruit"),
+      colId: "name" as const,
+    };
+    rt.cursorManager.moveCellCursorTo(first);
+
+    rt.controllerFor(root).handleKey({
+      key: "PageDown",
+      ctrlKey: false,
+      metaKey: false,
+      shiftKey: false,
+      altKey: false,
+    } as KeyboardEvent);
+
+    expect(rt.coordinator.getState().cellCursor?.rowId).toBe(
+      makeRowId(root, "Veg"),
+    );
+    expect(rt.sourceFor(root).snapshot().pagination?.page).toBe(1);
+  });
+
+  it("row-list ArrowDown at the last loaded row turns to the next page", () => {
+    const rt = pagedRuntime(ROW_MULTISELECT_LIST);
+    rt.cursorManager.moveRowCursorTo({
+      path: root,
+      rowId: makeRowId(root, "Fruit"),
+    });
+    rt.controllerFor(root).flushEffects();
+
+    rt.controllerFor(root).handleKey({
+      key: "ArrowDown",
+      ctrlKey: false,
+      metaKey: false,
+      shiftKey: false,
+      altKey: false,
+    } as KeyboardEvent);
+
+    const second = makeRowId(root, "Veg");
+    expect(rt.coordinator.getState().rowCursor).toEqual({
+      path: root,
+      rowId: second,
+    });
+    expect(rt.sourceFor(root).snapshot().pagination?.page).toBe(1);
+    expect(rt.controllerFor(root).effects.getState()).toContainEqual({
+      type: "scrollRowIntoView",
+      rowId: second,
     });
   });
 

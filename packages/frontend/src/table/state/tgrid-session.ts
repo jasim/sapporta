@@ -219,6 +219,9 @@ class DefaultTGridSession<
           search: state.search,
         };
       },
+      setHostPage: (levelId, page) => {
+        this.queryStoresByLevel.get(levelId)?.getState().setPage(page);
+      },
       sessionContext: this.currentSessionContext,
     });
 

@@ -425,6 +425,7 @@ export type {
   CellChange,
   CreateNodeResult,
   ReconcileEvent,
+  PageBoundaryNavigation,
   ReadonlyLevelDataSource,
   WritableLevelDataSource,
   LevelDataSource,
