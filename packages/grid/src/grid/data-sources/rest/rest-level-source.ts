@@ -352,7 +352,7 @@ export function restLevelSource<F = unknown>(
     | undefined {
     if (hostOwned) return undefined;
     return {
-      canGoPrevious: () => page > 0,
+      canGoPrevious: () => status === "ready" && page > 0,
       canGoNext: () => {
         if (status !== "ready") return false;
         if (!Number.isFinite(pageSize)) return false;
@@ -362,10 +362,12 @@ export function restLevelSource<F = unknown>(
         return nodes.length >= pageSize;
       },
       goPrevious: () => {
+        if (status !== "ready") return;
         if (page <= 0) return;
         setSourceOwnedPage(page - 1, pageSize);
       },
       goNext: () => {
+        if (status !== "ready") return;
         if (!Number.isFinite(pageSize)) return;
         setSourceOwnedPage(page + 1, pageSize);
       },

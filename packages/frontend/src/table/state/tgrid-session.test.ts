@@ -33,6 +33,20 @@ async function flush(): Promise<void> {
   for (let i = 0; i < 5; i += 1) await Promise.resolve();
 }
 
+function deferred<T>(): {
+  promise: Promise<T>;
+  resolve: (value: T) => void;
+  reject: (err: unknown) => void;
+} {
+  let resolve!: (value: T) => void;
+  let reject!: (err: unknown) => void;
+  const promise = new Promise<T>((res, rej) => {
+    resolve = res;
+    reject = rej;
+  });
+  return { promise, resolve, reject };
+}
+
 describe("TGridSession", () => {
   it("uses level initial filters when no route query seed is provided", () => {
     const initialFilter = eqCondition("status", "open");
@@ -260,6 +274,119 @@ describe("TGridSession", () => {
         rowId: makeRowId(path, "2"),
         colId: "customer",
       });
+    } finally {
+      session.dispose();
+    }
+  });
+
+  it("does not advance host-owned page navigation again while the source is loading", async () => {
+    const page2 = deferred<Awaited<ReturnType<TableRowsClient["fetch"]>>>();
+    const page3 = deferred<Awaited<ReturnType<TableRowsClient["fetch"]>>>();
+    const rowsClient: TableRowsClient = {
+      fetch: vi.fn(async ({ page }) => {
+        if (page === 1) {
+          return {
+            data: [{ id: 1, customer: "Acme", status: "open" }],
+            meta: { total: 3, page, limit: 1, pages: 3 },
+          };
+        }
+        if (page === 2) return page2.promise;
+        if (page === 3) return page3.promise;
+        return {
+          data: [],
+          meta: { total: 3, page, limit: 1, pages: 3 },
+        };
+      }),
+      create: vi.fn(async (_table, data) => ({ data })),
+      update: vi.fn(async (_table, _id, data) => ({ data })),
+      remove: vi.fn(async (_table, id) => ({ data: { id } })),
+    };
+    const definition = defineTGrid<RowsByLevel>({
+      rootLevel: "orders",
+      levels: {
+        orders: {
+          table: ordersTable,
+          childLevels: [],
+          query: { owner: "host", pageSize: 1 },
+          rowsClient,
+        },
+      },
+    });
+    const onQueryUrlChange = vi.fn();
+    const session = createTGridSession<RowsByLevel>(definition, {
+      onQueryUrlChange,
+    });
+
+    try {
+      await flush();
+      const path = rootPath("orders");
+      session.runtime.cursorManager.moveCellCursorTo({
+        path,
+        rowId: makeRowId(path, "1"),
+        colId: "customer",
+      });
+
+      session.runtime.controllerFor(path).handleKey({
+        key: "ArrowDown",
+        ctrlKey: false,
+        metaKey: false,
+        shiftKey: false,
+        altKey: false,
+      } as KeyboardEvent);
+      await flush();
+
+      expect(session.getQueryState().page).toBe(2);
+      expect(rowsClient.fetch).toHaveBeenCalledTimes(2);
+
+      session.runtime.controllerFor(path).handleKey({
+        key: "ArrowDown",
+        ctrlKey: false,
+        metaKey: false,
+        shiftKey: false,
+        altKey: false,
+      } as KeyboardEvent);
+      await flush();
+
+      expect(session.getQueryState().page).toBe(2);
+      expect(rowsClient.fetch).toHaveBeenCalledTimes(2);
+      expect(onQueryUrlChange).toHaveBeenCalledTimes(1);
+
+      page2.resolve({
+        data: [{ id: 2, customer: "Beta", status: "open" }],
+        meta: { total: 3, page: 2, limit: 1, pages: 3 },
+      });
+      await flush();
+
+      expect(session.runtime.coordinator.getState().cellCursor).toEqual({
+        path,
+        rowId: makeRowId(path, "2"),
+        colId: "customer",
+      });
+
+      session.runtime.controllerFor(path).handleKey({
+        key: "ArrowDown",
+        ctrlKey: false,
+        metaKey: false,
+        shiftKey: false,
+        altKey: false,
+      } as KeyboardEvent);
+      await flush();
+
+      expect(session.getQueryState().page).toBe(3);
+      expect(rowsClient.fetch).toHaveBeenCalledTimes(3);
+      expect(onQueryUrlChange).toHaveBeenLastCalledWith({
+        level: "orders",
+        page: 3,
+        sort: [],
+        filters: [],
+        search: null,
+      });
+
+      page3.resolve({
+        data: [{ id: 3, customer: "Core", status: "open" }],
+        meta: { total: 3, page: 3, limit: 1, pages: 3 },
+      });
+      await flush();
     } finally {
       session.dispose();
     }

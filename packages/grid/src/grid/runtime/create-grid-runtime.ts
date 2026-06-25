@@ -25,7 +25,7 @@
 //
 //   3. STRUCTURAL — `GridCoordinator`, one Zustand store per runtime.
 //      Cross-path concerns: expansion and active path. Boundary
-//      navigation resolves on demand through `nextVisibleRow` and
+//      navigation resolves on demand through visible-order helpers and
 //      dispatches focus directly to the target controller — no
 //      pendingFocus mailbox.
 //
@@ -673,7 +673,9 @@ export function createGridRuntime(args: RuntimeArgs): GridRuntime {
   ): boolean {
     assertLive();
     const src = sources.get(navigation.path);
-    const pageNavigation = src?.pageBoundaryNavigation;
+    if (!src) return false;
+    if (src.snapshot().status !== "ready") return false;
+    const pageNavigation = src.pageBoundaryNavigation;
     if (!pageNavigation) return false;
     const canTurn =
       navigation.direction === "next"

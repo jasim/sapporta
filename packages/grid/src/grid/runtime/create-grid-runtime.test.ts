@@ -1090,6 +1090,171 @@ describe("GridRuntime", () => {
     expect(rt.cursorManager.currentCellCursor()).toEqual(lastPageRowCursor);
   });
 
+  it("ArrowDown before a footer turns the page instead of creating a phantom", () => {
+    const source = writableSourceFromSnapshot({
+      status: "ready",
+      nodes: [
+        { levelName: "rows", columns: { id: "b", name: "Banana", qty: 2 } },
+      ],
+      footerRows: [{ rowKey: "total", columns: { qty: 2 } }],
+      pagination: { page: 0, pageSize: 1, totalCount: 2 },
+      serverManaged: { sort: true, filter: true, pagination: true },
+    });
+    const goNext = vi.fn();
+    source.pageBoundaryNavigation = {
+      canGoPrevious: () => false,
+      canGoNext: () => true,
+      goPrevious: () => {},
+      goNext,
+    };
+    const rt = createGridRuntime({
+      schema: tableSchema,
+      dataSource: dataSourceWithRoot(source),
+      phantomRows: {},
+    });
+    const lastDataCursor = {
+      path: rowsRoot,
+      rowId: makeRowId(rowsRoot, "b"),
+      colId: "qty",
+    };
+    rt.cursorManager.moveCellCursorTo(lastDataCursor);
+
+    rt.coordinator.navigateCell(rowsRoot, {
+      type: "moveRow",
+      direction: "down",
+      colPolicy: "preserve",
+      extend: false,
+    });
+
+    expect(rt.phantoms.get(rowsRoot)).toHaveLength(0);
+    expect(goNext).toHaveBeenCalledOnce();
+    expect(rt.cursorManager.currentCellCursor()).toEqual(lastDataCursor);
+  });
+
+  it("requestPageBoundaryNavigation returns false while the source snapshot is loading", () => {
+    const pageNavigation = {
+      canGoPrevious: vi.fn(() => false),
+      canGoNext: vi.fn(() => true),
+      goPrevious: vi.fn(),
+      goNext: vi.fn(),
+    };
+    const mutable = mutableWritableSource({
+      status: "loading",
+      nodes: tableNodes(),
+      pagination: { page: 0, pageSize: 2, totalCount: 4 },
+      serverManaged: { sort: true, filter: true, pagination: true },
+    });
+    mutable.source.pageBoundaryNavigation = pageNavigation;
+    const rt = createGridRuntime({
+      schema: tableSchema,
+      dataSource: dataSourceWithRoot(mutable.source),
+    });
+
+    const accepted = rt.requestPageBoundaryNavigation({
+      kind: "cell",
+      path: rowsRoot,
+      direction: "next",
+      colId: "name",
+      colPolicy: "preserve",
+      extend: false,
+    });
+
+    expect(accepted).toBe(false);
+    expect(pageNavigation.canGoNext).not.toHaveBeenCalled();
+    expect(pageNavigation.goNext).not.toHaveBeenCalled();
+  });
+
+  it("does not record pending page-boundary navigation while loading", () => {
+    const mutable = mutableWritableSource({
+      status: "loading",
+      nodes: tableNodes(),
+      pagination: { page: 0, pageSize: 2, totalCount: 4 },
+      serverManaged: { sort: true, filter: true, pagination: true },
+    });
+    mutable.source.pageBoundaryNavigation = {
+      canGoPrevious: () => false,
+      canGoNext: () => true,
+      goPrevious: () => {},
+      goNext: () => {},
+    };
+    const rt = createGridRuntime({
+      schema: tableSchema,
+      dataSource: dataSourceWithRoot(mutable.source),
+    });
+
+    expect(
+      rt.requestPageBoundaryNavigation({
+        kind: "cell",
+        path: rowsRoot,
+        direction: "next",
+        colId: "name",
+        colPolicy: "preserve",
+        extend: false,
+      }),
+    ).toBe(false);
+
+    mutable.publish({
+      status: "ready",
+      nodes: [
+        { levelName: "rows", columns: { id: "c", name: "Cherry", qty: 3 } },
+      ],
+      pagination: { page: 1, pageSize: 2, totalCount: 4 },
+      serverManaged: { sort: true, filter: true, pagination: true },
+    });
+
+    expect(rt.cursorManager.currentCellCursor()).toBeNull();
+  });
+
+  it("ready page-boundary navigation records and resolves focus on the new page", () => {
+    const mutable = mutableWritableSource({
+      status: "ready",
+      nodes: [
+        { levelName: "rows", columns: { id: "b", name: "Banana", qty: 2 } },
+      ],
+      pagination: { page: 0, pageSize: 1, totalCount: 2 },
+      serverManaged: { sort: true, filter: true, pagination: true },
+    });
+    mutable.source.pageBoundaryNavigation = {
+      canGoPrevious: () => false,
+      canGoNext: () => true,
+      goPrevious: () => {},
+      goNext: () => {
+        mutable.publish({
+          status: "ready",
+          nodes: [
+            {
+              levelName: "rows",
+              columns: { id: "c", name: "Cherry", qty: 3 },
+            },
+          ],
+          pagination: { page: 1, pageSize: 1, totalCount: 2 },
+          serverManaged: { sort: true, filter: true, pagination: true },
+        });
+      },
+    };
+    const rt = createGridRuntime({
+      schema: tableSchema,
+      dataSource: dataSourceWithRoot(mutable.source),
+    });
+
+    expect(
+      rt.requestPageBoundaryNavigation({
+        kind: "cell",
+        path: rowsRoot,
+        direction: "next",
+        colId: "qty",
+        colPolicy: "preserve",
+        extend: false,
+      }),
+    ).toBe(true);
+
+    expect(rt.cursorManager.currentCellCursor()).toEqual({
+      path: rowsRoot,
+      rowId: makeRowId(rowsRoot, "c"),
+      colId: "qty",
+    });
+  });
+
   it("ArrowDown at the final datasource row of a paginated source creates a phantom", () => {
     const source = writableSourceFromSnapshot({
       status: "ready",

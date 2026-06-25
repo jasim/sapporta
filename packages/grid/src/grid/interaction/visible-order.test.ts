@@ -1,15 +1,21 @@
 import { describe, expect, it } from "vitest";
 import {
   nextColumn,
-  nextVisibleRow,
+  resolveRowSelectableNavigation,
+  resolveVisibleRowNavigation,
   visibleRows,
   type VisibleCursor,
 } from "./visible-order";
 import { capabilitiesFor } from "../types/capabilities";
 import { createGridRuntime } from "../runtime/create-grid-runtime";
+import type { GridRuntime } from "../runtime/create-grid-runtime";
 import { inMemoryGridDataSource } from "../data-sources/memory/in-memory-grid-source";
 import { childPath, makeRowId, rootPath } from "../types/identity";
+import type { GridPath, RowId } from "../types/identity";
 import type { TreeNode } from "../types/level-row";
+import type { LevelRow } from "../types/level-row";
+import { buildSchemaTopology } from "../schema";
+import type { ColPolicy, RowDirection } from "../types/action";
 import type { GridSchema } from "../types/schema";
 
 const testColumn = (id: string, name: string) => ({
@@ -78,6 +84,83 @@ function setup({ expand = [] as string[] } = {}) {
 
 const deps = { capabilitiesFor };
 
+function cellTarget(
+  runtime: GridRuntime,
+  coordinator: GridRuntime["coordinator"],
+  from: VisibleCursor,
+  dir: RowDirection,
+  colPolicy: ColPolicy,
+  resolveDeps: typeof deps,
+): VisibleCursor | null {
+  return resolveVisibleRowNavigation(
+    runtime,
+    coordinator,
+    from,
+    dir,
+    colPolicy,
+    resolveDeps,
+  ).target;
+}
+
+function fakeRuntimeWithRows(rows: LevelRow[]): GridRuntime {
+  const rowById = new Map<RowId, LevelRow>();
+  const rowIndexById = new Map<RowId, number>();
+  rows.forEach((row, index) => {
+    rowById.set(row.id, row);
+    rowIndexById.set(row.id, index);
+  });
+  const runtime = {
+    schema: reportSchema,
+    schemaTopology: buildSchemaTopology(reportSchema),
+    coordinator: {
+      getState: () => ({
+        cellCursor: null,
+        rowCursor: null,
+        expansion: new Map<GridPath, Set<RowId>>(),
+      }),
+      getInitialState: () => ({
+        cellCursor: null,
+        rowCursor: null,
+        expansion: new Map<GridPath, Set<RowId>>(),
+      }),
+      subscribe: () => () => {},
+      toggleExpand: () => {},
+      navigateCell: () => {},
+      navigateRow: () => {},
+    },
+    displayedRowsFor: () => ({
+      rows,
+      rowById,
+      rowIndexById,
+    }),
+    materializedChildren: () => [],
+    snapshotFor: () => ({ status: "ready", nodes: [] }),
+    schemaAt: () => reportSchema.levels.cat,
+  };
+  return runtime as unknown as GridRuntime;
+}
+
+function dataRow(rowKey: string): LevelRow {
+  return {
+    kind: "data",
+    id: makeRowId(root, rowKey),
+    rowSelectable: true,
+    columns: { name: rowKey },
+    hasChildren: false,
+    source: { levelName: "cat", columns: { name: rowKey } },
+  };
+}
+
+function footerRow(rowKey: string): LevelRow {
+  return {
+    kind: "footer",
+    id: makeRowId(root, rowKey),
+    rowSelectable: false,
+    columns: { name: rowKey },
+    source: { rowKey, columns: { name: rowKey } },
+  };
+}
+
 describe("visibleRows", () => {
   it("yields only the parent rows when nothing is expanded", () => {
     const rt = setup();
@@ -125,7 +208,7 @@ describe("visibleRows", () => {
   });
 });
 
-describe("nextVisibleRow", () => {
+describe("resolveVisibleRowNavigation", () => {
   it("ArrowDown from a parent row enters its expanded child", () => {
     const rt = setup({ expand: ["Fruit"] });
     const from: VisibleCursor = {
@@ -133,7 +216,7 @@ describe("nextVisibleRow", () => {
       rowId: makeRowId(root, "Fruit"),
       colId: "name",
     };
-    const next = nextVisibleRow(
+    const next = cellTarget(
       rt,
       rt.coordinator,
       from,
@@ -155,7 +238,7 @@ describe("nextVisibleRow", () => {
       rowId: makeRowId(fruitItems, "Banana"),
       colId: "name",
     };
-    const next = nextVisibleRow(
+    const next = cellTarget(
       rt,
       rt.coordinator,
       from,
@@ -177,7 +260,7 @@ describe("nextVisibleRow", () => {
       rowId: makeRowId(root, "Veg"),
       colId: "name",
     };
-    const next = nextVisibleRow(
+    const next = cellTarget(
       rt,
       rt.coordinator,
       from,
@@ -199,7 +282,7 @@ describe("nextVisibleRow", () => {
       rowId: makeRowId(vegItems, "Carrot"),
       colId: "name",
     };
-    const next = nextVisibleRow(
+    const next = cellTarget(
       rt,
       rt.coordinator,
       from,
@@ -221,7 +304,7 @@ describe("nextVisibleRow", () => {
       rowId: makeRowId(root, "Fruit"),
       colId: "name",
     };
-    const next = nextVisibleRow(
+    const next = cellTarget(
       rt,
       rt.coordinator,
       from,
@@ -243,7 +326,7 @@ describe("nextVisibleRow", () => {
       rowId: makeRowId(root, "Fruit"),
       colId: "name", // both root and items declare 'name'
     };
-    const next = nextVisibleRow(
+    const next = cellTarget(
       rt,
       rt.coordinator,
       from,
@@ -261,7 +344,7 @@ describe("nextVisibleRow", () => {
       rowId: makeRowId(root, "Fruit"),
       colId: "qty", // items has no 'qty' column
     };
-    const next = nextVisibleRow(
+    const next = cellTarget(
       rt,
       rt.coordinator,
       from,
@@ -279,7 +362,7 @@ describe("nextVisibleRow", () => {
       rowId: makeRowId(root, "Fruit"),
       colId: "qty", // schema differs but 'first' policy applies regardless
     };
-    const next = nextVisibleRow(
+    const next = cellTarget(
       rt,
       rt.coordinator,
       from,
@@ -295,7 +378,7 @@ describe("nextVisibleRow", () => {
       rowId: makeRowId(root, "Fruit"),
       colId: "name",
     };
-    const next2 = nextVisibleRow(
+    const next2 = cellTarget(
       rt,
       rt.coordinator,
       from2,
@@ -314,7 +397,7 @@ describe("nextVisibleRow", () => {
       colId: "name",
     };
     expect(
-      nextVisibleRow(rt, rt.coordinator, from, "down", "preserve", deps),
+      cellTarget(rt, rt.coordinator, from, "down", "preserve", deps),
     ).toBeNull();
   });
 
@@ -326,7 +409,7 @@ describe("nextVisibleRow", () => {
       colId: "name",
     };
     // Sequence: Fruit, Apple, Banana, Veg, Carrot — delta +3 from Fruit lands on Veg.
-    const next = nextVisibleRow(
+    const next = cellTarget(
       rt,
       rt.coordinator,
       from,
@@ -339,6 +422,140 @@ describe("nextVisibleRow", () => {
       rowId: makeRowId(root, "Veg"),
       colId: "name",
     });
+  });
+
+  it("ArrowDown overflows next when a footer follows the last focusable row", () => {
+    const rt = fakeRuntimeWithRows([
+      dataRow("Fruit"),
+      footerRow("total"),
+    ]);
+
+    const result = resolveVisibleRowNavigation(
+      rt,
+      rt.coordinator,
+      { path: root, rowId: makeRowId(root, "Fruit"), colId: "name" },
+      "down",
+      "preserve",
+      deps,
+    );
+
+    expect(result).toEqual({ target: null, overflow: "next" });
+  });
+
+  it("ArrowUp overflows previous when a footer precedes the first focusable row", () => {
+    const rt = fakeRuntimeWithRows([
+      footerRow("opening-total"),
+      dataRow("Fruit"),
+    ]);
+
+    const result = resolveVisibleRowNavigation(
+      rt,
+      rt.coordinator,
+      { path: root, rowId: makeRowId(root, "Fruit"), colId: "name" },
+      "up",
+      "preserve",
+      deps,
+    );
+
+    expect(result).toEqual({ target: null, overflow: "previous" });
+  });
+
+  it("PageDown uses focusable reachability for next overflow", () => {
+    const rt = fakeRuntimeWithRows([
+      dataRow("Fruit"),
+      footerRow("total"),
+    ]);
+
+    const result = resolveVisibleRowNavigation(
+      rt,
+      rt.coordinator,
+      { path: root, rowId: makeRowId(root, "Fruit"), colId: "name" },
+      { delta: 1 },
+      "preserve",
+      deps,
+    );
+
+    expect(result).toEqual({ target: null, overflow: "next" });
+  });
+
+  it("PageUp uses focusable reachability for previous overflow", () => {
+    const rt = fakeRuntimeWithRows([
+      footerRow("opening-total"),
+      dataRow("Fruit"),
+    ]);
+
+    const result = resolveVisibleRowNavigation(
+      rt,
+      rt.coordinator,
+      { path: root, rowId: makeRowId(root, "Fruit"), colId: "name" },
+      { delta: -1 },
+      "preserve",
+      deps,
+    );
+
+    expect(result).toEqual({ target: null, overflow: "previous" });
+  });
+});
+
+describe("resolveRowSelectableNavigation", () => {
+  it("ArrowDown overflows next when a non-row-selectable row follows the last selectable row", () => {
+    const rt = fakeRuntimeWithRows([
+      dataRow("Fruit"),
+      footerRow("total"),
+    ]);
+
+    const result = resolveRowSelectableNavigation(
+      rt,
+      rt.coordinator,
+      { path: root, rowId: makeRowId(root, "Fruit") },
+      "down",
+    );
+
+    expect(result).toEqual({ target: null, overflow: "next" });
+  });
+
+  it("ArrowUp overflows previous when a non-row-selectable row precedes the first selectable row", () => {
+    const rt = fakeRuntimeWithRows([
+      footerRow("opening-total"),
+      dataRow("Fruit"),
+    ]);
+
+    const result = resolveRowSelectableNavigation(
+      rt,
+      rt.coordinator,
+      { path: root, rowId: makeRowId(root, "Fruit") },
+      "up",
+    );
+
+    expect(result).toEqual({ target: null, overflow: "previous" });
+  });
+
+  it("PageDown and PageUp use row-selectable reachability", () => {
+    const after = fakeRuntimeWithRows([
+      dataRow("Fruit"),
+      footerRow("total"),
+    ]);
+    const before = fakeRuntimeWithRows([
+      footerRow("opening-total"),
+      dataRow("Fruit"),
+    ]);
+
+    expect(
+      resolveRowSelectableNavigation(
+        after,
+        after.coordinator,
+        { path: root, rowId: makeRowId(root, "Fruit") },
+        { delta: 1 },
+      ),
+    ).toEqual({ target: null, overflow: "next" });
+    expect(
+      resolveRowSelectableNavigation(
+        before,
+        before.coordinator,
+        { path: root, rowId: makeRowId(root, "Fruit") },
+        { delta: -1 },
+      ),
+    ).toEqual({ target: null, overflow: "previous" });
   });
 });
 

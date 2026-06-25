@@ -9,7 +9,7 @@ import type {
 } from "../data-sources/types";
 import { childPath, makeRowId, rootPath } from "../types/identity";
 import type { GridPath, RowId } from "../types/identity";
-import type { TreeNode } from "../types/level-row";
+import type { FooterRow, TreeNode } from "../types/level-row";
 import type { GridSchema } from "../types/schema";
 import type { GridInteractionConfig } from "../types/interaction";
 import { ROW_MULTISELECT_LIST } from "../types/interaction";
@@ -105,22 +105,25 @@ function setupRowList() {
   });
 }
 
-function pagedRootDataSource(pages: TreeNode[][]): GridDataSource {
+function pagedRootDataSource(
+  pages: TreeNode[][],
+  footerRows?: FooterRow[],
+): GridDataSource {
   let page = 0;
-  let snapshot: LevelSnapshot = {
-    status: "ready",
-    nodes: pages[page],
-    pagination: { page, pageSize: 1, totalCount: pages.length },
-    serverManaged: { sort: true, filter: true, pagination: true },
-  };
-  const subscribers = new Set<() => void>();
-  const publish = () => {
-    snapshot = {
+  const snapshotForPage = (): LevelSnapshot => {
+    const next: LevelSnapshot = {
       status: "ready",
       nodes: pages[page],
       pagination: { page, pageSize: 1, totalCount: pages.length },
       serverManaged: { sort: true, filter: true, pagination: true },
     };
+    if (footerRows) next.footerRows = footerRows;
+    return next;
+  };
+  let snapshot: LevelSnapshot = snapshotForPage();
+  const subscribers = new Set<() => void>();
+  const publish = () => {
+    snapshot = snapshotForPage();
     for (const subscriber of subscribers) subscriber();
   };
   const source: LevelDataSource = {
@@ -168,13 +171,16 @@ function pagedRootDataSource(pages: TreeNode[][]): GridDataSource {
   };
 }
 
-function pagedRuntime(interaction?: GridInteractionConfig) {
+function pagedRuntime(
+  interaction?: GridInteractionConfig,
+  footerRows?: FooterRow[],
+) {
   return createGridRuntime({
     schema: reportSchema,
     dataSource: pagedRootDataSource([
       [{ levelName: "cat", columns: { name: "Fruit" } }],
       [{ levelName: "cat", columns: { name: "Veg" } }],
-    ]),
+    ], footerRows),
     interaction,
   });
 }
@@ -395,6 +401,33 @@ describe("GridCoordinator", () => {
     expect(rt.sourceFor(root).snapshot().pagination?.page).toBe(1);
   });
 
+  it("ArrowDown from the last focusable row before a footer turns to the next page", () => {
+    const rt = pagedRuntime(undefined, [
+      { rowKey: "total", columns: { name: "Total" } },
+    ]);
+    const first = {
+      path: root,
+      rowId: makeRowId(root, "Fruit"),
+      colId: "name" as const,
+    };
+    rt.cursorManager.moveCellCursorTo(first);
+
+    rt.controllerFor(root).handleKey({
+      key: "ArrowDown",
+      ctrlKey: false,
+      metaKey: false,
+      shiftKey: false,
+      altKey: false,
+    } as KeyboardEvent);
+
+    expect(rt.sourceFor(root).snapshot().pagination?.page).toBe(1);
+    expect(rt.coordinator.getState().cellCursor).toEqual({
+      path: root,
+      rowId: makeRowId(root, "Veg"),
+      colId: "name",
+    });
+  });
+
   it("row-list ArrowDown at the last loaded row turns to the next page", () => {
     const rt = pagedRuntime(ROW_MULTISELECT_LIST);
     rt.cursorManager.moveRowCursorTo({
@@ -420,6 +453,30 @@ describe("GridCoordinator", () => {
     expect(rt.controllerFor(root).effects.getState()).toContainEqual({
       type: "scrollRowIntoView",
       rowId: second,
+    });
+  });
+
+  it("row-list ArrowDown from the last selectable row before a footer turns to the next page", () => {
+    const rt = pagedRuntime(ROW_MULTISELECT_LIST, [
+      { rowKey: "total", columns: { name: "Total" } },
+    ]);
+    rt.cursorManager.moveRowCursorTo({
+      path: root,
+      rowId: makeRowId(root, "Fruit"),
+    });
+
+    rt.controllerFor(root).handleKey({
+      key: "ArrowDown",
+      ctrlKey: false,
+      metaKey: false,
+      shiftKey: false,
+      altKey: false,
+    } as KeyboardEvent);
+
+    expect(rt.sourceFor(root).snapshot().pagination?.page).toBe(1);
+    expect(rt.coordinator.getState().rowCursor).toEqual({
+      path: root,
+      rowId: makeRowId(root, "Veg"),
     });
   });
 

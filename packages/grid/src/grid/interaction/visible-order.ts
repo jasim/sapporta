@@ -12,10 +12,10 @@
 // (Tab overflow, Page, Home/End) compose them at the dispatch layer.
 // Each primitive has one reason to change.
 //
-// `nextVisibleRow` is the only primitive that can land on a different
-// schema, so it owns column-on-landing through `colPolicy`. The
-// dispatch layer never overrides the result — the rule lives in one
-// place, picked by the caller.
+// `resolveVisibleRowNavigation` is the only primitive that can land on a
+// different schema, so it owns column-on-landing through `colPolicy`. The
+// dispatch layer never overrides the result — the rule lives in one place,
+// picked by the caller.
 
 import type { ColumnSchema, LevelSchema } from "../types/schema";
 import type { ColId, GridPath, RowId } from "../types/identity";
@@ -40,6 +40,17 @@ export type VisibleRowPosition = {
 };
 
 export type ColDirection = "left" | "right" | "start" | "end";
+export type NavigationOverflow = "previous" | "next";
+
+export type CellRowNavigationResult = {
+  target: VisibleCursor | null;
+  overflow: NavigationOverflow | null;
+};
+
+export type RowNavigationResult = {
+  target: VisibleRowPosition | null;
+  overflow: NavigationOverflow | null;
+};
 
 type CapabilitiesFn = (kind: LevelRowKind) => RowCapabilities;
 
@@ -209,6 +220,39 @@ function deltaHop(
   );
 }
 
+function firstReachableIndex(
+  steps: RowStep[],
+  isReachable: (step: RowStep) => boolean,
+): number {
+  return steps.findIndex(isReachable);
+}
+
+function lastReachableIndex(
+  steps: RowStep[],
+  isReachable: (step: RowStep) => boolean,
+): number {
+  for (let index = steps.length - 1; index >= 0; index -= 1) {
+    if (isReachable(steps[index])) return index;
+  }
+  return -1;
+}
+
+function deltaOverflow(
+  steps: RowStep[],
+  fromIndex: number,
+  delta: number,
+  isReachable: (step: RowStep) => boolean,
+): NavigationOverflow | null {
+  if (delta === 0) return null;
+  const first = firstReachableIndex(steps, isReachable);
+  const last = lastReachableIndex(steps, isReachable);
+  if (first < 0 || last < 0) return delta < 0 ? "previous" : "next";
+  const targetIndex = fromIndex + delta;
+  if (delta < 0 && targetIndex < first) return "previous";
+  if (delta > 0 && targetIndex > last) return "next";
+  return null;
+}
+
 export type NextVisibleRowDeps = {
   capabilitiesFor: CapabilitiesFn;
 };
@@ -217,85 +261,86 @@ export type NextVisibleRowDeps = {
 // (no synthetic context object) — every input the walk needs already lives
 // on those two surfaces. `colPolicy` chooses the column on landing; the
 // dispatch layer never second-guesses the result.
-export function nextVisibleRow(
+export function resolveVisibleRowNavigation(
   runtime: GridRuntime,
   coordinator: GridCoordinatorPublic,
   from: VisibleCursor,
   dir: RowDirection,
   colPolicy: ColPolicy,
   deps: NextVisibleRowDeps,
-): VisibleCursor | null {
+): CellRowNavigationResult {
   const { capabilitiesFor } = deps;
   const steps = collect(runtime, coordinator);
   const idx = indexOfStep(steps, from.path, from.rowId);
 
   let target: RowStep | null;
+  let overflow: NavigationOverflow | null = null;
   if (dir === "first") {
     target = firstFocusableStep(steps, runtime, capabilitiesFor);
   } else if (dir === "last") {
     target = lastFocusableStep(steps, runtime, capabilitiesFor);
   } else if (dir === "up") {
-    if (idx < 0) return null;
+    if (idx < 0) return { target: null, overflow: null };
     target = nextFocusableStep(steps, idx, -1, runtime, capabilitiesFor);
+    if (!target) overflow = "previous";
   } else if (dir === "down") {
-    if (idx < 0) return null;
+    if (idx < 0) return { target: null, overflow: null };
     target = nextFocusableStep(steps, idx, 1, runtime, capabilitiesFor);
+    if (!target) overflow = "next";
   } else {
-    if (idx < 0) return null;
+    if (idx < 0) return { target: null, overflow: null };
+    overflow = deltaOverflow(steps, idx, dir.delta, (step) =>
+      isFocusable(runtime, step, capabilitiesFor),
+    );
+    if (overflow) return { target: null, overflow };
     target = deltaHop(steps, idx, dir.delta, runtime, capabilitiesFor);
   }
 
-  if (!target) return null;
-  if (target.path === from.path && target.rowId === from.rowId) return null;
-  return makeCursor(target, runtime, from.colId, colPolicy);
+  if (!target) return { target: null, overflow };
+  if (target.path === from.path && target.rowId === from.rowId) {
+    return { target: null, overflow: null };
+  }
+  return {
+    target: makeCursor(target, runtime, from.colId, colPolicy),
+    overflow: null,
+  };
 }
 
-export function pageBoundaryDirectionForRowMovement(
-  runtime: GridRuntime,
-  coordinator: GridCoordinatorPublic,
-  from: VisibleRowPosition,
-  direction: "up" | "down" | { delta: number },
-): "previous" | "next" | null {
-  const steps = collect(runtime, coordinator);
-  const idx = indexOfStep(steps, from.path, from.rowId);
-  if (idx < 0) return null;
-  if (direction === "up") return idx === 0 ? "previous" : null;
-  if (direction === "down") {
-    return idx === steps.length - 1 ? "next" : null;
-  }
-  if (direction.delta < 0 && idx + direction.delta < 0) return "previous";
-  if (direction.delta > 0 && idx + direction.delta >= steps.length) {
-    return "next";
-  }
-  return null;
-}
-
-export function nextRowSelectablePosition(
+export function resolveRowSelectableNavigation(
   runtime: GridRuntime,
   coordinator: GridCoordinatorPublic,
   from: VisibleRowPosition,
   direction: "up" | "down" | "first" | "last" | { delta: number },
-): VisibleRowPosition | null {
+): RowNavigationResult {
   const steps = collect(runtime, coordinator);
   const idx = indexOfStep(steps, from.path, from.rowId);
   let target: RowStep | null;
+  let overflow: NavigationOverflow | null = null;
   if (direction === "first") {
     target = nextRowSelectableStep(steps, -1, 1, runtime);
   } else if (direction === "last") {
     target = nextRowSelectableStep(steps, steps.length, -1, runtime);
   } else if (direction === "up") {
-    if (idx < 0) return null;
+    if (idx < 0) return { target: null, overflow: null };
     target = nextRowSelectableStep(steps, idx, -1, runtime);
+    if (!target) overflow = "previous";
   } else if (direction === "down") {
-    if (idx < 0) return null;
+    if (idx < 0) return { target: null, overflow: null };
     target = nextRowSelectableStep(steps, idx, 1, runtime);
+    if (!target) overflow = "next";
   } else {
-    if (idx < 0) return null;
+    if (idx < 0) return { target: null, overflow: null };
+    overflow = deltaOverflow(steps, idx, direction.delta, (step) =>
+      isRowSelectable(runtime, step),
+    );
+    if (overflow) return { target: null, overflow };
     target = rowDeltaHop(steps, idx, direction.delta, runtime);
   }
-  if (!target) return null;
-  if (target.path === from.path && target.rowId === from.rowId) return null;
-  return target;
+  if (!target) return { target: null, overflow };
+  if (target.path === from.path && target.rowId === from.rowId) {
+    return { target: null, overflow: null };
+  }
+  return { target, overflow: null };
 }
 
 function nextRowSelectableStep(

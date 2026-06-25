@@ -15,7 +15,7 @@
 //
 // The coordinator never tracks the visible-order projection itself —
 // it reads runtime + coordinator state at call time through
-// `nextVisibleRow`. There is no cached projection, no "topology
+// `resolveVisibleRowNavigation`. There is no cached projection, no "topology
 // snapshot": render and navigation read the same live inputs and so
 // cannot disagree.
 //
@@ -32,7 +32,7 @@
 // `onExpand(path, rowId)` is the seam the runtime uses to drive its child
 // source registry: when a row is first expanded the runtime resolves any
 // missing child sources for that (path, rowKey) and registers them so
-// `nextVisibleRow` can include them on the next traversal.
+// `resolveVisibleRowNavigation` can include them on the next traversal.
 //
 // For the four-channel invariant this wires into, see `index.ts`.
 
@@ -50,9 +50,8 @@ import type {
 import type { GridRuntime } from "../runtime/create-grid-runtime";
 import type { CursorManager } from "./cursor-manager";
 import {
-  nextRowSelectablePosition,
-  nextVisibleRow,
-  pageBoundaryDirectionForRowMovement,
+  resolveRowSelectableNavigation,
+  resolveVisibleRowNavigation,
 } from "./visible-order";
 import { firstFocusableRow } from "../types/level-row-traversal";
 
@@ -356,7 +355,7 @@ export function createGridCoordinator(
 
     const move = rowMoveFor(intent);
     if (!move) return null;
-    const target = nextVisibleRow(
+    const result = resolveVisibleRowNavigation(
       runtime,
       coordinatorStore,
       { path: fromPath, rowId: cursor.rowId, colId: cursor.colId },
@@ -364,23 +363,13 @@ export function createGridCoordinator(
       move.colPolicy,
       { capabilitiesFor: args.capabilitiesFor },
     );
-    const pageBoundaryDirection =
-      move.direction === "up" ||
-      move.direction === "down" ||
-      typeof move.direction === "object"
-        ? pageBoundaryDirectionForRowMovement(
-            runtime,
-            coordinatorStore,
-            { path: fromPath, rowId: cursor.rowId },
-            move.direction,
-          )
-        : null;
+    if (result.target) return result.target;
     if (
-      pageBoundaryDirection &&
+      result.overflow &&
       runtime.requestPageBoundaryNavigation({
         kind: "cell",
         path: fromPath,
-        direction: pageBoundaryDirection,
+        direction: result.overflow,
         colId: cursor.colId,
         colPolicy: move.colPolicy,
         extend: move.extend,
@@ -388,8 +377,7 @@ export function createGridCoordinator(
     ) {
       return null;
     }
-    if (target) return target;
-    return move.direction === "down"
+    return result.overflow === "next"
       ? runtime.phantomBoundaryCellTarget(
           fromPath,
           cursor.colId,
@@ -447,45 +435,38 @@ export function createGridCoordinator(
       // Row traversal is deliberately column-free. It uses the same
       // rowSelectable gate as row selection so keyboard focus and operation
       // selection cannot disagree about which rows are valid.
-      const target = nextRowSelectablePosition(
+      const result = resolveRowSelectableNavigation(
         runtime,
         coordinatorStore,
         rowCursor,
         intent.direction,
       );
-      const pageBoundaryDirection = pageBoundaryDirectionForRowMovement(
-        runtime,
-        coordinatorStore,
-        rowCursor,
-        intent.direction,
-      );
+      if (result.target) return result.target;
       if (
-        pageBoundaryDirection &&
+        result.overflow &&
         runtime.requestPageBoundaryNavigation({
           kind: "row",
           path: fromPath,
-          direction: pageBoundaryDirection,
+          direction: result.overflow,
           extend: intent.extend,
         })
       ) {
         return null;
       }
-      if (target) return target;
-      return intent.direction === "down"
+      return result.overflow === "next"
         ? runtime.phantomBoundaryRowTarget(fromPath)
         : null;
     }
     if (intent.type === "moveActiveRowEdge") {
-      return nextRowSelectablePosition(
+      return resolveRowSelectableNavigation(
         runtime,
         coordinatorStore,
         rowCursor,
         intent.edge === "first" ? "first" : "last",
-      );
+      ).target;
     }
     if (intent.type === "moveActiveRowDelta") {
-      const direction = { delta: intent.delta };
-      const target = nextRowSelectablePosition(
+      const result = resolveRowSelectableNavigation(
         runtime,
         coordinatorStore,
         rowCursor,
@@ -493,24 +474,21 @@ export function createGridCoordinator(
           delta: intent.delta,
         },
       );
-      const pageBoundaryDirection = pageBoundaryDirectionForRowMovement(
-        runtime,
-        coordinatorStore,
-        rowCursor,
-        direction,
-      );
+      if (result.target) return result.target;
       if (
-        pageBoundaryDirection &&
+        result.overflow &&
         runtime.requestPageBoundaryNavigation({
           kind: "row",
           path: fromPath,
-          direction: pageBoundaryDirection,
+          direction: result.overflow,
           extend: intent.extend,
         })
       ) {
         return null;
       }
-      return target;
+      return result.overflow === "next"
+        ? runtime.phantomBoundaryRowTarget(fromPath)
+        : null;
     }
     return null;
   }
