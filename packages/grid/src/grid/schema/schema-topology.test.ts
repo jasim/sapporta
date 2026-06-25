@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { buildSchemaTopology } from "./schema-topology";
 import type { LevelOptions } from "../types/level-row";
-import type { GridSchema, LevelSchema } from "../types/schema";
+import type { ColumnSchema, GridSchema, LevelSchema } from "../types/schema";
 
 function level(
   name: string,
@@ -9,6 +9,22 @@ function level(
   options: LevelOptions = {},
 ): LevelSchema {
   return { name, columns: [], options, childLevels };
+}
+
+function levelWithColumns(name: string, columns: ColumnSchema[]): LevelSchema {
+  return { name, columns, options: {}, childLevels: [] };
+}
+
+function column(
+  id: string,
+  overrides: Partial<ColumnSchema> = {},
+): ColumnSchema {
+  return {
+    id: id as never,
+    name: id,
+    renderCell: ({ value }) => String(value ?? ""),
+    ...overrides,
+  };
 }
 
 // rowKey on expandable levels is required by the GridPath encoding (see
@@ -128,6 +144,108 @@ describe("buildSchemaTopology", () => {
     expect(() => buildSchemaTopology(bad)).toThrow(
       /expandable level "orders" must declare options\.rowKey/,
     );
+  });
+
+  it("throws when a level has duplicate column ids", () => {
+    const bad: GridSchema = {
+      rootLevel: "rows",
+      levels: {
+        rows: levelWithColumns("rows", [column("name"), column("name")]),
+      },
+    };
+
+    expect(() => buildSchemaTopology(bad)).toThrow(
+      /level "rows" has duplicate column id "name"/,
+    );
+  });
+
+  it("throws when an editable column has repeated gestures", () => {
+    const bad: GridSchema = {
+      rootLevel: "rows",
+      levels: {
+        rows: levelWithColumns("rows", [
+          column("name", {
+            edit: {
+              editor: () => null,
+              startsOn: ["enter", "enter"],
+            },
+          }),
+        ]),
+      },
+    };
+
+    expect(() => buildSchemaTopology(bad)).toThrow(
+      /column "rows\.name" repeats edit gesture "enter"/,
+    );
+  });
+
+  it("throws when an activation column has repeated gestures", () => {
+    const bad: GridSchema = {
+      rootLevel: "rows",
+      levels: {
+        rows: levelWithColumns("rows", [
+          column("name", {
+            activation: {
+              startsOn: ["click", "click"],
+              describe: "Open",
+              run: () => {},
+            },
+          }),
+        ]),
+      },
+    };
+
+    expect(() => buildSchemaTopology(bad)).toThrow(
+      /column "rows\.name" repeats activation gesture "click"/,
+    );
+  });
+
+  it("throws when edit and activation claim the same owning gesture", () => {
+    const bad: GridSchema = {
+      rootLevel: "rows",
+      levels: {
+        rows: levelWithColumns("rows", [
+          column("name", {
+            edit: {
+              editor: () => null,
+              startsOn: ["enter", "doubleClick"],
+            },
+            activation: {
+              startsOn: ["doubleClick"],
+              describe: "Open",
+              run: () => {},
+            },
+          }),
+        ]),
+      },
+    };
+
+    expect(() => buildSchemaTopology(bad)).toThrow(
+      /column "rows\.name" assigns "doubleClick" to both edit and activation/,
+    );
+  });
+
+  it("allows activation-only gestures that do not overlap edit gestures", () => {
+    const ok: GridSchema = {
+      rootLevel: "rows",
+      levels: {
+        rows: levelWithColumns("rows", [
+          column("name", {
+            edit: {
+              editor: () => null,
+              startsOn: ["enter"],
+            },
+            activation: {
+              startsOn: ["click", "space"],
+              describe: "Open",
+              run: () => {},
+            },
+          }),
+        ]),
+      },
+    };
+
+    expect(() => buildSchemaTopology(ok)).not.toThrow();
   });
 
   it("allows a leaf level to omit options.rowKey", () => {

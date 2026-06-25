@@ -8,6 +8,8 @@
 // Validation choke point: because `buildSchemaTopology` is the first
 // place that walks a `GridSchema`, it validates structural constraints
 // that must hold for the grid to function correctly:
+//   - Each level's column ids must be unique.
+//   - Column edit and activation gestures must be internally consistent.
 //   - Expandable levels (`childLevels.length > 0`) must declare an
 //     explicit `options.rowKey` — the default index-derived rowKey
 //     would re-introduce index fragility at the RowId layer.
@@ -19,7 +21,13 @@
 // `childLevels` order is semantically significant: it determines the render order
 // of child levels under an expanded row.
 
-import type { GridSchema, LevelSchema } from "../types/schema";
+import type {
+  CellActivationGesture,
+  CellEditGesture,
+  ColumnSchema,
+  GridSchema,
+  LevelSchema,
+} from "../types/schema";
 
 export type SchemaTopology = {
   rootLevelName: string;
@@ -41,6 +49,10 @@ export function buildSchemaTopology(schema: GridSchema): SchemaTopology {
     if (name === "") {
       throw new Error("SchemaTopology: level names must be non-empty");
     }
+  }
+
+  for (const name of levelNames) {
+    validateLevelColumns(name, schema.levels[name]);
   }
 
   // Expandable levels (childLevels.length > 0) must declare an explicit
@@ -118,4 +130,86 @@ export function buildSchemaTopology(schema: GridSchema): SchemaTopology {
       return parentByChild.get(name) ?? null;
     },
   };
+}
+
+function validateLevelColumns(levelName: string, level: LevelSchema): void {
+  const seen = new Set<string>();
+  for (const column of level.columns) {
+    if (seen.has(column.id)) {
+      throw new Error(
+        `SchemaTopology: level "${levelName}" has duplicate column id "${column.id}"`,
+      );
+    }
+    seen.add(column.id);
+    validateColumnInteractions(levelName, column);
+  }
+}
+
+function validateColumnInteractions(
+  levelName: string,
+  column: ColumnSchema,
+): void {
+  if (column.edit) {
+    if (!column.edit.editor) {
+      throw new Error(
+        `SchemaTopology: column "${levelName}.${column.id}" declares edit without an editor`,
+      );
+    }
+    assertUniqueGestures(
+      `SchemaTopology: column "${levelName}.${column.id}" repeats edit gesture`,
+      column.edit.startsOn,
+    );
+  }
+
+  if (column.activation) {
+    if (!column.activation.describe) {
+      throw new Error(
+        `SchemaTopology: column "${levelName}.${column.id}" declares activation without describe`,
+      );
+    }
+    if (!column.activation.run) {
+      throw new Error(
+        `SchemaTopology: column "${levelName}.${column.id}" declares activation without run`,
+      );
+    }
+    assertUniqueGestures(
+      `SchemaTopology: column "${levelName}.${column.id}" repeats activation gesture`,
+      column.activation.startsOn,
+    );
+  }
+
+  if (!column.edit || !column.activation) return;
+  const editGestures = new Set<CellEditGesture>(column.edit.startsOn);
+  for (const activationGesture of column.activation.startsOn) {
+    if (gestureOverlaps(editGestures, activationGesture)) {
+      throw new Error(
+        `SchemaTopology: column "${levelName}.${column.id}" assigns "${activationGesture}" to both edit and activation`,
+      );
+    }
+  }
+}
+
+function assertUniqueGestures<TGesture extends string>(
+  message: string,
+  gestures: readonly TGesture[],
+): void {
+  const seen = new Set<TGesture>();
+  for (const gesture of gestures) {
+    if (seen.has(gesture)) throw new Error(`${message} "${gesture}"`);
+    seen.add(gesture);
+  }
+}
+
+function gestureOverlaps(
+  editGestures: Set<CellEditGesture>,
+  activationGesture: CellActivationGesture,
+): boolean {
+  switch (activationGesture) {
+    case "enter":
+    case "doubleClick":
+      return editGestures.has(activationGesture);
+    case "space":
+    case "click":
+      return false;
+  }
 }

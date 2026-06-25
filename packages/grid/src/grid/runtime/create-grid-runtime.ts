@@ -150,7 +150,6 @@ import {
 } from "../displayed-rows";
 import {
   buildSchemaTopology,
-  normalizeGridSchema,
   type SchemaTopology,
 } from "../schema";
 import {
@@ -304,8 +303,7 @@ type PendingPhantomCreate = {
 };
 
 export function createGridRuntime(args: RuntimeArgs): GridRuntime {
-  const { dataSource } = args;
-  const schema = normalizeGridSchema(args.schema);
+  const { schema, dataSource } = args;
   const interaction = normalizeInteraction(args.interaction);
   const schemaTopology = buildSchemaTopology(schema);
 
