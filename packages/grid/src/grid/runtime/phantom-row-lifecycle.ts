@@ -15,19 +15,26 @@ import type { LevelSchema } from "../types/schema";
 import type { PhantomRow, PhantomRowsConfig } from "../types/level-row";
 
 export type PhantomRowLifecycle = {
+  // Empty writable levels should still offer a place to add the first row.
   ensureBlankForEmptyPath: (path: GridPath) => PhantomRow | null;
+  // A blank add-row belongs only where a new row can be appended right now.
+  reconcileBlankAppendPhantoms: (path: GridPath) => void;
+  // Moving past the final cell should land on a reusable add-row when allowed.
   boundaryCellTarget: (
     path: GridPath,
     colId: ColId,
     colPolicy: "preserve" | "first" | "last",
   ) => CellCursor | null;
+  // Row-list navigation gets the same add-row behavior without a column.
   boundaryRowTarget: (
     path: GridPath,
   ) => { path: GridPath; rowId: RowId } | null;
+  // Leaving a filled add-row saves it as an application row.
   onCellCursorChanging: (
     previous: CellCursor | null,
     next: CellCursor | null,
   ) => void;
+  // Row-list focus uses the same save-on-leave rule as cell focus.
   onRowCursorChanging: (
     previous: { path: GridPath; rowId: RowId } | null,
     next: { path: GridPath; rowId: RowId } | null,
@@ -38,6 +45,7 @@ export type PhantomRowLifecycle = {
     colId: ColId,
     value: unknown,
   ) => void;
+  // Apps can decide what "blank" means for their own columns.
   isBlank: (columns: Record<ColId, unknown>) => boolean;
 };
 
@@ -92,7 +100,7 @@ export function createPhantomRowLifecycle(
   }
 
   function ensureBlankPhantom(path: GridPath): PhantomRow | null {
-    removeBlankPhantomsOutsideAppendBoundary(path);
+    reconcileBlankAppendPhantoms(path);
     if (!eligible(path)) return null;
     const existing = blankEditingPhantom(path);
     if (existing) return existing;
@@ -121,17 +129,20 @@ export function createPhantomRowLifecycle(
     const source = deps.getSource(path);
     if (!source) return null;
     const snapshot = source.snapshot();
-    removeBlankPhantomsOutsideAppendBoundary(path);
+    reconcileBlankAppendPhantoms(path);
+    if (snapshot.status !== "ready") return null;
     if (snapshot.nodes.length !== 0) return null;
     return ensureBlankPhantom(path);
   }
 
-  function removeBlankPhantomsOutsideAppendBoundary(path: GridPath): void {
+  function reconcileBlankAppendPhantoms(path: GridPath): void {
+    if (!lifecycleEnabled) return;
     const source = deps.getSource(path);
     if (!source) return;
     const snapshot = source.snapshot();
-    if (snapshot.status !== "ready") return;
-    if (isDatasourceAppendBoundary(snapshot)) return;
+    if (snapshot.status === "ready" && isDatasourceAppendBoundary(snapshot)) {
+      return;
+    }
     for (const phantom of deps.getPhantoms(path)) {
       if (phantom.state.kind === "editing" && isBlank(phantom.columns)) {
         deps.removePhantom(path, phantom.rowKey);
@@ -218,6 +229,7 @@ export function createPhantomRowLifecycle(
 
   return {
     ensureBlankForEmptyPath,
+    reconcileBlankAppendPhantoms,
     boundaryCellTarget,
     boundaryRowTarget,
     onCellCursorChanging: onCursorChanging,

@@ -453,6 +453,7 @@ export function createGridRuntime(args: RuntimeArgs): GridRuntime {
         error ? { path, status, error } : { path, status },
       );
     }
+    phantomLifecycle.reconcileBlankAppendPhantoms(path);
     phantomLifecycle.ensureBlankForEmptyPath(path);
   }
 

@@ -1312,6 +1312,94 @@ describe("GridRuntime", () => {
     expect(rt.displayedRowFor(rowsRoot, target!.rowId)?.kind).toBe("phantom");
   });
 
+  it("removes a blank append phantom while keyboard paging back from the last page", () => {
+    const mutable = mutableWritableSource({
+      status: "ready",
+      nodes: [
+        { levelName: "rows", columns: { id: "c", name: "Cherry", qty: 3 } },
+      ],
+      pagination: { page: 1, pageSize: 2, totalCount: 3 },
+      serverManaged: { sort: true, filter: true, pagination: true },
+    });
+    mutable.source.pageBoundaryNavigation = {
+      canGoPrevious: () => true,
+      canGoNext: () => false,
+      goPrevious: () => {
+        mutable.publish({
+          status: "loading",
+          nodes: [
+            {
+              levelName: "rows",
+              columns: { id: "c", name: "Cherry", qty: 3 },
+            },
+          ],
+          pagination: { page: 0, pageSize: 2, totalCount: 3 },
+          serverManaged: { sort: true, filter: true, pagination: true },
+        });
+      },
+      goNext: () => {},
+    };
+    const rt = createGridRuntime({
+      schema: tableSchema,
+      dataSource: dataSourceWithRoot(mutable.source),
+      phantomRows: {},
+    });
+    const lastPageRowCursor = {
+      path: rowsRoot,
+      rowId: makeRowId(rowsRoot, "c"),
+      colId: "qty",
+    };
+    rt.cursorManager.moveCellCursorTo(lastPageRowCursor);
+
+    rt.coordinator.navigateCell(rowsRoot, {
+      type: "moveRow",
+      direction: "down",
+      colPolicy: "preserve",
+      extend: false,
+    });
+    expect(rt.phantoms.get(rowsRoot)).toHaveLength(1);
+    expect(
+      rt.displayedRowsFor(rowsRoot).rows.some((row) => row.kind === "phantom"),
+    ).toBe(true);
+
+    rt.coordinator.navigateCell(rowsRoot, {
+      type: "moveRow",
+      direction: "up",
+      colPolicy: "preserve",
+      extend: false,
+    });
+    expect(rt.cursorManager.currentCellCursor()).toEqual(lastPageRowCursor);
+
+    rt.coordinator.navigateCell(rowsRoot, {
+      type: "moveRow",
+      direction: "up",
+      colPolicy: "preserve",
+      extend: false,
+    });
+
+    expect(rt.phantoms.get(rowsRoot)).toHaveLength(0);
+    expect(
+      rt.displayedRowsFor(rowsRoot).rows.some((row) => row.kind === "phantom"),
+    ).toBe(false);
+
+    mutable.publish({
+      status: "ready",
+      nodes: tableNodes(),
+      pagination: { page: 0, pageSize: 2, totalCount: 3 },
+      serverManaged: { sort: true, filter: true, pagination: true },
+    });
+
+    expect(rt.phantoms.get(rowsRoot)).toHaveLength(0);
+    expect(
+      rt.displayedRowsFor(rowsRoot).rows.some((row) => row.kind === "phantom"),
+    ).toBe(false);
+    expect(rt.cursorManager.currentCellCursor()).toEqual({
+      path: rowsRoot,
+      rowId: makeRowId(rowsRoot, "b"),
+      colId: "qty",
+    });
+  });
+
   it("does not eagerly create an empty-path phantom for an empty non-final page", () => {
     const source = writableSourceFromSnapshot({
       status: "ready",
