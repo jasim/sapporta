@@ -1582,6 +1582,10 @@ export async function prepareDockerReleaseProject(
     join(project.projectDir, "packages", "frontend", "package.json"),
     specs.workspacePackage,
   );
+  rewritePackageJson(
+    join(project.projectDir, "packages", "shared", "package.json"),
+    specs.workspacePackage,
+  );
 
   await step("pnpm install after Docker release dependency rewrite", () =>
     run("pnpm", ["install"], {
