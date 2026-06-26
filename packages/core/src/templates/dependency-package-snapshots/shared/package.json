@@ -36,43 +36,52 @@
     ".": {
       "types": "./dist/index.d.ts",
       "sapporta:source": "./src/index.ts",
-      "import": "./dist/index.js"
+      "default": "./dist/index.js"
     },
     "./filter": {
+      "types": "./dist/filter.d.ts",
       "sapporta:source": "./src/filter.ts",
-      "import": "./dist/filter.js"
+      "default": "./dist/filter.js"
     },
     "./value-kind": {
+      "types": "./dist/value-kind.d.ts",
       "sapporta:source": "./src/value-kind.ts",
-      "import": "./dist/value-kind.js"
+      "default": "./dist/value-kind.js"
     },
     "./temporal": {
+      "types": "./dist/temporal.d.ts",
       "sapporta:source": "./src/temporal.ts",
-      "import": "./dist/temporal.js"
+      "default": "./dist/temporal.js"
     },
     "./daterange": {
+      "types": "./dist/daterange.d.ts",
       "sapporta:source": "./src/daterange.ts",
-      "import": "./dist/daterange.js"
+      "default": "./dist/daterange.js"
     },
     "./grid-dataset": {
+      "types": "./dist/grid-dataset/index.d.ts",
       "sapporta:source": "./src/grid-dataset/index.ts",
-      "import": "./dist/grid-dataset/index.js"
+      "default": "./dist/grid-dataset/index.js"
     },
     "./row-id": {
+      "types": "./dist/row-id.d.ts",
       "sapporta:source": "./src/row-id.ts",
-      "import": "./dist/row-id.js"
+      "default": "./dist/row-id.js"
     },
     "./validation": {
+      "types": "./dist/validation/index.d.ts",
       "sapporta:source": "./src/validation/index.ts",
-      "import": "./dist/validation/index.js"
+      "default": "./dist/validation/index.js"
     },
     "./contracts": {
+      "types": "./dist/contracts/index.d.ts",
       "sapporta:source": "./src/contracts/index.ts",
-      "import": "./dist/contracts/index.js"
+      "default": "./dist/contracts/index.js"
     },
     "./client": {
+      "types": "./dist/client/index.d.ts",
       "sapporta:source": "./src/client/index.ts",
-      "import": "./dist/client/index.js"
+      "default": "./dist/client/index.js"
     },
     "./package.json": "./package.json"
   },

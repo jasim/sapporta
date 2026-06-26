@@ -16,9 +16,15 @@ export default defineConfig(({ command }) => {
       react(),
       dts({
         tsconfigPath: "./tsconfig.json",
+        compilerOptions: {
+          paths: {
+            "@/*": ["./src/*"],
+          },
+        },
         entryRoot: "src",
         include: ["src"],
         bundleTypes: false,
+        aliasesExclude: [/^@sapporta\//],
       }),
     ],
     resolve: {

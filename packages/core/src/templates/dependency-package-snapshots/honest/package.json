@@ -40,7 +40,7 @@
     ".": {
       "types": "./dist/index.d.ts",
       "sapporta:source": "./src/index.ts",
-      "import": "./dist/index.js"
+      "default": "./dist/index.js"
     },
     "./package.json": "./package.json"
   },

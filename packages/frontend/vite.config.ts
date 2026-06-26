@@ -10,9 +10,15 @@ export default defineConfig({
     tailwindcss(),
     dts({
       tsconfigPath: "./tsconfig.json",
+      compilerOptions: {
+        paths: {
+          "@/*": ["./src/*"],
+        },
+      },
       entryRoot: "src",
       include: ["src"],
       bundleTypes: false,
+      aliasesExclude: [/^@sapporta\//],
     }),
   ],
   resolve: {

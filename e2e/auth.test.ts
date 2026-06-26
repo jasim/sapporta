@@ -373,7 +373,7 @@ describe.sequential("sapporta init auth template - end-to-end", () => {
         expectedStatus: 422,
       }),
       422,
-      { code: "validation_failed" },
+      { code: "VALIDATION_FAILED" },
     );
 
     const firstTask = await requestJson<RowBody>(baseUrl, "/api/tables/tasks", {
@@ -1606,7 +1606,7 @@ describe.sequential("sapporta init auth template - end-to-end", () => {
     fields: readonly string[],
   ): void {
     expect(response.status, response.rawBody).toBe(422);
-    expect(response.body.code, response.rawBody).toBe("validation_failed");
+    expect(response.body.code, response.rawBody).toBe("VALIDATION_FAILED");
     const actualFields = response.body.details?.map((detail) => detail.field);
     expect(actualFields, response.rawBody).toEqual(
       expect.arrayContaining([...fields]),

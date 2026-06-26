@@ -36,27 +36,27 @@
     ".": {
       "types": "./dist/index.d.ts",
       "sapporta:source": "./src/index.ts",
-      "import": "./dist/index.js"
+      "default": "./dist/index.js"
     },
     "./grid": {
       "types": "./dist/grid/index.d.ts",
       "sapporta:source": "./src/grid/index.ts",
-      "import": "./dist/grid.js"
+      "default": "./dist/grid.js"
     },
     "./column-preset": {
       "types": "./dist/column-preset/index.d.ts",
       "sapporta:source": "./src/column-preset/index.ts",
-      "import": "./dist/column-preset.js"
+      "default": "./dist/column-preset.js"
     },
     "./lookup": {
       "types": "./dist/lookup/index.d.ts",
       "sapporta:source": "./src/lookup/index.ts",
-      "import": "./dist/lookup.js"
+      "default": "./dist/lookup.js"
     },
     "./lookup/react": {
       "types": "./dist/lookup/react/index.d.ts",
       "sapporta:source": "./src/lookup/react/index.ts",
-      "import": "./dist/lookup/react.js"
+      "default": "./dist/lookup/react.js"
     },
     "./index.css": {
       "sapporta:source": "./src/index.css",

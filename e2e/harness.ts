@@ -1284,10 +1284,10 @@ export async function assertSqliteTable(
       timeoutMs: 30_000,
     },
   );
-  const result = JSON.parse(output) as {
+  const result = parseJsonOutput<{
     exists: boolean;
     columns: SqliteTableColumn[];
-  };
+  }>(output);
   expect(result.exists, `Expected SQLite table ${tableName} to exist`).toBe(
     true,
   );
@@ -1326,7 +1326,7 @@ export async function assertSqliteTableMissing(
       timeoutMs: 30_000,
     },
   );
-  const result = JSON.parse(output) as { exists: boolean };
+  const result = parseJsonOutput<{ exists: boolean }>(output);
   expect(result.exists, `Expected SQLite table ${tableName} not to exist`).toBe(
     false,
   );
@@ -1484,7 +1484,7 @@ export async function readSqliteRows<T extends Record<string, unknown>>(
       timeoutMs: 30_000,
     },
   );
-  return JSON.parse(output) as T[];
+  return parseJsonOutput<T[]>(output);
 }
 
 export async function runSqliteStatement(
@@ -1517,7 +1517,25 @@ export async function runSqliteStatement(
       timeoutMs: 30_000,
     },
   );
-  return JSON.parse(output) as SqliteStatementResult;
+  return parseJsonOutput<SqliteStatementResult>(output);
+}
+
+export function parseJsonOutput<T>(output: string): T {
+  const lines = output
+    .trim()
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0);
+
+  for (let index = lines.length - 1; index >= 0; index -= 1) {
+    try {
+      return JSON.parse(lines[index]) as T;
+    } catch {
+      continue;
+    }
+  }
+
+  return JSON.parse(output) as T;
 }
 
 export async function addWorkspaceMember(

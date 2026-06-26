@@ -37,7 +37,7 @@
     ".": {
       "types": "./dist/index.d.ts",
       "sapporta:source": "./src/index.ts",
-      "import": "./dist/index.js"
+      "default": "./dist/index.js"
     },
     "./index.css": {
       "sapporta:source": "./src/index.css",

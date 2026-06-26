@@ -11,6 +11,7 @@ import {
   buildGeneratedProject,
   cleanupProject,
   createTempProject,
+  parseJsonOutput,
   runText,
   runDrizzleMigrationCycle,
   scaffoldProject,
@@ -283,7 +284,7 @@ describe("generated table authz and row security - end-to-end", () => {
       expectedStatus: 422,
       serverOutput: server!.output,
     }).then((response) => {
-      expect(response.body.code).toBe("validation_failed");
+      expect(response.body.code).toBe("VALIDATION_FAILED");
     });
 
     await requestJson<unknown>(baseUrl, "/api/auth/organization/create", {
@@ -716,7 +717,7 @@ describe("generated table authz and row security - end-to-end", () => {
         serverOutput: server!.output,
       },
     ).then((response) => {
-      expect(response.body.code).toBe("validation_failed");
+      expect(response.body.code).toBe("VALIDATION_FAILED");
     });
 
     await requestJson<ErrorBody>(
@@ -744,7 +745,7 @@ describe("generated table authz and row security - end-to-end", () => {
       expectedStatus: 422,
       serverOutput: server!.output,
     }).then((response) => {
-      expect(response.body.code).toBe("validation_failed");
+      expect(response.body.code).toBe("VALIDATION_FAILED");
     });
 
     for (const note of [input.otherUserNote, input.inactiveWorkspaceNote]) {
@@ -789,7 +790,7 @@ describe("generated table authz and row security - end-to-end", () => {
         serverOutput: server!.output,
       },
     ).then((response) => {
-      expect(response.body.code).toBe("validation_failed");
+      expect(response.body.code).toBe("VALIDATION_FAILED");
     });
   }
 
@@ -904,7 +905,7 @@ describe("generated table authz and row security - end-to-end", () => {
       env: testProject.env,
       timeoutMs: 30_000,
     });
-    return JSON.parse(output) as T[];
+    return parseJsonOutput<T[]>(output);
   }
 
   async function runSqliteStatement(
