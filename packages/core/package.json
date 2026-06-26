@@ -114,7 +114,7 @@
   "devDependencies": {
     "@better-auth/drizzle-adapter": "^1.6.21",
     "@casl/ability": "^7.0.0",
-    "@sapporta/honest": "^0.3.4",
+    "@sapporta/honest": "workspace:^",
     "@sapporta/rest-core": "3.52.2",
     "@types/better-sqlite3": "^7.6.13",
     "@types/nodemailer": "^8.0.1",
