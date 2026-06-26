@@ -3,6 +3,8 @@ import { createGridController } from "./controller";
 import { capabilitiesFor } from "../types/capabilities";
 import { CELL_EDITING_GRID } from "../types/interaction";
 import { rootPath, makeRowId } from "../types/identity";
+import type { CellNavigationIntent } from "../types/action";
+import type { Coord, GridPath } from "../types/identity";
 import type { ColumnSchema } from "../types/schema";
 import type { DisplayedRows, LevelRow } from "../types/level-row";
 import { buildDisplayed } from "../pipeline/stages/build-displayed";
@@ -59,9 +61,9 @@ const displayed = makeRows([
 
 function makeController(
   opts: {
-    onNavigate?: ReturnType<typeof vi.fn>;
-    clearCellRange?: ReturnType<typeof vi.fn>;
-    writeValue?: ReturnType<typeof vi.fn>;
+    onNavigate?: (intent: CellNavigationIntent) => void;
+    clearCellRange?: (path: GridPath) => void;
+    writeValue?: (coord: Coord, newValue: unknown) => void;
   } = {},
 ) {
   return createGridController({

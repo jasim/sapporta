@@ -12,7 +12,7 @@ export default defineConfig({
       tsconfigPath: "./tsconfig.json",
       entryRoot: "src",
       include: ["src"],
-      rollupTypes: false,
+      bundleTypes: false,
     }),
   ],
   resolve: {

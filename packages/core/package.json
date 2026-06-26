@@ -63,12 +63,12 @@
     "typecheck": "tsc --noEmit && tsc --noEmit -p src/templates/tsconfig.json && tsc --noEmit -p tsconfig.project-auth.json"
   },
   "dependencies": {
-    "@hono/node-server": "^1.14.1",
+    "@hono/node-server": "^2.0.6",
     "@sapporta/shared": "workspace:*",
-    "commander": "^14.0.3",
+    "commander": "^15.0.0",
     "drizzle-kit": "^0.31.10",
-    "nodemailer": "^6.10.1",
-    "winston": "^3.17.0"
+    "nodemailer": "^9.0.1",
+    "winston": "^3.19.0"
   },
   "peerDependencies": {
     "@sapporta/honest": "^0.3.4",
@@ -79,18 +79,18 @@
     "zod": "^4.3.6"
   },
   "devDependencies": {
+    "@better-auth/drizzle-adapter": "^1.6.21",
     "@casl/ability": "^7.0.0",
-    "@better-auth/drizzle-adapter": "^1.6.13",
-    "@sapporta/honest": "workspace:*",
+    "@sapporta/honest": "^0.3.4",
     "@sapporta/rest-core": "3.52.2",
-    "@types/better-sqlite3": "^7.x",
-    "@types/nodemailer": "^6.4.17",
-    "auth": "^1.6.13",
-    "better-auth": "^1.6.13",
-    "better-sqlite3": "^12.0.0",
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/nodemailer": "^8.0.1",
+    "auth": "^1.6.21",
+    "better-auth": "^1.6.21",
+    "better-sqlite3": "^12.11.1",
     "drizzle-orm": "^0.45.2",
-    "hono": "^4.7.4",
-    "typescript": "^5.7.3",
-    "zod": "^4.3.6"
+    "hono": "^4.12.27",
+    "typescript": "^6.0.3",
+    "zod": "^4.4.3"
   }
 }

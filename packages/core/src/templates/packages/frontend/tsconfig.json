@@ -10,7 +10,6 @@
     "noEmit": true,
     "types": ["vite/client"],
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
-    "baseUrl": ".",
     "paths": {
       "%%SAPPORTA:SLUG%%-shared": ["../shared/src/index.ts"]
     }

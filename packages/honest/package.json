@@ -58,8 +58,8 @@
   },
   "devDependencies": {
     "@sapporta/rest-core": "3.52.2",
-    "hono": "^4.7.4",
-    "typescript": "^5.7.3",
-    "zod": "^4.3.6"
+    "hono": "^4.12.27",
+    "typescript": "^6.0.3",
+    "zod": "^4.4.3"
   }
 }
