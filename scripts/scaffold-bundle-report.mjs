@@ -23,7 +23,7 @@ const projectDir = existingProject ?? join(parentDir, projectName);
 
 try {
   if (!existingProject) {
-    run("pnpm", ["--filter", "@sapporta/server", "build"], root);
+    run("pnpm", ["-r", "--sort", "--if-present", "build"], root);
     run(
       "node",
       [join(root, "packages/core/bin/sapporta.mjs"), "init", projectName],

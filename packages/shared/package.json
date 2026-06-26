@@ -35,17 +35,45 @@
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
+      "sapporta:source": "./src/index.ts",
       "import": "./dist/index.js"
     },
-    "./filter": "./dist/filter.js",
-    "./value-kind": "./dist/value-kind.js",
-    "./temporal": "./dist/temporal.js",
-    "./daterange": "./dist/daterange.js",
-    "./grid-dataset": "./dist/grid-dataset/index.js",
-    "./row-id": "./dist/row-id.js",
-    "./validation": "./dist/validation/index.js",
-    "./contracts": "./dist/contracts/index.js",
-    "./client": "./dist/client/index.js",
+    "./filter": {
+      "sapporta:source": "./src/filter.ts",
+      "import": "./dist/filter.js"
+    },
+    "./value-kind": {
+      "sapporta:source": "./src/value-kind.ts",
+      "import": "./dist/value-kind.js"
+    },
+    "./temporal": {
+      "sapporta:source": "./src/temporal.ts",
+      "import": "./dist/temporal.js"
+    },
+    "./daterange": {
+      "sapporta:source": "./src/daterange.ts",
+      "import": "./dist/daterange.js"
+    },
+    "./grid-dataset": {
+      "sapporta:source": "./src/grid-dataset/index.ts",
+      "import": "./dist/grid-dataset/index.js"
+    },
+    "./row-id": {
+      "sapporta:source": "./src/row-id.ts",
+      "import": "./dist/row-id.js"
+    },
+    "./validation": {
+      "sapporta:source": "./src/validation/index.ts",
+      "import": "./dist/validation/index.js"
+    },
+    "./contracts": {
+      "sapporta:source": "./src/contracts/index.ts",
+      "import": "./dist/contracts/index.js"
+    },
+    "./client": {
+      "sapporta:source": "./src/client/index.ts",
+      "import": "./dist/client/index.js"
+    },
     "./package.json": "./package.json"
   },
   "scripts": {

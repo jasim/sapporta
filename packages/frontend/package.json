@@ -37,53 +37,68 @@
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
+      "sapporta:source": "./src/index.ts",
       "import": "./dist/index.js"
     },
     "./app": {
       "types": "./dist/app/index.d.ts",
+      "sapporta:source": "./src/app/index.ts",
       "import": "./dist/app.js"
     },
     "./platform": {
       "types": "./dist/platform/index.d.ts",
+      "sapporta:source": "./src/platform/index.ts",
       "import": "./dist/platform.js"
     },
     "./schema": {
       "types": "./dist/schema-catalog/index.d.ts",
+      "sapporta:source": "./src/schema-catalog/index.ts",
       "import": "./dist/schema.js"
     },
     "./auth": {
       "types": "./dist/auth/index.d.ts",
+      "sapporta:source": "./src/auth/index.ts",
       "import": "./dist/auth.js"
     },
     "./auth/runtime": {
       "types": "./dist/auth/runtime.d.ts",
+      "sapporta:source": "./src/auth/runtime.ts",
       "import": "./dist/auth/runtime.js"
     },
     "./auth/pages": {
       "types": "./dist/auth/pages.d.ts",
+      "sapporta:source": "./src/auth/pages.ts",
       "import": "./dist/auth/pages.js"
     },
     "./routes/table": {
       "types": "./dist/routes/table.d.ts",
+      "sapporta:source": "./src/routes/table.ts",
       "import": "./dist/routes/table.js"
     },
     "./routes/new-record": {
       "types": "./dist/routes/new-record.d.ts",
+      "sapporta:source": "./src/routes/new-record.ts",
       "import": "./dist/routes/new-record.js"
     },
     "./report": {
       "types": "./dist/report/index.d.ts",
+      "sapporta:source": "./src/report/index.ts",
       "import": "./dist/report.js"
     },
     "./layout": {
       "types": "./dist/shell/components/SidebarShell.d.ts",
+      "sapporta:source": "./src/shell/components/SidebarShell.tsx",
       "import": "./dist/layout.js"
     },
     "./shell": {
       "types": "./dist/shell.d.ts",
+      "sapporta:source": "./src/shell.ts",
       "import": "./dist/shell.js"
     },
-    "./index.css": "./dist/index.css"
+    "./index.css": {
+      "sapporta:source": "./src/index.css",
+      "default": "./dist/index.css"
+    }
   },
   "scripts": {
     "build": "vite build",

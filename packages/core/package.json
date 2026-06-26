@@ -44,16 +44,41 @@
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
+      "sapporta:source": "./src/index.ts",
       "import": "./dist/index.js"
     },
-    "./table": "./dist/schema/table.js",
-    "./errors": "./dist/db/errors.js",
-    "./create-project": "./dist/create-project.js",
-    "./cli": "./dist/cli/index.js",
-    "./cli/routes": "./dist/cli/routes.js",
-    "./cli/http-client": "./dist/cli/http-client.js",
-    "./cli/request": "./dist/cli/request.js",
-    "./cli/format": "./dist/cli/format.js",
+    "./table": {
+      "sapporta:source": "./src/schema/table.ts",
+      "import": "./dist/schema/table.js"
+    },
+    "./errors": {
+      "sapporta:source": "./src/db/errors.ts",
+      "import": "./dist/db/errors.js"
+    },
+    "./create-project": {
+      "sapporta:source": "./src/cli/init-project/create-project.ts",
+      "import": "./dist/create-project.js"
+    },
+    "./cli": {
+      "sapporta:source": "./src/cli/index.ts",
+      "import": "./dist/cli/index.js"
+    },
+    "./cli/routes": {
+      "sapporta:source": "./src/cli/routes.ts",
+      "import": "./dist/cli/routes.js"
+    },
+    "./cli/http-client": {
+      "sapporta:source": "./src/cli/http-client.ts",
+      "import": "./dist/cli/http-client.js"
+    },
+    "./cli/request": {
+      "sapporta:source": "./src/cli/request.ts",
+      "import": "./dist/cli/request.js"
+    },
+    "./cli/format": {
+      "sapporta:source": "./src/cli/format.ts",
+      "import": "./dist/cli/format.js"
+    },
     "./package.json": "./package.json"
   },
   "scripts": {

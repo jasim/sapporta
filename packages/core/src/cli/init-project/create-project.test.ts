@@ -1,5 +1,5 @@
+import { execFileSync } from "node:child_process";
 import { existsSync, mkdtempSync, readdirSync, readFileSync } from "node:fs";
-import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -18,9 +18,7 @@ import {
 
 describe("resolveOwningPackage", () => {
   it("reads @sapporta/server metadata without resolving its ESM-only root export", () => {
-    const requireFromHere = createRequire(import.meta.url);
-
-    expect(() => requireFromHere.resolve("@sapporta/server")).toThrow(
+    expect(nativeRequireResolveError("@sapporta/server")).toMatch(
       /No "exports" main defined|Package subpath '\.' is not defined/,
     );
     expect(
@@ -30,6 +28,30 @@ describe("resolveOwningPackage", () => {
     });
   });
 });
+
+function nativeRequireResolveError(packageName: string): string {
+  const script = `
+    const { createRequire } = require("node:module");
+    const requireFromHere = createRequire(${JSON.stringify(import.meta.url)});
+    try {
+      requireFromHere.resolve(${JSON.stringify(packageName)});
+    } catch (error) {
+      console.error(error instanceof Error ? error.message : String(error));
+      process.exit(1);
+    }
+  `;
+
+  try {
+    execFileSync(process.execPath, ["-e", script], {
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+  } catch (error) {
+    return error instanceof Error ? error.message : String(error);
+  }
+
+  throw new Error(`Expected native require.resolve(${packageName}) to fail`);
+}
 
 describe("createProject", () => {
   it("fails registry preflight before writing the target", () => {
@@ -94,8 +116,7 @@ describe("createProject", () => {
       if (previousDevModePackageRoot === undefined) {
         delete process.env.SAPPORTA_DEV_MODE_PACKAGE_ROOT;
       } else {
-        process.env.SAPPORTA_DEV_MODE_PACKAGE_ROOT =
-          previousDevModePackageRoot;
+        process.env.SAPPORTA_DEV_MODE_PACKAGE_ROOT = previousDevModePackageRoot;
       }
     }
 
@@ -182,12 +203,13 @@ describe("createProject", () => {
     const migrationApplyIndex = commands.indexOf(
       "pnpm --filter ./packages/api db:migrate",
     );
-    expect(commands.slice(migrationApplyIndex + 1, migrationApplyIndex + 4))
-      .toEqual([
-        "git init",
-        "git add .",
-        "git commit -m Create Sapporta project",
-      ]);
+    expect(
+      commands.slice(migrationApplyIndex + 1, migrationApplyIndex + 4),
+    ).toEqual([
+      "git init",
+      "git add .",
+      "git commit -m Create Sapporta project",
+    ]);
   });
 });
 

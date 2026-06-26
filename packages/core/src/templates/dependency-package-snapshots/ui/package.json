@@ -36,9 +36,13 @@
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
+      "sapporta:source": "./src/index.ts",
       "import": "./dist/index.js"
     },
-    "./index.css": "./dist/index.css"
+    "./index.css": {
+      "sapporta:source": "./src/index.css",
+      "default": "./dist/index.css"
+    }
   },
   "scripts": {
     "dev": "vite",
