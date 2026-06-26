@@ -23,7 +23,7 @@
     "test:e2e:npm:docker": "zx scripts/test.mjs e2e-npm-docker",
     "pretest:e2e:docker": "zx scripts/test.mjs prepare-e2e",
     "test:e2e:docker": "zx scripts/test.mjs e2e-docker",
-    "sapporta": "node packages/core/bin/sapporta.mjs",
+    "sapporta": "node packages/cli/bin/sapporta.mjs",
     "changeset": "changeset",
     "version": "changeset version",
     "release": "node scripts/release.mjs"
@@ -43,8 +43,5 @@
     "onlyBuiltDependencies": [
       "better-sqlite3"
     ]
-  },
-  "dependencies": {
-    "sapporta": "link:packages/cli"
   }
 }

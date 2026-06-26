@@ -4,16 +4,9 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
-overrides:
-  sapporta: link:packages/cli
-
 importers:
 
   .:
-    dependencies:
-      sapporta:
-        specifier: link:packages/cli
-        version: link:packages/cli
     devDependencies:
       '@changesets/cli':
         specifier: ^2.31.0
