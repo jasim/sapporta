@@ -1,5 +1,11 @@
 # @sapporta/ui
 
+## 0.2.6
+
+### Patch Changes
+
+- Release for homepage deployment pre-checks
+
 ## 0.2.5
 
 ### Patch Changes

@@ -1,5 +1,11 @@
 # @sapporta/shared
 
+## 0.1.6
+
+### Patch Changes
+
+- Release for homepage deployment pre-checks
+
 ## 0.1.5
 
 ### Patch Changes

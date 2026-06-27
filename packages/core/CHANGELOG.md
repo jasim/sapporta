@@ -1,5 +1,14 @@
 # @sapporta/server
 
+## 0.2.6
+
+### Patch Changes
+
+- Release for homepage deployment pre-checks
+- Updated dependencies
+  - @sapporta/honest@0.3.5
+  - @sapporta/shared@0.1.6
+
 ## 0.2.5
 
 ### Patch Changes

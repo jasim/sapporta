@@ -1,6 +1,6 @@
 {
   "name": "@sapporta/ui",
-  "version": "0.2.5",
+  "version": "0.2.6",
   "type": "module",
   "description": "Sapporta UI primitives and reusable React utilities.",
   "keywords": [

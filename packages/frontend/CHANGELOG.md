@@ -1,5 +1,15 @@
 # @sapporta/frontend
 
+## 0.2.6
+
+### Patch Changes
+
+- Release for homepage deployment pre-checks
+- Updated dependencies
+  - @sapporta/grid@0.2.6
+  - @sapporta/shared@0.1.6
+  - @sapporta/ui@0.2.6
+
 ## 0.2.5
 
 ### Patch Changes

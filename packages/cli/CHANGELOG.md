@@ -1,5 +1,13 @@
 # sapporta
 
+## 0.2.5
+
+### Patch Changes
+
+- Release for homepage deployment pre-checks
+- Updated dependencies
+  - @sapporta/server@0.2.6
+
 ## 0.2.4
 
 ### Patch Changes

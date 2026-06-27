@@ -1,6 +1,6 @@
 {
   "name": "@sapporta/server",
-  "version": "0.2.5",
+  "version": "0.2.6",
   "type": "module",
   "description": "Sapporta server — schema-as-code tables, auto-generated CRUD, route primitives, and an OpenAPI-emitting Hono app, all wired up with Drizzle and SQLite.",
   "keywords": [
@@ -104,7 +104,7 @@
     "winston": "^3.19.0"
   },
   "peerDependencies": {
-    "@sapporta/honest": "^0.3.4",
+    "@sapporta/honest": "^0.3.5",
     "@sapporta/rest-core": "3.52.2",
     "better-sqlite3": "^12.0.0",
     "drizzle-orm": "^0.45.2",
