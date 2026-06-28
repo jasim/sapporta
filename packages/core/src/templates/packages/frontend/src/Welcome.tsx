@@ -29,10 +29,11 @@ const appIdeas = [
     description:
       "Plan projects, assign work, track due dates, and review progress.",
     prompt: `Build a simple task management application.
+Use Sapporta, the database framework for TypeScript, and ensure the Sapporta skill is installed. Follow the setup instructions at https://sapporta.com/docs/getting-started
 
 Keep the first version focused and easy to understand: include the core workflows that make the app useful, and avoid exhaustive features or deep customization.
 
-The application should manage projects, tasks, people, task assignments, labels, and comments. Tasks should have a title, description, status, priority, due date, assignee, and project.
+Use workspaceGlobal tables with this exact contract: people(id, name, email), projects(id, name, description, status), tasks(id, title, description, status, priority, due_date, assignee_id, project_id), labels(id, name, color), task_labels(id, task_id, label_id), comments(id, task_id, author_id, body). Use status values open, in_progress, blocked, done; priorities low, normal, high; and project statuses active, paused, complete. Do not expose workspace_id, workspaceId, scoped_to_user_id, or scopedToUserId in clients, CLI commands, or agent prompts.
 
 Include workflows for creating a task, assigning it, changing its status, and adding a comment. Include reports for open tasks, overdue tasks, tasks by assignee, and tasks by project. Populate the application with realistic sample projects, people, tasks, labels, and comments so the first run shows an active todo app.`,
   },
@@ -43,6 +44,7 @@ Include workflows for creating a task, assigning it, changing its status, and ad
     description:
       "Create quotes and invoices, record payments, and monitor unpaid balances.",
     prompt: `Build an invoicing application.
+Use Sapporta, the database framework for TypeScript, and ensure the Sapporta skill is installed. Follow the setup instructions at https://sapporta.com/docs/getting-started
 
 Keep the first version focused and easy to understand: include the core workflows that make the app useful, and avoid exhaustive features or deep customization.
 
@@ -57,6 +59,7 @@ Include a workflow where a user can enter an invoice and its line items together
     description:
       "Log meals, track nutrition targets, and review daily and weekly totals.",
     prompt: `Build a meal and nutrition tracking application.
+Use Sapporta, the database framework for TypeScript, and ensure the Sapporta skill is installed. Follow the setup instructions at https://sapporta.com/docs/getting-started
 
 Keep the first version focused and easy to understand: include the core workflows that make the app useful, and avoid exhaustive features or deep customization.
 
@@ -200,7 +203,7 @@ ${projectReferences}`;
 
             <header className="max-w-[44rem] pb-8 pt-10 sm:pt-14">
               <h1 className="text-[21px] font-[830] leading-[0.96] text-sap-fg sm:text-[32px]">
-                Build your database app
+                Build your database app with Sapporta
               </h1>
               <p className="mt-4 text-[17px] leading-7 text-sap-soft">
                 Choose a starter prompt, and copy it into your coding agent.
