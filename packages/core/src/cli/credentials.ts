@@ -26,7 +26,8 @@ export function resolveApiUrl(
   flags: Record<string, unknown>,
   env: Record<string, string | undefined> = process.env,
 ): string {
-  const explicit = readScalarFlag(flags["api-url"]);
+  const explicit =
+    readScalarFlag(flags.apiUrl) ?? readScalarFlag(flags["api-url"]);
   const apiUrl = explicit ?? env.SAPPORTA_API_URL ?? "http://localhost:3000";
   return apiUrl.replace(/\/+$/, "");
 }
@@ -35,7 +36,8 @@ export function resolveApiToken(
   flags: Record<string, unknown>,
   env: Record<string, string | undefined> = process.env,
 ): { apiToken?: string } {
-  const explicit = readScalarFlag(flags["api-token"]);
+  const explicit =
+    readScalarFlag(flags.apiToken) ?? readScalarFlag(flags["api-token"]);
   const token = explicit ?? env.SAPPORTA_API_TOKEN;
   return token && token.length > 0 ? { apiToken: token } : {};
 }

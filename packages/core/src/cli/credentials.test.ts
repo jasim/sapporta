@@ -27,8 +27,8 @@ describe("resolveCliCredentials", () => {
     expect(
       resolveCliCredentials(
         {
-          "api-url": "https://flag.example.com/",
-          "api-token": "flag-token",
+          apiUrl: "https://flag.example.com/",
+          apiToken: "flag-token",
         },
         {
           SAPPORTA_API_URL: "https://env.example.com",

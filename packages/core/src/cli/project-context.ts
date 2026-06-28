@@ -15,7 +15,7 @@ export interface ProjectContext {
  * Resolve project context from CLI flags or filesystem walk.
  *
  * Resolution order:
- *   1. --sapporta-project-dir flag
+ *   1. --project-dir flag
  *   2. Walk up from cwd looking for sapporta.json
  *
  * From the project root we derive packages/api/dist/ (compiled
@@ -24,11 +24,12 @@ export interface ProjectContext {
 export async function resolveProjectContext(
   flags: Record<string, string>,
 ): Promise<ProjectContext> {
-  const projectDir = flags["sapporta-project-dir"] ?? findProjectRoot();
+  const projectDir =
+    flags["project-dir"] ?? flags.projectDir ?? findProjectRoot();
 
   if (!projectDir) {
     throw new OperationError(
-      "No Sapporta project found. Use --sapporta-project-dir or run from within a project directory (containing sapporta.json)",
+      "No Sapporta project found. Use --project-dir or run from within a project directory (containing sapporta.json)",
       ErrorCode.PROJECT_NOT_FOUND,
     );
   }

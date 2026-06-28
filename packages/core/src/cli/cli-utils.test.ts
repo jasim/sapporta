@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import Database from "better-sqlite3";
-import { parseFlags, formatTable, truncateValues } from "./format.js";
+import { formatTable, truncateValues } from "./format.js";
 import {
   requireSelect,
   rejectDangerousSQL,
@@ -14,31 +14,6 @@ import {
   getTableColumns,
   validatePayloadColumns,
 } from "../introspect/db-helpers.js";
-
-describe("parseFlags", () => {
-  it("parses --key value pairs", () => {
-    const result = parseFlags(["--table", "accounts", "--limit", "10"]);
-    expect(result.table).toBe("accounts");
-    expect(result.limit).toBe("10");
-  });
-
-  it("parses boolean flags (no value)", () => {
-    const result = parseFlags(["--verbose", "--table", "accounts"]);
-    expect(result.verbose).toBe("true");
-    expect(result.table).toBe("accounts");
-  });
-
-  it("collects positional args under _", () => {
-    const result = parseFlags(["accounts", "--limit", "5"]);
-    expect(result._).toEqual(["accounts"]);
-    expect(result.limit).toBe("5");
-  });
-
-  it("returns empty for no args", () => {
-    const result = parseFlags([]);
-    expect(result._).toEqual([]);
-  });
-});
 
 describe("requireSelect", () => {
   it("allows SELECT queries", () => {

@@ -85,32 +85,35 @@ The CLI exposes resource-centered commands and routes all data commands through 
 
 **Requires a running server** (`pnpm dev` or `pnpm start` from the project) for API-backed commands. `init` works without a server.
 
-### CLI Self-Introspection
+### CLI Endpoint Discovery
 
-Use `describe` to discover live HTTP endpoints and their input schemas:
+Use `endpoints` to discover live HTTP endpoints and their input schemas:
 
 ```bash
 # List all available HTTP endpoints
-sapporta describe
+sapporta endpoints list
 
 # Get full input schema (JSON Schema) for an endpoint
-sapporta describe "POST /api/meta/sql"
-sapporta describe "POST /api/tables/accounts"
+sapporta endpoints show "POST /api/meta/sql"
+sapporta endpoints show "POST /api/tables/accounts"
 ```
 
 ### Global Flags
 
 ```bash
---output-format json   # Structured JSON output (auto-detected when stdout is not a TTY)
---output-format table  # Human-readable table output (default in terminal)
---input-body-json '{...}'  # JSON object to send as the request body for commands that accept one
+--output json     # Structured JSON output (auto-detected when stdout is not a TTY)
+--output table    # Human-readable table output (default in terminal)
+--api-url <url>   # Server URL (default: http://localhost:3000)
+--api-token <token>
+--project-dir <path>
 ```
 
 ### Table Definition Commands
 
 ```bash
 # List all tables with schema metadata and row counts
-sapporta tables
+sapporta tables list
+sapporta tables list --detail
 
 # Show table structure (columns, types, constraints, foreign keys)
 sapporta tables show <name>
@@ -119,16 +122,19 @@ sapporta tables show <name>
 sapporta tables indexes <name>
 
 # Show sample rows from a table
-sapporta tables sample <name> --limit 10 --fields name,type
+sapporta tables sample <name> --limit 10 --columns name,type
 ```
 
 ### Database Commands
 
 ```bash
-# Run any SQL statement — reads return rows, writes report row counts
-sapporta db exec-sql "SELECT * FROM accounts"
-sapporta db exec-sql --input-body-json '{"sql": "SELECT * FROM accounts", "limit": 50}'
-sapporta db exec-sql --input-body-json '{"sql": "DELETE FROM accounts WHERE id = 5"}'
+# Reads return rows
+sapporta sql query "SELECT * FROM accounts"
+sapporta sql query "SELECT * FROM accounts WHERE type = ?" --params '["asset"]' --limit 50
+
+# Writes require the explicit execute command
+sapporta sql execute "UPDATE accounts SET name = ? WHERE id = ?" --params '["Cash",5]'
+sapporta sql execute "DELETE FROM accounts WHERE id = ?" --params '[5]' --dry-run
 ```
 
 ### Schema Migrations
@@ -157,22 +163,23 @@ Change schema, run Drizzle Kit generate, review SQL, run Drizzle Kit migrate, st
 
 ```bash
 # List rows (with filters, sort, pagination)
-sapporta rows <table> --limit 50 --page 2 --sort name --order asc
+sapporta rows list <table> --limit 50 --page 2 --sort "-created_at,name"
+sapporta rows list <table> --where '{"status":{"eq":"active"}}'
 
 # Get a single row by ID
 sapporta rows get <table> <id>
 
-# Insert a single row
-sapporta rows insert <table> --data '{"name":"Cash","type":"asset"}'
+# Create a single row
+sapporta rows create <table> --values '{"name":"Cash","type":"asset"}'
 
-# Insert multiple rows (batch)
-sapporta rows insert <table> --data '[{"name":"Cash"},{"name":"Revenue"}]'
+# Create multiple rows (batch)
+sapporta rows create <table> --values '[{"name":"Cash"},{"name":"Revenue"}]'
 
-# Insert master + detail records atomically
-sapporta rows insert orders --data '{"customer":"Alice","$details":{"table":"order_items","fk":"order_id","rows":[{"product":"Widget","quantity":3}]}}'
+# Create master + detail records atomically
+sapporta rows create orders --values '{"customer":"Alice","$details":{"table":"order_items","fk":"order_id","rows":[{"product":"Widget","quantity":3}]}}'
 
 # Update a row
-sapporta rows update <table> <id> --data '{"name":"Updated"}'
+sapporta rows update <table> <id> --values '{"name":"Updated"}'
 
 # Delete a row
 sapporta rows delete <table> <id>
@@ -181,24 +188,16 @@ sapporta rows delete <table> <id>
 ### Route-Based Reports
 
 Reports are ordinary app routes that return `GridReportResult` from
-`@sapporta/shared/report-grid`. Use `sapporta describe` to inspect the route
+`@sapporta/shared/report-grid`. Use `sapporta endpoints` to inspect the route
 contract and call the route like any other endpoint.
 
-### Action Commands
+### Generic API Commands
 
 ```bash
-# List all actions
-sapporta actions
-
-# Execute an action
-sapporta actions run <name> --data '{"field":"value"}'
-```
-
-### View Commands
-
-```bash
-# List all custom views
-sapporta views
+sapporta api get /api/tables/books --query '{"limit":50}'
+sapporta api post /api/custom-route --body '{"field":"value"}'
+sapporta api put /api/custom-route/123 --body '{"field":"updated"}'
+sapporta api delete /api/custom-route/123
 ```
 
 ## Project Context

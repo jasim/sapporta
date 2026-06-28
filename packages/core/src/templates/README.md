@@ -17,7 +17,7 @@ Open `http://localhost:5173`.
 - `pnpm dev` - start backend and frontend in watch mode
 - `pnpm build` - compile the shared package, API, and frontend
 - `pnpm start` - run the production server after `pnpm build`
-- `pnpm exec sapporta describe` - inspect the running API
+- `pnpm exec sapporta endpoints list` - inspect the running API
 
 ## Project layout
 

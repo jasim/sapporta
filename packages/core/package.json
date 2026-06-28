@@ -67,25 +67,30 @@
       "sapporta:source": "./src/cli/index.ts",
       "default": "./dist/cli/index.js"
     },
-    "./cli/routes": {
-      "types": "./dist/cli/routes.d.ts",
-      "sapporta:source": "./src/cli/routes.ts",
-      "default": "./dist/cli/routes.js"
+    "./cli/commands": {
+      "types": "./dist/cli/commands/registry.d.ts",
+      "sapporta:source": "./src/cli/commands/registry.ts",
+      "default": "./dist/cli/commands/registry.js"
+    },
+    "./cli/client": {
+      "types": "./dist/cli/client/app-client.d.ts",
+      "sapporta:source": "./src/cli/client/app-client.ts",
+      "default": "./dist/cli/client/app-client.js"
     },
     "./cli/http-client": {
       "types": "./dist/cli/http-client.d.ts",
       "sapporta:source": "./src/cli/http-client.ts",
       "default": "./dist/cli/http-client.js"
     },
-    "./cli/request": {
-      "types": "./dist/cli/request.d.ts",
-      "sapporta:source": "./src/cli/request.ts",
-      "default": "./dist/cli/request.js"
-    },
     "./cli/format": {
       "types": "./dist/cli/format.d.ts",
       "sapporta:source": "./src/cli/format.ts",
       "default": "./dist/cli/format.js"
+    },
+    "./cli/render": {
+      "types": "./dist/cli/render/output.d.ts",
+      "sapporta:source": "./src/cli/render/output.ts",
+      "default": "./dist/cli/render/output.js"
     },
     "./package.json": "./package.json"
   },

@@ -1,7 +1,7 @@
 /**
  * Helpers for reading the app's OpenAPI document.
  *
- * `sapporta describe` uses these helpers to list and inspect the endpoints
+ * `sapporta endpoints` uses these helpers to list and inspect the endpoints
  * exposed by the selected deployment. If the OpenAPI route is protected, the
  * same bearer token used for table/report commands is used here too.
  */

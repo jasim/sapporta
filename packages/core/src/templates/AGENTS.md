@@ -9,7 +9,7 @@ APIs, auth-aware row access, and a React app shell.
 - `pnpm dev` starts the API and frontend in watch mode.
 - `pnpm build` compiles the shared package, API, and frontend.
 - `pnpm start` runs the production server after `pnpm build`.
-- `pnpm exec sapporta describe` inspects the running API.
+- `pnpm exec sapporta endpoints list` inspects the running API.
 
 Prefer the project-local CLI form: `pnpm exec sapporta ...`.
 
