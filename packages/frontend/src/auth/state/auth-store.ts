@@ -12,46 +12,39 @@ import {
 } from "@/auth/api/auth-context";
 import { useSchemaStore } from "@/schema-catalog/state/schema-store";
 
-export type AuthStatus =
-  | "idle"
-  | "loading"
-  | "authenticated"
-  | "unauthenticated"
-  | "unverified"
-  | "workspace_required"
-  | "error";
+export type AuthSession =
+  | { kind: "unknown" }
+  | { kind: "loading" }
+  | { kind: "guest" }
+  | { kind: "authenticated"; context: AuthContextResponse }
+  | { kind: "unverified" }
+  | { kind: "workspaceRequired" }
+  | { kind: "failed"; error: string };
 
 export interface AuthState {
-  status: AuthStatus;
-  context: AuthContextResponse | null;
+  session: AuthSession;
   bootstrapStatus: AuthBootstrapStatus | null;
-  error: string | null;
-  load: () => Promise<void>;
+  restoreSession: () => Promise<void>;
+  reloadSession: () => Promise<void>;
   loadBootstrapStatus: () => Promise<void>;
-  refresh: () => Promise<void>;
   switchWorkspace: (body: SwitchActiveWorkspaceBody) => Promise<void>;
   logout: () => Promise<void>;
   reset: () => void;
 }
 
 export const useAuthStore = create<AuthState>((set, get) => ({
-  status: "idle",
-  context: null,
+  session: { kind: "unknown" },
   bootstrapStatus: null,
-  error: null,
-  load: async () => {
-    if (get().status === "loading") return;
-    set({ status: "loading", error: null });
-    try {
-      const context = await fetchAuthContext();
-      set({
-        context,
-        status: context.user.emailVerified ? "authenticated" : "unverified",
-        error: null,
-      });
-    } catch (err) {
-      set(authFailureState(err));
-    }
+  restoreSession: async () => {
+    const kind = get().session.kind;
+    if (kind !== "unknown" && kind !== "failed") return;
+    set({ session: { kind: "loading" } });
+    set({ session: await readAuthSession() });
+  },
+  reloadSession: async () => {
+    if (get().session.kind === "loading") return;
+    set({ session: { kind: "loading" } });
+    set({ session: await readAuthSession() });
   },
   loadBootstrapStatus: async () => {
     if (get().bootstrapStatus) return;
@@ -68,58 +61,50 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       });
     }
   },
-  refresh: async () => {
-    set({ status: "loading", error: null });
-    try {
-      const context = await fetchAuthContext();
-      set({
-        context,
-        status: context.user.emailVerified ? "authenticated" : "unverified",
-        error: null,
-      });
-    } catch (err) {
-      set(authFailureState(err));
-    }
-  },
   switchWorkspace: async (body) => {
     const context = await switchActiveWorkspace(body);
     useSchemaStore.getState().reset();
-    set({
-      context,
-      status: context.user.emailVerified ? "authenticated" : "unverified",
-      error: null,
-    });
+    set({ session: sessionFromContext(context) });
   },
   logout: async () => {
     await signOut();
     useSchemaStore.getState().reset();
-    set({ status: "unauthenticated", context: null, error: null });
+    set({ session: { kind: "guest" } });
   },
   reset: () =>
     set({
-      status: "idle",
-      context: null,
+      session: { kind: "unknown" },
       bootstrapStatus: null,
-      error: null,
     }),
 }));
 
-function authFailureState(
-  err: unknown,
-): Pick<AuthState, "status" | "context" | "error"> {
+async function readAuthSession(): Promise<AuthSession> {
+  try {
+    const context = await fetchAuthContext();
+    return sessionFromContext(context);
+  } catch (err) {
+    return sessionFromAuthFailure(err);
+  }
+}
+
+function sessionFromContext(context: AuthContextResponse): AuthSession {
+  if (!context.user.emailVerified) return { kind: "unverified" };
+  return { kind: "authenticated", context };
+}
+
+function sessionFromAuthFailure(err: unknown): AuthSession {
   const code = errorCode(err);
   if (code === "unauthenticated") {
-    return { status: "unauthenticated", context: null, error: null };
+    return { kind: "guest" };
   }
   if (code === "email_not_verified") {
-    return { status: "unverified", context: null, error: null };
+    return { kind: "unverified" };
   }
   if (code === "workspace_required") {
-    return { status: "workspace_required", context: null, error: null };
+    return { kind: "workspaceRequired" };
   }
   return {
-    status: "error",
-    context: null,
+    kind: "failed",
     error: err instanceof Error ? err.message : String(err),
   };
 }

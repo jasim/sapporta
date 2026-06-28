@@ -16,5 +16,5 @@ export {
 export {
   useAuthStore,
   type AuthState,
-  type AuthStatus,
+  type AuthSession,
 } from "./state/auth-store";

@@ -12,5 +12,5 @@ export { AuthGate, PublicOnlyGate } from "./components/AuthGate";
 export {
   useAuthStore,
   type AuthState,
-  type AuthStatus,
+  type AuthSession,
 } from "./state/auth-store";

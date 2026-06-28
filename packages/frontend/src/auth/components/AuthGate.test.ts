@@ -94,18 +94,44 @@ afterEach(() => {
 });
 
 describe("auth route gates", () => {
+  it("does not restore auth context from protected route guards", async () => {
+    const calls = installFetch(() =>
+      jsonResponse({ error: "Unexpected request" }, 500),
+    );
+    useAuthStoreSetState({ session: { kind: "guest" } });
+
+    await renderRoutes(
+      "/tables/tasks",
+      createElement(Route, {
+        path: "/login",
+        element: createElement(Screen, { label: "login page" }),
+      }),
+      createElement(Route, {
+        path: "/tables/tasks",
+        element: createElement(
+          AuthGate,
+          null,
+          createElement(Screen, { label: "protected page" }),
+        ),
+      }),
+    );
+
+    await waitForText("login page");
+    expect(calls.some((call) => call.path === "/api/auth-context")).toBe(false);
+  });
+
   it("redirects protected routes for unauthenticated, unverified, and workspace-required states", async () => {
     const cases = [
       {
-        status: "unauthenticated",
+        session: { kind: "guest" },
         expectedText: "login page",
       },
       {
-        status: "unverified",
+        session: { kind: "unverified" },
         expectedText: "verify email page",
       },
       {
-        status: "workspace_required",
+        session: { kind: "workspaceRequired" },
         expectedText: "signup page",
       },
     ] as const;
@@ -117,7 +143,7 @@ describe("auth route gates", () => {
       host.innerHTML = "";
       root = createRoot(host);
       useAuthStoreReset();
-      useAuthStoreSetState({ status: testCase.status });
+      useAuthStoreSetState({ session: testCase.session });
 
       await act(async () => {
         root.render(
@@ -168,7 +194,7 @@ describe("auth route gates", () => {
       }
       return jsonResponse({ error: "Unexpected request" }, 500);
     });
-    useAuthStoreSetState({ status: "unauthenticated" });
+    useAuthStoreSetState({ session: { kind: "guest" } });
 
     await renderPublicGate("/login");
 
@@ -177,7 +203,9 @@ describe("auth route gates", () => {
   });
 
   it("keeps authenticated visitors out of public login pages", async () => {
-    useAuthStoreSetState({ status: "authenticated", context: AUTH_CONTEXT });
+    useAuthStoreSetState({
+      session: { kind: "authenticated", context: AUTH_CONTEXT },
+    });
 
     await renderPublicGate("/login");
 
@@ -383,7 +411,9 @@ describe("auth pages", () => {
       }
       return jsonResponse({ error: "Unexpected request" }, 500);
     });
-    useAuthStoreSetState({ status: "authenticated", context: AUTH_CONTEXT });
+    useAuthStoreSetState({
+      session: { kind: "authenticated", context: AUTH_CONTEXT },
+    });
     useSchemaStore.setState({ loaded: true });
     await renderRoutes(
       "/tables/tasks",

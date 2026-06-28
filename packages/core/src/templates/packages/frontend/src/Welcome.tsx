@@ -2,6 +2,7 @@ import { type ReactNode, useEffect, useState } from "react";
 import {
   fetchAuthContext,
   useAuthStore,
+  type AuthSession,
 } from "@sapporta/frontend/auth/runtime";
 import { getApiBase } from "@sapporta/frontend/platform";
 import { useSchemaStore } from "@sapporta/frontend/schema";
@@ -84,9 +85,7 @@ const eyebrowClass =
 // needs after the app has its own primary surface.
 export function Welcome() {
   const { tables, loaded, error, name, slug } = useSchemaStore();
-  const authStatus = useAuthStore((s) => s.status);
-  const authContext = useAuthStore((s) => s.context);
-  const authError = useAuthStore((s) => s.error);
+  const authSession = useAuthStore((s) => s.session);
   const [selectedIdeaId, setSelectedIdeaId] = useState<AppIdea["id"]>("tasks");
   const [copyStatus, setCopyStatus] = useState<CopyStatus>("idle");
   const [viewMode, setViewMode] = useState<ViewMode>("onboarding");
@@ -124,7 +123,7 @@ ${projectReferences}`;
     setDiagnostics([
       renderCheckResult("frontend", "pass", "Frontend route rendered."),
       schemaCheck({ loaded, error, tables, name, slug }),
-      authStoreCheck({ authStatus, authContext, authError }),
+      authStoreCheck(authSession),
     ]);
 
     const results = await Promise.all([
@@ -407,30 +406,26 @@ function schemaCheck(args: {
   );
 }
 
-function authStoreCheck(args: {
-  authStatus: string;
-  authContext: unknown;
-  authError: string | null;
-}): DiagnosticResult {
-  if (args.authStatus === "authenticated" && args.authContext) {
+function authStoreCheck(session: AuthSession): DiagnosticResult {
+  if (session.kind === "authenticated") {
     return renderCheckResult(
       "authStore",
       "pass",
       "The protected app shell has an authenticated user and workspace context.",
     );
   }
-  if (args.authStatus === "error") {
+  if (session.kind === "failed") {
     return renderCheckResult(
       "authStore",
       "fail",
-      "The auth store is in an error state.",
-      args.authError ?? undefined,
+      "The app shell could not load the current session.",
+      session.error,
     );
   }
   return renderCheckResult(
     "authStore",
     "warn",
-    `The auth store status is "${args.authStatus}". If this page is visible unexpectedly, inspect /api/auth-context and the auth gate.`,
+    `The current session is "${session.kind}". If this page is visible unexpectedly, inspect /api/auth-context and the auth gate.`,
   );
 }
 

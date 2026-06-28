@@ -33,7 +33,7 @@ export {
   switchActiveWorkspace,
   useAuthStore,
   type AuthState,
-  type AuthStatus,
+  type AuthSession,
 } from "@/auth";
 export { BootLoader } from "@/app/boot/BootLoader";
 export { HomeRedirect } from "@/app/boot/HomeRedirect";

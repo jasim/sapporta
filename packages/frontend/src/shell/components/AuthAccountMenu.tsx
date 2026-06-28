@@ -13,11 +13,12 @@ export interface AuthAccountMenuProps extends Omit<
 
 export function AuthAccountMenu(props: AuthAccountMenuProps) {
   const { sections = [], ...accountMenuProps } = props;
-  const context = useAuthStore((s) => s.context);
+  const session = useAuthStore((s) => s.session);
   const logout = useAuthStore((s) => s.logout);
   const navigate = useNavigate();
 
-  if (!context) return null;
+  if (session.kind !== "authenticated") return null;
+  const { context } = session;
 
   const profileSection: AccountMenuSection = {
     id: "account",

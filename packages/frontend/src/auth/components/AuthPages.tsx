@@ -81,8 +81,10 @@ export function VerifyEmailPage() {
   const location = useLocation();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const refresh = useAuthStore((s) => s.refresh);
-  const contextEmail = useAuthStore((s) => s.context?.user.email);
+  const reloadSession = useAuthStore((s) => s.reloadSession);
+  const session = useAuthStore((s) => s.session);
+  const contextEmail =
+    session.kind === "authenticated" ? session.context.user.email : undefined;
   const stateEmail = readVerifyEmailState(location.state).email;
   const token = searchParams.get("token");
   const next = safeRedirectPath(searchParams.get("next"));
@@ -106,7 +108,7 @@ export function VerifyEmailPage() {
           credentials: "include",
         });
         if (!res.ok) throw new Error(await responseMessage(res));
-        await refresh();
+        await reloadSession();
         if (cancelled) return;
         setMessage("Email verified. Taking you back...");
         window.setTimeout(() => {
@@ -125,7 +127,7 @@ export function VerifyEmailPage() {
     return () => {
       cancelled = true;
     };
-  }, [navigate, next, refresh, token]);
+  }, [navigate, next, reloadSession, token]);
 
   async function resend(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -201,7 +203,7 @@ export function VerifyEmailPage() {
 function EmailPasswordPage({ mode }: { mode: AuthMode }) {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const refresh = useAuthStore((s) => s.refresh);
+  const reloadSession = useAuthStore((s) => s.reloadSession);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
@@ -242,7 +244,7 @@ function EmailPasswordPage({ mode }: { mode: AuthMode }) {
         );
         return;
       }
-      await refresh();
+      await reloadSession();
       if (mode === "signup") {
         navigate("/verify-email", { replace: true, state: { email } });
         return;

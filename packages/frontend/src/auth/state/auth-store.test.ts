@@ -38,16 +38,18 @@ describe("auth store", () => {
     vi.unstubAllGlobals();
   });
 
-  it("loads the Sapporta auth context", async () => {
+  it("restores the Sapporta auth context", async () => {
     vi.stubGlobal(
       "fetch",
       vi.fn(async () => jsonResponse(AUTH_CONTEXT)),
     );
 
-    await useAuthStore.getState().load();
+    await useAuthStore.getState().restoreSession();
 
-    expect(useAuthStore.getState().status).toBe("authenticated");
-    expect(useAuthStore.getState().context?.workspace.id).toBe("workspace-1");
+    expect(useAuthStore.getState().session).toEqual({
+      kind: "authenticated",
+      context: AUTH_CONTEXT,
+    });
     expect(fetch).toHaveBeenCalledWith(
       "/api/auth-context",
       expect.objectContaining({
@@ -57,7 +59,7 @@ describe("auth store", () => {
     );
   });
 
-  it("maps unauthenticated failures to unauthenticated status", async () => {
+  it("maps unauthenticated failures to guest sessions", async () => {
     vi.stubGlobal(
       "fetch",
       vi.fn(async () =>
@@ -68,13 +70,12 @@ describe("auth store", () => {
       ),
     );
 
-    await useAuthStore.getState().load();
+    await useAuthStore.getState().restoreSession();
 
-    expect(useAuthStore.getState().status).toBe("unauthenticated");
-    expect(useAuthStore.getState().context).toBeNull();
+    expect(useAuthStore.getState().session).toEqual({ kind: "guest" });
   });
 
-  it("maps auth policy failures to UI auth states", async () => {
+  it("maps auth policy failures to session states", async () => {
     vi.stubGlobal(
       "fetch",
       vi.fn(async () =>
@@ -85,10 +86,9 @@ describe("auth store", () => {
       ),
     );
 
-    await useAuthStore.getState().load();
+    await useAuthStore.getState().restoreSession();
 
-    expect(useAuthStore.getState().status).toBe("unverified");
-    expect(useAuthStore.getState().context).toBeNull();
+    expect(useAuthStore.getState().session).toEqual({ kind: "unverified" });
 
     vi.stubGlobal(
       "fetch",
@@ -100,10 +100,11 @@ describe("auth store", () => {
       ),
     );
 
-    await useAuthStore.getState().refresh();
+    await useAuthStore.getState().reloadSession();
 
-    expect(useAuthStore.getState().status).toBe("workspace_required");
-    expect(useAuthStore.getState().context).toBeNull();
+    expect(useAuthStore.getState().session).toEqual({
+      kind: "workspaceRequired",
+    });
   });
 
   it("loads public auth bootstrap status", async () => {
@@ -155,11 +156,12 @@ describe("auth store", () => {
       ),
     );
 
-    await useAuthStore.getState().load();
+    await useAuthStore.getState().restoreSession();
 
-    expect(useAuthStore.getState().status).toBe("error");
-    expect(useAuthStore.getState().context).toBeNull();
-    expect(useAuthStore.getState().error).toBe("API error 500");
+    expect(useAuthStore.getState().session).toEqual({
+      kind: "failed",
+      error: "API error 500",
+    });
   });
 
   it("resets loaded metadata after workspace switch", async () => {
@@ -174,7 +176,10 @@ describe("auth store", () => {
       .switchWorkspace({ workspaceId: "workspace-1" });
 
     expect(useSchemaStore.getState().loaded).toBe(false);
-    expect(useAuthStore.getState().status).toBe("authenticated");
+    expect(useAuthStore.getState().session).toEqual({
+      kind: "authenticated",
+      context: AUTH_CONTEXT,
+    });
     expect(fetch).toHaveBeenCalledWith(
       "/api/auth-context/active-workspace",
       expect.objectContaining({
@@ -191,19 +196,13 @@ describe("auth store", () => {
       vi.fn(async () => jsonResponse({ ok: true })),
     );
     useAuthStore.setState({
-      status: "authenticated",
-      context: AUTH_CONTEXT,
-      error: "stale",
+      session: { kind: "authenticated", context: AUTH_CONTEXT },
     });
     useSchemaStore.setState({ loaded: true });
 
     await useAuthStore.getState().logout();
 
-    expect(useAuthStore.getState()).toMatchObject({
-      status: "unauthenticated",
-      context: null,
-      error: null,
-    });
+    expect(useAuthStore.getState().session).toEqual({ kind: "guest" });
     expect(useSchemaStore.getState().loaded).toBe(false);
     expect(fetch).toHaveBeenCalledWith(
       "/api/auth/sign-out",

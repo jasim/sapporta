@@ -36,15 +36,9 @@ import {
 } from "@/shell/components/AccountMenu";
 
 export function AccountProfilePage() {
-  const context = useAuthStore((s) => s.context);
-  const status = useAuthStore((s) => s.status);
-  const load = useAuthStore((s) => s.load);
+  const session = useAuthStore((s) => s.session);
 
-  useEffect(() => {
-    if (status === "idle") void load();
-  }, [load, status]);
-
-  if (status === "idle" || status === "loading") {
+  if (session.kind === "unknown" || session.kind === "loading") {
     return (
       <div className="flex h-full items-center justify-center text-sap-muted">
         Loading...
@@ -52,7 +46,7 @@ export function AccountProfilePage() {
     );
   }
 
-  if (!context) {
+  if (session.kind !== "authenticated") {
     return (
       <div className="flex h-full items-center justify-center text-sap-muted">
         Not signed in.
@@ -60,6 +54,7 @@ export function AccountProfilePage() {
     );
   }
 
+  const { context } = session;
   const displayName = getAccountDisplayName(context.user);
   const initials = getAccountInitials(context.user);
 

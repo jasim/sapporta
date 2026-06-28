@@ -2,7 +2,7 @@ import { useEffect } from "react";
 import { Route, Routes, useNavigate } from "react-router-dom";
 import { AppShell, setNavigate } from "@sapporta/frontend/app";
 import { BootLoader } from "@sapporta/frontend/app";
-import { AuthGate, useAuthStore } from "@sapporta/frontend/auth/runtime";
+import { AuthGate } from "@sapporta/frontend/auth/runtime";
 import {
   appHomeRoute,
   appNavigation,
@@ -15,9 +15,17 @@ import {
   sapportaPublicRoutes,
 } from "./SapportaRoutes";
 
-export function SapportaApp() {
+export interface SapportaAppProps {
+  // Shows Sapporta's generated table navigation by default. Turn this off when
+  // the app provides its own navigation surface for built-in table routes.
+  showFrameworkNavigation?: boolean;
+}
+
+export function SapportaApp({
+  showFrameworkNavigation = true,
+}: SapportaAppProps) {
   const navigate = useNavigate();
-  const isOwner = useAuthStore((s) => s.context?.isOwner ?? false);
+
   useEffect(() => {
     setNavigate(navigate);
   }, [navigate]);
@@ -25,23 +33,23 @@ export function SapportaApp() {
   return (
     <Routes>
       {sapportaPublicRoutes}
-      {appPublicRoutes}
 
       <Route
         element={
-          <AuthGate>
-            <BootLoader>
-              <AppShell
-                navigation={appNavigation}
-                showFrameworkNavigation={isOwner}
-              />
-            </BootLoader>
-          </AuthGate>
+          <BootLoader>
+            <AppShell
+              navigation={appNavigation}
+              showFrameworkNavigation={showFrameworkNavigation}
+            />
+          </BootLoader>
         }
       >
         {appHomeRoute}
-        {appProtectedRoutes}
-        {sapportaProtectedRoutes}
+        {appPublicRoutes}
+        <Route element={<AuthGate />}>
+          {appProtectedRoutes}
+          {sapportaProtectedRoutes}
+        </Route>
         {sapportaNotFoundRoute}
       </Route>
     </Routes>

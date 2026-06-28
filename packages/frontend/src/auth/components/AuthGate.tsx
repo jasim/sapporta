@@ -1,18 +1,13 @@
 import { useEffect, type ReactNode } from "react";
-import { Navigate, useLocation } from "react-router-dom";
+import { Navigate, Outlet, useLocation } from "react-router-dom";
 import { Loader2 } from "lucide-react";
 import { useAuthStore } from "@/auth/state/auth-store";
 
-export function AuthGate({ children }: { children: ReactNode }) {
+export function AuthGate({ children }: { children?: ReactNode }) {
   const location = useLocation();
-  const status = useAuthStore((s) => s.status);
-  const load = useAuthStore((s) => s.load);
+  const session = useAuthStore((s) => s.session);
 
-  useEffect(() => {
-    if (status === "idle") void load();
-  }, [load, status]);
-
-  if (status === "idle" || status === "loading") {
+  if (session.kind === "unknown" || session.kind === "loading") {
     return (
       <div className="flex h-screen items-center justify-center bg-sap-bg">
         <Loader2 className="h-6 w-6 animate-spin text-sap-muted" />
@@ -20,19 +15,19 @@ export function AuthGate({ children }: { children: ReactNode }) {
     );
   }
 
-  if (status === "unauthenticated") {
+  if (session.kind === "guest") {
     return <Navigate to="/login" replace state={{ from: location }} />;
   }
 
-  if (status === "unverified") {
+  if (session.kind === "unverified") {
     return <Navigate to="/verify-email" replace />;
   }
 
-  if (status === "workspace_required") {
+  if (session.kind === "workspaceRequired") {
     return <Navigate to="/signup" replace />;
   }
 
-  if (status === "error") {
+  if (session.kind === "failed") {
     return (
       <div className="flex h-screen items-center justify-center bg-sap-bg text-sap-negative">
         Could not load your session.
@@ -40,22 +35,22 @@ export function AuthGate({ children }: { children: ReactNode }) {
     );
   }
 
-  return <>{children}</>;
+  return <>{children ?? <Outlet />}</>;
 }
 
 export function PublicOnlyGate({ children }: { children: ReactNode }) {
   const location = useLocation();
-  const status = useAuthStore((s) => s.status);
+  const session = useAuthStore((s) => s.session);
   const bootstrapStatus = useAuthStore((s) => s.bootstrapStatus);
   const loadBootstrapStatus = useAuthStore((s) => s.loadBootstrapStatus);
 
   useEffect(() => {
-    if (status !== "authenticated" && !bootstrapStatus) {
+    if (session.kind !== "authenticated" && !bootstrapStatus) {
       void loadBootstrapStatus();
     }
-  }, [bootstrapStatus, loadBootstrapStatus, status]);
+  }, [bootstrapStatus, loadBootstrapStatus, session.kind]);
 
-  if (status === "authenticated") return <Navigate to="/" replace />;
+  if (session.kind === "authenticated") return <Navigate to="/" replace />;
   if (location.pathname === "/login" && !bootstrapStatus) {
     return (
       <div className="flex h-screen items-center justify-center bg-sap-bg">

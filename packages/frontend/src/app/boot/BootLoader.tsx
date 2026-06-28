@@ -1,21 +1,30 @@
 import { useEffect, type ReactNode } from "react";
 import { Loader2 } from "lucide-react";
 import { loadAdminMetadata } from "@/app/actions/boot";
+import { useAuthStore } from "@/auth/state/auth-store";
 import { useSchemaStore } from "@/schema-catalog/state/schema-store";
 
 /**
- * Loads schema on mount.
- * Gates children until schema is loaded.
+ * Loads app metadata and restores the browser session before rendering shell
+ * routes. Route guards decide what each settled session may see.
  */
 export function BootLoader({ children }: { children: ReactNode }) {
   const loaded = useSchemaStore((s) => s.loaded);
   const error = useSchemaStore((s) => s.error);
+  const session = useAuthStore((s) => s.session);
+  const restoreSession = useAuthStore((s) => s.restoreSession);
 
   useEffect(() => {
     if (!loaded && !error) {
       loadAdminMetadata();
     }
   }, [loaded, error]);
+
+  useEffect(() => {
+    if (session.kind === "unknown") {
+      void restoreSession();
+    }
+  }, [restoreSession, session.kind]);
 
   if (error) {
     return (
@@ -47,7 +56,7 @@ export function BootLoader({ children }: { children: ReactNode }) {
     );
   }
 
-  if (!loaded) {
+  if (!loaded || session.kind === "unknown" || session.kind === "loading") {
     return (
       <div className="flex items-center justify-center h-screen bg-sap-bg">
         <div className="text-center space-y-3">
