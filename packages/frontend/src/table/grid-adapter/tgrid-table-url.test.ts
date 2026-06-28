@@ -6,8 +6,22 @@ import {
   sanitizeSortDescriptors,
 } from "./tgrid-table-url";
 import type { ColId } from "@sapporta/grid";
+import type { ColumnSchema } from "@sapporta/shared/contracts";
 
 const COLS: ReadonlySet<ColId> = new Set(["name", "created_at"] as ColId[]);
+const FILTER_COLS: ReadonlySet<ColId> = new Set([
+  "book_id",
+  "title",
+] as ColId[]);
+const FILTER_COLUMNS: ColumnSchema[] = [
+  {
+    name: "book_id",
+    label: "Book",
+    kind: "number",
+    foreignKey: { table: "books", column: "id" },
+  },
+  { name: "title", label: "Title", kind: "text" },
+];
 
 describe("parseTableSearchParams - page", () => {
   test("defaults to page 1 when absent", () => {
@@ -87,6 +101,53 @@ describe("parseTableSearchParams - sort", () => {
       { colId: "name", direction: "asc" },
       { colId: "created_at", direction: "desc" },
     ]);
+  });
+});
+
+describe("parseTableSearchParams - filters", () => {
+  test("canonicalizes foreign-key equality to single-value membership", () => {
+    const r = parseTableSearchParams(
+      new URLSearchParams("filter%5Bbook_id%5D%5Beq%5D=6"),
+      FILTER_COLS,
+      FILTER_COLUMNS,
+    );
+
+    expect(r.filters).toHaveLength(1);
+    expect(r.filters[0]).toMatchObject({
+      column: "book_id",
+      op: "in",
+      values: ["6"],
+    });
+  });
+
+  test("canonicalizes foreign-key inequality to single-value exclusion", () => {
+    const r = parseTableSearchParams(
+      new URLSearchParams("filter%5Bbook_id%5D%5Bneq%5D=6"),
+      FILTER_COLS,
+      FILTER_COLUMNS,
+    );
+
+    expect(r.filters).toHaveLength(1);
+    expect(r.filters[0]).toMatchObject({
+      column: "book_id",
+      op: "nin",
+      values: ["6"],
+    });
+  });
+
+  test("leaves non-foreign-key equality as scalar equality", () => {
+    const r = parseTableSearchParams(
+      new URLSearchParams("filter%5Btitle%5D%5Beq%5D=Draft"),
+      FILTER_COLS,
+      FILTER_COLUMNS,
+    );
+
+    expect(r.filters).toHaveLength(1);
+    expect(r.filters[0]).toMatchObject({
+      column: "title",
+      op: "eq",
+      value: "Draft",
+    });
   });
 });
 

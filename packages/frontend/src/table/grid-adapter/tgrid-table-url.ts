@@ -2,11 +2,13 @@ import {
   decodeFilters,
   encodeFilters,
   eqCondition,
+  mintFilterId,
   type FilterCondition,
 } from "@sapporta/shared/filter";
 import { parseBoundedInteger } from "@sapporta/shared/validation";
 import type { ColId, SortDescriptor } from "@sapporta/grid";
 import { parseSortString, stringifySortOrder } from "@sapporta/grid";
+import type { ColumnSchema } from "@sapporta/shared/contracts";
 
 export interface TableUrlState {
   page: number;
@@ -125,6 +127,7 @@ export function relatedRowsTableHref({
 export function parseTableSearchParams(
   searchParams: URLSearchParams,
   validColIds: ReadonlySet<ColId>,
+  columns?: readonly ColumnSchema[],
 ): TableUrlState {
   const page = parseTablePage(searchParams.get("page"));
 
@@ -140,9 +143,55 @@ export function parseTableSearchParams(
   const qRaw = searchParams.get("q");
   const search = qRaw && qRaw.trim() !== "" ? qRaw : null;
 
-  const filters = decodeFilters(searchParams);
+  const filters = normalizeForeignKeyScalarFilters(
+    decodeFilters(searchParams),
+    columns,
+  );
 
   return { page, sort, filters, search };
+}
+
+export function normalizeForeignKeyScalarFilters(
+  filters: FilterCondition[],
+  columns: readonly ColumnSchema[] | undefined,
+): FilterCondition[] {
+  if (!columns) return filters;
+
+  const foreignKeyColumns = new Set(
+    columns
+      .filter((column) => column.foreignKey)
+      .map((column) => column.name),
+  );
+  if (foreignKeyColumns.size === 0) return filters;
+
+  let changed = false;
+  const normalized = filters.map((condition): FilterCondition => {
+    if (!foreignKeyColumns.has(condition.column)) return condition;
+
+    if (condition.op === "eq") {
+      changed = true;
+      return {
+        id: mintFilterId(condition.column, "in"),
+        column: condition.column,
+        op: "in",
+        values: [condition.value],
+      };
+    }
+
+    if (condition.op === "neq") {
+      changed = true;
+      return {
+        id: mintFilterId(condition.column, "nin"),
+        column: condition.column,
+        op: "nin",
+        values: [condition.value],
+      };
+    }
+
+    return condition;
+  });
+
+  return changed ? normalized : filters;
 }
 
 function parseTablePage(raw: string | null): number {

@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import type { ColumnSchema } from "@sapporta/shared/contracts";
+import type { ColId } from "@sapporta/grid";
 import { summarizeOperator } from "./FilterCard";
+import { parseTableSearchParams } from "../grid-adapter/tgrid-table-url";
 
 const authorColumn: ColumnSchema = {
   name: "author_id",
@@ -40,5 +42,22 @@ describe("summarizeOperator", () => {
         authorColumn,
       ),
     ).toBe("is not");
+  });
+
+  it("uses direct equality wording for a URL foreign-key equality filter", () => {
+    const parsed = parseTableSearchParams(
+      new URLSearchParams("filter%5Bauthor_id%5D%5Beq%5D=jack"),
+      new Set(["author_id"] as ColId[]),
+      [authorColumn],
+    );
+    const condition = parsed.filters[0];
+    if (!condition) throw new Error("expected one parsed filter");
+
+    expect(condition).toMatchObject({
+      column: "author_id",
+      op: "in",
+      values: ["jack"],
+    });
+    expect(summarizeOperator(condition, authorColumn)).toBe("is");
   });
 });

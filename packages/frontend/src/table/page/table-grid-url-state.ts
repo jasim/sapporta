@@ -78,8 +78,8 @@ export function useTableGridUrlState<RowsByLevel extends TGridRowsByLevel>({
   );
   const prefKey = sortPreferenceKey ?? `sapporta:grid-sort:${tableName}`;
   const parsed = useMemo(
-    () => parseTableSearchParams(searchParams, validColIds),
-    [searchParams, validColIds],
+    () => parseTableSearchParams(searchParams, validColIds, columns),
+    [searchParams, validColIds, columns],
   );
   const initialSort = useMemo(
     () => parsed.sort ?? loadSortPref(prefKey, validColIds),
@@ -123,7 +123,7 @@ export function useTableGridUrlState<RowsByLevel extends TGridRowsByLevel>({
 
   const syncSessionFromUrl = useCallback(
     <AppServices>(session: TGridSession<RowsByLevel, AppServices>) => {
-      const params = parseTableSearchParams(searchParams, validColIds);
+      const params = parseTableSearchParams(searchParams, validColIds, columns);
       const seed = tableQuerySeedFromUrlState({
         searchParams,
         parsed: params,
@@ -134,7 +134,7 @@ export function useTableGridUrlState<RowsByLevel extends TGridRowsByLevel>({
         | undefined;
       store?.getState().syncFromUrl(seed);
     },
-    [levelId, prefKey, searchParams, validColIds],
+    [columns, levelId, prefKey, searchParams, validColIds],
   );
 
   return useMemo(
