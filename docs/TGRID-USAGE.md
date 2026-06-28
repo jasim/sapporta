@@ -7,7 +7,7 @@ row APIs by default.
 
 Use `TableRoute` for ordinary CRUD screens. Use TGrid when a
 workflow needs a custom table experience: nested rows, computed columns,
-workflow-specific editors, a custom toolbar, or save behavior that has to call
+workflow-specific editors, custom chrome, or save behavior that has to call
 application services.
 
 In Sapporta projects, custom TGrid views should follow the same field policy
@@ -43,7 +43,7 @@ import {
   defineTGrid,
   useTGridCell,
   useTGridSession,
-} from "@sapporta/ui";
+} from "@sapporta/frontend";
 
 type InvoiceRow = {
   id: string;
@@ -112,24 +112,24 @@ include a non-null value for that primary key.
 
 This example shows the pattern for a full custom page: create the session in one
 component, then pass the non-null session to an inner component that uses hooks
-such as `useTGridQueryState`. This keeps React hook order stable while the
+such as `useTableLevelQuery`. This keeps React hook order stable while the
 session is being created.
 
 ```tsx
-import { useEffect, useMemo, useSyncExternalStore } from "react";
+import { useEffect, useMemo } from "react";
 import {
-  Pagination,
   TGrid,
-  TableToolbar,
   createColumnsBuilder,
   defineTGrid,
   startTGridLookupLoading,
+  useTableLevelPager,
+  useTableLevelQuery,
+  useTGridSourceStatus,
   useTGridCell,
-  useTGridQueryState,
   useTGridSession,
   type TGridCellWriteContext,
   type TGridSession,
-} from "@sapporta/ui";
+} from "@sapporta/frontend";
 
 type InvoiceRow = {
   id: string;
@@ -276,58 +276,24 @@ function InvoiceGridInner({
 }: {
   session: TGridSession<RowsByLevel, AppServices>;
 }) {
-  const query = useTGridQueryState({
-    session,
-    level: "invoices",
-  });
-  const totalCount = useSourceField(
-    session,
-    (snapshot) => snapshot.pagination?.totalCount ?? 0,
-  );
-  const pages =
-    totalCount > 0 ? Math.max(1, Math.ceil(totalCount / query.pageSize)) : 0;
+  const query = useTableLevelQuery(session, "invoices");
+  const pager = useTableLevelPager(session, "invoices", "/invoices");
+  const status = useTGridSourceStatus(session);
 
   return (
     <>
-      <TableToolbar
-        tableLabel="Invoices"
-        totalCount={totalCount}
-        columns={invoicesTable.columns}
-        filters={query.filters}
+      <InvoiceReviewHeader
+        totalCount={status.totalCount}
         search={query.search}
-        searchable={(invoicesTable.search?.columns.length ?? 0) > 0}
-        exportUrl={session.csvExportUrl("invoices")}
-        hasSort={query.sort.length > 0}
-        onAddFilter={query.addFilter}
-        onUpdateFilter={query.updateFilter}
-        onRemoveFilter={query.removeFilter}
         onSearchChange={query.setSearch}
-        onClearSort={query.clearSort}
+        activeFilterCount={query.activeFilterCount}
+        exportUrl={session.csvExportUrl("invoices")}
       />
 
-      <TGrid session={session} />
+      <TGrid session={session} presentation="cards" />
 
-      <Pagination
-        page={query.page}
-        pages={pages}
-        onPageChange={query.setPage}
-        hrefForPage={(page) => session.tablePageUrl(page)}
-      />
+      <ReviewQueuePager {...pager} />
     </>
-  );
-}
-
-function useSourceField<T>(
-  session: TGridSession<RowsByLevel, AppServices>,
-  pick: (
-    snapshot: ReturnType<
-      TGridSession<RowsByLevel, AppServices>["rootSource"]["snapshot"]
-    >,
-  ) => T,
-): T {
-  return useSyncExternalStore(
-    (callback) => session.rootSource.subscribe(callback),
-    () => pick(session.rootSource.snapshot()),
   );
 }
 ```
@@ -384,7 +350,8 @@ Every level declares:
 to the underlying BaseGrid runtime when the session is created.
 
 ```ts
-import { ROW_PRIMARY_MASTER_DETAIL, defineTGrid } from "@sapporta/ui";
+import { ROW_PRIMARY_MASTER_DETAIL } from "@sapporta/grid";
+import { defineTGrid } from "@sapporta/frontend";
 
 const authorsGrid = defineTGrid<RowsByLevel>({
   rootLevel: "authors",
@@ -413,7 +380,7 @@ runtime. For the full preset list and behavior model, see
 `query.owner` decides where a level gets page/sort/filter/search state.
 
 Host-owned levels are controlled by UI state. They get a Zustand query store and
-can be used with `useTGridQueryState`.
+can be used with `useTableLevelQuery` or the lower-level `useTGridQueryState`.
 
 ```ts
 query: { owner: "host", pageSize: 50, urlSync: true }
@@ -557,7 +524,7 @@ Override `rowsClient` on a level to route reads or writes elsewhere while keepin
 the same grid runtime.
 
 ```ts
-import type { TableRowsClient } from "@sapporta/ui";
+import type { TableRowsClient } from "@sapporta/frontend";
 
 const rowsClient = {
   fetch: async (params) => fetchInvoiceRows(params),
@@ -604,15 +571,15 @@ const tableGridOptions = {
 ```
 
 Use this path when you want to adjust table defaults while keeping the standard
-URL behavior, New record action, toolbar, pagination, nested rows, lookup labels,
-and CSV export.
+URL behavior, New record action, responsive table chrome, nested rows, lookup
+labels, and CSV export.
 
 ## Custom Schema Table Routes
 
 For custom routes that should render a schema table with Sapporta's standard
-toolbar, pagination, URL behavior, lookup labels, nested rows, and CSV export,
-start with `SchemaTableGridView`. Pass the current table schema, all loaded
-schemas, router state, and the route path for the page.
+table surface, URL behavior, lookup labels, nested rows, and CSV export, start
+with `SchemaTableGridView`. Pass the current table schema, all loaded schemas,
+router state, and the route path for the page.
 
 ```tsx
 <SchemaTableGridView
@@ -624,7 +591,7 @@ schemas, router state, and the route path for the page.
 ```
 
 Pass row-query and view options directly when the route should keep the standard
-table page but adjust its defaults or controls.
+table page but adjust its defaults.
 
 ```tsx
 <SchemaTableGridView
@@ -637,8 +604,6 @@ table page but adjust its defaults or controls.
   }}
   relatedRows={{ pageSize: 25 }}
   interaction={ROW_PRIMARY_MASTER_DETAIL}
-  toolbar={({ props }) => <TableToolbar {...props} />}
-  pagination={({ props }) => <Pagination {...props} />}
 />
 ```
 
@@ -646,8 +611,7 @@ table page but adjust its defaults or controls.
 search value, fixed filters, and URL-sync setting. URL sync is enabled by
 default; pass `rootRows={{ urlSync: false }}` only when the table controls
 should not update the route. `relatedRows` applies the same query defaults to
-expanded child rows. Use `toolbar={false}` or `pagination={false}` to hide the
-standard controls, or pass render functions to replace them.
+expanded child rows.
 
 Use `SchemaTableGridView` when you need a custom route path or workflow page. If
 you are still showing ordinary `/tables/:tableName` pages, prefer `TableRoute`
@@ -688,6 +652,66 @@ graph.
 Keep route state in the view. `TableGridView` reads the current URL when the page
 loads and keeps browser back/forward navigation in sync with the visible table.
 
+For custom chrome, compose the session-level primitives directly instead of
+replacing pieces of the standard surface:
+
+```tsx
+function InvoiceReviewQueue() {
+  const table = useSchemaTableGrid({
+    source: { table: invoicesTable, tablesByName },
+    route: { path: "/review/invoices", searchParams, navigate },
+    rootRows: {
+      fixedFilters: [eqCondition("status", "pending_review")],
+      initialSort: [{ colId: "created_at", direction: "desc" }],
+      pageSize: 25,
+    },
+    onNewRecord: () => navigate("/review/invoices/new"),
+  });
+
+  if (!table.session) return <Spinner />;
+
+  return <InvoiceReviewQueueBody table={table} />;
+}
+
+function InvoiceReviewQueueBody({
+  table,
+}: {
+  table: TableGridBinding<SchemaTableRowsByLevel>;
+}) {
+  if (!table.session) return null;
+
+  const query = useTableLevelQuery(table.session, table.level);
+  const pager = useTableLevelPager(
+    table.session,
+    table.level,
+    table.routePath,
+  );
+  const status = useTGridSourceStatus(table.session);
+
+  return (
+    <div className="flex h-full flex-col bg-sap-surface">
+      <InvoiceReviewHeader
+        totalCount={status.totalCount}
+        search={query.search}
+        onSearchChange={query.setSearch}
+        activeFilterCount={query.activeFilterCount}
+        onNewRecord={table.onNewRecord}
+      />
+
+      <div className="flex-1 overflow-auto">
+        <TGrid
+          session={table.session}
+          presentation="cards"
+          viewRelatedRows={table.viewRelatedRows}
+        />
+      </div>
+
+      <ReviewQueuePager {...pager} />
+    </div>
+  );
+}
+```
+
 ## Public Helpers
 
 These helpers are exported from `@sapporta/frontend`:
@@ -702,13 +726,18 @@ These helpers are exported from `@sapporta/frontend`:
 - `buildSchemaTGridConfig(...)` creates schema-derived grid settings that a page
   can customize before calling `defineTGrid(...)`.
 - `TableGridView` renders a standard table surface from a `TGridDefinition`.
+- `useSchemaTableGrid(...)` and `useTableGrid(...)` create session bindings for
+  pages that compose their own chrome.
+- `useTableLevelQuery(...)`, `useTableLevelPager(...)`, and
+  `useTableSelection(...)` expose focused session-owned state for custom table
+  surfaces.
+- `TGrid` renders a live session with a concrete `presentation`.
 - `defineTGrid(...)` declares a fully custom typed level graph.
 - `useTGridCell(...)`, `useTGridCellEditor(...)`, and related context types
   support custom renderers, editors, and save handlers.
 - `useTGridSession`, `useTGridLifecycle`, `useTGridSourceStatus`,
-  `useTableGridUrlState`, `useTableToolbarProps`, `useTablePaginationProps`,
-  `TableGridSurface`, `TableToolbar`, `Pagination`, and `TGrid` are advanced
-  composition tools for pages that need their own surface.
+  and `useTableGridUrlState` are lower-level tools for pages that need direct
+  lifecycle or URL control.
 - `buildTableSearchParams(...)`, `parseTableSearchParams(...)`,
   `tableGridUrlForQueryState(...)`, and `tableQuerySeedFromUrlState(...)`
   handle table URL state.

@@ -6,7 +6,7 @@ import type { TGridSession } from "@/table/state/tgrid-session";
 
 // Small status snapshot for page chrome.
 // It is intentionally separate from row rendering so a loading spinner,
-// toolbar count, or error message can update without teaching those components
+// record count, or error message can update without teaching those components
 // about row loading details.
 export type TGridSourceStatus = {
   status: LevelSnapshot["status"];

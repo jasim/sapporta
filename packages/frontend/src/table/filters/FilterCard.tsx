@@ -51,12 +51,12 @@ export function FilterCard({
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <div className="inline-flex max-w-full flex-col gap-[2px]">
-        <div className="inline-flex h-sap-ctl max-w-full items-center gap-1 group-data-[toolbar-band=compact]/table-toolbar:h-11">
+        <div className="inline-flex h-sap-ctl max-w-full items-center gap-1">
           <PopoverTrigger asChild>
             <button
               type="button"
               className={
-                "flex min-w-0 max-w-full items-center gap-[6px] border-b bg-transparent px-0 pb-[2px] text-[17px] leading-[1.25] font-[620] text-sap-fg hover:border-sap-muted group-data-[toolbar-band=compact]/table-toolbar:h-11 " +
+                "flex min-w-0 max-w-full items-center gap-[6px] border-b bg-transparent px-0 pb-[2px] text-[17px] leading-[1.25] font-[620] text-sap-fg hover:border-sap-muted " +
                 (error ? "border-sap-negative" : "border-sap-border-strong")
               }
             >
@@ -73,7 +73,7 @@ export function FilterCard({
             type="button"
             aria-label={`Remove ${label} filter`}
             onClick={() => onRemove(condition.id)}
-            className="flex h-6 w-6 shrink-0 items-center justify-center rounded-[4px] bg-transparent text-sap-subtle hover:bg-sap-row-hover hover:text-sap-soft group-data-[toolbar-band=compact]/table-toolbar:h-11 group-data-[toolbar-band=compact]/table-toolbar:w-11"
+            className="flex h-6 w-6 shrink-0 items-center justify-center rounded-[4px] bg-transparent text-sap-subtle hover:bg-sap-row-hover hover:text-sap-soft"
           >
             <X className="h-[11px] w-[11px]" />
           </button>

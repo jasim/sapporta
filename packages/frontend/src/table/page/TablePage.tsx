@@ -10,7 +10,7 @@ import {
 
 export type TablePageGridOptions = Omit<
   // These values come from the current table route. Pass grid options for
-  // behavior you want to tune, such as row loading, toolbar, or pagination.
+  // behavior you want to tune, such as row loading or interaction behavior.
   SchemaTableGridViewProps,
   "source" | "route" | "registerAs" | "onNewRecord"
 >;

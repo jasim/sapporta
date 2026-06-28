@@ -1,35 +1,18 @@
 import { useEffect, useId, useMemo, useState } from "react";
 import type { FormEvent, MouseEvent } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import { parseOptionalBoundedInteger } from "@sapporta/shared/validation";
-import { visiblePaginationItems } from "./visible-pagination-items";
-
-export interface PaginationProps {
-  page: number;
-  pages: number;
-  onPageChange: (page: number) => void;
-  hrefForPage?: (page: number) => string;
-}
+import { visiblePaginationItems } from "@/table/grid-adapter/visible-pagination-items";
+import type { TableLevelPager } from "./table-level-pager";
+import { clampPage, parsePageJump } from "./table-pager-math";
 
 const MIN_PAGE_SLOT_DIGITS = 4;
 
-function clampPage(page: number, pages: number): number {
-  if (pages <= 0) return 1;
-  if (!Number.isFinite(page)) return 1;
-  return Math.min(Math.max(Math.trunc(page), 1), pages);
-}
-
-/**
- * Dense table pagination strip. Keeps the bottom bar compact while exposing
- * generous targets for adjacent-page movement, direct page links around the
- * current position, and an editable page jump field.
- */
-export function Pagination({
+export function NumberedTablePager({
   page,
   pages,
   onPageChange,
   hrefForPage,
-}: PaginationProps) {
+}: TableLevelPager) {
   const pageJumpId = useId();
   const [draftPage, setDraftPage] = useState(String(page));
   const pageItems = useMemo(
@@ -196,15 +179,85 @@ export function Pagination({
   );
 }
 
-function parsePageJump(raw: string, pages: number): number | undefined {
-  try {
-    return parseOptionalBoundedInteger(raw, {
-      name: "page",
-      min: 1,
-      max: pages,
-      makeError: (message) => new Error(message),
-    });
-  } catch {
-    return undefined;
+export function CompactTablePager({
+  page,
+  pages,
+  onPageChange,
+}: TableLevelPager) {
+  const pageJumpId = useId();
+  const safePage = clampPage(page, pages);
+  const [draftPage, setDraftPage] = useState(String(safePage));
+
+  useEffect(() => {
+    setDraftPage(String(safePage));
+  }, [safePage]);
+
+  if (pages <= 1) return null;
+
+  function goToPage(nextPage: number): void {
+    const clamped = clampPage(nextPage, pages);
+    setDraftPage(String(clamped));
+    if (clamped !== page) onPageChange(clamped);
   }
+
+  function commitPageJump(): void {
+    const parsed = parsePageJump(draftPage, pages);
+    if (parsed === undefined) {
+      setDraftPage(String(safePage));
+      return;
+    }
+    goToPage(parsed);
+  }
+
+  function handleSubmit(event: FormEvent<HTMLFormElement>): void {
+    event.preventDefault();
+    commitPageJump();
+  }
+
+  return (
+    <nav
+      aria-label="Table pages"
+      className="grid min-h-[48px] shrink-0 grid-cols-[44px_minmax(0,1fr)_44px] items-center gap-2 border-t border-sap-border bg-sap-surface px-3 py-1.5"
+    >
+      <button
+        type="button"
+        disabled={safePage <= 1}
+        onClick={() => goToPage(safePage - 1)}
+        className="flex h-10 w-10 items-center justify-center rounded-[6px] border border-sap-border-soft bg-sap-surface text-sap-soft hover:bg-sap-row-hover hover:text-sap-fg focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-40"
+        aria-label="Previous page"
+      >
+        <ChevronLeft className="h-4 w-4" />
+      </button>
+
+      <form
+        aria-label="Page jump"
+        onSubmit={handleSubmit}
+        className="mx-auto flex min-w-0 items-center justify-center gap-2 text-sap-meta text-sap-muted"
+      >
+        <label htmlFor={pageJumpId} className="sr-only">
+          Page
+        </label>
+        <input
+          id={pageJumpId}
+          value={draftPage}
+          onChange={(event) => setDraftPage(event.target.value)}
+          onBlur={commitPageJump}
+          inputMode="numeric"
+          aria-label={`Page number, 1 through ${pages}`}
+          className="mono h-9 w-[58px] rounded-[5px] border border-sap-border bg-sap-surface px-2 text-center text-sap-meta text-sap-fg shadow-[inset_0_0_0_1px_var(--sap-border-soft)] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+        />
+        <span className="whitespace-nowrap">of {pages}</span>
+      </form>
+
+      <button
+        type="button"
+        disabled={safePage >= pages}
+        onClick={() => goToPage(safePage + 1)}
+        className="flex h-10 w-10 items-center justify-center rounded-[6px] border border-sap-border-soft bg-sap-surface text-sap-soft hover:bg-sap-row-hover hover:text-sap-fg focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-40"
+        aria-label="Next page"
+      >
+        <ChevronRight className="h-4 w-4" />
+      </button>
+    </nav>
+  );
 }

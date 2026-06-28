@@ -1,48 +1,57 @@
 import { useEffect, useState } from "react";
-import type { TGridView } from "./TGrid";
 
-const tableViewModes: readonly TGridView[] = ["auto", "tabular", "cards"];
+export type TableViewPreference = "auto" | "tabular" | "cards";
+
+const tableViewModes: readonly TableViewPreference[] = [
+  "auto",
+  "tabular",
+  "cards",
+];
 
 export function tableViewPreferenceKey(tableName: string): string {
   return `sapporta:table-view:${tableName}`;
 }
 
 export function useTableViewPreference(tableName: string): {
-  view: TGridView;
-  setView: (view: TGridView) => void;
+  preference: TableViewPreference;
+  setPreference: (preference: TableViewPreference) => void;
 } {
   const key = tableViewPreferenceKey(tableName);
-  const [view, setViewState] = useState<TGridView>(() =>
+  const [preference, setPreferenceState] = useState<TableViewPreference>(() =>
     readTableViewPreference(key),
   );
 
   useEffect(() => {
-    setViewState(readTableViewPreference(key));
+    setPreferenceState(readTableViewPreference(key));
   }, [key]);
 
   return {
-    view,
-    setView: (nextView) => {
-      setViewState(nextView);
+    preference,
+    setPreference: (nextPreference) => {
+      setPreferenceState(nextPreference);
       if (typeof window !== "undefined") {
-        window.localStorage.setItem(key, nextView);
+        window.localStorage.setItem(key, nextPreference);
       }
     },
   };
 }
 
-function readTableViewPreference(key: string): TGridView {
+function readTableViewPreference(key: string): TableViewPreference {
   if (typeof window === "undefined") return "auto";
   const value = window.localStorage.getItem(key);
   return normalizeTableViewPreference(value);
 }
 
-export function normalizeTableViewPreference(value: string | null): TGridView {
+export function normalizeTableViewPreference(
+  value: string | null,
+): TableViewPreference {
   if (value === "grid") return "tabular";
   if (value === "rows") return "cards";
-  return isTGridView(value) ? value : "auto";
+  return isTableViewPreference(value) ? value : "auto";
 }
 
-function isTGridView(value: string | null): value is TGridView {
-  return tableViewModes.includes(value as TGridView);
+function isTableViewPreference(
+  value: string | null,
+): value is TableViewPreference {
+  return tableViewModes.includes(value as TableViewPreference);
 }

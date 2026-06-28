@@ -213,21 +213,21 @@
   text-decoration: none;
 }
 
-@media (max-width: 640px) {
-  :where(
+:where(
+  [data-table-page-mode="narrowCards"]
     .sapporta-table-grid[data-grid-presentation="cards"]
-      [data-grid-part="row-field"]
-  ) {
-    gap: 3px;
-    grid-template-columns: 1fr;
-    padding: 5px 10px;
-  }
+    [data-grid-part="row-field"]
+) {
+  gap: 3px;
+  grid-template-columns: 1fr;
+  padding: 5px 10px;
+}
 
-  :where(
+:where(
+  [data-table-page-mode="narrowCards"]
     .sapporta-table-grid[data-grid-presentation="cards"]
-      [data-grid-part="child-level"]
-  ) {
-    margin-left: 4px;
-    padding-left: 10px;
-  }
+    [data-grid-part="child-level"]
+) {
+  margin-left: 4px;
+  padding-left: 10px;
 }

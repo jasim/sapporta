@@ -402,7 +402,7 @@ function makeEndpointFactory(args: {
         };
       },
       // Pages with their own table controls should see one pagination story:
-      // toolbar clicks, URL sync, and keyboard boundary navigation all change
+      // page clicks, URL sync, and keyboard boundary navigation all change
       // the same query state. The latest fetch result is enough to know whether
       // another page exists.
       pageBoundaryNavigation:

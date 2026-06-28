@@ -29,7 +29,7 @@ export type TGridLevelQueryConfig = {
   initialFilters?: readonly FilterCondition[];
   initialSearch?: string | null;
   // Always applied to row fetches and CSV exports, but not shown as editable
-  // toolbar filters. Use this for constraints the page promises to keep.
+  // editable filters. Use this for constraints the page promises to keep.
   fixedFilters?: readonly FilterCondition[];
   urlSync?: boolean;
 };

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type CSSProperties } from "react";
+import { useMemo, type CSSProperties } from "react";
 import { Table2 } from "lucide-react";
 import {
   trailingEdge,
@@ -27,9 +27,7 @@ import type { TGridSession } from "@/table/state/tgrid-session";
 import type { TGridLevelInfo } from "@/table/grid-adapter/tgrid-level-config";
 import "./table-card.css";
 
-export type TGridView = GridPresentation | "auto";
-export type TGridViewMode = TGridView;
-type TGridViewportBand = "compact" | "expanded";
+export type TGridPresentation = GridPresentation;
 
 export type ViewRelatedRowsOption =
   | boolean
@@ -73,13 +71,13 @@ export function TGrid<
   className,
   style,
   viewRelatedRows,
-  view = "auto",
+  presentation = "tabular",
 }: {
   session: TGridSession<RowsByLevel, AppServices>;
   className?: string;
   style?: CSSProperties;
   viewRelatedRows?: ViewRelatedRowsOption;
-  view?: TGridView;
+  presentation?: TGridPresentation;
 }) {
   const runtime = session.runtime;
   const sessionContext = session as TGridRenderableSessionContext;
@@ -110,8 +108,6 @@ export function TGrid<
       viewRelatedRows,
     });
   }, [className, root, sessionContext, style, viewRelatedRows]);
-  const viewport = useTGridViewportBand();
-  const presentation = resolveTGridPresentation(view, viewport);
 
   return (
     <GridRuntimeProvider runtime={runtime}>
@@ -124,35 +120,6 @@ export function TGrid<
       )}
     </GridRuntimeProvider>
   );
-}
-
-function resolveTGridPresentation(
-  view: TGridView,
-  viewport: TGridViewportBand,
-): GridPresentation {
-  if (view !== "auto") return view;
-  return viewport === "compact" ? "cards" : "tabular";
-}
-
-function useTGridViewportBand(): TGridViewportBand {
-  const [band, setBand] = useState<TGridViewportBand>(() =>
-    viewportBandForWidth(
-      typeof window === "undefined" ? 1024 : window.innerWidth,
-    ),
-  );
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const onResize = () => setBand(viewportBandForWidth(window.innerWidth));
-    window.addEventListener("resize", onResize);
-    return () => window.removeEventListener("resize", onResize);
-  }, []);
-
-  return band;
-}
-
-function viewportBandForWidth(width: number): TGridViewportBand {
-  return width < 768 ? "compact" : "expanded";
 }
 
 function mergeTGridChrome({

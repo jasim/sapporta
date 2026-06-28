@@ -261,24 +261,15 @@ describe("SchemaTableGridView", () => {
     );
   });
 
-  it("forwards table view controls to TableGridView", async () => {
-    const toolbar: Exclude<
-      NonNullable<TableGridViewProps<SchemaTableRowsByLevel>["toolbar"]>,
-      false
-    > = () => createElement("div", null, "toolbar");
-    const pagination: Exclude<
-      NonNullable<TableGridViewProps<SchemaTableRowsByLevel>["pagination"]>,
-      false
-    > = () => createElement("div", null, "pagination");
-
+  it("forwards table grid behavior options to TableGridView", async () => {
     const props = await renderSchemaTableGridView({
       loadLookups: false,
-      toolbar,
-      pagination,
+      className: "table-page",
+      gridClassName: "table-grid",
     });
 
     expect(props.loadLookups).toBe(false);
-    expect(props.toolbar).toBe(toolbar);
-    expect(props.pagination).toBe(pagination);
+    expect(props.className).toBe("table-page");
+    expect(props.gridClassName).toBe("table-grid");
   });
 });

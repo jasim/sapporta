@@ -1,10 +1,10 @@
 import { useState } from "react";
 import { Check, MonitorSmartphone, PanelsTopLeft, Table2 } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger, cn } from "@sapporta/ui";
-import type { TGridView } from "./TGrid";
+import type { TableViewPreference } from "./table-view-pref";
 
 const options: readonly {
-  value: TGridView;
+  value: TableViewPreference;
   label: string;
   icon: typeof MonitorSmartphone;
 }[] = [
@@ -17,12 +17,12 @@ export function TableViewSwitch({
   value,
   onChange,
 }: {
-  value: TGridView;
-  onChange: (view: TGridView) => void;
+  value: TableViewPreference;
+  onChange: (view: TableViewPreference) => void;
 }) {
   const [open, setOpen] = useState(false);
 
-  function selectView(nextView: TGridView) {
+  function selectView(nextView: TableViewPreference) {
     onChange(nextView);
     setOpen(false);
   }
@@ -32,9 +32,9 @@ export function TableViewSwitch({
       <PopoverTrigger
         aria-label="Open table view options"
         title="View options"
-        className="inline-flex h-sap-ctl w-[30px] items-center justify-center rounded-[6px] border border-sap-border bg-sap-surface text-sap-soft hover:bg-sap-row-hover hover:text-sap-fg group-data-[toolbar-band=compact]/table-toolbar:h-11 group-data-[toolbar-band=compact]/table-toolbar:w-11 group-data-[toolbar-band=compact]/table-toolbar:shrink-0"
+        className="inline-flex h-sap-ctl w-[30px] items-center justify-center rounded-[6px] border border-sap-border bg-sap-surface text-sap-soft hover:bg-sap-row-hover hover:text-sap-fg"
       >
-        <PanelsTopLeft className="h-[12px] w-[12px] group-data-[toolbar-band=compact]/table-toolbar:h-4 group-data-[toolbar-band=compact]/table-toolbar:w-4" />
+        <PanelsTopLeft className="h-[12px] w-[12px]" />
       </PopoverTrigger>
       <PopoverContent
         align="end"

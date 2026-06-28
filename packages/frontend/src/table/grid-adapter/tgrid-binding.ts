@@ -35,7 +35,7 @@ export type TGridTableSchemaOverrides<RowShape extends TGridTableRow> = Partial<
   columns?: Partial<Record<RowFieldName<RowShape>, Partial<TableColumnSchema>>>;
 };
 
-// Identifies the level whose toolbar or pagination controls should be read.
+// Identifies the level whose query controls should be read.
 export type UseTGridQueryStateArgs<
   RowsByLevel extends TGridRowsByLevel,
   AppServices,

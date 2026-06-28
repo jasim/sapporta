@@ -10,12 +10,11 @@ import {
   type RowId,
 } from "@sapporta/grid";
 import {
-  deleteSelectedTableToolbarRows,
-  selectedTableToolbarDeleteTargets,
-  type TableToolbarSession,
-} from "./TableToolbarDeleteRowAction";
+  deleteSelectedTableRows,
+  selectedTableDeleteTargets,
+} from "./table-selection";
 
-describe("TableToolbarDeleteRowAction", () => {
+describe("table selection", () => {
   it("collects persisted selected rows across registered paths child-first", () => {
     const root = rootPath("orders");
     const lines = childPath(root, "10" as never, "orders.lines");
@@ -32,7 +31,7 @@ describe("TableToolbarDeleteRowAction", () => {
       dataRowIds: new Set([orderRow, lineRow]),
     });
 
-    expect(selectedTableToolbarDeleteTargets(session)).toEqual([
+    expect(selectedTableDeleteTargets(session)).toEqual([
       { path: lines, rowKey: "501" },
       { path: root, rowKey: "10" },
     ]);
@@ -51,7 +50,7 @@ describe("TableToolbarDeleteRowAction", () => {
       removeRow,
     });
 
-    await deleteSelectedTableToolbarRows(session);
+    await deleteSelectedTableRows(session);
 
     expect(removeRow).toHaveBeenCalledWith(root, "10");
     expect(clearRowSelection).toHaveBeenCalledWith(root);
@@ -71,7 +70,7 @@ describe("TableToolbarDeleteRowAction", () => {
       setErrorBanner,
     });
 
-    await deleteSelectedTableToolbarRows(session);
+    await deleteSelectedTableRows(session);
 
     expect(setErrorBanner).toHaveBeenCalledWith(
       "Failed to delete row: permission denied",
@@ -85,8 +84,11 @@ function makeSession(args: {
   dataRowIds: Set<RowId>;
   clearRowSelection?: (path: GridPath) => void;
   removeRow?: GridRuntime["removeRow"];
-  setErrorBanner?: TableToolbarSession["setErrorBanner"];
-}): TableToolbarSession {
+  setErrorBanner?: (message: string | null) => void;
+}): {
+  runtime: GridRuntime;
+  setErrorBanner: (message: string | null) => void;
+} {
   const clearRowSelection = args.clearRowSelection ?? vi.fn();
   const refetch = vi.fn();
   return {

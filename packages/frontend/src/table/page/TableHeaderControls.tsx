@@ -56,26 +56,26 @@ export function SearchInput({
   );
 }
 
-type CompactButtonTone = "primary" | "ghost" | "danger";
+type CompactHeaderButtonTone = "primary" | "ghost" | "danger";
 
-type CompactToolbarButtonProps = {
-  tone?: CompactButtonTone;
+type CompactHeaderButtonProps = {
+  tone?: CompactHeaderButtonTone;
   icon?: ReactNode;
   children: ReactNode;
   className?: string;
 } & ButtonHTMLAttributes<HTMLButtonElement>;
 
-export function CompactToolbarButton({
+export function CompactHeaderButton({
   tone = "ghost",
   icon,
   children,
   className,
   ...props
-}: CompactToolbarButtonProps) {
+}: CompactHeaderButtonProps) {
   return (
     <button
       type="button"
-      className={compactToolbarButtonClassName(tone, className)}
+      className={compactHeaderButtonClassName(tone, className)}
       {...props}
     >
       {icon}
@@ -84,30 +84,30 @@ export function CompactToolbarButton({
   );
 }
 
-type CompactToolbarLinkProps = {
-  tone?: Exclude<CompactButtonTone, "danger">;
+type CompactHeaderLinkProps = {
+  tone?: Exclude<CompactHeaderButtonTone, "danger">;
   icon?: ReactNode;
   children: ReactNode;
   className?: string;
 } & AnchorHTMLAttributes<HTMLAnchorElement>;
 
-export function CompactToolbarLink({
+export function CompactHeaderLink({
   tone = "ghost",
   icon,
   children,
   className,
   ...props
-}: CompactToolbarLinkProps) {
+}: CompactHeaderLinkProps) {
   return (
-    <a className={compactToolbarButtonClassName(tone, className)} {...props}>
+    <a className={compactHeaderButtonClassName(tone, className)} {...props}>
       {icon}
       <span className="truncate">{children}</span>
     </a>
   );
 }
 
-function compactToolbarButtonClassName(
-  tone: CompactButtonTone,
+function compactHeaderButtonClassName(
+  tone: CompactHeaderButtonTone,
   className?: string,
 ): string {
   const toneClass =

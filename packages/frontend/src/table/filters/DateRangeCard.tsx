@@ -107,7 +107,7 @@ export function DateRangeCard({
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
-      <div className="inline-flex h-sap-ctl max-w-full items-stretch overflow-hidden rounded-[5px] border border-sap-border group-data-[toolbar-band=compact]/table-toolbar:h-11">
+      <div className="inline-flex h-sap-ctl max-w-full items-stretch overflow-hidden rounded-[5px] border border-sap-border">
         <PopoverTrigger asChild>
           <button
             type="button"
@@ -124,7 +124,7 @@ export function DateRangeCard({
           type="button"
           aria-label={`Remove ${label} range filter`}
           onClick={removeBoth}
-          className="flex shrink-0 items-center border-l border-sap-border bg-sap-surface px-[8px] text-sap-muted hover:bg-sap-row-hover hover:text-sap-fg group-data-[toolbar-band=compact]/table-toolbar:w-11 group-data-[toolbar-band=compact]/table-toolbar:justify-center group-data-[toolbar-band=compact]/table-toolbar:px-0"
+          className="flex shrink-0 items-center border-l border-sap-border bg-sap-surface px-[8px] text-sap-muted hover:bg-sap-row-hover hover:text-sap-fg"
         >
           <X className="h-[11px] w-[11px]" />
         </button>

@@ -188,8 +188,8 @@ class DefaultTGridSession<
     const lookupResolver = createTGridLookupResolver(this.lookupRegistry);
     this.columnMapper = createTGridColumnMapper(lookupResolver);
 
-    // Levels with visible table controls need query stores so their toolbar,
-    // pagination, export links, and row fetches all use the same state.
+    // Levels with visible table controls need query stores so filters, search,
+    // paging, export links, and row fetches all use the same state.
     for (const [levelId, level] of Object.entries(definition.levels) as Array<
       [TGridLevelId<RowsByLevel>, TGridLevelConfig<RowsByLevel, AppServices>]
     >) {

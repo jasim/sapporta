@@ -8,8 +8,13 @@ import {
   type SchemaTableRootRowsOptions,
   type SchemaTableRowsByLevel,
 } from "@/table/grid-adapter/schema-tgrid";
+import type { TGridDefinition } from "@/table/grid-adapter/tgrid-runtime-config";
 import type { TableGridRoute } from "./table-grid-url-state";
-import { TableGridView, type TableGridViewProps } from "./TableGridView";
+import {
+  TableGridView,
+  useTableGrid,
+  type TableGridBinding,
+} from "./TableGridView";
 import type { ViewRelatedRowsOption } from "./TGrid";
 
 export type SchemaTableGridViewSource = {
@@ -32,11 +37,11 @@ export type SchemaTableGridViewProps = {
   relatedRows?: SchemaTableRelatedRowsOptions;
   interaction?: GridInteractionConfig;
   loadLookups?: boolean;
-  toolbar?: TableGridViewProps<SchemaTableRowsByLevel>["toolbar"];
-  pagination?: TableGridViewProps<SchemaTableRowsByLevel>["pagination"];
   className?: string;
   gridClassName?: string;
 };
+
+export type UseSchemaTableGridArgs = SchemaTableGridViewProps;
 
 const schemaTableGridDefaultRootRows: SchemaTableRootRowsOptions = {
   urlSync: true,
@@ -167,11 +172,75 @@ export function SchemaTableGridView({
   relatedRows,
   interaction,
   loadLookups,
-  toolbar,
-  pagination,
   className,
   gridClassName,
 }: SchemaTableGridViewProps) {
+  const definition = useSchemaTableGridDefinition({
+    source,
+    rootRows,
+    relatedRows,
+    interaction,
+  });
+
+  return (
+    <TableGridView<SchemaTableRowsByLevel>
+      definition={definition}
+      table={source.table}
+      route={route}
+      registerAs={registerAs}
+      loadLookups={loadLookups}
+      onNewRecord={onNewRecord}
+      viewRelatedRows={viewRelatedRows}
+      className={className}
+      gridClassName={gridClassName}
+    />
+  );
+}
+
+export function useSchemaTableGrid({
+  source,
+  route,
+  registerAs,
+  onNewRecord,
+  viewRelatedRows,
+  rootRows,
+  relatedRows,
+  interaction,
+  loadLookups,
+  className,
+  gridClassName,
+}: UseSchemaTableGridArgs): TableGridBinding<SchemaTableRowsByLevel> {
+  const definition = useSchemaTableGridDefinition({
+    source,
+    rootRows,
+    relatedRows,
+    interaction,
+  });
+
+  return useTableGrid<SchemaTableRowsByLevel>({
+    definition,
+    table: source.table,
+    route,
+    registerAs,
+    loadLookups,
+    onNewRecord,
+    viewRelatedRows,
+    className,
+    gridClassName,
+  });
+}
+
+function useSchemaTableGridDefinition({
+  source,
+  rootRows,
+  relatedRows,
+  interaction,
+}: {
+  source: SchemaTableGridViewSource;
+  rootRows?: SchemaTableRootRowsOptions;
+  relatedRows?: SchemaTableRelatedRowsOptions;
+  interaction?: GridInteractionConfig;
+}): TGridDefinition<SchemaTableRowsByLevel> {
   const gridSource = useMemo<SchemaTableGridSource>(
     () => ({
       rootTableName: source.table.name,
@@ -196,19 +265,5 @@ export function SchemaTableGridView({
     [gridSource, interactionOptions, relatedRowOptions, rootRowOptions],
   );
 
-  return (
-    <TableGridView<SchemaTableRowsByLevel>
-      definition={definition}
-      table={source.table}
-      route={route}
-      registerAs={registerAs}
-      loadLookups={loadLookups}
-      onNewRecord={onNewRecord}
-      viewRelatedRows={viewRelatedRows}
-      toolbar={toolbar}
-      pagination={pagination}
-      className={className}
-      gridClassName={gridClassName}
-    />
-  );
+  return definition;
 }

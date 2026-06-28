@@ -86,7 +86,7 @@ export function FilterCardsBar({
         <PopoverTrigger asChild>
           <button
             type="button"
-            className="inline-flex items-center gap-[4px] h-sap-ctl px-[10px] rounded-[6px] border border-sap-border-soft text-sap-muted hover:text-sap-fg hover:bg-sap-row-hover text-sap-data font-semibold group-data-[toolbar-band=compact]/table-toolbar:h-11 group-data-[toolbar-band=compact]/table-toolbar:px-3"
+            className="inline-flex items-center gap-[4px] h-sap-ctl px-[10px] rounded-[6px] border border-sap-border-soft text-sap-muted hover:text-sap-fg hover:bg-sap-row-hover text-sap-data font-semibold"
           >
             <Plus className="h-[11px] w-[11px]" />
             Add filter

@@ -1,38 +1,43 @@
-import type { ReactElement, ReactNode } from "react";
+import { forwardRef, type ReactNode } from "react";
 import { Loader2 } from "lucide-react";
 import { cn } from "@sapporta/ui";
+import type { TablePageMode } from "./table-page-mode";
 import type { TGridSourceStatus } from "./tgrid-source-status";
 
 // Visual shell for table-like pages.
-// It knows how loading, page-level errors, save-error banners, the grid, and
-// pagination are arranged, but it does not know where any of that state comes
-// from. Pass plain React nodes to keep the layout reusable in custom views.
+// It knows how loading, page-level errors, save-error banners, content, and the
+// footer are arranged, but it does not know where any of that state comes from.
 export type TableGridSurfaceProps = {
+  mode: TablePageMode;
   tableLabel: string;
   loadState: TGridSourceStatus;
   errorMessage?: string | null;
   errorBanner?: string | null;
   onDismissErrorBanner?: () => void;
-  grid: ReactNode;
-  toolbar?: ReactNode;
-  pagination?: ReactNode;
+  header?: ReactNode;
+  children?: ReactNode;
+  footer?: ReactNode;
   className?: string;
 };
 
-// Render the standard table page chrome around caller-supplied controls.
-// Use this when you want Sapporta's table layout but need to choose your own
-// toolbar, pagination, filters, or grid content.
-export function TableGridSurface({
-  tableLabel,
-  loadState,
-  errorMessage,
-  errorBanner,
-  onDismissErrorBanner,
-  grid,
-  toolbar,
-  pagination,
-  className,
-}: TableGridSurfaceProps): ReactElement {
+export const TableGridSurface = forwardRef<
+  HTMLDivElement,
+  TableGridSurfaceProps
+>(function TableGridSurface(
+  {
+    mode,
+    tableLabel,
+    loadState,
+    errorMessage,
+    errorBanner,
+    onDismissErrorBanner,
+    header,
+    children,
+    footer,
+    className,
+  },
+  ref,
+) {
   const showSpinner =
     loadState.status === "loading" && loadState.totalCount === 0;
   const visibleError =
@@ -41,8 +46,12 @@ export function TableGridSurface({
       : null;
 
   return (
-    <div className={cn("flex h-full flex-col bg-sap-surface", className)}>
-      {toolbar}
+    <div
+      ref={ref}
+      data-table-page-mode={mode}
+      className={cn("flex h-full flex-col bg-sap-surface", className)}
+    >
+      {header}
 
       {errorBanner && (
         <div
@@ -76,12 +85,17 @@ export function TableGridSurface({
       )}
 
       {!showSpinner && !visibleError && (
-        <div className="flex-1 overflow-auto px-5 pb-7">
-          <div className="bg-sap-surface">{grid}</div>
+        <div
+          className={cn(
+            "flex-1 overflow-auto",
+            mode === "narrowCards" ? "px-2 pb-3" : "px-5 pb-7",
+          )}
+        >
+          <div className="bg-sap-surface">{children}</div>
         </div>
       )}
 
-      {pagination}
+      {footer}
     </div>
   );
-}
+});

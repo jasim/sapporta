@@ -3,7 +3,8 @@
 import { act, createElement, type ReactElement } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { Pagination } from "./Pagination";
+import { CompactTablePager, NumberedTablePager } from "./TablePagers";
+import { clampPage, parsePageJump } from "./table-pager-math";
 
 (
   globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
@@ -64,7 +65,21 @@ function pageInput(container: HTMLElement): HTMLInputElement {
   return input;
 }
 
-describe("Pagination", () => {
+describe("table pager math", () => {
+  it("clamps page numbers to the available range", () => {
+    expect(clampPage(0, 10)).toBe(1);
+    expect(clampPage(11, 10)).toBe(10);
+    expect(clampPage(Number.NaN, 10)).toBe(1);
+  });
+
+  it("parses bounded page jumps", () => {
+    expect(parsePageJump("7", 10)).toBe(7);
+    expect(parsePageJump("11", 10)).toBeUndefined();
+    expect(parsePageJump("abc", 10)).toBeUndefined();
+  });
+});
+
+describe("NumberedTablePager", () => {
   let mounted: { root: Root; container: HTMLElement } | null = null;
 
   afterEach(async () => {
@@ -77,7 +92,7 @@ describe("Pagination", () => {
   it("commits a valid typed page when the input blurs", async () => {
     const onPageChange = vi.fn();
     mounted = await render(
-      createElement(Pagination, { page: 2, pages: 10, onPageChange }),
+      createElement(NumberedTablePager, { page: 2, pages: 10, onPageChange }),
     );
 
     const input = pageInput(mounted.container);
@@ -93,7 +108,7 @@ describe("Pagination", () => {
   it("resets an invalid typed page on blur without changing pages", async () => {
     const onPageChange = vi.fn();
     mounted = await render(
-      createElement(Pagination, { page: 2, pages: 10, onPageChange }),
+      createElement(NumberedTablePager, { page: 2, pages: 10, onPageChange }),
     );
 
     const input = pageInput(mounted.container);
@@ -103,5 +118,28 @@ describe("Pagination", () => {
 
     expect(onPageChange).not.toHaveBeenCalled();
     expect(input.value).toBe("2");
+  });
+});
+
+describe("CompactTablePager", () => {
+  let mounted: { root: Root; container: HTMLElement } | null = null;
+
+  afterEach(async () => {
+    if (mounted) {
+      await unmount(mounted.root, mounted.container);
+      mounted = null;
+    }
+  });
+
+  it("renders one page-jump form and no numbered page strip", async () => {
+    const onPageChange = vi.fn();
+    mounted = await render(
+      createElement(CompactTablePager, { page: 2, pages: 10, onPageChange }),
+    );
+
+    expect(mounted.container.querySelector("ol")).toBeNull();
+    expect(
+      mounted.container.querySelector('form[aria-label="Page jump"]'),
+    ).toBeInstanceOf(HTMLFormElement);
   });
 });

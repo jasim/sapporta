@@ -36,7 +36,6 @@ export * from "./grid-adapter/tgrid-column-builder";
 export * from "./grid-adapter/tgrid-binding";
 export * from "./grid-adapter/tgrid-types";
 export * from "./grid-adapter/tgrid-table-url";
-export { Pagination, type PaginationProps } from "./grid-adapter/Pagination";
 export {
   visiblePaginationItems,
   type PaginationRangeItem,
@@ -45,8 +44,7 @@ export * from "./lookup/tgrid-lookup-loading";
 export * from "./lookup/table-lookup-registry";
 export { TGrid } from "./page/TGrid";
 export type {
-  TGridView,
-  TGridViewMode,
+  TGridPresentation,
   ViewRelatedRowsContext,
   ViewRelatedRowsOption,
 } from "./page/TGrid";
@@ -57,28 +55,24 @@ export {
 } from "./page/TablePage";
 export {
   SchemaTableGridView,
+  useSchemaTableGrid,
+  type UseSchemaTableGridArgs,
   type SchemaTableGridViewSource,
   type SchemaTableGridViewProps,
 } from "./page/SchemaTableGridView";
 export {
-  TableGridSurface,
-  type TableGridSurfaceProps,
-} from "./page/TableGridSurface";
-export {
   TableGridView,
-  type TableGridPaginationRenderArgs,
+  useTableGrid,
+  type TableGridBinding,
   type TableGridViewProps,
-  type TableGridToolbarRenderArgs,
+  type UseTableGridArgs,
 } from "./page/TableGridView";
-export { TableToolbar, type TableToolbarProps } from "./page/TableToolbar";
-export {
-  TableToolbarDeleteRowAction,
-  type TableToolbarDeleteRowActionProps,
-  type TableToolbarSession,
-} from "./page/TableToolbarDeleteRowAction";
 export * from "./page/table-grid-url-state";
-export * from "./page/table-pagination-binding";
-export * from "./page/table-toolbar-binding";
+export * from "./page/table-level-pager";
+export * from "./page/table-level-query";
+export * from "./page/table-page-mode";
+export * from "./page/table-selection";
+export * from "./page/table-view-pref";
 export * from "./page/tgrid-lifecycle";
 export * from "./page/tgrid-source-status";
 export { NewRecordRoute } from "./route/NewRecordRoute";

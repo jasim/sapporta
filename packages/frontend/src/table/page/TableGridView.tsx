@@ -1,10 +1,6 @@
-import { useEffect, type ReactNode } from "react";
+import { useEffect } from "react";
 import { useStore } from "zustand";
 import type { TableSchema } from "@sapporta/shared/contracts";
-import {
-  Pagination,
-  type PaginationProps,
-} from "@/table/grid-adapter/Pagination";
 import { useTGridSession } from "@/table/grid-adapter/tgrid-binding";
 import type { TGridDefinition } from "@/table/grid-adapter/tgrid-runtime-config";
 import type {
@@ -13,46 +9,27 @@ import type {
 } from "@/table/grid-adapter/tgrid-types";
 import type { TGridSession } from "@/table/state/tgrid-session";
 import { TGrid, type ViewRelatedRowsOption } from "./TGrid";
+import { TableGridHeader } from "./TableGridHeader";
+import { TableGridPager } from "./TableGridPager";
 import { TableGridSurface } from "./TableGridSurface";
-import { TableToolbar, type TableToolbarProps } from "./TableToolbar";
-import { TableViewSwitch } from "./TableViewSwitch";
 import {
   useTableGridUrlState,
   type TableGridRoute,
-  type TableGridUrlStateBinding,
 } from "./table-grid-url-state";
-import { useTablePaginationProps } from "./table-pagination-binding";
-import { useTableToolbarProps } from "./table-toolbar-binding";
 import { useTGridLifecycle } from "./tgrid-lifecycle";
 import {
   tableLoadErrorMessage,
   useTGridSourceStatus,
 } from "./tgrid-source-status";
 import { useTableViewPreference } from "./table-view-pref";
-
-// A custom toolbar receives the same ready-to-render props as the default
-// toolbar, plus the live session for advanced actions such as row reloads.
-export type TableGridToolbarRenderArgs<
-  RowsByLevel extends TGridRowsByLevel,
-  AppServices = unknown,
-> = {
-  session: TGridSession<RowsByLevel, AppServices>;
-  props: TableToolbarProps;
-};
-
-// A custom pagination control receives the page model Sapporta uses for the
-// built-in table page, including route-aware links for each page.
-export type TableGridPaginationRenderArgs<
-  RowsByLevel extends TGridRowsByLevel,
-  AppServices = unknown,
-> = {
-  session: TGridSession<RowsByLevel, AppServices>;
-  props: PaginationProps;
-};
+import {
+  resolveTableGridPresentation,
+  useTablePageMode,
+} from "./table-page-mode";
 
 // Complete table experience for the common case: create a session, bind it to
-// the caller's route, show the standard toolbar/grid/pagination layout, and let
-// the caller replace any visible control with props they can inspect.
+// the caller's route, and render the standard table layout from the live
+// session.
 //
 // The route stays outside this component so custom pages can live anywhere in
 // the app while table controls update that page's URL.
@@ -68,25 +45,30 @@ export type TableGridViewProps<
   loadLookups?: boolean;
   onNewRecord?: () => void;
   viewRelatedRows?: ViewRelatedRowsOption;
-  toolbar?:
-    | false
-    | ((
-        args: TableGridToolbarRenderArgs<RowsByLevel, AppServices>,
-      ) => ReactNode);
-  pagination?:
-    | false
-    | ((
-        args: TableGridPaginationRenderArgs<RowsByLevel, AppServices>,
-      ) => ReactNode);
   className?: string;
   gridClassName?: string;
 };
 
-// Mount a TGrid definition as a reusable table view.
-// Use this when your page wants Sapporta's standard table affordances with a
-// small amount of customization. Use the lower-level hooks directly when you
-// want to assemble a different surface.
-export function TableGridView<
+export type UseTableGridArgs<
+  RowsByLevel extends TGridRowsByLevel,
+  AppServices = unknown,
+> = TableGridViewProps<RowsByLevel, AppServices>;
+
+export type TableGridBinding<
+  RowsByLevel extends TGridRowsByLevel,
+  AppServices = unknown,
+> = {
+  session: TGridSession<RowsByLevel, AppServices> | null;
+  table: TableSchema;
+  level: TGridLevelId<RowsByLevel>;
+  routePath: string;
+  onNewRecord?: () => void;
+  viewRelatedRows?: ViewRelatedRowsOption;
+  className?: string;
+  gridClassName?: string;
+};
+
+export function useTableGrid<
   RowsByLevel extends TGridRowsByLevel,
   AppServices = unknown,
 >({
@@ -98,11 +80,12 @@ export function TableGridView<
   loadLookups,
   onNewRecord,
   viewRelatedRows,
-  toolbar,
-  pagination,
   className,
   gridClassName,
-}: TableGridViewProps<RowsByLevel, AppServices>) {
+}: UseTableGridArgs<RowsByLevel, AppServices>): TableGridBinding<
+  RowsByLevel,
+  AppServices
+> {
   const urlState = useTableGridUrlState<RowsByLevel>({
     tableName: table.name,
     columns: table.columns,
@@ -122,7 +105,55 @@ export function TableGridView<
     loadLookups,
   });
 
-  if (!session) {
+  useEffect(() => {
+    if (!session) return;
+    urlState.syncSessionFromUrl(session);
+  }, [session, urlState]);
+
+  return {
+    session,
+    table,
+    level: urlState.level,
+    routePath: urlState.routePath,
+    onNewRecord,
+    viewRelatedRows,
+    className,
+    gridClassName,
+  };
+}
+
+// Mount a TGrid definition as a reusable table view.
+// Use the lower-level hooks directly when a page needs custom chrome around the
+// same session primitives.
+export function TableGridView<
+  RowsByLevel extends TGridRowsByLevel,
+  AppServices = unknown,
+>({
+  definition,
+  table,
+  route,
+  services,
+  registerAs,
+  loadLookups,
+  onNewRecord,
+  viewRelatedRows,
+  className,
+  gridClassName,
+}: TableGridViewProps<RowsByLevel, AppServices>) {
+  const tableGrid = useTableGrid({
+    definition,
+    table,
+    route,
+    services,
+    registerAs,
+    loadLookups,
+    onNewRecord,
+    viewRelatedRows,
+    className,
+    gridClassName,
+  });
+
+  if (!tableGrid.session) {
     return (
       <div className="flex h-full items-center justify-center bg-sap-surface text-sap-muted">
         Loading table...
@@ -132,17 +163,14 @@ export function TableGridView<
 
   return (
     <TableGridViewWithSession
-      session={session}
-      table={table}
-      level={urlState.level}
-      routePath={urlState.routePath}
-      urlState={urlState}
-      onNewRecord={onNewRecord}
-      viewRelatedRows={viewRelatedRows}
-      toolbar={toolbar}
-      pagination={pagination}
-      className={className}
-      gridClassName={gridClassName}
+      session={tableGrid.session}
+      table={tableGrid.table}
+      level={tableGrid.level}
+      routePath={tableGrid.routePath}
+      onNewRecord={tableGrid.onNewRecord}
+      viewRelatedRows={tableGrid.viewRelatedRows}
+      className={tableGrid.className}
+      gridClassName={tableGrid.gridClassName}
     />
   );
 }
@@ -157,11 +185,8 @@ function TableGridViewWithSession<
   table,
   level,
   routePath,
-  urlState,
   onNewRecord,
   viewRelatedRows,
-  toolbar,
-  pagination,
   className,
   gridClassName,
 }: {
@@ -169,55 +194,31 @@ function TableGridViewWithSession<
   table: TableSchema;
   level: TGridLevelId<RowsByLevel>;
   routePath: string;
-  urlState: TableGridUrlStateBinding<RowsByLevel>;
   onNewRecord?: () => void;
   viewRelatedRows?: ViewRelatedRowsOption;
-  toolbar?:
-    | false
-    | ((
-        args: TableGridToolbarRenderArgs<RowsByLevel, AppServices>,
-      ) => ReactNode);
-  pagination?:
-    | false
-    | ((
-        args: TableGridPaginationRenderArgs<RowsByLevel, AppServices>,
-      ) => ReactNode);
   className?: string;
   gridClassName?: string;
 }) {
-  useEffect(() => {
-    urlState.syncSessionFromUrl(session);
-  }, [session, urlState]);
-
   const rootRowsLoadState = useTGridSourceStatus(session);
   const errorMessage =
     rootRowsLoadState.status === "error"
       ? tableLoadErrorMessage(rootRowsLoadState.error)
       : null;
-  const toolbarProps = useTableToolbarProps({
-    session,
-    table,
-    totalCount: rootRowsLoadState.totalCount,
-    level,
-    onNewRecord,
-  });
-  const paginationProps = useTablePaginationProps({
-    session,
-    totalCount: rootRowsLoadState.totalCount,
-    level,
-    routePath,
-  });
   const errorBanner = useStore(
     session.queryStore,
     (state) => state.errorBanner,
   );
   const tableView = useTableViewPreference(table.name);
-  const viewControl = (
-    <TableViewSwitch value={tableView.view} onChange={tableView.setView} />
-  );
+  const { ref, mode } = useTablePageMode();
+  const presentation = resolveTableGridPresentation({
+    mode,
+    preference: tableView.preference,
+  });
 
   return (
     <TableGridSurface
+      ref={ref}
+      mode={mode}
       tableLabel={table.label ?? table.name}
       loadState={rootRowsLoadState}
       errorMessage={errorMessage}
@@ -225,29 +226,33 @@ function TableGridViewWithSession<
       onDismissErrorBanner={() =>
         session.queryStore.getState().setErrorBanner(null)
       }
-      grid={
-        <TGrid
+      header={
+        <TableGridHeader
+          mode={mode}
           session={session}
-          className={gridClassName}
-          viewRelatedRows={viewRelatedRows}
-          view={tableView.view}
+          table={table}
+          level={level}
+          viewPreference={tableView.preference}
+          onViewPreferenceChange={tableView.setPreference}
+          onNewRecord={onNewRecord}
         />
       }
-      toolbar={
-        toolbar === false ? null : toolbar ? (
-          toolbar({ session, props: { ...toolbarProps, viewControl } })
-        ) : (
-          <TableToolbar {...toolbarProps} viewControl={viewControl} />
-        )
-      }
-      pagination={
-        pagination === false ? null : pagination ? (
-          pagination({ session, props: paginationProps })
-        ) : (
-          <Pagination {...paginationProps} />
-        )
+      footer={
+        <TableGridPager
+          mode={mode}
+          session={session}
+          level={level}
+          routePath={routePath}
+        />
       }
       className={className}
-    />
+    >
+      <TGrid
+        session={session}
+        className={gridClassName}
+        viewRelatedRows={viewRelatedRows}
+        presentation={presentation}
+      />
+    </TableGridSurface>
   );
 }
