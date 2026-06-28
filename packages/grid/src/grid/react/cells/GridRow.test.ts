@@ -12,6 +12,7 @@ import type { TreeNode } from "../../types/level-row";
 import type { GridSchema } from "../../types/schema";
 import { GridLevel } from "../GridLevel";
 import { GridRuntimeProvider } from "../GridRuntimeProvider";
+import { withRowExpansionColumn } from "./ExpandableCellFrame";
 import { rowChromeStateFromInteractionStatus } from "./GridRow";
 
 (
@@ -45,6 +46,27 @@ const schema: GridSchema = {
         testColumn("id", "ID", { displayType: "pk" }),
         testColumn("book_id", "Book"),
         testColumn("author_id", "Author"),
+        testColumn("text", "Text"),
+      ],
+      options: { rowKey: (node: TreeNode) => String(node.columns.id) },
+      childLevels: [],
+    },
+  },
+};
+
+const expandableIdentifierSchema: GridSchema = {
+  rootLevel: "quotes",
+  levels: {
+    quotes: {
+      name: "quotes",
+      columns: [
+        withRowExpansionColumn(
+          columnPreset.identifier({
+            id: "id",
+            name: "ID",
+            meta: { displayType: "pk" },
+          }),
+        ),
         testColumn("text", "Text"),
       ],
       options: { rowKey: (node: TreeNode) => String(node.columns.id) },
@@ -112,6 +134,23 @@ function createQuotesRuntime(interaction?: typeof ROW_MULTISELECT_LIST) {
   });
 }
 
+function createExpandableIdentifierRuntime() {
+  return createGridRuntime({
+    schema: expandableIdentifierSchema,
+    dataSource: inMemoryGridDataSource({
+      schema: expandableIdentifierSchema,
+      tree,
+      levels: {
+        quotes: {
+          sortMode: "none",
+          filterMode: "none",
+          paginationMode: "none",
+        },
+      },
+    }),
+  });
+}
+
 describe("GridRow cards presentation", () => {
   let mounted: { root: Root; container: HTMLElement } | null = null;
 
@@ -152,6 +191,37 @@ describe("GridRow cards presentation", () => {
     expect(
       mounted.container.querySelectorAll('[role="gridcell"]'),
     ).toHaveLength(8);
+  });
+
+  it("renders expandable identifier values inside the pk card field", async () => {
+    mounted = await render(
+      createElement(GridRuntimeProvider, {
+        runtime: createExpandableIdentifierRuntime(),
+        children: createElement(GridLevel, {
+          path: rootPath("quotes"),
+          presentation: "cards",
+        }),
+      }),
+    );
+
+    const pkField = mounted.container.querySelector(
+      '[data-row-id="quotes#q1"] [data-grid-part="row-field"][data-col-id="id"][data-display-type="pk"]',
+    );
+    if (!(pkField instanceof HTMLElement)) {
+      throw new Error("expected pk card field");
+    }
+
+    expect(
+      pkField.querySelector('[data-grid-part="expand-cell"]'),
+    ).toBeInstanceOf(HTMLElement);
+    expect(
+      pkField.querySelector('[data-grid-part="expand-content"]'),
+    ).toBeInstanceOf(HTMLElement);
+    expect(
+      pkField
+        .querySelector('[data-grid-part="expand-content"]')
+        ?.textContent?.trim(),
+    ).toBe("q1");
   });
 
   it("does not render tabular column headers in cards presentation", async () => {

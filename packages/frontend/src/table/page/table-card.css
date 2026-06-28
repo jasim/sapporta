@@ -91,6 +91,32 @@
   color: var(--sap-fg-subtle, hsl(215 14% 45%));
 }
 
+/* Identifier cells are right-aligned in tabular grids. In cards, the value
+   should read like the other row fields: directly after the label or expand
+   chevron, with long identifiers still constrained to the value column. */
+:where(
+  .sapporta-table-grid[data-grid-presentation="cards"]
+    [data-grid-part="row-field"][data-display-type="pk"]
+    [data-grid-part="expand-content"]
+) {
+  flex: 0 1 auto;
+  max-width: 100%;
+  width: fit-content;
+}
+
+:where(
+  .sapporta-table-grid[data-grid-presentation="cards"]
+    [data-grid-part="row-field"][data-display-type="pk"]
+    [data-grid-part="cell-content"]
+    > *,
+  .sapporta-table-grid[data-grid-presentation="cards"]
+    [data-grid-part="row-field"][data-display-type="pk"]
+    [data-grid-part="expand-content"]
+    > *
+) {
+  text-align: left;
+}
+
 :where(
   .sapporta-table-grid[data-grid-presentation="cards"] [data-grid-part="cell"],
   .sapporta-table-grid[data-grid-presentation="cards"]
