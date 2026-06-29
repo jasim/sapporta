@@ -8,6 +8,7 @@ export {
   useDisplayedRowSequence,
   useGridRuntime,
   useLevelSnapshot,
+  useLevelSourceState,
   usePhantoms,
   useSelectedRowIds,
   useSelectedRows,

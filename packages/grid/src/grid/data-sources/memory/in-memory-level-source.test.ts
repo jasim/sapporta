@@ -75,19 +75,19 @@ describe("inMemoryLevelSource (writable)", () => {
 
   it("serverManaged is { false, false, false } on every snapshot", () => {
     const src = inMemoryLevelSource(baseOpts());
-    expect(src.snapshot().serverManaged).toEqual({
+    expect(src.state().snapshot.serverManaged).toEqual({
       sort: false,
       filter: false,
       pagination: false,
     });
     src.setSort([{ colId: "amount", direction: "asc" }]);
-    expect(src.snapshot().serverManaged).toEqual({
+    expect(src.state().snapshot.serverManaged).toEqual({
       sort: false,
       filter: false,
       pagination: false,
     });
     src.setCell("a", "amount", 99);
-    expect(src.snapshot().serverManaged).toEqual({
+    expect(src.state().snapshot.serverManaged).toEqual({
       sort: false,
       filter: false,
       pagination: false,
@@ -96,22 +96,22 @@ describe("inMemoryLevelSource (writable)", () => {
 
   it("snapshot() returns identity-stable refs across no-op reads", () => {
     const src = inMemoryLevelSource(baseOpts());
-    const s1 = src.snapshot();
-    const s2 = src.snapshot();
+    const s1 = src.state().snapshot;
+    const s2 = src.state().snapshot;
     expect(s1).toBe(s2);
     expect(s1.nodes).toBe(s2.nodes);
   });
 
   it("setSort re-sorts, allocates new nodes ref, fires subscribers exactly once", () => {
     const src = inMemoryLevelSource(baseOpts());
-    const before = src.snapshot();
+    const before = src.state().snapshot;
     const sub = vi.fn();
     src.subscribe(sub);
 
     src.setSort([{ colId: "amount", direction: "asc" }]);
 
     expect(sub).toHaveBeenCalledTimes(1);
-    const after = src.snapshot();
+    const after = src.state().snapshot;
     expect(after).not.toBe(before);
     expect(after.nodes).not.toBe(before.nodes);
     expect(after.nodes.map((n) => n.columns.id)).toEqual(["b", "c", "a"]);
@@ -120,7 +120,7 @@ describe("inMemoryLevelSource (writable)", () => {
 
   it("setFilter applies the predicate, allocates new nodes ref, fires subscribers exactly once", () => {
     const src = inMemoryLevelSource(baseOpts());
-    const before = src.snapshot();
+    const before = src.state().snapshot;
     const sub = vi.fn();
     src.subscribe(sub);
 
@@ -129,7 +129,7 @@ describe("inMemoryLevelSource (writable)", () => {
     } satisfies TestFilter);
 
     expect(sub).toHaveBeenCalledTimes(1);
-    const after = src.snapshot();
+    const after = src.state().snapshot;
     expect(after.nodes).not.toBe(before.nodes);
     expect(after.nodes.map((n) => n.columns.id)).toEqual(["a", "c"]);
   });
@@ -144,7 +144,7 @@ describe("inMemoryLevelSource (writable)", () => {
     );
 
     src.setPage(2, 10);
-    const snap = src.snapshot();
+    const snap = src.state().snapshot;
     expect(snap.pagination).toEqual({ page: 2, pageSize: 10, totalCount: 25 });
     expect(snap.nodes).toHaveLength(5);
     expect(snap.nodes[0].columns.id).toBe("r20");
@@ -163,12 +163,12 @@ describe("inMemoryLevelSource (writable)", () => {
     expect(src.pageBoundaryNavigation?.canGoNext()).toBe(true);
 
     src.pageBoundaryNavigation?.goNext();
-    expect(src.snapshot().pagination?.page).toBe(1);
-    expect(src.snapshot().nodes[0].columns.id).toBe("r5");
+    expect(src.state().snapshot.pagination?.page).toBe(1);
+    expect(src.state().snapshot.nodes[0].columns.id).toBe("r5");
 
     src.pageBoundaryNavigation?.goPrevious();
-    expect(src.snapshot().pagination?.page).toBe(0);
-    expect(src.snapshot().nodes[0].columns.id).toBe("r0");
+    expect(src.state().snapshot.pagination?.page).toBe(0);
+    expect(src.state().snapshot.nodes[0].columns.id).toBe("r0");
   });
 
   it("setPage rejects non-integer pagination windows", () => {
@@ -182,10 +182,10 @@ describe("inMemoryLevelSource (writable)", () => {
 
   it("setCell mutates the matching node and allocates a new nodes ref", () => {
     const src = inMemoryLevelSource(baseOpts());
-    const before = src.snapshot();
+    const before = src.state().snapshot;
 
     src.setCell("a", "amount", 999);
-    const after = src.snapshot();
+    const after = src.state().snapshot;
 
     expect(after.nodes).not.toBe(before.nodes);
     const a = after.nodes.find((n) => n.columns.id === "a")!;
@@ -215,7 +215,7 @@ describe("inMemoryLevelSource (writable)", () => {
     ]);
 
     expect(sub).toHaveBeenCalledTimes(1);
-    const snap = src.snapshot();
+    const snap = src.state().snapshot;
     const byId = new Map(
       snap.nodes.map((n) => [n.columns.id, n.columns.amount]),
     );
@@ -226,7 +226,7 @@ describe("inMemoryLevelSource (writable)", () => {
 
   it("applyChanges throws on a missing rowKey and leaves the snapshot unchanged", () => {
     const src = inMemoryLevelSource(baseOpts());
-    const before = src.snapshot();
+    const before = src.state().snapshot;
     const sub = vi.fn();
     src.subscribe(sub);
 
@@ -237,18 +237,18 @@ describe("inMemoryLevelSource (writable)", () => {
       ]),
     ).toThrow(/no node with rowKey 'ghost'/);
 
-    expect(src.snapshot()).toBe(before);
+    expect(src.state().snapshot).toBe(before);
     expect(sub).not.toHaveBeenCalled();
   });
 
   it("setCell on a missing rowKey throws and does not mutate state", () => {
     const src = inMemoryLevelSource(baseOpts());
-    const before = src.snapshot();
+    const before = src.state().snapshot;
 
     expect(() => src.setCell("ghost", "amount", 1)).toThrow(
       /no node with rowKey 'ghost'/,
     );
-    expect(src.snapshot()).toBe(before);
+    expect(src.state().snapshot).toBe(before);
   });
 
   it("createNode appends by default and surfaces the new node", async () => {
@@ -264,7 +264,7 @@ describe("inMemoryLevelSource (writable)", () => {
       },
       atIndex: 3,
     });
-    const snap = src.snapshot();
+    const snap = src.state().snapshot;
     expect(snap.nodes).toHaveLength(4);
     expect(snap.nodes[3].columns.id).toBe("d");
   });
@@ -275,7 +275,7 @@ describe("inMemoryLevelSource (writable)", () => {
       { levelName: "items", columns: { id: "z", amount: 0, name: "Z" } },
       1,
     );
-    const snap = src.snapshot();
+    const snap = src.state().snapshot;
     expect(snap.nodes.map((n) => n.columns.id)).toEqual(["a", "z", "b", "c"]);
   });
 
@@ -283,7 +283,7 @@ describe("inMemoryLevelSource (writable)", () => {
     const src = inMemoryLevelSource(baseOpts());
     src.setCell("b", "amount", 100);
     src.removeNode("b");
-    const snap = src.snapshot();
+    const snap = src.state().snapshot;
     expect(snap.nodes.map((n) => n.columns.id)).toEqual(["a", "c"]);
   });
 
@@ -326,7 +326,7 @@ describe("inMemoryLevelSource (writable)", () => {
       }),
     );
 
-    const snap = src.snapshot();
+    const snap = src.state().snapshot;
     expect(lastSeen!).toHaveLength(2);
     expect(snap.nodes).toHaveLength(2);
     // Rollups merged into the published nodes without mutating originals.
@@ -355,10 +355,10 @@ describe("inMemoryLevelSource (writable)", () => {
       ],
     }));
     const src = inMemoryLevelSource(baseOpts({ aggregator }));
-    const before = src.snapshot();
+    const before = src.state().snapshot;
     // Same total → the source reuses the prior footerRows reference.
     src.setCell("a", "name", "Apricot");
-    const after = src.snapshot();
+    const after = src.state().snapshot;
     expect(after.footerRows).toBe(before.footerRows);
     expect(after.nodes).not.toBe(before.nodes);
   });
@@ -384,14 +384,14 @@ describe("inMemoryLevelSource (writable)", () => {
   it("with sortMode 'none', setSort is ignored and the snapshot omits sort", () => {
     const src = inMemoryLevelSource(baseOpts({ sortMode: "none" }));
     src.setSort([{ colId: "amount", direction: "asc" }]);
-    const snap = src.snapshot();
+    const snap = src.state().snapshot;
     expect(snap.sort).toBeUndefined();
     expect(snap.nodes.map((n) => n.columns.id)).toEqual(["a", "b", "c"]);
   });
 
   it("with paginationMode 'none', the snapshot omits pagination", () => {
     const src = inMemoryLevelSource(baseOpts({ paginationMode: "none" }));
-    expect(src.snapshot().pagination).toBeUndefined();
+    expect(src.state().snapshot.pagination).toBeUndefined();
   });
 });
 
@@ -419,31 +419,31 @@ describe("inMemoryReadonlyLevelSource", () => {
       baseOpts({ initialNodes: many, initialPage: 0, initialPageSize: 10 }),
     );
 
-    const s1 = src.snapshot();
-    expect(src.snapshot()).toBe(s1);
+    const s1 = src.state().snapshot;
+    expect(src.state().snapshot).toBe(s1);
 
     src.setSort([{ colId: "amount", direction: "desc" }]);
-    const s2 = src.snapshot();
+    const s2 = src.state().snapshot;
     expect(s2).not.toBe(s1);
     expect(s2.nodes[0].columns.id).toBe("r24");
 
     src.setFilter({
       amount: (v: unknown) => typeof v === "number" && v % 2 === 0,
     } satisfies TestFilter);
-    const s3 = src.snapshot();
+    const s3 = src.state().snapshot;
     expect(s3).not.toBe(s2);
 
     src.setPage(1, 5);
-    const s4 = src.snapshot();
+    const s4 = src.state().snapshot;
     expect(s4.pagination).toMatchObject({ page: 1, pageSize: 5 });
 
-    expect(src.snapshot()).toBe(s4);
+    expect(src.state().snapshot).toBe(s4);
   });
 
   it("refetch is a no-op on in-memory readonly sources", () => {
     const src = inMemoryReadonlyLevelSource(baseOpts());
-    const before = src.snapshot();
+    const before = src.state().snapshot;
     src.refetch();
-    expect(src.snapshot()).toBe(before);
+    expect(src.state().snapshot).toBe(before);
   });
 });

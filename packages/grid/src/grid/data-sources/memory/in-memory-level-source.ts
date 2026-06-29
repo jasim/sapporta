@@ -55,6 +55,7 @@ import { defaultRowKey } from "../../pipeline/stages/build-data";
 import { assertBoundedInteger } from "@sapporta/shared/validation";
 import type {
   LevelSnapshot,
+  LevelSourceState,
   PageBoundaryNavigation,
   ReadonlyLevelDataSource,
   ReconcileEvent,
@@ -159,6 +160,7 @@ function buildCore<F>(opts: InMemoryLevelSourceOpts<F>): Core<F> {
   // Cached published state. Invalidated on any mutation so the next
   // `snapshot()` rebuilds — and stays stable across no-op reads.
   let cachedSnapshot: LevelSnapshot<F> | null = null;
+  let cachedState: LevelSourceState<F> | null = null;
   let cachedRowKeyToBaseIdx: Map<RowKey, number> | null = null;
   // Last-published `nodes` and `footerRows` references — held so the next
   // recompute can reuse them when content didn't actually change.
@@ -246,7 +248,6 @@ function buildCore<F>(opts: InMemoryLevelSourceOpts<F>): Core<F> {
       : footerRows;
 
     const snapshot: LevelSnapshot<F> = {
-      status: "ready",
       nodes: finalNodes,
       serverManaged: SERVER_MANAGED,
     };
@@ -263,6 +264,7 @@ function buildCore<F>(opts: InMemoryLevelSourceOpts<F>): Core<F> {
     if (finalFooters) snapshot.footerRows = finalFooters;
 
     cachedSnapshot = snapshot;
+    cachedState = { status: "ready", snapshot };
     cachedRowKeyToBaseIdx = rowKeyToBaseIdx;
     lastNodes = finalNodes;
     lastFooterRows = finalFooters;
@@ -274,6 +276,7 @@ function buildCore<F>(opts: InMemoryLevelSourceOpts<F>): Core<F> {
 
   function invalidate(): void {
     cachedSnapshot = null;
+    cachedState = null;
     cachedRowKeyToBaseIdx = null;
   }
 
@@ -312,9 +315,9 @@ function buildCore<F>(opts: InMemoryLevelSourceOpts<F>): Core<F> {
 
   const read: ReadonlyLevelDataSource = {
     writable: false,
-    snapshot() {
+    state(): LevelSourceState<F> {
       ensureFresh();
-      return cachedSnapshot!;
+      return cachedState!;
     },
     subscribe(fn) {
       subs.add(fn);
@@ -451,7 +454,7 @@ export function inMemoryLevelSource<F = unknown>(
   // identity object rather than sharing one with the readonly variant.
   return {
     writable: true,
-    snapshot: core.read.snapshot,
+    state: core.read.state,
     subscribe: core.read.subscribe,
     setSort: core.read.setSort,
     setFilter: core.read.setFilter,
@@ -476,7 +479,7 @@ export function inMemoryReadonlyLevelSource<F = unknown>(
   // is false at runtime — not merely `setCell === undefined`.
   return {
     writable: false,
-    snapshot: core.read.snapshot,
+    state: core.read.state,
     subscribe: core.read.subscribe,
     setSort: core.read.setSort,
     setFilter: core.read.setFilter,

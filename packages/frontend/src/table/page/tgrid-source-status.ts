@@ -1,5 +1,5 @@
 import { useSyncExternalStore } from "react";
-import type { LevelSnapshot } from "@sapporta/grid";
+import type { LevelSnapshot, LevelSourceState } from "@sapporta/grid";
 import { ApiError } from "@sapporta/shared/client";
 import type { TGridRowsByLevel } from "@/table/grid-adapter/tgrid-types";
 import type { TGridSession } from "@/table/state/tgrid-session";
@@ -9,14 +9,29 @@ import type { TGridSession } from "@/table/state/tgrid-session";
 // record count, or error message can update without teaching those components
 // about row loading details.
 export type TGridSourceStatus = {
-  status: LevelSnapshot["status"];
+  status: LevelSourceState["status"];
   error: unknown;
   totalCount: number;
 };
 
-// Subscribe to one field from the root data source.
-// Use this when a component needs a narrow piece of loading state and should
-// not re-render for unrelated source changes.
+export function useTGridSourceStateField<
+  RowsByLevel extends TGridRowsByLevel,
+  AppServices,
+  T,
+>(
+  session: TGridSession<RowsByLevel, AppServices>,
+  pick: (state: LevelSourceState) => T,
+): T {
+  return useSyncExternalStore(
+    (cb) => session.rootSource.subscribe(cb),
+    () => pick(session.rootSource.state()),
+    () => pick(session.rootSource.state()),
+  );
+}
+
+// Subscribe to one field from the root source snapshot.
+// Use this when a component needs row data/count without caring about
+// lifecycle-only state.
 export function useTGridSourceField<
   RowsByLevel extends TGridRowsByLevel,
   AppServices,
@@ -25,11 +40,7 @@ export function useTGridSourceField<
   session: TGridSession<RowsByLevel, AppServices>,
   pick: (snapshot: LevelSnapshot) => T,
 ): T {
-  return useSyncExternalStore(
-    (cb) => session.rootSource.subscribe(cb),
-    () => pick(session.rootSource.snapshot()),
-    () => pick(session.rootSource.snapshot()),
-  );
+  return useTGridSourceStateField(session, (state) => pick(state.snapshot));
 }
 
 // Read the loading/error/count values usually needed by table page chrome.
@@ -37,8 +48,10 @@ export function useTGridSourceStatus<
   RowsByLevel extends TGridRowsByLevel,
   AppServices = unknown,
 >(session: TGridSession<RowsByLevel, AppServices>): TGridSourceStatus {
-  const status = useTGridSourceField(session, (snapshot) => snapshot.status);
-  const error = useTGridSourceField(session, (snapshot) => snapshot.error);
+  const status = useTGridSourceStateField(session, (state) => state.status);
+  const error = useTGridSourceStateField(session, (state) =>
+    "error" in state ? state.error : undefined,
+  );
   const totalCount = useTGridSourceField(
     session,
     (snapshot) => snapshot.pagination?.totalCount ?? 0,

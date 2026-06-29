@@ -62,7 +62,7 @@ import type {
 } from "../types/level-row";
 import type { RowPredicate, SortDescriptor } from "../pipeline/types";
 
-export type LevelStatus = "idle" | "loading" | "error" | "ready";
+export type LevelStatus = LevelSourceState["status"];
 
 // `F` is the host's filter grammar — opaque to the grid. The grid neither
 // defines operators nor knows what "search" means; it carries `F` through
@@ -103,9 +103,6 @@ export type LevelStatus = "idle" | "loading" | "error" | "ready";
 // `Record<ColId, predicate>` shape served both roles and forced any host
 // with a richer wire grammar to smuggle data past the contract.
 export type LevelSnapshot<F = unknown> = {
-  status: LevelStatus;
-  // Present iff status === "error".
-  error?: Error;
   // The nodes displayed-row derivation sees. Already windowed/sorted/filtered
   // if the source declared those concerns server-managed. Identity-stable.
   nodes: TreeNode[];
@@ -131,6 +128,40 @@ export type LevelSnapshot<F = unknown> = {
   // reads into the source.
   serverManaged: { sort: boolean; filter: boolean; pagination: boolean };
 };
+
+export type LevelRequest<F = unknown> = {
+  sort?: SortDescriptor[];
+  filter?: F;
+  page: number;
+  pageSize: number;
+};
+
+export type LevelSourceState<F = unknown> =
+  | {
+      status: "initialLoading";
+      snapshot: LevelSnapshot<F>;
+      pending: LevelRequest<F>;
+    }
+  | { status: "ready"; snapshot: LevelSnapshot<F> }
+  | {
+      status: "refreshing";
+      snapshot: LevelSnapshot<F>;
+      previous: LevelSnapshot<F>;
+      pending: LevelRequest<F>;
+    }
+  | {
+      status: "initialError";
+      snapshot: LevelSnapshot<F>;
+      error: Error;
+      retry: LevelRequest<F>;
+    }
+  | {
+      status: "refreshError";
+      snapshot: LevelSnapshot<F>;
+      previous: LevelSnapshot<F>;
+      error: Error;
+      retry: LevelRequest<F>;
+    };
 
 export type CellChange = { rowKey: RowKey; colId: ColId; value: unknown };
 
@@ -200,9 +231,9 @@ export type PageBoundaryNavigation = {
 // (which knows its own grammar) does.
 export type ReadonlyLevelDataSource = {
   writable: false;
-  snapshot(): LevelSnapshot;
+  state(): LevelSourceState;
   // Subscribe to snapshot transitions. The callback receives no payload —
-  // consumers re-read `snapshot()` after the callback fires. Returns an
+  // consumers re-read `state()` after the callback fires. Returns an
   // unsubscribe function.
   subscribe(fn: () => void): () => void;
   setSort: (s?: SortDescriptor[]) => void;
@@ -306,12 +337,7 @@ export type PhantomChannel = {
 // describe operations on rows, not filter state, and need no
 // parameterization — they are unaffected by the host's filter grammar.
 
-export type FetchPageRequest<F = unknown> = {
-  sort?: SortDescriptor[];
-  filter?: F;
-  page: number;
-  pageSize: number;
-};
+export type FetchPageRequest<F = unknown> = LevelRequest<F>;
 
 export type FetchPageResponse = {
   // Already shaped per the source's declared serverManaged flags.

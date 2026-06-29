@@ -1,6 +1,8 @@
 export type {
   LevelStatus,
   LevelSnapshot,
+  LevelSourceState,
+  LevelRequest,
   CellChange,
   CreateNodeResult,
   ReconcileEvent,

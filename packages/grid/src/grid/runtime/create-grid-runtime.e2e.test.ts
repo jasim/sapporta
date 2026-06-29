@@ -200,11 +200,11 @@ describe("GridRuntime over restGridDataSource — full lifecycle", () => {
     return { runtime, orders, lines, notes, events };
   }
 
-  it("loads the root: fetchPage fires once, status loading → ready, snapshot carries the fetched nodes", async () => {
+  it("loads the root: fetchPage fires once, status initialLoading → ready, snapshot carries the fetched nodes", async () => {
     const { runtime, orders } = buildRig();
 
     expect(orders.fetchCalls).toHaveLength(1);
-    expect(runtime.snapshotFor(ordersRoot).status).toBe("loading");
+    expect(runtime.sourceStateFor(ordersRoot).status).toBe("initialLoading");
 
     orders.fetchCalls[0].deferred.resolve({
       nodes: ordersFixture(),
@@ -213,7 +213,6 @@ describe("GridRuntime over restGridDataSource — full lifecycle", () => {
     await flush();
 
     const snap = runtime.snapshotFor(ordersRoot);
-    expect(snap.status).toBe("ready");
     expect(snap.nodes.map((n) => n.columns.id)).toEqual(["O1", "O2"]);
     expect(snap.pagination).toEqual({ page: 0, pageSize: 50, totalCount: 2 });
   });
@@ -281,7 +280,7 @@ describe("GridRuntime over restGridDataSource — full lifecycle", () => {
     const linesPath = childPath(ordersRoot, "O1", "lines");
 
     expect(lines.fetchCalls).toHaveLength(1);
-    expect(runtime.snapshotFor(linesPath).status).toBe("loading");
+    expect(runtime.sourceStateFor(linesPath).status).toBe("initialLoading");
 
     lines.fetchCalls[0].deferred.resolve({
       nodes: linesFixture(),
@@ -289,7 +288,7 @@ describe("GridRuntime over restGridDataSource — full lifecycle", () => {
     });
     await flush();
 
-    expect(runtime.snapshotFor(linesPath).status).toBe("ready");
+    expect(runtime.sourceStateFor(linesPath).status).toBe("ready");
     expect(
       runtime.snapshotFor(linesPath).nodes.map((n) => n.columns.id),
     ).toEqual(["L1", "L2"]);
@@ -383,7 +382,6 @@ describe("GridRuntime over restGridDataSource — full lifecycle", () => {
     await flush();
 
     const snap = runtime.snapshotFor(ordersRoot);
-    expect(snap.status).toBe("ready");
     expect(snap.nodes.find((n) => n.columns.id === "O1")?.columns.amount).toBe(
       100,
     );
@@ -420,30 +418,30 @@ describe("GridRuntime over restGridDataSource — full lifecycle", () => {
     });
   });
 
-  it("refetch issues a new fetchPage; status flips ready → loading → ready", async () => {
+  it("refetch issues a new fetchPage; status flips ready → refreshing → ready", async () => {
     const { runtime, orders, events } = buildRig();
     orders.fetchCalls[0].deferred.resolve({
       nodes: ordersFixture(),
       totalCount: 2,
     });
     await flush();
-    expect(runtime.snapshotFor(ordersRoot).status).toBe("ready");
+    expect(runtime.sourceStateFor(ordersRoot).status).toBe("ready");
 
     runtime.sourceFor(ordersRoot).refetch();
     expect(orders.fetchCalls).toHaveLength(2);
-    expect(runtime.snapshotFor(ordersRoot).status).toBe("loading");
+    expect(runtime.sourceStateFor(ordersRoot).status).toBe("refreshing");
 
     orders.fetchCalls[1].deferred.resolve({
       nodes: ordersFixture(),
       totalCount: 2,
     });
     await flush();
-    expect(runtime.snapshotFor(ordersRoot).status).toBe("ready");
+    expect(runtime.sourceStateFor(ordersRoot).status).toBe("ready");
 
     const statuses = events
       .filter((e) => e.kind === "levelStatusChanged")
       .map((e) => (e.payload as { status: string }).status);
-    expect(statuses).toEqual(["ready", "loading", "ready"]);
+    expect(statuses).toEqual(["ready", "refreshing", "ready"]);
   });
 });
 
@@ -619,7 +617,7 @@ describe("Success metric: switching source kinds requires no schema or component
       },
     });
     const rt1 = createGridRuntime({ schema: flatSchema, dataSource: ds1 });
-    expect(rt1.snapshotFor(ordersRoot).status).toBe("ready");
+    expect(rt1.sourceStateFor(ordersRoot).status).toBe("ready");
     const memRows = rt1.displayedRowsFor(ordersRoot).rows.map((r) => ({
       id: r.columns.id,
       amount: r.columns.amount,

@@ -422,6 +422,8 @@ export type {
   GridDataSource,
   LevelStatus,
   LevelSnapshot,
+  LevelSourceState,
+  LevelRequest,
   CellChange,
   CreateNodeResult,
   ReconcileEvent,

@@ -93,10 +93,12 @@ function makeSource(nodes: TreeNode[]) {
   const unsubscribe = vi.fn();
   const source: RuntimeLevelDataSource = {
     writable: false,
-    snapshot: () => ({
+    state: () => ({
       status: "ready",
-      nodes,
-      serverManaged: { sort: false, filter: false, pagination: false },
+      snapshot: {
+        nodes,
+        serverManaged: { sort: false, filter: false, pagination: false },
+      },
     }),
     subscribe: vi.fn(() => unsubscribe),
     setSort: () => {},

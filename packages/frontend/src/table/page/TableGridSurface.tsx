@@ -39,9 +39,10 @@ export const TableGridSurface = forwardRef<
   ref,
 ) {
   const showSpinner =
-    loadState.status === "loading" && loadState.totalCount === 0;
+    loadState.status === "initialLoading" && loadState.totalCount === 0;
+  const showRefreshing = loadState.status === "refreshing";
   const visibleError =
-    loadState.status === "error"
+    loadState.status === "initialError"
       ? (errorMessage ?? "Could not load rows.")
       : null;
 
@@ -52,6 +53,16 @@ export const TableGridSurface = forwardRef<
       className={cn("flex h-full flex-col bg-sap-surface", className)}
     >
       {header}
+
+      {showRefreshing && (
+        <div
+          role="status"
+          aria-live="polite"
+          className="h-[2px] shrink-0 overflow-hidden bg-sap-border-soft"
+        >
+          <div className="h-full w-1/3 animate-pulse bg-sap-brand" />
+        </div>
+      )}
 
       {errorBanner && (
         <div

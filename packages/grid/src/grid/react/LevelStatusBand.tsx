@@ -12,9 +12,9 @@
 // to `source.refetch()`; backend error text is surfaced verbatim per
 // `packages/ui/CLAUDE.md`.
 
-import type { LevelSnapshot } from "../data-sources/types";
+import type { LevelSourceState } from "../data-sources/types";
 import type { GridPath } from "../types/identity";
-import { useGridRuntime, useLevelSnapshot } from "./GridRuntimeProvider";
+import { useGridRuntime, useLevelSourceState } from "./GridRuntimeProvider";
 
 export type StatusBandModel =
   | null
@@ -24,14 +24,16 @@ export type StatusBandModel =
 // Pure decision logic. Tested directly so the component itself can stay
 // a trivial wrapper around the model + the retry callback.
 export function levelStatusBandModel(
-  snapshot: LevelSnapshot,
+  state: LevelSourceState,
   levelName: string,
 ): StatusBandModel {
-  switch (snapshot.status) {
+  switch (state.status) {
     case "ready":
-    case "idle":
+    case "refreshing":
+    case "refreshError":
       return null;
-    case "loading": {
+    case "initialLoading": {
+      const snapshot = state.snapshot;
       const totalCount = snapshot.pagination?.totalCount;
       const pageSize = snapshot.pagination?.pageSize;
       const page = snapshot.pagination?.page;
@@ -49,11 +51,11 @@ export function levelStatusBandModel(
       }
       return { kind: "loading", text: `Loading ${levelName}…` };
     }
-    case "error": {
+    case "initialError": {
       // Backend error message, verbatim. The framing prefix ("Failed to
       // load <levelName>: ") is the UI's job; the message after the
       // colon is the server's words untouched.
-      const message = snapshot.error?.message ?? "";
+      const message = state.error.message;
       return { kind: "error", text: `Failed to load ${levelName}: ${message}` };
     }
   }
@@ -61,9 +63,9 @@ export function levelStatusBandModel(
 
 export function LevelStatusBand({ path }: { path: GridPath }) {
   const runtime = useGridRuntime();
-  const snapshot = useLevelSnapshot(path);
+  const state = useLevelSourceState(path);
   const levelName = runtime.schemaAt(path).name;
-  const model = levelStatusBandModel(snapshot, levelName);
+  const model = levelStatusBandModel(state, levelName);
   if (!model) return null;
 
   if (model.kind === "loading") {

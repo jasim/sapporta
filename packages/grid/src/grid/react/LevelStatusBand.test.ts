@@ -1,41 +1,69 @@
 import { describe, expect, it } from "vitest";
 import { levelStatusBandModel } from "./LevelStatusBand";
-import type { LevelSnapshot } from "../data-sources/types";
+import type { LevelSnapshot, LevelSourceState } from "../data-sources/types";
 
 const baseSnapshot: LevelSnapshot = {
-  status: "ready",
   nodes: [],
   serverManaged: { sort: false, filter: false, pagination: false },
 };
 
+function state(
+  status: LevelSourceState["status"],
+  snapshot: LevelSnapshot = baseSnapshot,
+  error = new Error("connection refused"),
+): LevelSourceState {
+  switch (status) {
+    case "ready":
+      return { status, snapshot };
+    case "initialLoading":
+      return { status, snapshot, pending: { page: 0, pageSize: 25 } };
+    case "refreshing":
+      return {
+        status,
+        snapshot,
+        previous: baseSnapshot,
+        pending: { page: 0, pageSize: 25 },
+      };
+    case "initialError":
+      return { status, snapshot, error, retry: { page: 0, pageSize: 25 } };
+    case "refreshError":
+      return {
+        status,
+        snapshot,
+        previous: baseSnapshot,
+        error,
+        retry: { page: 0, pageSize: 25 },
+      };
+  }
+}
+
 describe("levelStatusBandModel", () => {
   it("returns null when status is ready", () => {
     expect(
-      levelStatusBandModel({ ...baseSnapshot, status: "ready" }, "rows"),
+      levelStatusBandModel(state("ready"), "rows"),
     ).toBeNull();
   });
 
-  it("returns null when status is idle", () => {
+  it("returns null when status is refreshing", () => {
     expect(
-      levelStatusBandModel({ ...baseSnapshot, status: "idle" }, "rows"),
+      levelStatusBandModel(state("refreshing"), "rows"),
     ).toBeNull();
   });
 
-  it("loading without pagination uses the bare form", () => {
+  it("initial loading without pagination uses the bare form", () => {
     const m = levelStatusBandModel(
-      { ...baseSnapshot, status: "loading" },
+      state("initialLoading"),
       "rows",
     );
     expect(m).toEqual({ kind: "loading", text: "Loading rows…" });
   });
 
-  it("loading with totalCount renders 'page X of Y'", () => {
+  it("initial loading with totalCount renders 'page X of Y'", () => {
     const m = levelStatusBandModel(
-      {
+      state("initialLoading", {
         ...baseSnapshot,
-        status: "loading",
         pagination: { page: 2, pageSize: 25, totalCount: 137 },
-      },
+      }),
       "orders",
     );
     // 137 / 25 → 6 pages.
@@ -45,37 +73,31 @@ describe("levelStatusBandModel", () => {
     });
   });
 
-  it("loading with totalCount=0 still renders 1 total page", () => {
+  it("initial loading with totalCount=0 still renders 1 total page", () => {
     const m = levelStatusBandModel(
-      {
+      state("initialLoading", {
         ...baseSnapshot,
-        status: "loading",
         pagination: { page: 1, pageSize: 25, totalCount: 0 },
-      },
+      }),
       "rows",
     );
     expect(m).toEqual({ kind: "loading", text: "Loading rows, page 1 of 1…" });
   });
 
-  it("loading with pagination but no totalCount falls back to bare form", () => {
+  it("initial loading with pagination but no totalCount falls back to bare form", () => {
     const m = levelStatusBandModel(
-      {
+      state("initialLoading", {
         ...baseSnapshot,
-        status: "loading",
         pagination: { page: 1, pageSize: 25 },
-      },
+      }),
       "rows",
     );
     expect(m).toEqual({ kind: "loading", text: "Loading rows…" });
   });
 
-  it("error surfaces the backend message verbatim", () => {
+  it("initial error surfaces the backend message verbatim", () => {
     const m = levelStatusBandModel(
-      {
-        ...baseSnapshot,
-        status: "error",
-        error: new Error("connection refused"),
-      },
+      state("initialError", baseSnapshot, new Error("connection refused")),
       "rows",
     );
     expect(m).toEqual({
@@ -84,14 +106,7 @@ describe("levelStatusBandModel", () => {
     });
   });
 
-  it("error without an Error instance still renders a band", () => {
-    // Defensive guard: shape is determined by `status === 'error'` alone,
-    // not by the presence of `error`. The framing is still emitted; the
-    // verbatim portion is empty.
-    const m = levelStatusBandModel(
-      { ...baseSnapshot, status: "error" },
-      "rows",
-    );
-    expect(m).toEqual({ kind: "error", text: "Failed to load rows: " });
+  it("refresh error renders no blocking band", () => {
+    expect(levelStatusBandModel(state("refreshError"), "rows")).toBeNull();
   });
 });

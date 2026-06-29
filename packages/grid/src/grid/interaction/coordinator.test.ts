@@ -188,7 +188,6 @@ function pagedRootDataSource(
   let page = 0;
   const snapshotForPage = (): LevelSnapshot => {
     const next: LevelSnapshot = {
-      status: "ready",
       nodes: pages[page],
       pagination: { page, pageSize: 1, totalCount: pages.length },
       serverManaged: { sort: true, filter: true, pagination: true },
@@ -204,7 +203,7 @@ function pagedRootDataSource(
   };
   const source: LevelDataSource = {
     writable: false,
-    snapshot: () => snapshot,
+    state: () => ({ status: "ready", snapshot }),
     subscribe: (fn) => {
       subscribers.add(fn);
       return () => {
@@ -431,7 +430,7 @@ describe("GridCoordinator", () => {
       rowId: second,
       colId: "name",
     });
-    expect(rt.sourceFor(root).snapshot().pagination?.page).toBe(1);
+    expect(rt.sourceFor(root).state().snapshot.pagination?.page).toBe(1);
     expect(rt.controllerFor(root).effects.getState()).toContainEqual({
       type: "scrollFocusIntoView",
       coord: { rowId: second, colId: "name" },
@@ -463,12 +462,12 @@ describe("GridCoordinator", () => {
       rowId: first,
       colId: "name",
     });
-    expect(rt.sourceFor(root).snapshot().pagination?.page).toBe(0);
+    expect(rt.sourceFor(root).state().snapshot.pagination?.page).toBe(0);
   });
 
   it("ArrowDown from the last child row of the last root page row turns the root page", () => {
     const rt = setupPagedBooks();
-    expect(rt.sourceFor(booksRoot).snapshot().pagination?.page).toBe(0);
+    expect(rt.sourceFor(booksRoot).state().snapshot.pagination?.page).toBe(0);
     expect(
       rt.displayedRowsFor(duneQuotes).rows.map((row) => row.columns.text),
     ).toEqual(["Fear is the mind-killer.", "The sleeper must awaken."]);
@@ -488,7 +487,7 @@ describe("GridCoordinator", () => {
       altKey: false,
     } as KeyboardEvent);
 
-    expect(rt.sourceFor(booksRoot).snapshot().pagination?.page).toBe(1);
+    expect(rt.sourceFor(booksRoot).state().snapshot.pagination?.page).toBe(1);
     expect(rt.coordinator.getState().cellCursor).toEqual({
       path: booksRoot,
       rowId: makeRowId(booksRoot, "book-3"),
@@ -524,7 +523,7 @@ describe("GridCoordinator", () => {
       rowId: makeRowId(root, "Apple"),
       colId: "name",
     });
-    expect(rt.sourceFor(root).snapshot().pagination?.page).toBe(0);
+    expect(rt.sourceFor(root).state().snapshot.pagination?.page).toBe(0);
 
     rt.controllerFor(root).handleKey({
       key: "PageDown",
@@ -539,7 +538,7 @@ describe("GridCoordinator", () => {
       rowId: makeRowId(root, "Veg"),
       colId: "name",
     });
-    expect(rt.sourceFor(root).snapshot().pagination?.page).toBe(1);
+    expect(rt.sourceFor(root).state().snapshot.pagination?.page).toBe(1);
   });
 
   it("PageUp first clamps to the first loaded cell, then turns to the previous page", () => {
@@ -570,7 +569,7 @@ describe("GridCoordinator", () => {
       rowId: makeRowId(root, "Apple"),
       colId: "name",
     });
-    expect(rt.sourceFor(root).snapshot().pagination?.page).toBe(1);
+    expect(rt.sourceFor(root).state().snapshot.pagination?.page).toBe(1);
 
     rt.controllerFor(root).handleKey({
       key: "PageUp",
@@ -585,7 +584,7 @@ describe("GridCoordinator", () => {
       rowId: makeRowId(root, "Fruit"),
       colId: "name",
     });
-    expect(rt.sourceFor(root).snapshot().pagination?.page).toBe(0);
+    expect(rt.sourceFor(root).state().snapshot.pagination?.page).toBe(0);
   });
 
   it("ArrowDown from the last focusable row before a footer turns to the next page", () => {
@@ -607,7 +606,7 @@ describe("GridCoordinator", () => {
       altKey: false,
     } as KeyboardEvent);
 
-    expect(rt.sourceFor(root).snapshot().pagination?.page).toBe(1);
+    expect(rt.sourceFor(root).state().snapshot.pagination?.page).toBe(1);
     expect(rt.coordinator.getState().cellCursor).toEqual({
       path: root,
       rowId: makeRowId(root, "Veg"),
@@ -636,7 +635,7 @@ describe("GridCoordinator", () => {
       path: root,
       rowId: second,
     });
-    expect(rt.sourceFor(root).snapshot().pagination?.page).toBe(1);
+    expect(rt.sourceFor(root).state().snapshot.pagination?.page).toBe(1);
     expect(rt.controllerFor(root).effects.getState()).toContainEqual({
       type: "scrollRowIntoView",
       rowId: second,
@@ -671,7 +670,7 @@ describe("GridCoordinator", () => {
       path: root,
       rowId: makeRowId(root, "Apple"),
     });
-    expect(rt.sourceFor(root).snapshot().pagination?.page).toBe(0);
+    expect(rt.sourceFor(root).state().snapshot.pagination?.page).toBe(0);
 
     rt.controllerFor(root).handleKey({
       key: "PageDown",
@@ -685,7 +684,7 @@ describe("GridCoordinator", () => {
       path: root,
       rowId: makeRowId(root, "Veg"),
     });
-    expect(rt.sourceFor(root).snapshot().pagination?.page).toBe(1);
+    expect(rt.sourceFor(root).state().snapshot.pagination?.page).toBe(1);
   });
 
   it("row-list PageUp first clamps to the first loaded row, then turns to the previous page", () => {
@@ -717,7 +716,7 @@ describe("GridCoordinator", () => {
       path: root,
       rowId: makeRowId(root, "Apple"),
     });
-    expect(rt.sourceFor(root).snapshot().pagination?.page).toBe(1);
+    expect(rt.sourceFor(root).state().snapshot.pagination?.page).toBe(1);
 
     rt.controllerFor(root).handleKey({
       key: "PageUp",
@@ -731,7 +730,7 @@ describe("GridCoordinator", () => {
       path: root,
       rowId: makeRowId(root, "Fruit"),
     });
-    expect(rt.sourceFor(root).snapshot().pagination?.page).toBe(0);
+    expect(rt.sourceFor(root).state().snapshot.pagination?.page).toBe(0);
   });
 
   it("row-list ArrowDown from the last selectable row before a footer turns to the next page", () => {
@@ -751,7 +750,7 @@ describe("GridCoordinator", () => {
       altKey: false,
     } as KeyboardEvent);
 
-    expect(rt.sourceFor(root).snapshot().pagination?.page).toBe(1);
+    expect(rt.sourceFor(root).state().snapshot.pagination?.page).toBe(1);
     expect(rt.coordinator.getState().rowCursor).toEqual({
       path: root,
       rowId: makeRowId(root, "Veg"),

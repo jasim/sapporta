@@ -134,7 +134,13 @@ function fakeRuntimeWithRows(rows: LevelRow[]): GridRuntime {
       rowIndexById,
     }),
     materializedChildren: () => [],
-    snapshotFor: () => ({ status: "ready", nodes: [] }),
+    sourceStateFor: () => ({
+      status: "ready",
+      snapshot: {
+        nodes: [],
+        serverManaged: { sort: false, filter: false, pagination: false },
+      },
+    }),
     schemaAt: () => reportSchema.levels.cat,
   };
   return runtime as unknown as GridRuntime;

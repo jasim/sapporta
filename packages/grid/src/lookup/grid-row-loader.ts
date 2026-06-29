@@ -26,8 +26,9 @@ export function startLoadingValueLookupEntriesForGridRows(args: {
       const loadForPath = () => {
         if (stopped) return;
 
-        const snapshot = source.snapshot();
-        if (snapshot.status !== "ready") return;
+        const state = source.state();
+        if (state.status !== "ready") return;
+        const snapshot = state.snapshot;
         if (lastNodesByPath.get(path) === snapshot.nodes) return;
         lastNodesByPath.set(path, snapshot.nodes);
 

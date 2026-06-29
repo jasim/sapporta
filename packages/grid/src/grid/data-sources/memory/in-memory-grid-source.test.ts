@@ -112,8 +112,9 @@ describe("inMemoryGridDataSource", () => {
   it("rootSource()'s nodes match the input tree (after slice)", () => {
     const tree = fixtureTree();
     const ds = inMemoryGridDataSource(baseOpts({ tree }));
-    const snap = ds.rootSource().snapshot();
-    expect(snap.status).toBe("ready");
+    const state = ds.rootSource().state();
+    expect(state.status).toBe("ready");
+    const snap = state.snapshot;
     expect(snap.nodes).toHaveLength(2);
     expect(snap.nodes[0].columns.id).toBe("ord-1");
     expect(snap.nodes[1].columns.id).toBe("ord-2");
@@ -162,11 +163,11 @@ describe("inMemoryGridDataSource", () => {
       }),
     );
 
-    expect(ds.rootSource().snapshot().footerRows).toEqual([
+    expect(ds.rootSource().state().snapshot.footerRows).toEqual([
       { rowKey: "orders-total", columns: { customer: "Total" } },
     ]);
     expect(
-      ds.resolveChild(root, "ord-1", "lines").snapshot().footerRows,
+      ds.resolveChild(root, "ord-1", "lines").state().snapshot.footerRows,
     ).toEqual([{ rowKey: "lines-total", columns: { amount: 30 } }]);
   });
 
@@ -174,8 +175,9 @@ describe("inMemoryGridDataSource", () => {
     const tree = fixtureTree();
     const ds = inMemoryGridDataSource(baseOpts({ tree }));
     const child = ds.resolveChild(root, "ord-1", "lines");
-    const snap = child.snapshot();
-    expect(snap.status).toBe("ready");
+    const state = child.state();
+    expect(state.status).toBe("ready");
+    const snap = state.snapshot;
     expect(snap.nodes.map((n) => n.columns.id)).toEqual(
       tree[0].children!.lines instanceof Array
         ? (tree[0].children!.lines as TreeNode[]).map((n) => n.columns.id)
@@ -186,8 +188,9 @@ describe("inMemoryGridDataSource", () => {
   it("resolveChild for a parent missing the childLevelName returns an empty source with status ready", () => {
     const ds = inMemoryGridDataSource(baseOpts());
     const child = ds.resolveChild(root, "ord-2", "lines");
-    const snap = child.snapshot();
-    expect(snap.status).toBe("ready");
+    const state = child.state();
+    expect(state.status).toBe("ready");
+    const snap = state.snapshot;
     expect(snap.nodes).toEqual([]);
   });
 
@@ -228,7 +231,7 @@ describe("inMemoryGridDataSource", () => {
       "ln-1",
       "notes",
     );
-    const snap = notes.snapshot();
+    const snap = notes.state().snapshot;
     expect(snap.nodes).toHaveLength(1);
     expect(snap.nodes[0].columns.id).toBe("n-1");
   });
@@ -244,7 +247,7 @@ describe("inMemoryGridDataSource", () => {
     root1.setSort([{ colId: "customer", direction: "desc" }]);
     // Path resolution still finds ord-1's lines.
     const lines = ds.resolveChild(root, "ord-1", "lines");
-    expect(lines.snapshot().nodes.map((n) => n.columns.id)).toEqual([
+    expect(lines.state().snapshot.nodes.map((n) => n.columns.id)).toEqual([
       "ln-1",
       "ln-2",
     ]);

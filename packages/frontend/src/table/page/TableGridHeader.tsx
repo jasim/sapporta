@@ -201,25 +201,34 @@ function NarrowCardTableHeader({
 
   return (
     <div className="sticky top-0 z-[var(--sap-z-shell-sticky)] border-b border-sap-border-soft bg-sap-surface/95">
-      <div className="flex flex-col gap-2.5 px-3 py-2.5">
-        <div className="flex min-w-0 items-start gap-2">
+      <div className="flex flex-col gap-2 px-3 py-2">
+        <div className="flex min-w-0 items-center gap-2">
           <div className="min-w-0 flex-1">
-            <h1 className="truncate text-[16px] font-[720] leading-5 text-sap-fg">
-              {tableLabel}
+            <h1
+              className="flex min-w-0 items-baseline gap-1.5 text-[16px] font-[720] leading-5 text-sap-fg"
+              aria-label={`${tableLabel}, ${formatRecordCount(totalCount)}`}
+            >
+              <span className="min-w-0 truncate">{tableLabel}</span>
+              <span className="shrink-0 text-sap-muted" aria-hidden="true">
+                &middot;
+              </span>
+              <span
+                className="mono shrink-0 text-[12px] font-[650] text-sap-muted"
+                aria-hidden="true"
+              >
+                {totalCount.toLocaleString()}
+              </span>
             </h1>
-            <p className="mono mt-[1px] text-[11.5px] text-sap-muted">
-              {formatRecordCount(totalCount)}
-            </p>
           </div>
           {onNewRecord && (
             <CompactHeaderButton
+              aria-label="New record"
+              title="New record"
               tone="primary"
               icon={<Plus className="h-4 w-4 shrink-0" />}
               onClick={onNewRecord}
-              className="h-10 min-w-10 shrink-0"
-            >
-              New
-            </CompactHeaderButton>
+              className="h-10 min-w-10 shrink-0 px-0"
+            />
           )}
           <CompactHeaderButton
             aria-label="Open table actions"
@@ -227,9 +236,7 @@ function NarrowCardTableHeader({
             icon={<MoreHorizontal className="h-4 w-4" />}
             onClick={() => setActionsOpen(true)}
             className="h-10 min-w-10 shrink-0 px-0"
-          >
-            <span className="sr-only">More actions</span>
-          </CompactHeaderButton>
+          />
         </div>
 
         {(query.searchable || canFilter) && (
@@ -247,7 +254,7 @@ function NarrowCardTableHeader({
               <CompactHeaderButton
                 icon={<ListFilter className="h-4 w-4 shrink-0" />}
                 onClick={() => setFiltersOpen(true)}
-                className="h-11 shrink-0"
+                className="h-10 shrink-0"
               >
                 {filterLabel}
               </CompactHeaderButton>
@@ -359,9 +366,7 @@ function SelectedRowsTableHeader({
           icon={<X className="h-4 w-4" />}
           onClick={selection.clear}
           className="shrink-0 px-0"
-        >
-          <span className="sr-only">Clear selection</span>
-        </CompactHeaderButton>
+        />
       </div>
     </div>
   );

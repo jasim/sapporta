@@ -1,10 +1,12 @@
 // REST-backed `LevelDataSource`. The server owns the data; this source is
 // the optimistic-edit + snapshot machinery that bridges it to the grid.
 //
-// Lifecycle: construction kicks off an initial `fetchPage`. The first
-// snapshot has `status: 'loading'`. On resolve the source flips to
-// `ready`; on reject to `error` with the host's error verbatim (project
-// policy: never interpret backend errors).
+// Lifecycle: construction kicks off an initial `fetchPage`. The first state is
+// `initialLoading`; on resolve the source flips to `ready`, and on reject to
+// `initialError` with the host's error verbatim (project policy: never
+// interpret backend errors). Once a committed snapshot exists, refetches publish
+// `refreshing` with the previous snapshot still renderable, then settle to
+// `ready` or `refreshError`.
 //
 // Mode mechanics: `serverManaged` is declared by the host and emitted on every
 // snapshot unchanged. Displayed-row derivation gates `withSort` / `withFilter`
@@ -27,8 +29,8 @@
 //   * `cellTokens[rowKey][colId]` — bumped per `setCell`. The same cell
 //     edited twice cancels the first PATCH (last-write-wins); different
 //     cells of the same row run independently. No internal retry, no
-//     queue. A failed PATCH does NOT auto-revert and does NOT flip
-//     `snapshot.status` to `'error'` — that field is reserved for
+//     queue. A failed PATCH does NOT auto-revert and does NOT flip the
+//     `LevelSourceState` to an error variant — those variants are reserved for
 //     level-wide fetch failures, not per-cell write outcomes.
 //
 // `applyChanges` is atomic from the grid's view. Without a batch endpoint
@@ -58,7 +60,7 @@ import type {
   InsertNodeRequest,
   LevelDataSource,
   LevelSnapshot,
-  LevelStatus,
+  LevelSourceState,
   PageBoundaryNavigation,
   PatchCellRequest,
   PatchCellResponse,
@@ -157,8 +159,6 @@ export function restLevelSource<F = unknown>(
     );
   }
 
-  let status: LevelStatus = "loading";
-  let error: Error | undefined;
   let nodes: TreeNode[] = [];
   let footerRows: FooterRow[] | undefined;
   let totalCount: number | undefined;
@@ -166,8 +166,11 @@ export function restLevelSource<F = unknown>(
   let filter: F | undefined = opts.initialFilter;
   let page = opts.initialPagination?.page ?? 0;
   let pageSize = opts.initialPagination?.pageSize ?? 0;
+  let displayQuery: FetchPageRequest<F> | undefined;
 
   let cachedSnapshot: LevelSnapshot<F> | null = null;
+  let committedSnapshot: LevelSnapshot<F> | null = null;
+  let currentState: LevelSourceState<F> | null = null;
   let fetchToken = 0;
 
   // Per-cell in-flight PATCH counter — supersession key. The latest token
@@ -180,15 +183,13 @@ export function restLevelSource<F = unknown>(
   let disposed = false;
 
   function buildSnapshot(): LevelSnapshot<F> {
-    // In host-owned mode the snapshot's pagination reads from the latest
-    // `query()` so chrome that derives from the snapshot stays consistent
-    // with the host's store; sort/filter remain the host's concern (chrome
-    // already renders from the store) and are not echoed onto the snapshot.
-    const q = opts.query ? opts.query() : undefined;
+    // In host-owned mode the snapshot's query-shaped fields read from the
+    // latest `query()` so chrome that derives from the snapshot stays
+    // consistent with the host's store.
+    const q = hostOwned ? displayQuery : undefined;
     const snapPage = q ? q.page : page;
     const snapPageSize = q ? q.pageSize : pageSize;
     const snap: LevelSnapshot<F> = {
-      status,
       nodes,
       serverManaged: opts.serverManaged,
       pagination:
@@ -196,13 +197,13 @@ export function restLevelSource<F = unknown>(
           ? { page: snapPage, pageSize: snapPageSize }
           : { page: snapPage, pageSize: snapPageSize, totalCount },
     };
-    if (error) snap.error = error;
     if (footerRows) snap.footerRows = footerRows;
-    if (!hostOwned) {
+    if (hostOwned) {
+      if (q?.sort !== undefined) snap.sort = q.sort;
+      if (q?.filter !== undefined) snap.filter = q.filter;
+    } else {
       // Source-owned mode: the source is authoritative for `sort` / `filter`,
       // so echo them onto the snapshot for chrome that reads off the snap.
-      // In host-owned mode the host's store is authoritative and chrome
-      // already reads from there; echoing here would just duplicate state.
       if (sort) snap.sort = sort;
       if (filter !== undefined) snap.filter = filter;
     }
@@ -223,6 +224,25 @@ export function restLevelSource<F = unknown>(
     return cachedSnapshot;
   }
 
+  function request(): FetchPageRequest<F> {
+    if (opts.query) return opts.query();
+    const req: FetchPageRequest<F> = { page, pageSize };
+    if (sort) req.sort = sort;
+    if (filter !== undefined) req.filter = filter;
+    return req;
+  }
+
+  function state(): LevelSourceState<F> {
+    if (!currentState) {
+      currentState = {
+        status: "initialLoading",
+        snapshot: snapshot(),
+        pending: request(),
+      };
+    }
+    return currentState;
+  }
+
   function invalidate(): void {
     cachedSnapshot = null;
   }
@@ -233,8 +253,30 @@ export function restLevelSource<F = unknown>(
   }
 
   function emit(): void {
-    invalidate();
     notify();
+  }
+
+  function publishReady(): void {
+    invalidate();
+    const next = snapshot();
+    committedSnapshot = next;
+    currentState = { status: "ready", snapshot: next };
+    publishDataMutation();
+  }
+
+  function publishDataMutation(): void {
+    invalidate();
+    const next = snapshot();
+    committedSnapshot = next;
+    const cur = currentState;
+    if (cur?.status === "refreshing") {
+      currentState = { ...cur, snapshot: next, previous: next };
+    } else if (cur?.status === "refreshError") {
+      currentState = { ...cur, snapshot: next, previous: next };
+    } else {
+      currentState = { status: "ready", snapshot: next };
+    }
+    emit();
   }
 
   function emitReconcile(event: ReconcileEvent): void {
@@ -298,17 +340,25 @@ export function restLevelSource<F = unknown>(
 
   function refetch(): void {
     const myToken = ++fetchToken;
-    status = "loading";
-    error = undefined;
-    emit();
-    let req: FetchPageRequest<F>;
-    if (opts.query) {
-      req = opts.query();
+    const req = request();
+    displayQuery = req;
+    invalidate();
+    const display = snapshot();
+    if (committedSnapshot) {
+      currentState = {
+        status: "refreshing",
+        snapshot: display,
+        previous: committedSnapshot,
+        pending: req,
+      };
     } else {
-      req = { page, pageSize };
-      if (sort) req.sort = sort;
-      if (filter !== undefined) req.filter = filter;
+      currentState = {
+        status: "initialLoading",
+        snapshot: display,
+        pending: req,
+      };
     }
+    emit();
     // Invoke directly — `fetchPage` returns a Promise synchronously; tests
     // and the runtime expect the host call to land before the next
     // microtask, not after a wrapping `Promise.resolve()`.
@@ -318,14 +368,29 @@ export function restLevelSource<F = unknown>(
         nodes = res.nodes;
         footerRows = res.footerRows;
         totalCount = res.totalCount;
-        status = "ready";
-        error = undefined;
-        emit();
+        publishReady();
       },
       (err) => {
         if (disposed || myToken !== fetchToken) return;
-        status = "error";
-        error = err instanceof Error ? err : new Error(reasonOf(err));
+        const error = err instanceof Error ? err : new Error(reasonOf(err));
+        invalidate();
+        const display = snapshot();
+        if (committedSnapshot) {
+          currentState = {
+            status: "refreshError",
+            snapshot: display,
+            previous: committedSnapshot,
+            error,
+            retry: req,
+          };
+        } else {
+          currentState = {
+            status: "initialError",
+            snapshot: display,
+            error,
+            retry: req,
+          };
+        }
         emit();
       },
     );
@@ -340,7 +405,7 @@ export function restLevelSource<F = unknown>(
     if (opts.serverManaged.pagination) {
       refetch();
     } else {
-      emit();
+      publishReady();
     }
   }
 
@@ -355,9 +420,9 @@ export function restLevelSource<F = unknown>(
     // should behave like the visible pagination buttons: enabled only when the
     // current page has finished loading and another page is known to exist.
     return {
-      canGoPrevious: () => status === "ready" && page > 0,
+      canGoPrevious: () => currentState?.status === "ready" && page > 0,
       canGoNext: () => {
-        if (status !== "ready") return false;
+        if (currentState?.status !== "ready") return false;
         if (!Number.isFinite(pageSize)) return false;
         if (totalCount !== undefined) {
           return (page + 1) * pageSize < totalCount;
@@ -365,12 +430,12 @@ export function restLevelSource<F = unknown>(
         return nodes.length >= pageSize;
       },
       goPrevious: () => {
-        if (status !== "ready") return;
+        if (currentState?.status !== "ready") return;
         if (page <= 0) return;
         setSourceOwnedPage(page - 1, pageSize);
       },
       goNext: () => {
-        if (status !== "ready") return;
+        if (currentState?.status !== "ready") return;
         if (!Number.isFinite(pageSize)) return;
         setSourceOwnedPage(page + 1, pageSize);
       },
@@ -379,7 +444,7 @@ export function restLevelSource<F = unknown>(
 
   const read: ReadonlyLevelDataSource = {
     writable: false,
-    snapshot,
+    state,
     subscribe(fn) {
       subs.add(fn);
       return () => {
@@ -397,7 +462,7 @@ export function restLevelSource<F = unknown>(
       if (opts.serverManaged.sort) {
         refetch();
       } else {
-        emit();
+        publishReady();
       }
     },
     setFilter(f) {
@@ -413,7 +478,7 @@ export function restLevelSource<F = unknown>(
       if (opts.serverManaged.filter) {
         refetch();
       } else {
-        emit();
+        publishReady();
       }
     },
     setPage(p, ps) {
@@ -442,7 +507,7 @@ export function restLevelSource<F = unknown>(
     const idx = requireNodeIdx(rowKey);
     const priorValue = nodes[idx].columns[colId];
     setNodeCell(idx, colId, value);
-    emit();
+    publishDataMutation();
 
     const myToken = bumpCellToken(rowKey, colId);
     opts.patchCell!({
@@ -582,7 +647,7 @@ export function restLevelSource<F = unknown>(
     const idx = findNodeIdx(rowKey);
     if (idx >= 0) {
       setNodeCell(idx, colId, authoritativeValue);
-      emit();
+      publishDataMutation();
     }
     emitReconcile({
       kind: "diverged",
@@ -611,7 +676,7 @@ export function restLevelSource<F = unknown>(
         columns: { ...next[idx].columns, ...patch },
       };
       nodes = next;
-      emit();
+      publishDataMutation();
     }
     emitPatchReconcile({
       rowKey,
@@ -636,7 +701,7 @@ export function restLevelSource<F = unknown>(
       const next = nodes.slice();
       next[idx] = node;
       nodes = next;
-      emit();
+      publishDataMutation();
     }
     emitPatchReconcile({
       rowKey,
@@ -692,7 +757,7 @@ export function restLevelSource<F = unknown>(
       localPriors.push({ rowKey: c.rowKey, colId: c.colId, value: priorValue });
       setNodeCell(idx, c.colId, c.value);
     }
-    emit();
+    publishDataMutation();
 
     // Per-cell tokens — applyChanges supersedes any in-flight setCell on
     // the same cell, just like a fresh setCell would.
@@ -730,7 +795,7 @@ export function restLevelSource<F = unknown>(
             setNodeCell(idx, localPriors[i].colId, localPriors[i].value);
           clearCellToken(changes[i].rowKey, changes[i].colId, myTokens[i]);
         }
-        emit();
+        publishDataMutation();
         for (let i = 0; i < live.length; i++) {
           const r = live[i];
           if (r === null) continue;
@@ -777,7 +842,7 @@ export function restLevelSource<F = unknown>(
     const next = nodes.slice();
     next.splice(idx, 0, serverNode);
     nodes = next;
-    emit();
+    publishDataMutation();
     return { node: serverNode, atIndex: idx };
   };
 
@@ -786,7 +851,7 @@ export function restLevelSource<F = unknown>(
     const next = nodes.slice();
     next.splice(idx, 1);
     nodes = next;
-    emit();
+    publishDataMutation();
     return opts.removeNode!({ rowKey });
   };
 
@@ -799,7 +864,7 @@ export function restLevelSource<F = unknown>(
 
   const writableSource: WritableLevelDataSource = {
     writable: true,
-    snapshot: read.snapshot,
+    state: read.state,
     subscribe: read.subscribe,
     setSort: read.setSort,
     setFilter: read.setFilter,

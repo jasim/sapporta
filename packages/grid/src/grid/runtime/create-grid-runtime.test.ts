@@ -7,6 +7,7 @@ import type {
   GridDataSource,
   LevelDataSource,
   LevelSnapshot,
+  LevelSourceState,
   LevelStatus,
   WritableLevelDataSource,
 } from "../data-sources/types";
@@ -191,17 +192,65 @@ function dataSourceWithRoot(source: LevelDataSource): GridDataSource {
   };
 }
 
+function readyState(snapshot: LevelSnapshot): LevelSourceState {
+  return { status: "ready", snapshot };
+}
+
+function stateWithStatus(
+  status: LevelStatus,
+  snapshot: LevelSnapshot,
+): LevelSourceState {
+  switch (status) {
+    case "ready":
+      return { status, snapshot };
+    case "initialLoading":
+      return { status, snapshot, pending: { page: 0, pageSize: 25 } };
+    case "refreshing":
+      return {
+        status,
+        snapshot,
+        previous: snapshot,
+        pending: { page: 0, pageSize: 25 },
+      };
+    case "initialError":
+      return {
+        status,
+        snapshot,
+        error: new Error("failed"),
+        retry: { page: 0, pageSize: 25 },
+      };
+    case "refreshError":
+      return {
+        status,
+        snapshot,
+        previous: snapshot,
+        error: new Error("failed"),
+        retry: { page: 0, pageSize: 25 },
+      };
+  }
+}
+
+type TestLevelSnapshot = LevelSnapshot & { status?: LevelStatus };
+
+function normalizeTestSnapshot(input: TestLevelSnapshot): {
+  status: LevelStatus;
+  snapshot: LevelSnapshot;
+} {
+  const { status = "ready", ...snapshot } = input;
+  return { status, snapshot };
+}
+
 function writableSourceWithCreate(
   createNode: WritableLevelDataSource["createNode"],
   nodes: TreeNode[] = [],
 ): WritableLevelDataSource {
   return {
     writable: true,
-    snapshot: () => ({
-      status: "ready",
-      nodes,
-      serverManaged: { sort: false, filter: false, pagination: false },
-    }),
+    state: () =>
+      readyState({
+        nodes,
+        serverManaged: { sort: false, filter: false, pagination: false },
+      }),
     subscribe: () => () => {},
     setSort: () => {},
     setFilter: () => {},
@@ -221,7 +270,7 @@ function writableSourceFromSnapshot(
 ): WritableLevelDataSource {
   return {
     writable: true,
-    snapshot: () => snapshot,
+    state: () => readyState(snapshot),
     subscribe: () => () => {},
     setSort: () => {},
     setFilter: () => {},
@@ -240,16 +289,16 @@ function writableSourceFromSnapshot(
 }
 
 function mutableWritableSource(
-  initialSnapshot: LevelSnapshot,
+  initialSnapshot: TestLevelSnapshot,
 ): {
   source: WritableLevelDataSource;
-  publish: (snapshot: LevelSnapshot) => void;
+  publish: (snapshot: TestLevelSnapshot) => void;
 } {
-  let snapshot = initialSnapshot;
+  let current = normalizeTestSnapshot(initialSnapshot);
   const subscribers = new Set<() => void>();
   const source: WritableLevelDataSource = {
     writable: true,
-    snapshot: () => snapshot,
+    state: () => stateWithStatus(current.status, current.snapshot),
     subscribe: (fn) => {
       subscribers.add(fn);
       return () => {
@@ -267,7 +316,7 @@ function mutableWritableSource(
     applyChanges: () => {},
     createNode: async (node, atIndex) => ({
       node,
-      atIndex: atIndex ?? snapshot.nodes.length,
+      atIndex: atIndex ?? current.snapshot.nodes.length,
     }),
     removeNode: () => {},
     onReconcile: () => () => {},
@@ -275,7 +324,7 @@ function mutableWritableSource(
   return {
     source,
     publish: (nextSnapshot) => {
-      snapshot = nextSnapshot;
+      current = normalizeTestSnapshot(nextSnapshot);
       for (const fn of subscribers) fn();
     },
   };
@@ -357,7 +406,7 @@ describe("GridRuntime", () => {
 
     rt.dispose();
 
-    expect(() => source.snapshot()).toThrow("GridRuntime has been disposed.");
+    expect(() => source.state().snapshot).toThrow("GridRuntime has been disposed.");
     expect(() => source.refetch()).toThrow("GridRuntime has been disposed.");
     expect(() => source.subscribe(() => {})).toThrow(
       "GridRuntime has been disposed.",
@@ -438,7 +487,7 @@ describe("GridRuntime", () => {
     expect("createNode" in src).toBe(false);
     expect("removeNode" in src).toBe(false);
     expect("dispose" in src).toBe(false);
-    expect(src.snapshot().nodes).toHaveLength(2);
+    expect(src.state().snapshot.nodes).toHaveLength(2);
   });
 
   it("sourceFor returns a live view for read, query, and refresh operations", () => {
@@ -449,7 +498,7 @@ describe("GridRuntime", () => {
     const source = rt.sourceFor(rowsRoot);
 
     expect(() => {
-      source.snapshot();
+      source.state().snapshot;
       source.setSort([{ colId: "qty", direction: "desc" }]);
       source.setPage(1, 25);
       source.refetch();
@@ -469,7 +518,7 @@ describe("GridRuntime", () => {
         });
         const readonly: LevelDataSource = {
           writable: false,
-          snapshot: writable.snapshot,
+          state: writable.state,
           subscribe: writable.subscribe,
           setSort: writable.setSort,
           setFilter: writable.setFilter,
@@ -645,11 +694,11 @@ describe("GridRuntime", () => {
       | null = null;
     const fakeWritable: WritableLevelDataSource = {
       writable: true,
-      snapshot: () => ({
-        status: "ready",
-        nodes: tableNodes(),
-        serverManaged: { sort: false, filter: false, pagination: false },
-      }),
+      state: () =>
+        readyState({
+          nodes: tableNodes(),
+          serverManaged: { sort: false, filter: false, pagination: false },
+        }),
       subscribe: () => () => {},
       setSort: () => {},
       setFilter: () => {},
@@ -698,15 +747,15 @@ describe("GridRuntime", () => {
   });
 
   it("emits levelStatusChanged when a source's status transitions", () => {
-    let status: import("../data-sources/types").LevelStatus = "loading";
+    let status: import("../data-sources/types").LevelStatus = "initialLoading";
     const subs = new Set<() => void>();
     const fake: LevelDataSource = {
       writable: false,
-      snapshot: () => ({
-        status,
-        nodes: [],
-        serverManaged: { sort: false, filter: false, pagination: false },
-      }),
+      state: () =>
+        stateWithStatus(status, {
+          nodes: [],
+          serverManaged: { sort: false, filter: false, pagination: false },
+        }),
       subscribe: (fn) => {
         subs.add(fn);
         return () => {
@@ -738,7 +787,7 @@ describe("GridRuntime", () => {
   });
 
   it("keeps displayed rows stable across status-only source emissions", () => {
-    let status: LevelStatus = "loading";
+    let status: LevelStatus = "initialLoading";
     const nodes = tableNodes();
     const footerRows = [{ rowKey: "total" as RowKey, columns: { qty: 3 } }];
     const serverManaged = Object.freeze({
@@ -749,12 +798,12 @@ describe("GridRuntime", () => {
     const subs = new Set<() => void>();
     const fake: LevelDataSource = {
       writable: false,
-      snapshot: (): LevelSnapshot => ({
-        status,
-        nodes,
-        footerRows,
-        serverManaged,
-      }),
+      state: () =>
+        stateWithStatus(status, {
+          nodes,
+          footerRows,
+          serverManaged,
+        }),
       subscribe: (fn) => {
         subs.add(fn);
         return () => {
@@ -1000,11 +1049,11 @@ describe("GridRuntime", () => {
     const mutationCommitted = vi.fn();
     const source: WritableLevelDataSource = {
       writable: true,
-      snapshot: () => ({
-        status: "ready",
-        nodes: [],
-        serverManaged: { sort: false, filter: false, pagination: false },
-      }),
+      state: () =>
+        readyState({
+          nodes: [],
+          serverManaged: { sort: false, filter: false, pagination: false },
+        }),
       subscribe: () => () => {},
       setSort: () => {},
       setFilter: () => {},
@@ -1086,7 +1135,6 @@ describe("GridRuntime", () => {
 
   it("ArrowDown at a non-final page boundary does not create a phantom", () => {
     const source = writableSourceFromSnapshot({
-      status: "ready",
       nodes: tableNodes(),
       pagination: { page: 0, pageSize: 2, totalCount: 3 },
       serverManaged: { sort: true, filter: true, pagination: true },
@@ -1116,7 +1164,6 @@ describe("GridRuntime", () => {
 
   it("ArrowDown before a footer turns the page instead of creating a phantom", () => {
     const source = writableSourceFromSnapshot({
-      status: "ready",
       nodes: [
         { levelName: "rows", columns: { id: "b", name: "Banana", qty: 2 } },
       ],
@@ -1163,7 +1210,7 @@ describe("GridRuntime", () => {
       goNext: vi.fn(),
     };
     const mutable = mutableWritableSource({
-      status: "loading",
+      status: "initialLoading",
       nodes: tableNodes(),
       pagination: { page: 0, pageSize: 2, totalCount: 4 },
       serverManaged: { sort: true, filter: true, pagination: true },
@@ -1190,7 +1237,7 @@ describe("GridRuntime", () => {
 
   it("does not record pending page-boundary navigation while loading", () => {
     const mutable = mutableWritableSource({
-      status: "loading",
+      status: "initialLoading",
       nodes: tableNodes(),
       pagination: { page: 0, pageSize: 2, totalCount: 4 },
       serverManaged: { sort: true, filter: true, pagination: true },
@@ -1218,7 +1265,6 @@ describe("GridRuntime", () => {
     ).toBe(false);
 
     mutable.publish({
-      status: "ready",
       nodes: [
         { levelName: "rows", columns: { id: "c", name: "Cherry", qty: 3 } },
       ],
@@ -1231,7 +1277,6 @@ describe("GridRuntime", () => {
 
   it("ready page-boundary navigation records and resolves focus on the new page", () => {
     const mutable = mutableWritableSource({
-      status: "ready",
       nodes: [
         { levelName: "rows", columns: { id: "b", name: "Banana", qty: 2 } },
       ],
@@ -1244,7 +1289,6 @@ describe("GridRuntime", () => {
       goPrevious: () => {},
       goNext: () => {
         mutable.publish({
-          status: "ready",
           nodes: [
             {
               levelName: "rows",
@@ -1281,7 +1325,6 @@ describe("GridRuntime", () => {
 
   it("ArrowDown at the final datasource row of a paginated source creates a phantom", () => {
     const source = writableSourceFromSnapshot({
-      status: "ready",
       nodes: [
         { levelName: "rows", columns: { id: "c", name: "Cherry", qty: 3 } },
       ],
@@ -1314,7 +1357,6 @@ describe("GridRuntime", () => {
 
   it("removes a blank append phantom while keyboard paging back from the last page", () => {
     const mutable = mutableWritableSource({
-      status: "ready",
       nodes: [
         { levelName: "rows", columns: { id: "c", name: "Cherry", qty: 3 } },
       ],
@@ -1326,7 +1368,7 @@ describe("GridRuntime", () => {
       canGoNext: () => false,
       goPrevious: () => {
         mutable.publish({
-          status: "loading",
+          status: "refreshing",
           nodes: [
             {
               levelName: "rows",
@@ -1383,7 +1425,6 @@ describe("GridRuntime", () => {
     ).toBe(false);
 
     mutable.publish({
-      status: "ready",
       nodes: tableNodes(),
       pagination: { page: 0, pageSize: 2, totalCount: 3 },
       serverManaged: { sort: true, filter: true, pagination: true },
@@ -1402,7 +1443,6 @@ describe("GridRuntime", () => {
 
   it("does not eagerly create an empty-path phantom for an empty non-final page", () => {
     const source = writableSourceFromSnapshot({
-      status: "ready",
       nodes: [],
       pagination: { page: 1, pageSize: 2, totalCount: 3 },
       serverManaged: { sort: true, filter: true, pagination: true },
@@ -1419,7 +1459,6 @@ describe("GridRuntime", () => {
 
   it("creates an empty-path phantom on the first page when total count is unknown", () => {
     const source = writableSourceFromSnapshot({
-      status: "ready",
       nodes: [],
       pagination: { page: 0, pageSize: 2 },
       serverManaged: { sort: true, filter: true, pagination: true },
@@ -1439,7 +1478,6 @@ describe("GridRuntime", () => {
 
   it("removes a blank append phantom when the source leaves the append boundary", () => {
     const source = mutableWritableSource({
-      status: "ready",
       nodes: [
         { levelName: "rows", columns: { id: "c", name: "Cherry", qty: 3 } },
       ],
@@ -1465,7 +1503,6 @@ describe("GridRuntime", () => {
     expect(rt.phantoms.get(rowsRoot)).toHaveLength(1);
 
     source.publish({
-      status: "ready",
       nodes: tableNodes(),
       pagination: { page: 0, pageSize: 2, totalCount: 3 },
       serverManaged: { sort: true, filter: true, pagination: true },
@@ -1726,11 +1763,11 @@ describe("GridRuntime", () => {
     const createFailed = vi.fn();
     const source: WritableLevelDataSource = {
       writable: true,
-      snapshot: () => ({
-        status: "ready",
-        nodes: [],
-        serverManaged: { sort: false, filter: false, pagination: false },
-      }),
+      state: () =>
+        readyState({
+          nodes: [],
+          serverManaged: { sort: false, filter: false, pagination: false },
+        }),
       subscribe: () => () => {},
       setSort: () => {},
       setFilter: () => {},

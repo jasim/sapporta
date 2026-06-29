@@ -6,7 +6,7 @@ import {
 } from "react";
 import { useStore } from "zustand";
 import type { GridRuntime } from "../runtime/create-grid-runtime";
-import type { LevelSnapshot } from "../data-sources/types";
+import type { LevelSnapshot, LevelSourceState } from "../data-sources/types";
 import type { CellCursor, Coord, GridPath, RowId } from "../types/identity";
 import type { CellSelectionState } from "../types/selection";
 import type {
@@ -58,6 +58,15 @@ export function useLevelSnapshot(path: GridPath): LevelSnapshot {
     (cb) => runtime.sourceFor(path).subscribe(cb),
     () => runtime.snapshotFor(path),
     () => runtime.snapshotFor(path),
+  );
+}
+
+export function useLevelSourceState(path: GridPath): LevelSourceState {
+  const runtime = useGridRuntime();
+  return useSyncExternalStore(
+    (cb) => runtime.sourceFor(path).subscribe(cb),
+    () => runtime.sourceStateFor(path),
+    () => runtime.sourceStateFor(path),
   );
 }
 

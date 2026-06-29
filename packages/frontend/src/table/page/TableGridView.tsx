@@ -201,7 +201,8 @@ function TableGridViewWithSession<
 }) {
   const rootRowsLoadState = useTGridSourceStatus(session);
   const errorMessage =
-    rootRowsLoadState.status === "error"
+    rootRowsLoadState.status === "initialError" ||
+    rootRowsLoadState.status === "refreshError"
       ? tableLoadErrorMessage(rootRowsLoadState.error)
       : null;
   const errorBanner = useStore(

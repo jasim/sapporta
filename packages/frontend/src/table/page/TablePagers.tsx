@@ -217,7 +217,7 @@ export function CompactTablePager({
   return (
     <nav
       aria-label="Table pages"
-      className="grid min-h-[48px] shrink-0 grid-cols-[44px_minmax(0,1fr)_44px] items-center gap-2 border-t border-sap-border bg-sap-surface px-3 py-1.5"
+      className="grid min-h-[44px] shrink-0 grid-cols-[40px_minmax(0,1fr)_40px] items-center gap-1.5 border-t border-sap-border bg-sap-surface px-2 py-0.5"
     >
       <button
         type="button"

@@ -73,7 +73,7 @@ export function* visibleRows(
     yield { path, rowId: row.id };
     if (!expanded?.has(row.id)) continue;
     for (const cp of runtime.materializedChildren(path, row.id)) {
-      if (runtime.snapshotFor(cp).status !== "ready") continue;
+      if (runtime.sourceStateFor(cp).status !== "ready") continue;
       yield* visibleRows(runtime, coordinator, cp);
     }
   }

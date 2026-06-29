@@ -15,7 +15,6 @@ function input(): DisplayedRowsInput {
     path,
     schema: { name: "rows", columns: [], options: {}, childLevels: [] },
     sourceSnapshot: {
-      status: "ready",
       nodes: [],
       serverManaged: { sort: false, filter: false, pagination: false },
     },

@@ -84,9 +84,9 @@ export function createPhantomRowLifecycle(
     if (!lifecycleEnabled) return false;
     const source = deps.getSource(path);
     if (!source || !source.writable) return false;
-    const snapshot = source.snapshot();
-    if (snapshot.status !== "ready") return false;
-    if (!isDatasourceAppendBoundary(snapshot)) return false;
+    const state = source.state();
+    if (state.status !== "ready") return false;
+    if (!isDatasourceAppendBoundary(state.snapshot)) return false;
     return deps.schemaAt(path).options.allowPhantoms === true;
   }
 
@@ -128,10 +128,10 @@ export function createPhantomRowLifecycle(
   function ensureBlankForEmptyPath(path: GridPath): PhantomRow | null {
     const source = deps.getSource(path);
     if (!source) return null;
-    const snapshot = source.snapshot();
+    const state = source.state();
     reconcileBlankAppendPhantoms(path);
-    if (snapshot.status !== "ready") return null;
-    if (snapshot.nodes.length !== 0) return null;
+    if (state.status !== "ready") return null;
+    if (state.snapshot.nodes.length !== 0) return null;
     return ensureBlankPhantom(path);
   }
 
@@ -139,8 +139,11 @@ export function createPhantomRowLifecycle(
     if (!lifecycleEnabled) return;
     const source = deps.getSource(path);
     if (!source) return;
-    const snapshot = source.snapshot();
-    if (snapshot.status === "ready" && isDatasourceAppendBoundary(snapshot)) {
+    const state = source.state();
+    if (
+      state.status === "ready" &&
+      isDatasourceAppendBoundary(state.snapshot)
+    ) {
       return;
     }
     for (const phantom of deps.getPhantoms(path)) {

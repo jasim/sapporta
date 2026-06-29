@@ -14,7 +14,7 @@ import { LevelStatusBand } from "./LevelStatusBand";
 import {
   useDisplayedRowSequence,
   useGridRuntime,
-  useLevelSnapshot,
+  useLevelSourceState,
   useRowInteractionSnapshot,
 } from "./GridRuntimeProvider";
 import { rowInteractionStatusFor } from "../types/row-selection";
@@ -167,10 +167,10 @@ function ChildLevelMount({
   chrome?: GridLevelChrome;
   presentation: GridPresentation;
 }) {
-  const snapshot = useLevelSnapshot(path);
+  const state = useLevelSourceState(path);
   return (
     <div data-grid-part="child-level">
-      {snapshot.status === "ready" ? (
+      {state.status === "ready" ? (
         <GridLevel path={path} chrome={chrome} presentation={presentation} />
       ) : (
         <LevelStatusBand path={path} />

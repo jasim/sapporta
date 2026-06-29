@@ -89,7 +89,6 @@ function makeSnapshot(
   } = {},
 ): LevelSnapshot {
   return {
-    status: "ready",
     nodes: args.nodes ?? nodes,
     footerRows: args.footerRows,
     sort: args.sort,

@@ -137,7 +137,7 @@ describe("TableController — passthroughs", () => {
     const displayed = rt.displayedRowsFor(rootPath("rows"));
     expect(displayed.rows.length).toBe(5);
     expect(displayed.rows[0].id).toBe(makeRowId(rootPath("rows"), "r20"));
-    const snap = tc.rootSource.snapshot();
+    const snap = tc.rootSource.state().snapshot;
     expect(snap.pagination).toEqual({ page: 2, pageSize: 10, totalCount: 25 });
   });
 

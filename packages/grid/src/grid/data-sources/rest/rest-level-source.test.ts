@@ -58,26 +58,26 @@ describe("restLevelSource — read surface", () => {
     const src = restLevelSource(baseOpts({ fetchPage }));
 
     expect(fetchPage).toHaveBeenCalledTimes(1);
-    expect(src.snapshot().status).toBe("loading");
+    expect(src.state().status).toBe("initialLoading");
 
     fetched.resolve({ nodes: fixtureNodes(), totalCount: 3 });
     await fetched.promise;
     await flush();
 
-    expect(src.snapshot().status).toBe("ready");
-    expect(src.snapshot().nodes.map((n) => n.columns.id)).toEqual([
+    expect(src.state().status).toBe("ready");
+    expect(src.state().snapshot.nodes.map((n) => n.columns.id)).toEqual([
       "a",
       "b",
       "c",
     ]);
-    expect(src.snapshot().pagination).toEqual({
+    expect(src.state().snapshot.pagination).toEqual({
       page: 0,
       pageSize: 10,
       totalCount: 3,
     });
   });
 
-  it("propagates fetchPage rejection: status loading → error, error.message verbatim", async () => {
+  it("propagates fetchPage rejection: status initialLoading → initialError, error.message verbatim", async () => {
     const fetched = deferred<FetchPageResponse>();
     const fetchPage = vi.fn(async () => fetched.promise);
     const src = restLevelSource(baseOpts({ fetchPage }));
@@ -86,9 +86,10 @@ describe("restLevelSource — read surface", () => {
     await fetched.promise.catch(() => {});
     await flush();
 
-    const snap = src.snapshot();
-    expect(snap.status).toBe("error");
-    expect(snap.error?.message).toBe(
+    const state = src.state();
+    expect(state.status).toBe("initialError");
+    if (state.status !== "initialError") throw new Error("expected initialError");
+    expect(state.error.message).toBe(
       "500 Internal Server Error — connection refused",
     );
   });
@@ -117,13 +118,13 @@ describe("restLevelSource — read surface", () => {
     });
     await calls[0].deferred.promise;
     await flush();
-    expect(src.snapshot().status).toBe("loading");
+    expect(src.state().status).toBe("initialLoading");
 
     calls[1].deferred.resolve({ nodes: fixtureNodes(), totalCount: 3 });
     await calls[1].deferred.promise;
     await flush();
-    expect(src.snapshot().status).toBe("ready");
-    expect(src.snapshot().nodes.map((n) => n.columns.id)).toEqual([
+    expect(src.state().status).toBe("ready");
+    expect(src.state().snapshot.nodes.map((n) => n.columns.id)).toEqual([
       "a",
       "b",
       "c",
@@ -146,13 +147,13 @@ describe("restLevelSource — read surface", () => {
     });
     await calls[0].promise;
     await flush();
-    expect(src.snapshot().status).toBe("loading");
+    expect(src.state().status).toBe("initialLoading");
 
     calls[1].resolve({ nodes: fixtureNodes(), totalCount: 3 });
     await calls[1].promise;
     await flush();
-    expect(src.snapshot().pagination?.page).toBe(1);
-    expect(src.snapshot().nodes.map((n) => n.columns.id)).toEqual([
+    expect(src.state().snapshot.pagination?.page).toBe(1);
+    expect(src.state().snapshot.nodes.map((n) => n.columns.id)).toEqual([
       "a",
       "b",
       "c",
@@ -178,7 +179,7 @@ describe("restLevelSource — read surface", () => {
     src.pageBoundaryNavigation?.goNext();
     expect(fetchPage).toHaveBeenLastCalledWith({ page: 1, pageSize: 10 });
     await flush();
-    expect(src.snapshot().pagination?.page).toBe(1);
+    expect(src.state().snapshot.pagination?.page).toBe(1);
 
     src.pageBoundaryNavigation?.goPrevious();
     expect(fetchPage).toHaveBeenLastCalledWith({ page: 0, pageSize: 10 });
@@ -211,7 +212,7 @@ describe("restLevelSource — read surface", () => {
 
     src.setSort([{ colId: "v", direction: "asc" }]);
     expect(fetchPage).toHaveBeenCalledTimes(1);
-    expect(src.snapshot().sort).toEqual([{ colId: "v", direction: "asc" }]);
+    expect(src.state().snapshot.sort).toEqual([{ colId: "v", direction: "asc" }]);
   });
 
   it("snapshot carries serverManaged unchanged from opts", async () => {
@@ -222,7 +223,7 @@ describe("restLevelSource — read surface", () => {
       }),
     );
     await flush();
-    expect(src.snapshot().serverManaged).toEqual({
+    expect(src.state().snapshot.serverManaged).toEqual({
       sort: true,
       filter: false,
       pagination: true,
@@ -287,7 +288,7 @@ describe("restLevelSource — host-owned query", () => {
     await flush();
     await flush();
 
-    expect(src.snapshot().pagination).toEqual({
+    expect(src.state().snapshot.pagination).toEqual({
       page: 1,
       pageSize: 10,
       totalCount: 42,
@@ -297,14 +298,15 @@ describe("restLevelSource — host-owned query", () => {
     src.refetch();
     await flush();
     await flush();
-    expect(src.snapshot().pagination).toEqual({
+    expect(src.state().snapshot.pagination).toEqual({
       page: 7,
       pageSize: 10,
       totalCount: 42,
     });
   });
 
-  it("snapshot omits sort/filter in host-owned mode — chrome reads from the host store, not the snapshot", async () => {
+  it("snapshot reflects sort/filter from the host-owned query", async () => {
+    const filter = { v: (value: unknown) => Number(value) > 1 };
     const fetchPage = vi.fn(async () => ({ nodes: fixtureNodes() }));
     const src = restLevelSource({
       fetchPage,
@@ -312,6 +314,7 @@ describe("restLevelSource — host-owned query", () => {
         page: 0,
         pageSize: 10,
         sort: [{ colId: "v", direction: "asc" }],
+        filter,
       }),
       serverManaged: { sort: true, filter: true, pagination: true },
       rowKey: (n) => String(n.columns.id),
@@ -319,9 +322,9 @@ describe("restLevelSource — host-owned query", () => {
     await flush();
     await flush();
 
-    const snap = src.snapshot();
-    expect(snap.sort).toBeUndefined();
-    expect(snap.filter).toBeUndefined();
+    const snap = src.state().snapshot;
+    expect(snap.sort).toEqual([{ colId: "v", direction: "asc" }]);
+    expect(snap.filter).toBe(filter);
   });
 
   it("setSort / setFilter / setPage are no-ops when query is provided", async () => {
@@ -380,7 +383,7 @@ describe("restLevelSource — host-owned query", () => {
     src.onReconcile((e) => events.push(e));
 
     src.setCell("a", "v", 42);
-    expect(src.snapshot().nodes[0].columns.v).toBe(42);
+    expect(src.state().snapshot.nodes[0].columns.v).toBe(42);
 
     patches[0].resolve({ value: 42 });
     await patches[0].promise;
@@ -458,7 +461,7 @@ describe("restLevelSource — setCell reconciliation", () => {
     src.onReconcile((e) => events.push(e));
 
     src.setCell("a", "v", 99);
-    expect(src.snapshot().nodes[0].columns.v).toBe(99);
+    expect(src.state().snapshot.nodes[0].columns.v).toBe(99);
 
     patches[0].resolve({ value: 99 });
     await patches[0].promise;
@@ -467,7 +470,7 @@ describe("restLevelSource — setCell reconciliation", () => {
     expect(events).toEqual([
       { kind: "agreed", rowKey: "a", colId: "v", value: 99 },
     ]);
-    expect(src.snapshot().nodes[0].columns.v).toBe(99);
+    expect(src.state().snapshot.nodes[0].columns.v).toBe(99);
   });
 
   it("diverged: nodes update to authoritative value before the event fires", async () => {
@@ -484,7 +487,7 @@ describe("restLevelSource — setCell reconciliation", () => {
     let nodesAtEvent: TreeNode[] | null = null;
     src.onReconcile((e) => {
       events.push(e);
-      nodesAtEvent = src.snapshot().nodes;
+      nodesAtEvent = src.state().snapshot.nodes;
     });
 
     src.setCell("a", "v", 99);
@@ -532,8 +535,8 @@ describe("restLevelSource — setCell reconciliation", () => {
         priorValue: 1,
       },
     ]);
-    expect(src.snapshot().nodes[0].columns.v).toBe(99);
-    expect(src.snapshot().status).toBe("ready");
+    expect(src.state().snapshot.nodes[0].columns.v).toBe(99);
+    expect(src.state().status).toBe("ready");
   });
 
   it("two setCell on same cell: first PATCH cancelled, last-write-wins", async () => {
@@ -568,7 +571,7 @@ describe("restLevelSource — setCell reconciliation", () => {
     expect(events).toEqual([
       { kind: "agreed", rowKey: "a", colId: "v", value: 100 },
     ]);
-    expect(src.snapshot().nodes[0].columns.v).toBe(100);
+    expect(src.state().snapshot.nodes[0].columns.v).toBe(100);
   });
 
   it("two setCell on different cells of the same row: both PATCHes issue independently", async () => {
@@ -619,8 +622,8 @@ describe("restLevelSource — applyChanges atomicity", () => {
       { rowKey: "a", colId: "v", value: 10 },
       { rowKey: "b", colId: "v", value: 20 },
     ]);
-    expect(src.snapshot().nodes[0].columns.v).toBe(10);
-    expect(src.snapshot().nodes[1].columns.v).toBe(20);
+    expect(src.state().snapshot.nodes[0].columns.v).toBe(10);
+    expect(src.state().snapshot.nodes[1].columns.v).toBe(20);
 
     await flush();
     await flush();
@@ -643,15 +646,15 @@ describe("restLevelSource — applyChanges atomicity", () => {
       { rowKey: "b", colId: "v", value: 20 },
     ]);
     // Optimistic state visible immediately.
-    expect(src.snapshot().nodes[0].columns.v).toBe(10);
-    expect(src.snapshot().nodes[1].columns.v).toBe(20);
+    expect(src.state().snapshot.nodes[0].columns.v).toBe(10);
+    expect(src.state().snapshot.nodes[1].columns.v).toBe(20);
 
     await flush();
     await flush();
     await flush();
     // Atomic revert.
-    expect(src.snapshot().nodes[0].columns.v).toBe(1);
-    expect(src.snapshot().nodes[1].columns.v).toBe(2);
+    expect(src.state().snapshot.nodes[0].columns.v).toBe(1);
+    expect(src.state().snapshot.nodes[1].columns.v).toBe(2);
     expect(events.map((e) => e.kind)).toEqual(["rejected", "rejected"]);
     expect(
       events.map((e) => (e.kind === "rejected" ? e.priorValue : undefined)),
@@ -693,7 +696,7 @@ describe("restLevelSource — createNode", () => {
       columns: { v: 4 },
     };
     const promise = src.createNode(draft);
-    expect(src.snapshot().nodes).toHaveLength(3);
+    expect(src.state().snapshot.nodes).toHaveLength(3);
 
     const serverNode: TreeNode = {
       levelName: "rows",
@@ -703,8 +706,8 @@ describe("restLevelSource — createNode", () => {
     await expect(promise).resolves.toEqual({ node: serverNode, atIndex: 3 });
     await flush();
 
-    expect(src.snapshot().nodes).toHaveLength(4);
-    expect(src.snapshot().nodes[3]).toBe(serverNode);
+    expect(src.state().snapshot.nodes).toHaveLength(4);
+    expect(src.state().snapshot.nodes[3]).toBe(serverNode);
   });
 
   it("appends default creates at the index visible after each server response", async () => {
@@ -747,7 +750,7 @@ describe("restLevelSource — createNode", () => {
       atIndex: 4,
     });
 
-    expect(src.snapshot().nodes.map((node) => node.columns.id)).toEqual([
+    expect(src.state().snapshot.nodes.map((node) => node.columns.id)).toEqual([
       "a",
       "b",
       "c",
@@ -763,13 +766,13 @@ describe("restLevelSource — createNode", () => {
       },
     });
     if (!src.writable) throw new Error("writable");
-    const before = src.snapshot().nodes;
+    const before = src.state().snapshot.nodes;
 
     await expect(
       src.createNode({ levelName: "rows", columns: { v: 4 } }),
     ).rejects.toThrow("nope");
 
-    expect(src.snapshot().nodes).toBe(before);
+    expect(src.state().snapshot.nodes).toBe(before);
   });
 });
 

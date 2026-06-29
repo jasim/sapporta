@@ -137,6 +137,7 @@ import type {
   GridDataSource,
   LevelDataSource,
   LevelSnapshot,
+  LevelSourceState,
   LevelStatus,
   RuntimeLevelDataSource,
   WritableLevelDataSource,
@@ -233,6 +234,7 @@ export type GridRuntime = {
     reason: DisplayedRowsInvalidationReason,
   ) => void;
   snapshotFor: (path: GridPath) => LevelSnapshot;
+  sourceStateFor: (path: GridPath) => LevelSourceState;
   controllerFor: (path: GridPath) => GridControllerPublic;
   cellActivationFor: (
     path: GridPath,
@@ -443,11 +445,12 @@ export function createGridRuntime(args: RuntimeArgs): GridRuntime {
   function onSourceSnapshotChanged(path: GridPath): void {
     const src = sources.get(path);
     if (!src) return;
-    const status = src.snapshot().status;
+    const state = src.state();
+    const status = state.status;
     const prev = lastStatusByPath.get(path);
     if (prev !== status) {
       lastStatusByPath.set(path, status);
-      const error = src.snapshot().error;
+      const error = "error" in state ? state.error : undefined;
       emitter.emit(
         "levelStatusChanged",
         error ? { path, status, error } : { path, status },
@@ -464,7 +467,7 @@ export function createGridRuntime(args: RuntimeArgs): GridRuntime {
   {
     const src = dataSource.rootSource();
     sources.set(root, src);
-    lastStatusByPath.set(root, src.snapshot().status);
+    lastStatusByPath.set(root, src.state().status);
     sourceUnsubs.set(
       root,
       src.subscribe(() => {
@@ -503,7 +506,7 @@ export function createGridRuntime(args: RuntimeArgs): GridRuntime {
         childLevelName,
       );
       sources.set(childPath, src);
-      lastStatusByPath.set(childPath, src.snapshot().status);
+      lastStatusByPath.set(childPath, src.state().status);
       sourceUnsubs.set(
         childPath,
         src.subscribe(() => {
@@ -529,6 +532,10 @@ export function createGridRuntime(args: RuntimeArgs): GridRuntime {
   }
 
   function snapshotFor(path: GridPath): LevelSnapshot {
+    return sourceStateFor(path).snapshot;
+  }
+
+  function sourceStateFor(path: GridPath): LevelSourceState {
     assertLive();
     const src = sources.get(path);
     if (!src) {
@@ -539,7 +546,7 @@ export function createGridRuntime(args: RuntimeArgs): GridRuntime {
           : `GridRuntime.snapshotFor: no source has been resolved for path "${path}". Expand the parent row first or invoke runtime.sourceFor on a known path.`,
       );
     }
-    return src.snapshot();
+    return src.state();
   }
 
   function schemaForPath(path: GridPath): LevelSchema {
@@ -683,7 +690,7 @@ export function createGridRuntime(args: RuntimeArgs): GridRuntime {
     // While a page is loading, repeated key presses should not skip ahead based
     // on old page counts. Wait until the app's latest rows are settled before
     // accepting another boundary turn.
-    if (src.snapshot().status !== "ready") return false;
+    if (src.state().status !== "ready") return false;
     const pageNavigation = src.pageBoundaryNavigation;
     if (!pageNavigation) return false;
     const canTurn =
@@ -707,12 +714,14 @@ export function createGridRuntime(args: RuntimeArgs): GridRuntime {
     const pending = pendingPageBoundaryNavigation;
     if (!pending || pending.path !== path) return;
 
-    const snapshot = snapshotFor(path);
+    const state = sourceStateFor(path);
     // Keep the requested landing while the next page loads. If the load fails,
     // leave the cursor where the user started instead of moving it during a
     // later, unrelated refresh.
-    if (snapshot.status === "loading") return;
-    if (snapshot.status !== "ready") {
+    if (state.status === "initialLoading" || state.status === "refreshing") {
+      return;
+    }
+    if (state.status !== "ready") {
       pendingPageBoundaryNavigation = null;
       return;
     }
@@ -811,9 +820,9 @@ export function createGridRuntime(args: RuntimeArgs): GridRuntime {
     if (view) return view;
     view = {
       writable: src.writable,
-      snapshot: () => {
+      state: () => {
         assertLive();
-        return src.snapshot();
+        return src.state();
       },
       subscribe: (fn) => {
         assertLive();
@@ -906,7 +915,7 @@ export function createGridRuntime(args: RuntimeArgs): GridRuntime {
     }
     const rowKey = rowKeyOfRowId(coord.rowId);
     const oldValue = readCellValue(
-      src.snapshot(),
+      src.state().snapshot,
       schemaForPath(path),
       rowKey,
       coord.colId,
@@ -979,7 +988,7 @@ export function createGridRuntime(args: RuntimeArgs): GridRuntime {
   function applyChanges(path: GridPath, changes: CellChange[]): void {
     const src = requireWritable(path);
     const levelSchema = schemaForPath(path);
-    const snapshot = src.snapshot();
+    const snapshot = src.state().snapshot;
     // Read prior values BEFORE the source applies the change — once
     // applyChanges returns, the snapshot will reflect the writes and
     // we can no longer recover the priors for the events.
@@ -1014,7 +1023,7 @@ export function createGridRuntime(args: RuntimeArgs): GridRuntime {
   async function removeRow(path: GridPath, rowKey: RowKey): Promise<void> {
     const src = requireWritable(path);
     const { node, index } = readNodeWithIndex(
-      src.snapshot(),
+      src.state().snapshot,
       schemaForPath(path),
       rowKey,
     );
@@ -1546,6 +1555,7 @@ export function createGridRuntime(args: RuntimeArgs): GridRuntime {
     subscribeDisplayedRow,
     invalidateDisplayedRows,
     snapshotFor,
+    sourceStateFor,
     controllerFor,
     cellActivationFor,
     schemaAt: schemaForPath,

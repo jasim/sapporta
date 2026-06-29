@@ -41,7 +41,7 @@ export function SearchInput({
     <div
       className={cn(
         "relative flex items-center rounded-[6px] border border-sap-border bg-sap-surface pl-[30px] pr-[10px]",
-        compact ? "h-11 w-full" : "h-sap-ctl w-[260px]",
+        compact ? "h-10 w-full" : "h-sap-ctl w-[260px]",
       )}
     >
       <Search className="absolute left-[10px] h-3.5 w-3.5 text-sap-subtle" />
@@ -61,7 +61,7 @@ type CompactHeaderButtonTone = "primary" | "ghost" | "danger";
 type CompactHeaderButtonProps = {
   tone?: CompactHeaderButtonTone;
   icon?: ReactNode;
-  children: ReactNode;
+  children?: ReactNode;
   className?: string;
 } & ButtonHTMLAttributes<HTMLButtonElement>;
 
@@ -79,7 +79,7 @@ export function CompactHeaderButton({
       {...props}
     >
       {icon}
-      <span className="truncate">{children}</span>
+      {children && <span className="truncate">{children}</span>}
     </button>
   );
 }
