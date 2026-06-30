@@ -69,10 +69,14 @@ COPY --from=build --chown=node:node /app/packages/shared/package.json ./packages
 COPY --from=build --chown=node:node /app/packages/frontend/dist ./packages/frontend/dist
 COPY --chown=node:node sapporta.json package.json pnpm-workspace.yaml ./
 
-# Sapporta's default SQLite database lives under /app/data. Mount this path as
-# a persistent volume in production or the database will be lost with the
-# container filesystem.
-RUN mkdir -p /app/data && chown -R node:node /app
+# Sapporta writes the default SQLite database to /app/data/sqlite.db. Mount
+# /app/data as a persistent volume in production or the database will be lost
+# with the container filesystem.
+#
+# Copied runtime files already use node ownership; only create /app/data here.
+# Do not chown /app, which would traverse the pnpm store in node_modules even
+# though the node user should write only under /app/data.
+RUN install -d -o node -g node /app/data
 
 USER node
 EXPOSE 3000
