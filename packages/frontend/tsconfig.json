@@ -3,6 +3,10 @@
     "target": "ES2022",
     "module": "ESNext",
     "moduleResolution": "bundler",
+    // Resolve workspace @sapporta/* imports through package.json exports.
+    // The private sapporta:source branch points TypeScript at source files;
+    // published consumers still use the normal built default branch.
+    "customConditions": ["sapporta:source"],
     "jsx": "react-jsx",
     "strict": true,
     "esModuleInterop": true,
@@ -10,40 +14,7 @@
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true,
     "isolatedModules": true,
-    "noEmit": true,
-    "paths": {
-      "@/*": ["./src/*"],
-      "@sapporta/grid": ["../grid/src/index.ts"],
-      "@sapporta/grid/column-preset": ["../grid/src/column-preset/index.ts"],
-      "@sapporta/grid/lookup": ["../grid/src/lookup/index.ts"],
-      "@sapporta/grid/lookup/react": ["../grid/src/lookup/react/index.ts"],
-      "@sapporta/shared": ["../shared/src/index.ts"],
-      "@sapporta/shared/client": ["../shared/src/client/index.ts"],
-      "@sapporta/shared/contracts": ["../shared/src/contracts/index.ts"],
-      "@sapporta/shared/error": ["../shared/src/error.ts"],
-      "@sapporta/shared/filter": ["../shared/src/filter.ts"],
-      "@sapporta/shared/grid-dataset": ["../shared/src/grid-dataset/index.ts"],
-      "@sapporta/shared/row-id": ["../shared/src/row-id.ts"],
-      "@sapporta/shared/temporal": ["../shared/src/temporal.ts"],
-      "@sapporta/shared/validation": ["../shared/src/validation/index.ts"],
-      "@sapporta/ui": ["../ui/src/index.ts"],
-      "@sapporta/ui/badge": ["../ui/src/ui/primitives/badge.tsx"],
-      "@sapporta/ui/button": ["../ui/src/ui/primitives/button.tsx"],
-      "@sapporta/ui/checkbox": ["../ui/src/ui/primitives/checkbox.tsx"],
-      "@sapporta/ui/command": ["../ui/src/ui/primitives/command.tsx"],
-      "@sapporta/ui/dialog": ["../ui/src/ui/primitives/dialog.tsx"],
-      "@sapporta/ui/input": ["../ui/src/ui/primitives/input.tsx"],
-      "@sapporta/ui/label": ["../ui/src/ui/primitives/label.tsx"],
-      "@sapporta/ui/popover": ["../ui/src/ui/primitives/popover.tsx"],
-      "@sapporta/ui/select": ["../ui/src/ui/primitives/select.tsx"],
-      "@sapporta/ui/sheet": ["../ui/src/ui/primitives/sheet.tsx"],
-      "@sapporta/ui/switch": ["../ui/src/ui/primitives/switch.tsx"],
-      "@sapporta/ui/cn": ["../ui/src/ui/utils/cn.ts"],
-      "@sapporta/ui/combobox": ["../ui/src/ui/composite/combobox.tsx"],
-      "@sapporta/ui/kbd": ["../ui/src/ui/composite/kbd.tsx"],
-      "@sapporta/ui/param-pill": ["../ui/src/ui/composite/param-pill.tsx"],
-      "@sapporta/ui/use-debounce": ["../ui/src/ui/hooks/useDebounce.ts"]
-    }
+    "noEmit": true
   },
   "include": ["src", "vite.config.ts"]
 }

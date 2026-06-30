@@ -5,11 +5,8 @@
 
 import { useEffect } from "react";
 import { useParams } from "react-router-dom";
-import { useSchemaStore } from "@/schema-catalog/state/schema-store";
-import {
-  TablePage,
-  type TablePageGridOptions,
-} from "@/table/page/TablePage";
+import { useSchemaStore } from "../../schema-catalog/state/schema-store";
+import { TablePage, type TablePageGridOptions } from "../page/TablePage";
 
 export type TableGridOptionsByTable = Record<string, TablePageGridOptions>;
 

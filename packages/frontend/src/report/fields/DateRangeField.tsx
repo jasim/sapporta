@@ -8,7 +8,7 @@ import {
   selectKeyFromState,
   stateFromSelectKey,
   updateCustomBound,
-} from "@/report/params/daterange-picker";
+} from "../params/daterange-picker";
 import { Input } from "@sapporta/ui/input";
 import {
   Select,

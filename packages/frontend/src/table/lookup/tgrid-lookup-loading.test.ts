@@ -12,9 +12,9 @@ import {
 } from "@sapporta/grid";
 import { columnPreset } from "@sapporta/grid/column-preset";
 import type { ValueLookup } from "@sapporta/grid/lookup";
-import type { TGridSession } from "@/table/state/tgrid-session";
+import type { TGridSession } from "../state/tgrid-session";
 import { startTGridLookupLoading } from "./tgrid-lookup-loading";
-import type { TGridTableColumnMeta } from "@/table/grid-adapter/tgrid-column-mapper";
+import type { TGridTableColumnMeta } from "../grid-adapter/tgrid-column-mapper";
 
 const ordersPath = rootPath("orders");
 const linesPath = childPath(ordersPath, "42", "orders.lines");

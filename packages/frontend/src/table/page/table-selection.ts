@@ -5,9 +5,9 @@ import {
   type GridRuntime,
   type RowKey,
 } from "@sapporta/grid";
-import { errorMessage } from "@/platform/http";
-import type { TGridRowsByLevel } from "@/table/grid-adapter/tgrid-types";
-import type { TGridSession } from "@/table/state/tgrid-session";
+import { errorMessage } from "../../platform/http";
+import type { TGridRowsByLevel } from "../grid-adapter/tgrid-types";
+import type { TGridSession } from "../state/tgrid-session";
 
 export type TableSelection =
   | {

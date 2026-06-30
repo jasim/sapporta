@@ -1,7 +1,7 @@
 import { type ReactNode, useMemo, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { ListFilter } from "lucide-react";
-import { useSchemaStore } from "@/schema-catalog/state/schema-store";
+import { useSchemaStore } from "../../schema-catalog/state/schema-store";
 import { AuthAccountMenu } from "./AuthAccountMenu";
 import { SidebarShell } from "./SidebarShell";
 import {

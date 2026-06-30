@@ -3,6 +3,7 @@ import react from "@vitejs/plugin-react";
 import dts from "vite-plugin-dts";
 import path from "node:path";
 import {
+  sapportaLibraryEntries,
   sapportaSourcePackageAliases,
   sapportaSourceResolveConditions,
   sapportaSourceSsrResolveConditions,
@@ -16,14 +17,10 @@ export default defineConfig(({ command }) => {
       react(),
       dts({
         tsconfigPath: "./tsconfig.json",
-        compilerOptions: {
-          paths: {
-            "@/*": ["./src/*"],
-          },
-        },
         entryRoot: "src",
         include: ["src"],
         bundleTypes: false,
+        // Keep @sapporta/* imports as public package subpaths in emitted .d.ts.
         aliasesExclude: [/^@sapporta\//],
       }),
     ],
@@ -31,12 +28,9 @@ export default defineConfig(({ command }) => {
       conditions: useSourcePackages
         ? sapportaSourceResolveConditions
         : undefined,
-      alias: [
-        { find: "@", replacement: path.resolve(__dirname, "./src") },
-        ...(useSourcePackages
-          ? sapportaSourcePackageAliases(path.resolve(__dirname, "../.."))
-          : []),
-      ],
+      alias: useSourcePackages
+        ? sapportaSourcePackageAliases(path.resolve(__dirname, "../.."))
+        : undefined,
     },
     ssr: useSourcePackages
       ? {
@@ -51,21 +45,12 @@ export default defineConfig(({ command }) => {
       sourcemap: true,
       cssCodeSplit: false,
       lib: {
-        entry: {
-          index: path.resolve(__dirname, "src/index.ts"),
-          grid: path.resolve(__dirname, "src/grid/index.ts"),
-          "column-preset": path.resolve(
-            __dirname,
-            "src/column-preset/index.ts",
-          ),
-          lookup: path.resolve(__dirname, "src/lookup/index.ts"),
-          "lookup/react": path.resolve(__dirname, "src/lookup/react/index.ts"),
-        },
+        // Build the same JS entrypoints that package.json exports publicly.
+        entry: sapportaLibraryEntries(__dirname),
         formats: ["es"],
       },
       rollupOptions: {
-        external: (id) =>
-          !id.startsWith(".") && !id.startsWith("@/") && !path.isAbsolute(id),
+        external: (id) => !id.startsWith(".") && !path.isAbsolute(id),
         output: {
           entryFileNames: "[name].js",
           chunkFileNames: "chunks/[name]-[hash].js",

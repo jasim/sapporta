@@ -13,9 +13,9 @@ import {
   vi,
 } from "vitest";
 import type { AuthContextResponse } from "@sapporta/shared/contracts";
-import { useSchemaStore } from "@/schema-catalog/state/schema-store";
-import { AuthAccountMenu } from "@/shell/components/AuthAccountMenu";
-import { useAuthStore, type AuthState } from "@/auth/state/auth-store";
+import { useSchemaStore } from "../../schema-catalog/state/schema-store";
+import { AuthAccountMenu } from "../../shell/components/AuthAccountMenu";
+import { useAuthStore, type AuthState } from "../state/auth-store";
 import { AuthGate, PublicOnlyGate } from "./AuthGate";
 import {
   ForgotPasswordPage,

@@ -9,8 +9,8 @@ import {
   columnPresetWidthForSizing,
   type ColumnWidth,
 } from "@sapporta/grid/column-preset";
-import { inferDisplayType, type DisplayType } from "@/table/model/column-types";
-import type { TableForeignKeyLookupBundle } from "@/table/lookup/table-lookup-registry";
+import { inferDisplayType, type DisplayType } from "../model/column-types";
+import type { TableForeignKeyLookupBundle } from "../lookup/table-lookup-registry";
 import type { TableColumnName } from "./tgrid-types";
 import type { TGridLookupResolver } from "./tgrid-lookup-resolver";
 

@@ -4,12 +4,12 @@ import type {
   FilterCondition,
   NewFilterCondition,
 } from "@sapporta/shared/filter";
-import type { LookupForColumn } from "@/table/lookup/column-lookup";
+import type { LookupForColumn } from "../lookup/column-lookup";
 import type {
   TGridLevelId,
   TGridRowsByLevel,
-} from "@/table/grid-adapter/tgrid-types";
-import type { TGridSession } from "@/table/state/tgrid-session";
+} from "../grid-adapter/tgrid-types";
+import type { TGridSession } from "../state/tgrid-session";
 import { requireHostQueryStore } from "./table-query-store";
 
 export type TableLevelQuery = {

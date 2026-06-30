@@ -178,6 +178,40 @@ describe("Sapporta package exports", () => {
     }
   });
 
+  it("resolves representative public exports to source files with sapporta:source", () => {
+    const tempProject = createLinkedConsumerProject();
+    try {
+      const representativeSpecifiers = [
+        "@sapporta/ui/button",
+        "@sapporta/shared/filter",
+        "@sapporta/grid/lookup/react",
+      ];
+      const sourceBySpecifier = new Map(
+        jsExports().map((exportTarget) => [
+          exportTarget.specifier,
+          exportTarget,
+        ]),
+      );
+      const results = resolveSourceSpecifiersInProject(
+        tempProject,
+        representativeSpecifiers,
+      );
+
+      for (const result of results) {
+        const exportTarget = sourceBySpecifier.get(result.specifier);
+        if (!exportTarget) {
+          throw new Error(`Missing export target for ${result.specifier}.`);
+        }
+        const expectedPath = realpathSync(
+          path.join(exportTarget.packageRoot, exportTarget.source),
+        );
+        expect(realpathSync(result.importPath)).toBe(expectedPath);
+      }
+    } finally {
+      rmSync(tempProject, { force: true, recursive: true });
+    }
+  });
+
   it("type-checks representative NodeNext and bundler consumers", () => {
     const tempProject = createLinkedConsumerProject();
     try {
@@ -408,6 +442,44 @@ function resolveSpecifiersInProject(
     encoding: "utf8",
   });
   return JSON.parse(output) as ResolutionResult[];
+}
+
+function resolveSourceSpecifiersInProject(
+  projectRoot: string,
+  specifiers: string[],
+): Pick<ResolutionResult, "specifier" | "importPath">[] {
+  const scriptPath = path.join(projectRoot, "resolve-source.mjs");
+  writeFileSync(
+    scriptPath,
+    `
+      import { fileURLToPath } from "node:url";
+
+      const specifiers = ${JSON.stringify(specifiers)};
+      const results = [];
+
+      for (const specifier of specifiers) {
+        results.push({
+          specifier,
+          importPath: fileURLToPath(await import.meta.resolve(specifier)),
+        });
+      }
+
+      console.log(JSON.stringify(results));
+    `,
+  );
+
+  const output = execFileSync(
+    process.execPath,
+    ["--conditions=sapporta:source", scriptPath],
+    {
+      cwd: projectRoot,
+      encoding: "utf8",
+    },
+  );
+  return JSON.parse(output) as Pick<
+    ResolutionResult,
+    "specifier" | "importPath"
+  >[];
 }
 
 function typeCheckConsumer(

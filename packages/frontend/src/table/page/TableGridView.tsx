@@ -1,13 +1,13 @@
 import { useEffect } from "react";
 import { useStore } from "zustand";
 import type { TableSchema } from "@sapporta/shared/contracts";
-import { useTGridSession } from "@/table/grid-adapter/tgrid-binding";
-import type { TGridDefinition } from "@/table/grid-adapter/tgrid-runtime-config";
+import { useTGridSession } from "../grid-adapter/tgrid-binding";
+import type { TGridDefinition } from "../grid-adapter/tgrid-runtime-config";
 import type {
   TGridLevelId,
   TGridRowsByLevel,
-} from "@/table/grid-adapter/tgrid-types";
-import type { TGridSession } from "@/table/state/tgrid-session";
+} from "../grid-adapter/tgrid-types";
+import type { TGridSession } from "../state/tgrid-session";
 import { TGrid, type ViewRelatedRowsOption } from "./TGrid";
 import { TableGridHeader } from "./TableGridHeader";
 import { TableGridPager } from "./TableGridPager";

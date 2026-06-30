@@ -9,8 +9,8 @@ import {
   fetchAuthContext,
   signOut,
   switchActiveWorkspace,
-} from "@/auth/api/auth-context";
-import { useSchemaStore } from "@/schema-catalog/state/schema-store";
+} from "../api/auth-context";
+import { useSchemaStore } from "../../schema-catalog/state/schema-store";
 
 export type AuthSession =
   | { kind: "unknown" }

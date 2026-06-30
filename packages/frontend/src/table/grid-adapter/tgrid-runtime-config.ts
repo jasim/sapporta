@@ -29,7 +29,7 @@ import {
   updateTableRow,
   deleteTableRow,
   type FetchTableRowsParams,
-} from "@/table/api/rows";
+} from "../api/rows";
 import type { RowId } from "@sapporta/shared/row-id";
 import type { TGridColumnMapper } from "./tgrid-column-mapper";
 import { tableRowIdentity } from "./table-row-identity";

@@ -21,37 +21,37 @@ import { sortOrderEqual } from "@sapporta/grid";
 import {
   compileTGridRuntimeConfig,
   type TGridDefinition,
-} from "@/table/grid-adapter/tgrid-runtime-config";
-import type { TGridFilter } from "@/table/grid-adapter/tgrid-filter";
+} from "../grid-adapter/tgrid-runtime-config";
+import type { TGridFilter } from "../grid-adapter/tgrid-filter";
 import type {
   TGridLevelConfig,
   TGridLevelInfo,
   TGridLevelsConfigMap,
-} from "@/table/grid-adapter/tgrid-level-config";
+} from "../grid-adapter/tgrid-level-config";
 import {
   createTGridColumnMapper,
   type TGridColumnMapper,
-} from "@/table/grid-adapter/tgrid-column-mapper";
+} from "../grid-adapter/tgrid-column-mapper";
 import type {
   TGridRuntimeLevel,
   TGridSessionContext,
-} from "@/table/grid-adapter/tgrid-cell-context";
-import { createTGridLookupResolver } from "@/table/grid-adapter/tgrid-lookup-resolver";
+} from "../grid-adapter/tgrid-cell-context";
+import { createTGridLookupResolver } from "../grid-adapter/tgrid-lookup-resolver";
 import {
   createTableLookupRegistry,
   type TableLookupRegistry,
-} from "@/table/lookup/table-lookup-registry";
+} from "../lookup/table-lookup-registry";
 import {
   createColumnLookupResolver,
   type LookupForColumn,
-} from "@/table/lookup/column-lookup";
-import { buildTableRowsQuery } from "@/table/api/rows";
-import { getApiBase } from "@/platform/client";
+} from "../lookup/column-lookup";
+import { buildTableRowsQuery } from "../api/rows";
+import { getApiBase } from "../../platform/client";
 import type {
   TGridLevelId,
   TGridRowsByLevel,
   TGridTableRow,
-} from "@/table/grid-adapter/tgrid-types";
+} from "../grid-adapter/tgrid-types";
 import type {
   TGridRouteQuerySeed,
   TGridLevelQueryState,

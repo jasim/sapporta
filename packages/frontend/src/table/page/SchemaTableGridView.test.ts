@@ -8,8 +8,8 @@ import {
   type GridInteractionConfig,
 } from "@sapporta/grid";
 import type { TableSchema } from "@sapporta/shared/contracts";
-import type { TGridDefinition } from "@/table/grid-adapter/tgrid-runtime-config";
-import type { SchemaTableRowsByLevel } from "@/table/grid-adapter/schema-tgrid";
+import type { TGridDefinition } from "../grid-adapter/tgrid-runtime-config";
+import type { SchemaTableRowsByLevel } from "../grid-adapter/schema-tgrid";
 import type { TableGridViewProps } from "./TableGridView";
 import {
   SchemaTableGridView,

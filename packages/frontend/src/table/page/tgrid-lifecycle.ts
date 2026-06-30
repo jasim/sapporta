@@ -1,11 +1,11 @@
 import { useEffect } from "react";
-import type { TGridRowsByLevel } from "@/table/grid-adapter/tgrid-types";
-import { startTGridLookupLoading } from "@/table/lookup/tgrid-lookup-loading";
-import type { TGridSession } from "@/table/state/tgrid-session";
+import type { TGridRowsByLevel } from "../grid-adapter/tgrid-types";
+import { startTGridLookupLoading } from "../lookup/tgrid-lookup-loading";
+import type { TGridSession } from "../state/tgrid-session";
 import {
   registerTGridSession,
   unregisterTGridSession,
-} from "@/table/state/tgrid-session-registry";
+} from "../state/tgrid-session-registry";
 
 // Optional page-level side effects for a live grid session.
 // `registerAs` lets app actions such as "save a new record, then reload the

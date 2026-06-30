@@ -6,7 +6,7 @@ import {
   renderCommandResult,
   resolveOutputFormat,
 } from "../render/output.js";
-import type { CliCommandContext, CliCommandSpec } from "./types.js";
+import type { CliCommandContext, CliCommandSpec, CliProgram } from "./types.js";
 
 const GROUP_DESCRIPTIONS: Record<string, string> = {
   api: "Call arbitrary app endpoints",
@@ -19,7 +19,7 @@ const GROUP_DESCRIPTIONS: Record<string, string> = {
 export function createCliProgram(
   version: string,
   commands: readonly CliCommandSpec[],
-): Command {
+): CliProgram {
   const program = new Command("sapporta")
     .version(version)
     .option("--api-url <url>", "Server URL (default: http://localhost:3000)")

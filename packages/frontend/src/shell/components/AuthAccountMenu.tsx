@@ -1,7 +1,7 @@
 import type { ComponentProps } from "react";
 import { UserRound } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { useAuthStore } from "@/auth/state/auth-store";
+import { useAuthStore } from "../../auth/state/auth-store";
 import { AccountMenu, type AccountMenuSection } from "./AccountMenu";
 
 export interface AuthAccountMenuProps extends Omit<

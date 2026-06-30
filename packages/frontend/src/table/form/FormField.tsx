@@ -14,7 +14,7 @@ import {
   SelectValue,
 } from "@sapporta/ui/select";
 import type { LookupCapabilities } from "@sapporta/grid/lookup";
-import { inferDisplayType } from "@/table/model/column-types";
+import { inferDisplayType } from "../model/column-types";
 import type { ColumnSchema } from "@sapporta/shared/contracts";
 import { useLookupOptions } from "@sapporta/grid/lookup/react";
 import {

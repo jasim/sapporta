@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { useParams } from "react-router-dom";
-import { useSchemaStore } from "@/schema-catalog/state/schema-store";
-import { NewRecordPage } from "@/table/form/NewRecordPage";
+import { useSchemaStore } from "../../schema-catalog/state/schema-store";
+import { NewRecordPage } from "../form/NewRecordPage";
 
 export function NewRecordRoute() {
   const { tableName } = useParams<{ tableName: string }>();

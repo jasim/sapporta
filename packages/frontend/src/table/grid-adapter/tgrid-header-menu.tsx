@@ -6,8 +6,8 @@ import {
 } from "@sapporta/shared/filter";
 import type { ColumnSchema as GridColumnSchema } from "@sapporta/grid";
 import { lookupCapabilities, preset } from "@sapporta/grid/column-preset";
-import type { LookupForColumn } from "@/table/lookup/column-lookup";
-import { HeaderFilterMenuContent } from "@/table/filters/HeaderFilterPopover";
+import type { LookupForColumn } from "../lookup/column-lookup";
+import { HeaderFilterMenuContent } from "../filters/HeaderFilterPopover";
 import type { TGridFilter } from "./tgrid-filter";
 import type { TGridTableColumnMeta } from "./tgrid-column-mapper";
 

@@ -3,8 +3,8 @@ import type { TableSchema } from "@sapporta/shared/contracts";
 import { eqCondition } from "@sapporta/shared/filter";
 import { makeRowId, rootPath } from "@sapporta/grid";
 import { createTGridSession } from "./tgrid-session";
-import { defineTGrid } from "@/table/grid-adapter/tgrid-runtime-config";
-import type { TableRowsClient } from "@/table/grid-adapter/tgrid-level-config";
+import { defineTGrid } from "../grid-adapter/tgrid-runtime-config";
+import type { TableRowsClient } from "../grid-adapter/tgrid-level-config";
 
 type OrderRow = {
   id: number;

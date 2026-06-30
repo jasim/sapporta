@@ -8,7 +8,7 @@ import {
   useTGridCell,
   type TGridCellWriteContext,
   type TGridColumnsBuilder,
-} from "@/index";
+} from "../../index";
 
 type InvoiceRow = {
   id: string;

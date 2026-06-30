@@ -1,8 +1,8 @@
 import { useEffect, type ReactNode } from "react";
 import { Loader2 } from "lucide-react";
-import { loadAdminMetadata } from "@/app/actions/boot";
-import { useAuthStore } from "@/auth/state/auth-store";
-import { useSchemaStore } from "@/schema-catalog/state/schema-store";
+import { loadAdminMetadata } from "../actions/boot";
+import { useAuthStore } from "../../auth/state/auth-store";
+import { useSchemaStore } from "../../schema-catalog/state/schema-store";
 
 /**
  * Loads app metadata and restores the browser session before rendering shell

@@ -12,7 +12,7 @@ import { createTGridColumnMapper } from "./tgrid-column-mapper";
 import type { TGridLookupResolver } from "./tgrid-lookup-resolver";
 import { createTGridColumnsBuilder } from "./tgrid-column-spec";
 import type { TGridSessionContext } from "./tgrid-cell-context";
-import type { TableLookupRegistry } from "@/table/lookup/table-lookup-registry";
+import type { TableLookupRegistry } from "../lookup/table-lookup-registry";
 
 type OrderRow = { id: number; customer: string; internal?: string };
 type LineRow = {

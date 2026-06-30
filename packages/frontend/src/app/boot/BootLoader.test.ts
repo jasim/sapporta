@@ -13,10 +13,10 @@ import {
   vi,
 } from "vitest";
 import type { AuthContextResponse } from "@sapporta/shared/contracts";
-import { AuthGate } from "@/auth/components/AuthGate";
-import { useAuthStore } from "@/auth/state/auth-store";
-import { AuthAccountMenu } from "@/shell/components/AuthAccountMenu";
-import { useSchemaStore } from "@/schema-catalog/state/schema-store";
+import { AuthGate } from "../../auth/components/AuthGate";
+import { useAuthStore } from "../../auth/state/auth-store";
+import { AuthAccountMenu } from "../../shell/components/AuthAccountMenu";
+import { useSchemaStore } from "../../schema-catalog/state/schema-store";
 import { BootLoader } from "./BootLoader";
 
 const AUTH_CONTEXT = {
@@ -190,7 +190,9 @@ async function renderBootLoader(children: ReactNode): Promise<void> {
 }
 
 function installBootFetch(
-  handler: (request: FetchRequest) => Response | null | Promise<Response | null>,
+  handler: (
+    request: FetchRequest,
+  ) => Response | null | Promise<Response | null>,
 ): FetchCall[] {
   const calls: FetchCall[] = [];
   vi.stubGlobal(

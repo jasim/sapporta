@@ -1,4 +1,4 @@
-import { uiClient } from "@/platform/client";
+import { uiClient } from "../../platform/client";
 import type {
   CountResponse,
   PaginatedRows,

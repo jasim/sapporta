@@ -1,5 +1,5 @@
 import { Navigate } from "react-router-dom";
-import { useSchemaStore } from "@/schema-catalog/state/schema-store";
+import { useSchemaStore } from "../../schema-catalog/state/schema-store";
 
 export function HomeRedirect() {
   const { loaded, tables } = useSchemaStore();

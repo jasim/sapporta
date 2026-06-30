@@ -1,7 +1,7 @@
 import { useEffect, type ReactNode } from "react";
 import { Navigate, Outlet, useLocation } from "react-router-dom";
 import { Loader2 } from "lucide-react";
-import { useAuthStore } from "@/auth/state/auth-store";
+import { useAuthStore } from "../state/auth-store";
 
 export function AuthGate({ children }: { children?: ReactNode }) {
   const location = useLocation();

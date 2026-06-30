@@ -7,7 +7,7 @@ import type {
 import type { ColumnSchema } from "@sapporta/shared/contracts";
 import { cn } from "@sapporta/ui/cn";
 import { Popover, PopoverContent, PopoverTrigger } from "@sapporta/ui/popover";
-import type { LookupForColumn } from "@/table/lookup/column-lookup";
+import type { LookupForColumn } from "../lookup/column-lookup";
 import { ConditionEditor } from "./ConditionEditor";
 import { FilterCard } from "./FilterCard";
 import { DateRangeCard, groupDateRanges } from "./DateRangeCard";

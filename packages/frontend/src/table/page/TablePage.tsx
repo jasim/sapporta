@@ -1,8 +1,8 @@
 import { useMemo } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import type { TableSchema } from "@sapporta/shared/contracts";
-import { useSchemaStore } from "@/schema-catalog/state/schema-store";
-import { navigateToNewRecord } from "@/table/actions/record-actions";
+import { useSchemaStore } from "../../schema-catalog/state/schema-store";
+import { navigateToNewRecord } from "../actions/record-actions";
 import {
   SchemaTableGridView,
   type SchemaTableGridViewProps,

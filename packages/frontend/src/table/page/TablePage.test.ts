@@ -5,7 +5,7 @@ import { createRoot, type Root } from "react-dom/client";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { TableSchema } from "@sapporta/shared/contracts";
-import { useSchemaStore } from "@/schema-catalog/state/schema-store";
+import { useSchemaStore } from "../../schema-catalog/state/schema-store";
 import { TablePage, type TablePageGridOptions } from "./TablePage";
 import type { SchemaTableGridViewProps } from "./SchemaTableGridView";
 

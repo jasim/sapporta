@@ -25,7 +25,7 @@ import { TagInput } from "./inputs/TagInput";
 import { CheckboxList } from "./inputs/CheckboxList";
 import { LookupCheckboxList } from "./inputs/LookupCheckboxList";
 import type { ListOp, Polarity, ScalarOp } from "@sapporta/shared/filter";
-import { inferDisplayType } from "@/table/model/column-types";
+import { inferDisplayType } from "../model/column-types";
 
 /** Filter-side column types — coarser than the render-side DisplayType. */
 export type FilterColumnType =

@@ -1,4 +1,3 @@
-import type { Command as CommanderCommand } from "commander";
 import type { z } from "zod";
 import type { SapportaCliClient } from "../client/app-client.js";
 import type { OutputFormat } from "../render/output.js";
@@ -47,7 +46,7 @@ export interface CliCommandSpec {
   ): Promise<CliCommandResult>;
 }
 
-export interface RegisteredCliCommand {
-  spec: CliCommandSpec;
-  command: CommanderCommand;
+export interface CliProgram {
+  help(): void;
+  parseAsync(argv?: readonly string[]): Promise<CliProgram>;
 }

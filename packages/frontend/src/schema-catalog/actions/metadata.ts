@@ -1,6 +1,6 @@
-import { ApiError } from "@/platform/http";
-import { fetchProjectInfo, fetchSchema } from "@/schema-catalog/api/schema";
-import { useSchemaStore } from "@/schema-catalog/state/schema-store";
+import { ApiError } from "../../platform/http";
+import { fetchProjectInfo, fetchSchema } from "../api/schema";
+import { useSchemaStore } from "../state/schema-store";
 
 function apiErrorMessage(err: ApiError): string {
   if (err.body && typeof err.body === "object" && "error" in err.body) {

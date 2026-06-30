@@ -1,5 +1,5 @@
 import type { ProjectInfo, TableSchema } from "@sapporta/shared/contracts";
-import { fetchApiJson } from "@/platform/http";
+import { fetchApiJson } from "../../platform/http";
 
 export async function fetchSchema(): Promise<{ tables: TableSchema[] }> {
   return fetchApiJson<{ tables: TableSchema[] }>("/meta/tables");

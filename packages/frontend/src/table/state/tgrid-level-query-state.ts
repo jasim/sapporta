@@ -3,8 +3,8 @@ import type {
   FilterCondition,
   NewFilterCondition,
 } from "@sapporta/shared/filter";
-import type { TGridFilter } from "@/table/grid-adapter/tgrid-filter";
-import type { TGridTableRow } from "@/table/grid-adapter/tgrid-types";
+import type { TGridFilter } from "../grid-adapter/tgrid-filter";
+import type { TGridTableRow } from "../grid-adapter/tgrid-types";
 
 // Query values supplied by the current route. Omitted fields keep the level's
 // configured defaults; present empty arrays/nulls intentionally clear defaults.

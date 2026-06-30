@@ -4,18 +4,18 @@ import { ArrowLeft, Loader2 } from "lucide-react";
 import type { TableSchema } from "@sapporta/shared/contracts";
 import { ApiError } from "@sapporta/shared/client";
 import type { LookupCapabilities } from "@sapporta/grid/lookup";
-import { TopBar, TopBarButton } from "@/shell/components/TopBar";
+import { TopBar, TopBarButton } from "../../shell/components/TopBar";
 import { Button } from "@sapporta/ui/button";
-import { RecordFormField } from "@/table/form/RecordFormField";
-import { RecordFormProvider } from "@/table/form/RecordFormProvider";
+import { RecordFormField } from "./RecordFormField";
+import { RecordFormProvider } from "./RecordFormProvider";
 import {
   compactRecordFormValues,
   createRecordFormStore,
-} from "@/table/form/record-form-store";
-import { isRecordFormEditableColumn } from "@/table/form/field-policy";
-import { createRecord } from "@/table/actions/record-actions";
-import { createTableLookupRegistry } from "@/table/lookup/table-lookup-registry";
-import { createColumnLookupResolver } from "@/table/lookup/column-lookup";
+} from "./record-form-store";
+import { isRecordFormEditableColumn } from "./field-policy";
+import { createRecord } from "../actions/record-actions";
+import { createTableLookupRegistry } from "../lookup/table-lookup-registry";
+import { createColumnLookupResolver } from "../lookup/column-lookup";
 
 export function NewRecordPage({ tableSchema }: { tableSchema: TableSchema }) {
   const navigate = useNavigate();

@@ -6,7 +6,7 @@ import type {
   createTableRow,
   updateTableRow,
   deleteTableRow,
-} from "@/table/api/rows";
+} from "../api/rows";
 import type {
   RowFieldName,
   TableColumnName,

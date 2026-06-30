@@ -4,7 +4,7 @@ import { createTGridLookupResolver } from "./tgrid-lookup-resolver";
 import type {
   TableForeignKeyLookupBundle,
   TableLookupRegistry,
-} from "@/table/lookup/table-lookup-registry";
+} from "../lookup/table-lookup-registry";
 
 const ownerColumn: ColumnSchema = {
   name: "owner_id",

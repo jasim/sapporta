@@ -7,8 +7,8 @@ import {
   type SchemaTableGridSource,
   type SchemaTableRootRowsOptions,
   type SchemaTableRowsByLevel,
-} from "@/table/grid-adapter/schema-tgrid";
-import type { TGridDefinition } from "@/table/grid-adapter/tgrid-runtime-config";
+} from "../grid-adapter/schema-tgrid";
+import type { TGridDefinition } from "../grid-adapter/tgrid-runtime-config";
 import type { TableGridRoute } from "./table-grid-url-state";
 import {
   TableGridView,

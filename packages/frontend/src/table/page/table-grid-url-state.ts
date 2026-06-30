@@ -3,23 +3,23 @@ import type { StoreApi } from "zustand/vanilla";
 import type { ColId, SortDescriptor } from "@sapporta/grid";
 import type { ColumnSchema } from "@sapporta/shared/contracts";
 import type { FilterCondition } from "@sapporta/shared/filter";
-import { loadPref, savePref } from "@/platform/prefs";
+import { loadPref, savePref } from "../../platform/prefs";
 import {
   buildTableSearchParams,
   parseTableSearchParams,
   sanitizeSortDescriptors,
-} from "@/table/grid-adapter/tgrid-table-url";
+} from "../grid-adapter/tgrid-table-url";
 import type {
   TGridLevelId,
   TGridRowsByLevel,
   TGridTableRow,
-} from "@/table/grid-adapter/tgrid-types";
-import type { TGridLevelQueryState } from "@/table/state/tgrid-level-query-state";
+} from "../grid-adapter/tgrid-types";
+import type { TGridLevelQueryState } from "../state/tgrid-level-query-state";
 import type {
   CreateTGridSessionArgs,
   TGridRouteQuerySeed,
   TGridSession,
-} from "@/table/state/tgrid-session";
+} from "../state/tgrid-session";
 
 type PersistedSort = Array<{ colId: string; direction: string }>;
 

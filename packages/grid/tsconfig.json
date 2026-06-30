@@ -3,6 +3,10 @@
     "target": "ES2022",
     "module": "ESNext",
     "moduleResolution": "bundler",
+    // Resolve workspace @sapporta/* imports through package.json exports.
+    // The private sapporta:source branch points TypeScript at source files;
+    // published consumers still use the normal built default branch.
+    "customConditions": ["sapporta:source"],
     "jsx": "react-jsx",
     "strict": true,
     "esModuleInterop": true,
@@ -10,12 +14,7 @@
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true,
     "isolatedModules": true,
-    "noEmit": true,
-    "paths": {
-      "@/*": ["./src/*"],
-      "@sapporta/shared/validation": ["../shared/src/validation/index.ts"],
-      "@sapporta/ui": ["../ui/src/index.ts"]
-    }
+    "noEmit": true
   },
   "include": ["src", "vite.config.ts"]
 }

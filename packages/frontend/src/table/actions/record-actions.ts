@@ -1,6 +1,6 @@
-import { getNavigate } from "@/app/router/router-bridge";
-import { createTableRow } from "@/table/api/rows";
-import { reloadTGridRows } from "@/table/state/tgrid-session-registry";
+import { getNavigate } from "../../app/router/router-bridge";
+import { createTableRow } from "../api/rows";
+import { reloadTGridRows } from "../state/tgrid-session-registry";
 
 export async function createRecord(
   tableName: string,

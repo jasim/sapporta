@@ -3,6 +3,10 @@ import path from "node:path";
 
 export const SAPPORTA_SOURCE_CONDITION = "sapporta:source";
 
+// Sapporta packages publish built JS through each export's `default` branch.
+// The monorepo also records a private `sapporta:source` branch beside it, so
+// local type-checks, tests, and dev servers can resolve the same public import
+// specifiers to source files without hand-maintained tsconfig path maps.
 export const sapportaSourceResolveConditions = [
   SAPPORTA_SOURCE_CONDITION,
   "module",
@@ -42,6 +46,11 @@ export type SapportaSourceAlias = {
   replacement: string;
 };
 
+export type SapportaLibraryEntries = Record<string, string>;
+
+// Some Vite/Vitest paths still need concrete aliases rather than only
+// conditional resolution. Build those aliases from package exports so the
+// package manifest stays the source of truth for every public subpath.
 export function sapportaSourcePackageAliases(
   monorepoRoot: string,
 ): SapportaSourceAlias[] {
@@ -75,6 +84,31 @@ export function sapportaSourcePackageAliases(
   );
 }
 
+export function sapportaLibraryEntries(
+  packageRoot: string,
+): SapportaLibraryEntries {
+  const packageJson = readPackageJson(path.join(packageRoot, "package.json"));
+  const entries: SapportaLibraryEntries = {};
+
+  for (const [subpath, exportValue] of Object.entries(
+    packageJson.exports ?? {},
+  )) {
+    if (subpath === "./package.json") continue;
+
+    // JS library entries mirror the public export map. CSS exports stay assets,
+    // so they are intentionally excluded from the Rollup entry object.
+    const sourceTarget = sourceTargetFor(exportValue);
+    if (!sourceTarget || !isTypeScriptSourceTarget(sourceTarget)) continue;
+
+    entries[entryNameForSubpath(subpath)] = path.resolve(
+      packageRoot,
+      sourceTarget,
+    );
+  }
+
+  return entries;
+}
+
 function readPackageJson(packageJsonPath: string): PackageJson {
   return JSON.parse(readFileSync(packageJsonPath, "utf8")) as PackageJson;
 }
@@ -84,6 +118,14 @@ function sourceTargetFor(exportValue: PackageExportValue): string | undefined {
 
   const sourceTarget = exportValue[SAPPORTA_SOURCE_CONDITION];
   return typeof sourceTarget === "string" ? sourceTarget : undefined;
+}
+
+function isTypeScriptSourceTarget(sourceTarget: string): boolean {
+  return sourceTarget.endsWith(".ts") || sourceTarget.endsWith(".tsx");
+}
+
+function entryNameForSubpath(subpath: string): string {
+  return subpath === "." ? "index" : subpath.slice(2);
 }
 
 function exactSpecifierPattern(specifier: string): RegExp {

@@ -1,10 +1,11 @@
 import { describe, expect, it } from "vitest";
+import type { Command } from "commander";
 import { createCliProgram } from "./framework.js";
 import { CLI_COMMANDS } from "./registry.js";
 
 describe("CLI command registry help", () => {
   function helpFor(args: string[]): string {
-    const program = createCliProgram("0.0.0-test", CLI_COMMANDS);
+    const program = createCliProgram("0.0.0-test", CLI_COMMANDS) as Command;
     const target = args.reduce(
       (command, name) =>
         command.commands.find((candidate) => candidate.name() === name) ??

@@ -1,7 +1,7 @@
 import { useEffect, useId, useMemo, useState } from "react";
 import type { FormEvent, MouseEvent } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import { visiblePaginationItems } from "@/table/grid-adapter/visible-pagination-items";
+import { visiblePaginationItems } from "../grid-adapter/visible-pagination-items";
 import type { TableLevelPager } from "./table-level-pager";
 import { clampPage, parsePageJump } from "./table-pager-math";
 

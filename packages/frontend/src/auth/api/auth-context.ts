@@ -6,7 +6,7 @@ import type {
   CreateAuthTokenResponse,
   SwitchActiveWorkspaceBody,
 } from "@sapporta/shared/contracts";
-import { fetchApi, fetchApiJson } from "@/platform/http";
+import { fetchApi, fetchApiJson } from "../../platform/http";
 
 export async function fetchAuthContext(): Promise<AuthContextResponse> {
   return fetchApiJson<AuthContextResponse>("/auth-context");

@@ -5,8 +5,8 @@ import { createRoot, type Root } from "react-dom/client";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { TableSchema } from "@sapporta/shared/contracts";
-import { useSchemaStore } from "@/schema-catalog/state/schema-store";
-import type { TablePageProps } from "@/table/page/TablePage";
+import { useSchemaStore } from "../../schema-catalog/state/schema-store";
+import type { TablePageProps } from "../page/TablePage";
 import { TableRoute, type TableGridOptionsByTable } from "./TableRoute";
 
 (
@@ -17,7 +17,7 @@ const { tablePageSpy } = vi.hoisted(() => ({
   tablePageSpy: vi.fn(),
 }));
 
-vi.mock("@/table/page/TablePage", async () => {
+vi.mock("../page/TablePage", async () => {
   const React = await import("react");
   return {
     TablePage: (props: TablePageProps): ReactElement => {

@@ -1,6 +1,6 @@
 import { createStore, type StoreApi } from "zustand/vanilla";
 import type { TableSchema } from "@sapporta/shared/contracts";
-import { isRecordFormEditableColumn } from "@/table/form/field-policy";
+import { isRecordFormEditableColumn } from "./field-policy";
 
 export type RecordFormValues = Record<string, unknown>;
 

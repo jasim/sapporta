@@ -4,7 +4,7 @@ import {
   compactRecordFormValues,
   createRecordFormStore,
   initialRecordFormValues,
-} from "@/table/form/record-form-store";
+} from "./record-form-store";
 
 const PRODUCTS_SCHEMA: TableSchema = {
   name: "products",

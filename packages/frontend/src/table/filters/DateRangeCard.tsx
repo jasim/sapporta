@@ -19,7 +19,7 @@ import type {
 import { Input } from "@sapporta/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@sapporta/ui/popover";
 import type { ColumnSchema } from "@sapporta/shared/contracts";
-import { inferDisplayType } from "@/table/model/column-types";
+import { inferDisplayType } from "../model/column-types";
 
 /** A date-range pair. `gte` is always the lower bound, `lte` the upper. */
 export interface DateRange {

@@ -1,4 +1,7 @@
-import { loadProjectInfo, loadSchema } from "@/schema-catalog/actions/metadata";
+import {
+  loadProjectInfo,
+  loadSchema,
+} from "../../schema-catalog/actions/metadata";
 
 export function loadAdminMetadata(): void {
   void loadSchema();

@@ -12,7 +12,7 @@ import type {
   NewFilterCondition,
 } from "@sapporta/shared/filter";
 import type { ColumnSchema } from "@sapporta/shared/contracts";
-import type { LookupForColumn } from "@/table/lookup/column-lookup";
+import type { LookupForColumn } from "../lookup/column-lookup";
 import {
   Select,
   SelectContent,

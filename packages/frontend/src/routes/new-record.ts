@@ -1,1 +1,1 @@
-export { NewRecordRoute } from "@/table/route/NewRecordRoute";
+export { NewRecordRoute } from "../table/route/NewRecordRoute";

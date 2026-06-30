@@ -1,6 +1,6 @@
 import { Moon, Sun } from "lucide-react";
-import { useThemeStore } from "@/shell/state/theme-store";
-import { useHintsStore } from "@/shell/state/hints-store";
+import { useThemeStore } from "../state/theme-store";
+import { useHintsStore } from "../state/hints-store";
 import { SapportaMark } from "./Sidebar";
 
 /**

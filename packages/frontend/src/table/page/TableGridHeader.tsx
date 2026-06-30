@@ -15,13 +15,13 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@sapporta/ui/sheet";
-import { TopBar, TopBarButton } from "@/shell/components/TopBar";
-import { FilterCardsBar } from "@/table/filters/FilterCardsBar";
+import { TopBar, TopBarButton } from "../../shell/components/TopBar";
+import { FilterCardsBar } from "../filters/FilterCardsBar";
 import type {
   TGridLevelId,
   TGridRowsByLevel,
-} from "@/table/grid-adapter/tgrid-types";
-import type { TGridSession } from "@/table/state/tgrid-session";
+} from "../grid-adapter/tgrid-types";
+import type { TGridSession } from "../state/tgrid-session";
 import { TableViewSwitch } from "./TableViewSwitch";
 import {
   CompactHeaderButton,
@@ -308,9 +308,7 @@ function NarrowCardTableHeader({
           className="max-h-[82vh] overflow-auto rounded-t-[8px] border-sap-border bg-sap-surface p-0"
         >
           <SheetHeader className="px-4 pb-2 pt-4 text-left">
-            <SheetTitle className="text-[16px] text-sap-fg">
-              Filters
-            </SheetTitle>
+            <SheetTitle className="text-[16px] text-sap-fg">Filters</SheetTitle>
             <SheetDescription className="text-sap-muted">
               {tableLabel}
             </SheetDescription>

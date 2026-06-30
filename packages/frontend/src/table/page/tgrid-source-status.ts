@@ -1,8 +1,8 @@
 import { useSyncExternalStore } from "react";
 import type { LevelSnapshot, LevelSourceState } from "@sapporta/grid";
 import { ApiError } from "@sapporta/shared/client";
-import type { TGridRowsByLevel } from "@/table/grid-adapter/tgrid-types";
-import type { TGridSession } from "@/table/state/tgrid-session";
+import type { TGridRowsByLevel } from "../grid-adapter/tgrid-types";
+import type { TGridSession } from "../state/tgrid-session";
 
 // Small status snapshot for page chrome.
 // It is intentionally separate from row rendering so a loading spinner,

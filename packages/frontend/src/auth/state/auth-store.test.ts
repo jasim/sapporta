@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { AuthContextResponse } from "@sapporta/shared/contracts";
-import { useSchemaStore } from "@/schema-catalog/state/schema-store";
+import { useSchemaStore } from "../../schema-catalog/state/schema-store";
 import { useAuthStore } from "./auth-store";
 
 const AUTH_CONTEXT = {

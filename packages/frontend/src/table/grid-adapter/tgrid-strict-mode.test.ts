@@ -7,20 +7,20 @@ import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { TableSchema } from "@sapporta/shared/contracts";
 import { rootPath } from "@sapporta/grid";
-import { TGrid } from "@/table/page/TGrid";
-import { TablePage } from "@/table/page/TablePage";
-import { useSchemaStore } from "@/schema-catalog/state/schema-store";
+import { TGrid } from "../page/TGrid";
+import { TablePage } from "../page/TablePage";
+import { useSchemaStore } from "../../schema-catalog/state/schema-store";
 import { defineTGrid } from "./tgrid-runtime-config";
 import { useTGridSession } from "./tgrid-binding";
-import type { TGridSession } from "@/table/state/tgrid-session";
+import type { TGridSession } from "../state/tgrid-session";
 import type { TableRowsClient } from "./tgrid-level-config";
 
 (
   globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
 ).IS_REACT_ACT_ENVIRONMENT = true;
 
-vi.mock("@/table/api/rows", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@/table/api/rows")>();
+vi.mock("../api/rows", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../api/rows")>();
   return {
     ...actual,
     fetchTableRows: vi.fn(async () => ({

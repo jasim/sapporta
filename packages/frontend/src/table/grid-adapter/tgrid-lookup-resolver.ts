@@ -1,6 +1,6 @@
-import type { TableLookupRegistry } from "@/table/lookup/table-lookup-registry";
+import type { TableLookupRegistry } from "../lookup/table-lookup-registry";
 import type { ColumnSchema as TableColumnSchema } from "@sapporta/shared/contracts";
-import type { TableForeignKeyLookupBundle } from "@/table/lookup/table-lookup-registry";
+import type { TableForeignKeyLookupBundle } from "../lookup/table-lookup-registry";
 
 export type TGridLookupResolver = {
   bundleFor(args: {

@@ -4,7 +4,7 @@ import { CachedValueLookup, type ValueLookup } from "@sapporta/grid/lookup";
 import {
   fetchLookupEntriesForSearch,
   fetchLookupEntriesForValues,
-} from "@/lookup/api/lookup";
+} from "../../lookup/api/lookup";
 
 export type TableLookupKey = `${string}.${string}->${string}.${string}`;
 

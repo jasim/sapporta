@@ -9,7 +9,7 @@ import {
   tableColumnPresetWidth,
 } from "./tgrid-column-mapper";
 import type { TGridLookupResolver } from "./tgrid-lookup-resolver";
-import type { TableForeignKeyLookupBundle } from "@/table/lookup/table-lookup-registry";
+import type { TableForeignKeyLookupBundle } from "../lookup/table-lookup-registry";
 
 const valueLookup = new StaticValueLookup([{ value: "a", label: "Alpha" }]);
 const searchLookup = new StaticSearchLookup([{ value: "b", label: "Beta" }]);

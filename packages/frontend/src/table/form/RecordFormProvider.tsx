@@ -1,9 +1,6 @@
 import { createContext, useContext, type ReactNode, type Context } from "react";
 import { useStore } from "zustand";
-import type {
-  RecordFormState,
-  RecordFormStore,
-} from "@/table/form/record-form-store";
+import type { RecordFormState, RecordFormStore } from "./record-form-store";
 
 const RecordFormContext: Context<RecordFormStore | null> =
   createContext<RecordFormStore | null>(null);

@@ -1,4 +1,4 @@
-import { uiClient } from "@/platform/client";
+import { uiClient } from "../../platform/client";
 import type { LookupResponse } from "@sapporta/shared/contracts";
 import type { RowId } from "@sapporta/shared/row-id";
 import type { LookupEntry } from "@sapporta/grid/lookup";

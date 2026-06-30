@@ -16,10 +16,10 @@ import {
 import { Button } from "@sapporta/ui/button";
 import { Input } from "@sapporta/ui/input";
 import { Label } from "@sapporta/ui/label";
-import { getApiBase } from "@/platform/base";
-import { useAuthStore } from "@/auth/state/auth-store";
-import { loadProjectInfo } from "@/schema-catalog/actions/metadata";
-import { useSchemaStore } from "@/schema-catalog/state/schema-store";
+import { getApiBase } from "../../platform/base";
+import { useAuthStore } from "../state/auth-store";
+import { loadProjectInfo } from "../../schema-catalog/actions/metadata";
+import { useSchemaStore } from "../../schema-catalog/state/schema-store";
 
 type AuthMode = "login" | "signup" | "forgot" | "reset";
 type VerifyEmailLocationState = { email?: string };

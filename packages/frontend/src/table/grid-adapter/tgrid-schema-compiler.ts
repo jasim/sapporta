@@ -5,7 +5,7 @@ import type {
   TGridLevelConfig,
   TGridLevelQueryConfig,
   TGridLevelsConfigMap,
-} from "@/table/grid-adapter/tgrid-level-config";
+} from "./tgrid-level-config";
 
 // Table schemas keyed by table name. Schema-driven pages need this lookup so a
 // child relation such as `orders -> order_lines` can find the child table's

@@ -2,4 +2,4 @@ export {
   TableRoute,
   type TableGridOptionsByTable,
   type TableRouteProps,
-} from "@/table/route/TableRoute";
+} from "../table/route/TableRoute";

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { fetchTableRows } from "@/table/api/rows";
+import { fetchTableRows } from "../api/rows";
 import type { SortDescriptor } from "@sapporta/grid";
 import type { Row } from "@sapporta/shared/contracts";
 import {

@@ -34,7 +34,7 @@ import { cn } from "@sapporta/ui/cn";
 import {
   gridDatasetAncestorsForPath,
   gridDatasetNodeForRow,
-} from "@/grid-dataset/path";
+} from "../../grid-dataset/path";
 import "./ReportGrid.css";
 
 export type ReportGridLink = {

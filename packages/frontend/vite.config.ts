@@ -3,6 +3,7 @@ import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import dts from "vite-plugin-dts";
 import path from "node:path";
+import { sapportaLibraryEntries } from "../../scripts/sapporta-source-resolution";
 
 export default defineConfig({
   plugins: [
@@ -10,54 +11,25 @@ export default defineConfig({
     tailwindcss(),
     dts({
       tsconfigPath: "./tsconfig.json",
-      compilerOptions: {
-        paths: {
-          "@/*": ["./src/*"],
-        },
-      },
       entryRoot: "src",
       include: ["src"],
       bundleTypes: false,
+      // Keep @sapporta/* imports as public package subpaths in emitted .d.ts.
       aliasesExclude: [/^@sapporta\//],
     }),
   ],
-  resolve: {
-    alias: {
-      "@": path.resolve(__dirname, "./src"),
-    },
-  },
   build: {
     outDir: "dist",
     emptyOutDir: true,
     sourcemap: true,
     cssCodeSplit: false,
     lib: {
-      entry: {
-        index: path.resolve(__dirname, "src/index.ts"),
-        app: path.resolve(__dirname, "src/app/index.ts"),
-        platform: path.resolve(__dirname, "src/platform/index.ts"),
-        schema: path.resolve(__dirname, "src/schema-catalog/index.ts"),
-        auth: path.resolve(__dirname, "src/auth/index.ts"),
-        "auth/runtime": path.resolve(__dirname, "src/auth/runtime.ts"),
-        "auth/pages": path.resolve(__dirname, "src/auth/pages.ts"),
-        "auth/profile": path.resolve(__dirname, "src/auth/profile.ts"),
-        layout: path.resolve(
-          __dirname,
-          "src/shell/components/SidebarShell.tsx",
-        ),
-        shell: path.resolve(__dirname, "src/shell.ts"),
-        "routes/table": path.resolve(__dirname, "src/routes/table.ts"),
-        "routes/new-record": path.resolve(
-          __dirname,
-          "src/routes/new-record.ts",
-        ),
-        report: path.resolve(__dirname, "src/report/index.ts"),
-      },
+      // Build the same JS entrypoints that package.json exports publicly.
+      entry: sapportaLibraryEntries(__dirname),
       formats: ["es"],
     },
     rollupOptions: {
-      external: (id) =>
-        !id.startsWith(".") && !id.startsWith("@/") && !path.isAbsolute(id),
+      external: (id) => !id.startsWith(".") && !path.isAbsolute(id),
       output: {
         entryFileNames: "[name].js",
         chunkFileNames: "chunks/[name]-[hash].js",

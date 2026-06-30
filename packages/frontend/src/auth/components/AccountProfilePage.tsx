@@ -10,9 +10,7 @@ import {
   UserRound,
 } from "lucide-react";
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
-import {
-  Button,
-} from "@sapporta/ui/button";
+import { Button } from "@sapporta/ui/button";
 import {
   Dialog,
   DialogClose,
@@ -29,13 +27,13 @@ import {
   createAuthToken,
   listAuthTokens,
   revokeAuthToken,
-} from "@/auth/api/auth-context";
-import { useAuthStore } from "@/auth/state/auth-store";
+} from "../api/auth-context";
+import { useAuthStore } from "../state/auth-store";
 import {
   formatAuthRole,
   getAccountDisplayName,
   getAccountInitials,
-} from "@/shell/components/AccountMenu";
+} from "../../shell/components/AccountMenu";
 
 export function AccountProfilePage() {
   const session = useAuthStore((s) => s.session);
@@ -390,8 +388,8 @@ function CreatedTokenDialog({
                 New access token created
               </DialogTitle>
               <DialogDescription className="mt-2 text-sap-body text-sap-muted">
-                Copy this token now. It will not be shown again after this
-                popup is closed.
+                Copy this token now. It will not be shown again after this popup
+                is closed.
               </DialogDescription>
             </div>
           </div>

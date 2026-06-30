@@ -20,7 +20,7 @@ import type {
   ColumnSchema as TableColumnSchema,
 } from "@sapporta/shared/contracts";
 import type { ColumnSchema as GridColumnSchema } from "@sapporta/grid";
-import type { TableLookupRegistry } from "@/table/lookup/table-lookup-registry";
+import type { TableLookupRegistry } from "../lookup/table-lookup-registry";
 import type {
   RowFieldName,
   TGridLevelId,

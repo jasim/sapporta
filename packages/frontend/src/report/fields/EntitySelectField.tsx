@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { fetchLookupEntriesForSearch } from "@/lookup/api/lookup";
+import { fetchLookupEntriesForSearch } from "../../lookup/api/lookup";
 import { Combobox } from "@sapporta/ui/combobox";
 
 export function EntitySelectField({
