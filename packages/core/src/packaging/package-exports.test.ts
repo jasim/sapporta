@@ -224,13 +224,31 @@ describe("Sapporta package exports", () => {
         source: `
           import * as frontend from "@sapporta/frontend";
           import * as frontendApp from "@sapporta/frontend/app";
+          import * as frontendAuthProfile from "@sapporta/frontend/auth/profile";
           import * as grid from "@sapporta/grid";
           import * as gridRuntime from "@sapporta/grid/grid";
           import * as ui from "@sapporta/ui";
+          import * as uiButton from "@sapporta/ui/button";
+          import * as uiCn from "@sapporta/ui/cn";
+          import * as uiPopover from "@sapporta/ui/popover";
           import * as shared from "@sapporta/shared";
           import * as contracts from "@sapporta/shared/contracts";
+          import * as sharedError from "@sapporta/shared/error";
 
-          export { frontend, frontendApp, grid, gridRuntime, ui, shared, contracts };
+          export {
+            frontend,
+            frontendApp,
+            frontendAuthProfile,
+            grid,
+            gridRuntime,
+            ui,
+            uiButton,
+            uiCn,
+            uiPopover,
+            shared,
+            sharedError,
+            contracts,
+          };
         `,
       });
     } finally {

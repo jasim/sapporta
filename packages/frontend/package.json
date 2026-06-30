@@ -70,6 +70,11 @@
       "sapporta:source": "./src/auth/pages.ts",
       "default": "./dist/auth/pages.js"
     },
+    "./auth/profile": {
+      "types": "./dist/auth/profile.d.ts",
+      "sapporta:source": "./src/auth/profile.ts",
+      "default": "./dist/auth/profile.js"
+    },
     "./routes/table": {
       "types": "./dist/routes/table.d.ts",
       "sapporta:source": "./src/routes/table.ts",

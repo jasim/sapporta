@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { cn } from "@sapporta/ui";
+import { cn } from "@sapporta/ui/cn";
 
 export interface ReportStat {
   /** Short uppercase label (e.g. "Opening balance"). */

@@ -1,6 +1,6 @@
 import { useState, useRef } from "react";
 import { X } from "lucide-react";
-import { Input } from "@sapporta/ui";
+import { Input } from "@sapporta/ui/input";
 import type { ListInputProps } from "./types";
 
 /** Free-form tag entry for `in` / `nin` on text or number columns.

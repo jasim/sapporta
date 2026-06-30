@@ -6,35 +6,44 @@ import type {
   CreateAuthTokenResponse,
   SwitchActiveWorkspaceBody,
 } from "@sapporta/shared/contracts";
-import { uiClient } from "@/platform/client";
-import { fetchApi } from "@/platform/http";
+import { fetchApi, fetchApiJson } from "@/platform/http";
 
 export async function fetchAuthContext(): Promise<AuthContextResponse> {
-  return uiClient.getAuthContext();
+  return fetchApiJson<AuthContextResponse>("/auth-context");
 }
 
 export async function fetchAuthBootstrapStatus(): Promise<AuthBootstrapStatus> {
-  return uiClient.getAuthBootstrapStatus();
+  return fetchApiJson<AuthBootstrapStatus>("/auth-bootstrap");
 }
 
 export async function switchActiveWorkspace(
   body: SwitchActiveWorkspaceBody,
 ): Promise<AuthContextResponse> {
-  return uiClient.switchActiveWorkspace({ body });
+  return fetchApiJson<AuthContextResponse>("/auth-context/active-workspace", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
 }
 
 export async function listAuthTokens(): Promise<AuthTokenListResponse> {
-  return uiClient.listAuthTokens();
+  return fetchApiJson<AuthTokenListResponse>("/auth-tokens");
 }
 
 export async function createAuthToken(
   body: CreateAuthTokenBody,
 ): Promise<CreateAuthTokenResponse> {
-  return uiClient.createAuthToken({ body });
+  return fetchApiJson<CreateAuthTokenResponse>("/auth-tokens", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
 }
 
 export async function revokeAuthToken(id: string): Promise<void> {
-  await uiClient.revokeAuthToken({ params: { id } });
+  await fetchApi(`/auth-tokens/${encodeURIComponent(id)}`, {
+    method: "DELETE",
+  });
 }
 
 export async function signOut(): Promise<void> {

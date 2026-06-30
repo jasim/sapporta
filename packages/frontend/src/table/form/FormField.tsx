@@ -1,22 +1,18 @@
 import { useState } from "react";
 import { ChevronDown } from "lucide-react";
-import { Input } from "@sapporta/ui";
-import { Label } from "@sapporta/ui";
-import { Checkbox } from "@sapporta/ui";
+import { Button } from "@sapporta/ui/button";
+import { Checkbox } from "@sapporta/ui/checkbox";
+import { ComboboxList } from "@sapporta/ui/combobox";
+import { Input } from "@sapporta/ui/input";
+import { Label } from "@sapporta/ui/label";
+import { Popover, PopoverContent, PopoverTrigger } from "@sapporta/ui/popover";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@sapporta/ui";
-import {
-  Button,
-  ComboboxList,
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@sapporta/ui";
+} from "@sapporta/ui/select";
 import type { LookupCapabilities } from "@sapporta/grid/lookup";
 import { inferDisplayType } from "@/table/model/column-types";
 import type { ColumnSchema } from "@sapporta/shared/contracts";

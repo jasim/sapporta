@@ -30,7 +30,7 @@ import type {
   GridDatasetFooterRow,
   GridDatasetNode,
 } from "@sapporta/shared/grid-dataset";
-import { cn } from "@sapporta/ui";
+import { cn } from "@sapporta/ui/cn";
 import {
   gridDatasetAncestorsForPath,
   gridDatasetNodeForRow,

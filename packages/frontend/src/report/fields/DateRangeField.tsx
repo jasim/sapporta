@@ -9,14 +9,14 @@ import {
   stateFromSelectKey,
   updateCustomBound,
 } from "@/report/params/daterange-picker";
-import { Input } from "@sapporta/ui";
+import { Input } from "@sapporta/ui/input";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@sapporta/ui";
+} from "@sapporta/ui/select";
 
 const SELECT_LABELS: Record<DateRangeSelectKey, string> = {
   all_time: "All time",

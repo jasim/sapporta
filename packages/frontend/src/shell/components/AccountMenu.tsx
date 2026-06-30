@@ -1,12 +1,11 @@
 import {
-  forwardRef,
+  cloneElement,
   useState,
-  type ButtonHTMLAttributes,
+  type MouseEvent,
   type ReactElement,
   type ReactNode,
 } from "react";
 import { ChevronRight, LogOut, UserRound } from "lucide-react";
-import { Button, Popover, PopoverContent, PopoverTrigger } from "@sapporta/ui";
 import type {
   AuthContextResponse,
   AuthCurrentUser,
@@ -94,27 +93,35 @@ export function AccountMenu({
     }
   }
 
-  const trigger = renderTrigger ? (
-    renderTrigger({ displayName, initials, secondaryLabel, open })
-  ) : (
-    <DefaultAccountMenuTrigger
-      displayName={displayName}
-      initials={initials}
-      secondaryLabel={secondaryLabel}
-      open={open}
-      ariaLabel={triggerAriaLabel}
-    />
-  );
+  const trigger = renderTrigger
+    ? withTriggerProps(
+        renderTrigger({ displayName, initials, secondaryLabel, open }),
+        () => setOpen((current) => !current),
+      )
+    : (
+        <DefaultAccountMenuTrigger
+          displayName={displayName}
+          initials={initials}
+          secondaryLabel={secondaryLabel}
+          open={open}
+          ariaLabel={triggerAriaLabel}
+          onClick={() => setOpen((current) => !current)}
+        />
+      );
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>{trigger}</PopoverTrigger>
-      <PopoverContent
-        side="right"
-        align="end"
-        sideOffset={8}
-        className="w-[260px] p-0 text-sap-body"
-      >
+    <div className="relative">
+      {trigger}
+      {open && (
+        <button
+          type="button"
+          aria-label="Close account menu"
+          className="fixed inset-0 z-[calc(var(--sap-z-popover)-1)] cursor-default bg-transparent"
+          onClick={() => setOpen(false)}
+        />
+      )}
+      {open && (
+        <div className="absolute bottom-0 left-full z-[var(--sap-z-popover)] ml-2 w-[260px] rounded-md border border-sap-border bg-popover p-0 text-sap-body text-popover-foreground shadow-md outline-none">
         <div className="border-b border-sap-border-soft px-3 py-3">
           <div className="flex items-center gap-2">
             <AccountAvatar initials={initials} />
@@ -190,8 +197,9 @@ export function AccountMenu({
             {footer}
           </div>
         )}
-      </PopoverContent>
-    </Popover>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -219,40 +227,31 @@ export function formatAuthRole(role: AuthRole): string {
   return role === "owner" ? "Owner" : "Member";
 }
 
-interface DefaultAccountMenuTriggerProps
-  extends
-    AccountMenuTriggerRenderProps,
-    ButtonHTMLAttributes<HTMLButtonElement> {
+interface DefaultAccountMenuTriggerProps extends AccountMenuTriggerRenderProps {
   ariaLabel?: string;
+  className?: string;
+  onClick: () => void;
 }
 
-const DefaultAccountMenuTrigger = forwardRef<
-  HTMLButtonElement,
-  DefaultAccountMenuTriggerProps
->(function DefaultAccountMenuTrigger(
-  {
-    displayName,
-    initials,
-    secondaryLabel,
-    open,
-    ariaLabel,
-    className,
-    ...props
-  },
-  ref,
-) {
+function DefaultAccountMenuTrigger({
+  displayName,
+  initials,
+  secondaryLabel,
+  open,
+  ariaLabel,
+  className,
+  onClick,
+}: DefaultAccountMenuTriggerProps) {
   return (
-    <Button
-      ref={ref}
+    <button
       type="button"
-      variant="ghost"
       aria-label={ariaLabel ?? `Open account menu for ${displayName}`}
       aria-expanded={open}
+      onClick={onClick}
       className={cx(
-        "h-auto w-full justify-start gap-2 rounded-[6px] px-2 py-[7px] text-left hover:bg-sap-row-hover",
+        "inline-flex h-auto w-full items-center justify-start gap-2 rounded-[6px] px-2 py-[7px] text-left text-sap-soft hover:bg-sap-row-hover",
         className,
       )}
-      {...props}
     >
       <AccountAvatar initials={initials} />
       <span className="min-w-0 flex-1">
@@ -268,9 +267,9 @@ const DefaultAccountMenuTrigger = forwardRef<
         className="h-[13px] w-[13px] shrink-0 text-sap-subtle"
         strokeWidth={1.7}
       />
-    </Button>
+    </button>
   );
-});
+}
 
 function AccountAvatar({ initials }: { initials: string }) {
   return (
@@ -286,6 +285,23 @@ function AccountAvatar({ initials }: { initials: string }) {
 
 function errorMessage(err: unknown): string {
   return err instanceof Error ? err.message : "Could not complete action.";
+}
+
+type TriggerElementProps = {
+  "aria-expanded"?: boolean;
+  onClick?: (event: MouseEvent<HTMLElement>) => void;
+};
+
+function withTriggerProps(trigger: ReactElement, onClick: () => void) {
+  const typedTrigger = trigger as ReactElement<TriggerElementProps>;
+  return cloneElement(typedTrigger, {
+    "aria-expanded": true,
+    onClick: (event: MouseEvent<HTMLElement>) => {
+      const currentProps = typedTrigger.props;
+      currentProps.onClick?.(event);
+      if (!event.defaultPrevented) onClick();
+    },
+  });
 }
 
 function cx(...classes: Array<string | false | null | undefined>): string {

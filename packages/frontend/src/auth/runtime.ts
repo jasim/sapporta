@@ -7,7 +7,6 @@ export {
   switchActiveWorkspace,
   signOut,
 } from "./api/auth-context";
-export { AccountProfilePage } from "./components/AccountProfilePage";
 export { AuthGate, PublicOnlyGate } from "./components/AuthGate";
 export {
   useAuthStore,

@@ -13,7 +13,9 @@ import {
   useNavigate,
   useSearchParams,
 } from "react-router-dom";
-import { Button, Input, Label } from "@sapporta/ui";
+import { Button } from "@sapporta/ui/button";
+import { Input } from "@sapporta/ui/input";
+import { Label } from "@sapporta/ui/label";
 import { getApiBase } from "@/platform/base";
 import { useAuthStore } from "@/auth/state/auth-store";
 import { loadProjectInfo } from "@/schema-catalog/actions/metadata";

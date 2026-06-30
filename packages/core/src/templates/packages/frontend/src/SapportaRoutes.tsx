@@ -1,6 +1,6 @@
 import { lazy, Suspense } from "react";
 import { Route } from "react-router-dom";
-import { AccountProfilePage, NotFoundView } from "@sapporta/frontend/app";
+import { NotFoundView } from "@sapporta/frontend/app";
 import { PublicOnlyGate } from "@sapporta/frontend/auth/runtime";
 
 // Load screens on demand so the app starts quickly.
@@ -27,6 +27,11 @@ const ForgotPasswordPage = lazy(() =>
 const ResetPasswordPage = lazy(() =>
   import("@sapporta/frontend/auth/pages").then((m) => ({
     default: m.ResetPasswordPage,
+  })),
+);
+const AccountProfilePage = lazy(() =>
+  import("@sapporta/frontend/auth/profile").then((m) => ({
+    default: m.AccountProfilePage,
   })),
 );
 const TableRoute = lazy(() =>
@@ -97,7 +102,14 @@ export const sapportaPublicRoutes = (
 
 export const sapportaProtectedRoutes = (
   <>
-    <Route path="account/profile" element={<AccountProfilePage />} />
+    <Route
+      path="account/profile"
+      element={
+        <Suspense fallback={<RouteFallback />}>
+          <AccountProfilePage />
+        </Suspense>
+      }
+    />
     <Route
       path="tables/:tableName/new"
       element={

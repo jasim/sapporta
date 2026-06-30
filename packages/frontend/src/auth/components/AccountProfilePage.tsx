@@ -12,6 +12,8 @@ import {
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import {
   Button,
+} from "@sapporta/ui/button";
+import {
   Dialog,
   DialogClose,
   DialogContent,
@@ -19,9 +21,9 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  Input,
-  Label,
-} from "@sapporta/ui";
+} from "@sapporta/ui/dialog";
+import { Input } from "@sapporta/ui/input";
+import { Label } from "@sapporta/ui/label";
 import type { AuthToken } from "@sapporta/shared/contracts";
 import {
   createAuthToken,

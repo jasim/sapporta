@@ -1,4 +1,4 @@
-import { ApiError } from "@sapporta/shared/client";
+import { ApiError } from "@sapporta/shared/error";
 import { getApiBase } from "./base";
 
 export { ApiError };
@@ -9,10 +9,19 @@ export async function fetchApi(
 ): Promise<Response> {
   const response = await fetch(`${getApiBase()}${path}`, {
     credentials: "include",
+    method: init?.method ?? "GET",
     ...init,
   });
   if (response.ok) return response;
   throw new ApiError(response.status, await parseErrorBody(response));
+}
+
+export async function fetchApiJson<T>(
+  path: string,
+  init?: RequestInit,
+): Promise<T> {
+  const response = await fetchApi(path, init);
+  return (await response.json()) as T;
 }
 
 export async function fetchJson<T>(

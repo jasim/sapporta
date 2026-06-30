@@ -1,4 +1,4 @@
-import { Input } from "@sapporta/ui";
+import { Input } from "@sapporta/ui/input";
 import type { ScalarInputComponent, ScalarInputProps } from "./types";
 
 /** Build a scalar text/number/date input. One implementation, three HTML

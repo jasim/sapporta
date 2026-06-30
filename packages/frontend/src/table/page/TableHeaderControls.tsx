@@ -6,7 +6,8 @@ import {
   type ReactNode,
 } from "react";
 import { Search } from "lucide-react";
-import { cn, useDebounce } from "@sapporta/ui";
+import { cn } from "@sapporta/ui/cn";
+import { useDebounce } from "@sapporta/ui/use-debounce";
 
 export function formatRecordCount(totalCount: number): string {
   return `${totalCount} record${totalCount === 1 ? "" : "s"}`;

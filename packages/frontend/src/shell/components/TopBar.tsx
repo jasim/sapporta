@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
-import { cn } from "@sapporta/ui";
-import { Kbd } from "@sapporta/ui";
+import { cn } from "@sapporta/ui/cn";
+import { Kbd } from "@sapporta/ui/kbd";
 
 /**
  * Application top bar. 52px tall, sits on the content surface with a

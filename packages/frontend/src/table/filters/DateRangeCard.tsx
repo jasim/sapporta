@@ -16,8 +16,8 @@ import type {
   FilterCondition,
   NewFilterCondition,
 } from "@sapporta/shared/filter";
-import { Popover, PopoverContent, PopoverTrigger } from "@sapporta/ui";
-import { Input } from "@sapporta/ui";
+import { Input } from "@sapporta/ui/input";
+import { Popover, PopoverContent, PopoverTrigger } from "@sapporta/ui/popover";
 import type { ColumnSchema } from "@sapporta/shared/contracts";
 import { inferDisplayType } from "@/table/model/column-types";
 

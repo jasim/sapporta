@@ -1,6 +1,6 @@
 import { forwardRef, type ReactNode } from "react";
 import { Loader2 } from "lucide-react";
-import { cn } from "@sapporta/ui";
+import { cn } from "@sapporta/ui/cn";
 import type { TablePageMode } from "./table-page-mode";
 import type { TGridSourceStatus } from "./tgrid-source-status";
 

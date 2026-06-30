@@ -12,7 +12,7 @@ import {
 } from "@sapporta/grid";
 import { columnPreset } from "@sapporta/grid/column-preset";
 import type { TableSchema } from "@sapporta/shared/contracts";
-import { cn } from "@sapporta/ui";
+import { cn } from "@sapporta/ui/cn";
 import { relatedRowsTableHref } from "@/table/grid-adapter/tgrid-table-url";
 import type { TGridFilter } from "@/table/grid-adapter/tgrid-filter";
 import type { TGridTableColumnMeta } from "@/table/grid-adapter/tgrid-column-mapper";

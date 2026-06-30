@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Check, MonitorSmartphone, PanelsTopLeft, Table2 } from "lucide-react";
-import { Popover, PopoverContent, PopoverTrigger, cn } from "@sapporta/ui";
+import { cn } from "@sapporta/ui/cn";
+import { Popover, PopoverContent, PopoverTrigger } from "@sapporta/ui/popover";
 import type { TableViewPreference } from "./table-view-pref";
 
 const options: readonly {

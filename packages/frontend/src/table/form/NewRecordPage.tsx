@@ -5,7 +5,7 @@ import type { TableSchema } from "@sapporta/shared/contracts";
 import { ApiError } from "@sapporta/shared/client";
 import type { LookupCapabilities } from "@sapporta/grid/lookup";
 import { TopBar, TopBarButton } from "@/shell/components/TopBar";
-import { Button } from "@sapporta/ui";
+import { Button } from "@sapporta/ui/button";
 import { RecordFormField } from "@/table/form/RecordFormField";
 import { RecordFormProvider } from "@/table/form/RecordFormProvider";
 import {

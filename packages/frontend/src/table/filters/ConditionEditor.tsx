@@ -19,8 +19,8 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@sapporta/ui";
-import { Popover, PopoverContent, PopoverTrigger } from "@sapporta/ui";
+} from "@sapporta/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@sapporta/ui/popover";
 import {
   Command,
   CommandEmpty,
@@ -28,7 +28,7 @@ import {
   CommandInput,
   CommandItem,
   CommandList,
-} from "@sapporta/ui";
+} from "@sapporta/ui/command";
 import {
   catalog,
   findEntryForCondition,

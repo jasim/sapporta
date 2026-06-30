@@ -24,6 +24,9 @@
   "main": "./dist/index.js",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
+  "sideEffects": [
+    "**/*.css"
+  ],
   "files": [
     "dist/",
     "src/",
@@ -42,6 +45,86 @@
     "./index.css": {
       "sapporta:source": "./src/index.css",
       "default": "./dist/index.css"
+    },
+    "./badge": {
+      "types": "./dist/ui/primitives/badge.d.ts",
+      "sapporta:source": "./src/ui/primitives/badge.tsx",
+      "default": "./dist/badge.js"
+    },
+    "./button": {
+      "types": "./dist/ui/primitives/button.d.ts",
+      "sapporta:source": "./src/ui/primitives/button.tsx",
+      "default": "./dist/button.js"
+    },
+    "./checkbox": {
+      "types": "./dist/ui/primitives/checkbox.d.ts",
+      "sapporta:source": "./src/ui/primitives/checkbox.tsx",
+      "default": "./dist/checkbox.js"
+    },
+    "./command": {
+      "types": "./dist/ui/primitives/command.d.ts",
+      "sapporta:source": "./src/ui/primitives/command.tsx",
+      "default": "./dist/command.js"
+    },
+    "./dialog": {
+      "types": "./dist/ui/primitives/dialog.d.ts",
+      "sapporta:source": "./src/ui/primitives/dialog.tsx",
+      "default": "./dist/dialog.js"
+    },
+    "./input": {
+      "types": "./dist/ui/primitives/input.d.ts",
+      "sapporta:source": "./src/ui/primitives/input.tsx",
+      "default": "./dist/input.js"
+    },
+    "./label": {
+      "types": "./dist/ui/primitives/label.d.ts",
+      "sapporta:source": "./src/ui/primitives/label.tsx",
+      "default": "./dist/label.js"
+    },
+    "./popover": {
+      "types": "./dist/ui/primitives/popover.d.ts",
+      "sapporta:source": "./src/ui/primitives/popover.tsx",
+      "default": "./dist/popover.js"
+    },
+    "./select": {
+      "types": "./dist/ui/primitives/select.d.ts",
+      "sapporta:source": "./src/ui/primitives/select.tsx",
+      "default": "./dist/select.js"
+    },
+    "./sheet": {
+      "types": "./dist/ui/primitives/sheet.d.ts",
+      "sapporta:source": "./src/ui/primitives/sheet.tsx",
+      "default": "./dist/sheet.js"
+    },
+    "./switch": {
+      "types": "./dist/ui/primitives/switch.d.ts",
+      "sapporta:source": "./src/ui/primitives/switch.tsx",
+      "default": "./dist/switch.js"
+    },
+    "./combobox": {
+      "types": "./dist/ui/composite/combobox.d.ts",
+      "sapporta:source": "./src/ui/composite/combobox.tsx",
+      "default": "./dist/combobox.js"
+    },
+    "./kbd": {
+      "types": "./dist/ui/composite/kbd.d.ts",
+      "sapporta:source": "./src/ui/composite/kbd.tsx",
+      "default": "./dist/kbd.js"
+    },
+    "./param-pill": {
+      "types": "./dist/ui/composite/param-pill.d.ts",
+      "sapporta:source": "./src/ui/composite/param-pill.tsx",
+      "default": "./dist/param-pill.js"
+    },
+    "./cn": {
+      "types": "./dist/ui/utils/cn.d.ts",
+      "sapporta:source": "./src/ui/utils/cn.ts",
+      "default": "./dist/cn.js"
+    },
+    "./use-debounce": {
+      "types": "./dist/ui/hooks/useDebounce.d.ts",
+      "sapporta:source": "./src/ui/hooks/useDebounce.ts",
+      "default": "./dist/use-debounce.js"
     }
   },
   "scripts": {

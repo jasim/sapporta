@@ -5,7 +5,7 @@ import type {
   NewFilterCondition,
 } from "@sapporta/shared/filter";
 import type { ColumnSchema } from "@sapporta/shared/contracts";
-import { Popover, PopoverContent, PopoverTrigger } from "@sapporta/ui";
+import { Popover, PopoverContent, PopoverTrigger } from "@sapporta/ui/popover";
 import { useLookupValueLabels } from "@sapporta/grid/lookup/react";
 import type { LookupForColumn } from "@/table/lookup/column-lookup";
 import { ConditionEditor } from "./ConditionEditor";

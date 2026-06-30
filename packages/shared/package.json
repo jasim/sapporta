@@ -68,6 +68,11 @@
       "sapporta:source": "./src/row-id.ts",
       "default": "./dist/row-id.js"
     },
+    "./error": {
+      "types": "./dist/error.d.ts",
+      "sapporta:source": "./src/error.ts",
+      "default": "./dist/error.js"
+    },
     "./validation": {
       "types": "./dist/validation/index.d.ts",
       "sapporta:source": "./src/validation/index.ts",

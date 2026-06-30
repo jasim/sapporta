@@ -10,7 +10,7 @@ import { Filter } from "lucide-react";
 import type { NewFilterCondition } from "@sapporta/shared/filter";
 import type { ColumnSchema } from "@sapporta/shared/contracts";
 import type { LookupForColumn } from "@/table/lookup/column-lookup";
-import { Popover, PopoverContent, PopoverTrigger } from "@sapporta/ui";
+import { Popover, PopoverContent, PopoverTrigger } from "@sapporta/ui/popover";
 import { ConditionEditor } from "./ConditionEditor";
 
 export interface CellFilterActionProps {

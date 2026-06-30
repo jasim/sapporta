@@ -29,7 +29,7 @@ import {
   type InitClientReturn,
   type PartialClientInferRequest,
 } from "@sapporta/rest-core";
-import { ApiError } from "../contracts/error.js";
+import { ApiError } from "../error.js";
 
 type SuccessStatus = 200 | 201 | 202 | 204;
 
@@ -136,5 +136,5 @@ export function createApiClient<T extends AppRouter>(
   return wrapThrowing(raw);
 }
 
-export { ApiError } from "../contracts/error.js";
+export { ApiError } from "../error.js";
 export type { ClientInferResponses };

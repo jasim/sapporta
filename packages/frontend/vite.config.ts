@@ -40,6 +40,7 @@ export default defineConfig({
         auth: path.resolve(__dirname, "src/auth/index.ts"),
         "auth/runtime": path.resolve(__dirname, "src/auth/runtime.ts"),
         "auth/pages": path.resolve(__dirname, "src/auth/pages.ts"),
+        "auth/profile": path.resolve(__dirname, "src/auth/profile.ts"),
         layout: path.resolve(
           __dirname,
           "src/shell/components/SidebarShell.tsx",

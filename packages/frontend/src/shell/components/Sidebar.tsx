@@ -1,12 +1,6 @@
 import { type ReactNode, useMemo, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { ListFilter } from "lucide-react";
-import {
-  ComboboxList,
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@sapporta/ui";
 import { useSchemaStore } from "@/schema-catalog/state/schema-store";
 import { AuthAccountMenu } from "./AuthAccountMenu";
 import { SidebarShell } from "./SidebarShell";
@@ -221,40 +215,60 @@ export function NavigationPicker({
     trigger === "rail"
       ? "h-10 w-10 rounded-[6px] inline-flex items-center justify-center text-sap-soft hover:bg-sap-row-hover"
       : "min-w-[56px] h-12 px-2 rounded-[6px] flex flex-col items-center justify-center gap-1 text-sap-label text-sap-soft";
+  const panelClass =
+    trigger === "rail"
+      ? "absolute bottom-0 left-full ml-3 w-[min(360px,calc(100vw-24px))]"
+      : "absolute bottom-full right-0 mb-2 w-[min(360px,calc(100vw-24px))]";
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
+    <div className="relative">
+      <button
+        type="button"
+        className={buttonClass}
+        title="Open navigation"
+        aria-label="Open navigation"
+        aria-expanded={open}
+        onClick={() => setOpen((current) => !current)}
+      >
+        <ListFilter className="h-[17px] w-[17px]" strokeWidth={1.5} />
+        {trigger === "mobile" && <span>Browse</span>}
+      </button>
+      {open && (
         <button
           type="button"
-          className={buttonClass}
-          title="Open navigation"
-          aria-label="Open navigation"
-        >
-          <ListFilter className="h-[17px] w-[17px]" strokeWidth={1.5} />
-          {trigger === "mobile" && <span>Browse</span>}
-        </button>
-      </PopoverTrigger>
-      <PopoverContent
-        align={trigger === "rail" ? "end" : "center"}
-        side={trigger === "rail" ? "right" : "top"}
-        sideOffset={trigger === "rail" ? 12 : 8}
-        className="w-[min(360px,calc(100vw-24px))] p-0"
-      >
-        <ComboboxList
-          value={activeItem?.to ?? null}
-          options={options}
-          onPick={(path) => {
-            if (path) {
-              navigate(path);
-            }
-            setOpen(false);
-          }}
-          allowClear={false}
-          listClassName="max-h-[320px]"
+          aria-label="Close navigation"
+          className="fixed inset-0 z-[calc(var(--sap-z-popover)-1)] cursor-default bg-transparent"
+          onClick={() => setOpen(false)}
         />
-      </PopoverContent>
-    </Popover>
+      )}
+      {open && (
+        <div
+          className={cx(
+            panelClass,
+            "z-[var(--sap-z-popover)] max-h-[320px] overflow-y-auto rounded-md border border-sap-border bg-popover p-1 text-sap-body text-popover-foreground shadow-md",
+          )}
+        >
+          {options.map((option) => (
+            <button
+              key={option.id}
+              type="button"
+              className={cx(
+                "flex w-full items-center rounded-[4px] px-2 py-[7px] text-left text-sap-data hover:bg-sap-row-hover hover:text-sap-fg",
+                activeItem?.to === option.id
+                  ? "bg-sap-active-nav font-[650] text-sap-fg"
+                  : "text-sap-soft",
+              )}
+              onClick={() => {
+                navigate(option.id);
+                setOpen(false);
+              }}
+            >
+              <span className="truncate">{option.label}</span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
 

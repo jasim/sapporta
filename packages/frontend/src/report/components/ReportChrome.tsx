@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { Loader2, Play } from "lucide-react";
 import { TopBar } from "@/shell/components/TopBar";
-import { cn } from "@sapporta/ui";
+import { cn } from "@sapporta/ui/cn";
 
 export interface ReportScreenFrameProps {
   title: string;

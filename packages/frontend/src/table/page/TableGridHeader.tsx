@@ -14,7 +14,7 @@ import {
   SheetDescription,
   SheetHeader,
   SheetTitle,
-} from "@sapporta/ui";
+} from "@sapporta/ui/sheet";
 import { TopBar, TopBarButton } from "@/shell/components/TopBar";
 import { FilterCardsBar } from "@/table/filters/FilterCardsBar";
 import type {
