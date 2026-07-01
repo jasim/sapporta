@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type RefObject } from "react";
+import { useLayoutEffect, useRef, useState, type RefObject } from "react";
 import type { GridPresentation } from "@sapporta/grid";
 import type { TableViewPreference } from "./table-view-pref";
 
@@ -14,8 +14,16 @@ export function resolveTableGridPresentation(args: {
   mode: TablePageMode;
   preference: TableViewPreference;
 }): GridPresentation {
-  if (args.mode === "narrowCards") return "cards";
-  return args.preference === "cards" ? "cards" : "tabular";
+  if (args.preference === "auto") {
+    return args.mode === "narrowCards" ? "cards" : "tabular";
+  }
+
+  return args.preference;
+}
+
+function initialTablePageMode(): TablePageMode {
+  if (typeof window === "undefined") return "wide";
+  return resolveTablePageMode(window.innerWidth);
 }
 
 export function useTablePageMode(): {
@@ -23,9 +31,9 @@ export function useTablePageMode(): {
   mode: TablePageMode;
 } {
   const ref = useRef<HTMLDivElement>(null);
-  const [mode, setMode] = useState<TablePageMode>("wide");
+  const [mode, setMode] = useState<TablePageMode>(initialTablePageMode);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const element = ref.current;
     if (!element) return;
 
