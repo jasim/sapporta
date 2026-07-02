@@ -39,6 +39,17 @@ describe("ReportGridDataset", () => {
     return container;
   }
 
+  async function rerenderClient(
+    element: ReactElement,
+    options: { strict?: boolean } = {},
+  ): Promise<void> {
+    await act(async () => {
+      mounted?.root.render(
+        options.strict ? createElement(StrictMode, null, element) : element,
+      );
+    });
+  }
+
   async function waitForText(
     container: HTMLElement,
     text: string,
@@ -52,6 +63,38 @@ describe("ReportGridDataset", () => {
     throw new Error(
       `Expected rendered text "${text}", got "${container.textContent}"`,
     );
+  }
+
+  function hasDisposedRuntimeError(
+    calls: Parameters<typeof console.error>[],
+  ): boolean {
+    return calls.some((call) =>
+      call.some((arg) => String(arg).includes("GridRuntime has been disposed")),
+    );
+  }
+
+  function replacementDataset(rowKey: string, account: string): GridDataset {
+    return {
+      name: `trial-balance-${rowKey}`,
+      label: `Trial Balance ${rowKey}`,
+      rootLevel: "account",
+      levels: {
+        account: {
+          columns: [
+            { id: "account", label: "Account", kind: "text" },
+            { id: "debit", label: "Debit", kind: "number" },
+          ],
+          childLevels: [],
+        },
+      },
+      nodes: [
+        {
+          rowKey,
+          levelName: "account",
+          columns: { account, debit: 125 },
+        },
+      ],
+    };
   }
 
   it("renders nested rows with app-owned row and cell links", async () => {
@@ -233,41 +276,100 @@ describe("ReportGridDataset", () => {
       await waitForText(container, "Cash");
       expect(container.textContent).toContain("Cash");
       expect(container.textContent).toContain("125");
-      expect(
-        consoleError.mock.calls.some((call) =>
-          call.some((arg) =>
-            String(arg).includes("GridRuntime has been disposed"),
-          ),
-        ),
-      ).toBe(false);
+      expect(hasDisposedRuntimeError(consoleError.mock.calls)).toBe(false);
       expect(container.textContent).not.toContain("Loading report...");
     } finally {
       consoleError.mockRestore();
     }
   });
 
-  it("replaces the StrictMode replayed session instead of reusing a disposed runtime", async () => {
+  it("keeps default-expanded nested rows open after StrictMode effect replay", async () => {
     const dataset = {
-      name: "trial-balance",
-      label: "Trial Balance",
+      name: "account-ledger",
+      label: "Account Ledger",
       rootLevel: "account",
       levels: {
         account: {
-          columns: [
-            { id: "account", label: "Account", kind: "text" },
-            { id: "debit", label: "Debit", kind: "number" },
-          ],
+          columns: [{ id: "name", label: "Account", kind: "text" }],
+          childLevels: ["entry"],
+        },
+        entry: {
+          columns: [{ id: "description", label: "Description", kind: "text" }],
           childLevels: [],
         },
       },
       nodes: [
         {
-          rowKey: "cash",
+          rowKey: "acct-1",
           levelName: "account",
-          columns: { account: "Cash", debit: 125 },
+          columns: { name: "Cash" },
+          children: {
+            entry: [
+              {
+                rowKey: "journal-1",
+                levelName: "entry",
+                columns: { description: "Opening balance" },
+              },
+            ],
+          },
         },
       ],
     } satisfies GridDataset;
+
+    const consoleError = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => {});
+    try {
+      const container = await renderClient(
+        createElement(ReportGridDataset, { dataset }),
+        { strict: true },
+      );
+
+      await waitForText(container, "Opening balance");
+      expect(container.textContent).toContain("Cash");
+      expect(container.textContent).toContain("Opening balance");
+      expect(hasDisposedRuntimeError(consoleError.mock.calls)).toBe(false);
+    } finally {
+      consoleError.mockRestore();
+    }
+  });
+
+  it.each([
+    { strict: false, mode: "ordinary" },
+    { strict: true, mode: "StrictMode" },
+  ])(
+    "replaces the report session on $mode dataset replacement",
+    async ({ strict }) => {
+      const datasetA = replacementDataset("cash", "Cash");
+      const datasetB = replacementDataset("receivables", "Receivables");
+
+      const consoleError = vi
+        .spyOn(console, "error")
+        .mockImplementation(() => {});
+      try {
+        const container = await renderClient(
+          createElement(ReportGridDataset, { dataset: datasetA }),
+          { strict },
+        );
+
+        await waitForText(container, "Cash");
+        await rerenderClient(
+          createElement(ReportGridDataset, { dataset: datasetB }),
+          { strict },
+        );
+        await waitForText(container, "Receivables");
+
+        expect(container.textContent).toContain("Receivables");
+        expect(container.textContent).not.toContain("Cash");
+        expect(hasDisposedRuntimeError(consoleError.mock.calls)).toBe(false);
+      } finally {
+        consoleError.mockRestore();
+      }
+    },
+  );
+
+  it("unmounts a StrictMode report session without reading a disposed runtime", async () => {
+    const dataset = replacementDataset("cash", "Cash");
 
     const consoleError = vi
       .spyOn(console, "error")
@@ -285,13 +387,7 @@ describe("ReportGridDataset", () => {
       mounted?.container.remove();
       mounted = null;
 
-      expect(
-        consoleError.mock.calls.some((call) =>
-          call.some((arg) =>
-            String(arg).includes("GridRuntime has been disposed"),
-          ),
-        ),
-      ).toBe(false);
+      expect(hasDisposedRuntimeError(consoleError.mock.calls)).toBe(false);
     } finally {
       consoleError.mockRestore();
     }

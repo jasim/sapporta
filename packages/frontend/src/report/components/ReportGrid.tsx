@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useLayoutEffect, useMemo, type ReactNode } from "react";
 import {
   CELL_GRID_WITH_ACTIVE_ROW,
   childPath,
@@ -10,6 +10,7 @@ import {
   makeRowId,
   rootPath,
   trailingEdge,
+  useGridRuntimeEffect,
   withRowExpansionColumn,
   type CellRenderProps,
   type ColumnSchema,
@@ -73,14 +74,17 @@ export type ReportGridLinkResolvers<TInput = unknown> = Record<
   }
 >;
 
-export type ReportGridSession = {
+export type ReportGridBinding = {
   dataset: GridDataset;
   runtime: GridRuntime;
   root: GridPath;
+};
+
+export type DisposableReportGridSession = ReportGridBinding & {
   dispose(): void;
 };
 
-export type CreateReportGridSessionArgs<TInput = unknown> = {
+export type ReportGridResourceArgs<TInput = unknown> = {
   dataset: GridDataset;
   links?: ReportGridLinkResolvers<TInput>;
   input?: TInput;
@@ -97,9 +101,19 @@ export function ReportGrid<TInput = unknown>({
   links,
   input,
 }: ReportGridProps<TInput>) {
-  const session = useReportGridSession({ dataset, links, input });
+  const runtime = useGridRuntimeEffect(
+    () => {
+      const model = buildReportGridModel(dataset, links, input);
+      return createGridRuntime({
+        schema: model.schema,
+        dataSource: model.dataSource,
+        interaction: CELL_GRID_WITH_ACTIVE_ROW,
+      });
+    },
+    [dataset, links, input],
+  );
 
-  if (!session) {
+  if (!runtime) {
     return (
       <div className="sapporta-report-tgrid min-w-full text-sap-muted">
         Loading report...
@@ -107,33 +121,55 @@ export function ReportGrid<TInput = unknown>({
     );
   }
 
-  return <ReportGridView session={session} />;
+  return (
+    <GridRuntimeProvider runtime={runtime}>
+      <ReportGridBody
+        session={{ dataset, runtime, root: rootPath(dataset.rootLevel) }}
+      />
+    </GridRuntimeProvider>
+  );
 }
 
-export function useReportGridSession<TInput = unknown>({
+export function useReportGridBinding<TInput = unknown>({
   dataset,
   links,
   input,
-}: CreateReportGridSessionArgs<TInput>): ReportGridSession | null {
-  const [session, setSession] = useState<ReportGridSession | null>(null);
+}: ReportGridResourceArgs<TInput>): ReportGridBinding | null {
+  const runtime = useGridRuntimeEffect(
+    () => {
+      const model = buildReportGridModel(dataset, links, input);
+      return createGridRuntime({
+        schema: model.schema,
+        dataSource: model.dataSource,
+        interaction: CELL_GRID_WITH_ACTIVE_ROW,
+      });
+    },
+    [dataset, links, input],
+  );
 
-  useEffect(() => {
-    const next = createReportGridSession({ dataset, links, input });
-    setSession(next);
-    return () => {
-      next.dispose();
-      setSession((current) => (current === next ? null : current));
-    };
-  }, [dataset, links, input]);
+  useLayoutEffect(() => {
+    if (!runtime) return;
+    expandDefaultReportRows(runtime, dataset);
+  }, [dataset, runtime]);
 
-  return session;
+  return useMemo<ReportGridBinding | null>(
+    () =>
+      runtime
+        ? {
+            dataset,
+            runtime,
+            root: rootPath(dataset.rootLevel),
+          }
+        : null,
+    [dataset, runtime],
+  );
 }
 
 export function createReportGridSession<TInput = unknown>({
   dataset,
   links,
   input,
-}: CreateReportGridSessionArgs<TInput>): ReportGridSession {
+}: ReportGridResourceArgs<TInput>): DisposableReportGridSession {
   const model = buildReportGridModel(dataset, links, input);
   const runtime = createGridRuntime({
     schema: model.schema,
@@ -149,14 +185,24 @@ export function createReportGridSession<TInput = unknown>({
   };
 }
 
-export function ReportGridView({ session }: { session: ReportGridSession }) {
+export function ReportGridView({ session }: { session: ReportGridBinding }) {
+  return (
+    <GridRuntimeProvider runtime={session.runtime}>
+      <ReportGridBody session={session} />
+    </GridRuntimeProvider>
+  );
+}
+
+function ReportGridBody({ session }: { session: ReportGridBinding }) {
   const chrome = useReportGridChrome();
+
+  useLayoutEffect(() => {
+    expandDefaultReportRows(session.runtime, session.dataset);
+  }, [session.dataset, session.runtime]);
 
   return (
     <div className="sapporta-report-tgrid min-w-full">
-      <GridRuntimeProvider runtime={session.runtime}>
-        <GridLevel path={session.root} chrome={chrome} presentation="tabular" />
-      </GridRuntimeProvider>
+      <GridLevel path={session.root} chrome={chrome} presentation="tabular" />
     </div>
   );
 }
@@ -284,7 +330,7 @@ function expandNodesAtPath({
     const childEntries = Object.entries(node.children ?? {});
     if (childEntries.length === 0) continue;
 
-    runtime.coordinator.toggleExpand(path, makeRowId(path, node.rowKey));
+    runtime.coordinator.expand(path, makeRowId(path, node.rowKey));
     for (const [childLevelName, childNodes] of childEntries) {
       expandNodesAtPath({
         runtime,

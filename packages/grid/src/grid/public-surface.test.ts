@@ -18,9 +18,13 @@ describe("grid public surface", () => {
 
     expect(typeof mod.createGridRuntime).toBe("function");
     expect(typeof mod.GridRuntimeProvider).toBe("function");
+    expect(typeof mod.useGridRuntimeEffect).toBe("function");
     expect(typeof mod.GridLevel).toBe("function");
     expect(typeof mod.inMemoryGridDataSource).toBe("function");
     expect(typeof mod.restGridDataSource).toBe("function");
+    expect(mod).not.toHaveProperty("GridRuntimeRoot");
+    expect(mod).not.toHaveProperty("useCommittedDisposableResource");
+    expect(mod).not.toHaveProperty("useGridRuntimeResource");
     expect(mod).not.toHaveProperty("inMemoryLevelSource");
     expect(mod).not.toHaveProperty("restLevelSource");
   });

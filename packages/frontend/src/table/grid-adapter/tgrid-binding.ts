@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useRef } from "react";
 import { useStore } from "zustand";
 import type { StoreApi } from "zustand/vanilla";
 import type {
@@ -23,6 +23,7 @@ import type {
   TGridRowsByLevel,
   TGridTableRow,
 } from "./tgrid-types";
+import { useCommittedDisposableResource } from "./use-committed-disposable-resource";
 
 // Table metadata for callers that choose the table name at the use site.
 export type TGridTableSchemaInput = Omit<TableSchema, "name">;
@@ -86,21 +87,10 @@ export function useTGridSession<
     routeQuerySeeds: args.routeQuerySeeds,
   };
 
-  const [session, setSession] = useState<TGridSession<
-    RowsByLevel,
-    AppServices
-  > | null>(null);
-
-  useEffect(() => {
-    const next = createTGridSessionWithRef(definition, liveInputsRef);
-    setSession(next);
-    return () => {
-      next.dispose();
-      setSession((current) => (current === next ? null : current));
-    };
-  }, [definition]);
-
-  return session;
+  return useCommittedDisposableResource(
+    () => createTGridSessionWithRef(definition, liveInputsRef),
+    [definition],
+  );
 }
 
 export function createColumnsBuilder<

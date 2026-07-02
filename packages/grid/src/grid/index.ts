@@ -28,14 +28,18 @@
 //
 //   import {
 //     createGridRuntime, GridRuntimeProvider, GridLevel, rootPath,
-//     inMemoryGridDataSource,
+//     inMemoryGridDataSource, useGridRuntimeEffect,
 //   } from "../grid";
 //
-//   const runtime = createGridRuntime({
-//     schema,
-//     dataSource: inMemoryGridDataSource({ schema, tree, levels }),
-//     on: { mutationCommitted, ... },
-//   });
+//   const runtime = useGridRuntimeEffect(() => {
+//     return createGridRuntime({
+//       schema,
+//       dataSource: inMemoryGridDataSource({ schema, tree, levels }),
+//       on: { mutationCommitted, ... },
+//     });
+//   }, [schema, tree, levels, mutationCommitted]);
+//
+//   if (!runtime) return <Loading />;
 //
 //   <GridRuntimeProvider runtime={runtime}>
 //     <GridLevel path={rootPath(schema.rootLevel)} />
@@ -383,6 +387,7 @@ export {
 
 export {
   GridRuntimeProvider,
+  useGridRuntimeEffect,
   useActiveCell,
   useActiveCellForPath,
   useActiveRow,

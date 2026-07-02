@@ -124,6 +124,8 @@ function fakeRuntimeWithRows(rows: LevelRow[]): GridRuntime {
         expansion: new Map<GridPath, Set<RowId>>(),
       }),
       subscribe: () => () => {},
+      expand: () => {},
+      collapse: () => {},
       toggleExpand: () => {},
       navigateCell: () => {},
       navigateRow: () => {},

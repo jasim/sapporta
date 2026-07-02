@@ -894,6 +894,27 @@ describe("GridCoordinator", () => {
     expect(rt.coordinator.getState().expansion.get(root)).toBeUndefined();
   });
 
+  it("expand and collapse are idempotent", () => {
+    const ds = inMemoryGridDataSource({
+      schema: reportSchema,
+      tree,
+      levels: {
+        cat: { sortMode: "none", filterMode: "none", paginationMode: "none" },
+        items: { sortMode: "none", filterMode: "none", paginationMode: "none" },
+      },
+    });
+    const rt = createGridRuntime({ schema: reportSchema, dataSource: ds });
+    const id = makeRowId(root, "Fruit");
+
+    rt.coordinator.expand(root, id);
+    rt.coordinator.expand(root, id);
+    expect(rt.coordinator.getState().expansion.get(root)?.has(id)).toBe(true);
+
+    rt.coordinator.collapse(root, id);
+    rt.coordinator.collapse(root, id);
+    expect(rt.coordinator.getState().expansion.get(root)).toBeUndefined();
+  });
+
   // The visible sequence under the new model interleaves children
   // between their owning parent rows. With Fruit and Veg both expanded:
   //   Fruit → Apple → Banana → Veg → Carrot

@@ -68,6 +68,8 @@ export type CoordinatorState = {
 };
 
 export interface GridCoordinatorVerbs {
+  expand: (path: GridPath, rowId: RowId) => void;
+  collapse: (path: GridPath, rowId: RowId) => void;
   toggleExpand: (path: GridPath, rowId: RowId) => void;
   navigateCell: (fromPath: GridPath, intent: CellNavigationIntent) => void;
   navigateRow: (fromPath: GridPath, intent: RowNavigationIntent) => void;
@@ -138,24 +140,40 @@ export function createGridCoordinator(
     store.setState({ ...cur, rowCursor: cursor }, true);
   };
 
+  store.expand = (path, rowId) => {
+    setExpanded(path, rowId, true);
+  };
+
+  store.collapse = (path, rowId) => {
+    setExpanded(path, rowId, false);
+  };
+
   store.toggleExpand = (path, rowId) => {
     const cur = store.getState();
     const at = cur.expansion.get(path);
-    const willExpand = !(at && at.has(rowId));
+    setExpanded(path, rowId, !(at && at.has(rowId)));
+  };
+
+  function setExpanded(path: GridPath, rowId: RowId, expanded: boolean): void {
+    const cur = store.getState();
+    const at = cur.expansion.get(path);
+    const currentlyExpanded = at?.has(rowId) ?? false;
+    if (currentlyExpanded === expanded) return;
+
     // Resolve child sources BEFORE we mutate state — readers of
     // `expansion` (GridLevel) sample `runtime.materializedChildren` on
     // the next render, and the runtime's onExpand is what populates
     // the registry with the new child paths.
-    if (willExpand) args.onExpand?.(path, rowId);
+    if (expanded) args.onExpand?.(path, rowId);
     const nextSet = new Set(at ?? []);
-    if (nextSet.has(rowId)) nextSet.delete(rowId);
-    else nextSet.add(rowId);
+    if (expanded) nextSet.add(rowId);
+    else nextSet.delete(rowId);
     const nextExpansion = new Map(cur.expansion);
     if (nextSet.size === 0) nextExpansion.delete(path);
     else nextExpansion.set(path, nextSet);
     store.setState({ ...cur, expansion: nextExpansion }, true);
 
-    if (!willExpand) {
+    if (!expanded) {
       const runtime = args.getRuntime();
       const cursorManager = args.getCursorManager();
       const cellCursor = cur.cellCursor;
@@ -202,7 +220,7 @@ export function createGridCoordinator(
         }
       }
     }
-  };
+  }
 
   function rowMoveFor(intent: CellNavigationIntent): {
     direction: RowDirection;

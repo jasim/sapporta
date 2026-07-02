@@ -1,3 +1,4 @@
+export { useGridRuntimeEffect } from "./GridRuntimeEffect";
 export {
   GridRuntimeProvider,
   useActiveCell,

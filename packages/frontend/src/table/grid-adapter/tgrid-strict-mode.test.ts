@@ -69,6 +69,30 @@ const definition = defineTGrid<RowsByLevel>({
   },
 });
 
+function definitionWithCustomer(customer: string) {
+  const replacementRowsClient: TableRowsClient = {
+    fetch: vi.fn(async () => ({
+      data: [{ id: "1", customer }],
+      meta: { total: 1, page: 1, limit: 50, pages: 1 },
+    })),
+    create: vi.fn(async (_table, data) => ({ data })),
+    update: vi.fn(async (_table, _id, data) => ({ data })),
+    remove: vi.fn(async (_table, id) => ({ data: { id } })),
+  };
+
+  return defineTGrid<RowsByLevel>({
+    rootLevel: "orders",
+    levels: {
+      orders: {
+        table: ordersTable,
+        childLevels: [],
+        query: { owner: "host" },
+        rowsClient: replacementRowsClient,
+      },
+    },
+  });
+}
+
 const OrdersTGrid = TGrid as (props: {
   session: TGridSession<RowsByLevel, unknown>;
 }) => ReactElement;
@@ -89,6 +113,20 @@ function CustomGridView() {
   return createElement(OrdersTGrid, { session });
 }
 
+function ReplaceableGridView({
+  definition,
+}: {
+  definition: ReturnType<typeof definitionWithCustomer>;
+}) {
+  const session = useTGridSession(definition);
+
+  if (!session) return createElement("div", null, "loading");
+
+  session.runtime.sourceFor(rootPath("orders"));
+
+  return createElement(OrdersTGrid, { session });
+}
+
 async function renderStrict(element: ReactElement): Promise<{
   container: HTMLDivElement;
   root: Root;
@@ -100,6 +138,36 @@ async function renderStrict(element: ReactElement): Promise<{
     root.render(createElement(StrictMode, null, element));
   });
   return { container, root };
+}
+
+async function renderClient(
+  element: ReactElement,
+  options: { strict?: boolean } = {},
+): Promise<{
+  container: HTMLDivElement;
+  root: Root;
+}> {
+  const container = document.createElement("div");
+  document.body.append(container);
+  const root = createRoot(container);
+  await act(async () => {
+    root.render(
+      options.strict ? createElement(StrictMode, null, element) : element,
+    );
+  });
+  return { container, root };
+}
+
+async function rerenderClient(
+  root: Root,
+  element: ReactElement,
+  options: { strict?: boolean } = {},
+): Promise<void> {
+  await act(async () => {
+    root.render(
+      options.strict ? createElement(StrictMode, null, element) : element,
+    );
+  });
 }
 
 async function waitForText(
@@ -122,6 +190,14 @@ async function unmount(root: Root, container: HTMLElement): Promise<void> {
     root.unmount();
   });
   container.remove();
+}
+
+function hasDisposedRuntimeError(
+  calls: Parameters<typeof console.error>[],
+): boolean {
+  return calls.some((call) =>
+    call.some((arg) => String(arg).includes("GridRuntime has been disposed")),
+  );
 }
 
 describe("TGrid StrictMode lifecycle", () => {
@@ -178,4 +254,39 @@ describe("TGrid StrictMode lifecycle", () => {
       consoleError.mockRestore();
     }
   });
+
+  it.each([
+    { strict: false, mode: "ordinary" },
+    { strict: true, mode: "StrictMode" },
+  ])(
+    "replaces a hook-owned session on $mode definition replacement",
+    async ({ strict }) => {
+      const definitionA = definitionWithCustomer("Acme");
+      const definitionB = definitionWithCustomer("Beta");
+      const consoleError = vi
+        .spyOn(console, "error")
+        .mockImplementation(() => {});
+
+      try {
+        mounted = await renderClient(
+          createElement(ReplaceableGridView, { definition: definitionA }),
+          { strict },
+        );
+
+        await waitForText(mounted.container, "Acme");
+        await rerenderClient(
+          mounted.root,
+          createElement(ReplaceableGridView, { definition: definitionB }),
+          { strict },
+        );
+        await waitForText(mounted.container, "Beta");
+
+        expect(mounted.container.textContent).toContain("Beta");
+        expect(mounted.container.textContent).not.toContain("Acme");
+        expect(hasDisposedRuntimeError(consoleError.mock.calls)).toBe(false);
+      } finally {
+        consoleError.mockRestore();
+      }
+    },
+  );
 });
