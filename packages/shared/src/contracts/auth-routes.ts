@@ -35,7 +35,7 @@ export const getAuthBootstrapStatusRoute = c.query({
   method: "GET",
   path: "/auth-bootstrap",
   summary: "Read whether the browser should show sign-up",
-  metadata: { tags: ["auth"] },
+  metadata: { tags: ["auth"], openapi: { include: false } },
   responses: {
     200: authBootstrapStatusSchema,
   },

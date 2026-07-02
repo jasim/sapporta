@@ -157,6 +157,18 @@ function parseMaybe(schema: unknown, value: unknown): unknown {
   return isZodSchema(schema) ? schema.parse(value) : value;
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return !!value && typeof value === "object";
+}
+
+function routeShouldAppearInOpenApi(route: AppRoute): boolean {
+  const metadata = route.metadata;
+  if (!isRecord(metadata)) return true;
+  const openapi = metadata.openapi;
+  if (!isRecord(openapi)) return true;
+  return openapi.include !== false;
+}
+
 function responseContentType(route: AppRoute, status: number): ContentType {
   const res = (route.responses as Record<number, unknown>)[status];
   if (res && typeof res === "object" && "contentType" in res && "body" in res) {
@@ -400,6 +412,7 @@ export class TsRestApi<E extends Env = Env, DocCtx = void> extends Hono<E> {
     const prefix = options?.pathPrefix ?? "";
     for (const emit of this.docEmitters) {
       for (const [rawKey, route] of Object.entries(emit(ctx))) {
+        if (!routeShouldAppearInOpenApi(route)) continue;
         const finalPath = prefix + route.path;
         const pk = routeKey(route.method, finalPath);
         if (seenPaths.has(pk)) {

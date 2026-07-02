@@ -129,6 +129,114 @@ describe("openapi smoke — built-in sub-apps in /openapi.json", () => {
     expect(spec.paths["/api/meta/sql"].post.responses).toHaveProperty("403");
   });
 
+  it("omits contract routes with metadata.openapi.include false from OpenAPI only", async () => {
+    const c = initContract();
+    const publicRoute = c.query({
+      method: "GET",
+      path: "/public-status",
+      summary: "Public status",
+      responses: {
+        200: z.object({ ok: z.boolean() }),
+      },
+    });
+    const setupOnlyRoute = c.query({
+      method: "GET",
+      path: "/setup-status",
+      summary: "Setup status",
+      metadata: { openapi: { include: false } },
+      responses: {
+        200: z.object({ secret: z.string() }),
+      },
+    });
+
+    const { app } = await createIntegrationApp({
+      configureApi: (api) => {
+        api.register("publicStatus", publicRoute, () => ({
+          status: 200,
+          body: { ok: true },
+        }));
+        api.register("setupStatus", setupOnlyRoute, () => ({
+          status: 200,
+          body: { secret: "setup-only" },
+        }));
+      },
+    });
+
+    const runtimeResponse = await app.request("/api/setup-status");
+    expect(runtimeResponse.status).toBe(200);
+    await expect(runtimeResponse.json()).resolves.toEqual({
+      secret: "setup-only",
+    });
+
+    const specResponse = await app.request("/api/openapi.json");
+    expect(specResponse.status).toBe(200);
+    const spec = (await specResponse.json()) as {
+      paths: Record<string, unknown>;
+    };
+    expect(spec.paths["/api/public-status"]).toBeDefined();
+    expect(spec.paths["/api/setup-status"]).toBeUndefined();
+  });
+
+  it("omits registerFamily routes with metadata.openapi.include false", async () => {
+    const c = initContract();
+    const visibleFamilyRoute = c.query({
+      method: "GET",
+      path: "/family/visible",
+      responses: {
+        200: z.object({ name: z.string() }),
+      },
+    });
+    const hiddenFamilyRoute = c.query({
+      method: "GET",
+      path: "/family/hidden",
+      metadata: { openapi: { include: false } },
+      responses: {
+        200: z.object({ name: z.string() }),
+      },
+    });
+
+    const { app } = await createIntegrationApp({
+      configureApi: (api) => {
+        api.registerFamily({
+          method: "get",
+          genericPath: "/family/:name",
+          docs: () => ({
+            visibleFamily: visibleFamilyRoute,
+            hiddenFamily: hiddenFamilyRoute,
+          }),
+          dispatch: (context) => {
+            const name = context.req.param("name");
+            if (name === "hidden") {
+              return {
+                route: hiddenFamilyRoute,
+                handler: () => ({ status: 200, body: { name } }),
+              };
+            }
+            if (name === "visible") {
+              return {
+                route: visibleFamilyRoute,
+                handler: () => ({ status: 200, body: { name } }),
+              };
+            }
+            return undefined;
+          },
+        });
+      },
+    });
+
+    const runtimeResponse = await app.request("/api/family/hidden");
+    expect(runtimeResponse.status).toBe(200);
+    await expect(runtimeResponse.json()).resolves.toEqual({ name: "hidden" });
+
+    const specResponse = await app.request("/api/openapi.json");
+    expect(specResponse.status).toBe(200);
+    const spec = (await specResponse.json()) as {
+      paths: Record<string, unknown>;
+    };
+    expect(spec.paths["/api/family/visible"]).toBeDefined();
+    expect(spec.paths["/api/family/hidden"]).toBeUndefined();
+  });
+
   it("serves app-owned report routes through the app API and OpenAPI", async () => {
     const c = initContract();
     const trialBalanceRoute = c.query({

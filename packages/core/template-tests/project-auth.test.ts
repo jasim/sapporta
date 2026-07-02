@@ -18,6 +18,7 @@ import {
   workspaceGlobalOnlyAuthority,
   workspaceUserScopedAuthority,
 } from "@sapporta/server";
+import { getAuthBootstrapStatusRoute } from "@sapporta/shared/contracts";
 import type { BetterAuthSessionApi } from "../src/templates/project-auth/better-auth.js";
 import {
   resolveSapportaAuthContext,
@@ -509,9 +510,7 @@ describe("project auth template", () => {
 
     expect(emptyResponse.status).toBe(200);
     await expect(emptyResponse.json()).resolves.toEqual({
-      userCount: 0,
-      workspaceCount: 0,
-      isEmpty: true,
+      shouldShowSignUp: true,
     });
 
     conn.sqlite
@@ -523,10 +522,13 @@ describe("project auth template", () => {
     const responseWithUser = await app.request("/api/auth-bootstrap");
 
     expect(responseWithUser.status).toBe(200);
-    await expect(responseWithUser.json()).resolves.toEqual({
-      userCount: 1,
-      workspaceCount: 0,
-      isEmpty: false,
+    await expect(responseWithUser.json()).resolves.toEqual({});
+  });
+
+  it("keeps auth bootstrap status out of OpenAPI", () => {
+    const metadata = getAuthBootstrapStatusRoute.metadata;
+    expect(metadata).toMatchObject({
+      openapi: { include: false },
     });
   });
 

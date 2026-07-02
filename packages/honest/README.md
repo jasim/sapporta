@@ -114,6 +114,27 @@ Pull another `TsRestApi`'s doc emitters into this one so the merged spec include
 
 Walks every registered route into a flat `AppRouter` object and defers to `@sapporta/rest-open-api`. Returns the OpenAPI 3.1 JSON document. `options.pathPrefix` prefixes every path in the emitted spec — use it when the api is mounted under a parent Hono route, so the served spec reports the externally-visible URL.
 
+### Excluding a contract route from OpenAPI
+
+A route can set `metadata: { openapi: { include: false } }` to keep the route
+out of `generateDocument()` while still registering the runtime handler:
+
+```ts
+const setupStatus = c.query({
+  method: "GET",
+  path: "/setup-status",
+  metadata: { openapi: { include: false } },
+  responses: {
+    200: z.object({ ready: z.boolean() }),
+  },
+});
+```
+
+Only the exact value `include: false` excludes the route. Missing or malformed
+metadata keeps the current default: the route appears in OpenAPI. Plain Hono
+routes such as `api.get("/healthz", ...)` remain available for endpoints that
+do not need the contract system at all.
+
 ### `errorBodySchema` / `ErrorBody`
 
 The shared `{ error, code?, details? }` Zod schema (with OpenAPI component id `"ErrorBody"`) that the adapter emits for built-in failures. Re-exported so consumers can reuse it in their own response schemas and share the component across the spec.
