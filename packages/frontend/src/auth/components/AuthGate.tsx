@@ -58,7 +58,10 @@ export function PublicOnlyGate({ children }: { children: ReactNode }) {
       </div>
     );
   }
-  if (location.pathname === "/login" && bootstrapStatus?.isEmpty === true) {
+  if (
+    location.pathname === "/login" &&
+    bootstrapStatus?.shouldShowSignUp === true
+  ) {
     return <Navigate to="/signup" replace />;
   }
   return <>{children}</>;

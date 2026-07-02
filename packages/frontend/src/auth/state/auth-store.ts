@@ -53,11 +53,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       set({ bootstrapStatus });
     } catch {
       set({
-        bootstrapStatus: {
-          userCount: 1,
-          workspaceCount: 1,
-          isEmpty: false,
-        },
+        bootstrapStatus: {},
       });
     }
   },

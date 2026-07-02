@@ -110,17 +110,13 @@ describe("auth store", () => {
   it("loads public auth bootstrap status", async () => {
     vi.stubGlobal(
       "fetch",
-      vi.fn(async () =>
-        jsonResponse({ userCount: 0, workspaceCount: 0, isEmpty: true }),
-      ),
+      vi.fn(async () => jsonResponse({ shouldShowSignUp: true })),
     );
 
     await useAuthStore.getState().loadBootstrapStatus();
 
     expect(useAuthStore.getState().bootstrapStatus).toEqual({
-      userCount: 0,
-      workspaceCount: 0,
-      isEmpty: true,
+      shouldShowSignUp: true,
     });
     expect(fetch).toHaveBeenCalledWith(
       "/api/auth-bootstrap",
@@ -131,7 +127,7 @@ describe("auth store", () => {
     );
   });
 
-  it("treats bootstrap status failures as non-empty", async () => {
+  it("treats bootstrap status failures as regular login", async () => {
     vi.stubGlobal(
       "fetch",
       vi.fn(async () =>
@@ -141,11 +137,7 @@ describe("auth store", () => {
 
     await useAuthStore.getState().loadBootstrapStatus();
 
-    expect(useAuthStore.getState().bootstrapStatus).toEqual({
-      userCount: 1,
-      workspaceCount: 1,
-      isEmpty: false,
-    });
+    expect(useAuthStore.getState().bootstrapStatus).toEqual({});
   });
 
   it("records generic auth load failures", async () => {

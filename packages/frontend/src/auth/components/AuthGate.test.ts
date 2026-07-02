@@ -187,9 +187,7 @@ describe("auth route gates", () => {
     const calls = installFetch((request) => {
       if (request.path === "/api/auth-bootstrap") {
         return jsonResponse({
-          userCount: 0,
-          workspaceCount: 0,
-          isEmpty: true,
+          shouldShowSignUp: true,
         });
       }
       return jsonResponse({ error: "Unexpected request" }, 500);
@@ -199,6 +197,21 @@ describe("auth route gates", () => {
     await renderPublicGate("/login");
 
     await waitForText("signup page");
+    expect(calls.map((call) => call.path)).toEqual(["/api/auth-bootstrap"]);
+  });
+
+  it("keeps regular login when auth bootstrap returns no sign-up signal", async () => {
+    const calls = installFetch((request) => {
+      if (request.path === "/api/auth-bootstrap") {
+        return jsonResponse({});
+      }
+      return jsonResponse({ error: "Unexpected request" }, 500);
+    });
+    useAuthStoreSetState({ session: { kind: "guest" } });
+
+    await renderPublicGate("/login");
+
+    await waitForText("login page");
     expect(calls.map((call) => call.path)).toEqual(["/api/auth-bootstrap"]);
   });
 

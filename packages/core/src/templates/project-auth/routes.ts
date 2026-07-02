@@ -198,13 +198,8 @@ function tokenManagementScope(
 export function authBootstrapStatus(
   conn: ProjectDbConnection,
 ): AuthBootstrapStatus {
-  const userCount = countRows(conn, "user");
-  const workspaceCount = countRows(conn, "organization");
-  return {
-    userCount,
-    workspaceCount,
-    isEmpty: userCount === 0 && workspaceCount === 0,
-  };
+  if (hasExistingAuthSetup(conn)) return {};
+  return { shouldShowSignUp: true };
 }
 
 export function authContextResponse(
@@ -240,18 +235,23 @@ export function authContextResponse(
   };
 }
 
-function countRows(
-  conn: ProjectDbConnection,
-  tableName: "user" | "organization",
-): number {
+function hasExistingAuthSetup(conn: ProjectDbConnection): boolean {
   const row = conn.sqlite
-    .prepare(`SELECT COUNT(*) AS count FROM "${tableName}"`)
+    .prepare(
+      `
+        SELECT CASE
+          WHEN EXISTS (SELECT 1 FROM "user") THEN 1
+          WHEN EXISTS (SELECT 1 FROM "organization") THEN 1
+          ELSE 0
+        END AS hasExistingAuthSetup
+      `,
+    )
     .get();
-  return readCount(row);
+  return readSqliteBoolean(row, "hasExistingAuthSetup");
 }
 
-function readCount(row: unknown): number {
-  if (typeof row !== "object" || row === null || !("count" in row)) return 0;
-  const count = row.count;
-  return typeof count === "number" ? count : 0;
+function readSqliteBoolean(row: unknown, field: string): boolean {
+  if (typeof row !== "object" || row === null || !(field in row)) return false;
+  const record = row as Record<string, unknown>;
+  return record[field] === 1;
 }

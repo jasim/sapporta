@@ -34,7 +34,7 @@ export const getAuthContextRoute = c.query({
 export const getAuthBootstrapStatusRoute = c.query({
   method: "GET",
   path: "/auth-bootstrap",
-  summary: "Read public Sapporta auth bootstrap status",
+  summary: "Read whether the browser should show sign-up",
   metadata: { tags: ["auth"] },
   responses: {
     200: authBootstrapStatusSchema,

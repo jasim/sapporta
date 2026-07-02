@@ -60,9 +60,7 @@ export type AuthContextResponse = z.output<typeof authContextResponseSchema>;
 
 export const authBootstrapStatusSchema = z
   .object({
-    userCount: z.number().int().nonnegative(),
-    workspaceCount: z.number().int().nonnegative(),
-    isEmpty: z.boolean(),
+    shouldShowSignUp: z.literal(true).optional(),
   })
   .meta({ id: "AuthBootstrapStatus" });
 export type AuthBootstrapStatus = z.output<typeof authBootstrapStatusSchema>;
