@@ -51,14 +51,21 @@ import {
   createGridRuntime,
   inMemoryGridDataSource,
   rootPath,
-} from "@sapporta/ui";
-
-const runtime = createGridRuntime({
-  schema,
-  dataSource,
-});
+  useGridRuntimeEffect,
+} from "@sapporta/grid";
 
 export function ProjectGrid() {
+  const runtime = useGridRuntimeEffect(
+    () =>
+      createGridRuntime({
+        schema,
+        dataSource,
+      }),
+    [dataSource],
+  );
+
+  if (!runtime) return null;
+
   return (
     <GridRuntimeProvider runtime={runtime}>
       <GridLevel path={rootPath(schema.rootLevel)} />
@@ -87,22 +94,17 @@ A custom grid screen usually needs two pieces:
    behavior
 2. a React view that renders that live grid
 
-Create the live grid outside the visible grid view. In React, create it from an
-effect-backed hook, wait until it exists, then pass it to the view. This keeps
-the grid stable while React mounts, unmounts, and replays effects in
-development.
+Create the live grid with `useGridRuntimeEffect`, wait until it returns a
+runtime, then pass the runtime to `GridRuntimeProvider`. The dependency list is
+the runtime replacement policy. The hook creates the runtime after commit,
+returns `null` until the committed runtime matches the current dependencies,
+and disposes the created runtime from effect cleanup.
 
-Avoid creating the runtime directly inside the rendered grid component:
-
-```tsx
-const runtime = useMemo(() => createGridRuntime(...), [...]);
-useEffect(() => () => runtime.dispose(), [runtime]);
-```
-
+Avoid creating the runtime during render and pairing it with a cleanup effect.
 That can break in React development mode. React may replay effects while
-keeping memoized values, so the visible grid can keep using a runtime that has
-already been disposed. The usual symptom is a grid that appears briefly, then
-clears with `GridRuntime has been disposed.`
+keeping render-created values, so the visible grid can keep using a runtime
+that has already been disposed. The usual symptom is a grid that appears
+briefly, then clears with `GridRuntime has been disposed.`
 
 ## Your First Flat Grid
 
@@ -115,27 +117,30 @@ import {
   GridLevel,
   GridRuntimeProvider,
   createGridRuntime,
-  date,
   inMemoryGridDataSource,
-  number,
   rootPath,
-  select,
-  text,
+  useGridRuntimeEffect,
   type GridSchema,
   type TreeNode,
-} from "@sapporta/ui";
+} from "@sapporta/grid";
+import { columnPreset } from "@sapporta/grid/column-preset";
 
 const taskColumns = [
-  text({ id: "title", name: "Task", edit: "default", width: "fill" }),
-  select({
+  columnPreset.text({
+    id: "title",
+    name: "Task",
+    edit: "default",
+    width: "fill",
+  }),
+  columnPreset.select({
     id: "status",
     name: "Status",
     edit: "default",
     width: "enum",
     options: ["todo", "doing", "done"],
   }),
-  number({ id: "estimate", name: "Estimate", edit: "default" }),
-  date({ id: "dueDate", name: "Due", edit: "default" }),
+  columnPreset.number({ id: "estimate", name: "Estimate", edit: "default" }),
+  columnPreset.date({ id: "dueDate", name: "Due", edit: "default" }),
 ];
 
 const schema: GridSchema = {
@@ -175,24 +180,31 @@ const tasks: TreeNode[] = [
   },
 ];
 
-const dataSource = inMemoryGridDataSource({
-  schema,
-  tree: tasks,
-  levels: {
-    tasks: {
-      sortMode: "client",
-      filterMode: "none",
-      paginationMode: "none",
-    },
-  },
-});
-
-const runtime = createGridRuntime({ schema, dataSource });
-
 export function TaskGrid() {
+  const runtime = useGridRuntimeEffect(
+    () =>
+      createGridRuntime({
+        schema,
+        dataSource: inMemoryGridDataSource({
+          schema,
+          tree: tasks,
+          levels: {
+            tasks: {
+              sortMode: "client",
+              filterMode: "none",
+              paginationMode: "none",
+            },
+          },
+        }),
+      }),
+    [],
+  );
+
+  if (!runtime) return null;
+
   return (
     <GridRuntimeProvider runtime={runtime}>
-      <GridLevel path={rootPath("tasks")} />
+      <GridLevel path={rootPath(schema.rootLevel)} />
     </GridRuntimeProvider>
   );
 }
@@ -218,7 +230,7 @@ import {
   percentage,
   select,
   text,
-} from "@sapporta/ui";
+} from "@sapporta/grid/column-preset";
 
 const columns = [
   identifier({ id: "id", name: "ID", width: "compact" }),
@@ -245,7 +257,8 @@ ColumnPreset is still BaseGrid. The helpers return `ColumnSchema` objects, so
 you can mix preset columns with raw columns:
 
 ```tsx
-import { text, type ColumnSchema } from "@sapporta/ui";
+import type { ColumnSchema } from "@sapporta/grid";
+import { text } from "@sapporta/grid/column-preset";
 
 const StatusBadge = ({ value }: { value: unknown }) => (
   <span data-status={String(value)}>{String(value)}</span>
@@ -270,7 +283,7 @@ overrides.
 A raw column controls cell display through `renderCell`.
 
 ```tsx
-import type { ColumnSchema } from "@sapporta/ui";
+import type { ColumnSchema } from "@sapporta/grid";
 
 const titleWithFlagColumn: ColumnSchema = {
   id: "title",
@@ -340,7 +353,7 @@ A raw editor receives `CellEditorProps`. It decides when to commit or cancel.
 
 ```tsx
 import { useState } from "react";
-import type { CellEditorProps, ColumnSchema } from "@sapporta/ui";
+import type { CellEditorProps, ColumnSchema } from "@sapporta/grid";
 
 function StatusEditor(props: CellEditorProps) {
   const [value, setValue] = useState(String(props.value ?? "todo"));
@@ -384,7 +397,7 @@ Nested grids are modeled as levels. A project row can have task children, and a
 task row can have subtask children.
 
 ```ts
-import { rootPath, type GridSchema, type TreeNode } from "@sapporta/ui";
+import { rootPath, type GridSchema, type TreeNode } from "@sapporta/grid";
 
 const schema: GridSchema = {
   rootLevel: "projects",
@@ -466,7 +479,7 @@ Expansion is part of the runtime's structural state. You can toggle it through
 the coordinator.
 
 ```ts
-import { makeRowId, rootPath } from "@sapporta/ui";
+import { makeRowId, rootPath } from "@sapporta/grid";
 
 const path = rootPath("projects");
 const rowId = makeRowId(path, "project-1");
@@ -487,8 +500,12 @@ multi-select behavior:
 import {
   ROW_MULTISELECT_LIST,
   createGridRuntime,
+} from "@sapporta/grid";
+import {
   rowSelectionColumn,
-} from "@sapporta/ui";
+  select,
+  text,
+} from "@sapporta/grid/column-preset";
 
 const taskColumns = [
   rowSelectionColumn(),
@@ -510,7 +527,7 @@ commands on click.
 Read selected rows from the runtime:
 
 ```ts
-import { rootPath } from "@sapporta/ui";
+import { rootPath } from "@sapporta/grid";
 
 const path = rootPath("tasks");
 const selectedRowIds = runtime.selectedRowIds(path);
@@ -534,7 +551,7 @@ The active row is the row that owns keyboard focus. Depending on the interaction
 config, it may come from the active cell or from a row cursor.
 
 ```tsx
-import { rootPath, useActiveRow, useGridRuntime } from "@sapporta/ui";
+import { rootPath, useActiveRow, useGridRuntime } from "@sapporta/grid";
 
 function TaskDetailPanel() {
   const path = rootPath("tasks");
@@ -565,7 +582,7 @@ import {
   useSelectedRows,
   useCellSelection,
   useSelectedRowIds,
-} from "@sapporta/ui";
+} from "@sapporta/grid";
 
 function GridToolbar() {
   const path = rootPath("tasks");
@@ -602,7 +619,7 @@ import type {
   GridPath,
   LevelDataSource,
   RowKey,
-} from "@sapporta/ui";
+} from "@sapporta/grid";
 
 function projectDataSource(): GridDataSource {
   return {
@@ -632,7 +649,7 @@ import type {
   ReconcileEvent,
   TreeNode,
   WritableLevelDataSource,
-} from "@sapporta/ui";
+} from "@sapporta/grid";
 
 function createProjectLevelSource(): WritableLevelDataSource {
   let nodes: TreeNode[] = [];
@@ -815,7 +832,6 @@ The practical guidance is simple:
 This is the usual shape of a BaseGrid screen:
 
 ```tsx
-import { useEffect, useState } from "react";
 import {
   CELL_GRID_WITH_INDEPENDENT_ROW_SELECTION,
   GridLevel,
@@ -823,14 +839,14 @@ import {
   createGridRuntime,
   inMemoryGridDataSource,
   rootPath,
-  rowSelectionColumn,
-  select,
-  text,
-  type GridPath,
-  type GridRuntime,
+  useGridRuntimeEffect,
   type GridSchema,
   type TreeNode,
-} from "@sapporta/ui";
+} from "@sapporta/grid";
+import {
+  columnPreset,
+  rowSelectionColumn,
+} from "@sapporta/grid/column-preset";
 
 const schema: GridSchema = {
   rootLevel: "projects",
@@ -839,8 +855,13 @@ const schema: GridSchema = {
       name: "projects",
       columns: [
         rowSelectionColumn(),
-        text({ id: "name", name: "Project", edit: "default", width: "fill" }),
-        select({
+        columnPreset.text({
+          id: "name",
+          name: "Project",
+          edit: "default",
+          width: "fill",
+        }),
+        columnPreset.select({
           id: "status",
           name: "Status",
           edit: "default",
@@ -854,8 +875,13 @@ const schema: GridSchema = {
       name: "tasks",
       columns: [
         rowSelectionColumn(),
-        text({ id: "title", name: "Task", edit: "default", width: "fill" }),
-        select({
+        columnPreset.text({
+          id: "title",
+          name: "Task",
+          edit: "default",
+          width: "fill",
+        }),
+        columnPreset.select({
           id: "status",
           name: "Status",
           edit: "default",
@@ -868,73 +894,42 @@ const schema: GridSchema = {
   },
 };
 
-type ProjectGridSession = {
-  runtime: GridRuntime;
-  rootPath: GridPath;
-  dispose(): void;
-};
-
-function createProjectGridSession(tree: TreeNode[]): ProjectGridSession {
-  const dataSource = inMemoryGridDataSource({
-    schema,
-    tree,
-    levels: {
-      projects: {
-        sortMode: "client",
-        filterMode: "none",
-        paginationMode: "none",
-      },
-      tasks: {
-        sortMode: "client",
-        filterMode: "none",
-        paginationMode: "none",
-      },
-    },
-  });
-
-  const runtime = createGridRuntime({
-    schema,
-    dataSource,
-    interaction: CELL_GRID_WITH_INDEPENDENT_ROW_SELECTION,
-  });
-
-  return {
-    runtime,
-    rootPath: rootPath("projects"),
-    dispose: () => runtime.dispose(),
-  };
-}
-
-function useProjectGridSession(tree: TreeNode[]): ProjectGridSession | null {
-  const [session, setSession] = useState<ProjectGridSession | null>(null);
-
-  useEffect(() => {
-    const next = createProjectGridSession(tree);
-    setSession(next);
-
-    return () => {
-      next.dispose();
-      setSession((current) => (current === next ? null : current));
-    };
-  }, [tree]);
-
-  return session;
-}
-
 export function ProjectPlanner({ tree }: { tree: TreeNode[] }) {
-  const session = useProjectGridSession(tree);
+  const runtime = useGridRuntimeEffect(
+    () =>
+      createGridRuntime({
+        schema,
+        dataSource: inMemoryGridDataSource({
+          schema,
+          tree,
+          levels: {
+            projects: {
+              sortMode: "client",
+              filterMode: "none",
+              paginationMode: "none",
+            },
+            tasks: {
+              sortMode: "client",
+              filterMode: "none",
+              paginationMode: "none",
+            },
+          },
+        }),
+        interaction: CELL_GRID_WITH_INDEPENDENT_ROW_SELECTION,
+      }),
+    [tree],
+  );
 
-  if (!session) return null;
+  if (!runtime) return null;
 
-  return <ProjectGridView session={session} />;
-}
-
-function ProjectGridView({ session }: { session: ProjectGridSession }) {
   return (
     <div className="project-planner">
-      <GridRuntimeProvider runtime={session.runtime}>
-        <GridLevel path={session.rootPath} />
-        <ProjectDetailPanel path={session.rootPath} />
+      <GridRuntimeProvider runtime={runtime}>
+        <GridLevel
+          path={rootPath(schema.rootLevel)}
+          chrome={columnPreset.chrome()}
+        />
+        <ProjectDetailPanel path={rootPath(schema.rootLevel)} />
       </GridRuntimeProvider>
     </div>
   );

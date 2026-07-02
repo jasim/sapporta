@@ -1,25 +1,25 @@
-# Grid Result Shape
+# Grid Dataset Shape
 
-The canonical report wire type lives at `@sapporta/shared/report-grid`.
+The canonical report wire type lives at `@sapporta/shared/grid-dataset`.
 
 ```ts
 import type {
-  GridColumn,
-  GridFooterRow,
-  GridReportNode,
-  GridReportResult,
-} from "@sapporta/shared/report-grid";
+  GridDataset,
+  GridDatasetColumn,
+  GridDatasetFooterRow,
+  GridDatasetNode,
+} from "@sapporta/shared/grid-dataset";
 ```
 
-`GridReportResult` contains:
+`GridDataset` contains:
 
 - `name` and `label` for the dataset.
-- `columns` for the top-level grid.
-- `levelColumns` keyed by each node level name.
-- `data`, an array of `GridReportNode`.
-- optional `footerRows`, `levelOptions`, `stats`, and `errors`.
+- `rootLevel`, the level rendered at the root.
+- `levels`, keyed by each node level name.
+- `nodes`, an array of `GridDatasetNode`.
+- optional `footerRows`, `totalCount`, `stats`, and `errors`.
 
-`GridReportResult` is a renderer wire shape. It does not describe how to query
+`GridDataset` is a renderer wire shape. It does not describe how to query
 data, authorize the route, or place reports in navigation.
 
 This shape is for report data. If you are building a different custom
@@ -30,27 +30,51 @@ Columns should include hidden identifiers when the frontend needs them for
 navigation:
 
 ```ts
-const levelColumns = {
-  account: [
-    { name: "account_id", label: "Account ID", visuallyHidden: true },
-    { name: "name", label: "Account" },
+const dataset = {
+  name: "trial-balance",
+  label: "Trial Balance",
+  rootLevel: "account",
+  levels: {
+    account: {
+      columns: [
+        {
+          id: "account_id",
+          label: "Account ID",
+          kind: "text",
+          visuallyHidden: true,
+        },
+        { id: "name", label: "Account", kind: "text" },
+        {
+          id: "balance",
+          label: "Balance",
+          kind: "number",
+          displayFormat: "currency",
+        },
+      ],
+      childLevels: [],
+    },
+  },
+  nodes: [
     {
-      name: "balance",
-      label: "Balance",
-      kind: "number",
-      displayFormat: "currency",
+      rowKey: "account-1",
+      levelName: "account",
+      columns: {
+        account_id: "account-1",
+        name: "Cash",
+        balance: 1250,
+      },
     },
   ],
-} satisfies Record<string, GridColumn[]>;
+} satisfies GridDataset;
 ```
 
 The response does not serialize links. Frontend screens pass link resolvers to
-`ReportGridResult` because they own route state, current parameters, and
+`ReportGridDataset` because they own route state, current parameters, and
 navigation policy.
 
 ```tsx
-<ReportGridResult
-  result={result}
+<ReportGridDataset
+  dataset={dataset}
   links={{
     account: {
       row: ({ node }) => [
@@ -61,10 +85,10 @@ navigation policy.
         },
       ],
       cell: {
-        name: ({ node }) => [
+        name: ({ node, column }) => [
           {
             label: "Open ledger",
-            href: `/reports/account-ledger?account_id=${node.columns.account_id}`,
+            href: `/reports/account-ledger?account_id=${node.columns.account_id}&column=${column.id}`,
             kind: "route",
           },
         ],

@@ -29,9 +29,9 @@ The definition describes the grid. The session holds the live state for query
 stores, lookup caches, compiled columns, endpoint calls, and exports. The React
 component renders that session in the grid UI.
 
-If your screen is not backed by Sapporta table APIs, use BaseGrid directly and
-follow the same live-grid shape: create the live grid from a hook, render after
-it exists, and dispose it when the screen unmounts. See
+If your screen is not backed by Sapporta table APIs, use BaseGrid directly.
+Create the runtime with `useGridRuntimeEffect`, render after it returns a
+runtime, and pass that runtime to `GridRuntimeProvider`. See
 [Building a Grid from Scratch with BaseGrid](./BASEGRID-GUIDE.md#build-a-custom-grid-screen).
 
 ## Minimal Example

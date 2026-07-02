@@ -56,8 +56,8 @@ const session = useTGridSession(invoicesDefinition, {
 ```tsx
 import {
   CELL_GRID_WITH_INDEPENDENT_ROW_SELECTION,
-  rowSelectionColumn,
-} from "@sapporta/ui";
+} from "@sapporta/grid";
+import { rowSelectionColumn } from "@sapporta/grid/column-preset";
 
 const invoicesDefinition = defineTGrid<RowsByLevel>({
   rootLevel: "invoices",
@@ -91,7 +91,7 @@ const session = useTGridSession(invoicesDefinition, {
 ### Detail Panel That Follows the Cursor Row
 
 ```tsx
-import { CELL_PRIMARY_WITH_SIDE_PANEL_ROW } from "@sapporta/ui";
+import { CELL_PRIMARY_WITH_SIDE_PANEL_ROW } from "@sapporta/grid";
 
 function InvoiceWithSidePanel() {
   const session = useTGridSession(invoicesDefinition, {
@@ -129,7 +129,7 @@ const session = useTGridSession(invoicesDefinition, {
 ### Master-Detail Row List
 
 ```tsx
-import { ROW_PRIMARY_MASTER_DETAIL } from "@sapporta/ui";
+import { ROW_PRIMARY_MASTER_DETAIL } from "@sapporta/grid";
 
 function InvoiceMasterDetail() {
   const session = useTGridSession(invoicesDefinition, {
@@ -155,7 +155,8 @@ function InvoiceMasterDetail() {
 ### Multi-Select Row List
 
 ```tsx
-import { ROW_MULTISELECT_LIST, rowSelectionColumn } from "@sapporta/ui";
+import { ROW_MULTISELECT_LIST } from "@sapporta/grid";
+import { rowSelectionColumn } from "@sapporta/grid/column-preset";
 
 function InvoiceMultiSelect() {
   const session = useTGridSession(invoicesDefinition, {
@@ -479,7 +480,7 @@ The presets are examples, not special cases. You can compose any valid `GridInte
 Use `satisfies GridInteractionConfig` to get compile-time validation:
 
 ```ts
-import { type GridInteractionConfig } from "@sapporta/ui";
+import { type GridInteractionConfig } from "@sapporta/grid";
 
 // A cell-grid with single-mode independent row selection,
 // pointer-only (Space does nothing).
@@ -538,7 +539,7 @@ import {
   useSelectedRowIds,
   useSelectedRows,
   rowInteractionStatusFor,
-} from "@sapporta/ui";
+} from "@sapporta/grid";
 
 function MyComponent() {
   const runtime = useGridRuntime();
@@ -752,7 +753,7 @@ import {
   makeSingleRowSelection,
   makeRowRangeSelection,
   makeRowSetSelection,
-} from "@sapporta/ui";
+} from "@sapporta/grid";
 
 const none = null;
 const one = makeSingleRowSelection("row-42");

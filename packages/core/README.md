@@ -187,8 +187,8 @@ sapporta rows delete <table> <id>
 
 ### Route-Based Reports
 
-Reports are ordinary app routes that return `GridReportResult` from
-`@sapporta/shared/report-grid`. Use `sapporta endpoints` to inspect the route
+Reports are ordinary app routes that return `GridDataset` from
+`@sapporta/shared/grid-dataset`. Use `sapporta endpoints` to inspect the route
 contract and call the route like any other endpoint.
 
 ### Generic API Commands

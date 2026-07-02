@@ -18,7 +18,8 @@ selection styling, read [BASEGRID-STYLING.md](./BASEGRID-STYLING.md).
 
 ## Import Surface
 
-The BaseGrid and ColumnPreset APIs are exported from `@sapporta/ui`.
+BaseGrid runtime and React primitives are exported from `@sapporta/grid`.
+ColumnPreset helpers are exported from `@sapporta/grid/column-preset`.
 
 ```ts
 import {
@@ -27,7 +28,7 @@ import {
   createGridRuntime,
   inMemoryGridDataSource,
   rootPath,
-  text,
+  useGridRuntimeEffect,
   useActiveCell,
   useActiveCellForPath,
   useActiveRow,
@@ -39,7 +40,8 @@ import {
   type GridSchema,
   type RowInteractionSnapshot,
   type TreeNode,
-} from "@sapporta/ui";
+} from "@sapporta/grid";
+import { columnPreset, text } from "@sapporta/grid/column-preset";
 ```
 
 Do not use TGrid APIs when you are building a BaseGrid from scratch. TGrid
@@ -301,7 +303,7 @@ type CellActivation = {
 ### Raw Column Example
 
 ```tsx
-import type { ColumnSchema } from "@sapporta/ui";
+import type { ColumnSchema } from "@sapporta/grid";
 
 const statusColumn: ColumnSchema = {
   id: "status",
@@ -317,7 +319,7 @@ const statusColumn: ColumnSchema = {
 
 ```tsx
 import { useState } from "react";
-import type { CellEditorProps, ColumnSchema } from "@sapporta/ui";
+import type { CellEditorProps, ColumnSchema } from "@sapporta/grid";
 
 function TextEditor(props: CellEditorProps) {
   const [value, setValue] = useState(String(props.value ?? ""));
@@ -680,8 +682,9 @@ for custom sources.
 ## Runtime Construction
 
 `createGridRuntime` creates a live object with subscriptions and disposable
-resources. If you create a runtime for a React screen, create it from an
-effect-backed hook and render the grid after the runtime exists. See
+resources. If you create a runtime for a React screen, call
+`useGridRuntimeEffect(() => createGridRuntime(...), deps)` and render the grid
+after the hook returns a runtime. See
 [Build a Custom Grid Screen](./BASEGRID-GUIDE.md#build-a-custom-grid-screen)
 for the recommended screen shape.
 
@@ -697,7 +700,7 @@ type RuntimeArgs = {
 function createGridRuntime(args: RuntimeArgs): GridRuntime;
 ```
 
-Example:
+Outside React:
 
 ```ts
 const runtime = createGridRuntime({
@@ -726,6 +729,19 @@ try {
   runtime.dispose();
 }
 ```
+
+### `useGridRuntimeEffect`
+
+```ts
+function useGridRuntimeEffect(
+  create: () => GridRuntime,
+  deps: readonly unknown[],
+): GridRuntime | null;
+```
+
+Creates a React-owned runtime after commit and disposes it from effect cleanup.
+The dependency list controls runtime replacement. Render `null` or loading UI
+until the hook returns a runtime that matches the current dependencies.
 
 ## Runtime API
 
@@ -881,9 +897,18 @@ function GridRuntimeProvider({
 Provides the runtime to BaseGrid React components and hooks.
 
 ```tsx
-<GridRuntimeProvider runtime={runtime}>
-  <GridLevel path={rootPath("projects")} />
-</GridRuntimeProvider>
+const runtime = useGridRuntimeEffect(
+  () => createGridRuntime({ schema, dataSource }),
+  [dataSource],
+);
+
+if (!runtime) return null;
+
+return (
+  <GridRuntimeProvider runtime={runtime}>
+    <GridLevel path={rootPath(schema.rootLevel)} />
+  </GridRuntimeProvider>
+);
 ```
 
 ### `useGridRuntime`
@@ -1139,7 +1164,7 @@ Example:
 ColumnPreset width helpers are useful when writing custom headers or toolbars:
 
 ```tsx
-import { templateColumns } from "@sapporta/ui";
+import { templateColumns } from "@sapporta/grid/column-preset";
 
 function CustomHeader({ schema }: { schema: ColumnSchema[] }) {
   return (
@@ -1166,8 +1191,8 @@ For a new BaseGrid, build in this order:
 2. Create `ColumnSchema[]`, preferably with ColumnPreset helpers first.
 3. Create a `GridSchema` with root and child levels.
 4. Start with `inMemoryGridDataSource` or implement `GridDataSource`.
-5. Create the runtime in the screen's live grid setup. In React, do this from
-   an effect-backed hook and render after it exists.
+5. In React, call `useGridRuntimeEffect(() => createGridRuntime(...), deps)`
+   and render after it returns a runtime.
 6. Render `<GridRuntimeProvider>` and `<GridLevel path={rootPath(...)} />` from
    a view that receives the live grid.
 7. Add runtime event handlers for saves, reconciliation, and status changes.

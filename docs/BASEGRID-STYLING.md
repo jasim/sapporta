@@ -23,6 +23,10 @@ createGridRuntime({
 });
 ```
 
+For React-owned BaseGrid runtimes, follow
+[Build a Custom Grid Screen](./BASEGRID-GUIDE.md#build-a-custom-grid-screen)
+and create the runtime with `useGridRuntimeEffect`.
+
 Common choices:
 
 | Goal                                        | Interaction shape                         |

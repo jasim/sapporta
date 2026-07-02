@@ -9,7 +9,7 @@ The usual shape is:
 1. Define a shared route contract in `packages/shared/src/contracts`.
 2. Implement the backend handler under `packages/api/app`.
 3. Build a React screen under `packages/frontend/src`.
-4. Render the returned `GridReportResult` with `ReportGridResult`.
+4. Render the returned `GridDataset` with `ReportGridDataset`.
 
 Simple reports usually use `GET` query parameters. More complex inputs can use
 a `POST` body.
@@ -20,9 +20,9 @@ a `POST` body.
 import { z } from "zod";
 import { initContract } from "@sapporta/rest-core";
 import {
-  gridReportResultSchema,
-  type GridReportResult,
-} from "@sapporta/shared/report-grid";
+  gridDatasetSchema,
+  type GridDataset,
+} from "@sapporta/shared/grid-dataset";
 import { errorBodySchema } from "@sapporta/shared/contracts";
 
 const c = initContract();
@@ -36,7 +36,7 @@ export const trialBalanceRoute = c.query({
     asOfDate: z.string(),
   }),
   responses: {
-    200: gridReportResultSchema,
+    200: gridDatasetSchema,
     400: errorBodySchema,
     403: errorBodySchema,
   },
@@ -48,6 +48,7 @@ The backend returns a plain object that satisfies the shared result type.
 ```ts
 import { sql } from "drizzle-orm";
 import { TsRestApi, type SapportaEnv } from "@sapporta/server";
+import type { GridDataset } from "@sapporta/shared/grid-dataset";
 import { accounts, journals, journalEntries } from "../schema/index";
 import { trialBalanceRoute } from "my-app-shared/contracts/reports";
 
@@ -82,40 +83,43 @@ api.register("trialBalance", trialBalanceRoute, async ({ c, request }) => {
 
 function toTrialBalanceResult(
   rows: { account: string; debit: number; credit: number }[],
-): GridReportResult {
-  const levelColumns = {
-    account: [
-      { name: "account", label: "Account" },
-      {
-        name: "debit",
-        label: "Debit",
-        kind: "number",
-        displayFormat: "currency",
-        zeroDisplay: "blank",
-      },
-      {
-        name: "credit",
-        label: "Credit",
-        kind: "number",
-        displayFormat: "currency",
-        zeroDisplay: "blank",
-      },
-    ],
-  };
-
+): GridDataset {
   return {
     name: "trial-balance",
     label: "Trial Balance",
-    columns: levelColumns.account,
-    levelColumns,
-    data: rows.map((row) => ({
+    rootLevel: "account",
+    levels: {
+      account: {
+        columns: [
+          { id: "account", label: "Account", kind: "text" },
+          {
+            id: "debit",
+            label: "Debit",
+            kind: "number",
+            displayFormat: "currency",
+            zeroDisplay: "blank",
+          },
+          {
+            id: "credit",
+            label: "Credit",
+            kind: "number",
+            displayFormat: "currency",
+            zeroDisplay: "blank",
+          },
+        ],
+        childLevels: [],
+      },
+    },
+    nodes: rows.map((row) => ({
+      rowKey: row.account,
       levelName: "account",
       columns: row,
     })),
     footerRows: [
       {
-        label: "Grand Total",
+        rowKey: "grand-total",
         columns: {
+          account: "Grand Total",
           debit: rows.reduce((sum, row) => sum + row.debit, 0),
           credit: rows.reduce((sum, row) => sum + row.credit, 0),
         },
@@ -135,22 +139,22 @@ copying report internals.
 
 ```tsx
 import { useEffect, useState } from "react";
-import { ReportGridResult, ReportScreenFrame } from "@sapporta/frontend/report";
-import type { GridReportResult } from "@sapporta/shared/report-grid";
+import { ReportGridDataset, ReportScreenFrame } from "@sapporta/frontend/report";
+import type { GridDataset } from "@sapporta/shared/grid-dataset";
 import { reportsApi } from "../api";
 
 export function TrialBalanceReport() {
-  const [result, setResult] = useState<GridReportResult | null>(null);
+  const [dataset, setDataset] = useState<GridDataset | null>(null);
 
   useEffect(() => {
     void reportsApi
       .trialBalance({ query: { asOfDate: "2026-06-12" } })
-      .then(setResult);
+      .then(setDataset);
   }, []);
 
   return (
     <ReportScreenFrame title="Trial Balance">
-      {result ? <ReportGridResult result={result} /> : null}
+      {dataset ? <ReportGridDataset dataset={dataset} /> : null}
     </ReportScreenFrame>
   );
 }
@@ -164,7 +168,7 @@ it("returns a trial balance grid", async () => {
     "/api/reports/trial-balance?asOfDate=2026-06-12",
   );
   expect(response.status).toBe(200);
-  const body = gridReportResultSchema.parse(await response.json());
+  const body = gridDatasetSchema.parse(await response.json());
   expect(body.name).toBe("trial-balance");
 });
 ```
@@ -222,37 +226,18 @@ type AccountBalanceRow = {
 export function toBalanceSheetResult(
   sections: SectionRow[],
   accounts: AccountBalanceRow[],
-): GridReportResult {
-  const levelColumns = {
-    section: [
-      { name: "section", label: "Section" },
-      {
-        name: "section_total",
-        label: "Total",
-        kind: "number",
-        displayFormat: "currency",
-      },
-    ],
-    account: [
-      { name: "account", label: "Account" },
-      {
-        name: "balance",
-        label: "Balance",
-        kind: "number",
-        displayFormat: "currency",
-      },
-    ],
-  };
-
-  const data = sections.map((section) => {
+): GridDataset {
+  const nodes = sections.map((section) => {
     const childRows = accounts.filter((row) => row.section === section.section);
     const childNodes = childRows.map((row) => ({
+      rowKey: row.account,
       levelName: "account",
       columns: { account: row.account, balance: row.balance },
     }));
     const sectionTotal = childRows.reduce((sum, row) => sum + row.balance, 0);
 
     return {
+      rowKey: section.section,
       levelName: "section",
       columns: { section: section.section },
       rollup: { section_total: sectionTotal },
@@ -260,28 +245,55 @@ export function toBalanceSheetResult(
     };
   });
 
-  const assets = data.find((node) => node.columns.section === "Asset");
-  const liabilities = data.find((node) => node.columns.section === "Liability");
-  const equity = data.find((node) => node.columns.section === "Equity");
+  const assets = nodes.find((node) => node.columns.section === "Asset");
+  const liabilities = nodes.find((node) => node.columns.section === "Liability");
+  const equity = nodes.find((node) => node.columns.section === "Equity");
 
   return {
     name: "balance-sheet",
     label: "Balance Sheet",
-    columns: levelColumns.section,
-    levelColumns,
-    data,
+    rootLevel: "section",
+    levels: {
+      section: {
+        columns: [
+          { id: "section", label: "Section", kind: "text" },
+          {
+            id: "section_total",
+            label: "Total",
+            kind: "number",
+            displayFormat: "currency",
+          },
+        ],
+        childLevels: ["account"],
+      },
+      account: {
+        columns: [
+          { id: "account", label: "Account", kind: "text" },
+          {
+            id: "balance",
+            label: "Balance",
+            kind: "number",
+            displayFormat: "currency",
+          },
+        ],
+        childLevels: [],
+      },
+    },
+    nodes,
     footerRows: [
       {
-        label: "Total Liabilities + Equity",
+        rowKey: "total-liabilities-equity",
         columns: {
+          section: "Total Liabilities + Equity",
           section_total:
             Number(liabilities?.rollup?.section_total ?? 0) +
             Number(equity?.rollup?.section_total ?? 0),
         },
       },
       {
-        label: "Net",
+        rowKey: "net",
         columns: {
+          section: "Net",
           section_total:
             Number(assets?.rollup?.section_total ?? 0) -
             (Number(liabilities?.rollup?.section_total ?? 0) +
@@ -295,13 +307,13 @@ export function toBalanceSheetResult(
 
 ## Links
 
-`GridReportResult` does not serialize links. Frontend screens pass link
-resolvers to `ReportGridResult` because the screen owns route state, current
+`GridDataset` does not serialize links. Frontend screens pass link
+resolvers to `ReportGridDataset` because the screen owns route state, current
 parameters, and navigation policy.
 
 ```tsx
-<ReportGridResult
-  result={result}
+<ReportGridDataset
+  dataset={dataset}
   links={{
     account: {
       row: ({ node }) => [
@@ -320,8 +332,8 @@ Footer link resolvers apply to the whole footer row. They are not per-cell link
 resolvers.
 
 ```tsx
-<ReportGridResult
-  result={result}
+<ReportGridDataset
+  dataset={dataset}
   links={{
     account: {
       footer: () => [
@@ -363,5 +375,5 @@ export const appProtectedRoutes = (
 );
 ```
 
-`ReportGridResult` is a renderer. It does not run queries, discover reports,
+`ReportGridDataset` is a renderer. It does not run queries, discover reports,
 authorize access, or decide which reports appear in navigation.

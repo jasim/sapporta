@@ -26,7 +26,7 @@ Keep handlers thin:
 
 - Resolve auth and request input in the route handler.
 - Read rows in a data function that receives `auth` explicitly.
-- Map rows to `GridReportResult` in a pure function.
+- Map rows to `GridDataset` in a pure function.
 
 For Drizzle reads, compose the table's row-security predicate:
 
