@@ -93,10 +93,6 @@ export function CellEditorOverlay({
   const row = runtime.displayedRowsFor(path).rowById.get(editing.coord.rowId);
   if (!row) return null;
   const value = row.columns[column.id];
-  const editStart =
-    editing.trigger === "type"
-      ? { trigger: editing.trigger, typedSeed: editing.typedSeed }
-      : { trigger: editing.trigger };
 
   return (
     <div
@@ -111,14 +107,14 @@ export function CellEditorOverlay({
       }}
     >
       <Editor
-        {...editStart}
+        editStart={editing.editStart}
         value={value}
         row={row}
         column={column}
         path={path}
         anchor={containerRef.current as HTMLElement}
-        onCommit={(v, commit) => controller.commitEdit(v, commit)}
-        onCancel={() => controller.cancelEdit()}
+        commit={(v, commit) => controller.commitEdit(v, commit)}
+        cancel={() => controller.cancelEdit()}
       />
     </div>
   );

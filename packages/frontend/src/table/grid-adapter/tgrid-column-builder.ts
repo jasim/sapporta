@@ -492,9 +492,10 @@ function typedEditor<
       K
     > = {
       ...baseContext,
+      editStart: props.editStart,
       value: props.value as RowsByLevel[LevelId][K],
-      commit: (value, target) => props.onCommit(value, target),
-      cancel: props.onCancel,
+      commit: (value, target) => props.commit(value, target),
+      cancel: props.cancel,
     };
     return createElement(
       tgridSessionContext.Provider,

@@ -70,7 +70,7 @@ function transitionFor(
         rowSelection: state.rowSelection,
         editing: {
           coord: action.coord,
-          ...editStart,
+          editStart,
         },
       };
     }
@@ -113,7 +113,8 @@ function deriveEffects(prev: ControllerState, next: Next): GridEffect[] {
     return [
       {
         type: "focusCellEditor",
-        cursor: next.editing.trigger === "type" ? "atEnd" : "selectAll",
+        cursor:
+          next.editing.editStart.trigger === "type" ? "atEnd" : "selectAll",
       },
     ];
   }

@@ -17,11 +17,11 @@ export function SelectEditor(props: CellEditorProps) {
       value={String(props.value ?? "")}
       onChange={(e) => {
         const option = options.find((o) => String(o.value) === e.target.value);
-        props.onCommit(option ? option.value : e.target.value);
+        props.commit(option ? option.value : e.target.value);
       }}
-      onBlur={props.onCancel}
+      onBlur={props.cancel}
       onKeyDown={(e) => {
-        if (e.key === "Escape") props.onCancel();
+        if (e.key === "Escape") props.cancel();
       }}
     >
       {options.map((option) => (

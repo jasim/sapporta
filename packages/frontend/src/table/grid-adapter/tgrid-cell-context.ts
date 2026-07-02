@@ -14,6 +14,7 @@ import type {
   RowKey,
   CommitTarget,
   CellRenderActivation,
+  CellEditorStart,
 } from "@sapporta/grid";
 import type {
   TableSchema,
@@ -122,6 +123,7 @@ export type TGridCellEditorContext<
   LevelId extends TGridLevelId<RowsByLevel>,
   K extends RowFieldName<RowsByLevel[LevelId]>,
 > = TGridCellContext<RowsByLevel, AppServices, LevelId> & {
+  editStart: CellEditorStart;
   value: RowsByLevel[LevelId][K];
   commit(value: RowsByLevel[LevelId][K], target?: CommitTarget): void;
   cancel(): void;

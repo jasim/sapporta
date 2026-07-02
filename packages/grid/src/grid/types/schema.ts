@@ -18,7 +18,7 @@
 // Cell editors see `CellEditorProps` — the full surface an editor needs.
 // Editors are consumer code. While editing, the controller's key handler
 // returns early — the editor's focused element decides what Escape/Enter/Tab mean and calls
-// onCommit/onCancel. `onCommit` is async-tolerant; editors that resolve a
+// commit/cancel. `commit` is async-tolerant; editors that resolve a
 // value via fetch call it after their promise settles.
 //
 // Editor as singleton overlay: the editing cell does NOT branch into an
@@ -132,7 +132,8 @@ export type CellRenderProps = {
   activation: CellRenderActivation | null;
 };
 
-export type CellEditorProps = CellEditorStart & {
+export type CellEditorProps = {
+  editStart: CellEditorStart;
   value: unknown;
   row: LevelRow;
   column: ColumnSchema;
@@ -141,8 +142,8 @@ export type CellEditorProps = CellEditorStart & {
   // `commit` tells the controller where focus should land after the write
   // (next/prev/down/stay/…). Editors omit it for "stay" semantics; Tab
   // passes "next"/"prev"; Enter passes "down".
-  onCommit: (newValue: unknown, commit?: CommitTarget) => void;
-  onCancel: () => void;
+  commit: (newValue: unknown, commit?: CommitTarget) => void;
+  cancel: () => void;
 };
 
 export type ColumnSchema = {

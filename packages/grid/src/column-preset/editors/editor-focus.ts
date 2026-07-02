@@ -1,4 +1,4 @@
-import type { CellEditorProps } from "../../grid/types/schema";
+import type { CellEditorStart } from "../../grid/types/schema";
 
 type EditorInputControl = HTMLInputElement | HTMLTextAreaElement;
 
@@ -17,11 +17,11 @@ const TEXT_SELECTION_INPUT_TYPES = new Set([
 // after that seed; explicit edit starts select the value for overwrite.
 export function focusEditorInput(
   node: EditorInputControl,
-  trigger: CellEditorProps["trigger"],
+  editStart: CellEditorStart,
 ): void {
   node.focus();
 
-  if (trigger === "type") {
+  if (editStart.trigger === "type") {
     if (supportsTextSelection(node)) {
       const end = node.value.length;
       node.setSelectionRange(end, end);

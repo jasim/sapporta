@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import type { CellEditorProps, ColumnSchema } from "../../grid/types/schema";
+import type {
+  CellEditorProps,
+  CellEditorStart,
+  ColumnSchema,
+} from "../../grid/types/schema";
 import { rootPath, makeRowId } from "../../grid/types/identity";
 import type { LevelRow } from "../../grid/types/level-row";
 import { initialDateEditorValue } from "./DateEditor";
@@ -16,12 +20,7 @@ function column(id: string): ColumnSchema {
   };
 }
 
-function props(
-  start:
-    | { trigger: "type"; typedSeed: string }
-    | { trigger: "doubleClick" | "enter" | "f2" },
-  value: unknown,
-): CellEditorProps {
+function props(editStart: CellEditorStart, value: unknown): CellEditorProps {
   const c = column("a");
   const row: LevelRow = {
     kind: "data",
@@ -32,69 +31,73 @@ function props(
     source: {} as never,
   };
   return {
-    ...start,
+    editStart,
     value,
     row,
     column: c,
     path,
     anchor: {} as HTMLElement,
-    onCommit: () => {},
-    onCancel: () => {},
+    commit: () => {},
+    cancel: () => {},
   };
+}
+
+function textInitialValue(editStart: CellEditorStart, value: unknown): string {
+  const p = props(editStart, value);
+  return initialTextEditorValue(p.value, p.editStart);
+}
+
+function numericInitialValue(
+  editStart: CellEditorStart,
+  value: unknown,
+): string {
+  const p = props(editStart, value);
+  return initialNumericEditorValue(p.value, p.editStart);
+}
+
+function dateInitialValue(editStart: CellEditorStart, value: unknown): string {
+  const p = props(editStart, value);
+  return initialDateEditorValue(p.value, p.editStart);
 }
 
 describe("preset editor start values", () => {
   it("initializes text edits from the raw value on double-click", () => {
-    expect(
-      initialTextEditorValue(props({ trigger: "doubleClick" }, "existing")),
-    ).toBe("existing");
+    expect(textInitialValue({ trigger: "doubleClick" }, "existing")).toBe(
+      "existing",
+    );
   });
 
   it("initializes text edits from the typed seed for type starts", () => {
     expect(
-      initialTextEditorValue(
-        props({ trigger: "type", typedSeed: "z" }, "existing"),
-      ),
+      textInitialValue({ trigger: "type", typedSeed: "z" }, "existing"),
     ).toBe("z");
   });
 
   it("initializes nullish text values as blank for non-type starts", () => {
-    expect(
-      initialTextEditorValue(props({ trigger: "doubleClick" }, null)),
-    ).toBe("");
-    expect(
-      initialTextEditorValue(props({ trigger: "doubleClick" }, undefined)),
-    ).toBe("");
+    expect(textInitialValue({ trigger: "doubleClick" }, null)).toBe("");
+    expect(textInitialValue({ trigger: "doubleClick" }, undefined)).toBe("");
   });
 
   it("initializes numeric edits from raw model values", () => {
+    expect(numericInitialValue({ trigger: "doubleClick" }, 1234.5)).toBe(
+      "1234.5",
+    );
     expect(
-      initialNumericEditorValue(props({ trigger: "doubleClick" }, 1234.5)),
-    ).toBe("1234.5");
-    expect(
-      initialNumericEditorValue(
-        props({ trigger: "type", typedSeed: "7" }, 1234.5),
-      ),
+      numericInitialValue({ trigger: "type", typedSeed: "7" }, 1234.5),
     ).toBe("7");
   });
 
   it("does not decorate currency or percentage raw values for editing", () => {
-    expect(initialNumericEditorValue(props({ trigger: "enter" }, 12.5))).toBe(
-      "12.5",
-    );
-    expect(initialNumericEditorValue(props({ trigger: "f2" }, 0.15))).toBe(
-      "0.15",
-    );
+    expect(numericInitialValue({ trigger: "enter" }, 12.5)).toBe("12.5");
+    expect(numericInitialValue({ trigger: "f2" }, 0.15)).toBe("0.15");
   });
 
   it("initializes date edits from the raw value unless type-started", () => {
+    expect(dateInitialValue({ trigger: "doubleClick" }, "2026-05-15")).toBe(
+      "2026-05-15",
+    );
     expect(
-      initialDateEditorValue(props({ trigger: "doubleClick" }, "2026-05-15")),
-    ).toBe("2026-05-15");
-    expect(
-      initialDateEditorValue(
-        props({ trigger: "type", typedSeed: "2" }, "2026-05-15"),
-      ),
+      dateInitialValue({ trigger: "type", typedSeed: "2" }, "2026-05-15"),
     ).toBe("2");
   });
 });

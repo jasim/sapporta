@@ -62,8 +62,10 @@ describe("reduceController START_EDIT", () => {
       }),
     ).toEqual({
       coord: { rowId: "rows#r0", colId: "a" },
-      trigger: "type",
-      typedSeed: "x",
+      editStart: {
+        trigger: "type",
+        typedSeed: "x",
+      },
     });
   });
 
@@ -76,7 +78,7 @@ describe("reduceController START_EDIT", () => {
       }),
     ).toEqual({
       coord: { rowId: "rows#r0", colId: "a" },
-      trigger: "doubleClick",
+      editStart: { trigger: "doubleClick" },
     });
   });
 
@@ -89,7 +91,7 @@ describe("reduceController START_EDIT", () => {
       }),
     ).toEqual({
       coord: { rowId: "rows#r0", colId: "a" },
-      trigger: "enter",
+      editStart: { trigger: "enter" },
     });
   });
 
@@ -102,7 +104,7 @@ describe("reduceController START_EDIT", () => {
       }),
     ).toEqual({
       coord: { rowId: "rows#r0", colId: "a" },
-      trigger: "f2",
+      editStart: { trigger: "f2" },
     });
   });
 });

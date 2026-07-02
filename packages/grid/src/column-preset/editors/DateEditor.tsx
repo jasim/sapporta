@@ -1,16 +1,18 @@
 import { useEffect, useRef, useState } from "react";
-import type { CellEditorProps } from "../../grid/types/schema";
+import type { CellEditorProps, CellEditorStart } from "../../grid/types/schema";
 import { focusEditorInput } from "./editor-focus";
 import { parseForCommit } from "./parse-for-commit";
 
 export function DateEditor(props: CellEditorProps) {
-  const [value, setValue] = useState(() => initialDateEditorValue(props));
+  const [value, setValue] = useState(() =>
+    initialDateEditorValue(props.value, props.editStart),
+  );
   const ref = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     if (!ref.current) return;
-    focusEditorInput(ref.current, props.trigger);
-  }, [props.trigger]);
+    focusEditorInput(ref.current, props.editStart);
+  }, [props.editStart]);
 
   return (
     <input
@@ -20,14 +22,14 @@ export function DateEditor(props: CellEditorProps) {
       data-grid-part="editor-input"
       value={value}
       onChange={(e) => setValue(e.target.value)}
-      onBlur={() => props.onCommit(parseForCommit(props, value))}
+      onBlur={() => props.commit(parseForCommit(props, value))}
       onKeyDown={(e) => {
-        if (e.key === "Escape") props.onCancel();
+        if (e.key === "Escape") props.cancel();
         if (e.key === "Enter")
-          props.onCommit(parseForCommit(props, value), "down");
+          props.commit(parseForCommit(props, value), "down");
         if (e.key === "Tab") {
           e.preventDefault();
-          props.onCommit(
+          props.commit(
             parseForCommit(props, value),
             e.shiftKey ? "prev" : "next",
           );
@@ -37,7 +39,10 @@ export function DateEditor(props: CellEditorProps) {
   );
 }
 
-export function initialDateEditorValue(props: CellEditorProps): string {
-  if (props.trigger === "type") return props.typedSeed;
-  return props.value == null ? "" : String(props.value);
+export function initialDateEditorValue(
+  value: unknown,
+  editStart: CellEditorStart,
+): string {
+  if (editStart.trigger === "type") return editStart.typedSeed;
+  return value == null ? "" : String(value);
 }

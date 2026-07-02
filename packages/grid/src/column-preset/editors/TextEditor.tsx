@@ -1,12 +1,14 @@
 import { useEffect, useRef, useState } from "react";
-import type { CellEditorProps } from "../../grid/types/schema";
+import type { CellEditorProps, CellEditorStart } from "../../grid/types/schema";
 import { presetRuntime } from "../preset";
 import styles from "../sapporta-preset.module.css";
 import { focusEditorInput } from "./editor-focus";
 import { parseForCommit } from "./parse-for-commit";
 
 export function TextEditor(props: CellEditorProps) {
-  const [value, setValue] = useState(() => initialTextEditorValue(props));
+  const [value, setValue] = useState(() =>
+    initialTextEditorValue(props.value, props.editStart),
+  );
   const inputRef = useRef<HTMLInputElement | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const columnPreset = presetRuntime(props.column)?.preset;
@@ -18,8 +20,8 @@ export function TextEditor(props: CellEditorProps) {
   useEffect(() => {
     const node = multiLine ? textareaRef.current : inputRef.current;
     if (!node) return;
-    focusEditorInput(node, props.trigger);
-  }, [multiLine, props.trigger]);
+    focusEditorInput(node, props.editStart);
+  }, [multiLine, props.editStart]);
 
   if (multiLine) {
     return (
@@ -29,15 +31,15 @@ export function TextEditor(props: CellEditorProps) {
         data-grid-part="editor-input"
         value={value}
         onChange={(e) => setValue(e.target.value)}
-        onBlur={() => props.onCommit(parseForCommit(props, value))}
+        onBlur={() => props.commit(parseForCommit(props, value))}
         onKeyDown={(e) => {
           if (e.key === "Escape") {
-            props.onCancel();
+            props.cancel();
             return;
           }
           if (e.key === "Tab") {
             e.preventDefault();
-            props.onCommit(
+            props.commit(
               parseForCommit(props, value),
               e.shiftKey ? "prev" : "next",
             );
@@ -45,7 +47,7 @@ export function TextEditor(props: CellEditorProps) {
           }
           if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
             e.preventDefault();
-            props.onCommit(parseForCommit(props, value));
+            props.commit(parseForCommit(props, value));
           }
         }}
       />
@@ -58,14 +60,14 @@ export function TextEditor(props: CellEditorProps) {
       data-grid-part="editor-input"
       value={value}
       onChange={(e) => setValue(e.target.value)}
-      onBlur={() => props.onCommit(parseForCommit(props, value))}
+      onBlur={() => props.commit(parseForCommit(props, value))}
       onKeyDown={(e) => {
-        if (e.key === "Escape") props.onCancel();
+        if (e.key === "Escape") props.cancel();
         if (e.key === "Enter")
-          props.onCommit(parseForCommit(props, value), "down");
+          props.commit(parseForCommit(props, value), "down");
         if (e.key === "Tab") {
           e.preventDefault();
-          props.onCommit(
+          props.commit(
             parseForCommit(props, value),
             e.shiftKey ? "prev" : "next",
           );
@@ -75,7 +77,10 @@ export function TextEditor(props: CellEditorProps) {
   );
 }
 
-export function initialTextEditorValue(props: CellEditorProps): string {
-  if (props.trigger === "type") return props.typedSeed;
-  return props.value == null ? "" : String(props.value);
+export function initialTextEditorValue(
+  value: unknown,
+  editStart: CellEditorStart,
+): string {
+  if (editStart.trigger === "type") return editStart.typedSeed;
+  return value == null ? "" : String(value);
 }

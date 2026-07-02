@@ -1,9 +1,19 @@
-import { describe, expect, it, vi } from "vitest";
-import { isValidElement } from "react";
+// @vitest-environment happy-dom
+
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { act, createElement, isValidElement, type ReactElement } from "react";
+import { createRoot, type Root } from "react-dom/client";
 import type { Row, TableSchema } from "@sapporta/shared/contracts";
 import { eqCondition } from "@sapporta/shared/filter";
-import type { GridRuntime, RestEndpointFactory } from "@sapporta/grid";
+import type {
+  CellEditorProps,
+  CellEditorStart,
+  GridRuntime,
+  LevelRow,
+  RestEndpointFactory,
+} from "@sapporta/grid";
 import { ExpandableCellFrame } from "@sapporta/grid";
+import { makeRowId, rootPath } from "@sapporta/grid";
 import { preset } from "@sapporta/grid/column-preset";
 import { compileTGridRuntimeConfig } from "./tgrid-runtime-config";
 import type { TableRowsClient } from "./tgrid-level-config";
@@ -11,8 +21,15 @@ import type { TGridFilter } from "./tgrid-filter";
 import { createTGridColumnMapper } from "./tgrid-column-mapper";
 import type { TGridLookupResolver } from "./tgrid-lookup-resolver";
 import { createTGridColumnsBuilder } from "./tgrid-column-spec";
-import type { TGridSessionContext } from "./tgrid-cell-context";
+import type {
+  TGridCellEditorContext,
+  TGridSessionContext,
+} from "./tgrid-cell-context";
 import type { TableLookupRegistry } from "../lookup/table-lookup-registry";
+
+(
+  globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
+).IS_REACT_ACT_ENVIRONMENT = true;
 
 type OrderRow = { id: number; customer: string; internal?: string };
 type LineRow = {
@@ -31,6 +48,27 @@ type RowsByLevel = {
 };
 
 describe("compileTGridRuntimeConfig", () => {
+  let mounted: { root: Root; container: HTMLElement } | null = null;
+
+  afterEach(async () => {
+    if (!mounted) return;
+    await act(async () => {
+      mounted?.root.unmount();
+    });
+    mounted.container.remove();
+    mounted = null;
+  });
+
+  async function renderClient(element: ReactElement): Promise<void> {
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+    await act(async () => {
+      root.render(element);
+    });
+    mounted = { root, container };
+  }
+
   const orderSchema: TableSchema = {
     name: "orders",
     label: "Orders",
@@ -671,6 +709,112 @@ describe("compileTGridRuntimeConfig", () => {
         levelName: "orders",
         columns: { id: 1, customer: "ACME-saved" },
       },
+    });
+  });
+
+  it("passes edit start metadata into typed custom editors", async () => {
+    type Services = { suffix: string };
+    const columns = createTGridColumnsBuilder<RowsByLevel, Services, "orders">(
+      "orders",
+    );
+    const editStart: CellEditorStart = { trigger: "type", typedSeed: "A" };
+    let observed: {
+      editStart: CellEditorStart;
+      value: string;
+    } | null = null;
+
+    function CustomerEditor(
+      ctx: TGridCellEditorContext<RowsByLevel, Services, "orders", "customer">,
+    ) {
+      observed = {
+        editStart: ctx.editStart,
+        value: ctx.value,
+      };
+      return null;
+    }
+
+    const session: TGridSessionContext<RowsByLevel, Services> = {
+      rootLevel: "orders",
+      runtime: {} as unknown as GridRuntime,
+      appServices: { suffix: "saved" },
+      lookupRegistry: {} as unknown as TableLookupRegistry,
+      levels: {} as unknown as TGridSessionContext<
+        RowsByLevel,
+        Services
+      >["levels"],
+    };
+    const lookupResolver: TGridLookupResolver = {
+      bundleFor: () => undefined,
+    };
+    const config = compileTGridRuntimeConfig<RowsByLevel, Services>({
+      rootLevel: "orders",
+      levels: {
+        orders: {
+          table: orderSchema,
+          childLevels: [],
+          query: { owner: "host" },
+          columns: [
+            columns.table("customer", {
+              edit: {
+                editor: CustomerEditor,
+                startsOn: ["type"],
+              },
+            }),
+          ],
+        },
+        "orders.lines": {
+          table: lineSchema,
+          parent: { level: "orders", foreignKey: "order_id" },
+          childLevels: [],
+        },
+        "orders.lines.allocations": {
+          table: allocationSchema,
+          parent: { level: "orders.lines", foreignKey: "line_id" },
+          childLevels: [],
+        },
+      },
+      columnMapper: createTGridColumnMapper(lookupResolver),
+      sessionContext: () => session,
+      hostQueryState: () => ({
+        page: 1,
+        pageSize: 25,
+        sort: [],
+        filters: [],
+        search: null,
+      }),
+    });
+    const editor = config.gridSchema.levels.orders.columns[0].edit?.editor;
+    expect(editor).toBeDefined();
+    if (!editor) throw new Error("expected custom editor to be compiled");
+
+    const path = rootPath("orders");
+    const row: LevelRow = {
+      kind: "data",
+      id: makeRowId(path, "1"),
+      rowSelectable: true,
+      columns: { id: 1, customer: "Existing" },
+      hasChildren: false,
+      source: {
+        levelName: "orders",
+        columns: { id: 1, customer: "Existing" },
+      },
+    };
+    const props: CellEditorProps = {
+      editStart,
+      value: "Existing",
+      row,
+      column: config.gridSchema.levels.orders.columns[0],
+      path,
+      anchor: document.createElement("div"),
+      commit: () => {},
+      cancel: () => {},
+    };
+
+    await renderClient(createElement(editor, props));
+
+    expect(observed).toEqual({
+      editStart,
+      value: "Existing",
     });
   });
 });

@@ -122,7 +122,7 @@ describe("keyEventToCellIntent", () => {
       },
       editing: {
         coord: { rowId: makeRowId(path, "r0"), colId: "a" },
-        trigger: "f2",
+        editStart: { trigger: "f2" },
       },
       liveRowFocus: null,
       rowSelection: null,

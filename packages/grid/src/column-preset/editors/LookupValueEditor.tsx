@@ -15,7 +15,7 @@ export function LookupValueEditor(props: CellEditorProps) {
     : undefined;
   const searchLookup = capabilities?.searchLookup;
   const [searchText, setSearchText] = useState(() =>
-    props.trigger === "type" ? props.typedSeed : "",
+    props.editStart.trigger === "type" ? props.editStart.typedSeed : "",
   );
   const inputRef = useRef<HTMLInputElement | null>(null);
   const rootRef = useRef<HTMLDivElement | null>(null);
@@ -43,9 +43,9 @@ export function LookupValueEditor(props: CellEditorProps) {
         ref={inputRef}
         value=""
         readOnly
-        onBlur={props.onCancel}
+        onBlur={props.cancel}
         onKeyDown={(e) => {
-          if (e.key === "Escape") props.onCancel();
+          if (e.key === "Escape") props.cancel();
         }}
         className="h-full w-full"
         data-grid-part="editor-input"
@@ -60,14 +60,14 @@ export function LookupValueEditor(props: CellEditorProps) {
       onBlurCapture={() => {
         window.setTimeout(() => {
           if (!rootRef.current?.contains(document.activeElement)) {
-            props.onCancel();
+            props.cancel();
           }
         }, 0);
       }}
       onKeyDown={(e) => {
         if (e.key === "Escape") {
           e.preventDefault();
-          props.onCancel();
+          props.cancel();
         }
       }}
     >
@@ -76,7 +76,7 @@ export function LookupValueEditor(props: CellEditorProps) {
         options={comboboxOptions}
         onPick={(id) => {
           const entry = options.find((option) => String(option.value) === id);
-          props.onCommit(entry ? entry.value : id);
+          props.commit(entry ? entry.value : id);
         }}
         inputRef={inputRef}
         searchText={searchText}
