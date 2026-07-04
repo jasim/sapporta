@@ -133,8 +133,8 @@ describe("inMemoryGridDataSource", () => {
     const rootSource = ds.rootSource();
     const childSource = ds.resolveChild(root, "ord-1", "lines");
 
-    expect(rootSource.writable).toBe(false);
-    expect(childSource.writable).toBe(false);
+    expect(rootSource.write).toBeUndefined();
+    expect(childSource.write).toBeUndefined();
     expect("setCell" in rootSource).toBe(false);
     expect("setCell" in childSource).toBe(false);
   });
@@ -241,10 +241,10 @@ describe("inMemoryGridDataSource", () => {
     // path resolution.
     const ds = inMemoryGridDataSource(baseOpts());
     const root1 = ds.rootSource();
-    if (!root1.writable) throw new Error("expected writable root");
+    if (!root1.query?.sort) throw new Error("expected sortable root");
     // Sort orders by `customer` descending — moves "ord-1" (Alice) below
     // "ord-2" (Bob) in the in-memory level source.
-    root1.setSort([{ colId: "customer", direction: "desc" }]);
+    void root1.query.sort.set([{ colId: "customer", direction: "desc" }]);
     // Path resolution still finds ord-1's lines.
     const lines = ds.resolveChild(root, "ord-1", "lines");
     expect(lines.state().snapshot.nodes.map((n) => n.columns.id)).toEqual([
@@ -260,9 +260,9 @@ describe("inMemoryGridDataSource", () => {
     const ds = inMemoryGridDataSource(baseOpts({ tree }));
 
     const r = ds.rootSource();
-    if (!r.writable) throw new Error("expected writable root");
-    r.setCell("ord-1", "customer", "Aliceeee");
-    await r.createNode({
+    if (!r.write) throw new Error("expected writable root");
+    r.write.setCell("ord-1", "customer", "Aliceeee");
+    await r.write.createNode({
       levelName: "orders",
       columns: { id: "ord-3", customer: "C" },
     });
@@ -285,8 +285,8 @@ describe("inMemoryGridDataSource", () => {
     ds.dispose();
 
     // Post-dispose mutations on the underlying sources must not fire subs.
-    if (r.writable) r.setCell("ord-1", "customer", "X");
-    if (lines.writable) lines.setCell("ln-1", "amount", 999);
+    r.write?.setCell("ord-1", "customer", "X");
+    lines.write?.setCell("ln-1", "amount", 999);
     expect(rootSub).not.toHaveBeenCalled();
     expect(linesSub).not.toHaveBeenCalled();
   });

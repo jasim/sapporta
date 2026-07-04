@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import { rootPath } from "../types/identity";
 import type { LevelSchema } from "../types/schema";
 import type { LevelSnapshot } from "../data-sources/types";
@@ -18,28 +18,10 @@ import { withRowIds } from "../pipeline/stages/with-row-ids";
 import { buildDisplayed } from "../pipeline/stages/build-displayed";
 import { deriveDisplayedRowsState } from ".";
 import type { DisplayedRowsInput } from ".";
-import type { RowPredicate, SortDescriptor } from "../pipeline/types";
-
-vi.mock("../pipeline/stages/with-sort", async () => {
-  const actual = await vi.importActual<
-    typeof import("../pipeline/stages/with-sort")
-  >("../pipeline/stages/with-sort");
-  return { withSort: vi.fn(actual.withSort) };
-});
-
-vi.mock("../pipeline/stages/with-filter", async () => {
-  const actual = await vi.importActual<
-    typeof import("../pipeline/stages/with-filter")
-  >("../pipeline/stages/with-filter");
-  return { withFilter: vi.fn(actual.withFilter) };
-});
 
 function phantom(rowKey: string): PhantomRow {
   return { rowKey, columns: {}, state: { kind: "editing" } };
 }
-
-const sortSpy = withSort as unknown as ReturnType<typeof vi.fn>;
-const filterSpy = withFilter as unknown as ReturnType<typeof vi.fn>;
 
 const cols = [
   {
@@ -73,8 +55,6 @@ const nodes: TreeNode[] = [
   { levelName: "root", columns: { id: "c", name: "Cherry", qty: 2 } },
 ];
 
-const SERVER_MANAGED_NONE = { sort: false, filter: false, pagination: false };
-
 function makeSchema(options: LevelOptions = opts, columns = cols): LevelSchema {
   return { name: "root", columns, options, childLevels: [] };
 }
@@ -83,18 +63,13 @@ function makeSnapshot(
   args: {
     nodes?: TreeNode[];
     footerRows?: FooterRow[];
-    sort?: SortDescriptor[];
-    applyFilter?: RowPredicate;
-    serverManaged?: { sort: boolean; filter: boolean; pagination: boolean };
   } = {},
 ): LevelSnapshot {
-  return {
+  const snapshot: LevelSnapshot = {
     nodes: args.nodes ?? nodes,
-    footerRows: args.footerRows,
-    sort: args.sort,
-    applyFilter: args.applyFilter,
-    serverManaged: args.serverManaged ?? SERVER_MANAGED_NONE,
   };
+  if (args.footerRows) snapshot.footerRows = args.footerRows;
+  return snapshot;
 }
 
 function makeInput(
@@ -345,7 +320,6 @@ describe("deriveDisplayedRowsState composition", () => {
     const input = makeInput({
       snapshot: makeSnapshot({
         footerRows: [{ rowKey: "total", columns: { name: "Total", qty: 6 } }],
-        sort: [{ colId: "qty", direction: "asc" }],
       }),
       phantomRows: [phantom("p1")],
     });
@@ -361,43 +335,21 @@ describe("deriveDisplayedRowsState composition", () => {
       out.displayedRows.rows
         .slice(0, 3)
         .map((r) => (r.kind === "data" ? r.columns.id : null)),
-    ).toEqual(["b", "c", "a"]);
+    ).toEqual(["a", "b", "c"]);
   });
 
-  it("skips withSort when snapshot.serverManaged.sort is true", () => {
-    sortSpy.mockClear();
+  it("preserves the source's published row order", () => {
     const input = makeInput({
       snapshot: makeSnapshot({
-        sort: [{ colId: "qty", direction: "asc" }],
-        serverManaged: { sort: true, filter: false, pagination: false },
+        nodes: [nodes[1], nodes[2], nodes[0]],
       }),
     });
     const out = deriveDisplayedRowsState(input);
-    // Source already published the nodes in source-array order; pipeline
-    // must respect that and not re-sort.
     expect(
       out.displayedRows.rows.map((r) =>
         r.kind === "data" ? r.columns.id : null,
       ),
-    ).toEqual(["a", "b", "c"]);
-    expect(sortSpy).not.toHaveBeenCalled();
-  });
-
-  it("skips withFilter when snapshot.serverManaged.filter is true", () => {
-    filterSpy.mockClear();
-    const input = makeInput({
-      snapshot: makeSnapshot({
-        applyFilter: (cols) => Number(cols.qty) >= 999,
-        serverManaged: { sort: false, filter: true, pagination: false },
-      }),
-    });
-    const out = deriveDisplayedRowsState(input);
-    expect(out.displayedRows.rows.map((r) => r.kind)).toEqual([
-      "data",
-      "data",
-      "data",
-    ]);
-    expect(filterSpy).not.toHaveBeenCalled();
+    ).toEqual(["b", "c", "a"]);
   });
 });
 
@@ -409,13 +361,13 @@ describe("deriveDisplayedRowsState identity preservation", () => {
     expect(a).toBe(b);
   });
 
-  it("returns a new DisplayedRowsState ref when sort changes", () => {
+  it("returns a new DisplayedRowsState ref when source row order changes", () => {
     const base = makeInput();
     const a = deriveDisplayedRowsState(base);
     expect(deriveDisplayedRowsState(base, a)).toBe(a);
 
     const sortedSnapshot = makeSnapshot({
-      sort: [{ colId: "qty", direction: "asc" }],
+      nodes: [nodes[1], nodes[2], nodes[0]],
     });
     const sortedInput: DisplayedRowsInput = {
       ...base,
@@ -463,50 +415,6 @@ describe("deriveDisplayedRowsState identity preservation", () => {
     );
   });
 
-  it("flipping serverManaged.sort false → true skips withSort and re-runs the tail", () => {
-    const clientSorted = makeInput({
-      snapshot: makeSnapshot({ sort: [{ colId: "qty", direction: "asc" }] }),
-    });
-    const a = deriveDisplayedRowsState(clientSorted);
-    expect(
-      a.displayedRows.rows
-        .slice(0, 3)
-        .map((r) => (r.kind === "data" ? r.columns.id : null)),
-    ).toEqual(["b", "c", "a"]);
-    sortSpy.mockClear();
-    const serverSorted = makeInput({
-      snapshot: makeSnapshot({
-        sort: [{ colId: "qty", direction: "asc" }],
-        serverManaged: { sort: true, filter: false, pagination: false },
-      }),
-    });
-    const b = deriveDisplayedRowsState(serverSorted, a);
-    expect(sortSpy).not.toHaveBeenCalled();
-    expect(
-      b.displayedRows.rows
-        .slice(0, 3)
-        .map((r) => (r.kind === "data" ? r.columns.id : null)),
-    ).toEqual(["a", "b", "c"]);
-  });
-
-  it("flipping serverManaged.filter false → true skips withFilter even with a non-empty predicate", () => {
-    const applyFilter: RowPredicate = (cols) => Number(cols.qty) >= 999;
-    const clientFiltered = makeInput({
-      snapshot: makeSnapshot({ applyFilter }),
-    });
-    const a = deriveDisplayedRowsState(clientFiltered);
-    expect(a.displayedRows.rows.length).toBe(0);
-    filterSpy.mockClear();
-    const serverFiltered = makeInput({
-      snapshot: makeSnapshot({
-        applyFilter,
-        serverManaged: { sort: false, filter: true, pagination: false },
-      }),
-    });
-    const b = deriveDisplayedRowsState(serverFiltered, a);
-    expect(filterSpy).not.toHaveBeenCalled();
-    expect(b.displayedRows.rows.length).toBe(3);
-  });
 });
 
 describe("deriveDisplayedRowsState row sequence", () => {
@@ -530,7 +438,7 @@ describe("deriveDisplayedRowsState row sequence", () => {
     );
   });
 
-  it("changes DisplayedRowSequence when sort or filter changes order or membership", () => {
+  it("changes DisplayedRowSequence when source nodes change order or membership", () => {
     const base = makeInput();
     const first = deriveDisplayedRowsState(base);
 
@@ -538,7 +446,7 @@ describe("deriveDisplayedRowsState row sequence", () => {
       {
         ...base,
         sourceSnapshot: makeSnapshot({
-          sort: [{ colId: "qty", direction: "asc" }],
+          nodes: [nodes[1], nodes[2], nodes[0]],
         }),
       },
       first,
@@ -554,7 +462,7 @@ describe("deriveDisplayedRowsState row sequence", () => {
       {
         ...base,
         sourceSnapshot: makeSnapshot({
-          applyFilter: (cols) => Number(cols.qty) >= 2,
+          nodes: [nodes[0], nodes[2]],
         }),
       },
       first,

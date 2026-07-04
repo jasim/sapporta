@@ -2,7 +2,7 @@
 //
 // Phases 01–11 each shipped a focused unit-tested slice. This file glues
 // them together: a runtime over `restGridDataSource` for orders → lines →
-// notes, exercised through load → sort → paginate → expand → optimistic
+// notes, exercised through load → sort → expand → optimistic
 // edit → reconcile (agreed/diverged/rejected) → host-policy revert → refetch.
 //
 // The fake REST transport is a pair of injectable async stubs per level —
@@ -153,7 +153,6 @@ function endpointFor(t: Transport): RestEndpointFactory {
     insertNode: async (req) => req.node,
     removeNode: async () => {},
     rowQuery: sourceOwnedRowQuery({ page: 0, pageSize: 50 }),
-    serverManaged: { sort: true, filter: true, pagination: true },
   });
 }
 
@@ -215,10 +214,10 @@ describe("GridRuntime over restGridDataSource — full lifecycle", () => {
 
     const snap = runtime.snapshotFor(ordersRoot);
     expect(snap.nodes.map((n) => n.columns.id)).toEqual(["O1", "O2"]);
-    expect(snap.pagination).toEqual({ page: 0, pageSize: 50, totalCount: 2 });
+    expect("pagination" in snap).toBe(false);
   });
 
-  it("setSort on the root issues exactly one new fetchPage with the descriptor", async () => {
+  it("query.sort on the root issues exactly one new fetchPage with the descriptor", async () => {
     const { runtime, orders } = buildRig();
     orders.fetchCalls[0].deferred.resolve({
       nodes: ordersFixture(),
@@ -228,45 +227,11 @@ describe("GridRuntime over restGridDataSource — full lifecycle", () => {
 
     runtime
       .sourceFor(ordersRoot)
-      .setSort([{ colId: "amount", direction: "asc" }]);
+      .query!.sort!.set([{ colId: "amount", direction: "asc" }]);
     expect(orders.fetchCalls).toHaveLength(2);
     expect(orders.fetchCalls[1].req.sort).toEqual([
       { colId: "amount", direction: "asc" },
     ]);
-  });
-
-  it("setPage while a previous fetch is in flight: prior is cancelled, no stale data wins", async () => {
-    const { runtime, orders } = buildRig();
-    orders.fetchCalls[0].deferred.resolve({
-      nodes: ordersFixture(),
-      totalCount: 2,
-    });
-    await flush();
-
-    runtime.sourceFor(ordersRoot).setPage(1, 50);
-    expect(orders.fetchCalls).toHaveLength(2);
-    expect(orders.fetchCalls[1].req.page).toBe(1);
-
-    // Resolve the SECOND call (the page-1 fetch).
-    orders.fetchCalls[1].deferred.resolve({
-      nodes: [
-        {
-          levelName: "orders",
-          columns: { id: "O3", customer: "Gamma", amount: 300 },
-        },
-      ],
-      totalCount: 3,
-    });
-    await flush();
-
-    expect(
-      runtime.snapshotFor(ordersRoot).nodes.map((n) => n.columns.id),
-    ).toEqual(["O3"]);
-    expect(runtime.snapshotFor(ordersRoot).pagination).toEqual({
-      page: 1,
-      pageSize: 50,
-      totalCount: 3,
-    });
   });
 
   it("expanding a row resolves the child source once, transitions loading → ready", async () => {
@@ -428,7 +393,7 @@ describe("GridRuntime over restGridDataSource — full lifecycle", () => {
     await flush();
     expect(runtime.sourceStateFor(ordersRoot).status).toBe("ready");
 
-    runtime.sourceFor(ordersRoot).refetch();
+    runtime.sourceFor(ordersRoot).query!.refetch!();
     expect(orders.fetchCalls).toHaveLength(2);
     expect(runtime.sourceStateFor(ordersRoot).status).toBe("refreshing");
 
@@ -447,14 +412,14 @@ describe("GridRuntime over restGridDataSource — full lifecycle", () => {
 });
 
 // ---------------------------------------------------------------------
-// Success metrics — server-managed stage skipping and source swap.
+// Success metrics — source-shaped rows and source swap.
 // ---------------------------------------------------------------------
 
-describe("Success metric: server-managed sort/filter skip the pipeline stages", () => {
+describe("Success metric: REST source rows are already shaped for display", () => {
   const ordersRoot = rootPath("orders");
 
   // Schema with one flat level — the bare-minimum scenario for a
-  // 100×30-style table whose source declares everything server-managed.
+  // 100×30-style table whose source owns query shaping.
   const flatSchema: GridSchema = {
     rootLevel: "orders",
     levels: {
@@ -467,13 +432,10 @@ describe("Success metric: server-managed sort/filter skip the pipeline stages", 
     },
   };
 
-  // The displayed-row sort stage (`pipeline/with-sort.ts`) preserves source
-  // order. With `serverManaged.sort: true` set, derivation skips the stage
-  // entirely — applying a sort descriptor does NOT reorder the displayed rows,
-  // even though the source's snapshot carries the descriptor unchanged. This is
-  // the observable shape of
-  // "withSort = 0 invocations" without spying on module internals.
-  it("with serverManaged.sort=true, applying setSort does not reorder displayed rows", async () => {
+  // REST sources publish endpoint-shaped rows. Applying a sort descriptor
+  // refetches, and the displayed row order remains exactly what the endpoint
+  // returns.
+  it("query.sort does not reorder displayed rows locally", async () => {
     // Source returns nodes in a deliberately scrambled-by-amount order.
     const orders = makeTransport();
     const dataSource = restGridDataSource({
@@ -506,12 +468,12 @@ describe("Success metric: server-managed sort/filter skip the pipeline stages", 
       .rows.map((r) => r.columns.amount);
     expect(before).toEqual([300, 100, 200]);
 
-    // Apply a sort descriptor. The source's serverManaged.sort=true means
-    // setSort triggers a refetch; we resolve it with the SAME unsorted nodes.
+    // Apply a sort descriptor. The REST source refetches; we resolve it with
+    // the SAME unsorted nodes.
     // If the pipeline ran withSort, the displayed order would be [100,200,300].
     runtime
       .sourceFor(ordersRoot)
-      .setSort([{ colId: "amount", direction: "asc" }]);
+      .query!.sort!.set([{ colId: "amount", direction: "asc" }]);
     orders.fetchCalls[1].deferred.resolve({
       nodes: [
         {
@@ -537,7 +499,7 @@ describe("Success metric: server-managed sort/filter skip the pipeline stages", 
     expect(after).toEqual([300, 100, 200]);
   });
 
-  it("with serverManaged.filter=true, the pipeline does not drop rows the snapshot still carries", async () => {
+  it("query.filter does not drop displayed rows locally", async () => {
     const orders = makeTransport();
     const dataSource = restGridDataSource({
       schema: flatSchema,
@@ -560,9 +522,9 @@ describe("Success metric: server-managed sort/filter skip the pipeline stages", 
     await flush();
 
     // Apply a filter that, if run client-side, would exclude both rows.
-    runtime.sourceFor(ordersRoot).setFilter({ amount: () => false });
-    // serverManaged.filter=true triggers a refetch; resolve with both
-    // rows still present (server's prerogative).
+    runtime.sourceFor(ordersRoot).query!.filter!.set({ amount: () => false });
+    // The REST source refetches; resolve with both rows still present
+    // (endpoint's prerogative).
     orders.fetchCalls[1].deferred.resolve({
       nodes: [
         {

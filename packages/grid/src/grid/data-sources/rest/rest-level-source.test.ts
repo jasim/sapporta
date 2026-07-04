@@ -6,6 +6,7 @@ import type {
   PatchCellRequest,
   PatchCellResponse,
   ReconcileEvent,
+  WriteCapability,
 } from "../types";
 import {
   hostBackedRowQuery,
@@ -51,10 +52,20 @@ const baseOpts = (
 ): RestLevelSourceOpts<TestFilter> => ({
   fetchPage: vi.fn(async () => ({ nodes: fixtureNodes() })),
   rowQuery: sourceOwnedRowQuery({ page: 0, pageSize: 10 }),
-  serverManaged: { sort: true, filter: true, pagination: true },
   rowKey: (n) => String(n.columns.id),
   ...extra,
 });
+
+type WritableTestSource = ReturnType<typeof restLevelSource> & {
+  write: WriteCapability;
+};
+
+function requireWrite(
+  src: ReturnType<typeof restLevelSource>,
+): WriteCapability {
+  if (!src.write) throw new Error("expected writable source");
+  return src.write;
+}
 
 describe("restLevelSource — read surface", () => {
   it("issues exactly one fetchPage on construction; transitions loading → ready on resolve", async () => {
@@ -75,11 +86,7 @@ describe("restLevelSource — read surface", () => {
       "b",
       "c",
     ]);
-    expect(src.state().snapshot.pagination).toEqual({
-      page: 0,
-      pageSize: 10,
-      totalCount: 3,
-    });
+    expect("pagination" in src.state().snapshot).toBe(false);
   });
 
   it("propagates fetchPage rejection: status initialLoading → initialError, error.message verbatim", async () => {
@@ -113,7 +120,7 @@ describe("restLevelSource — read surface", () => {
     const src = restLevelSource(baseOpts({ fetchPage }));
     expect(calls).toHaveLength(1);
 
-    src.setSort([{ colId: "v", direction: "asc" }]);
+    void src.query!.sort!.set([{ colId: "v", direction: "asc" }]);
     expect(fetchPage).toHaveBeenCalledTimes(2);
     expect(calls[1].req.sort).toEqual([{ colId: "v", direction: "asc" }]);
 
@@ -137,15 +144,20 @@ describe("restLevelSource — read surface", () => {
     ]);
   });
 
-  it("setPage while a previous fetch is in flight: prior is cancelled, no stale data wins", async () => {
+  it("refetch after rowQuery page change cancels the prior fetch; no stale data wins", async () => {
     const calls: Array<ReturnType<typeof deferred<FetchPageResponse>>> = [];
     const fetchPage = vi.fn(async () => {
       const d = deferred<FetchPageResponse>();
       calls.push(d);
       return d.promise;
     });
-    const src = restLevelSource(baseOpts({ fetchPage }));
-    src.setPage(1, 10);
+    const rowQuery = sourceOwnedRowQuery<TestFilter>({
+      page: 0,
+      pageSize: 10,
+    });
+    const src = restLevelSource(baseOpts({ fetchPage, rowQuery }));
+    rowQuery.setPageState(1, 10);
+    void src.query!.refetch!();
     expect(fetchPage).toHaveBeenCalledTimes(2);
 
     calls[0].resolve({
@@ -158,7 +170,6 @@ describe("restLevelSource — read surface", () => {
     calls[1].resolve({ nodes: fixtureNodes(), totalCount: 3 });
     await calls[1].promise;
     await flush();
-    expect(src.state().snapshot.pagination?.page).toBe(1);
     expect(src.state().snapshot.nodes.map((n) => n.columns.id)).toEqual([
       "a",
       "b",
@@ -166,72 +177,46 @@ describe("restLevelSource — read surface", () => {
     ]);
   });
 
-  it("source-owned setPage fetches and resolves ready", async () => {
+  it("source-owned rowQuery page changes fetch through refetch", async () => {
     const fetchPage = vi.fn(async (req: FetchPageRequest) => ({
       nodes: fixtureNodes().slice(0, req.pageSize),
       totalCount: 30,
     }));
+    const rowQuery = sourceOwnedRowQuery<TestFilter>({
+      page: 0,
+      pageSize: 10,
+    });
     const src = restLevelSource(
       baseOpts({
         fetchPage,
-        rowQuery: sourceOwnedRowQuery({ page: 0, pageSize: 10 }),
+        rowQuery,
       }),
     );
     await flush();
 
-    const result = await src.setPage(1, 10);
+    rowQuery.setPageState(1, 10);
+    const result = await src.query!.refetch!();
     expect(result.kind).toBe("ready");
     expect(fetchPage).toHaveBeenLastCalledWith({ page: 1, pageSize: 10 });
-    await flush();
-    expect(src.state().snapshot.pagination?.page).toBe(1);
   });
 
-  it("setPage rejects non-integer pagination windows", () => {
-    const src = restLevelSource(
-      baseOpts({ rowQuery: sourceOwnedRowQuery({ page: 0, pageSize: 10 }) }),
-    );
+  it("source-owned rowQuery rejects non-integer pagination windows", () => {
+    const rowQuery = sourceOwnedRowQuery({ page: 0, pageSize: 10 });
 
-    expect(() => src.setPage(1.5, 10)).toThrow(/page must be an integer/);
-    expect(() => src.setPage(1, 0)).toThrow(/pageSize must be an integer/);
+    expect(() => rowQuery.setPageState(1.5, 10)).toThrow(
+      /page must be an integer/,
+    );
+    expect(() => rowQuery.setPageState(1, 0)).toThrow(
+      /pageSize must be an integer/,
+    );
   });
 
-  it("setSort with serverManaged.sort=false updates state without refetching", async () => {
-    const fetchPage = vi.fn(async () => ({
-      nodes: fixtureNodes(),
-      totalCount: 3,
-    }));
-    const src = restLevelSource(
-      baseOpts({
-        fetchPage,
-        serverManaged: { sort: false, filter: false, pagination: true },
-        compileFilter: () => undefined,
-      }),
-    );
+  it("REST snapshots omit query metadata", async () => {
+    const src = restLevelSource(baseOpts());
     await flush();
-    await flush();
-    expect(fetchPage).toHaveBeenCalledTimes(1);
-
-    const result = await src.setSort([{ colId: "v", direction: "asc" }]);
-    expect(result.kind).toBe("ready");
-    expect(fetchPage).toHaveBeenCalledTimes(1);
-    expect(src.state().snapshot.sort).toEqual([
-      { colId: "v", direction: "asc" },
-    ]);
-  });
-
-  it("snapshot carries serverManaged unchanged from opts", async () => {
-    const src = restLevelSource(
-      baseOpts({
-        serverManaged: { sort: true, filter: false, pagination: true },
-        compileFilter: () => undefined,
-      }),
-    );
-    await flush();
-    expect(src.state().snapshot.serverManaged).toEqual({
-      sort: true,
-      filter: false,
-      pagination: true,
-    });
+    expect("sort" in src.state().snapshot).toBe(false);
+    expect("filter" in src.state().snapshot).toBe(false);
+    expect("serverManaged" in src.state().snapshot).toBe(false);
   });
 
   it("resolves an older load as superseded when a newer refetch starts", async () => {
@@ -244,8 +229,8 @@ describe("restLevelSource — read surface", () => {
     const src = restLevelSource(baseOpts({ fetchPage }));
     expect(calls).toHaveLength(1);
 
-    const first = src.refetch();
-    const second = src.refetch();
+    const first = src.query!.refetch!();
+    const second = src.query!.refetch!();
 
     await expect(first).resolves.toEqual({ kind: "superseded" });
 
@@ -260,7 +245,7 @@ describe("restLevelSource — read surface", () => {
     const fetchPage = vi.fn(async () => fetched.promise);
     const src = restLevelSource(baseOpts({ fetchPage }));
 
-    const load = src.refetch();
+    const load = src.query!.refetch!();
     src.dispose();
 
     await expect(load).resolves.toEqual({ kind: "disposed" });
@@ -283,11 +268,10 @@ describe("restLevelSource — host-backed row query", () => {
       fetchPage,
       rowQuery: hostBackedRowQuery({
         current,
-        setSort: () => "unchanged",
-        setFilter: () => "unchanged",
-        setPage: () => "unchanged",
+        setSortState: () => "unchanged",
+        setFilterState: () => "unchanged",
+        setPageState: () => "unchanged",
       }),
-      serverManaged: { sort: true, filter: true, pagination: true },
       rowKey: (n) => String(n.columns.id),
     });
     await flush();
@@ -306,7 +290,7 @@ describe("restLevelSource — host-backed row query", () => {
       pageSize: 25,
       sort: [{ colId: "v", direction: "asc" }],
     };
-    await src.refetch();
+    await src.query!.refetch!();
     expect(fetchPage).toHaveBeenCalledTimes(2);
     expect(fetchPage.mock.calls[1][0]).toEqual({
       page: 5,
@@ -315,9 +299,9 @@ describe("restLevelSource — host-backed row query", () => {
     });
   });
 
-  it("snapshot.pagination.page reflects the current row query and totalCount from last response", async () => {
+  it("refetch reads page state from host row query without publishing pagination metadata", async () => {
     let cur: FetchPageRequest = { page: 1, pageSize: 10 };
-    const fetchPage = vi.fn(async () => ({
+    const fetchPage = vi.fn(async (_req: FetchPageRequest) => ({
       nodes: fixtureNodes(),
       totalCount: 42,
     }));
@@ -325,32 +309,25 @@ describe("restLevelSource — host-backed row query", () => {
       fetchPage,
       rowQuery: hostBackedRowQuery({
         current: () => cur,
-        setSort: () => "unchanged",
-        setFilter: () => "unchanged",
-        setPage: () => "unchanged",
+        setSortState: () => "unchanged",
+        setFilterState: () => "unchanged",
+        setPageState: () => "unchanged",
       }),
-      serverManaged: { sort: true, filter: true, pagination: true },
       rowKey: (n) => String(n.columns.id),
     });
     await flush();
     await flush();
 
-    expect(src.state().snapshot.pagination).toEqual({
-      page: 1,
-      pageSize: 10,
-      totalCount: 42,
-    });
+    expect(fetchPage.mock.calls[0][0]).toEqual({ page: 1, pageSize: 10 });
+    expect("pagination" in src.state().snapshot).toBe(false);
 
     cur = { page: 7, pageSize: 10 };
-    await src.refetch();
-    expect(src.state().snapshot.pagination).toEqual({
-      page: 7,
-      pageSize: 10,
-      totalCount: 42,
-    });
+    await src.query!.refetch!();
+    expect(fetchPage.mock.calls[1][0]).toEqual({ page: 7, pageSize: 10 });
+    expect("pagination" in src.state().snapshot).toBe(false);
   });
 
-  it("snapshot reflects sort/filter from the host-owned query", async () => {
+  it("query capabilities reflect sort/filter from the host-owned query", async () => {
     const filter = { v: (value: unknown) => Number(value) > 1 };
     const fetchPage = vi.fn(async (_req: FetchPageRequest<TestFilter>) => ({
       nodes: fixtureNodes(),
@@ -364,22 +341,24 @@ describe("restLevelSource — host-backed row query", () => {
           sort: [{ colId: "v", direction: "asc" }],
           filter,
         }),
-        setSort: () => "unchanged",
-        setFilter: () => "unchanged",
-        setPage: () => "unchanged",
+        setSortState: () => "unchanged",
+        setFilterState: () => "unchanged",
+        setPageState: () => "unchanged",
       }),
-      serverManaged: { sort: true, filter: true, pagination: true },
       rowKey: (n) => String(n.columns.id),
     });
     await flush();
     await flush();
 
-    const snap = src.state().snapshot;
-    expect(snap.sort).toEqual([{ colId: "v", direction: "asc" }]);
-    expect(snap.filter).toBe(filter);
+    expect(src.query!.sort!.current()).toEqual([
+      { colId: "v", direction: "asc" },
+    ]);
+    expect(src.query!.filter!.current()).toBe(filter);
+    expect("sort" in src.state().snapshot).toBe(false);
+    expect("filter" in src.state().snapshot).toBe(false);
   });
 
-  it("setSort / setFilter / setPage mutate host state and fetch", async () => {
+  it("query sort/filter mutate host state and fetch; host page changes refetch explicitly", async () => {
     let cur: FetchPageRequest<TestFilter> = {
       page: 0,
       pageSize: 10,
@@ -391,29 +370,29 @@ describe("restLevelSource — host-backed row query", () => {
       fetchPage,
       rowQuery: hostBackedRowQuery({
         current: () => cur,
-        setSort: (sort) => {
+        setSortState: (sort) => {
           cur = { ...cur, sort };
           return "changed";
         },
-        setFilter: (filter) => {
+        setFilterState: (filter) => {
           cur = { ...cur, filter };
           return "changed";
         },
-        setPage: (page, pageSize) => {
+        setPageState: (page, pageSize) => {
           cur = { ...cur, page, pageSize };
           return "changed";
         },
       }),
-      serverManaged: { sort: true, filter: true, pagination: true },
       rowKey: (n) => String(n.columns.id),
     });
     await flush();
     await flush();
     expect(fetchPage).toHaveBeenCalledTimes(1);
 
-    await src.setSort([{ colId: "v", direction: "asc" }]);
-    await src.setFilter({ v: () => true });
-    await src.setPage(99, 99);
+    await src.query!.sort!.set([{ colId: "v", direction: "asc" }]);
+    await src.query!.filter!.set({ v: () => true });
+    cur = { ...cur, page: 99, pageSize: 99 };
+    await src.query!.refetch!();
 
     expect(fetchPage).toHaveBeenCalledTimes(4);
     expect(fetchPage.mock.calls[1][0].sort).toEqual([
@@ -437,24 +416,23 @@ describe("restLevelSource — host-backed row query", () => {
       fetchPage: async () => ({ nodes: fixtureNodes(), totalCount: 3 }),
       rowQuery: hostBackedRowQuery({
         current: () => ({ page: 0, pageSize: 10 }),
-        setSort: () => "unchanged",
-        setFilter: () => "unchanged",
-        setPage: () => "unchanged",
+        setSortState: () => "unchanged",
+        setFilterState: () => "unchanged",
+        setPageState: () => "unchanged",
       }),
-      serverManaged: { sort: true, filter: true, pagination: true },
       rowKey: (n) => String(n.columns.id),
       patchCell,
       insertNode: async (req) => req.node,
       removeNode: async () => {},
     });
-    if (!src.writable) throw new Error("writable");
+    const write = requireWrite(src);
     await flush();
     await flush();
 
     const events: ReconcileEvent[] = [];
-    src.onReconcile((e) => events.push(e));
+    write.onReconcile((e) => events.push(e));
 
-    src.setCell("a", "v", 42);
+    write.setCell("a", "v", 42);
     expect(src.state().snapshot.nodes[0].columns.v).toBe(42);
 
     patches[0].resolve({ value: 42 });
@@ -468,9 +446,9 @@ describe("restLevelSource — host-backed row query", () => {
 });
 
 describe("restLevelSource — read-only / writable discrimination", () => {
-  it("with no edit endpoints supplied, returns a ReadonlyLevelDataSource (writable: false)", () => {
+  it("with no edit endpoints supplied, omits the write capability", () => {
     const src = restLevelSource(baseOpts());
-    expect(src.writable).toBe(false);
+    expect(src.write).toBeUndefined();
     expect("setCell" in src).toBe(false);
   });
 
@@ -484,7 +462,7 @@ describe("restLevelSource — read-only / writable discrimination", () => {
     ).toThrow(/all of \{patchCell, insertNode, removeNode\} must be wired/);
   });
 
-  it("with all three edit endpoints, returns a writable source", () => {
+  it("with all three edit endpoints, exposes a write capability", () => {
     const src = restLevelSource(
       baseOpts({
         patchCell: async () => ({ value: 0 }),
@@ -492,7 +470,7 @@ describe("restLevelSource — read-only / writable discrimination", () => {
         removeNode: async () => {},
       }),
     );
-    expect(src.writable).toBe(true);
+    expect(src.write).toBeDefined();
   });
 });
 
@@ -510,13 +488,13 @@ describe("restLevelSource — setCell reconciliation", () => {
 
   async function readyWritable(
     extra: Partial<RestLevelSourceOpts<TestFilter>> = {},
-  ) {
+  ): Promise<WritableTestSource> {
     const src = restLevelSource(writableOpts(extra));
-    if (!src.writable) throw new Error("expected writable source");
+    requireWrite(src);
     // Drain the initial fetchPage microtasks.
     await flush();
     await flush();
-    return src;
+    return src as WritableTestSource;
   }
 
   it("agreed: server returns the optimistic value; nodes unchanged after confirm", async () => {
@@ -527,12 +505,12 @@ describe("restLevelSource — setCell reconciliation", () => {
       return d.promise;
     });
     const src = await readyWritable({ patchCell });
-    if (!src.writable) throw new Error("writable");
+    const write = src.write;
 
     const events: ReconcileEvent[] = [];
-    src.onReconcile((e) => events.push(e));
+    write.onReconcile((e) => events.push(e));
 
-    src.setCell("a", "v", 99);
+    write.setCell("a", "v", 99);
     expect(src.state().snapshot.nodes[0].columns.v).toBe(99);
 
     patches[0].resolve({ value: 99 });
@@ -553,16 +531,16 @@ describe("restLevelSource — setCell reconciliation", () => {
       return d.promise;
     });
     const src = await readyWritable({ patchCell });
-    if (!src.writable) throw new Error("writable");
+    const write = src.write;
 
     const events: ReconcileEvent[] = [];
-    let nodesAtEvent: TreeNode[] | null = null;
-    src.onReconcile((e) => {
+    let nodesAtEvent: readonly TreeNode[] | null = null;
+    write.onReconcile((e) => {
       events.push(e);
       nodesAtEvent = src.state().snapshot.nodes;
     });
 
-    src.setCell("a", "v", 99);
+    write.setCell("a", "v", 99);
     patches[0].resolve({ value: 100 }); // server normalized
     await patches[0].promise;
     await flush();
@@ -587,12 +565,12 @@ describe("restLevelSource — setCell reconciliation", () => {
       return d.promise;
     });
     const src = await readyWritable({ patchCell });
-    if (!src.writable) throw new Error("writable");
+    const write = src.write;
 
     const events: ReconcileEvent[] = [];
-    src.onReconcile((e) => events.push(e));
+    write.onReconcile((e) => events.push(e));
 
-    src.setCell("a", "v", 99);
+    write.setCell("a", "v", 99);
     patches[0].reject(new Error("403 Forbidden — column read-only"));
     await patches[0].promise.catch(() => {});
     await flush();
@@ -622,13 +600,13 @@ describe("restLevelSource — setCell reconciliation", () => {
       return d.promise;
     });
     const src = await readyWritable({ patchCell });
-    if (!src.writable) throw new Error("writable");
+    const write = src.write;
 
     const events: ReconcileEvent[] = [];
-    src.onReconcile((e) => events.push(e));
+    write.onReconcile((e) => events.push(e));
 
-    src.setCell("a", "v", 99);
-    src.setCell("a", "v", 100);
+    write.setCell("a", "v", 99);
+    write.setCell("a", "v", 100);
     expect(patches).toHaveLength(2);
 
     // Resolve the FIRST (superseded) one — it should NOT emit reconcile.
@@ -651,10 +629,10 @@ describe("restLevelSource — setCell reconciliation", () => {
       value: _req.value,
     }));
     const src = await readyWritable({ patchCell });
-    if (!src.writable) throw new Error("writable");
+    const write = src.write;
 
-    src.setCell("a", "v", 99);
-    src.setCell("a", "id", "z");
+    write.setCell("a", "v", 99);
+    write.setCell("a", "id", "z");
     expect(patchCell).toHaveBeenCalledTimes(2);
     const colIds = patchCell.mock.calls.map((c) => c[0].colId).sort();
     expect(colIds).toEqual(["id", "v"]);
@@ -675,22 +653,22 @@ describe("restLevelSource — applyChanges atomicity", () => {
 
   async function readyWritable(
     extra: Partial<RestLevelSourceOpts<TestFilter>> = {},
-  ) {
+  ): Promise<WritableTestSource> {
     const src = restLevelSource(writableOpts(extra));
-    if (!src.writable) throw new Error("expected writable source");
+    requireWrite(src);
     await flush();
     await flush();
-    return src;
+    return src as WritableTestSource;
   }
 
   it("all PATCHes succeed: every change applies, agreed events fire per cell", async () => {
     const src = await readyWritable();
-    if (!src.writable) throw new Error("writable");
+    const write = src.write;
 
     const events: ReconcileEvent[] = [];
-    src.onReconcile((e) => events.push(e));
+    write.onReconcile((e) => events.push(e));
 
-    src.applyChanges([
+    write.applyChanges([
       { rowKey: "a", colId: "v", value: 10 },
       { rowKey: "b", colId: "v", value: 20 },
     ]);
@@ -708,12 +686,12 @@ describe("restLevelSource — applyChanges atomicity", () => {
       return { value: req.value };
     });
     const src = await readyWritable({ patchCell });
-    if (!src.writable) throw new Error("writable");
+    const write = src.write;
 
     const events: ReconcileEvent[] = [];
-    src.onReconcile((e) => events.push(e));
+    write.onReconcile((e) => events.push(e));
 
-    src.applyChanges([
+    write.applyChanges([
       { rowKey: "a", colId: "v", value: 10 },
       { rowKey: "b", colId: "v", value: 20 },
     ]);
@@ -737,7 +715,7 @@ describe("restLevelSource — applyChanges atomicity", () => {
 describe("restLevelSource — createNode", () => {
   async function readyWritable(
     extra: Partial<RestLevelSourceOpts<TestFilter>> = {},
-  ) {
+  ): Promise<WritableTestSource> {
     const src = restLevelSource(
       baseOpts({
         patchCell: async () => ({ value: 0 }),
@@ -746,10 +724,10 @@ describe("restLevelSource — createNode", () => {
         ...extra,
       }),
     );
-    if (!src.writable) throw new Error("expected writable source");
+    requireWrite(src);
     await flush();
     await flush();
-    return src;
+    return src as WritableTestSource;
   }
 
   it("waits for the endpoint result before inserting the authoritative node", async () => {
@@ -761,13 +739,13 @@ describe("restLevelSource — createNode", () => {
         return d.promise;
       },
     });
-    if (!src.writable) throw new Error("writable");
+    const write = src.write;
 
     const draft: TreeNode = {
       levelName: "rows",
       columns: { v: 4 },
     };
-    const promise = src.createNode(draft);
+    const promise = write.createNode(draft);
     expect(src.state().snapshot.nodes).toHaveLength(3);
 
     const serverNode: TreeNode = {
@@ -791,13 +769,13 @@ describe("restLevelSource — createNode", () => {
         return d.promise;
       },
     });
-    if (!src.writable) throw new Error("writable");
+    const write = src.write;
 
-    const first = src.createNode({
+    const first = write.createNode({
       levelName: "rows",
       columns: { id: "d", v: 4 },
     });
-    const second = src.createNode({
+    const second = write.createNode({
       levelName: "rows",
       columns: { id: "e", v: 5 },
     });
@@ -837,11 +815,11 @@ describe("restLevelSource — createNode", () => {
         throw new Error("nope");
       },
     });
-    if (!src.writable) throw new Error("writable");
+    const write = src.write;
     const before = src.state().snapshot.nodes;
 
     await expect(
-      src.createNode({ levelName: "rows", columns: { v: 4 } }),
+      write.createNode({ levelName: "rows", columns: { v: 4 } }),
     ).rejects.toThrow("nope");
 
     expect(src.state().snapshot.nodes).toBe(before);
@@ -851,7 +829,7 @@ describe("restLevelSource — createNode", () => {
 describe("restLevelSource — removeNode", () => {
   async function readyWritable(
     extra: Partial<RestLevelSourceOpts<TestFilter>> = {},
-  ) {
+  ): Promise<WritableTestSource> {
     const src = restLevelSource(
       baseOpts({
         patchCell: async () => ({ value: 0 }),
@@ -860,10 +838,10 @@ describe("restLevelSource — removeNode", () => {
         ...extra,
       }),
     );
-    if (!src.writable) throw new Error("expected writable source");
+    requireWrite(src);
     await flush();
     await flush();
-    return src;
+    return src as WritableTestSource;
   }
 
   it("surfaces backend delete failures to the caller", async () => {
@@ -872,9 +850,9 @@ describe("restLevelSource — removeNode", () => {
         throw new Error("delete denied");
       },
     });
-    if (!src.writable) throw new Error("writable");
+    const write = src.write;
 
-    await expect(src.removeNode("b")).rejects.toThrow("delete denied");
+    await expect(write.removeNode("b")).rejects.toThrow("delete denied");
   });
 });
 

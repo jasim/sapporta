@@ -140,7 +140,6 @@ function fakeRuntimeWithRows(rows: LevelRow[]): GridRuntime {
       status: "ready",
       snapshot: {
         nodes: [],
-        serverManaged: { sort: false, filter: false, pagination: false },
       },
     }),
     schemaAt: () => reportSchema.levels.cat,

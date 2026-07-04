@@ -106,13 +106,15 @@ function buildReadonlyRuntime() {
 }
 
 describe("TableController — writable construction", () => {
-  it("rootSource and rootController identity-stable across the runtime lifetime", () => {
+  it("rootSource and rootController identity-stable across the runtime lifetime", async () => {
     const rt = buildRuntime();
     const tc = createTableController({ runtime: rt });
     if (!tc.writable) throw new Error("expected writable");
     const sourceRef = tc.rootSource;
     const controllerRef = tc.rootController;
-    tc.rootSource.setSort([{ colId: "qty", direction: "desc" }]);
+    await tc.rootSource.query!.sort!.set([
+      { colId: "qty", direction: "desc" },
+    ]);
     expect(tc.rootSource).toBe(sourceRef);
     expect(tc.rootController).toBe(controllerRef);
   });
@@ -122,7 +124,7 @@ describe("TableController — writable construction", () => {
     const tc = createTableController({ runtime: rt });
     expect(tc.writable).toBe(true);
     if (!tc.writable) return;
-    expect(tc.rootSource.writable).toBe(true);
+    expect(tc.rootSource.canWrite).toBe(true);
     expect("setCell" in tc.rootSource).toBe(false);
     expect("createNode" in tc.rootSource).toBe(false);
     expect("removeNode" in tc.rootSource).toBe(false);
@@ -130,30 +132,21 @@ describe("TableController — writable construction", () => {
 });
 
 describe("TableController — passthroughs", () => {
-  it("rootSource.setPage windows the rows", () => {
+  it("rootSource.query.sort applies a SortDescriptor", async () => {
     const rt = buildRuntime();
     const tc = createTableController({ runtime: rt });
-    tc.rootSource.setPage(2, 10);
-    const displayed = rt.displayedRowsFor(rootPath("rows"));
-    expect(displayed.rows.length).toBe(5);
-    expect(displayed.rows[0].id).toBe(makeRowId(rootPath("rows"), "r20"));
-    const snap = tc.rootSource.state().snapshot;
-    expect(snap.pagination).toEqual({ page: 2, pageSize: 10, totalCount: 25 });
-  });
-
-  it("rootSource.setSort applies a SortDescriptor", () => {
-    const rt = buildRuntime();
-    const tc = createTableController({ runtime: rt });
-    tc.rootSource.setSort([{ colId: "qty", direction: "desc" }]);
+    await tc.rootSource.query!.sort!.set([
+      { colId: "qty", direction: "desc" },
+    ]);
     const displayed = rt.displayedRowsFor(rootPath("rows"));
     expect(displayed.rows[0].columns.qty).toBe(24);
     expect(displayed.rows[displayed.rows.length - 1].columns.qty).toBe(0);
   });
 
-  it("rootSource.setFilter drops rows that fail the predicate", () => {
+  it("rootSource.query.filter drops rows that fail the predicate", async () => {
     const rt = buildRuntime();
     const tc = createTableController({ runtime: rt });
-    tc.rootSource.setFilter({
+    await tc.rootSource.query!.filter!.set({
       qty: (v: unknown) => Number(v) >= 20,
     } satisfies TestFilter);
     const displayed = rt.displayedRowsFor(rootPath("rows"));
@@ -240,19 +233,10 @@ describe("TableController — readonly root", () => {
     const tc = createTableController({ runtime: rt });
     expect(tc.writable).toBe(false);
     if (tc.writable) return;
-    expect(tc.rootSource.writable).toBe(false);
+    expect(tc.rootSource.canWrite).toBe(false);
     expect("setCell" in tc.rootSource).toBe(false);
     expect("createNode" in tc.rootSource).toBe(false);
     expect("phantoms" in tc).toBe(false);
     expect("commitPhantomRow" in tc).toBe(false);
-  });
-
-  it("readonly rootSource still windows via setPage", () => {
-    const rt = buildReadonlyRuntime();
-    const tc = createTableController({ runtime: rt });
-    if (tc.writable) throw new Error("expected readonly");
-    tc.rootSource.setPage(0, 5);
-    const displayed = rt.displayedRowsFor(rootPath("rows"));
-    expect(displayed.rows.length).toBe(5);
   });
 });

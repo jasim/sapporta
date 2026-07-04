@@ -53,10 +53,11 @@ export type SelectOption = {
 };
 
 export type GridLevelCommands<TFilter = unknown> = {
-  setSort: (sort: SortDescriptor[] | undefined) => Promise<SourceLoadResult>;
-  setFilter: (filter: TFilter | undefined) => Promise<SourceLoadResult>;
-  setPage: (page: number, pageSize: number) => Promise<SourceLoadResult>;
-  refetch: () => Promise<SourceLoadResult>;
+  setSort?: (
+    sort: readonly SortDescriptor[] | undefined,
+  ) => Promise<SourceLoadResult>;
+  setFilter?: (filter: TFilter | undefined) => Promise<SourceLoadResult>;
+  refetch?: () => Promise<SourceLoadResult>;
   createRow: (node: TreeNode, atIndex?: number) => Promise<unknown>;
   removeRow: (rowKey: RowKey) => void | Promise<void>;
   writeCell: (coord: Coord, value: unknown) => void;
@@ -67,8 +68,8 @@ export type HeaderLevelState<TFilter = unknown> = {
   path: GridPath;
   levelName: string;
   schema: ColumnSchema[];
-  snapshot: LevelSnapshot<TFilter>;
-  sort: SortDescriptor[] | undefined;
+  snapshot: LevelSnapshot;
+  sort: readonly SortDescriptor[] | undefined;
   filter: TFilter | undefined;
   canWrite: boolean;
 };

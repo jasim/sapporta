@@ -2,13 +2,14 @@ export type {
   LevelStatus,
   LevelSnapshot,
   LevelSourceState,
-  LevelRequest,
   SourceLoadResult,
+  SortQueryCapability,
+  FilterQueryCapability,
+  LevelQueryCapabilities,
+  WriteCapability,
   CellChange,
   CreateNodeResult,
   ReconcileEvent,
-  ReadonlyLevelDataSource,
-  WritableLevelDataSource,
   RuntimeLevelDataSource,
   LevelDataSource,
   GridDataSource,
@@ -20,6 +21,12 @@ export type {
   InsertNodeRequest,
   RemoveNodeRequest,
 } from "./types";
+
+export {
+  filterSourceNodes,
+  sortSourceNodes,
+  sliceSourceNodes,
+} from "./query-shaping";
 
 export type { AncestorEntry, AncestorChain } from "./rest/ancestor";
 export { ancestor, renderChain } from "./rest/ancestor";

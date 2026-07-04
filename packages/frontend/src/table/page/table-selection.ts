@@ -168,6 +168,6 @@ function refetchPaths(
   paths: ReadonlySet<GridPath>,
 ): void {
   for (const path of paths) {
-    runtime.sourceFor(path).refetch();
+    void runtime.sourceFor(path).query?.refetch?.();
   }
 }

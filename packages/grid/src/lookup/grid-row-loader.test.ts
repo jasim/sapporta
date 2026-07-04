@@ -30,12 +30,11 @@ function makeSource(initialNodes: TreeNode[]) {
   let nodes = initialNodes;
   const listeners = new Set<() => void>();
   const source: RuntimeLevelDataSource = {
-    writable: false,
+    canWrite: false,
     state: () => ({
       status: "ready",
       snapshot: {
         nodes,
-        serverManaged: { sort: false, filter: false, pagination: false },
       },
     }),
     subscribe: (fn) => {
@@ -44,10 +43,9 @@ function makeSource(initialNodes: TreeNode[]) {
         listeners.delete(fn);
       };
     },
-    setSort: () => unchangedResult(source.state()),
-    setFilter: () => unchangedResult(source.state()),
-    setPage: () => unchangedResult(source.state()),
-    refetch: () => unchangedResult(source.state()),
+    query: {
+      refetch: () => unchangedResult(source.state()),
+    },
     onReconcile: () => () => {},
   };
 

@@ -5,7 +5,6 @@ import type { TreeNode } from "../types/level-row";
 
 const ready: LevelSnapshot = {
   nodes: [],
-  serverManaged: { sort: false, filter: false, pagination: false },
 };
 
 const readyState = (snapshot: LevelSnapshot = ready): LevelSourceState => ({
@@ -26,7 +25,6 @@ describe("shouldRenderEmpty", () => {
         {
           status: "initialLoading",
           snapshot: ready,
-          pending: { page: 0, pageSize: 25 },
         },
         0,
       ),
@@ -40,7 +38,6 @@ describe("shouldRenderEmpty", () => {
           status: "initialError",
           snapshot: ready,
           error: new Error("failed"),
-          retry: { page: 0, pageSize: 25 },
         },
         0,
       ),

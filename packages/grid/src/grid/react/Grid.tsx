@@ -52,7 +52,7 @@ export function Grid({
   path,
   schema,
   controller,
-  renderLevelHeader,
+  renderHeader,
   levelContainerClassName,
   levelContainerStyle,
   presentation = "tabular",
@@ -62,7 +62,7 @@ export function Grid({
   schema: ColumnSchema[];
   controller: GridControllerPublic;
   presentation?: GridPresentation;
-  renderLevelHeader?: (ctx: GridChromeContext) => ReactNode;
+  renderHeader?: (ctx: GridChromeContext) => ReactNode;
   levelContainerClassName?: (ctx: GridChromeContext) => string | undefined;
   levelContainerStyle?: (ctx: GridChromeContext) => CSSProperties | undefined;
   children?: ReactNode;
@@ -80,7 +80,7 @@ export function Grid({
     presentation,
     schema,
   };
-  const header = renderLevelHeader?.(chromeContext);
+  const header = renderHeader?.(chromeContext);
   const className = levelContainerClassName?.(chromeContext);
   const style = levelContainerStyle?.(chromeContext);
   const depth = decomposePath(path).edges.length;

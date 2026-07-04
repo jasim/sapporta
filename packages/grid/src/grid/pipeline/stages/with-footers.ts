@@ -5,7 +5,7 @@ import type { ProtoRow } from "../types";
 // are namespaced so they do not collide with data rowKeys.
 export function withFooters(
   rows: ProtoRow[],
-  footers: FooterRow[],
+  footers: readonly FooterRow[],
 ): ProtoRow[] {
   if (footers.length === 0) return rows;
   const out: ProtoRow[] = rows.slice();

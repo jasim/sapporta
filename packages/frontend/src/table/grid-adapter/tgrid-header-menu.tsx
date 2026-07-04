@@ -34,8 +34,10 @@ function TGridHeaderMenu({
     .filter((tableColumn) => !tableColumn.visuallyHidden);
   const lookupForColumn = lookupForGridColumn(level.schema);
 
+  if (!commands.setFilter || !commands.setSort) return null;
+
   const setConditions = (conditions: FilterCondition[]) =>
-    commands.setFilter({ ...filter, conditions });
+    commands.setFilter?.({ ...filter, conditions });
 
   return (
     <HeaderFilterMenuContent
@@ -44,7 +46,7 @@ function TGridHeaderMenu({
       columns={columns}
       filters={filter.conditions}
       lookupForColumn={lookupForColumn}
-      sort={level.sort ?? []}
+      sort={level.sort ? [...level.sort] : []}
       sortColumnId={column.column.id}
       onSort={commands.setSort}
       onAddFilter={(cond) =>

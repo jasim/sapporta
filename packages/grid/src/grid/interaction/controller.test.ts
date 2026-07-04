@@ -84,7 +84,7 @@ describe("GridController — verbs", () => {
     c.startEdit({ rowId: makeRowId(path, "r0"), colId: "a" }, "f2");
     expect(c.getState().editing).toEqual({
       coord: { rowId: "rows#r0", colId: "a" },
-      trigger: "f2",
+      editStart: { trigger: "f2" },
     });
     expect(c.getState().cellSelection).toBe(null);
     c.cancelEdit();
@@ -185,7 +185,7 @@ describe("GridController — verbs", () => {
     c.startEdit({ rowId: makeRowId(path, "r0"), colId: "a" }, "enter");
     expect(c.getState().editing).toEqual({
       coord: { rowId: "rows#r0", colId: "a" },
-      trigger: "enter",
+      editStart: { trigger: "enter" },
     });
   });
 });

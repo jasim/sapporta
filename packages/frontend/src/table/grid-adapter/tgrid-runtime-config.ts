@@ -101,6 +101,10 @@ type CompileTGridRuntimeConfigArgs<
   hostRowQueryState?: (
     levelId: TGridLevelId<RowsByLevel>,
   ) => RowQueryState<TGridFilter> | undefined;
+  recordTotalCount?: (
+    levelId: TGridLevelId<RowsByLevel>,
+    totalCount: number | null,
+  ) => void;
   sessionContext?: () => TGridSessionContext<RowsByLevel, AppServices>;
 };
 
@@ -218,6 +222,8 @@ export function compileTGridRuntimeConfig<
         queryConfig.owner === "host"
           ? () => args.hostRowQueryState?.(levelId)
           : undefined,
+      recordTotalCount: (totalCount) =>
+        args.recordTotalCount?.(levelId, totalCount),
       rowsClient,
       saveCellValueByColumn: columnBuild.saveCellValueByColumn,
       sessionContext: args.sessionContext as
@@ -264,6 +270,15 @@ function validateTGridDefinition<
     } else if (levelId !== rootLevel) {
       throw new Error(
         `${label}: non-root level '${String(levelId)}' has no parent`,
+      );
+    }
+
+    // Host query state is level-scoped. Non-root levels are path-scoped at
+    // runtime, with one source per expanded parent row, so sharing host state
+    // would mix page/sort/filter/count values between sibling child tables.
+    if (levelId !== rootLevel && config.query?.owner === "host") {
+      throw new Error(
+        `${label}: non-root level '${String(levelId)}' cannot use query.owner "host". Use "source" for expanded child levels, or make '${String(levelId)}' the root level of its own TGrid.`,
       );
     }
 
@@ -345,6 +360,7 @@ function makeEndpointFactory(args: {
   };
   queryConfig: TGridLevelQueryConfig;
   rowQueryState?: () => RowQueryState<TGridFilter> | undefined;
+  recordTotalCount?: (totalCount: number | null) => void;
   rowsClient: TableRowsClient;
   saveCellValueByColumn: ReadonlyMap<
     ColId,
@@ -387,7 +403,6 @@ function makeEndpointFactory(args: {
         : null,
     });
     return {
-      serverManaged: { sort: true, filter: true, pagination: true },
       rowQuery,
       buildRowsRequest,
       fetchPage: async (req) => {
@@ -395,10 +410,11 @@ function makeEndpointFactory(args: {
           tableName: args.table.name,
           page: req.page,
           limit: req.pageSize,
-          sort: req.sort,
+          sort: req.sort ? [...req.sort] : undefined,
           filters: req.filter?.conditions ?? [],
           search: req.filter?.search ?? undefined,
         } satisfies FetchTableRowsParams);
+        args.recordTotalCount?.(res.meta.total);
         return {
           nodes: buildTableTreeNodes(res.data, args.levelId),
           totalCount: res.meta.total,
@@ -449,6 +465,18 @@ function makeEndpointFactory(args: {
           args.table.name,
           String(req.rowKey) as RowId,
         );
+      },
+      canAppendRow: ({ request, visibleCount, totalCount }) => {
+        // TGrid request pages are one-based because the table API and URL state
+        // are one-based. The grid runtime never reads these coordinates; it
+        // only asks whether the currently loaded rows are the append boundary.
+        if (visibleCount === 0) {
+          return request.page === 1 && totalCount === 0;
+        }
+        if (!Number.isFinite(request.pageSize)) return true;
+        if (totalCount === undefined) return visibleCount < request.pageSize;
+        const pageStart = (request.page - 1) * request.pageSize;
+        return pageStart + visibleCount >= totalCount;
       },
     };
   };

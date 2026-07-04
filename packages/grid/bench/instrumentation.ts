@@ -1,7 +1,6 @@
 import type {
   GridDataSource,
   LevelDataSource,
-  RuntimeLevelDataSource,
 } from "../src/grid/data-sources/types";
 import type { GridEvents } from "../src/grid/runtime/emitter";
 import type { GridRuntime } from "../src/grid/runtime/create-grid-runtime";
@@ -9,7 +8,7 @@ import type { GridRuntime } from "../src/grid/runtime/create-grid-runtime";
 export type BenchCounters = {
   rootSourceCalls: number;
   resolveChildCalls: number;
-  sourceSnapshotCalls: number;
+  sourceStateCalls: number;
   sourceSubscribeCalls: number;
   sourceSubscriberFires: number;
   sourceDisposeCalls: number;
@@ -42,7 +41,7 @@ export function createBenchCounters(): BenchCounters {
   return {
     rootSourceCalls: 0,
     resolveChildCalls: 0,
-    sourceSnapshotCalls: 0,
+    sourceStateCalls: 0,
     sourceSubscribeCalls: 0,
     sourceSubscriberFires: 0,
     sourceDisposeCalls: 0,
@@ -170,11 +169,10 @@ function instrumentLevelDataSource(
   source: LevelDataSource,
   counters: BenchCounters,
 ): LevelDataSource {
-  const read: RuntimeLevelDataSource = {
-    writable: source.writable,
-    snapshot() {
-      counters.sourceSnapshotCalls++;
-      return source.snapshot();
+  const instrumented: LevelDataSource = {
+    state() {
+      counters.sourceStateCalls++;
+      return source.state();
     },
     subscribe(fn) {
       counters.sourceSubscribeCalls++;
@@ -183,61 +181,69 @@ function instrumentLevelDataSource(
         fn();
       });
     },
-    setSort(sort) {
-      source.setSort(sort);
-    },
-    setFilter(filter) {
-      source.setFilter(filter);
-    },
-    setPage(page, pageSize) {
-      source.setPage(page, pageSize);
-    },
-    refetch() {
-      source.refetch();
-    },
-    onReconcile(fn) {
-      counters.reconcileSubscribeCalls++;
-      if (!source.writable) return () => {};
-      return source.onReconcile((event) => {
-        counters.reconcileSubscriberFires++;
-        fn(event);
-      });
-    },
-  };
-
-  if (!source.writable) {
-    return {
-      ...read,
-      writable: false,
-      dispose() {
-        counters.sourceDisposeCalls++;
-        source.dispose();
-      },
-    };
-  }
-
-  return {
-    ...read,
-    writable: true,
-    setCell(rowKey, colId, value) {
-      counters.sourceSetCellCalls++;
-      source.setCell(rowKey, colId, value);
-    },
-    applyChanges(changes) {
-      counters.sourceApplyChangesCalls++;
-      source.applyChanges(changes);
-    },
-    createNode(node, atIndex) {
-      counters.sourceCreateNodeCalls++;
-      return source.createNode(node, atIndex);
-    },
-    removeNode(rowKey) {
-      counters.sourceRemoveNodeCalls++;
-      source.removeNode(rowKey);
-    },
     dispose() {
       counters.sourceDisposeCalls++;
       source.dispose();
     },
   };
+
+  const sourceQuery = source.query;
+  if (sourceQuery) {
+    const query: NonNullable<LevelDataSource["query"]> = {};
+    if (sourceQuery.sort) {
+      const sort = sourceQuery.sort;
+      query.sort = {
+        current: () => sort.current(),
+        set: (nextSort) => sort.set(nextSort),
+      };
+    }
+    if (sourceQuery.filter) {
+      const filter = sourceQuery.filter;
+      query.filter = {
+        current: () => filter.current(),
+        set: (nextFilter) => filter.set(nextFilter),
+      };
+    }
+    if (sourceQuery.refetch) {
+      const refetch = sourceQuery.refetch;
+      query.refetch = () => refetch();
+    }
+    if (query.sort || query.filter || query.refetch) {
+      instrumented.query = query;
+    }
+  }
+
+  const sourceWrite = source.write;
+  if (sourceWrite) {
+    instrumented.write = {
+      setCell(rowKey, colId, value) {
+        counters.sourceSetCellCalls++;
+        sourceWrite.setCell(rowKey, colId, value);
+      },
+      applyChanges(changes) {
+        counters.sourceApplyChangesCalls++;
+        sourceWrite.applyChanges(changes);
+      },
+      createNode(node, atIndex) {
+        counters.sourceCreateNodeCalls++;
+        return sourceWrite.createNode(node, atIndex);
+      },
+      removeNode(rowKey) {
+        counters.sourceRemoveNodeCalls++;
+        return sourceWrite.removeNode(rowKey);
+      },
+      onReconcile(fn) {
+        counters.reconcileSubscribeCalls++;
+        return sourceWrite.onReconcile((event) => {
+          counters.reconcileSubscriberFires++;
+          fn(event);
+        });
+      },
+      ...(sourceWrite.canAppendRow
+        ? { canAppendRow: () => sourceWrite.canAppendRow!() }
+        : {}),
+    };
+  }
+
+  return instrumented;
 }

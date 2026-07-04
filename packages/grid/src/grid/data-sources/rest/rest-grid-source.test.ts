@@ -55,7 +55,6 @@ function makeOpts(): RestLevelSourceOpts {
   return {
     fetchPage: async () => ({ nodes: [] }),
     rowQuery: sourceOwnedRowQuery({ page: 0, pageSize: 50 }),
-    serverManaged: { sort: true, filter: true, pagination: true },
   };
 }
 
@@ -165,10 +164,10 @@ describe("restGridDataSource", () => {
 
     ds.dispose();
 
-    // setSort would normally trigger subscribers via the loading transition;
+    // query.sort would normally trigger subscribers via the loading transition;
     // post-dispose the subscriber set is cleared.
-    root.setSort([{ colId: "id", direction: "asc" }]);
-    lines.setSort([{ colId: "id", direction: "asc" }]);
+    void root.query!.sort!.set([{ colId: "id", direction: "asc" }]);
+    void lines.query!.sort!.set([{ colId: "id", direction: "asc" }]);
     expect(rootSub).not.toHaveBeenCalled();
     expect(linesSub).not.toHaveBeenCalled();
   });

@@ -8,24 +8,14 @@
 // `refreshing` with the previous snapshot still renderable, then settle to
 // `ready` or `refreshError`.
 //
-// Mode mechanics: `serverManaged` is declared by the host and emitted on every
-// snapshot unchanged. Displayed-row derivation gates `withSort` / `withFilter`
-// against it. `setSort` / `setFilter` / `setPage` always update the declared
-// state and emit so chrome reflects the new values immediately; they trigger a
-// refetch only for concerns the server actually owns — flipping `setSort` on a
-// `serverManaged.sort: false` source is a derivation-only concern, not a
-// network round trip.
-//
-// All eight combinations of `serverManaged` flags are well-defined. The
-// blessed combinations are all-client (in-memory tables) and all-server
-// (REST-backed tables). Mixed modes are mechanically correct but the host
-// owns the UX implications (e.g. a "page-local filter" only filters the
-// visible page). The grid does not warn or refuse.
+// Query mechanics: the endpoint owns shaping for REST rows. Sort/filter query
+// capabilities update row-query state and refetch; the source publishes the
+// rows returned by the endpoint without local sort, filter, or window stages.
 //
 // In-flight ordering. Two cancellation primitives:
 //   * `fetchToken` — bumped on every refetch. Stale fetch resolutions are
 //     discarded (resolution-by-discard). This handles refetches triggered
-//     by `setSort`/`setFilter`/`setPage` and explicit `refetch()`.
+//     by query capability setters and explicit `refetch()`.
 //   * `cellTokens[rowKey][colId]` — bumped per `setCell`. The same cell
 //     edited twice cancels the first PATCH (last-write-wins); different
 //     cells of the same row run independently. No internal retry, no
@@ -42,7 +32,7 @@
 // Edit-verb wiring. If the host supplies any of `patchCell` / `insertNode`
 // / `removeNode`, ALL THREE must be wired — partial-write surfaces are a
 // footgun. Construction throws synchronously when the set is incomplete.
-// If none are supplied, the source returns a `ReadonlyLevelDataSource`.
+// If none are supplied, the source omits the write capability.
 //
 // `PatchCellResponse` may confirm one value, patch the row, replace the row,
 // or request a reload. The value for the edited cell drives the reconcile
@@ -53,27 +43,27 @@ import { defaultRowKey } from "../../pipeline/stages/build-data";
 import { assertBoundedInteger } from "@sapporta/shared/validation";
 import type { ColId, RowKey } from "../../types/identity";
 import type { FooterRow, TreeNode } from "../../types/level-row";
-import type { RowPredicate, SortDescriptor } from "../../pipeline/types";
+import type { SortDescriptor } from "../../pipeline/types";
 import type {
   FetchPageRequest,
   FetchPageResponse,
   InsertNodeRequest,
   LevelDataSource,
+  LevelQueryCapabilities,
   LevelSnapshot,
   LevelSourceState,
   PatchCellRequest,
   PatchCellResponse,
-  ReadonlyLevelDataSource,
   ReconcileEvent,
   RemoveNodeRequest,
   SourceLoadResult,
-  WritableLevelDataSource,
+  WriteCapability,
 } from "../types";
 
 export type RowQuery<F = unknown> = {
   page: number;
   pageSize: number;
-  sort?: SortDescriptor[];
+  sort?: readonly SortDescriptor[];
   filter?: F;
 };
 
@@ -87,9 +77,9 @@ export type RowQueryState<F = unknown> = {
   // Setters mutate query storage only. They do not fetch rows, push URLs, or
   // move focus. The REST source owns the command sequence: mutate query state,
   // decide whether server-managed data must reload, then publish the result.
-  setSort(sort: SortDescriptor[] | undefined): RowQueryChange;
-  setFilter(filter: F | undefined): RowQueryChange;
-  setPage(page: number, pageSize: number): RowQueryChange;
+  setSortState(sort: readonly SortDescriptor[] | undefined): RowQueryChange;
+  setFilterState(filter: F | undefined): RowQueryChange;
+  setPageState(page: number, pageSize: number): RowQueryChange;
 };
 
 export type BuildRowsRequest<F = unknown> = (
@@ -109,17 +99,17 @@ export function sourceOwnedRowQuery<F = unknown>(
     current() {
       return { ...query };
     },
-    setSort(sort) {
+    setSortState(sort) {
       if (query.sort === sort) return "unchanged";
-      query = { ...query, sort };
+      query = { ...query, sort: sort ? [...sort] : undefined };
       return "changed";
     },
-    setFilter(filter) {
+    setFilterState(filter) {
       if (Object.is(query.filter, filter)) return "unchanged";
       query = { ...query, filter };
       return "changed";
     },
-    setPage(page, pageSize) {
+    setPageState(page, pageSize) {
       assertPageWindow(page, pageSize);
       if (query.page === page && query.pageSize === pageSize) {
         return "unchanged";
@@ -149,21 +139,11 @@ export type RestLevelSourceOpts<F = unknown> = {
   rowQuery: RowQueryState<F>;
   buildRowsRequest?: BuildRowsRequest<F>;
 
-  // The host's grammar-to-predicate compiler. This is the trust boundary
-  // for filtering: the host owns `F` (the grammar), the host owns the
-  // compiler that turns `F` into a `RowPredicate` the grid can call, and
-  // the grid trusts the result without introspection. The compiler is the
-  // single place a grammar bug can exist.
-  //
-  // Required when `serverManaged.filter` is false (because the pipeline
-  // has to filter rows locally and needs a predicate to do it).
-  // Construction throws synchronously when this combination is wired
-  // wrong — surface contract violations at the boundary, not deep in a
-  // runtime call. Optional otherwise: server-side filtering means the
-  // server already shaped `nodes`, and the grid has nothing to filter.
-  compileFilter?: (filter: F | undefined) => RowPredicate | undefined;
-
-  serverManaged: { sort: boolean; filter: boolean; pagination: boolean };
+  canAppendRow?: (ctx: {
+    request: FetchPageRequest<F>;
+    visibleCount: number;
+    totalCount: number | undefined;
+  }) => boolean;
   // Per-level rowKey resolver. The grid source forwards this from the
   // schema's `LevelOptions.rowKey`; hosts wiring `restLevelSource` directly
   // can override. Defaults to array index.
@@ -203,29 +183,21 @@ export function restLevelSource<F = unknown>(
   const rowKeyFn = opts.rowKey ?? defaultRowKey;
   const buildRowsRequest = opts.buildRowsRequest ?? identityRowsRequest<F>;
 
-  if (!opts.serverManaged.filter && !opts.compileFilter) {
-    throw new Error(
-      "restLevelSource: compileFilter is required when serverManaged.filter is false — the source must compile its grammar to a RowPredicate for the pipeline",
-    );
-  }
-
   let nodes: TreeNode[] = [];
-  let footerRows: FooterRow[] | undefined;
+  let footerRows: readonly FooterRow[] | undefined;
   let totalCount: number | undefined;
   // `displayRequest` is the effective request that describes the visible
-  // snapshot. It includes host query values plus fixed filters, parent
-  // constraints, and defaults injected by `buildRowsRequest`. Loading states,
-  // retry state, pagination chrome, and client-side filter compilation all read
-  // this built request so the source state describes the rows a user is seeing.
+  // request. It includes host query values plus fixed filters, parent
+  // constraints, and defaults injected by `buildRowsRequest`.
   let displayRequest: FetchPageRequest<F> | undefined;
 
-  let cachedSnapshot: LevelSnapshot<F> | null = null;
-  let committedSnapshot: LevelSnapshot<F> | null = null;
-  let currentState: LevelSourceState<F> | null = null;
+  let cachedSnapshot: LevelSnapshot | null = null;
+  let committedSnapshot: LevelSnapshot | null = null;
+  let currentState: LevelSourceState | null = null;
   let fetchToken = 0;
   let pendingLoad: {
     token: number;
-    resolve: (result: SourceLoadResult<F>) => void;
+    resolve: (result: SourceLoadResult) => void;
   } | null = null;
 
   // Per-cell in-flight PATCH counter — supersession key. The latest token
@@ -237,30 +209,13 @@ export function restLevelSource<F = unknown>(
   const reconcileSubs = new Set<(e: ReconcileEvent) => void>();
   let disposed = false;
 
-  function buildSnapshot(): LevelSnapshot<F> {
-    const req = displayRequest ?? request();
-    const snap: LevelSnapshot<F> = {
-      nodes,
-      serverManaged: opts.serverManaged,
-      pagination:
-        totalCount === undefined
-          ? { page: req.page, pageSize: req.pageSize }
-          : { page: req.page, pageSize: req.pageSize, totalCount },
-    };
+  function buildSnapshot(): LevelSnapshot {
+    const snap: LevelSnapshot = { nodes };
     if (footerRows) snap.footerRows = footerRows;
-    if (req.sort !== undefined) snap.sort = req.sort;
-    if (req.filter !== undefined) snap.filter = req.filter;
-    if (!opts.serverManaged.filter) {
-      // Displayed-row derivation will run `withFilter` — supply the predicate.
-      // `compileFilter` is non-null here because construction throws when
-      // `serverManaged.filter === false && compileFilter === undefined`.
-      const predicate = opts.compileFilter!(req.filter);
-      if (predicate) snap.applyFilter = predicate;
-    }
     return snap;
   }
 
-  function snapshot(): LevelSnapshot<F> {
+  function snapshot(): LevelSnapshot {
     if (cachedSnapshot === null) cachedSnapshot = buildSnapshot();
     return cachedSnapshot;
   }
@@ -269,12 +224,11 @@ export function restLevelSource<F = unknown>(
     return buildRowsRequest(opts.rowQuery.current());
   }
 
-  function state(): LevelSourceState<F> {
+  function state(): LevelSourceState {
     if (!currentState) {
       currentState = {
         status: "initialLoading",
         snapshot: snapshot(),
-        pending: request(),
       };
     }
     return currentState;
@@ -293,7 +247,7 @@ export function restLevelSource<F = unknown>(
     notify();
   }
 
-  function publishReady(): Extract<LevelSourceState<F>, { status: "ready" }> {
+  function publishReady(): Extract<LevelSourceState, { status: "ready" }> {
     invalidate();
     const next = snapshot();
     committedSnapshot = next;
@@ -376,7 +330,7 @@ export function restLevelSource<F = unknown>(
     return String(err);
   }
 
-  function resolvePendingLoad(result: SourceLoadResult<F>): void {
+  function resolvePendingLoad(result: SourceLoadResult): void {
     if (!pendingLoad) return;
     pendingLoad.resolve(result);
     pendingLoad = null;
@@ -384,7 +338,7 @@ export function restLevelSource<F = unknown>(
 
   function resolveCurrentLoad(
     token: number,
-    result: SourceLoadResult<F>,
+    result: SourceLoadResult,
   ): void {
     if (pendingLoad?.token !== token) return;
     pendingLoad.resolve(result);
@@ -394,7 +348,8 @@ export function restLevelSource<F = unknown>(
   function publishLoadError(
     err: unknown,
     req: FetchPageRequest<F>,
-  ): Extract<LevelSourceState<F>, { status: "initialError" | "refreshError" }> {
+  ): Extract<LevelSourceState, { status: "initialError" | "refreshError" }> {
+    void req;
     const error = err instanceof Error ? err : new Error(reasonOf(err));
     invalidate();
     const display = snapshot();
@@ -404,21 +359,19 @@ export function restLevelSource<F = unknown>(
         snapshot: display,
         previous: committedSnapshot,
         error,
-        retry: req,
       };
     } else {
       currentState = {
         status: "initialError",
         snapshot: display,
         error,
-        retry: req,
       };
     }
     emit();
     return currentState;
   }
 
-  function refetch(): Promise<SourceLoadResult<F>> {
+  function refetch(): Promise<SourceLoadResult> {
     // A caller may await a page turn, refresh button, or sort command. Starting
     // a load settles any in-flight awaited operation as `superseded`; user
     // workflows wait only for the load whose token can still publish state.
@@ -433,20 +386,18 @@ export function restLevelSource<F = unknown>(
         status: "refreshing",
         snapshot: display,
         previous: committedSnapshot,
-        pending: req,
       };
     } else {
       currentState = {
         status: "initialLoading",
         snapshot: display,
-        pending: req,
       };
     }
     emit();
     // Subscribers observe `initialLoading` or `refreshing` before the promise
     // is returned. React hooks that subscribe to source state can render loading
     // chrome in the same turn in which the caller receives the load promise.
-    const promise = new Promise<SourceLoadResult<F>>((resolve) => {
+    const promise = new Promise<SourceLoadResult>((resolve) => {
       pendingLoad = { token: myToken, resolve };
     });
     // Invoke directly — `fetchPage` returns a Promise synchronously; tests
@@ -465,7 +416,7 @@ export function restLevelSource<F = unknown>(
     fetchPromise.then(
       (res) => {
         if (disposed || myToken !== fetchToken) return;
-        nodes = res.nodes;
+        nodes = res.nodes.slice();
         footerRows = res.footerRows;
         totalCount = res.totalCount;
         const readyState = publishReady();
@@ -483,21 +434,32 @@ export function restLevelSource<F = unknown>(
   // Initial fetch — every REST source starts in `loading`.
   void refetch();
 
-  function readyResult(): Promise<SourceLoadResult<F>> {
-    // Client-managed sort, filter, and pagination do not call `fetchPage`.
-    // They still publish a fresh ready state so displayed-row derivation and
-    // chrome read the new effective request before the command promise settles.
-    displayRequest = request();
-    const readyState = publishReady();
-    return Promise.resolve({ kind: "ready", state: readyState });
-  }
-
-  function unchangedResult(): Promise<SourceLoadResult<F>> {
+  function unchangedResult(): Promise<SourceLoadResult> {
     return Promise.resolve({ kind: "unchanged", state: state() });
   }
 
-  const read: ReadonlyLevelDataSource = {
-    writable: false,
+  const query: LevelQueryCapabilities = {
+    sort: {
+      current: () => opts.rowQuery.current().sort,
+      set: (sort) => {
+        const changed = opts.rowQuery.setSortState(
+          sort ? [...sort] : undefined,
+        );
+        return changed === "changed" ? refetch() : unchangedResult();
+      },
+    },
+    filter: {
+      current: () => opts.rowQuery.current().filter,
+      set: (filter) => {
+        const next = filter as F | undefined;
+        const changed = opts.rowQuery.setFilterState(next);
+        return changed === "changed" ? refetch() : unchangedResult();
+      },
+    },
+    refetch,
+  };
+
+  const read: LevelDataSource = {
     state,
     subscribe(fn) {
       subs.add(fn);
@@ -505,32 +467,6 @@ export function restLevelSource<F = unknown>(
         subs.delete(fn);
       };
     },
-    setSort(s) {
-      const changed = opts.rowQuery.setSort(s);
-      if (changed === "unchanged") return unchangedResult();
-      if (opts.serverManaged.sort) return refetch();
-      return readyResult();
-    },
-    setFilter(f) {
-      // The cross-source `LevelDataSource.setFilter` accepts `unknown` so
-      // the runtime can wire any source uniformly; this concrete source
-      // was typed at construction over `F`, so the cast lands the value
-      // back into the source's grammar slot. There is no validation —
-      // `F` is opaque to the grid by design.
-      const next = f as F | undefined;
-      const changed = opts.rowQuery.setFilter(next);
-      if (changed === "unchanged") return unchangedResult();
-      if (opts.serverManaged.filter) return refetch();
-      return readyResult();
-    },
-    setPage(p, ps) {
-      assertPageWindow(p, ps);
-      const changed = opts.rowQuery.setPage(p, ps);
-      if (changed === "unchanged") return unchangedResult();
-      if (opts.serverManaged.pagination) return refetch();
-      return readyResult();
-    },
-    refetch,
     dispose() {
       disposed = true;
       // Disposal is observable to awaiting callers. Tokens prevent late network
@@ -541,11 +477,12 @@ export function restLevelSource<F = unknown>(
       subs.clear();
       reconcileSubs.clear();
     },
+    query,
   };
 
   if (!writable) return read;
 
-  const setCell: WritableLevelDataSource["setCell"] = (
+  const setCell: WriteCapability["setCell"] = (
     rowKey,
     colId,
     value,
@@ -786,7 +723,7 @@ export function restLevelSource<F = unknown>(
     });
   }
 
-  const applyChanges: WritableLevelDataSource["applyChanges"] = (changes) => {
+  const applyChanges: WriteCapability["applyChanges"] = (changes) => {
     if (changes.length === 0) return;
     // Validate every rowKey resolves before mutating anything — a throw
     // here leaves state untouched.
@@ -878,7 +815,7 @@ export function restLevelSource<F = unknown>(
     });
   };
 
-  const createNode: WritableLevelDataSource["createNode"] = async (
+  const createNode: WriteCapability["createNode"] = async (
     node,
     atIndex,
   ) => {
@@ -892,7 +829,7 @@ export function restLevelSource<F = unknown>(
     return { node: serverNode, atIndex: idx };
   };
 
-  const removeNode: WritableLevelDataSource["removeNode"] = (rowKey) => {
+  const removeNode: WriteCapability["removeNode"] = (rowKey) => {
     const idx = requireNodeIdx(rowKey);
     const next = nodes.slice();
     next.splice(idx, 1);
@@ -901,27 +838,35 @@ export function restLevelSource<F = unknown>(
     return opts.removeNode!({ rowKey });
   };
 
-  const onReconcile: WritableLevelDataSource["onReconcile"] = (fn) => {
+  const onReconcile: WriteCapability["onReconcile"] = (fn) => {
     reconcileSubs.add(fn);
     return () => {
       reconcileSubs.delete(fn);
     };
   };
 
-  const writableSource: WritableLevelDataSource = {
-    writable: true,
+  const writableSource: LevelDataSource = {
     state: read.state,
     subscribe: read.subscribe,
-    setSort: read.setSort,
-    setFilter: read.setFilter,
-    setPage: read.setPage,
-    refetch: read.refetch,
+    query: read.query,
     dispose: read.dispose,
-    setCell,
-    applyChanges,
-    createNode,
-    removeNode,
-    onReconcile,
+    write: {
+      setCell,
+      applyChanges,
+      createNode,
+      removeNode,
+      onReconcile,
+      canAppendRow: () => {
+        const req = displayRequest ?? request();
+        return (
+          opts.canAppendRow?.({
+            request: req,
+            visibleCount: nodes.length,
+            totalCount,
+          }) ?? false
+        );
+      },
+    },
   };
   return writableSource;
 }

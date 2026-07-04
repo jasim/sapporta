@@ -12,8 +12,8 @@ export type RowComparator = (
 ) => number;
 
 export function makeRowComparator(
-  sort: SortDescriptor[],
-  columns: ColumnSchema[],
+  sort: readonly SortDescriptor[],
+  columns: readonly ColumnSchema[],
 ): RowComparator {
   const colIndex: Record<string, ColumnSchema> = {};
   for (const c of columns) colIndex[c.id] = c;

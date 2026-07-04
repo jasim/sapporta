@@ -10,7 +10,7 @@ export function defaultRowKey(node: TreeNode, localIdx: number): string {
 // Foundation step: TreeNode[] → ProtoRow[] (data rows only, no rollups
 // or brackets). Subsequent stages decorate this list.
 export function buildDataRows(
-  nodes: TreeNode[],
+  nodes: readonly TreeNode[],
   options: LevelOptions,
 ): ProtoRow[] {
   const rowKey = options.rowKey ?? defaultRowKey;

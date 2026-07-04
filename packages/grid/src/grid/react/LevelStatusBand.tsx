@@ -1,7 +1,7 @@
 // Per-path loading/error chrome.
 //
-// Subscribes only to the source's snapshot — re-renders fire on status,
-// error, and pagination changes; row-data churn does NOT wake this
+// Subscribes only to the source's state — re-renders fire on status and
+// error changes; row-data churn does NOT wake this
 // component because the source emits one notification per snapshot
 // transition and React bails out via `useSyncExternalStore` when the
 // snapshot reference is unchanged. This is the chief reason the band
@@ -9,7 +9,7 @@
 //
 // Renders nothing for `ready` / `idle`. Loading and error variants are
 // one-line bands above the body. Errors include a "Retry" button wired
-// to `source.refetch()`; backend error text is surfaced verbatim per
+// to `source.query.refetch`; backend error text is surfaced verbatim per
 // `packages/ui/CLAUDE.md`.
 
 import type { LevelSourceState } from "../data-sources/types";
@@ -32,25 +32,8 @@ export function levelStatusBandModel(
     case "refreshing":
     case "refreshError":
       return null;
-    case "initialLoading": {
-      const snapshot = state.snapshot;
-      const totalCount = snapshot.pagination?.totalCount;
-      const pageSize = snapshot.pagination?.pageSize;
-      const page = snapshot.pagination?.page;
-      if (
-        totalCount !== undefined &&
-        pageSize !== undefined &&
-        pageSize > 0 &&
-        page !== undefined
-      ) {
-        const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
-        return {
-          kind: "loading",
-          text: `Loading ${levelName}, page ${page} of ${totalPages}…`,
-        };
-      }
+    case "initialLoading":
       return { kind: "loading", text: `Loading ${levelName}…` };
-    }
     case "initialError": {
       // Backend error message, verbatim. The framing prefix ("Failed to
       // load <levelName>: ") is the UI's job; the message after the
@@ -93,7 +76,9 @@ export function LevelStatusBand({ path }: { path: GridPath }) {
       <button
         type="button"
         data-grid-part="level-status-retry"
-        onClick={() => runtime.sourceFor(path).refetch()}
+        onClick={() => {
+          void runtime.sourceFor(path).query?.refetch?.();
+        }}
       >
         Retry
       </button>

@@ -16,7 +16,13 @@ export {
   useRowInteractionSnapshot,
 } from "./GridRuntimeProvider";
 
-export { GridLevel, type GridLevelChrome } from "./GridLevel";
+export {
+  GridLevel,
+  type GridLevelChrome,
+  type GridStatusContext,
+  type GridEmptyContext,
+} from "./GridLevel";
+export { defaultGridLevelChrome } from "./default-grid-level-chrome";
 export {
   Grid,
   levelNameFromPath,

@@ -129,8 +129,6 @@ export type {
   LevelSnapshot,
   CellChange,
   ReconcileEvent,
-  ReadonlyLevelDataSource,
-  WritableLevelDataSource,
   LevelDataSource,
   GridDataSource,
   PhantomChannel,

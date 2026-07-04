@@ -16,7 +16,6 @@ function input(): DisplayedRowsInput {
     schema: { name: "rows", columns: [], options: {}, childLevels: [] },
     sourceSnapshot: {
       nodes: [],
-      serverManaged: { sort: false, filter: false, pagination: false },
     },
     phantomRows: [],
     viewState: {},

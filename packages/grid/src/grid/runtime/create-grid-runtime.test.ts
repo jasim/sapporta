@@ -10,7 +10,7 @@ import type {
   LevelSourceState,
   LevelStatus,
   SourceLoadResult,
-  WritableLevelDataSource,
+  WriteCapability,
 } from "../data-sources/types";
 import {
   childPath,
@@ -200,7 +200,6 @@ function readyState(snapshot: LevelSnapshot): LevelSourceState {
 function unchangedLoadResult(
   state: LevelSourceState = readyState({
     nodes: [],
-    serverManaged: { sort: false, filter: false, pagination: false },
   }),
 ): Promise<SourceLoadResult> {
   return Promise.resolve({ kind: "unchanged", state });
@@ -214,20 +213,18 @@ function stateWithStatus(
     case "ready":
       return { status, snapshot };
     case "initialLoading":
-      return { status, snapshot, pending: { page: 0, pageSize: 25 } };
+      return { status, snapshot };
     case "refreshing":
       return {
         status,
         snapshot,
         previous: snapshot,
-        pending: { page: 0, pageSize: 25 },
       };
     case "initialError":
       return {
         status,
         snapshot,
         error: new Error("failed"),
-        retry: { page: 0, pageSize: 25 },
       };
     case "refreshError":
       return {
@@ -235,12 +232,12 @@ function stateWithStatus(
         snapshot,
         previous: snapshot,
         error: new Error("failed"),
-        retry: { page: 0, pageSize: 25 },
       };
   }
 }
 
 type TestLevelSnapshot = LevelSnapshot & { status?: LevelStatus };
+type WritableTestSource = LevelDataSource & { write: WriteCapability };
 
 function normalizeTestSnapshot(input: TestLevelSnapshot): {
   status: LevelStatus;
@@ -251,61 +248,68 @@ function normalizeTestSnapshot(input: TestLevelSnapshot): {
 }
 
 function writableSourceWithCreate(
-  createNode: WritableLevelDataSource["createNode"],
+  createNode: WriteCapability["createNode"],
   nodes: TreeNode[] = [],
-): WritableLevelDataSource {
+): WritableTestSource {
   return {
-    writable: true,
     state: () =>
       readyState({
         nodes,
-        serverManaged: { sort: false, filter: false, pagination: false },
       }),
     subscribe: () => () => {},
-    setSort: () => unchangedLoadResult(),
-    setFilter: () => unchangedLoadResult(),
-    setPage: () => unchangedLoadResult(),
-    refetch: () => unchangedLoadResult(),
+    query: {
+      sort: { current: () => undefined, set: () => unchangedLoadResult() },
+      filter: { current: () => undefined, set: () => unchangedLoadResult() },
+      refetch: () => unchangedLoadResult(),
+    },
     dispose: () => {},
-    setCell: () => {},
-    applyChanges: () => {},
-    createNode,
-    removeNode: () => {},
-    onReconcile: () => () => {},
+    write: {
+      setCell: () => {},
+      applyChanges: () => {},
+      createNode,
+      removeNode: () => {},
+      onReconcile: () => () => {},
+      canAppendRow: () => true,
+    },
   };
 }
 
 function writableSourceFromSnapshot(
   snapshot: LevelSnapshot,
-): WritableLevelDataSource {
+  canAppendRow: () => boolean = () => true,
+): WritableTestSource {
   return {
-    writable: true,
     state: () => readyState(snapshot),
     subscribe: () => () => {},
-    setSort: () => unchangedLoadResult(),
-    setFilter: () => unchangedLoadResult(),
-    setPage: () => unchangedLoadResult(),
-    refetch: () => unchangedLoadResult(),
+    query: {
+      sort: { current: () => undefined, set: () => unchangedLoadResult() },
+      filter: { current: () => undefined, set: () => unchangedLoadResult() },
+      refetch: () => unchangedLoadResult(),
+    },
     dispose: () => {},
-    setCell: () => {},
-    applyChanges: () => {},
-    createNode: async (node, atIndex) => ({
-      node,
-      atIndex: atIndex ?? snapshot.nodes.length,
-    }),
-    removeNode: () => {},
-    onReconcile: () => () => {},
+    write: {
+      setCell: () => {},
+      applyChanges: () => {},
+      createNode: async (node, atIndex) => ({
+        node,
+        atIndex: atIndex ?? snapshot.nodes.length,
+      }),
+      removeNode: () => {},
+      onReconcile: () => () => {},
+      canAppendRow,
+    },
   };
 }
 
 function mutableWritableSource(initialSnapshot: TestLevelSnapshot): {
-  source: WritableLevelDataSource;
+  source: WritableTestSource;
   publish: (snapshot: TestLevelSnapshot) => void;
+  setCanAppendRow: (canAppendRow: () => boolean) => void;
 } {
   let current = normalizeTestSnapshot(initialSnapshot);
+  let canAppendRow = () => true;
   const subscribers = new Set<() => void>();
-  const source: WritableLevelDataSource = {
-    writable: true,
+  const source: WritableTestSource = {
     state: () => stateWithStatus(current.status, current.snapshot),
     subscribe: (fn) => {
       subscribers.add(fn);
@@ -313,24 +317,31 @@ function mutableWritableSource(initialSnapshot: TestLevelSnapshot): {
         subscribers.delete(fn);
       };
     },
-    setSort: () => unchangedLoadResult(),
-    setFilter: () => unchangedLoadResult(),
-    setPage: () => unchangedLoadResult(),
-    refetch: () => unchangedLoadResult(),
+    query: {
+      sort: { current: () => undefined, set: () => unchangedLoadResult() },
+      filter: { current: () => undefined, set: () => unchangedLoadResult() },
+      refetch: () => unchangedLoadResult(),
+    },
     dispose: () => {
       subscribers.clear();
     },
-    setCell: () => {},
-    applyChanges: () => {},
-    createNode: async (node, atIndex) => ({
-      node,
-      atIndex: atIndex ?? current.snapshot.nodes.length,
-    }),
-    removeNode: () => {},
-    onReconcile: () => () => {},
+    write: {
+      setCell: () => {},
+      applyChanges: () => {},
+      createNode: async (node, atIndex) => ({
+        node,
+        atIndex: atIndex ?? current.snapshot.nodes.length,
+      }),
+      removeNode: () => {},
+      onReconcile: () => () => {},
+      canAppendRow: () => canAppendRow(),
+    },
   };
   return {
     source,
+    setCanAppendRow: (next) => {
+      canAppendRow = next;
+    },
     publish: (nextSnapshot) => {
       current = normalizeTestSnapshot(nextSnapshot);
       for (const fn of subscribers) fn();
@@ -408,7 +419,17 @@ describe("GridRuntime", () => {
   it("guards retained source views after disposal", () => {
     const rt = createGridRuntime({
       schema: tableSchema,
-      dataSource: tableDataSource(),
+      dataSource: inMemoryGridDataSource({
+        schema: tableSchema,
+        tree: tableNodes(),
+        levels: {
+          rows: {
+            sortMode: "client",
+            filterMode: "none",
+            paginationMode: "none",
+          },
+        },
+      }),
     });
     const source = rt.sourceFor(rowsRoot);
 
@@ -417,19 +438,12 @@ describe("GridRuntime", () => {
     expect(() => source.state().snapshot).toThrow(
       "GridRuntime has been disposed.",
     );
-    expect(() => source.refetch()).toThrow("GridRuntime has been disposed.");
     expect(() => source.subscribe(() => {})).toThrow(
       "GridRuntime has been disposed.",
     );
-    expect(() => source.setSort([{ colId: "qty", direction: "asc" }])).toThrow(
-      "GridRuntime has been disposed.",
-    );
-    expect(() => source.setFilter(undefined)).toThrow(
-      "GridRuntime has been disposed.",
-    );
-    expect(() => source.setPage(1, 25)).toThrow(
-      "GridRuntime has been disposed.",
-    );
+    expect(() =>
+      source.query!.sort!.set([{ colId: "qty", direction: "asc" }]),
+    ).toThrow("GridRuntime has been disposed.");
     expect(() => source.onReconcile(() => {})).toThrow(
       "GridRuntime has been disposed.",
     );
@@ -491,7 +505,7 @@ describe("GridRuntime", () => {
       dataSource: tableDataSource(),
     });
     const src = rt.sourceFor(rowsRoot);
-    expect(src.writable).toBe(true);
+    expect(src.canWrite).toBe(true);
     expect("setCell" in src).toBe(false);
     expect("applyChanges" in src).toBe(false);
     expect("createNode" in src).toBe(false);
@@ -500,7 +514,7 @@ describe("GridRuntime", () => {
     expect(src.state().snapshot.nodes).toHaveLength(2);
   });
 
-  it("sourceFor returns a live view for read, query, and refresh operations", () => {
+  it("sourceFor returns a live view for read and query operations", () => {
     const rt = createGridRuntime({
       schema: tableSchema,
       dataSource: tableDataSource(),
@@ -509,9 +523,8 @@ describe("GridRuntime", () => {
 
     expect(() => {
       source.state().snapshot;
-      source.setSort([{ colId: "qty", direction: "desc" }]);
-      source.setPage(1, 25);
-      source.refetch();
+      source.query?.sort?.set([{ colId: "qty", direction: "desc" }]);
+      source.query?.refetch?.();
     }).not.toThrow();
   });
 
@@ -527,13 +540,9 @@ describe("GridRuntime", () => {
           paginationMode: "none",
         });
         const readonly: LevelDataSource = {
-          writable: false,
           state: writable.state,
           subscribe: writable.subscribe,
-          setSort: writable.setSort,
-          setFilter: writable.setFilter,
-          setPage: writable.setPage,
-          refetch: writable.refetch,
+          query: writable.query,
           dispose: writable.dispose,
         };
         return readonly;
@@ -702,31 +711,28 @@ describe("GridRuntime", () => {
     let reconcileFn:
       | ((e: import("../data-sources/types").ReconcileEvent) => void)
       | null = null;
-    const fakeWritable: WritableLevelDataSource = {
-      writable: true,
+    const fakeWritable: WritableTestSource = {
       state: () =>
         readyState({
           nodes: tableNodes(),
-          serverManaged: { sort: false, filter: false, pagination: false },
         }),
       subscribe: () => () => {},
-      setSort: () => unchangedLoadResult(),
-      setFilter: () => unchangedLoadResult(),
-      setPage: () => unchangedLoadResult(),
-      refetch: () => unchangedLoadResult(),
       dispose: () => {},
-      setCell: () => {},
-      applyChanges: () => {},
-      createNode: async (node, atIndex) => ({
-        node,
-        atIndex: atIndex ?? 0,
-      }),
-      removeNode: () => {},
-      onReconcile: (fn) => {
-        reconcileFn = fn;
-        return () => {
-          reconcileFn = null;
-        };
+      write: {
+        setCell: () => {},
+        applyChanges: () => {},
+        createNode: async (node, atIndex) => ({
+          node,
+          atIndex: atIndex ?? 0,
+        }),
+        removeNode: () => {},
+        onReconcile: (fn) => {
+          reconcileFn = fn;
+          return () => {
+            reconcileFn = null;
+          };
+        },
+        canAppendRow: () => true,
       },
     };
     const dataSource: GridDataSource = {
@@ -760,11 +766,9 @@ describe("GridRuntime", () => {
     let status: import("../data-sources/types").LevelStatus = "initialLoading";
     const subs = new Set<() => void>();
     const fake: LevelDataSource = {
-      writable: false,
       state: () =>
         stateWithStatus(status, {
           nodes: [],
-          serverManaged: { sort: false, filter: false, pagination: false },
         }),
       subscribe: (fn) => {
         subs.add(fn);
@@ -772,10 +776,6 @@ describe("GridRuntime", () => {
           subs.delete(fn);
         };
       },
-      setSort: () => unchangedLoadResult(),
-      setFilter: () => unchangedLoadResult(),
-      setPage: () => unchangedLoadResult(),
-      refetch: () => unchangedLoadResult(),
       dispose: () => {},
     };
     const dataSource: GridDataSource = {
@@ -800,19 +800,12 @@ describe("GridRuntime", () => {
     let status: LevelStatus = "initialLoading";
     const nodes = tableNodes();
     const footerRows = [{ rowKey: "total" as RowKey, columns: { qty: 3 } }];
-    const serverManaged = Object.freeze({
-      sort: false,
-      filter: false,
-      pagination: false,
-    });
     const subs = new Set<() => void>();
     const fake: LevelDataSource = {
-      writable: false,
       state: () =>
         stateWithStatus(status, {
           nodes,
           footerRows,
-          serverManaged,
         }),
       subscribe: (fn) => {
         subs.add(fn);
@@ -820,10 +813,6 @@ describe("GridRuntime", () => {
           subs.delete(fn);
         };
       },
-      setSort: () => unchangedLoadResult(),
-      setFilter: () => unchangedLoadResult(),
-      setPage: () => unchangedLoadResult(),
-      refetch: () => unchangedLoadResult(),
       dispose: () => {},
     };
     const dataSource: GridDataSource = {
@@ -1057,27 +1046,24 @@ describe("GridRuntime", () => {
   it("editing a phantom row stays local and does not emit mutationCommitted", () => {
     const setCell = vi.fn();
     const mutationCommitted = vi.fn();
-    const source: WritableLevelDataSource = {
-      writable: true,
+    const source: WritableTestSource = {
       state: () =>
         readyState({
           nodes: [],
-          serverManaged: { sort: false, filter: false, pagination: false },
         }),
       subscribe: () => () => {},
-      setSort: () => unchangedLoadResult(),
-      setFilter: () => unchangedLoadResult(),
-      setPage: () => unchangedLoadResult(),
-      refetch: () => unchangedLoadResult(),
       dispose: () => {},
-      setCell,
-      applyChanges: () => {},
-      createNode: async (node, atIndex) => ({
-        node,
-        atIndex: atIndex ?? 0,
-      }),
-      removeNode: () => {},
-      onReconcile: () => () => {},
+      write: {
+        setCell,
+        applyChanges: () => {},
+        createNode: async (node, atIndex) => ({
+          node,
+          atIndex: atIndex ?? 0,
+        }),
+        removeNode: () => {},
+        onReconcile: () => () => {},
+        canAppendRow: () => true,
+      },
     };
     const rt = createGridRuntime({
       schema: tableSchema,
@@ -1144,11 +1130,12 @@ describe("GridRuntime", () => {
   });
 
   it("ArrowDown at a non-final page boundary does not create a phantom", () => {
-    const source = writableSourceFromSnapshot({
-      nodes: tableNodes(),
-      pagination: { page: 0, pageSize: 2, totalCount: 3 },
-      serverManaged: { sort: true, filter: true, pagination: true },
-    });
+    const source = writableSourceFromSnapshot(
+      {
+        nodes: tableNodes(),
+      },
+      () => false,
+    );
     const rt = createGridRuntime({
       schema: tableSchema,
       dataSource: dataSourceWithRoot(source),
@@ -1172,21 +1159,24 @@ describe("GridRuntime", () => {
     expect(rt.cursorManager.currentCellCursor()).toEqual(lastPageRowCursor);
   });
 
-  it("ArrowDown before a footer turns the page instead of creating a phantom", () => {
-    const source = writableSourceFromSnapshot({
-      nodes: [
-        { levelName: "rows", columns: { id: "b", name: "Banana", qty: 2 } },
-      ],
-      footerRows: [{ rowKey: "total", columns: { qty: 2 } }],
-      pagination: { page: 0, pageSize: 1, totalCount: 2 },
-      serverManaged: { sort: true, filter: true, pagination: true },
-    });
-    const setPage = vi.fn(() => unchangedLoadResult(source.state()));
-    source.setPage = setPage;
+  it("ArrowDown before a footer requests a loaded-row boundary instead of creating a phantom", () => {
+    const source = writableSourceFromSnapshot(
+      {
+        nodes: [
+          { levelName: "rows", columns: { id: "b", name: "Banana", qty: 2 } },
+        ],
+        footerRows: [{ rowKey: "total", columns: { qty: 2 } }],
+      },
+      () => false,
+    );
+    const onLoadedRowsBoundary = vi.fn(() =>
+      unchangedLoadResult(source.state()),
+    );
     const rt = createGridRuntime({
       schema: tableSchema,
       dataSource: dataSourceWithRoot(source),
       phantomRows: {},
+      onLoadedRowsBoundary,
     });
     const lastDataCursor = {
       path: rowsRoot,
@@ -1203,57 +1193,63 @@ describe("GridRuntime", () => {
     });
 
     expect(rt.phantoms.get(rowsRoot)).toHaveLength(0);
-    expect(setPage).toHaveBeenCalledWith(1, 1);
+    expect(onLoadedRowsBoundary).toHaveBeenCalledWith({
+      kind: "cell",
+      loadPath: rowsRoot,
+      direction: "after",
+      origin: lastDataCursor,
+      colPolicy: "preserve",
+      extend: false,
+    });
     expect(rt.cursorManager.currentCellCursor()).toEqual(lastDataCursor);
   });
 
-  it("requestPageBoundaryNavigation returns false while the source snapshot is loading", () => {
+  it("requestLoadedRowsBoundary returns false while the source snapshot is loading", () => {
     const mutable = mutableWritableSource({
       status: "initialLoading",
       nodes: tableNodes(),
-      pagination: { page: 0, pageSize: 2, totalCount: 4 },
-      serverManaged: { sort: true, filter: true, pagination: true },
     });
-    const setPage = vi.fn(() => unchangedLoadResult(mutable.source.state()));
-    mutable.source.setPage = setPage;
     const rt = createGridRuntime({
       schema: tableSchema,
       dataSource: dataSourceWithRoot(mutable.source),
     });
 
-    const accepted = rt.requestPageBoundaryNavigation({
+    const accepted = rt.requestLoadedRowsBoundary({
       kind: "cell",
-      path: rowsRoot,
-      direction: "next",
-      colId: "name",
+      loadPath: rowsRoot,
+      direction: "after",
+      origin: {
+        path: rowsRoot,
+        rowId: makeRowId(rowsRoot, "b"),
+        colId: "name",
+      },
       colPolicy: "preserve",
       extend: false,
     });
 
     expect(accepted).toBe(false);
-    expect(setPage).not.toHaveBeenCalled();
   });
 
-  it("does not record pending page-boundary navigation while loading", () => {
+  it("does not record pending loaded-row boundary navigation while loading", () => {
     const mutable = mutableWritableSource({
       status: "initialLoading",
       nodes: tableNodes(),
-      pagination: { page: 0, pageSize: 2, totalCount: 4 },
-      serverManaged: { sort: true, filter: true, pagination: true },
     });
-    const setPage = vi.fn(() => unchangedLoadResult(mutable.source.state()));
-    mutable.source.setPage = setPage;
     const rt = createGridRuntime({
       schema: tableSchema,
       dataSource: dataSourceWithRoot(mutable.source),
     });
 
     expect(
-      rt.requestPageBoundaryNavigation({
+      rt.requestLoadedRowsBoundary({
         kind: "cell",
-        path: rowsRoot,
-        direction: "next",
-        colId: "name",
+        loadPath: rowsRoot,
+        direction: "after",
+        origin: {
+          path: rowsRoot,
+          rowId: makeRowId(rowsRoot, "b"),
+          colId: "name",
+        },
         colPolicy: "preserve",
         extend: false,
       }),
@@ -1263,53 +1259,44 @@ describe("GridRuntime", () => {
       nodes: [
         { levelName: "rows", columns: { id: "c", name: "Cherry", qty: 3 } },
       ],
-      pagination: { page: 1, pageSize: 2, totalCount: 4 },
-      serverManaged: { sort: true, filter: true, pagination: true },
     });
 
     expect(rt.cursorManager.currentCellCursor()).toBeNull();
   });
 
-  it("does not run the page fallback when the host boundary hook declines", () => {
+  it("returns false when the host loaded-row boundary hook declines", () => {
     const mutable = mutableWritableSource({
       nodes: [
         { levelName: "rows", columns: { id: "b", name: "Banana", qty: 2 } },
       ],
-      pagination: { page: 1, pageSize: 1, totalCount: 2 },
-      serverManaged: { sort: true, filter: true, pagination: true },
     });
-    const setPage = vi.fn(() => unchangedLoadResult(mutable.source.state()));
-    mutable.source.setPage = setPage;
-    const onPageBoundaryNavigation = vi.fn(() => false as const);
+    const onLoadedRowsBoundary = vi.fn(() => false as const);
     const rt = createGridRuntime({
       schema: tableSchema,
       dataSource: dataSourceWithRoot(mutable.source),
-      onPageBoundaryNavigation,
+      onLoadedRowsBoundary,
     });
 
-    const accepted = rt.requestPageBoundaryNavigation({
+    const accepted = rt.requestLoadedRowsBoundary({
       kind: "cell",
-      path: rowsRoot,
-      direction: "previous",
-      colId: "qty",
+      loadPath: rowsRoot,
+      direction: "before",
+      origin: { path: rowsRoot, rowId: makeRowId(rowsRoot, "b"), colId: "qty" },
       colPolicy: "preserve",
       extend: false,
     });
 
     expect(accepted).toBe(false);
-    expect(onPageBoundaryNavigation).toHaveBeenCalledOnce();
-    expect(setPage).not.toHaveBeenCalled();
+    expect(onLoadedRowsBoundary).toHaveBeenCalledOnce();
   });
 
-  it("ready page-boundary navigation records and resolves focus on the new page", () => {
+  it("ready loaded-row boundary navigation records and resolves focus after host load", async () => {
     const mutable = mutableWritableSource({
       nodes: [
         { levelName: "rows", columns: { id: "b", name: "Banana", qty: 2 } },
       ],
-      pagination: { page: 0, pageSize: 1, totalCount: 2 },
-      serverManaged: { sort: true, filter: true, pagination: true },
     });
-    mutable.source.setPage = async () => {
+    const onLoadedRowsBoundary = vi.fn(async () => {
       mutable.publish({
         nodes: [
           {
@@ -1317,28 +1304,32 @@ describe("GridRuntime", () => {
             columns: { id: "c", name: "Cherry", qty: 3 },
           },
         ],
-        pagination: { page: 1, pageSize: 1, totalCount: 2 },
-        serverManaged: { sort: true, filter: true, pagination: true },
       });
       const state = mutable.source.state();
       if (state.status !== "ready") throw new Error("expected ready");
-      return { kind: "ready", state };
-    };
+      return { kind: "ready" as const, state };
+    });
     const rt = createGridRuntime({
       schema: tableSchema,
       dataSource: dataSourceWithRoot(mutable.source),
+      onLoadedRowsBoundary,
     });
 
     expect(
-      rt.requestPageBoundaryNavigation({
+      rt.requestLoadedRowsBoundary({
         kind: "cell",
-        path: rowsRoot,
-        direction: "next",
-        colId: "qty",
+        loadPath: rowsRoot,
+        direction: "after",
+        origin: {
+          path: rowsRoot,
+          rowId: makeRowId(rowsRoot, "b"),
+          colId: "qty",
+        },
         colPolicy: "preserve",
         extend: false,
       }),
     ).toBe(true);
+    await flushMicrotasks();
 
     expect(rt.cursorManager.currentCellCursor()).toEqual({
       path: rowsRoot,
@@ -1352,8 +1343,6 @@ describe("GridRuntime", () => {
       nodes: [
         { levelName: "rows", columns: { id: "c", name: "Cherry", qty: 3 } },
       ],
-      pagination: { page: 1, pageSize: 2, totalCount: 3 },
-      serverManaged: { sort: true, filter: true, pagination: true },
     });
     const rt = createGridRuntime({
       schema: tableSchema,
@@ -1379,94 +1368,8 @@ describe("GridRuntime", () => {
     expect(rt.displayedRowFor(rowsRoot, target!.rowId)?.kind).toBe("phantom");
   });
 
-  it("removes a blank append phantom while keyboard paging back from the last page", () => {
-    const mutable = mutableWritableSource({
-      nodes: [
-        { levelName: "rows", columns: { id: "c", name: "Cherry", qty: 3 } },
-      ],
-      pagination: { page: 1, pageSize: 2, totalCount: 3 },
-      serverManaged: { sort: true, filter: true, pagination: true },
-    });
-    mutable.source.setPage = async () => {
-      mutable.publish({
-        status: "refreshing",
-        nodes: [
-          {
-            levelName: "rows",
-            columns: { id: "c", name: "Cherry", qty: 3 },
-          },
-        ],
-        pagination: { page: 0, pageSize: 2, totalCount: 3 },
-        serverManaged: { sort: true, filter: true, pagination: true },
-      });
-      return { kind: "unchanged", state: mutable.source.state() };
-    };
-    const rt = createGridRuntime({
-      schema: tableSchema,
-      dataSource: dataSourceWithRoot(mutable.source),
-      phantomRows: {},
-    });
-    const lastPageRowCursor = {
-      path: rowsRoot,
-      rowId: makeRowId(rowsRoot, "c"),
-      colId: "qty",
-    };
-    rt.cursorManager.moveCellCursorTo(lastPageRowCursor);
-
-    rt.coordinator.navigateCell(rowsRoot, {
-      type: "moveRow",
-      direction: "down",
-      colPolicy: "preserve",
-      extend: false,
-    });
-    expect(rt.phantoms.get(rowsRoot)).toHaveLength(1);
-    expect(
-      rt.displayedRowsFor(rowsRoot).rows.some((row) => row.kind === "phantom"),
-    ).toBe(true);
-
-    rt.coordinator.navigateCell(rowsRoot, {
-      type: "moveRow",
-      direction: "up",
-      colPolicy: "preserve",
-      extend: false,
-    });
-    expect(rt.cursorManager.currentCellCursor()).toEqual(lastPageRowCursor);
-
-    rt.coordinator.navigateCell(rowsRoot, {
-      type: "moveRow",
-      direction: "up",
-      colPolicy: "preserve",
-      extend: false,
-    });
-
-    expect(rt.phantoms.get(rowsRoot)).toHaveLength(0);
-    expect(
-      rt.displayedRowsFor(rowsRoot).rows.some((row) => row.kind === "phantom"),
-    ).toBe(false);
-
-    mutable.publish({
-      nodes: tableNodes(),
-      pagination: { page: 0, pageSize: 2, totalCount: 3 },
-      serverManaged: { sort: true, filter: true, pagination: true },
-    });
-
-    expect(rt.phantoms.get(rowsRoot)).toHaveLength(0);
-    expect(
-      rt.displayedRowsFor(rowsRoot).rows.some((row) => row.kind === "phantom"),
-    ).toBe(false);
-    expect(rt.cursorManager.currentCellCursor()).toEqual({
-      path: rowsRoot,
-      rowId: makeRowId(rowsRoot, "b"),
-      colId: "qty",
-    });
-  });
-
   it("does not eagerly create an empty-path phantom for an empty non-final page", () => {
-    const source = writableSourceFromSnapshot({
-      nodes: [],
-      pagination: { page: 1, pageSize: 2, totalCount: 3 },
-      serverManaged: { sort: true, filter: true, pagination: true },
-    });
+    const source = writableSourceFromSnapshot({ nodes: [] }, () => false);
     const rt = createGridRuntime({
       schema: tableSchema,
       dataSource: dataSourceWithRoot(source),
@@ -1480,8 +1383,6 @@ describe("GridRuntime", () => {
   it("creates an empty-path phantom on the first page when total count is unknown", () => {
     const source = writableSourceFromSnapshot({
       nodes: [],
-      pagination: { page: 0, pageSize: 2 },
-      serverManaged: { sort: true, filter: true, pagination: true },
     });
 
     const rt = createGridRuntime({
@@ -1501,8 +1402,6 @@ describe("GridRuntime", () => {
       nodes: [
         { levelName: "rows", columns: { id: "c", name: "Cherry", qty: 3 } },
       ],
-      pagination: { page: 1, pageSize: 2, totalCount: 3 },
-      serverManaged: { sort: true, filter: true, pagination: true },
     });
     const rt = createGridRuntime({
       schema: tableSchema,
@@ -1522,10 +1421,9 @@ describe("GridRuntime", () => {
     });
     expect(rt.phantoms.get(rowsRoot)).toHaveLength(1);
 
+    source.setCanAppendRow(() => false);
     source.publish({
       nodes: tableNodes(),
-      pagination: { page: 0, pageSize: 2, totalCount: 3 },
-      serverManaged: { sort: true, filter: true, pagination: true },
     });
 
     expect(rt.phantoms.get(rowsRoot)).toHaveLength(0);
@@ -1579,7 +1477,7 @@ describe("GridRuntime", () => {
   it("leaving a nonblank child-level phantom row creates one child row", async () => {
     const booksRoot = rootPath("books");
     const quotesPath = childPath(booksRoot, "book-1", "quotes");
-    const createQuoteNode = vi.fn<WritableLevelDataSource["createNode"]>(
+    const createQuoteNode = vi.fn<WriteCapability["createNode"]>(
       async (node, atIndex) => ({
         node: {
           levelName: "quotes",
@@ -1686,7 +1584,7 @@ describe("GridRuntime", () => {
       node: TreeNode;
       atIndex: number;
     }>();
-    const createNode = vi.fn<WritableLevelDataSource["createNode"]>(
+    const createNode = vi.fn<WriteCapability["createNode"]>(
       () => created.promise,
     );
     const rt = createGridRuntime({
@@ -1714,7 +1612,7 @@ describe("GridRuntime", () => {
       node: TreeNode;
       atIndex: number;
     }>();
-    const createNode = vi.fn<WritableLevelDataSource["createNode"]>(
+    const createNode = vi.fn<WriteCapability["createNode"]>(
       () => created.promise,
     );
     const rt = createGridRuntime({
@@ -1749,7 +1647,7 @@ describe("GridRuntime", () => {
       node: TreeNode;
       atIndex: number;
     }>();
-    const createNode = vi.fn<WritableLevelDataSource["createNode"]>(
+    const createNode = vi.fn<WriteCapability["createNode"]>(
       () => created.promise,
     );
     const rt = createGridRuntime({
@@ -1781,26 +1679,23 @@ describe("GridRuntime", () => {
 
   it("failed phantom row creates keep the phantom with failure state", async () => {
     const createFailed = vi.fn();
-    const source: WritableLevelDataSource = {
-      writable: true,
+    const source: WritableTestSource = {
       state: () =>
         readyState({
           nodes: [],
-          serverManaged: { sort: false, filter: false, pagination: false },
         }),
       subscribe: () => () => {},
-      setSort: () => unchangedLoadResult(),
-      setFilter: () => unchangedLoadResult(),
-      setPage: () => unchangedLoadResult(),
-      refetch: () => unchangedLoadResult(),
       dispose: () => {},
-      setCell: () => {},
-      applyChanges: () => {},
-      createNode: async () => {
-        throw new Error("validation failed");
+      write: {
+        setCell: () => {},
+        applyChanges: () => {},
+        createNode: async () => {
+          throw new Error("validation failed");
+        },
+        removeNode: () => {},
+        onReconcile: () => () => {},
+        canAppendRow: () => true,
       },
-      removeNode: () => {},
-      onReconcile: () => () => {},
     };
     const rt = createGridRuntime({
       schema: tableSchema,
@@ -2126,7 +2021,7 @@ describe("GridRuntime", () => {
     expect(rowInteractionChanged).not.toHaveBeenCalled();
   });
 
-  it("selected row id subscribers wake when displayed order changes", () => {
+  it("selected row id subscribers wake when displayed order changes", async () => {
     const rt = createGridRuntime({
       schema: tableSchema,
       dataSource: inMemoryGridDataSource({
@@ -2156,7 +2051,9 @@ describe("GridRuntime", () => {
     rt.subscribeSelectedRows(rowsRoot, selectedRowsChanged);
     rt.subscribeSelectedRowIds(rowsRoot, selectedRowIdsChanged);
 
-    rt.sourceFor(rowsRoot).setSort([{ colId: "qty", direction: "desc" }]);
+    await rt
+      .sourceFor(rowsRoot)
+      .query!.sort!.set([{ colId: "qty", direction: "desc" }]);
 
     expect(rt.selectedRowsFor(rowsRoot)).toEqual({
       kind: "set",

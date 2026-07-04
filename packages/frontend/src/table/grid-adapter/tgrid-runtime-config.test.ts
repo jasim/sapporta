@@ -18,7 +18,7 @@ import type {
 import { ExpandableCellFrame } from "@sapporta/grid";
 import { makeRowId, rootPath } from "@sapporta/grid";
 import { preset } from "@sapporta/grid/column-preset";
-import { compileTGridRuntimeConfig } from "./tgrid-runtime-config";
+import { compileTGridRuntimeConfig, defineTGrid } from "./tgrid-runtime-config";
 import type { TableRowsClient } from "./tgrid-level-config";
 import type { TGridFilter } from "./tgrid-filter";
 import { createTGridColumnMapper } from "./tgrid-column-mapper";
@@ -71,11 +71,11 @@ function makeHostRowQueryState(seed: {
       sort: [...state.sort],
       filter: { conditions: [...state.filters], search: state.search },
     }),
-    setSort: (sort) => {
+    setSortState: (sort) => {
       state = { ...state, sort: sort ? [...sort] : [], page: 1 };
       return "changed";
     },
-    setFilter: (filter) => {
+    setFilterState: (filter) => {
       state = {
         ...state,
         filters: [...(filter?.conditions ?? [])],
@@ -84,7 +84,7 @@ function makeHostRowQueryState(seed: {
       };
       return "changed";
     },
-    setPage: (page, pageSize) => {
+    setPageState: (page, pageSize) => {
       state = { ...state, page, pageSize };
       return "changed";
     },
@@ -254,6 +254,61 @@ describe("compileTGridRuntimeConfig", () => {
       tableName: "lines",
       parent: { parentLevelId: "orders", foreignKey: "order_id" },
     });
+  });
+
+  it("rejects host-owned query state on non-root levels", () => {
+    const lookupResolver: TGridLookupResolver = {
+      bundleFor: () => undefined,
+    };
+    const message =
+      'non-root level \'orders.lines\' cannot use query.owner "host"';
+
+    expect(() =>
+      defineTGrid<RowsByLevel>({
+        rootLevel: "orders",
+        levels: {
+          orders: {
+            table: orderSchema,
+            childLevels: ["orders.lines"],
+          },
+          "orders.lines": {
+            table: lineSchema,
+            parent: { level: "orders", foreignKey: "order_id" },
+            childLevels: ["orders.lines.allocations"],
+            query: { owner: "host" },
+          },
+          "orders.lines.allocations": {
+            table: allocationSchema,
+            parent: { level: "orders.lines", foreignKey: "line_id" },
+            childLevels: [],
+          },
+        },
+      }),
+    ).toThrow(message);
+
+    expect(() =>
+      compileTGridRuntimeConfig<RowsByLevel>({
+        rootLevel: "orders",
+        levels: {
+          orders: {
+            table: orderSchema,
+            childLevels: ["orders.lines"],
+          },
+          "orders.lines": {
+            table: lineSchema,
+            parent: { level: "orders", foreignKey: "order_id" },
+            childLevels: ["orders.lines.allocations"],
+            query: { owner: "host" },
+          },
+          "orders.lines.allocations": {
+            table: allocationSchema,
+            parent: { level: "orders.lines", foreignKey: "line_id" },
+            childLevels: [],
+          },
+        },
+        columnMapper: createTGridColumnMapper(lookupResolver),
+      }),
+    ).toThrow(message);
   });
 
   it("uses each table primary key as row identity", () => {

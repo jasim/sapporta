@@ -19,8 +19,9 @@ import type {
 } from "./tgrid-column-spec";
 
 // Query behavior for one table level.
-// Use `host` when the page shows controls for this level. Use `source` when the
-// level is loaded from a parent row expansion and should only use defaults.
+// Use `host` for the root level where one page owns the controls. Expanded
+// child levels can mount once per parent row, so they keep query state in the
+// source instance for that concrete path.
 export type TGridLevelQueryConfig = {
   owner?: "host" | "source";
   pageSize?: number | (() => number);

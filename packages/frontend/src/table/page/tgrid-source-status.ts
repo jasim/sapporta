@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from "react";
+import { useStore } from "zustand";
 import type { LevelSnapshot, LevelSourceState } from "@sapporta/grid";
 import { ApiError } from "@sapporta/shared/client";
 import type { TGridRowsByLevel } from "../grid-adapter/tgrid-types";
@@ -52,9 +53,9 @@ export function useTGridSourceStatus<
   const error = useTGridSourceStateField(session, (state) =>
     "error" in state ? state.error : undefined,
   );
-  const totalCount = useTGridSourceField(
-    session,
-    (snapshot) => snapshot.pagination?.totalCount ?? 0,
+  const totalCount = useStore(
+    session.queryStore,
+    (state) => state.totalCount ?? 0,
   );
   return { status, error, totalCount };
 }

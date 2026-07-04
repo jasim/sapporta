@@ -36,16 +36,17 @@ export function ColumnPresetHeader<TMeta = unknown, TFilter = unknown>({
     path,
     levelName,
     schema,
-    snapshot: snapshot as HeaderLevelState<TFilter>["snapshot"],
-    sort: snapshot.sort,
-    filter: snapshot.filter as TFilter | undefined,
-    canWrite: source.writable,
+    snapshot,
+    sort: source.query?.sort?.current(),
+    filter: source.query?.filter?.current() as TFilter | undefined,
+    canWrite: source.canWrite,
   };
   const defaultCommands: GridLevelCommands<TFilter> = {
-    setSort: (sort) => source.setSort(sort),
-    setFilter: (filter) => source.setFilter(filter),
-    setPage: (page, pageSize) => source.setPage(page, pageSize),
-    refetch: () => source.refetch(),
+    setSort: source.query?.sort?.set,
+    setFilter: source.query?.filter?.set as
+      | GridLevelCommands<TFilter>["setFilter"]
+      | undefined,
+    refetch: source.query?.refetch,
     createRow: (node, atIndex) => runtime.createRow(path, node, atIndex),
     removeRow: (rowKey) => runtime.removeRow(path, rowKey),
     writeCell: (coord, value) => runtime.writeCell(path, coord, value),
@@ -119,13 +120,14 @@ function HeaderCell<TMeta = unknown, TFilter = unknown>({
     sortIndex != null && sortIndex >= 0 && (level.sort?.length ?? 0) > 1
       ? sortIndex + 1
       : null;
-  const sortable = runtime?.headerBehavior.sortable === true;
+  const sortable =
+    runtime?.headerBehavior.sortable === true && commands.setSort !== undefined;
   const close = () => setOpen(false);
   const headerName = column.column.name;
 
   function handleHeaderClick(e: MouseEvent<HTMLDivElement>) {
     if (!sortable) return;
-    commands.setSort(
+    void commands.setSort?.(
       cycleSort(
         level.sort ?? [],
         column.column.id,

@@ -38,7 +38,7 @@ export function parseSortString(
   return out;
 }
 
-export function stringifySortOrder(order: SortDescriptor[]): string | null {
+export function stringifySortOrder(order: readonly SortDescriptor[]): string | null {
   if (order.length === 0) return null;
   return order
     .map((s) => (s.direction === "desc" ? `-${s.colId}` : s.colId))
@@ -46,7 +46,7 @@ export function stringifySortOrder(order: SortDescriptor[]): string | null {
 }
 
 export function cycleSort(
-  order: SortDescriptor[],
+  order: readonly SortDescriptor[],
   colId: ColId,
   mode: "replace" | "extend",
 ): SortDescriptor[] {
@@ -69,8 +69,8 @@ export function cycleSort(
 }
 
 export function sortOrderEqual(
-  a: SortDescriptor[],
-  b: SortDescriptor[],
+  a: readonly SortDescriptor[],
+  b: readonly SortDescriptor[],
 ): boolean {
   if (a === b) return true;
   if (a.length !== b.length) return false;

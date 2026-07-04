@@ -7,22 +7,34 @@ import {
 } from "react";
 import type { ColId, GridPath } from "../types/identity";
 import type { ColumnSchema } from "../types/schema";
-import { EmptyLevel } from "./EmptyLevel";
 import { Grid, type GridChromeContext, type GridPresentation } from "./Grid";
 import { GridRow } from "./cells/GridRow";
-import { LevelStatusBand } from "./LevelStatusBand";
 import {
   useDisplayedRowSequence,
   useGridRuntime,
   useLevelSourceState,
+  usePhantoms,
   useRowInteractionSnapshot,
 } from "./GridRuntimeProvider";
 import { rowInteractionStatusFor } from "../types/row-selection";
+import type { LevelSourceState, SourceLoadResult } from "../data-sources";
 
 export type GridLevelChrome = {
-  renderLevelHeader?: (ctx: GridChromeContext) => ReactNode;
+  renderHeader?: (ctx: GridChromeContext) => ReactNode;
+  renderStatus?: (ctx: GridStatusContext) => ReactNode;
+  renderEmpty?: (ctx: GridEmptyContext) => ReactNode;
   levelContainerClassName?: (ctx: GridChromeContext) => string | undefined;
   levelContainerStyle?: (ctx: GridChromeContext) => CSSProperties | undefined;
+};
+
+export type GridStatusContext = GridChromeContext & {
+  state: LevelSourceState;
+  retry?: () => Promise<SourceLoadResult>;
+};
+
+export type GridEmptyContext = GridChromeContext & {
+  state: Extract<LevelSourceState, { status: "ready" }>;
+  phantomCount: number;
 };
 
 // The recursive unit — the only component that bridges the two stores.
@@ -62,17 +74,42 @@ export function GridLevel({
   const controller = runtime.controllerFor(path);
   const level = runtime.schemaAt(path);
   const schema = level.columns;
+  const state = useLevelSourceState(path);
+  const phantoms = usePhantoms(path);
   const colOrder = useMemo(() => schema.map((c) => c.id), [schema]);
+  const chromeContext: GridChromeContext = {
+    path,
+    levelName: level.name,
+    presentation,
+    schema,
+  };
+  const retry = runtime.sourceFor(path).query?.refetch;
+  // Status chrome is sampled before the body so loading/error information stays
+  // outside `displayed.rows`. Empty chrome is sampled after the body guard: the
+  // level is empty only when the ready source has no nodes, no footers, and the
+  // phantom channel has no authoring rows.
+  const status = chrome?.renderStatus?.({ ...chromeContext, state, retry });
+  const empty =
+    state.status === "ready" &&
+    state.snapshot.nodes.length === 0 &&
+    phantoms.length === 0 &&
+    (state.snapshot.footerRows?.length ?? 0) === 0
+      ? chrome?.renderEmpty?.({
+          ...chromeContext,
+          state,
+          phantomCount: phantoms.length,
+        })
+      : null;
 
   return (
     <>
-      <LevelStatusBand path={path} />
+      {status}
       <Grid
         path={path}
         schema={schema}
         controller={controller}
         presentation={presentation}
-        renderLevelHeader={chrome?.renderLevelHeader}
+        renderHeader={chrome?.renderHeader}
         levelContainerClassName={chrome?.levelContainerClassName}
         levelContainerStyle={chrome?.levelContainerStyle}
       >
@@ -84,7 +121,7 @@ export function GridLevel({
           presentation={presentation}
         />
       </Grid>
-      <EmptyLevel path={path} />
+      {empty}
     </>
   );
 }
@@ -148,10 +185,10 @@ function DisplayedRowsBody({
 }
 
 // Per-child-row wrapper that gates the full `<GridLevel>` mount on the
-// child source's status. While loading or errored, only the status band
+// child source's status. While loading or errored, only the status slot
 // renders under the parent row — the heavy `<Grid>` markup stays unmounted
 // until the source resolves to `ready`. The status flip wakes this
-// component (via `useLevelSnapshot`) without re-rendering the parent.
+// component (via `useLevelSourceState`) without re-rendering the parent.
 //
 // The wrapper is part of the layout contract. Expanded child grids are
 // visually interleaved with parent rows, but they must not be direct grid
@@ -168,12 +205,22 @@ function ChildLevelMount({
   presentation: GridPresentation;
 }) {
   const state = useLevelSourceState(path);
+  const runtime = useGridRuntime();
+  const level = runtime.schemaAt(path);
+  const schema = level.columns;
+  const chromeContext: GridChromeContext = {
+    path,
+    levelName: level.name,
+    presentation,
+    schema,
+  };
+  const retry = runtime.sourceFor(path).query?.refetch;
   return (
     <div data-grid-part="child-level">
       {state.status === "ready" ? (
         <GridLevel path={path} chrome={chrome} presentation={presentation} />
       ) : (
-        <LevelStatusBand path={path} />
+        chrome?.renderStatus?.({ ...chromeContext, state, retry })
       )}
     </div>
   );

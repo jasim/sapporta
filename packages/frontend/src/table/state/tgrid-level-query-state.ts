@@ -24,6 +24,7 @@ export type TGridLevelQueryState<
   search: string | null;
   page: number;
   pageSize: number;
+  totalCount: number | null;
   errorBanner: string | null;
 
   // Source-facing setters. These mutate query state and return whether the
@@ -33,6 +34,7 @@ export type TGridLevelQueryState<
   setSortState: (sort: SortDescriptor[]) => "changed" | "unchanged";
   setFilterState: (filter: TGridFilter | undefined) => "changed" | "unchanged";
   setPageState: (page: number, pageSize: number) => "changed" | "unchanged";
+  setTotalCount: (totalCount: number | null) => void;
 
   // UI-facing commands for root-level table controls. These commands route
   // through the source and then sync application-visible state such as the URL.

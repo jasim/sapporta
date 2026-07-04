@@ -6,8 +6,7 @@ import {
   rootPath,
   type GridPath,
   type GridRuntime,
-  type LevelSourceState,
-  type PageBoundaryNavigationRequest,
+  type LoadedRowsBoundaryEvent,
   type RuntimeLevelDataSource,
   type RowQueryState,
   type RowKey,
@@ -232,6 +231,11 @@ class DefaultTGridSession<
       levels: definition.levels,
       columnMapper: this.columnMapper,
       hostRowQueryState: (levelId) => this.hostRowQueryState(levelId),
+      recordTotalCount: (levelId, totalCount) =>
+        this.queryStoresByLevel
+          .get(levelId)
+          ?.getState()
+          .setTotalCount(totalCount),
       sessionContext: this.currentSessionContext,
     });
 
@@ -245,8 +249,7 @@ class DefaultTGridSession<
       dataSource,
       interaction: definition.interaction,
       phantomRows: definition.phantomRows,
-      onPageBoundaryNavigation: ({ navigation, source, state }) =>
-        this.handlePageBoundaryNavigation(navigation, source, state),
+      onLoadedRowsBoundary: (event) => this.handleLoadedRowsBoundary(event),
       on: {
         cellReconciled: ({ event }) => {
           if (event.kind === "rejected") {
@@ -320,7 +323,7 @@ class DefaultTGridSession<
     path?: GridPath,
   ): Promise<SourceLoadResult> {
     const targetPath = this.requireLoadPath(levelId, path, "reloadRows");
-    return this.runtime.sourceFor(targetPath).refetch();
+    return this.refetchSource(targetPath);
   }
 
   async setLevelSort(
@@ -328,7 +331,9 @@ class DefaultTGridSession<
     path: GridPath,
     sort: SortDescriptor[],
   ): Promise<SourceLoadResult> {
-    const result = await this.runtime.sourceFor(path).setSort(sort);
+    const result =
+      (await this.runtime.sourceFor(path).query?.sort?.set(sort)) ??
+      this.unchangedSourceResult(path);
     this.pushUrlAfterReady(levelId, result);
     return result;
   }
@@ -338,7 +343,9 @@ class DefaultTGridSession<
     path: GridPath,
     filter: TGridFilter | undefined,
   ): Promise<SourceLoadResult> {
-    const result = await this.runtime.sourceFor(path).setFilter(filter);
+    const result =
+      (await this.runtime.sourceFor(path).query?.filter?.set(filter)) ??
+      this.unchangedSourceResult(path);
     this.pushUrlAfterReady(levelId, result);
     return result;
   }
@@ -349,7 +356,13 @@ class DefaultTGridSession<
     page: number,
     pageSize: number,
   ): Promise<SourceLoadResult> {
-    const result = await this.runtime.sourceFor(path).setPage(page, pageSize);
+    const changed = this.getQueryStore(levelId)
+      .getState()
+      .setPageState(page, pageSize);
+    const result =
+      changed === "changed"
+        ? await this.refetchSource(path)
+        : this.unchangedSourceResult(path);
     this.pushUrlAfterReady(levelId, result);
     return result;
   }
@@ -437,9 +450,9 @@ class DefaultTGridSession<
       // These setters are source-facing and passive. They update table query
       // state only. The source command that called them owns the row load, and
       // the session command owns any route sync that follows a ready result.
-      setSort: (sort) => store.getState().setSortState(sort ?? []),
-      setFilter: (filter) => store.getState().setFilterState(filter),
-      setPage: (page, pageSize) =>
+      setSortState: (sort) => store.getState().setSortState([...(sort ?? [])]),
+      setFilterState: (filter) => store.getState().setFilterState(filter),
+      setPageState: (page, pageSize) =>
         store.getState().setPageState(page, pageSize),
     };
   }
@@ -454,51 +467,57 @@ class DefaultTGridSession<
     if (result.kind === "ready") this.pushUrl(levelId);
   }
 
-  private handlePageBoundaryNavigation(
-    navigation: PageBoundaryNavigationRequest,
-    source: RuntimeLevelDataSource,
-    state: Extract<LevelSourceState, { status: "ready" }>,
+  private handleLoadedRowsBoundary(
+    event: LoadedRowsBoundaryEvent,
   ): Promise<SourceLoadResult> | false {
-    const pagination = state.snapshot.pagination;
-    if (!pagination) return false;
-    if (!Number.isFinite(pagination.pageSize)) return false;
-    // TGrid table pages use 1-based page numbers because table routes and
-    // export URLs expose page numbers to application users. The base grid never
-    // assumes that convention. This hook translates keyboard edge navigation
-    // into the same source command used by visible page controls.
-    const nextPage =
-      navigation.direction === "next"
-        ? pagination.page + 1
-        : pagination.page - 1;
-    // Returning false is an authoritative "no page turn" for the runtime hook.
-    // TGrid owns this boundary because its page numbers are route-visible and
-    // 1-based; the generic grid fallback cannot safely reinterpret page 1 as a
-    // source coordinate and request page 0.
-    if (nextPage < 1) return false;
-    if (
-      navigation.direction === "next" &&
-      pagination.totalCount !== undefined &&
-      pagination.page * pagination.pageSize >= pagination.totalCount
-    ) {
-      return false;
-    }
-    if (
-      navigation.direction === "next" &&
-      pagination.totalCount === undefined &&
-      state.snapshot.nodes.length < pagination.pageSize
-    ) {
-      return false;
-    }
-    const levelId = this.runtime.schemaAt(navigation.path)
+    // The low-level grid reports only "loaded rows ended before/after this
+    // path". TGrid translates that into its own table contract: one-based page
+    // numbers, page-size policy, route state, and total-count checks. Returning
+    // false tells the runtime to try an ancestor path or normal append-row
+    // fallback.
+    const levelId = this.runtime.schemaAt(event.loadPath)
       .name as TGridLevelId<RowsByLevel>;
-    // The runtime keeps the pending cursor landing while this promise is
-    // pending. The session pushes the URL after ready; the runtime then samples
-    // displayed rows and lands focus on the first or last row for the requested
-    // edge.
-    return source.setPage(nextPage, pagination.pageSize).then((result) => {
-      this.pushUrlAfterReady(levelId, result);
-      return result;
-    });
+    const store = this.queryStoresByLevel.get(levelId);
+    if (!store) return false;
+    const query = store.getState();
+    if (!Number.isFinite(query.pageSize)) return false;
+
+    const nextPage =
+      event.direction === "after" ? query.page + 1 : query.page - 1;
+    if (nextPage < 1) return false;
+
+    const sourceState = this.runtime.sourceStateFor(event.loadPath);
+    if (sourceState.status !== "ready") return false;
+    if (
+      event.direction === "after" &&
+      query.totalCount !== null &&
+      query.page * query.pageSize >= query.totalCount
+    ) {
+      return false;
+    }
+    if (
+      event.direction === "after" &&
+      query.totalCount === null &&
+      sourceState.snapshot.nodes.length < query.pageSize
+    ) {
+      return false;
+    }
+
+    return this.setLevelPage(levelId, event.loadPath, nextPage, query.pageSize);
+  }
+
+  private refetchSource(path: GridPath): Promise<SourceLoadResult> {
+    return (
+      this.runtime.sourceFor(path).query?.refetch?.() ??
+      Promise.resolve(this.unchangedSourceResult(path))
+    );
+  }
+
+  private unchangedSourceResult(path: GridPath): SourceLoadResult {
+    return {
+      kind: "unchanged",
+      state: this.runtime.sourceStateFor(path),
+    };
   }
 
   private requireLoadPath(
@@ -533,6 +552,7 @@ class DefaultTGridSession<
       search: initial.search,
       page: initial.page,
       pageSize: initial.pageSize,
+      totalCount: null,
       errorBanner: null,
 
       // Passive state setters are the only setters called from REST
@@ -565,6 +585,10 @@ class DefaultTGridSession<
         }
         set({ page, pageSize });
         return "changed";
+      },
+      setTotalCount: (totalCount) => {
+        if (get().totalCount === totalCount) return;
+        set({ totalCount });
       },
 
       setSort: (sort) => {

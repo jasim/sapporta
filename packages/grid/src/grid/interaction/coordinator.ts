@@ -110,9 +110,12 @@ export type CreateCoordinatorArgs = {
   onExpand?: (path: GridPath, rowId: RowId) => void;
 };
 
-type PageBoundaryRequest = Parameters<
-  GridRuntime["requestPageBoundaryNavigation"]
+type LoadedRowsBoundaryEvent = Parameters<
+  GridRuntime["requestLoadedRowsBoundary"]
 >[0];
+type LoadedRowsBoundaryRequest =
+  | Omit<Extract<LoadedRowsBoundaryEvent, { kind: "cell" }>, "loadPath">
+  | Omit<Extract<LoadedRowsBoundaryEvent, { kind: "row" }>, "loadPath">;
 
 export function createGridCoordinator(
   args: CreateCoordinatorArgs,
@@ -276,12 +279,12 @@ export function createGridCoordinator(
     return schema[nextIdx]?.id ?? null;
   }
 
-  function pageBoundaryCandidatePaths(path: GridPath): GridPath[] {
-    // When focus is inside expanded detail rows, the page the user sees may
-    // belong to an ancestor table. Example: a book row is expanded and focus is
-    // on that book's last quote. Pressing Down should first give the quote list
-    // a chance to page if quotes are independently paged, then give the books
-    // table a chance to show the next page of books.
+  function loadedRowsBoundaryCandidatePaths(path: GridPath): GridPath[] {
+    // When focus is inside expanded detail rows, the loaded window the user can
+    // extend may belong to an ancestor table. Example: a book row is expanded
+    // and focus is on that book's last quote. Pressing Down should first give
+    // the quote list a chance to load more rows if it owns that boundary, then
+    // give the books table a chance to load more books.
     const paths: GridPath[] = [];
     let current: GridPath | null = path;
     while (current) {
@@ -291,15 +294,18 @@ export function createGridCoordinator(
     return paths;
   }
 
-  function requestPageBoundaryNavigation(
+  function requestLoadedRowsBoundary(
     runtime: GridRuntime,
-    navigation: PageBoundaryRequest,
+    navigation: LoadedRowsBoundaryRequest,
   ): boolean {
-    // Ask nearest-to-farthest so nested tables keep their own paging behavior.
-    // If the focused detail list cannot page, the request climbs to the parent
-    // table instead of falling through to append-row behavior too early.
-    for (const path of pageBoundaryCandidatePaths(navigation.path)) {
-      if (runtime.requestPageBoundaryNavigation({ ...navigation, path })) {
+    // Ask nearest-to-farthest so nested tables keep their own loading policy.
+    // If the focused detail list cannot load more rows, the request climbs to
+    // the parent table instead of falling through to append-row behavior too
+    // early.
+    for (const loadPath of loadedRowsBoundaryCandidatePaths(
+      navigation.origin.path,
+    )) {
+      if (runtime.requestLoadedRowsBoundary({ ...navigation, loadPath })) {
         return true;
       }
     }
@@ -423,16 +429,16 @@ export function createGridCoordinator(
     );
     if (result.target) return result.target;
     // A table may show footer or subtotal rows that are not real keyboard
-    // targets. Treat those rows the same for in-page movement and page turns,
-    // so pressing Down at the last editable row behaves predictably. Creating
-    // a phantom row is the fallback only when the app cannot page forward.
+    // targets. Treat those rows the same for in-window movement and boundary
+    // loads, so pressing Down at the last editable row behaves predictably.
+    // Creating a phantom row is the fallback only when the app declines the
+    // boundary load.
     if (
       result.overflow &&
-      requestPageBoundaryNavigation(runtime, {
+      requestLoadedRowsBoundary(runtime, {
         kind: "cell",
-        path: fromPath,
-        direction: result.overflow,
-        colId: cursor.colId,
+        direction: result.overflow === "next" ? "after" : "before",
+        origin: cursor,
         colPolicy: move.colPolicy,
         extend: move.extend,
       })
@@ -505,14 +511,14 @@ export function createGridCoordinator(
       );
       if (result.target) return result.target;
       // In a row-list, keyboard focus follows rows the app can operate on.
-      // A visible footer at the edge should not block a page turn, and it
+      // A visible footer at the edge should not block a boundary load, and it
       // should not become the row cursor's landing target.
       if (
         result.overflow &&
-        requestPageBoundaryNavigation(runtime, {
+        requestLoadedRowsBoundary(runtime, {
           kind: "row",
-          path: fromPath,
-          direction: result.overflow,
+          direction: result.overflow === "next" ? "after" : "before",
+          origin: rowCursor,
           extend: intent.extend,
         })
       ) {
@@ -545,10 +551,10 @@ export function createGridCoordinator(
       // that edge can ask the app for the adjacent page.
       if (
         result.overflow &&
-        requestPageBoundaryNavigation(runtime, {
+        requestLoadedRowsBoundary(runtime, {
           kind: "row",
-          path: fromPath,
-          direction: result.overflow,
+          direction: result.overflow === "next" ? "after" : "before",
+          origin: rowCursor,
           extend: intent.extend,
         })
       ) {

@@ -139,9 +139,9 @@ export type CreateControllerArgs = {
   onNavigateRow?: (intent: RowNavigationIntent) => void;
   clearCellRange?: (path: GridPath) => void;
   clearRowSelection?: (path: GridPath) => void;
-  // Cell value writer — invoked from commitEdit. The runtime wires this to the
-  // path's writable `LevelDataSource.setCell` via `writeCell`, where
-  // `mutationCommitted` is emitted.
+  // Cell value writer — invoked from commitEdit. The runtime wires this to
+  // `writeCell`, where it calls the path source's write capability and emits
+  // `mutationCommitted`.
   writeValue?: (coord: Coord, newValue: unknown) => void;
   activateCell?: (coord: Coord, trigger: CellActivationTrigger) => void;
 };

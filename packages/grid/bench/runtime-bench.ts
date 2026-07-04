@@ -449,10 +449,10 @@ function performDataRederive(runtime: GridRuntime): void {
   const source = runtime.sourceFor(path);
   const rows = runtime.displayedRowSequenceFor(path).rows;
   if (rows.length === 0) return;
-  source.refetch();
+  void source.query?.refetch?.();
   runtime.writeCell(path, { rowId: rows[0].id, colId: "c1" }, "changed");
-  source.setSort([{ colId: "c1", direction: "asc" }]);
-  source.setSort(undefined);
+  void source.query?.sort?.set([{ colId: "c1", direction: "asc" }]);
+  void source.query?.sort?.set(undefined);
 }
 
 function performExpansionLifecycle(runtime: GridRuntime): void {

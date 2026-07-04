@@ -1,10 +1,8 @@
 import type { ProtoRow, RowPredicate } from "../types";
 
-// `withFilter` is the only place in the grid that "filters." It takes a
-// pre-compiled `RowPredicate` — never a grammar — because the grid has no
-// filter grammar of its own. The predicate is produced upstream by the
-// source's `compileFilter` (host code) from the host's `F` and arrives
-// here through `snapshot.applyFilter`. The grid trusts it and calls it.
+// Legacy proto-row filter helper kept for consumers that explicitly compose a
+// custom display pipeline. Core displayed-row derivation does not call it:
+// built-in sources publish already-filtered `TreeNode` values.
 //
 // Filtering is row-kind-aware. Non-data rows (brackets, footers, phantoms)
 // represent structural roles, not user data, so they always survive. A

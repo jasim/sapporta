@@ -101,8 +101,6 @@ export function TGrid<
               session.setLevelSort(levelId, level.path, sort ? [...sort] : []),
             setFilter: (filter) =>
               session.setLevelFilter(levelId, level.path, filter),
-            setPage: (page, pageSize) =>
-              session.setLevelPage(levelId, level.path, page, pageSize),
           };
         },
       },
@@ -146,15 +144,18 @@ function mergeTGridChrome({
   viewRelatedRows: ViewRelatedRowsOption | undefined;
 }): GridLevelChrome {
   return {
-    renderLevelHeader: (ctx) =>
+    renderHeader: (ctx) =>
       ctx.presentation === "cards" ? (
         renderCardsLevelHeader(session, ctx, root, viewRelatedRows)
       ) : (
         <>
-          {chrome.renderLevelHeader?.(ctx)}
+          {chrome.renderHeader?.(ctx)}
           {renderRelatedRowsLink(session, ctx, root, viewRelatedRows)}
         </>
       ),
+    renderStatus: (ctx) =>
+      ctx.path === root ? null : chrome.renderStatus?.(ctx),
+    renderEmpty: (ctx) => (ctx.path === root ? null : chrome.renderEmpty?.(ctx)),
     levelContainerClassName: (ctx) =>
       cn(
         chrome.levelContainerClassName?.(ctx),

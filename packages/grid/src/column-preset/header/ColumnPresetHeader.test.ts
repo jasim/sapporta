@@ -87,14 +87,13 @@ describe("ColumnPresetHeader sorting", () => {
           pageSize: 50,
           sort,
         }),
-        setSort: (next) => {
-          sort = next ?? [];
+        setSortState: (next) => {
+          sort = next ? [...next] : [];
           return "changed";
         },
-        setFilter: () => "unchanged",
-        setPage: () => "unchanged",
+        setFilterState: () => "unchanged",
+        setPageState: () => "unchanged",
       }),
-      serverManaged: { sort: true, filter: true, pagination: true },
       rowKey: (node) => String(node.columns.id),
     });
     const dataSource: GridDataSource = {
@@ -115,7 +114,7 @@ describe("ColumnPresetHeader sorting", () => {
           schema: schema.levels.rows.columns,
           options: {
             commandOverrides: () => ({
-              setSort: (next) => source.setSort(next),
+              setSort: (next) => source.query!.sort!.set(next),
             }),
           },
         }),

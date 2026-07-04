@@ -1,12 +1,10 @@
 import { buildDataRows } from "../pipeline/stages/build-data";
 import { buildDisplayed } from "../pipeline/stages/build-displayed";
-import { withFilter } from "../pipeline/stages/with-filter";
 import { withFooters } from "../pipeline/stages/with-footers";
 import { withOpeningClosing } from "../pipeline/stages/with-opening-closing";
 import { withPhantoms } from "../pipeline/stages/with-phantoms";
 import { withRollup } from "../pipeline/stages/with-rollup";
 import { withRowIds } from "../pipeline/stages/with-row-ids";
-import { withSort } from "../pipeline/stages/with-sort";
 import type { ColId } from "../types/identity";
 import type {
   DisplayedRows,
@@ -24,7 +22,6 @@ const EMPTY_FOOTERS: FooterRow[] = [];
 // order matters because each stage answers a different domain question:
 // source nodes become data rows, tree structure adds rollups/brackets,
 // server footers join the body, local phantoms join only after real rows,
-// client filter/sort run only when the server did not already do that work,
 // and row ids are assigned last from the final path-relative order.
 //
 // `previous` is only for identity preservation. It must never change the
@@ -70,13 +67,7 @@ function deriveIdentifiedRows(input: DisplayedRowsInput): LevelRow[] {
     phantomRows,
     schema.options,
   );
-  const filteredRows = sourceSnapshot.serverManaged.filter
-    ? rowsWithPhantoms
-    : withFilter(rowsWithPhantoms, sourceSnapshot.applyFilter);
-  const sortedRows = sourceSnapshot.serverManaged.sort
-    ? filteredRows
-    : withSort(filteredRows, sourceSnapshot.sort, schema.columns);
-  return withRowIds(sortedRows, path);
+  return withRowIds(rowsWithPhantoms, path);
 }
 
 export function buildDisplayedRowSequence(

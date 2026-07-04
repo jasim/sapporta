@@ -90,7 +90,7 @@
 //    columns, renderers — none of that changes on a click.
 //
 // The key invariant: a change in one channel never causes subscribers of
-// another channel to wake up. That is the whole design in one sentence.
+// another channel to wake up.
 //
 // =====================================================================
 // The four channels
@@ -137,13 +137,13 @@
 //      `data-active` and propagates to descendant cells via CSS, with
 //      no per-cell subscription.
 //
-//   4. DATA — `LevelDataSource` (per `GridPath`). Owns nodes,
-//      sort/filter/pagination state, server-supplied footers/aggregates,
-//      and `loading | error | ready` status. The runtime never owns data;
-//      it receives a `GridDataSource` from the host and registers sources
-//      as paths are expanded. Sources emit identity-stable snapshots;
+//   4. DATA — `LevelDataSource` (per `GridPath`). Publishes nodes already
+//      shaped for display, optional footers, lifecycle state, and optional
+//      query/write capabilities. The runtime never owns data or page state;
+//      it receives a `GridDataSource` from the host and registers sources as
+//      paths are expanded. Sources emit identity-stable snapshots;
 //      displayed-row derivation is a pure function of `DisplayedRowsInput`.
-//      Seven invariants govern the data plane — see `data-sources/types.ts`.
+//      The source contract is documented in `data-sources/types.ts`.
 //
 // =====================================================================
 // Interaction domains
@@ -332,10 +332,9 @@
 //     via CSS). Only expansion toggle legitimately re-renders many cells,
 //     and that is rare.
 //
-// A 100×30 flat table with `restLevelSource` and
-// `serverManaged: { sort: true, filter: true, pagination: true }` performs
-// zero client-side passes over data — pipeline runs `withSort` / `withFilter`
-// exactly zero times. Switching that same table to `inMemoryLevelSource`
+// A 100×30 flat table with `restLevelSource` performs zero client-side query
+// passes over data: the endpoint returns rows already sorted, filtered, and
+// windowed. Switching that same table to `inMemoryLevelSource`
 // requires changing only the host's source construction; no grid code,
 // schema, or component changes.
 //
@@ -352,12 +351,9 @@
 //     the grid does not orchestrate.
 //   - Column virtualization, frozen columns, resize. Orthogonal to the
 //     data plane.
-//   - Cursor-based / infinite pagination. The current pagination contract
-//     is shaped for paged tables and reports. Cursor/infinite is the
-//     planned extension point: add a sibling verb (e.g.
-//     `setCursor(cursor, pageSize)`) and widen `pagination` to a
-//     discriminated union. The invariant "the source publishes already-
-//     windowed nodes" survives unchanged. Don't generalize prematurely.
+//   - Cursor-based / infinite loading. Add a concrete source capability when
+//     a consumer needs it. The invariant "the source publishes already-windowed
+//     nodes" survives unchanged.
 //   - Domain features (FK chips, link adornments, schema-derived context
 //     menus). Consumer-side: they live outside `grid/`, attach data via
 //     `column.meta`, and supply `renderCell` / `edit` / activation /
@@ -373,7 +369,7 @@ export {
   createGridRuntime,
   createTableController,
   type GridRuntime,
-  type PageBoundaryNavigationRequest,
+  type LoadedRowsBoundaryEvent,
   type RuntimeArgs,
   type RowInteractionCommands,
   type RowInteractionSnapshot,
@@ -402,11 +398,14 @@ export {
   useSelectedRows,
   useRowInteractionSnapshot,
   GridLevel,
+  defaultGridLevelChrome,
   CellActivationButton,
   ExpandableCellFrame,
   rowExpansionActivation,
   withRowExpansionColumn,
   type GridChromeContext,
+  type GridStatusContext,
+  type GridEmptyContext,
   type GridLevelChrome,
   type GridPresentation,
 } from "./react";
@@ -416,6 +415,9 @@ export {
   inMemoryGridDataSource,
   restGridDataSource,
   sourceOwnedRowQuery,
+  filterSourceNodes,
+  sortSourceNodes,
+  sliceSourceNodes,
 } from "./data-sources";
 export {
   createDisplayedRowsStore,
@@ -434,13 +436,14 @@ export type {
   LevelStatus,
   LevelSnapshot,
   LevelSourceState,
-  LevelRequest,
   SourceLoadResult,
+  SortQueryCapability,
+  FilterQueryCapability,
+  LevelQueryCapabilities,
+  WriteCapability,
   CellChange,
   CreateNodeResult,
   ReconcileEvent,
-  ReadonlyLevelDataSource,
-  WritableLevelDataSource,
   LevelDataSource,
   PhantomChannel,
   RuntimeLevelDataSource,

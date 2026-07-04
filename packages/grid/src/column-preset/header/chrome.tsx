@@ -1,5 +1,8 @@
 import type { CSSProperties } from "react";
-import type { GridLevelChrome } from "../../grid/react/GridLevel";
+import {
+  defaultGridLevelChrome,
+  type GridLevelChrome,
+} from "../../grid/react";
 import type { PresetChromeOptions } from "../types";
 import { templateColumns } from "../width";
 import styles from "../sapporta-preset.module.css";
@@ -9,7 +12,8 @@ export function chrome<TMeta = unknown, TFilter = unknown>(
   options: PresetChromeOptions<TMeta, TFilter> = {},
 ): GridLevelChrome {
   return {
-    renderLevelHeader: ({ path, levelName, presentation, schema }) =>
+    ...defaultGridLevelChrome,
+    renderHeader: ({ path, levelName, presentation, schema }) =>
       presentation === "tabular" ? (
         <ColumnPresetHeader
           path={path}

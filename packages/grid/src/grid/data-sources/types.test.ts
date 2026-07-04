@@ -2,40 +2,22 @@ import { describe, expectTypeOf, it } from "vitest";
 import type {
   LevelDataSource,
   LevelSnapshot,
-  ReadonlyLevelDataSource,
   ReconcileEvent,
-  WritableLevelDataSource,
+  WriteCapability,
 } from "./types";
 
-describe("LevelDataSource discriminated union", () => {
-  // The `writable` literal must narrow the union without a cast — this is
-  // the contract that lets the runtime check `source.writable` once and
-  // call edit verbs without TypeScript complaining.
-  it("narrows to ReadonlyLevelDataSource when writable is false", () => {
-    function check(source: LevelDataSource) {
-      if (!source.writable) {
-        expectTypeOf(source).toEqualTypeOf<ReadonlyLevelDataSource>();
-        // setCell must NOT exist on the narrowed type.
-        // @ts-expect-error — readonly source has no setCell verb.
-        source.setCell;
-      }
-    }
-    check({} as LevelDataSource);
+describe("LevelDataSource capability surface", () => {
+  it("keeps write verbs behind the optional write capability", () => {
+    expectTypeOf<LevelDataSource["write"]>().toEqualTypeOf<
+      WriteCapability | undefined
+    >();
   });
 
-  it("narrows to WritableLevelDataSource when writable is true", () => {
-    function check(source: LevelDataSource) {
-      if (source.writable) {
-        expectTypeOf(source).toEqualTypeOf<WritableLevelDataSource>();
-        // Edit verbs and reconciliation are present on the narrowed type.
-        expectTypeOf(source.setCell).toBeFunction();
-        expectTypeOf(source.applyChanges).toBeFunction();
-        expectTypeOf(source.createNode).toBeFunction();
-        expectTypeOf(source.removeNode).toBeFunction();
-        expectTypeOf(source.onReconcile).toBeFunction();
-      }
-    }
-    check({} as LevelDataSource);
+  it("does not expose write verbs on the source itself", () => {
+    // @ts-expect-error — callers must go through source.write.
+    type _SetCell = LevelDataSource["setCell"];
+    // @ts-expect-error — callers must go through source.write.
+    type _CreateNode = LevelDataSource["createNode"];
   });
 });
 
@@ -75,22 +57,21 @@ describe("ReconcileEvent discriminated union", () => {
   });
 });
 
-describe("LevelSnapshot.serverManaged", () => {
-  it("is required (not optional)", () => {
-    type ServerManagedKey = "serverManaged";
+describe("LevelSnapshot", () => {
+  it("requires only the renderable nodes payload", () => {
+    type NodesKey = "nodes";
     type SnapshotRequiredKeys = {
       [K in keyof LevelSnapshot]-?: undefined extends LevelSnapshot[K]
         ? never
         : K;
     }[keyof LevelSnapshot];
-    expectTypeOf<ServerManagedKey>().toMatchTypeOf<SnapshotRequiredKeys>();
+    expectTypeOf<NodesKey>().toEqualTypeOf<SnapshotRequiredKeys>();
   });
 
-  it("has the three boolean concerns", () => {
-    expectTypeOf<LevelSnapshot["serverManaged"]>().toEqualTypeOf<{
-      sort: boolean;
-      filter: boolean;
-      pagination: boolean;
-    }>();
+  it("does not carry query or pagination metadata", () => {
+    // @ts-expect-error — server/local query policy belongs to capabilities.
+    type _ServerManaged = LevelSnapshot["serverManaged"];
+    // @ts-expect-error — page state belongs to the source or host.
+    type _Pagination = LevelSnapshot["pagination"];
   });
 });

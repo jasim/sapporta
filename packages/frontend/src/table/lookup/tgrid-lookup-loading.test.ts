@@ -93,19 +93,17 @@ function makeNode(columns: Record<string, unknown>): TreeNode {
 function makeSource(nodes: TreeNode[]) {
   const unsubscribe = vi.fn();
   const source: RuntimeLevelDataSource = {
-    writable: false,
+    canWrite: false,
     state: () => ({
       status: "ready",
       snapshot: {
         nodes,
-        serverManaged: { sort: false, filter: false, pagination: false },
       },
     }),
     subscribe: vi.fn(() => unsubscribe),
-    setSort: () => unchangedResult(source.state()),
-    setFilter: () => unchangedResult(source.state()),
-    setPage: () => unchangedResult(source.state()),
-    refetch: () => unchangedResult(source.state()),
+    query: {
+      refetch: () => unchangedResult(source.state()),
+    },
     onReconcile: () => () => {},
   };
   return { source, unsubscribe };

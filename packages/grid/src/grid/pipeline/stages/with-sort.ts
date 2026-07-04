@@ -7,8 +7,8 @@ import { makeRowComparator } from "./sort-impl";
 // data row carries its trailing rollup so the two move together.
 export function withSort(
   rows: ProtoRow[],
-  sort: SortDescriptor[] | undefined,
-  columns: ColumnSchema[],
+  sort: readonly SortDescriptor[] | undefined,
+  columns: readonly ColumnSchema[],
 ): ProtoRow[] {
   if (!sort || sort.length === 0) return rows;
   const cmp = makeRowComparator(sort, columns);

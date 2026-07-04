@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { createGridRuntime } from "../runtime/create-grid-runtime";
-import type { GridRuntime } from "../runtime/create-grid-runtime";
+import type {
+  GridRuntime,
+  LoadedRowsBoundaryEvent,
+} from "../runtime/create-grid-runtime";
 import { inMemoryGridDataSource } from "../data-sources/memory/in-memory-grid-source";
 import type {
   GridDataSource,
@@ -158,25 +161,60 @@ function setupRowList() {
 }
 
 function setupPagedBooks() {
+  let page = 0;
+  const rootPages = [booksTree.slice(0, 2), booksTree.slice(2)];
+  let rootSnapshot: LevelSnapshot = { nodes: rootPages[page] };
+  const rootSubs = new Set<() => void>();
+  const rootSource: LevelDataSource = {
+    state: () => ({ status: "ready", snapshot: rootSnapshot }),
+    subscribe: (fn) => {
+      rootSubs.add(fn);
+      return () => {
+        rootSubs.delete(fn);
+      };
+    },
+    dispose: () => {
+      rootSubs.clear();
+    },
+  };
+  const quotesSource: LevelDataSource = {
+    state: () => ({
+      status: "ready",
+      snapshot: { nodes: booksTree[1].children!.quotes as TreeNode[] },
+    }),
+    subscribe: () => () => {},
+    dispose: () => {},
+  };
   const rt = createGridRuntime({
     schema: booksSchema,
-    dataSource: inMemoryGridDataSource({
-      schema: booksSchema,
-      tree: booksTree,
-      levels: {
-        books: {
-          sortMode: "none",
-          filterMode: "none",
-          paginationMode: "client",
-          initialPageSize: 2,
-        },
-        quotes: {
-          sortMode: "none",
-          filterMode: "none",
-          paginationMode: "none",
-        },
+    dataSource: {
+      rootSource: () => rootSource,
+      resolveChild: () => quotesSource,
+      dispose: () => {
+        rootSource.dispose();
+        quotesSource.dispose();
       },
-    }),
+    },
+    onLoadedRowsBoundary: (event) => {
+      if (event.loadPath !== booksRoot) {
+        return false;
+      }
+      const nextPage = event.direction === "after" ? page + 1 : page - 1;
+      if (nextPage < 0 || nextPage >= rootPages.length) {
+        return Promise.resolve({
+          kind: "unchanged" as const,
+          state: rootSource.state(),
+        });
+      }
+      page = nextPage;
+      rootSnapshot = { nodes: rootPages[page] };
+      for (const fn of rootSubs) fn();
+      const state = rootSource.state();
+      if (state.status !== "ready") {
+        return Promise.resolve({ kind: "unchanged" as const, state });
+      }
+      return Promise.resolve({ kind: "ready" as const, state });
+    },
   });
   rt.coordinator.toggleExpand(booksRoot, makeRowId(booksRoot, "book-2"));
   return rt;
@@ -185,13 +223,17 @@ function setupPagedBooks() {
 function pagedRootDataSource(
   pages: TreeNode[][],
   footerRows?: FooterRow[],
-): GridDataSource {
-  let page = 0;
+  initialPage = 0,
+): {
+  dataSource: GridDataSource;
+  onLoadedRowsBoundary: (
+    event: LoadedRowsBoundaryEvent,
+  ) => Promise<SourceLoadResult> | false;
+} {
+  let page = initialPage;
   const snapshotForPage = (): LevelSnapshot => {
     const next: LevelSnapshot = {
       nodes: pages[page],
-      pagination: { page, pageSize: 1, totalCount: pages.length },
-      serverManaged: { sort: true, filter: true, pagination: true },
     };
     if (footerRows) next.footerRows = footerRows;
     return next;
@@ -203,7 +245,6 @@ function pagedRootDataSource(
     for (const subscriber of subscribers) subscriber();
   };
   const source: LevelDataSource = {
-    writable: false,
     state: () => ({ status: "ready", snapshot }),
     subscribe: (fn) => {
       subscribers.add(fn);
@@ -211,24 +252,31 @@ function pagedRootDataSource(
         subscribers.delete(fn);
       };
     },
-    setSort: () => readyLoadResult(source.state()),
-    setFilter: () => readyLoadResult(source.state()),
-    setPage: (nextPage) => {
-      page = nextPage;
-      publish();
-      return readyLoadResult(source.state());
-    },
-    refetch: () => readyLoadResult(source.state()),
     dispose: () => {
       subscribers.clear();
     },
   };
   return {
-    rootSource: () => source,
-    resolveChild: () => {
-      throw new Error("not used");
+    dataSource: {
+      rootSource: () => source,
+      resolveChild: () => {
+        throw new Error("not used");
+      },
+      dispose: source.dispose,
     },
-    dispose: source.dispose,
+    onLoadedRowsBoundary: (event) => {
+      if (event.loadPath !== root) return false;
+      const nextPage = event.direction === "after" ? page + 1 : page - 1;
+      if (nextPage < 0 || nextPage >= pages.length) {
+        return Promise.resolve({
+          kind: "unchanged" as const,
+          state: source.state(),
+        });
+      }
+      page = nextPage;
+      publish();
+      return readyLoadResult(source.state());
+    },
   };
 }
 
@@ -241,9 +289,14 @@ function readyLoadResult(
   return Promise.resolve({ kind: "ready", state });
 }
 
+async function flushMicrotasks(): Promise<void> {
+  for (let i = 0; i < 5; i++) await Promise.resolve();
+}
+
 function pagedRuntime(
   interaction?: GridInteractionConfig,
   footerRows?: FooterRow[],
+  initialPage = 0,
 ) {
   return pagedRuntimeWithPages(
     [
@@ -252,6 +305,7 @@ function pagedRuntime(
     ],
     interaction,
     footerRows,
+    initialPage,
   );
 }
 
@@ -259,10 +313,13 @@ function pagedRuntimeWithPages(
   pages: TreeNode[][],
   interaction?: GridInteractionConfig,
   footerRows?: FooterRow[],
+  initialPage = 0,
 ) {
+  const harness = pagedRootDataSource(pages, footerRows, initialPage);
   return createGridRuntime({
     schema: reportSchema,
-    dataSource: pagedRootDataSource(pages, footerRows),
+    dataSource: harness.dataSource,
+    onLoadedRowsBoundary: harness.onLoadedRowsBoundary,
     interaction,
   });
 }
@@ -401,7 +458,7 @@ describe("GridCoordinator", () => {
     });
   });
 
-  it("ArrowDown at the last loaded cell turns to the next page and focuses its first row", () => {
+  it("ArrowDown at the last loaded cell turns to the next page and focuses its first row", async () => {
     const rt = pagedRuntime();
     const first = {
       path: root,
@@ -418,6 +475,7 @@ describe("GridCoordinator", () => {
       shiftKey: false,
       altKey: false,
     } as KeyboardEvent);
+    await flushMicrotasks();
 
     const second = makeRowId(root, "Veg");
     expect(rt.coordinator.getState().cellCursor).toEqual({
@@ -425,16 +483,14 @@ describe("GridCoordinator", () => {
       rowId: second,
       colId: "name",
     });
-    expect(rt.sourceFor(root).state().snapshot.pagination?.page).toBe(1);
     expect(rt.controllerFor(root).effects.getState()).toContainEqual({
       type: "scrollFocusIntoView",
       coord: { rowId: second, colId: "name" },
     });
   });
 
-  it("ArrowUp at the first loaded cell turns to the previous page and focuses its last row", () => {
-    const rt = pagedRuntime();
-    rt.sourceFor(root).setPage(1, 1);
+  it("ArrowUp at the first loaded cell turns to the previous page and focuses its last row", async () => {
+    const rt = pagedRuntime(undefined, undefined, 1);
     const second = {
       path: root,
       rowId: makeRowId(root, "Veg"),
@@ -450,6 +506,7 @@ describe("GridCoordinator", () => {
       shiftKey: false,
       altKey: false,
     } as KeyboardEvent);
+    await flushMicrotasks();
 
     const first = makeRowId(root, "Fruit");
     expect(rt.coordinator.getState().cellCursor).toEqual({
@@ -457,12 +514,10 @@ describe("GridCoordinator", () => {
       rowId: first,
       colId: "name",
     });
-    expect(rt.sourceFor(root).state().snapshot.pagination?.page).toBe(0);
   });
 
-  it("ArrowDown from the last child row of the last root page row turns the root page", () => {
+  it("ArrowDown from the last child row of the last root page row turns the root page", async () => {
     const rt = setupPagedBooks();
-    expect(rt.sourceFor(booksRoot).state().snapshot.pagination?.page).toBe(0);
     expect(
       rt.displayedRowsFor(duneQuotes).rows.map((row) => row.columns.text),
     ).toEqual(["Fear is the mind-killer.", "The sleeper must awaken."]);
@@ -481,8 +536,8 @@ describe("GridCoordinator", () => {
       shiftKey: false,
       altKey: false,
     } as KeyboardEvent);
+    await flushMicrotasks();
 
-    expect(rt.sourceFor(booksRoot).state().snapshot.pagination?.page).toBe(1);
     expect(rt.coordinator.getState().cellCursor).toEqual({
       path: booksRoot,
       rowId: makeRowId(booksRoot, "book-3"),
@@ -490,7 +545,7 @@ describe("GridCoordinator", () => {
     });
   });
 
-  it("PageDown first clamps to the last loaded cell, then turns to the next page", () => {
+  it("PageDown first clamps to the last loaded cell, then turns to the next page", async () => {
     const rt = pagedRuntimeWithPages([
       [
         { levelName: "cat", columns: { name: "Fruit" } },
@@ -512,13 +567,13 @@ describe("GridCoordinator", () => {
       shiftKey: false,
       altKey: false,
     } as KeyboardEvent);
+    await flushMicrotasks();
 
     expect(rt.coordinator.getState().cellCursor).toEqual({
       path: root,
       rowId: makeRowId(root, "Apple"),
       colId: "name",
     });
-    expect(rt.sourceFor(root).state().snapshot.pagination?.page).toBe(0);
 
     rt.controllerFor(root).handleKey({
       key: "PageDown",
@@ -527,24 +582,28 @@ describe("GridCoordinator", () => {
       shiftKey: false,
       altKey: false,
     } as KeyboardEvent);
+    await flushMicrotasks();
 
     expect(rt.coordinator.getState().cellCursor).toEqual({
       path: root,
       rowId: makeRowId(root, "Veg"),
       colId: "name",
     });
-    expect(rt.sourceFor(root).state().snapshot.pagination?.page).toBe(1);
   });
 
-  it("PageUp first clamps to the first loaded cell, then turns to the previous page", () => {
-    const rt = pagedRuntimeWithPages([
-      [{ levelName: "cat", columns: { name: "Fruit" } }],
+  it("PageUp first clamps to the first loaded cell, then turns to the previous page", async () => {
+    const rt = pagedRuntimeWithPages(
       [
-        { levelName: "cat", columns: { name: "Apple" } },
-        { levelName: "cat", columns: { name: "Veg" } },
+        [{ levelName: "cat", columns: { name: "Fruit" } }],
+        [
+          { levelName: "cat", columns: { name: "Apple" } },
+          { levelName: "cat", columns: { name: "Veg" } },
+        ],
       ],
-    ]);
-    rt.sourceFor(root).setPage(1, 1);
+      undefined,
+      undefined,
+      1,
+    );
     rt.cursorManager.moveCellCursorTo({
       path: root,
       rowId: makeRowId(root, "Veg"),
@@ -558,13 +617,13 @@ describe("GridCoordinator", () => {
       shiftKey: false,
       altKey: false,
     } as KeyboardEvent);
+    await flushMicrotasks();
 
     expect(rt.coordinator.getState().cellCursor).toEqual({
       path: root,
       rowId: makeRowId(root, "Apple"),
       colId: "name",
     });
-    expect(rt.sourceFor(root).state().snapshot.pagination?.page).toBe(1);
 
     rt.controllerFor(root).handleKey({
       key: "PageUp",
@@ -573,16 +632,16 @@ describe("GridCoordinator", () => {
       shiftKey: false,
       altKey: false,
     } as KeyboardEvent);
+    await flushMicrotasks();
 
     expect(rt.coordinator.getState().cellCursor).toEqual({
       path: root,
       rowId: makeRowId(root, "Fruit"),
       colId: "name",
     });
-    expect(rt.sourceFor(root).state().snapshot.pagination?.page).toBe(0);
   });
 
-  it("ArrowDown from the last focusable row before a footer turns to the next page", () => {
+  it("ArrowDown from the last focusable row before a footer turns to the next page", async () => {
     const rt = pagedRuntime(undefined, [
       { rowKey: "total", columns: { name: "Total" } },
     ]);
@@ -600,8 +659,8 @@ describe("GridCoordinator", () => {
       shiftKey: false,
       altKey: false,
     } as KeyboardEvent);
+    await flushMicrotasks();
 
-    expect(rt.sourceFor(root).state().snapshot.pagination?.page).toBe(1);
     expect(rt.coordinator.getState().cellCursor).toEqual({
       path: root,
       rowId: makeRowId(root, "Veg"),
@@ -609,7 +668,7 @@ describe("GridCoordinator", () => {
     });
   });
 
-  it("row-list ArrowDown at the last loaded row turns to the next page", () => {
+  it("row-list ArrowDown at the last loaded row turns to the next page", async () => {
     const rt = pagedRuntime(ROW_MULTISELECT_LIST);
     rt.cursorManager.moveRowCursorTo({
       path: root,
@@ -624,20 +683,20 @@ describe("GridCoordinator", () => {
       shiftKey: false,
       altKey: false,
     } as KeyboardEvent);
+    await flushMicrotasks();
 
     const second = makeRowId(root, "Veg");
     expect(rt.coordinator.getState().rowCursor).toEqual({
       path: root,
       rowId: second,
     });
-    expect(rt.sourceFor(root).state().snapshot.pagination?.page).toBe(1);
     expect(rt.controllerFor(root).effects.getState()).toContainEqual({
       type: "scrollRowIntoView",
       rowId: second,
     });
   });
 
-  it("row-list PageDown first clamps to the last loaded row, then turns to the next page", () => {
+  it("row-list PageDown first clamps to the last loaded row, then turns to the next page", async () => {
     const rt = pagedRuntimeWithPages(
       [
         [
@@ -660,12 +719,12 @@ describe("GridCoordinator", () => {
       shiftKey: false,
       altKey: false,
     } as KeyboardEvent);
+    await flushMicrotasks();
 
     expect(rt.coordinator.getState().rowCursor).toEqual({
       path: root,
       rowId: makeRowId(root, "Apple"),
     });
-    expect(rt.sourceFor(root).state().snapshot.pagination?.page).toBe(0);
 
     rt.controllerFor(root).handleKey({
       key: "PageDown",
@@ -674,15 +733,15 @@ describe("GridCoordinator", () => {
       shiftKey: false,
       altKey: false,
     } as KeyboardEvent);
+    await flushMicrotasks();
 
     expect(rt.coordinator.getState().rowCursor).toEqual({
       path: root,
       rowId: makeRowId(root, "Veg"),
     });
-    expect(rt.sourceFor(root).state().snapshot.pagination?.page).toBe(1);
   });
 
-  it("row-list PageUp first clamps to the first loaded row, then turns to the previous page", () => {
+  it("row-list PageUp first clamps to the first loaded row, then turns to the previous page", async () => {
     const rt = pagedRuntimeWithPages(
       [
         [{ levelName: "cat", columns: { name: "Fruit" } }],
@@ -692,8 +751,9 @@ describe("GridCoordinator", () => {
         ],
       ],
       ROW_MULTISELECT_LIST,
+      undefined,
+      1,
     );
-    rt.sourceFor(root).setPage(1, 1);
     rt.cursorManager.moveRowCursorTo({
       path: root,
       rowId: makeRowId(root, "Veg"),
@@ -706,12 +766,12 @@ describe("GridCoordinator", () => {
       shiftKey: false,
       altKey: false,
     } as KeyboardEvent);
+    await flushMicrotasks();
 
     expect(rt.coordinator.getState().rowCursor).toEqual({
       path: root,
       rowId: makeRowId(root, "Apple"),
     });
-    expect(rt.sourceFor(root).state().snapshot.pagination?.page).toBe(1);
 
     rt.controllerFor(root).handleKey({
       key: "PageUp",
@@ -720,15 +780,15 @@ describe("GridCoordinator", () => {
       shiftKey: false,
       altKey: false,
     } as KeyboardEvent);
+    await flushMicrotasks();
 
     expect(rt.coordinator.getState().rowCursor).toEqual({
       path: root,
       rowId: makeRowId(root, "Fruit"),
     });
-    expect(rt.sourceFor(root).state().snapshot.pagination?.page).toBe(0);
   });
 
-  it("row-list ArrowDown from the last selectable row before a footer turns to the next page", () => {
+  it("row-list ArrowDown from the last selectable row before a footer turns to the next page", async () => {
     const rt = pagedRuntime(ROW_MULTISELECT_LIST, [
       { rowKey: "total", columns: { name: "Total" } },
     ]);
@@ -744,8 +804,8 @@ describe("GridCoordinator", () => {
       shiftKey: false,
       altKey: false,
     } as KeyboardEvent);
+    await flushMicrotasks();
 
-    expect(rt.sourceFor(root).state().snapshot.pagination?.page).toBe(1);
     expect(rt.coordinator.getState().rowCursor).toEqual({
       path: root,
       rowId: makeRowId(root, "Veg"),
@@ -910,11 +970,11 @@ describe("GridCoordinator", () => {
     expect(rt.coordinator.getState().expansion.get(root)).toBeUndefined();
   });
 
-  // The visible sequence under the new model interleaves children
-  // between their owning parent rows. With Fruit and Veg both expanded:
+  // The visible sequence interleaves children between their owning parent
+  // rows. With Fruit and Veg both expanded:
   //   Fruit → Apple → Banana → Veg → Carrot
-  // The navigation tests below assert this new (correct) order rather
-  // than the old expansion-order sibling walk.
+  // The navigation tests below assert that runtime traversal follows the same
+  // sequence the user sees on screen.
   it("navigate down from last child row dispatches focus on the parent's next row", () => {
     const rt = setupExpanded();
     // Seed cursor on the source path so coordinator.navigate can

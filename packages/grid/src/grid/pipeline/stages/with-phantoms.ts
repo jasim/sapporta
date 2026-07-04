@@ -13,7 +13,7 @@ import type { ProtoRow } from "../types";
 // know about persisted data.
 export function withPhantoms(
   rows: ProtoRow[],
-  phantoms: PhantomRow[],
+  phantoms: readonly PhantomRow[],
   options: LevelOptions,
 ): ProtoRow[] {
   if (!options.allowPhantoms || phantoms.length === 0) return rows;

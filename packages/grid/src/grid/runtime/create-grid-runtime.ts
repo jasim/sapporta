@@ -1,14 +1,13 @@
 // The runtime — a plain TypeScript value (not React) that owns the
 // grid's entire non-React state graph.
 //
-// Phase 08 keystone: the runtime holds a `GridSchema` + `GridDataSource`,
-// derives `SchemaTopology` once, and rebuilds `PathTopology` whenever
-// its child-source registry mutates. Sources own data, sort, filter,
-// pagination, and status; the runtime owns expansion (via the
-// coordinator), phantoms (via the channel), and per-path displayed-row
-// stores that derive `DisplayedRowsInput` into full rows plus row sequences.
-// There is no `applyTransaction` and no `nodes/sort/filter`-by-path map —
-// those concerns live on the source.
+// The runtime holds a `GridSchema` + `GridDataSource`, derives
+// `SchemaTopology` once, and registers child sources as rows are expanded.
+// Sources publish display-ready nodes and lifecycle state; source or host
+// capabilities own query/loading policy. The runtime owns expansion,
+// phantoms, mutation events, and per-path displayed-row stores that derive
+// `DisplayedRowsInput` into full rows plus row sequences. There is no
+// `applyTransaction` and no `nodes/sort/filter/page` map in the runtime.
 //
 // Four non-interfering channels. Grid state lives in exactly four
 // channels, each with its own mechanism and lifetime. A change in one
@@ -29,11 +28,11 @@
 //      dispatches focus directly to the target controller — no
 //      pendingFocus mailbox.
 //
-//   4. DATA — `LevelDataSource` (per `GridPath`). Owns nodes,
-//      sort/filter/pagination state, server-supplied footers/aggregates,
-//      and `loading | error | ready` status. The runtime never owns data;
-//      it receives a `GridDataSource` from the host and registers sources
-//      as paths are expanded.
+//   4. DATA — `LevelDataSource` (per `GridPath`). Publishes nodes that are
+//      already shaped for display, optional footers, lifecycle state, and
+//      optional query/write capabilities. The runtime never owns data or
+//      page state; it receives a `GridDataSource` from the host and
+//      registers sources as paths are expanded.
 //
 // The runtime is also the single seam through which writes flow:
 // `writeCell`, `applyChanges`, `createRow`, `removeRow`, and
@@ -136,12 +135,13 @@ import type {
   CreateNodeResult,
   GridDataSource,
   LevelDataSource,
+  LevelQueryCapabilities,
   LevelSnapshot,
   LevelSourceState,
   LevelStatus,
   RuntimeLevelDataSource,
   SourceLoadResult,
-  WritableLevelDataSource,
+  WriteCapability,
 } from "../data-sources/types";
 import {
   createDisplayedRowsStore,
@@ -182,19 +182,12 @@ export type RuntimeArgs = {
   interaction?: GridInteractionConfig;
   initialPhantomsByPath?: Map<GridPath, PhantomRow[]>;
   phantomRows?: PhantomRowsConfig;
-  // A host can own displayed-row edge policy for paged tables. The runtime
-  // provides the exact source, path, and ready state at the edge. The host
-  // starts the source command and returns its load promise. Returning `false`
-  // is authoritative: the host considered the edge and declined the page turn.
-  // The runtime must not infer another page number because
-  // `snapshot.pagination.page` does not encode whether the source uses 0-based
-  // or 1-based pages. After a ready result, the runtime samples displayed rows
-  // and moves the cursor according to the original key request.
-  onPageBoundaryNavigation?: (args: {
-    navigation: PageBoundaryNavigationRequest;
-    source: RuntimeLevelDataSource;
-    state: Extract<LevelSourceState, { status: "ready" }>;
-  }) => Promise<SourceLoadResult> | false;
+  // A host can own displayed-row edge policy for loaded windows. The runtime
+  // emits a boundary event and waits for the host/source load promise. After a
+  // ready result, it samples displayed rows and lands on the requested edge.
+  onLoadedRowsBoundary?: (
+    event: LoadedRowsBoundaryEvent,
+  ) => Promise<SourceLoadResult> | false;
   on?: { [E in keyof GridEvents]?: (payload: GridEvents[E]) => void };
 };
 
@@ -298,9 +291,7 @@ export type GridRuntime = {
     colPolicy: "preserve" | "first" | "last",
   ) => CellCursor | null;
   phantomBoundaryRowTarget: (path: GridPath) => RowCursor | null;
-  requestPageBoundaryNavigation: (
-    navigation: PageBoundaryNavigationRequest,
-  ) => boolean;
+  requestLoadedRowsBoundary: (event: LoadedRowsBoundaryEvent) => boolean;
 
   on: GridEmitter["on"];
   dispose: () => void;
@@ -323,23 +314,24 @@ type PendingPhantomCreate = {
   atIndex?: number;
 };
 
-export type PageBoundaryNavigationRequest =
+export type LoadedRowsBoundaryEvent =
   | {
       kind: "cell";
-      path: GridPath;
-      direction: "next" | "previous";
-      colId: ColId;
+      loadPath: GridPath;
+      direction: "before" | "after";
+      origin: CellCursor;
       colPolicy: ColPolicy;
       extend: boolean;
     }
   | {
       kind: "row";
-      path: GridPath;
-      direction: "next" | "previous";
+      loadPath: GridPath;
+      direction: "before" | "after";
+      origin: RowCursor;
       extend: boolean;
     };
 
-type PendingPageBoundaryNavigation = PageBoundaryNavigationRequest;
+type PendingLoadedRowsBoundary = LoadedRowsBoundaryEvent;
 
 export function createGridRuntime(args: RuntimeArgs): GridRuntime {
   const { schema, dataSource } = args;
@@ -370,8 +362,7 @@ export function createGridRuntime(args: RuntimeArgs): GridRuntime {
   const reconcileUnsubs = new Map<GridPath, () => void>();
   const lastStatusByPath = new Map<GridPath, LevelStatus>();
   const pendingPhantomCreates = new Map<string, PendingPhantomCreate>();
-  let pendingPageBoundaryNavigation: PendingPageBoundaryNavigation | null =
-    null;
+  let pendingLoadedRowsBoundary: PendingLoadedRowsBoundary | null = null;
   const phantomLifecycle = createPhantomRowLifecycle({
     config: args.phantomRows,
     getSource: (path) => sources.get(path),
@@ -488,16 +479,17 @@ export function createGridRuntime(args: RuntimeArgs): GridRuntime {
       src.subscribe(() => {
         onSourceSnapshotChanged(root);
         invalidateDisplayedRows(root, { type: "source" });
-        // After a keyboard page turn, the cursor should land on rows from the
-        // page the app just loaded. Recompute displayed rows first so the
-        // landing target comes from the current page, not the previous one.
-        resolvePendingPageBoundaryNavigation(root);
+        // After a host-owned boundary load, the cursor should land on rows
+        // from the window the app just loaded. Recompute displayed rows first
+        // so the landing target comes from current source state, not the
+        // previous window.
+        resolvePendingLoadedRowsBoundary(root);
       }),
     );
-    if (src.writable) {
+    if (src.write) {
       reconcileUnsubs.set(
         root,
-        src.onReconcile((event) => {
+        src.write.onReconcile((event) => {
           emitter.emit("cellReconciled", { path: root, event });
         }),
       );
@@ -527,15 +519,16 @@ export function createGridRuntime(args: RuntimeArgs): GridRuntime {
         src.subscribe(() => {
           onSourceSnapshotChanged(childPath);
           invalidateDisplayedRows(childPath, { type: "source" });
-          // Expanded child tables page independently. A parent refresh should
-          // not finish a pending page turn inside a child table, or vice versa.
-          resolvePendingPageBoundaryNavigation(childPath);
+          // Expanded child tables load boundaries independently. A parent
+          // refresh should not finish a pending boundary load inside a child
+          // table, or vice versa.
+          resolvePendingLoadedRowsBoundary(childPath);
         }),
       );
-      if (src.writable) {
+      if (src.write) {
         reconcileUnsubs.set(
           childPath,
-          src.onReconcile((event) => {
+          src.write.onReconcile((event) => {
             emitter.emit("cellReconciled", { path: childPath, event });
           }),
         );
@@ -696,88 +689,40 @@ export function createGridRuntime(args: RuntimeArgs): GridRuntime {
     if (next !== current) controller.setRowSelection(next);
   }
 
-  function requestPageBoundaryNavigation(
-    navigation: PendingPageBoundaryNavigation,
+  function requestLoadedRowsBoundary(
+    event: PendingLoadedRowsBoundary,
   ): boolean {
     assertLive();
-    const src = sources.get(navigation.path);
+    const src = sources.get(event.loadPath);
     if (!src) return false;
-    // While a page is loading, repeated key presses should not skip ahead based
-    // on stale page counts. Wait until the app's latest rows are settled before
-    // accepting another boundary turn.
+    // While rows are loading, repeated key presses should not skip ahead based
+    // on stale counts. Wait until the latest rows are settled before accepting
+    // another boundary turn.
     const state = src.state();
     if (state.status !== "ready") return false;
-    // When installed, the host hook owns boundary policy for this runtime. A
-    // falsy return is a deliberate "no turn", not permission to fall through to
-    // the generic 0-based fallback below.
-    if (args.onPageBoundaryNavigation) {
-      const hostLoad = args.onPageBoundaryNavigation({
-        navigation,
-        source: sourceFor(navigation.path),
-        state,
-      });
-      if (!hostLoad) return false;
-      pendingPageBoundaryNavigation = navigation;
-      void hostLoad.then((result) => {
-        if (result.kind === "ready") {
-          resolvePendingPageBoundaryNavigation(navigation.path);
-          return;
-        }
-        if (pendingPageBoundaryNavigation === navigation) {
-          pendingPageBoundaryNavigation = null;
-        }
-      });
-      return true;
-    }
-    // The fallback covers sources whose snapshot pagination is directly
-    // commandable by `setPage`. It treats `snapshot.pagination.page` as the
-    // source's own page coordinate and performs no route or application-state
-    // updates. Hosts that use a different page coordinate should handle the edge
-    // in `onPageBoundaryNavigation`.
-    const pagination = state.snapshot.pagination;
-    if (!pagination) return false;
-    if (!Number.isFinite(pagination.pageSize)) return false;
-    const nextPage =
-      navigation.direction === "next"
-        ? pagination.page + 1
-        : pagination.page - 1;
-    if (nextPage < 0) return false;
-    if (
-      navigation.direction === "next" &&
-      pagination.totalCount !== undefined &&
-      (pagination.page + 1) * pagination.pageSize >= pagination.totalCount
-    ) {
-      return false;
-    }
-    if (
-      navigation.direction === "next" &&
-      pagination.totalCount === undefined &&
-      state.snapshot.nodes.length < pagination.pageSize
-    ) {
-      return false;
-    }
-    // The source promise marks the data load boundary only. The runtime waits
-    // for a ready result, then samples displayed rows synchronously and lands
-    // focus. Loading failures and unchanged results leave the cursor where it
-    // started.
-    pendingPageBoundaryNavigation = navigation;
-    void src
-      .setPage(nextPage, pagination.pageSize)
-      .then((result: SourceLoadResult) => {
-        if (result.kind === "ready") {
-          resolvePendingPageBoundaryNavigation(navigation.path);
-          return;
-        }
-        if (pendingPageBoundaryNavigation === navigation) {
-          pendingPageBoundaryNavigation = null;
-        }
-      });
+    const hostLoad = args.onLoadedRowsBoundary?.(event);
+    if (!hostLoad) return false;
+    pendingLoadedRowsBoundary = event;
+    // The host promise describes the source load, not React paint. Source
+    // subscriptions may already have resolved the pending landing before the
+    // promise callback runs. Keep both paths legal: a ready promise performs a
+    // final sample if needed, and non-ready outcomes clear only the still-live
+    // intent.
+    void hostLoad.then((result) => {
+      if (result.kind === "ready") {
+        resolvePendingLoadedRowsBoundary(event.loadPath);
+        return;
+      }
+      if (pendingLoadedRowsBoundary === event) {
+        pendingLoadedRowsBoundary = null;
+      }
+    });
     return true;
   }
 
-  function resolvePendingPageBoundaryNavigation(path: GridPath): void {
-    const pending = pendingPageBoundaryNavigation;
-    if (!pending || pending.path !== path) return;
+  function resolvePendingLoadedRowsBoundary(path: GridPath): void {
+    const pending = pendingLoadedRowsBoundary;
+    if (!pending || pending.loadPath !== path) return;
 
     const state = sourceStateFor(path);
     // Keep the requested landing while the next page loads. If the load fails,
@@ -787,13 +732,13 @@ export function createGridRuntime(args: RuntimeArgs): GridRuntime {
       return;
     }
     if (state.status !== "ready") {
-      pendingPageBoundaryNavigation = null;
+      pendingLoadedRowsBoundary = null;
       return;
     }
 
     if (pending.kind === "cell") {
-      const target = pendingPageBoundaryCellTarget(pending);
-      pendingPageBoundaryNavigation = null;
+      const target = pendingLoadedRowsBoundaryCellTarget(pending);
+      pendingLoadedRowsBoundary = null;
       if (!target) return;
       if (pending.extend) {
         cursorManager.extendCellSelectionTo(target);
@@ -807,8 +752,8 @@ export function createGridRuntime(args: RuntimeArgs): GridRuntime {
       return;
     }
 
-    const target = pendingPageBoundaryRowTarget(pending);
-    pendingPageBoundaryNavigation = null;
+    const target = pendingLoadedRowsBoundaryRowTarget(pending);
+    pendingLoadedRowsBoundary = null;
     if (!target) return;
     if (pending.extend) {
       cursorManager.extendRowSelectionToCursor(target);
@@ -818,45 +763,46 @@ export function createGridRuntime(args: RuntimeArgs): GridRuntime {
     controllerCursorPortFor(target.path).revealRow(target.rowId);
   }
 
-  function pendingPageBoundaryCellTarget(
-    pending: Extract<PendingPageBoundaryNavigation, { kind: "cell" }>,
+  function pendingLoadedRowsBoundaryCellTarget(
+    pending: Extract<PendingLoadedRowsBoundary, { kind: "cell" }>,
   ): CellCursor | null {
-    const displayed = displayedRowsFor(pending.path);
-    // On the next page, continue at the first focusable row; on the previous
-    // page, continue at the last. Keep the same column rule the user gets from
-    // Tab, Arrow, and Page keys inside the current page.
+    const displayed = displayedRowsFor(pending.loadPath);
+    // After an "after" boundary load, continue at the first focusable row;
+    // after a "before" boundary load, continue at the last. Keep the same
+    // column rule the user gets from Tab, Arrow, and Page keys inside the
+    // current loaded window.
     const row =
-      pending.direction === "next"
+      pending.direction === "after"
         ? firstFocusableRow(displayed, capabilitiesFor)
         : lastFocusableRow(displayed, capabilitiesFor);
     if (!row) return null;
-    const colId = resolvePendingPageBoundaryColumn(
-      schemaForPath(pending.path),
-      pending.colId,
+    const colId = resolvePendingLoadedRowsBoundaryColumn(
+      schemaForPath(pending.loadPath),
+      pending.origin.colId,
       pending.colPolicy,
     );
-    return colId ? { path: pending.path, rowId: row.id, colId } : null;
+    return colId ? { path: pending.loadPath, rowId: row.id, colId } : null;
   }
 
-  function pendingPageBoundaryRowTarget(
-    pending: Extract<PendingPageBoundaryNavigation, { kind: "row" }>,
+  function pendingLoadedRowsBoundaryRowTarget(
+    pending: Extract<PendingLoadedRowsBoundary, { kind: "row" }>,
   ): RowCursor | null {
-    const rows = displayedRowsFor(pending.path).rows;
+    const rows = displayedRowsFor(pending.loadPath).rows;
     // Row-list pages can include visible rows that are not operation targets.
     // After paging, land on the first or last selectable row so bulk actions
     // and keyboard focus keep pointing at rows the app can actually use.
-    if (pending.direction === "next") {
+    if (pending.direction === "after") {
       const row = rows.find((candidate) => candidate.rowSelectable);
-      return row ? { path: pending.path, rowId: row.id } : null;
+      return row ? { path: pending.loadPath, rowId: row.id } : null;
     }
     for (let index = rows.length - 1; index >= 0; index -= 1) {
       const row = rows[index];
-      if (row.rowSelectable) return { path: pending.path, rowId: row.id };
+      if (row.rowSelectable) return { path: pending.loadPath, rowId: row.id };
     }
     return null;
   }
 
-  function resolvePendingPageBoundaryColumn(
+  function resolvePendingLoadedRowsBoundaryColumn(
     levelSchema: LevelSchema,
     sourceColId: ColId,
     policy: ColPolicy,
@@ -883,8 +829,54 @@ export function createGridRuntime(args: RuntimeArgs): GridRuntime {
     }
     let view = sourceViews.get(path);
     if (view) return view;
+    const sourceQuery = src.query;
+    // Runtime views wrap source capabilities so callers cannot hold a stale
+    // source object after disposal and cannot reach write verbs directly.
+    // Query commands are exposed because they are source loads; mutations still
+    // go through runtime methods so `mutationCommitted` remains the single
+    // user-attributable mutation channel.
+    const query: LevelQueryCapabilities | undefined = sourceQuery
+      ? {
+          ...(sourceQuery.sort
+            ? {
+                sort: {
+                  current: () => {
+                    assertLive();
+                    return sourceQuery.sort!.current();
+                  },
+                  set: (sort) => {
+                    assertLive();
+                    return sourceQuery.sort!.set(sort);
+                  },
+                },
+              }
+            : {}),
+          ...(sourceQuery.filter
+            ? {
+                filter: {
+                  current: () => {
+                    assertLive();
+                    return sourceQuery.filter!.current();
+                  },
+                  set: (filter) => {
+                    assertLive();
+                    return sourceQuery.filter!.set(filter);
+                  },
+                },
+              }
+            : {}),
+          ...(sourceQuery.refetch
+            ? {
+                refetch: () => {
+                  assertLive();
+                  return sourceQuery.refetch!();
+                },
+              }
+            : {}),
+        }
+      : undefined;
     view = {
-      writable: src.writable,
+      canWrite: src.write !== undefined,
       state: () => {
         assertLive();
         return src.state();
@@ -893,33 +885,21 @@ export function createGridRuntime(args: RuntimeArgs): GridRuntime {
         assertLive();
         return src.subscribe(fn);
       },
-      setSort: (sort) => {
-        assertLive();
-        return src.setSort(sort);
-      },
-      setFilter: (filter) => {
-        assertLive();
-        return src.setFilter(filter);
-      },
-      setPage: (page, pageSize) => {
-        assertLive();
-        return src.setPage(page, pageSize);
-      },
-      refetch: () => {
-        assertLive();
-        return src.refetch();
-      },
+      ...(query ? { query } : {}),
       onReconcile(fn) {
         assertLive();
-        if (!src.writable) return () => {};
-        return src.onReconcile(fn);
+        if (!src.write) return () => {};
+        return src.write.onReconcile(fn);
       },
     };
     sourceViews.set(path, view);
     return view;
   }
 
-  function requireWritable(path: GridPath): WritableLevelDataSource {
+  function requireWritable(path: GridPath): {
+    source: LevelDataSource;
+    write: WriteCapability;
+  } {
     assertLive();
     const src = sources.get(path);
     if (!src) {
@@ -927,16 +907,19 @@ export function createGridRuntime(args: RuntimeArgs): GridRuntime {
         `GridRuntime: no source has been resolved for path "${path}". Expand the parent row first.`,
       );
     }
-    if (!src.writable) {
+    if (!src.write) {
       throw new Error(
         `GridRuntime: source for path "${path}" is readonly — writeCell/applyChanges/createRow/removeRow are not available.`,
       );
     }
-    return src;
+    // Capture the capability object once for this command. A source should not
+    // swap write capabilities while a command is running; if it changes
+    // writability, it should publish a new source lifecycle through its host.
+    return { source: src, write: src.write };
   }
 
   function writeCell(path: GridPath, coord: Coord, value: unknown): void {
-    const src = requireWritable(path);
+    const { source, write } = requireWritable(path);
     const row = displayedRowsFor(path).rowById.get(coord.rowId);
     if (!row) {
       throw new Error(
@@ -960,12 +943,12 @@ export function createGridRuntime(args: RuntimeArgs): GridRuntime {
     }
     const rowKey = rowKeyOfRowId(coord.rowId);
     const oldValue = readCellValue(
-      src.state().snapshot,
+      source.state().snapshot,
       schemaForPath(path),
       rowKey,
       coord.colId,
     );
-    src.setCell(rowKey, coord.colId, value);
+    write.setCell(rowKey, coord.colId, value);
     emitter.emit("mutationCommitted", {
       kind: "cell",
       path,
@@ -1031,16 +1014,16 @@ export function createGridRuntime(args: RuntimeArgs): GridRuntime {
   }
 
   function applyChanges(path: GridPath, changes: CellChange[]): void {
-    const src = requireWritable(path);
+    const { source, write } = requireWritable(path);
     const levelSchema = schemaForPath(path);
-    const snapshot = src.state().snapshot;
+    const snapshot = source.state().snapshot;
     // Read prior values BEFORE the source applies the change. Once
     // applyChanges returns, the snapshot reflects the writes and the prior
     // values are unavailable for mutation events.
     const priors = changes.map((c) =>
       readCellValue(snapshot, levelSchema, c.rowKey, c.colId),
     );
-    src.applyChanges(changes);
+    write.applyChanges(changes);
     const edits = changes.map((c, i) => ({
       coord: { rowId: makeRowId(path, c.rowKey), colId: c.colId },
       oldValue: priors[i],
@@ -1054,8 +1037,8 @@ export function createGridRuntime(args: RuntimeArgs): GridRuntime {
     node: TreeNode,
     atIndex?: number,
   ): Promise<CreateNodeResult> {
-    const src = requireWritable(path);
-    const result = await src.createNode(node, atIndex);
+    const { write } = requireWritable(path);
+    const result = await write.createNode(node, atIndex);
     emitter.emit("mutationCommitted", {
       kind: "insert",
       path,
@@ -1066,13 +1049,13 @@ export function createGridRuntime(args: RuntimeArgs): GridRuntime {
   }
 
   async function removeRow(path: GridPath, rowKey: RowKey): Promise<void> {
-    const src = requireWritable(path);
+    const { source, write } = requireWritable(path);
     const { node, index } = readNodeWithIndex(
-      src.state().snapshot,
+      source.state().snapshot,
       schemaForPath(path),
       rowKey,
     );
-    await src.removeNode(rowKey);
+    await write.removeNode(rowKey);
     emitter.emit("mutationCommitted", {
       kind: "remove",
       path,
@@ -1569,7 +1552,7 @@ export function createGridRuntime(args: RuntimeArgs): GridRuntime {
     rowInteractionSnapshots.clear();
     schemaCache.clear();
     lastStatusByPath.clear();
-    pendingPageBoundaryNavigation = null;
+    pendingLoadedRowsBoundary = null;
     dataSource.dispose();
     emitter.clear();
   }
@@ -1613,7 +1596,7 @@ export function createGridRuntime(args: RuntimeArgs): GridRuntime {
     commitPhantomRow,
     phantomBoundaryCellTarget: phantomLifecycle.boundaryCellTarget,
     phantomBoundaryRowTarget: phantomLifecycle.boundaryRowTarget,
-    requestPageBoundaryNavigation,
+    requestLoadedRowsBoundary,
     on: emitter.on,
     dispose,
   };

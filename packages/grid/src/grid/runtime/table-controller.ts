@@ -10,11 +10,10 @@
 // `runtime.controllerFor(...)` for nested grids — those still go through
 // the runtime.
 //
-// The wrapper is a discriminated union on the root source's `writable`
+// The wrapper is a discriminated union on the root source's write capability
 // flag. `rootSource` is always the runtime's read view and never exposes
 // edit verbs; writable roots add phantom helpers and commitPhantomRow.
-// Runtime methods remain the write seam. At runtime,
-// `'setCell' in controller.rootSource === false`.
+// Runtime methods remain the write seam.
 
 import type { ColId, GridPath, RowKey } from "../types/identity";
 import type { PhantomRow } from "../types/level-row";
@@ -58,7 +57,7 @@ export function createTableController(args: {
   const rootSource = runtime.sourceFor(path);
   const rootController = runtime.controllerFor(path);
 
-  if (!rootSource.writable) {
+  if (!rootSource.canWrite) {
     return { writable: false, rootSource, rootController };
   }
 

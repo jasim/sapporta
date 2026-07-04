@@ -10,7 +10,7 @@ import {
   makeRowId,
   phantomKeyFromDisplayedRowId,
 } from "../types/identity";
-import type { LevelDataSource, LevelSnapshot } from "../data-sources/types";
+import type { LevelDataSource } from "../data-sources/types";
 import type { LevelSchema } from "../types/schema";
 import type { PhantomRow, PhantomRowsConfig } from "../types/level-row";
 
@@ -83,10 +83,14 @@ export function createPhantomRowLifecycle(
   function eligible(path: GridPath): boolean {
     if (!lifecycleEnabled) return false;
     const source = deps.getSource(path);
-    if (!source || !source.writable) return false;
+    if (!source?.write) return false;
     const state = source.state();
     if (state.status !== "ready") return false;
-    if (!isDatasourceAppendBoundary(state.snapshot)) return false;
+    // Append eligibility is a source/write decision. A table source can answer
+    // from one-based page and total-count state, while a local source can answer
+    // from its private window. The lifecycle only needs the boolean: may a
+    // blank authoring row be appended to the currently loaded rows?
+    if (source.write.canAppendRow?.() !== true) return false;
     return deps.schemaAt(path).options.allowPhantoms === true;
   }
 
@@ -140,12 +144,12 @@ export function createPhantomRowLifecycle(
     const source = deps.getSource(path);
     if (!source) return;
     const state = source.state();
-    if (
-      state.status === "ready" &&
-      isDatasourceAppendBoundary(state.snapshot)
-    ) {
+    if (state.status === "ready" && source.write?.canAppendRow?.() === true) {
       return;
     }
+    // Only remove blank editing rows. A filled row is user input and should be
+    // saved or failed through the normal leave-and-commit path, not deleted
+    // because the surrounding source moved out of append position.
     for (const phantom of deps.getPhantoms(path)) {
       if (phantom.state.kind === "editing" && isBlank(phantom.columns)) {
         deps.removePhantom(path, phantom.rowKey);
@@ -246,31 +250,4 @@ export function defaultIsBlank(columns: Record<ColId, unknown>): boolean {
   return Object.values(columns).every(
     (value) => value === null || value === undefined || value === "",
   );
-}
-
-function isDatasourceAppendBoundary(snapshot: LevelSnapshot): boolean {
-  const pagination = snapshot.pagination;
-  if (!pagination) return true;
-
-  const visibleCount = snapshot.nodes.length;
-  if (visibleCount === 0) {
-    // An empty later page is not a place to append; it means the source window
-    // is past real rows. Without a total, the first page is the datasource's
-    // only valid empty append location.
-    if (pagination.totalCount === undefined) return pagination.page === 0;
-    return pagination.page === 0 && pagination.totalCount === 0;
-  }
-
-  if (!Number.isFinite(pagination.pageSize)) return true;
-
-  if (pagination.totalCount === undefined) {
-    // Without a total, a short page is the only signal that the datasource
-    // ended. A full page may still have another page after it.
-    return visibleCount < pagination.pageSize;
-  }
-
-  // With a total, compare the current page window end to the datasource count,
-  // not to the number of rows currently displayed.
-  const pageStart = pagination.page * pagination.pageSize;
-  return pageStart + visibleCount >= pagination.totalCount;
 }

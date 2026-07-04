@@ -1,9 +1,7 @@
-// Single home for all client-side sort/filter/paginate/aggregate logic.
-// `inMemoryLevelSource` is the writable variant; `inMemoryReadonlyLevelSource`
-// drops the edit verbs and reconciliation channel so a host that wants a
-// derived readonly level cannot accidentally call `setCell` on it
-// (the discriminated union enforces this at compile time, the missing
-// keys at runtime).
+// Single home for all client-side sort/filter/window/aggregate logic.
+// `inMemoryLevelSource` attaches `write`; `inMemoryReadonlyLevelSource` omits
+// it. Runtime callers read `source.write` to decide whether mutation commands
+// are available, so edit verbs never live on the read surface.
 //
 // Identity-stability contract: `snapshot()` returns the same object across
 // no-op reads; on any state change the source allocates a new top-level
@@ -16,22 +14,17 @@
 // mutates data and notifies snapshot subscribers.
 //
 // Reconciliation: the optimistic and authoritative values are equal by
-// construction for an in-memory source, so `onReconcile` never fires. The
-// design doc (L217) permits either "skip emission" or "fire `agreed` sync"
-// for in-memory; we pick skip — fewer events keeps tests stable and the
-// host can detect "nothing reconciled" by `writable: true` plus a sync
-// source. `'diverged'` and `'rejected'` are unreachable here.
+// construction for an in-memory source, so `onReconcile` never fires.
+// `'diverged'` and `'rejected'` are unreachable here because there is no
+// authoritative async system that can disagree with the local write.
 //
-// Mode semantics:
-//   - `serverManaged` is always `{ sort: false, filter: false, pagination: false }`
-//     because this source applied those concerns itself.
-//   - `sortMode: 'none'` / `filterMode: 'none'` / `paginationMode: 'none'`
-//     means the verb is a no-op and the snapshot omits the field —
-//     chrome won't render paging controls for a level that doesn't page.
-//   - These are orthogonal: `'client'` means the source applies the concern
-//     and publishes the result; `'none'` means the concern is absent.
-//     Displayed-row derivation never sees an in-memory source with
-//     `serverManaged` flags.
+// Query semantics:
+//   - `sortMode: 'client'` and `filterMode: 'client'` expose matching query
+//     capabilities and apply them before publishing `snapshot.nodes`.
+//   - `paginationMode: 'client'` slices rows inside this source. Pagination is
+//     not exposed as a generic grid command.
+//   - `sortMode: 'none'` / `filterMode: 'none'` means the source does not
+//     expose that query capability.
 //
 // Aggregation: when an `aggregator` is supplied, it runs after
 // sort/filter/window and its rollup payloads are merged into `node.rollup`
@@ -50,23 +43,28 @@ import type { ColId, RowKey } from "../../types/identity";
 import type { ColumnSchema } from "../../types/schema";
 import type { FooterRow, LevelOptions, TreeNode } from "../../types/level-row";
 import type { RowPredicate, SortDescriptor } from "../../pipeline/types";
-import { makeRowComparator } from "../../pipeline/stages/sort-impl";
 import { defaultRowKey } from "../../pipeline/stages/build-data";
 import { assertBoundedInteger } from "@sapporta/shared/validation";
 import type {
+  LevelDataSource,
+  LevelQueryCapabilities,
   LevelSnapshot,
   LevelSourceState,
-  ReadonlyLevelDataSource,
   ReconcileEvent,
   SourceLoadResult,
-  WritableLevelDataSource,
+  WriteCapability,
 } from "../types";
+import {
+  filterSourceNodes,
+  sliceSourceNodes,
+  sortSourceNodes,
+} from "../query-shaping";
 
 type ClientMode = "client" | "none";
 
 export type InMemoryAggregator = (
-  nodes: TreeNode[],
-  columns: ColumnSchema[],
+  nodes: readonly TreeNode[],
+  columns: readonly ColumnSchema[],
 ) => {
   perRowRollup: Map<RowKey, Record<ColId, unknown>>;
   footerRows: FooterRow[];
@@ -96,35 +94,23 @@ export type InMemoryLevelSourceOpts<F = unknown> = {
   compileFilter?: (filter: F | undefined) => RowPredicate | undefined;
 };
 
-// `Object.freeze` so accidental writes from a host or a future stage fail
-// loudly instead of silently corrupting the shared sentinel.
-const SERVER_MANAGED = Object.freeze({
-  sort: false,
-  filter: false,
-  pagination: false,
-}) as { sort: false; filter: false; pagination: false };
-
 type Core<F> = {
-  read: ReadonlyLevelDataSource;
+  read: LevelDataSource;
   // Edit verbs are present only on writable sources. The readonly factory omits
   // these verbs; the writable factory attaches this same implementation.
-  setCell: WritableLevelDataSource["setCell"];
-  applyChanges: WritableLevelDataSource["applyChanges"];
-  createNode: WritableLevelDataSource["createNode"];
-  removeNode: WritableLevelDataSource["removeNode"];
-  onReconcile: WritableLevelDataSource["onReconcile"];
-  // Bulk replacement — primarily for hosts that hand the in-memory
-  // source server-fetched rows. Not part of the cross-source
-  // `WritableLevelDataSource` contract; a host that wants this verb knows
-  // it is talking to an in-memory source.
+  write: WriteCapability;
+  // Bulk replacement — primarily for hosts that hand the in-memory source
+  // server-fetched rows. It is implementation-specific, so it stays off the
+  // cross-source `LevelDataSource` contract.
   replaceNodes: (nodes: TreeNode[]) => void;
 };
 
-// Returned shape for hosts that construct an in-memory source directly
-// and want the `replaceNodes` verb. The cross-source surface remains
-// `WritableLevelDataSource`; widen here only when the host knows it
-// owns the implementation.
-export type InMemoryLevelSource = WritableLevelDataSource & {
+// Returned shape for hosts that construct an in-memory source directly and want
+// the `replaceNodes` verb. Cross-source code should depend on
+// `LevelDataSource`; application code that owns this implementation can depend
+// on the extra method.
+export type InMemoryLevelSource = LevelDataSource & {
+  write: WriteCapability;
   replaceNodes: (nodes: TreeNode[]) => void;
 };
 
@@ -138,6 +124,9 @@ function buildCore<F>(opts: InMemoryLevelSourceOpts<F>): Core<F> {
   const rowKeyFn = opts.options.rowKey ?? defaultRowKey;
   const initialPage = opts.initialPage ?? 0;
   const initialPageSize = opts.initialPageSize ?? Number.POSITIVE_INFINITY;
+  if (opts.paginationMode === "client") {
+    assertPageWindow(initialPage, initialPageSize);
+  }
 
   // Copy on construction so external mutation of `initialNodes` doesn't
   // bleed into our snapshots after-the-fact.
@@ -158,52 +147,35 @@ function buildCore<F>(opts: InMemoryLevelSourceOpts<F>): Core<F> {
 
   // Cached published state. Invalidated on any mutation so the next
   // `snapshot()` rebuilds — and stays stable across no-op reads.
-  let cachedSnapshot: LevelSnapshot<F> | null = null;
-  let cachedState: LevelSourceState<F> | null = null;
+  let cachedSnapshot: LevelSnapshot | null = null;
+  let cachedState: LevelSourceState | null = null;
   let cachedRowKeyToBaseIdx: Map<RowKey, number> | null = null;
+  let cachedShapeTotalCount = baseNodes.length;
   // Last-published `nodes` and `footerRows` references — held so the next
   // recompute can reuse them when content didn't actually change.
-  let lastNodes: TreeNode[] | null = null;
-  let lastFooterRows: FooterRow[] | undefined = undefined;
+  let lastNodes: readonly TreeNode[] | null = null;
+  let lastFooterRows: readonly FooterRow[] | undefined = undefined;
 
   function recompute(): void {
-    let pipelineNodes: TreeNode[] = baseNodes;
+    let pipelineNodes: readonly TreeNode[] = baseNodes;
 
-    // Filter is applied here, in the source, even though the grid
-    // pipeline has its own `withFilter` stage. The reason is order: the
-    // pipeline runs filter→sort, but `pagination` and the optional
-    // `aggregator` happen INSIDE the source and must see the filtered
-    // set (filter→sort→window→aggregate is the canonical order).
-    // Filtering at the source ensures that.
-    //
-    // The compiled `predicate` is also published on the snapshot below (as
-    // `applyFilter`) so displayed-row derivation sees a stable reference.
-    // Derivation will run `withFilter` against already-filtered rows — every
-    // survivor passes, so it's a no-op.
-    // (`compileFilter!` is non-null here because construction throws
-    // when `filterMode === 'client' && compileFilter === undefined`.)
     let predicate: RowPredicate | undefined;
     if (opts.filterMode === "client" && filter !== undefined) {
       predicate = opts.compileFilter!(filter);
-      if (predicate) {
-        const keep = predicate;
-        pipelineNodes = pipelineNodes.filter((n) => keep(n.columns));
-      }
+      pipelineNodes = filterSourceNodes(pipelineNodes, predicate);
     }
 
-    if (opts.sortMode === "client" && sort && sort.length > 0) {
-      if (pipelineNodes === baseNodes) pipelineNodes = pipelineNodes.slice();
-      const cmp = makeRowComparator(sort, opts.columns);
-      pipelineNodes.sort((a, b) => cmp(a.columns, b.columns));
+    if (opts.sortMode === "client") {
+      pipelineNodes = sortSourceNodes(pipelineNodes, sort, opts.columns);
     }
 
-    let pagination: LevelSnapshot<F>["pagination"];
+    cachedShapeTotalCount = pipelineNodes.length;
     if (opts.paginationMode === "client") {
-      const totalCount = pipelineNodes.length;
-      const start = page * pageSize;
-      const end = Number.isFinite(pageSize) ? start + pageSize : totalCount;
-      pipelineNodes = pipelineNodes.slice(start, end);
-      pagination = { page, pageSize, totalCount };
+      const start = Number.isFinite(pageSize) ? page * pageSize : 0;
+      pipelineNodes = sliceSourceNodes(pipelineNodes, {
+        offset: start,
+        limit: pageSize,
+      });
     }
 
     // Build the rowKey index against original base references — sort/filter
@@ -219,7 +191,7 @@ function buildCore<F>(opts: InMemoryLevelSourceOpts<F>): Core<F> {
       if (baseIdx !== undefined) rowKeyToBaseIdx.set(key, baseIdx);
     }
 
-    let publishedNodes: TreeNode[] = pipelineNodes;
+    let publishedNodes: readonly TreeNode[] = pipelineNodes;
     let footerRows: FooterRow[] | undefined = opts.footerRows?.slice();
     if (opts.aggregator) {
       const result = opts.aggregator(pipelineNodes, opts.columns);
@@ -246,20 +218,7 @@ function buildCore<F>(opts: InMemoryLevelSourceOpts<F>): Core<F> {
       ? lastFooterRows
       : footerRows;
 
-    const snapshot: LevelSnapshot<F> = {
-      nodes: finalNodes,
-      serverManaged: SERVER_MANAGED,
-    };
-    if (opts.sortMode === "client" && sort) snapshot.sort = sort;
-    if (opts.filterMode === "client" && filter !== undefined)
-      snapshot.filter = filter;
-    // See the recompute comment: source filtered `finalNodes` already, so
-    // the pipeline's `withFilter` against this predicate is a no-op. We
-    // still publish the predicate so the pipeline's stage cache keys on a
-    // stable reference instead of a fresh closure every snapshot — the
-    // grid never sees the host's grammar, only the predicate.
-    if (predicate) snapshot.applyFilter = predicate;
-    if (pagination) snapshot.pagination = pagination;
+    const snapshot: LevelSnapshot = { nodes: finalNodes };
     if (finalFooters) snapshot.footerRows = finalFooters;
 
     cachedSnapshot = snapshot;
@@ -293,21 +252,10 @@ function buildCore<F>(opts: InMemoryLevelSourceOpts<F>): Core<F> {
     return idx;
   }
 
-  function setClientPage(p: number, ps: number): "changed" | "unchanged" {
-    if (opts.paginationMode === "none") return "unchanged";
-    assertPageWindow(p, ps);
-    if (page === p && pageSize === ps) return "unchanged";
-    page = p;
-    pageSize = ps;
-    invalidate();
-    notify();
-    return "changed";
-  }
-
-  function readyResult(): Promise<SourceLoadResult<F>> {
+  function readyResult(): Promise<SourceLoadResult> {
     // In-memory commands publish synchronously because all rows are local.
     // The resolved promise keeps the same caller contract as REST sources:
-    // after `await source.setPage(...)`, `state()` already exposes the
+    // after `await source.query.sort?.set(...)`, `state()` already exposes the
     // recomputed ready snapshot.
     ensureFresh();
     const state = cachedState!;
@@ -317,7 +265,7 @@ function buildCore<F>(opts: InMemoryLevelSourceOpts<F>): Core<F> {
     return Promise.resolve({ kind: "ready", state });
   }
 
-  function unchangedResult(): Promise<SourceLoadResult<F>> {
+  function unchangedResult(): Promise<SourceLoadResult> {
     ensureFresh();
     return Promise.resolve({ kind: "unchanged", state: cachedState! });
   }
@@ -331,9 +279,42 @@ function buildCore<F>(opts: InMemoryLevelSourceOpts<F>): Core<F> {
     };
   }
 
-  const read: ReadonlyLevelDataSource = {
-    writable: false,
-    state(): LevelSourceState<F> {
+  function setSortQuery(
+    nextSort: readonly SortDescriptor[] | undefined,
+  ): Promise<SourceLoadResult> {
+    if (sort === nextSort) return unchangedResult();
+    sort = nextSort ? [...nextSort] : undefined;
+    invalidate();
+    notify();
+    return readyResult();
+  }
+
+  function setFilterQuery(
+    nextFilter: F | undefined,
+  ): Promise<SourceLoadResult> {
+    if (filter === nextFilter) return unchangedResult();
+    filter = nextFilter;
+    invalidate();
+    notify();
+    return readyResult();
+  }
+
+  const query: LevelQueryCapabilities = {};
+  if (opts.sortMode === "client") {
+    query.sort = {
+      current: () => sort,
+      set: setSortQuery,
+    };
+  }
+  if (opts.filterMode === "client") {
+    query.filter = {
+      current: () => filter,
+      set: (next) => setFilterQuery(next as F | undefined),
+    };
+  }
+
+  const read: LevelDataSource = {
+    state(): LevelSourceState {
       ensureFresh();
       return cachedState!;
     },
@@ -343,51 +324,21 @@ function buildCore<F>(opts: InMemoryLevelSourceOpts<F>): Core<F> {
         subs.delete(fn);
       };
     },
-    setSort(s) {
-      if (opts.sortMode === "none") return unchangedResult();
-      if (sort === s) return unchangedResult();
-      sort = s;
-      invalidate();
-      notify();
-      return readyResult();
-    },
-    setFilter(f) {
-      if (opts.filterMode === "none") return unchangedResult();
-      // `LevelDataSource.setFilter` is `unknown` to keep the cross-source
-      // surface uniform; this source was typed at construction over `F`.
-      const next = f as F | undefined;
-      if (filter === next) return unchangedResult();
-      filter = next;
-      invalidate();
-      notify();
-      return readyResult();
-    },
-    setPage(p, ps) {
-      const changed = setClientPage(p, ps);
-      return changed === "changed" ? readyResult() : unchangedResult();
-    },
-    refetch() {
-      // No upstream — refetch is a no-op for in-memory sources.
-      return unchangedResult();
-    },
     dispose() {
       disposed = true;
       subs.clear();
       reconcileSubs.clear();
     },
   };
+  if (query.sort || query.filter || query.refetch) read.query = query;
 
-  const setCell: WritableLevelDataSource["setCell"] = (
-    rowKey,
-    colId,
-    value,
-  ) => {
+  const setCell: WriteCapability["setCell"] = (rowKey, colId, value) => {
     applyOne(rowKey, colId, value);
     invalidate();
     notify();
   };
 
-  const applyChanges: WritableLevelDataSource["applyChanges"] = (changes) => {
+  const applyChanges: WriteCapability["applyChanges"] = (changes) => {
     // Atomic from the grid's view: validate every rowKey resolves before
     // mutating anything. A throw here leaves baseNodes untouched.
     for (const c of changes) lookupBaseIdx(c.rowKey);
@@ -396,10 +347,7 @@ function buildCore<F>(opts: InMemoryLevelSourceOpts<F>): Core<F> {
     notify();
   };
 
-  const createNode: WritableLevelDataSource["createNode"] = async (
-    node,
-    atIndex,
-  ) => {
+  const createNode: WriteCapability["createNode"] = async (node, atIndex) => {
     const idx = atIndex === undefined ? baseNodes.length : atIndex;
     baseNodes = baseNodes.slice();
     baseNodes.splice(idx, 0, node);
@@ -408,7 +356,7 @@ function buildCore<F>(opts: InMemoryLevelSourceOpts<F>): Core<F> {
     return { node, atIndex: idx };
   };
 
-  const removeNode: WritableLevelDataSource["removeNode"] = (rowKey) => {
+  const removeNode: WriteCapability["removeNode"] = (rowKey) => {
     const baseIdx = lookupBaseIdx(rowKey);
     baseNodes = baseNodes.slice();
     baseNodes.splice(baseIdx, 1);
@@ -422,7 +370,7 @@ function buildCore<F>(opts: InMemoryLevelSourceOpts<F>): Core<F> {
     notify();
   };
 
-  const onReconcile: WritableLevelDataSource["onReconcile"] = (fn) => {
+  const onReconcile: WriteCapability["onReconcile"] = (fn) => {
     // Documented contract: in-memory sources never emit reconcile events
     // (optimistic === authoritative). We accept the subscription so callers
     // can wire it uniformly across source kinds, but no event will ever
@@ -433,13 +381,25 @@ function buildCore<F>(opts: InMemoryLevelSourceOpts<F>): Core<F> {
     };
   };
 
+  function canAppendRow(): boolean {
+    if (opts.paginationMode === "none") return true;
+    ensureFresh();
+    const visibleCount = cachedSnapshot!.nodes.length;
+    if (visibleCount === 0) return page === 0 && cachedShapeTotalCount === 0;
+    if (!Number.isFinite(pageSize)) return true;
+    return page * pageSize + visibleCount >= cachedShapeTotalCount;
+  }
+
   return {
     read,
-    setCell,
-    applyChanges,
-    createNode,
-    removeNode,
-    onReconcile,
+    write: {
+      setCell,
+      applyChanges,
+      createNode,
+      removeNode,
+      onReconcile,
+      canAppendRow,
+    },
     replaceNodes,
   };
 }
@@ -451,37 +411,23 @@ export function inMemoryLevelSource<F = unknown>(
   // Reproduce the read surface so the writable source has its own, fresh
   // identity object rather than sharing one with the readonly variant.
   return {
-    writable: true,
     state: core.read.state,
     subscribe: core.read.subscribe,
-    setSort: core.read.setSort,
-    setFilter: core.read.setFilter,
-    setPage: core.read.setPage,
-    refetch: core.read.refetch,
+    ...(core.read.query ? { query: core.read.query } : {}),
     dispose: core.read.dispose,
-    setCell: core.setCell,
-    applyChanges: core.applyChanges,
-    createNode: core.createNode,
-    removeNode: core.removeNode,
-    onReconcile: core.onReconcile,
+    write: core.write,
     replaceNodes: core.replaceNodes,
   };
 }
 
 export function inMemoryReadonlyLevelSource<F = unknown>(
   opts: InMemoryLevelSourceOpts<F>,
-): ReadonlyLevelDataSource {
+): LevelDataSource {
   const core = buildCore<F>(opts);
-  // Construct an object with ONLY the read keys so `'setCell' in source`
-  // is false at runtime — not merely `setCell === undefined`.
   return {
-    writable: false,
     state: core.read.state,
     subscribe: core.read.subscribe,
-    setSort: core.read.setSort,
-    setFilter: core.read.setFilter,
-    setPage: core.read.setPage,
-    refetch: core.read.refetch,
+    ...(core.read.query ? { query: core.read.query } : {}),
     dispose: core.read.dispose,
   };
 }
@@ -492,14 +438,19 @@ function assertPageWindow(page: number, pageSize: number): void {
     min: 0,
     makeError: (message) => new Error(message),
   });
-  assertBoundedInteger(pageSize, {
-    name: "pageSize",
-    min: 1,
-    makeError: (message) => new Error(message),
-  });
+  if (pageSize !== Number.POSITIVE_INFINITY) {
+    assertBoundedInteger(pageSize, {
+      name: "pageSize",
+      min: 1,
+      makeError: (message) => new Error(message),
+    });
+  }
 }
 
-function nodesEqual(prev: TreeNode[] | null, next: TreeNode[]): boolean {
+function nodesEqual(
+  prev: readonly TreeNode[] | null,
+  next: readonly TreeNode[],
+): boolean {
   if (prev === null) return false;
   if (prev === next) return true;
   if (prev.length !== next.length) return false;
@@ -508,8 +459,8 @@ function nodesEqual(prev: TreeNode[] | null, next: TreeNode[]): boolean {
 }
 
 function footerRowsEqual(
-  prev: FooterRow[] | undefined,
-  next: FooterRow[] | undefined,
+  prev: readonly FooterRow[] | undefined,
+  next: readonly FooterRow[] | undefined,
 ): boolean {
   if (prev === next) return true;
   if (!prev || !next) return false;
