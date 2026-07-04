@@ -6,9 +6,13 @@ import {
   rootPath,
   type GridPath,
   type GridRuntime,
+  type LevelSourceState,
+  type PageBoundaryNavigationRequest,
   type RuntimeLevelDataSource,
+  type RowQueryState,
   type RowKey,
   type SortDescriptor,
+  type SourceLoadResult,
 } from "@sapporta/grid";
 import {
   filtersEqual,
@@ -120,7 +124,26 @@ export type TGridSession<
   getQueryState<LevelId extends TGridLevelId<RowsByLevel>>(
     levelId?: LevelId,
   ): TGridLevelQueryState<RowsByLevel[LevelId]>;
-  reloadRows(levelId?: TGridLevelId<RowsByLevel>, path?: GridPath): void;
+  reloadRows(
+    levelId?: TGridLevelId<RowsByLevel>,
+    path?: GridPath,
+  ): Promise<SourceLoadResult>;
+  setLevelSort(
+    levelId: TGridLevelId<RowsByLevel>,
+    path: GridPath,
+    sort: SortDescriptor[],
+  ): Promise<SourceLoadResult>;
+  setLevelFilter(
+    levelId: TGridLevelId<RowsByLevel>,
+    path: GridPath,
+    filter: TGridFilter | undefined,
+  ): Promise<SourceLoadResult>;
+  setLevelPage(
+    levelId: TGridLevelId<RowsByLevel>,
+    path: GridPath,
+    page: number,
+    pageSize: number,
+  ): Promise<SourceLoadResult>;
   setErrorBanner(message: string | null): void;
   lookupForColumn: LookupForColumn;
   csvExportUrl(levelId?: TGridLevelId<RowsByLevel>): string;
@@ -208,22 +231,7 @@ class DefaultTGridSession<
       rootLevel: definition.rootLevel,
       levels: definition.levels,
       columnMapper: this.columnMapper,
-      hostQueryState: (levelId) => {
-        const state = this.queryStoresByLevel.get(levelId)?.getState();
-        if (!state) return undefined;
-        return {
-          page: state.page,
-          pageSize: state.pageSize,
-          sort: state.sort,
-          filters: state.filters,
-          search: state.search,
-        };
-      },
-      setHostPage: (levelId, page) => {
-        // Keyboard page turns should behave exactly like the page buttons a
-        // table view renders, including route sync and page-number clamping.
-        this.queryStoresByLevel.get(levelId)?.getState().setPage(page);
-      },
+      hostRowQueryState: (levelId) => this.hostRowQueryState(levelId),
       sessionContext: this.currentSessionContext,
     });
 
@@ -237,6 +245,8 @@ class DefaultTGridSession<
       dataSource,
       interaction: definition.interaction,
       phantomRows: definition.phantomRows,
+      onPageBoundaryNavigation: ({ navigation, source, state }) =>
+        this.handlePageBoundaryNavigation(navigation, source, state),
       on: {
         cellReconciled: ({ event }) => {
           if (event.kind === "rejected") {
@@ -306,10 +316,42 @@ class DefaultTGridSession<
   }
 
   reloadRows(
-    _levelId: TGridLevelId<RowsByLevel> = this.rootLevel,
-    path: GridPath = this.rootGridPath,
-  ): void {
-    this.runtime.sourceFor(path).refetch();
+    levelId: TGridLevelId<RowsByLevel> = this.rootLevel,
+    path?: GridPath,
+  ): Promise<SourceLoadResult> {
+    const targetPath = this.requireLoadPath(levelId, path, "reloadRows");
+    return this.runtime.sourceFor(targetPath).refetch();
+  }
+
+  async setLevelSort(
+    levelId: TGridLevelId<RowsByLevel>,
+    path: GridPath,
+    sort: SortDescriptor[],
+  ): Promise<SourceLoadResult> {
+    const result = await this.runtime.sourceFor(path).setSort(sort);
+    this.pushUrlAfterReady(levelId, result);
+    return result;
+  }
+
+  async setLevelFilter(
+    levelId: TGridLevelId<RowsByLevel>,
+    path: GridPath,
+    filter: TGridFilter | undefined,
+  ): Promise<SourceLoadResult> {
+    const result = await this.runtime.sourceFor(path).setFilter(filter);
+    this.pushUrlAfterReady(levelId, result);
+    return result;
+  }
+
+  async setLevelPage(
+    levelId: TGridLevelId<RowsByLevel>,
+    path: GridPath,
+    page: number,
+    pageSize: number,
+  ): Promise<SourceLoadResult> {
+    const result = await this.runtime.sourceFor(path).setPage(page, pageSize);
+    this.pushUrlAfterReady(levelId, result);
+    return result;
   }
 
   setErrorBanner(message: string | null): void {
@@ -371,6 +413,110 @@ class DefaultTGridSession<
     return `${getApiBase()}/tables/${level.table.name}/export.csv${queryString ? `?${queryString}` : ""}`;
   }
 
+  private hostRowQueryState(
+    levelId: TGridLevelId<RowsByLevel>,
+  ): RowQueryState<TGridFilter> | undefined {
+    const store = this.queryStoresByLevel.get(levelId);
+    if (!store) return undefined;
+    return {
+      // The REST source samples this value immediately before building a
+      // request. The query store remains the application-visible state for URL
+      // sync, exports, search controls, and filters.
+      current: () => {
+        const state = store.getState();
+        return {
+          page: state.page,
+          pageSize: state.pageSize,
+          sort: [...state.sort],
+          filter: {
+            conditions: [...state.filters],
+            search: state.search,
+          },
+        };
+      },
+      // These setters are source-facing and passive. They update table query
+      // state only. The source command that called them owns the row load, and
+      // the session command owns any route sync that follows a ready result.
+      setSort: (sort) => store.getState().setSortState(sort ?? []),
+      setFilter: (filter) => store.getState().setFilterState(filter),
+      setPage: (page, pageSize) =>
+        store.getState().setPageState(page, pageSize),
+    };
+  }
+
+  private pushUrlAfterReady(
+    levelId: TGridLevelId<RowsByLevel>,
+    result: SourceLoadResult,
+  ): void {
+    // URL state follows committed table state. A refreshing, errored,
+    // superseded, disposed, or unchanged command leaves the route untouched so
+    // browser history does not advertise rows that never became ready.
+    if (result.kind === "ready") this.pushUrl(levelId);
+  }
+
+  private handlePageBoundaryNavigation(
+    navigation: PageBoundaryNavigationRequest,
+    source: RuntimeLevelDataSource,
+    state: Extract<LevelSourceState, { status: "ready" }>,
+  ): Promise<SourceLoadResult> | false {
+    const pagination = state.snapshot.pagination;
+    if (!pagination) return false;
+    if (!Number.isFinite(pagination.pageSize)) return false;
+    // TGrid table pages use 1-based page numbers because table routes and
+    // export URLs expose page numbers to application users. The base grid never
+    // assumes that convention. This hook translates keyboard edge navigation
+    // into the same source command used by visible page controls.
+    const nextPage =
+      navigation.direction === "next"
+        ? pagination.page + 1
+        : pagination.page - 1;
+    // Returning false is an authoritative "no page turn" for the runtime hook.
+    // TGrid owns this boundary because its page numbers are route-visible and
+    // 1-based; the generic grid fallback cannot safely reinterpret page 1 as a
+    // source coordinate and request page 0.
+    if (nextPage < 1) return false;
+    if (
+      navigation.direction === "next" &&
+      pagination.totalCount !== undefined &&
+      pagination.page * pagination.pageSize >= pagination.totalCount
+    ) {
+      return false;
+    }
+    if (
+      navigation.direction === "next" &&
+      pagination.totalCount === undefined &&
+      state.snapshot.nodes.length < pagination.pageSize
+    ) {
+      return false;
+    }
+    const levelId = this.runtime.schemaAt(navigation.path)
+      .name as TGridLevelId<RowsByLevel>;
+    // The runtime keeps the pending cursor landing while this promise is
+    // pending. The session pushes the URL after ready; the runtime then samples
+    // displayed rows and lands focus on the first or last row for the requested
+    // edge.
+    return source.setPage(nextPage, pagination.pageSize).then((result) => {
+      this.pushUrlAfterReady(levelId, result);
+      return result;
+    });
+  }
+
+  private requireLoadPath(
+    levelId: TGridLevelId<RowsByLevel>,
+    path: GridPath | undefined,
+    caller: string,
+  ): GridPath {
+    if (path) return path;
+    if (levelId === this.rootLevel) return this.rootGridPath;
+    // Query stores are keyed by level id. Runtime sources are keyed by
+    // GridPath. A non-root level can be expanded many times under different
+    // parent rows, so any row-loading command for that level must name the
+    // concrete path it intends to reload.
+    throw new Error(
+      `TGridSession.${caller}: loading level '${String(levelId)}' requires a GridPath`,
+    );
+  }
+
   private createQueryStore<LevelId extends TGridLevelId<RowsByLevel>>(
     levelId: LevelId,
     level: TGridLevelConfig<RowsByLevel, AppServices, LevelId>,
@@ -389,57 +535,16 @@ class DefaultTGridSession<
       pageSize: initial.pageSize,
       errorBanner: null,
 
-      setSort: (sort) => {
-        if (sortOrderEqual(get().sort, sort)) return;
+      // Passive state setters are the only setters called from REST
+      // RowQueryState. They have no side effects beyond updating query values.
+      // UI commands below call the exact source path, await the source load, and
+      // then sync the URL when the source reaches ready.
+      setSortState: (sort) => {
+        if (sortOrderEqual(get().sort, sort)) return "unchanged";
         set({ sort, page: 1 });
-        this.reloadRows(levelId);
-        this.pushUrl(levelId);
+        return "changed";
       },
-      clearSort: () => {
-        if (get().sort.length === 0) return;
-        set({ sort: [], page: 1 });
-        this.reloadRows(levelId);
-        this.pushUrl(levelId);
-      },
-      addFilter: (cond) => {
-        const next = [
-          ...get().filters,
-          { ...cond, id: mintFilterId(cond.column, cond.op) },
-        ];
-        set({ filters: next, page: 1 });
-        this.reloadRows(levelId);
-        this.pushUrl(levelId);
-      },
-      updateFilter: (id, patch) => {
-        const idx = get().filters.findIndex((f) => f.id === id);
-        if (idx < 0) return;
-        const next = [...get().filters];
-        next[idx] = { ...patch, id } as FilterCondition;
-        set({ filters: next, page: 1 });
-        this.reloadRows(levelId);
-        this.pushUrl(levelId);
-      },
-      removeFilter: (id) => {
-        const next = get().filters.filter((f) => f.id !== id);
-        if (next.length === get().filters.length) return;
-        set({ filters: next, page: 1 });
-        this.reloadRows(levelId);
-        this.pushUrl(levelId);
-      },
-      clearFilters: () => {
-        if (get().filters.length === 0) return;
-        set({ filters: [], page: 1 });
-        this.reloadRows(levelId);
-        this.pushUrl(levelId);
-      },
-      setSearch: (q) => {
-        const normalized = q && q.trim() !== "" ? q : null;
-        if (get().search === normalized) return;
-        set({ search: normalized, page: 1 });
-        this.reloadRows(levelId);
-        this.pushUrl(levelId);
-      },
-      setFilter: (filter) => {
+      setFilterState: (filter) => {
         const nextFilters = normalizeFilters(filter?.conditions ?? []);
         const nextSearch =
           filter?.search && filter.search.trim() !== "" ? filter.search : null;
@@ -448,17 +553,113 @@ class DefaultTGridSession<
           filtersEqual(cur.filters, nextFilters) &&
           cur.search === nextSearch
         ) {
-          return;
+          return "unchanged";
         }
         set({ filters: nextFilters, search: nextSearch, page: 1 });
-        this.reloadRows(levelId);
-        this.pushUrl(levelId);
+        return "changed";
+      },
+      setPageState: (page, pageSize) => {
+        const cur = get();
+        if (cur.page === page && cur.pageSize === pageSize) {
+          return "unchanged";
+        }
+        set({ page, pageSize });
+        return "changed";
+      },
+
+      setSort: (sort) => {
+        void this.setLevelSort(
+          levelId,
+          this.requireLoadPath(levelId, undefined, "setSort"),
+          sort,
+        );
+      },
+      clearSort: () => {
+        if (get().sort.length === 0) return;
+        void this.setLevelSort(
+          levelId,
+          this.requireLoadPath(levelId, undefined, "clearSort"),
+          [],
+        );
+      },
+      addFilter: (cond) => {
+        const next = [
+          ...get().filters,
+          { ...cond, id: mintFilterId(cond.column, cond.op) },
+        ];
+        void this.setLevelFilter(
+          levelId,
+          this.requireLoadPath(levelId, undefined, "addFilter"),
+          {
+            conditions: next,
+            search: get().search,
+          },
+        );
+      },
+      updateFilter: (id, patch) => {
+        const idx = get().filters.findIndex((f) => f.id === id);
+        if (idx < 0) return;
+        const next = [...get().filters];
+        next[idx] = { ...patch, id } as FilterCondition;
+        void this.setLevelFilter(
+          levelId,
+          this.requireLoadPath(levelId, undefined, "updateFilter"),
+          {
+            conditions: next,
+            search: get().search,
+          },
+        );
+      },
+      removeFilter: (id) => {
+        const next = get().filters.filter((f) => f.id !== id);
+        if (next.length === get().filters.length) return;
+        void this.setLevelFilter(
+          levelId,
+          this.requireLoadPath(levelId, undefined, "removeFilter"),
+          {
+            conditions: next,
+            search: get().search,
+          },
+        );
+      },
+      clearFilters: () => {
+        if (get().filters.length === 0) return;
+        void this.setLevelFilter(
+          levelId,
+          this.requireLoadPath(levelId, undefined, "clearFilters"),
+          {
+            conditions: [],
+            search: get().search,
+          },
+        );
+      },
+      setSearch: (q) => {
+        const normalized = q && q.trim() !== "" ? q : null;
+        if (get().search === normalized) return;
+        void this.setLevelFilter(
+          levelId,
+          this.requireLoadPath(levelId, undefined, "setSearch"),
+          {
+            conditions: get().filters,
+            search: normalized,
+          },
+        );
+      },
+      setFilter: (filter) => {
+        void this.setLevelFilter(
+          levelId,
+          this.requireLoadPath(levelId, undefined, "setFilter"),
+          filter,
+        );
       },
       setPage: (page) => {
         if (get().page === page) return;
-        set({ page });
-        this.reloadRows(levelId);
-        this.pushUrl(levelId);
+        void this.setLevelPage(
+          levelId,
+          this.requireLoadPath(levelId, undefined, "setPage"),
+          page,
+          get().pageSize,
+        );
       },
 
       setErrorBanner: (msg) => set({ errorBanner: msg }),
@@ -479,7 +680,7 @@ class DefaultTGridSession<
         }
         if (Object.keys(patch).length === 0) return;
         set(patch);
-        this.reloadRows(levelId);
+        void this.reloadRows(levelId);
       },
     }));
   }

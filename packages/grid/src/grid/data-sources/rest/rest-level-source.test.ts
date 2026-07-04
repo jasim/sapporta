@@ -7,7 +7,12 @@ import type {
   PatchCellResponse,
   ReconcileEvent,
 } from "../types";
-import { restLevelSource, type RestLevelSourceOpts } from "./rest-level-source";
+import {
+  hostBackedRowQuery,
+  restLevelSource,
+  sourceOwnedRowQuery,
+  type RestLevelSourceOpts,
+} from "./rest-level-source";
 
 // A controllable promise — lets a test resolve / reject the host side
 // of a `fetchPage` or `patchCell` call deterministically.
@@ -45,7 +50,7 @@ const baseOpts = (
   extra: Partial<RestLevelSourceOpts<TestFilter>> = {},
 ): RestLevelSourceOpts<TestFilter> => ({
   fetchPage: vi.fn(async () => ({ nodes: fixtureNodes() })),
-  initialPagination: { page: 0, pageSize: 10 },
+  rowQuery: sourceOwnedRowQuery({ page: 0, pageSize: 10 }),
   serverManaged: { sort: true, filter: true, pagination: true },
   rowKey: (n) => String(n.columns.id),
   ...extra,
@@ -88,7 +93,8 @@ describe("restLevelSource — read surface", () => {
 
     const state = src.state();
     expect(state.status).toBe("initialError");
-    if (state.status !== "initialError") throw new Error("expected initialError");
+    if (state.status !== "initialError")
+      throw new Error("expected initialError");
     expect(state.error.message).toBe(
       "500 Internal Server Error — connection refused",
     );
@@ -160,7 +166,7 @@ describe("restLevelSource — read surface", () => {
     ]);
   });
 
-  it("exposes source-owned page-boundary navigation", async () => {
+  it("source-owned setPage fetches and resolves ready", async () => {
     const fetchPage = vi.fn(async (req: FetchPageRequest) => ({
       nodes: fixtureNodes().slice(0, req.pageSize),
       totalCount: 30,
@@ -168,26 +174,21 @@ describe("restLevelSource — read surface", () => {
     const src = restLevelSource(
       baseOpts({
         fetchPage,
-        initialPagination: { page: 0, pageSize: 10 },
+        rowQuery: sourceOwnedRowQuery({ page: 0, pageSize: 10 }),
       }),
     );
     await flush();
 
-    expect(src.pageBoundaryNavigation?.canGoPrevious()).toBe(false);
-    expect(src.pageBoundaryNavigation?.canGoNext()).toBe(true);
-
-    src.pageBoundaryNavigation?.goNext();
+    const result = await src.setPage(1, 10);
+    expect(result.kind).toBe("ready");
     expect(fetchPage).toHaveBeenLastCalledWith({ page: 1, pageSize: 10 });
     await flush();
     expect(src.state().snapshot.pagination?.page).toBe(1);
-
-    src.pageBoundaryNavigation?.goPrevious();
-    expect(fetchPage).toHaveBeenLastCalledWith({ page: 0, pageSize: 10 });
   });
 
   it("setPage rejects non-integer pagination windows", () => {
     const src = restLevelSource(
-      baseOpts({ initialPagination: { page: 0, pageSize: 10 } }),
+      baseOpts({ rowQuery: sourceOwnedRowQuery({ page: 0, pageSize: 10 }) }),
     );
 
     expect(() => src.setPage(1.5, 10)).toThrow(/page must be an integer/);
@@ -210,9 +211,12 @@ describe("restLevelSource — read surface", () => {
     await flush();
     expect(fetchPage).toHaveBeenCalledTimes(1);
 
-    src.setSort([{ colId: "v", direction: "asc" }]);
+    const result = await src.setSort([{ colId: "v", direction: "asc" }]);
+    expect(result.kind).toBe("ready");
     expect(fetchPage).toHaveBeenCalledTimes(1);
-    expect(src.state().snapshot.sort).toEqual([{ colId: "v", direction: "asc" }]);
+    expect(src.state().snapshot.sort).toEqual([
+      { colId: "v", direction: "asc" },
+    ]);
   });
 
   it("snapshot carries serverManaged unchanged from opts", async () => {
@@ -229,29 +233,67 @@ describe("restLevelSource — read surface", () => {
       pagination: true,
     });
   });
+
+  it("resolves an older load as superseded when a newer refetch starts", async () => {
+    const calls: Array<ReturnType<typeof deferred<FetchPageResponse>>> = [];
+    const fetchPage = vi.fn(async () => {
+      const d = deferred<FetchPageResponse>();
+      calls.push(d);
+      return d.promise;
+    });
+    const src = restLevelSource(baseOpts({ fetchPage }));
+    expect(calls).toHaveLength(1);
+
+    const first = src.refetch();
+    const second = src.refetch();
+
+    await expect(first).resolves.toEqual({ kind: "superseded" });
+
+    calls[2].resolve({ nodes: fixtureNodes() });
+    const result = await second;
+    expect(result.kind).toBe("ready");
+    expect(src.state().status).toBe("ready");
+  });
+
+  it("resolves a pending load as disposed when the source is disposed", async () => {
+    const fetched = deferred<FetchPageResponse>();
+    const fetchPage = vi.fn(async () => fetched.promise);
+    const src = restLevelSource(baseOpts({ fetchPage }));
+
+    const load = src.refetch();
+    src.dispose();
+
+    await expect(load).resolves.toEqual({ kind: "disposed" });
+  });
 });
 
-describe("restLevelSource — host-owned query", () => {
-  it("refetch() calls query() and forwards the result to fetchPage", async () => {
-    const queryFn = vi.fn<() => FetchPageRequest>(() => ({
+describe("restLevelSource — host-backed row query", () => {
+  it("refetch() calls current() and forwards the built request to fetchPage", async () => {
+    let cur: FetchPageRequest = {
       page: 2,
       pageSize: 25,
       sort: [{ colId: "v", direction: "desc" }],
-    }));
+    };
+    const current = vi.fn(() => cur);
     const fetchPage = vi.fn(async (_req: FetchPageRequest) => ({
       nodes: fixtureNodes(),
       totalCount: 99,
     }));
     const src = restLevelSource({
       fetchPage,
-      query: queryFn,
+      rowQuery: hostBackedRowQuery({
+        current,
+        setSort: () => "unchanged",
+        setFilter: () => "unchanged",
+        setPage: () => "unchanged",
+      }),
       serverManaged: { sort: true, filter: true, pagination: true },
       rowKey: (n) => String(n.columns.id),
     });
     await flush();
     await flush();
 
-    expect(queryFn).toHaveBeenCalledTimes(1);
+    expect(current).toHaveBeenCalledTimes(1);
     expect(fetchPage).toHaveBeenCalledTimes(1);
     expect(fetchPage.mock.calls[0][0]).toEqual({
       page: 2,
@@ -259,12 +301,12 @@ describe("restLevelSource — host-owned query", () => {
       sort: [{ colId: "v", direction: "desc" }],
     });
 
-    queryFn.mockReturnValue({
+    cur = {
       page: 5,
       pageSize: 25,
       sort: [{ colId: "v", direction: "asc" }],
-    });
-    src.refetch();
+    };
+    await src.refetch();
     expect(fetchPage).toHaveBeenCalledTimes(2);
     expect(fetchPage.mock.calls[1][0]).toEqual({
       page: 5,
@@ -273,7 +315,7 @@ describe("restLevelSource — host-owned query", () => {
     });
   });
 
-  it("snapshot.pagination.page reflects the current query() and totalCount from last response", async () => {
+  it("snapshot.pagination.page reflects the current row query and totalCount from last response", async () => {
     let cur: FetchPageRequest = { page: 1, pageSize: 10 };
     const fetchPage = vi.fn(async () => ({
       nodes: fixtureNodes(),
@@ -281,7 +323,12 @@ describe("restLevelSource — host-owned query", () => {
     }));
     const src = restLevelSource({
       fetchPage,
-      query: () => cur,
+      rowQuery: hostBackedRowQuery({
+        current: () => cur,
+        setSort: () => "unchanged",
+        setFilter: () => "unchanged",
+        setPage: () => "unchanged",
+      }),
       serverManaged: { sort: true, filter: true, pagination: true },
       rowKey: (n) => String(n.columns.id),
     });
@@ -295,9 +342,7 @@ describe("restLevelSource — host-owned query", () => {
     });
 
     cur = { page: 7, pageSize: 10 };
-    src.refetch();
-    await flush();
-    await flush();
+    await src.refetch();
     expect(src.state().snapshot.pagination).toEqual({
       page: 7,
       pageSize: 10,
@@ -307,14 +352,21 @@ describe("restLevelSource — host-owned query", () => {
 
   it("snapshot reflects sort/filter from the host-owned query", async () => {
     const filter = { v: (value: unknown) => Number(value) > 1 };
-    const fetchPage = vi.fn(async () => ({ nodes: fixtureNodes() }));
+    const fetchPage = vi.fn(async (_req: FetchPageRequest<TestFilter>) => ({
+      nodes: fixtureNodes(),
+    }));
     const src = restLevelSource({
       fetchPage,
-      query: () => ({
-        page: 0,
-        pageSize: 10,
-        sort: [{ colId: "v", direction: "asc" }],
-        filter,
+      rowQuery: hostBackedRowQuery({
+        current: () => ({
+          page: 0,
+          pageSize: 10,
+          sort: [{ colId: "v", direction: "asc" }],
+          filter,
+        }),
+        setSort: () => "unchanged",
+        setFilter: () => "unchanged",
+        setPage: () => "unchanged",
       }),
       serverManaged: { sort: true, filter: true, pagination: true },
       rowKey: (n) => String(n.columns.id),
@@ -327,15 +379,31 @@ describe("restLevelSource — host-owned query", () => {
     expect(snap.filter).toBe(filter);
   });
 
-  it("setSort / setFilter / setPage are no-ops when query is provided", async () => {
-    const queryFn = vi.fn<() => FetchPageRequest>(() => ({
+  it("setSort / setFilter / setPage mutate host state and fetch", async () => {
+    let cur: FetchPageRequest<TestFilter> = {
       page: 0,
       pageSize: 10,
+    };
+    const fetchPage = vi.fn(async (_req: FetchPageRequest<TestFilter>) => ({
+      nodes: fixtureNodes(),
     }));
-    const fetchPage = vi.fn(async () => ({ nodes: fixtureNodes() }));
-    const src = restLevelSource({
+    const src = restLevelSource<TestFilter>({
       fetchPage,
-      query: queryFn,
+      rowQuery: hostBackedRowQuery({
+        current: () => cur,
+        setSort: (sort) => {
+          cur = { ...cur, sort };
+          return "changed";
+        },
+        setFilter: (filter) => {
+          cur = { ...cur, filter };
+          return "changed";
+        },
+        setPage: (page, pageSize) => {
+          cur = { ...cur, page, pageSize };
+          return "changed";
+        },
+      }),
       serverManaged: { sort: true, filter: true, pagination: true },
       rowKey: (n) => String(n.columns.id),
     });
@@ -343,20 +411,19 @@ describe("restLevelSource — host-owned query", () => {
     await flush();
     expect(fetchPage).toHaveBeenCalledTimes(1);
 
-    src.setSort([{ colId: "v", direction: "asc" }]);
-    src.setFilter({ v: () => true });
-    src.setPage(99, 99);
+    await src.setSort([{ colId: "v", direction: "asc" }]);
+    await src.setFilter({ v: () => true });
+    await src.setPage(99, 99);
 
-    expect(fetchPage).toHaveBeenCalledTimes(1);
-  });
-
-  it("throws at construction when both `query` and `initialPagination` are omitted", () => {
-    expect(() =>
-      restLevelSource({
-        fetchPage: async () => ({ nodes: [] }),
-        serverManaged: { sort: true, filter: true, pagination: true },
-      }),
-    ).toThrow(/initialPagination is required when `query` is not provided/);
+    expect(fetchPage).toHaveBeenCalledTimes(4);
+    expect(fetchPage.mock.calls[1][0].sort).toEqual([
+      { colId: "v", direction: "asc" },
+    ]);
+    expect(fetchPage.mock.calls[2][0].filter).toEqual({ v: expect.anything() });
+    expect(fetchPage.mock.calls[3][0]).toMatchObject({
+      page: 99,
+      pageSize: 99,
+    });
   });
 
   it("edit lifecycle is identical: setCell agreed reconciles like source-owned mode", async () => {
@@ -368,7 +435,12 @@ describe("restLevelSource — host-owned query", () => {
     });
     const src = restLevelSource({
       fetchPage: async () => ({ nodes: fixtureNodes(), totalCount: 3 }),
-      query: () => ({ page: 0, pageSize: 10 }),
+      rowQuery: hostBackedRowQuery({
+        current: () => ({ page: 0, pageSize: 10 }),
+        setSort: () => "unchanged",
+        setFilter: () => "unchanged",
+        setPage: () => "unchanged",
+      }),
       serverManaged: { sort: true, filter: true, pagination: true },
       rowKey: (n) => String(n.columns.id),
       patchCell,

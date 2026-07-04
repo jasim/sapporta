@@ -279,6 +279,73 @@ describe("TGridSession", () => {
     }
   });
 
+  it("does not request page zero when page-boundary navigation cannot go previous", async () => {
+    const fetch = vi.fn<TableRowsClient["fetch"]>(async ({ page }) => {
+      const pageNumber = page ?? 1;
+      return {
+        data: [
+          {
+            id: pageNumber,
+            customer: `Customer ${pageNumber}`,
+            status: "open",
+          },
+        ],
+        meta: { total: 2, page: pageNumber, limit: 1, pages: 2 },
+      };
+    });
+    const rowsClient: TableRowsClient = {
+      fetch,
+      create: vi.fn(async (_table, data) => ({ data })),
+      update: vi.fn(async (_table, _id, data) => ({ data })),
+      remove: vi.fn(async (_table, id) => ({ data: { id } })),
+    };
+    const definition = defineTGrid<RowsByLevel>({
+      rootLevel: "orders",
+      levels: {
+        orders: {
+          table: ordersTable,
+          childLevels: [],
+          query: { owner: "host", pageSize: 1 },
+          rowsClient,
+        },
+      },
+    });
+    const onQueryUrlChange = vi.fn();
+    const session = createTGridSession<RowsByLevel>(definition, {
+      onQueryUrlChange,
+    });
+
+    try {
+      await flush();
+      const path = rootPath("orders");
+      session.runtime.cursorManager.moveCellCursorTo({
+        path,
+        rowId: makeRowId(path, "1"),
+        colId: "customer",
+      });
+
+      session.runtime.controllerFor(path).handleKey({
+        key: "ArrowUp",
+        ctrlKey: false,
+        metaKey: false,
+        shiftKey: false,
+        altKey: false,
+      } as KeyboardEvent);
+      await flush();
+
+      expect(fetch.mock.calls.map(([req]) => req.page)).toEqual([1]);
+      expect(session.getQueryState().page).toBe(1);
+      expect(onQueryUrlChange).not.toHaveBeenCalled();
+      expect(session.runtime.coordinator.getState().cellCursor).toEqual({
+        path,
+        rowId: makeRowId(path, "1"),
+        colId: "customer",
+      });
+    } finally {
+      session.dispose();
+    }
+  });
+
   it("PageDown clamps within the loaded host-owned page before changing pages", async () => {
     const rowsClient: TableRowsClient = {
       fetch: vi.fn(async ({ page }) => ({
@@ -434,13 +501,21 @@ describe("TGridSession", () => {
 
       expect(session.getQueryState().page).toBe(2);
       expect(rowsClient.fetch).toHaveBeenCalledTimes(2);
-      expect(onQueryUrlChange).toHaveBeenCalledTimes(1);
+      expect(onQueryUrlChange).not.toHaveBeenCalled();
 
       page2.resolve({
         data: [{ id: 2, customer: "Beta", status: "open" }],
         meta: { total: 3, page: 2, limit: 1, pages: 3 },
       });
       await flush();
+
+      expect(onQueryUrlChange).toHaveBeenCalledWith({
+        level: "orders",
+        page: 2,
+        sort: [],
+        filters: [],
+        search: null,
+      });
 
       expect(session.runtime.coordinator.getState().cellCursor).toEqual({
         path,
@@ -459,6 +534,14 @@ describe("TGridSession", () => {
 
       expect(session.getQueryState().page).toBe(3);
       expect(rowsClient.fetch).toHaveBeenCalledTimes(3);
+      expect(onQueryUrlChange).toHaveBeenCalledTimes(1);
+
+      page3.resolve({
+        data: [{ id: 3, customer: "Core", status: "open" }],
+        meta: { total: 3, page: 3, limit: 1, pages: 3 },
+      });
+      await flush();
+
       expect(onQueryUrlChange).toHaveBeenLastCalledWith({
         level: "orders",
         page: 3,
@@ -466,12 +549,6 @@ describe("TGridSession", () => {
         filters: [],
         search: null,
       });
-
-      page3.resolve({
-        data: [{ id: 3, customer: "Core", status: "open" }],
-        meta: { total: 3, page: 3, limit: 1, pages: 3 },
-      });
-      await flush();
     } finally {
       session.dispose();
     }

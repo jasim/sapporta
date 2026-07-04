@@ -21,6 +21,7 @@ import type {
 import { inMemoryGridDataSource } from "../data-sources/memory/in-memory-grid-source";
 import { restGridDataSource } from "../data-sources/rest/rest-grid-source";
 import type { RestEndpointFactory } from "../data-sources/rest/rest-grid-source";
+import { sourceOwnedRowQuery } from "../data-sources/rest/rest-level-source";
 import {
   childPath,
   makeRowId,
@@ -151,7 +152,7 @@ function endpointFor(t: Transport): RestEndpointFactory {
     patchCell: t.patchCell,
     insertNode: async (req) => req.node,
     removeNode: async () => {},
-    initialPagination: { page: 0, pageSize: 50 },
+    rowQuery: sourceOwnedRowQuery({ page: 0, pageSize: 50 }),
     serverManaged: { sort: true, filter: true, pagination: true },
   });
 }

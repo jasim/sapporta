@@ -5,6 +5,7 @@ import {
   type GridPath,
   type GridRuntime,
   type RuntimeLevelDataSource,
+  type SourceLoadResult,
   type TreeNode,
 } from "../grid";
 import { startLoadingValueLookupEntriesForGridRows } from "./grid-row-loader";
@@ -43,10 +44,10 @@ function makeSource(initialNodes: TreeNode[]) {
         listeners.delete(fn);
       };
     },
-    setSort: () => {},
-    setFilter: () => {},
-    setPage: () => {},
-    refetch: () => {},
+    setSort: () => unchangedResult(source.state()),
+    setFilter: () => unchangedResult(source.state()),
+    setPage: () => unchangedResult(source.state()),
+    refetch: () => unchangedResult(source.state()),
     onReconcile: () => () => {},
   };
 
@@ -61,6 +62,12 @@ function makeSource(initialNodes: TreeNode[]) {
     },
     listenerCount: () => listeners.size,
   };
+}
+
+function unchangedResult(
+  state: ReturnType<RuntimeLevelDataSource["state"]>,
+): Promise<SourceLoadResult> {
+  return Promise.resolve({ kind: "unchanged", state });
 }
 
 function makeRuntime(args: {

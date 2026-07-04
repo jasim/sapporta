@@ -7,17 +7,21 @@ import type {
 import { eqCondition, type FilterCondition } from "@sapporta/shared/filter";
 import {
   childPath,
+  hostBackedRowQuery,
   rootPath,
+  sourceOwnedRowQuery,
   type GridInteractionConfig,
   type PhantomRowsConfig,
 } from "@sapporta/grid";
 import type {
+  BuildRowsRequest,
   ColId,
   GridPath,
   GridSchema,
   LevelSchema,
   PatchCellResponse,
   RestEndpointFactory,
+  RowQueryState,
   RowKey,
   SortDescriptor,
   TreeNode,
@@ -94,19 +98,10 @@ type CompileTGridRuntimeConfigArgs<
   rootLevel: TGridLevelId<RowsByLevel>;
   levels: TGridLevelsConfigMap<RowsByLevel, AppServices>;
   columnMapper: TGridColumnMapper;
-  hostQueryState?: (
+  hostRowQueryState?: (
     levelId: TGridLevelId<RowsByLevel>,
-  ) => TGridRowQueryState | undefined;
-  setHostPage?: (levelId: TGridLevelId<RowsByLevel>, page: number) => void;
+  ) => RowQueryState<TGridFilter> | undefined;
   sessionContext?: () => TGridSessionContext<RowsByLevel, AppServices>;
-};
-
-type TGridRowQueryState = {
-  page: number;
-  pageSize: number;
-  sort: readonly SortDescriptor[];
-  filters: readonly FilterCondition[];
-  search: string | null;
 };
 
 // Prepared table view data: row loading, cell editing, and level metadata.
@@ -221,11 +216,7 @@ export function compileTGridRuntimeConfig<
       queryConfig,
       rowQueryState:
         queryConfig.owner === "host"
-          ? () => args.hostQueryState?.(levelId)
-          : undefined,
-      setHostPage:
-        queryConfig.owner === "host"
-          ? (page) => args.setHostPage?.(levelId, page)
+          ? () => args.hostRowQueryState?.(levelId)
           : undefined,
       rowsClient,
       saveCellValueByColumn: columnBuild.saveCellValueByColumn,
@@ -353,8 +344,7 @@ function makeEndpointFactory(args: {
     defaultSort: SortDescriptor[];
   };
   queryConfig: TGridLevelQueryConfig;
-  rowQueryState?: () => TGridRowQueryState | undefined;
-  setHostPage?: (page: number) => void;
+  rowQueryState?: () => RowQueryState<TGridFilter> | undefined;
   rowsClient: TableRowsClient;
   saveCellValueByColumn: ReadonlyMap<
     ColId,
@@ -373,18 +363,33 @@ function makeEndpointFactory(args: {
     const parentRowKey = args.parent
       ? parentKeyFor(args.levelId, args.parent.parentLevelId, ctx.ancestors)
       : null;
-    let latestTotalCount: number | undefined;
-    let latestLoadedRowCount = 0;
+    // A REST level receives two independent pieces:
+    //
+    // - `rowQuery` stores the mutable page, sort, filter, and search values a
+    //   user can change.
+    // - `buildRowsRequest` adds the context that is always true for this level,
+    //   such as parent-row constraints and fixed filters.
+    //
+    // This split keeps application-visible query state small and reusable. CSV
+    // export, URL state, table controls, and row loading read the same mutable
+    // query state, while child-table constraints stay attached to the expanded
+    // source instance that owns them.
+    const rowQuery =
+      args.queryConfig.owner === "host"
+        ? requireHostRowQuery(args.levelId, args.rowQueryState)
+        : sourceOwnedRowQuery<TGridFilter>(
+            initialSourceOwnedQuery(args.queryConfig, args.parent),
+          );
+    const buildRowsRequest = buildTGridRowsRequest({
+      fixedFilters: args.queryConfig.fixedFilters ?? [],
+      parentConstraint: args.parent
+        ? eqCondition(args.parent.foreignKey, String(parentRowKey))
+        : null,
+    });
     return {
       serverManaged: { sort: true, filter: true, pagination: true },
-      query: makeQuery(
-        args,
-        ctx,
-        parentRowKey,
-        args.parent
-          ? eqCondition(args.parent.foreignKey, String(parentRowKey))
-          : null,
-      ),
+      rowQuery,
+      buildRowsRequest,
       fetchPage: async (req) => {
         const res = await args.rowsClient.fetch({
           tableName: args.table.name,
@@ -394,44 +399,11 @@ function makeEndpointFactory(args: {
           filters: req.filter?.conditions ?? [],
           search: req.filter?.search ?? undefined,
         } satisfies FetchTableRowsParams);
-        latestTotalCount = res.meta.total;
-        latestLoadedRowCount = res.data.length;
         return {
           nodes: buildTableTreeNodes(res.data, args.levelId),
           totalCount: res.meta.total,
         };
       },
-      // Pages with their own table controls should see one pagination story:
-      // page clicks, URL sync, and keyboard boundary navigation all change
-      // the same query state. The latest fetch result is enough to know whether
-      // another page exists.
-      pageBoundaryNavigation:
-        args.queryConfig.owner === "host" && args.setHostPage
-          ? {
-              canGoPrevious: () => {
-                const q = args.rowQueryState?.();
-                return q !== undefined && q.page > 1;
-              },
-              canGoNext: () => {
-                const q = args.rowQueryState?.();
-                if (!q) return false;
-                if (latestTotalCount !== undefined) {
-                  return q.page * q.pageSize < latestTotalCount;
-                }
-                return latestLoadedRowCount >= q.pageSize;
-              },
-              goPrevious: () => {
-                const q = args.rowQueryState?.();
-                if (!q || q.page <= 1) return;
-                args.setHostPage?.(q.page - 1);
-              },
-              goNext: () => {
-                const q = args.rowQueryState?.();
-                if (!q) return;
-                args.setHostPage?.(q.page + 1);
-              },
-            }
-          : undefined,
       patchCell: async (req) => {
         const saveCellValue = args.saveCellValueByColumn.get(req.colId);
         if (saveCellValue) {
@@ -482,79 +454,61 @@ function makeEndpointFactory(args: {
   };
 }
 
-function makeQuery(
-  args: {
-    levelId: string;
-    parent?: {
-      parentLevelId: string;
-      foreignKey: TableColumnName;
-      defaultSort: SortDescriptor[];
-    };
-    queryConfig: TGridLevelQueryConfig;
-    rowQueryState?: () => TGridRowQueryState | undefined;
-  },
-  ctx: {
-    ancestors: Parameters<RestEndpointFactory<TGridFilter>>[0]["ancestors"];
-  },
-  parentRowKey: string | null,
-  parentConstraint: FilterCondition | null,
-):
-  | (() => {
-      page: number;
-      pageSize: number;
-      sort: SortDescriptor[];
-      filter: TGridFilter;
-    })
-  | undefined {
-  const queryConfig = args.queryConfig;
-  const hasParent = Boolean(args.parent);
-  const parentFilter = parentConstraint ? [parentConstraint] : [];
-
-  // Levels with visible controls use the current query state. Levels loaded from
-  // an expanded parent row use configured defaults plus the parent-row filter.
-  if (queryConfig.owner === "host" || hasParent) {
-    if (queryConfig.owner === "host") {
-      return () => {
-        const q = args.rowQueryState?.();
-        if (!q) {
-          throw new Error(
-            `compileTGridRuntimeConfig: no host query state found for level '${args.levelId}'.`,
-          );
-        }
-        return {
-          page: q.page,
-          pageSize: q.pageSize,
-          sort: [...q.sort],
-          filter: {
-            conditions: [
-              ...parentFilter,
-              ...(queryConfig.fixedFilters ?? []),
-              ...q.filters,
-            ],
-            search: q.search,
-          },
-        };
-      };
-    }
-
-    return () => {
-      return {
-        page: queryConfig.initialPage ?? 1,
-        pageSize: defaultPageSize(queryConfig.pageSize),
-        sort: [...(args.parent?.defaultSort ?? [])],
-        filter: {
-          conditions: [
-            ...parentFilter,
-            ...(queryConfig.fixedFilters ?? []),
-            ...(queryConfig.initialFilters ?? []),
-          ],
-          search: queryConfig.initialSearch ?? null,
-        },
-      };
-    };
+function requireHostRowQuery(
+  levelId: string,
+  rowQueryState: (() => RowQueryState<TGridFilter> | undefined) | undefined,
+): RowQueryState<TGridFilter> {
+  const state = rowQueryState?.();
+  if (!state) {
+    throw new Error(
+      `compileTGridRuntimeConfig: no host query state found for level '${levelId}'.`,
+    );
   }
+  return hostBackedRowQuery(state);
+}
 
-  return undefined;
+function initialSourceOwnedQuery(
+  queryConfig: TGridLevelQueryConfig,
+  parent:
+    | {
+        defaultSort: SortDescriptor[];
+      }
+    | undefined,
+) {
+  return {
+    page: queryConfig.initialPage ?? 1,
+    pageSize: defaultPageSize(queryConfig.pageSize),
+    sort: [...(queryConfig.initialSort ?? parent?.defaultSort ?? [])],
+    filter: {
+      conditions: [...(queryConfig.initialFilters ?? [])],
+      search: queryConfig.initialSearch ?? null,
+    },
+  };
+}
+
+function buildTGridRowsRequest(args: {
+  fixedFilters: readonly FilterCondition[];
+  parentConstraint: FilterCondition | null;
+}): BuildRowsRequest<TGridFilter> {
+  // Request building is sampled for loading states, retry state, snapshots, and
+  // fetch calls. The order below makes constraints visible in a stable way:
+  // parent constraint first, fixed page constraints next, then user filters.
+  // User controls do not mutate parent or fixed constraints; they only mutate
+  // the row query that is passed into this function.
+  const parentFilters = args.parentConstraint ? [args.parentConstraint] : [];
+  return (query) => ({
+    page: query.page,
+    pageSize: query.pageSize,
+    sort: query.sort ? [...query.sort] : [],
+    filter: {
+      conditions: [
+        ...parentFilters,
+        ...args.fixedFilters,
+        ...(query.filter?.conditions ?? []),
+      ],
+      search: query.filter?.search ?? null,
+    },
+  });
 }
 
 function patchCellResponseFromTGridResult(

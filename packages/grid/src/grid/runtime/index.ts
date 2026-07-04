@@ -3,6 +3,7 @@ export { collectRowOperationTargets } from "./row-operation-targets";
 export {
   createGridRuntime,
   type GridRuntime,
+  type PageBoundaryNavigationRequest,
   type RuntimeArgs,
   type RowInteractionCommands,
 } from "./create-grid-runtime";

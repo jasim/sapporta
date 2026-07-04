@@ -4,7 +4,10 @@ import type { GridSchema } from "../../types/schema";
 import type { AncestorChain } from "./ancestor";
 import { ancestor } from "./ancestor";
 import { restGridDataSource } from "./rest-grid-source";
-import type { RestLevelSourceOpts } from "./rest-level-source";
+import {
+  sourceOwnedRowQuery,
+  type RestLevelSourceOpts,
+} from "./rest-level-source";
 
 const textColumn = (id: string, name: string) => ({
   id,
@@ -51,7 +54,7 @@ const schema: GridSchema = {
 function makeOpts(): RestLevelSourceOpts {
   return {
     fetchPage: async () => ({ nodes: [] }),
-    initialPagination: { page: 0, pageSize: 50 },
+    rowQuery: sourceOwnedRowQuery({ page: 0, pageSize: 50 }),
     serverManaged: { sort: true, filter: true, pagination: true },
   };
 }

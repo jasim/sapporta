@@ -150,7 +150,7 @@ describe("inMemoryLevelSource (writable)", () => {
     expect(snap.nodes[0].columns.id).toBe("r20");
   });
 
-  it("exposes page-boundary navigation when pagination is active", () => {
+  it("setPage resolves ready when pagination changes and unchanged for the same page", async () => {
     const many: TreeNode[] = Array.from({ length: 12 }, (_, i) => ({
       levelName: "items",
       columns: { id: `r${i}`, amount: i, name: `n${i}` },
@@ -159,16 +159,13 @@ describe("inMemoryLevelSource (writable)", () => {
       baseOpts({ initialNodes: many, initialPage: 0, initialPageSize: 5 }),
     );
 
-    expect(src.pageBoundaryNavigation?.canGoPrevious()).toBe(false);
-    expect(src.pageBoundaryNavigation?.canGoNext()).toBe(true);
-
-    src.pageBoundaryNavigation?.goNext();
+    const changed = await src.setPage(1, 5);
+    expect(changed.kind).toBe("ready");
     expect(src.state().snapshot.pagination?.page).toBe(1);
     expect(src.state().snapshot.nodes[0].columns.id).toBe("r5");
 
-    src.pageBoundaryNavigation?.goPrevious();
-    expect(src.state().snapshot.pagination?.page).toBe(0);
-    expect(src.state().snapshot.nodes[0].columns.id).toBe("r0");
+    const unchanged = await src.setPage(1, 5);
+    expect(unchanged.kind).toBe("unchanged");
   });
 
   it("setPage rejects non-integer pagination windows", () => {

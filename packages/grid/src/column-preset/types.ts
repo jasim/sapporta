@@ -9,7 +9,10 @@ import type {
 } from "../grid/types/schema";
 import type { ColId, Coord, GridPath, RowKey } from "../grid/types/identity";
 import type { SortDescriptor } from "../grid/pipeline/types";
-import type { LevelSnapshot } from "../grid/data-sources/types";
+import type {
+  LevelSnapshot,
+  SourceLoadResult,
+} from "../grid/data-sources/types";
 import type { TreeNode } from "../grid/types/level-row";
 import type { SearchLookup, ValueLookup } from "../lookup";
 import type { ColumnPreset } from "./preset";
@@ -50,10 +53,10 @@ export type SelectOption = {
 };
 
 export type GridLevelCommands<TFilter = unknown> = {
-  setSort: (sort: SortDescriptor[] | undefined) => void;
-  setFilter: (filter: TFilter | undefined) => void;
-  setPage: (page: number, pageSize: number) => void;
-  refetch: () => void;
+  setSort: (sort: SortDescriptor[] | undefined) => Promise<SourceLoadResult>;
+  setFilter: (filter: TFilter | undefined) => Promise<SourceLoadResult>;
+  setPage: (page: number, pageSize: number) => Promise<SourceLoadResult>;
+  refetch: () => Promise<SourceLoadResult>;
   createRow: (node: TreeNode, atIndex?: number) => Promise<unknown>;
   removeRow: (rowKey: RowKey) => void | Promise<void>;
   writeCell: (coord: Coord, value: unknown) => void;

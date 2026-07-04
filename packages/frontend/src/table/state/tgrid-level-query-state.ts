@@ -26,6 +26,16 @@ export type TGridLevelQueryState<
   pageSize: number;
   errorBanner: string | null;
 
+  // Source-facing setters. These mutate query state and return whether the
+  // effective query changed. They do not load rows, push URLs, or update focus.
+  // Table controls should call the command methods below, or session-level
+  // source commands when they know the concrete GridPath.
+  setSortState: (sort: SortDescriptor[]) => "changed" | "unchanged";
+  setFilterState: (filter: TGridFilter | undefined) => "changed" | "unchanged";
+  setPageState: (page: number, pageSize: number) => "changed" | "unchanged";
+
+  // UI-facing commands for root-level table controls. These commands route
+  // through the source and then sync application-visible state such as the URL.
   setSort: (sort: SortDescriptor[]) => void;
   clearSort: () => void;
   addFilter: (cond: NewFilterCondition) => void;

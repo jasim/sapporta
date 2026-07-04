@@ -61,14 +61,84 @@ import type {
   LevelDataSource,
   LevelSnapshot,
   LevelSourceState,
-  PageBoundaryNavigation,
   PatchCellRequest,
   PatchCellResponse,
   ReadonlyLevelDataSource,
   ReconcileEvent,
   RemoveNodeRequest,
+  SourceLoadResult,
   WritableLevelDataSource,
 } from "../types";
+
+export type RowQuery<F = unknown> = {
+  page: number;
+  pageSize: number;
+  sort?: SortDescriptor[];
+  filter?: F;
+};
+
+export type RowQueryChange = "changed" | "unchanged";
+
+export type RowQueryState<F = unknown> = {
+  // `current()` is sampled at command time. Hosts that keep query values in
+  // route state, Zustand, or another app store should return a fresh value
+  // that reflects the state a user sees in controls and export links.
+  current(): RowQuery<F>;
+  // Setters mutate query storage only. They do not fetch rows, push URLs, or
+  // move focus. The REST source owns the command sequence: mutate query state,
+  // decide whether server-managed data must reload, then publish the result.
+  setSort(sort: SortDescriptor[] | undefined): RowQueryChange;
+  setFilter(filter: F | undefined): RowQueryChange;
+  setPage(page: number, pageSize: number): RowQueryChange;
+};
+
+export type BuildRowsRequest<F = unknown> = (
+  query: RowQuery<F>,
+) => FetchPageRequest<F>;
+
+// Source-owned query storage is the small in-source state container used by
+// embedded grids and child levels that do not expose table controls. It stores
+// only mutable user query values. Fixed constraints belong in
+// `buildRowsRequest`, where every fetch and every snapshot can see them.
+export function sourceOwnedRowQuery<F = unknown>(
+  initial: RowQuery<F>,
+): RowQueryState<F> {
+  assertPageWindow(initial.page, initial.pageSize);
+  let query: RowQuery<F> = { ...initial };
+  return {
+    current() {
+      return { ...query };
+    },
+    setSort(sort) {
+      if (query.sort === sort) return "unchanged";
+      query = { ...query, sort };
+      return "changed";
+    },
+    setFilter(filter) {
+      if (Object.is(query.filter, filter)) return "unchanged";
+      query = { ...query, filter };
+      return "changed";
+    },
+    setPage(page, pageSize) {
+      assertPageWindow(page, pageSize);
+      if (query.page === page && query.pageSize === pageSize) {
+        return "unchanged";
+      }
+      query = { ...query, page, pageSize };
+      return "changed";
+    },
+  };
+}
+
+export function hostBackedRowQuery<F = unknown>(
+  state: RowQueryState<F>,
+): RowQueryState<F> {
+  // Host-backed query storage keeps the same command contract while the values
+  // live in application state. The returned object is deliberately transparent:
+  // the source still calls the same `current` and setter methods in the same
+  // order as it does for source-owned storage.
+  return state;
+}
 
 export type RestLevelSourceOpts<F = unknown> = {
   fetchPage: (req: FetchPageRequest<F>) => Promise<FetchPageResponse>;
@@ -76,20 +146,8 @@ export type RestLevelSourceOpts<F = unknown> = {
   insertNode?: (req: InsertNodeRequest) => Promise<TreeNode>;
   removeNode?: (req: RemoveNodeRequest) => Promise<void>;
 
-  // When provided, the source treats the host as the single owner of query
-  // state. Called on every refetch and on every snapshot build. The source
-  // carries no internal sort/filter/page state in this mode and `setSort`
-  // / `setFilter` / `setPage` become no-ops — the host updates its store
-  // and calls `refetch()` directly.
-  //
-  // When omitted, the source owns query state via its own setSort/setFilter
-  // /setPage verbs and its initial* options.
-  query?: () => FetchPageRequest<F>;
-
-  // Required when `query` is omitted; ignored when `query` is provided.
-  initialPagination?: { page: number; pageSize: number };
-  initialSort?: SortDescriptor[];
-  initialFilter?: F;
+  rowQuery: RowQueryState<F>;
+  buildRowsRequest?: BuildRowsRequest<F>;
 
   // The host's grammar-to-predicate compiler. This is the trust boundary
   // for filtering: the host owns `F` (the grammar), the host owns the
@@ -110,8 +168,6 @@ export type RestLevelSourceOpts<F = unknown> = {
   // schema's `LevelOptions.rowKey`; hosts wiring `restLevelSource` directly
   // can override. Defaults to array index.
   rowKey?: (node: TreeNode, localIdx: number) => RowKey;
-
-  pageBoundaryNavigation?: PageBoundaryNavigation;
 };
 
 export function restLevelSource<F = unknown>(
@@ -145,13 +201,7 @@ export function restLevelSource<F = unknown>(
   }
 
   const rowKeyFn = opts.rowKey ?? defaultRowKey;
-  const hostOwned = opts.query !== undefined;
-
-  if (!hostOwned && !opts.initialPagination) {
-    throw new Error(
-      "restLevelSource: initialPagination is required when `query` is not provided",
-    );
-  }
+  const buildRowsRequest = opts.buildRowsRequest ?? identityRowsRequest<F>;
 
   if (!opts.serverManaged.filter && !opts.compileFilter) {
     throw new Error(
@@ -162,16 +212,21 @@ export function restLevelSource<F = unknown>(
   let nodes: TreeNode[] = [];
   let footerRows: FooterRow[] | undefined;
   let totalCount: number | undefined;
-  let sort: SortDescriptor[] | undefined = opts.initialSort;
-  let filter: F | undefined = opts.initialFilter;
-  let page = opts.initialPagination?.page ?? 0;
-  let pageSize = opts.initialPagination?.pageSize ?? 0;
-  let displayQuery: FetchPageRequest<F> | undefined;
+  // `displayRequest` is the effective request that describes the visible
+  // snapshot. It includes host query values plus fixed filters, parent
+  // constraints, and defaults injected by `buildRowsRequest`. Loading states,
+  // retry state, pagination chrome, and client-side filter compilation all read
+  // this built request so the source state describes the rows a user is seeing.
+  let displayRequest: FetchPageRequest<F> | undefined;
 
   let cachedSnapshot: LevelSnapshot<F> | null = null;
   let committedSnapshot: LevelSnapshot<F> | null = null;
   let currentState: LevelSourceState<F> | null = null;
   let fetchToken = 0;
+  let pendingLoad: {
+    token: number;
+    resolve: (result: SourceLoadResult<F>) => void;
+  } | null = null;
 
   // Per-cell in-flight PATCH counter — supersession key. The latest token
   // is the only one whose resolution is allowed to mutate state.
@@ -183,37 +238,23 @@ export function restLevelSource<F = unknown>(
   let disposed = false;
 
   function buildSnapshot(): LevelSnapshot<F> {
-    // In host-owned mode the snapshot's query-shaped fields read from the
-    // latest `query()` so chrome that derives from the snapshot stays
-    // consistent with the host's store.
-    const q = hostOwned ? displayQuery : undefined;
-    const snapPage = q ? q.page : page;
-    const snapPageSize = q ? q.pageSize : pageSize;
+    const req = displayRequest ?? request();
     const snap: LevelSnapshot<F> = {
       nodes,
       serverManaged: opts.serverManaged,
       pagination:
         totalCount === undefined
-          ? { page: snapPage, pageSize: snapPageSize }
-          : { page: snapPage, pageSize: snapPageSize, totalCount },
+          ? { page: req.page, pageSize: req.pageSize }
+          : { page: req.page, pageSize: req.pageSize, totalCount },
     };
     if (footerRows) snap.footerRows = footerRows;
-    if (hostOwned) {
-      if (q?.sort !== undefined) snap.sort = q.sort;
-      if (q?.filter !== undefined) snap.filter = q.filter;
-    } else {
-      // Source-owned mode: the source is authoritative for `sort` / `filter`,
-      // so echo them onto the snapshot for chrome that reads off the snap.
-      if (sort) snap.sort = sort;
-      if (filter !== undefined) snap.filter = filter;
-    }
+    if (req.sort !== undefined) snap.sort = req.sort;
+    if (req.filter !== undefined) snap.filter = req.filter;
     if (!opts.serverManaged.filter) {
-      // Displayed-row derivation will run `withFilter` — supply the predicate. In
-      // host-owned mode the canonical filter lives on the latest
-      // `query()` return; in source-owned mode it's our internal `filter`.
-      // `compileFilter` is non-null here because construction throws
-      // when `serverManaged.filter === false && compileFilter === undefined`.
-      const predicate = opts.compileFilter!(hostOwned ? q?.filter : filter);
+      // Displayed-row derivation will run `withFilter` — supply the predicate.
+      // `compileFilter` is non-null here because construction throws when
+      // `serverManaged.filter === false && compileFilter === undefined`.
+      const predicate = opts.compileFilter!(req.filter);
       if (predicate) snap.applyFilter = predicate;
     }
     return snap;
@@ -225,11 +266,7 @@ export function restLevelSource<F = unknown>(
   }
 
   function request(): FetchPageRequest<F> {
-    if (opts.query) return opts.query();
-    const req: FetchPageRequest<F> = { page, pageSize };
-    if (sort) req.sort = sort;
-    if (filter !== undefined) req.filter = filter;
-    return req;
+    return buildRowsRequest(opts.rowQuery.current());
   }
 
   function state(): LevelSourceState<F> {
@@ -256,12 +293,13 @@ export function restLevelSource<F = unknown>(
     notify();
   }
 
-  function publishReady(): void {
+  function publishReady(): Extract<LevelSourceState<F>, { status: "ready" }> {
     invalidate();
     const next = snapshot();
     committedSnapshot = next;
     currentState = { status: "ready", snapshot: next };
-    publishDataMutation();
+    emit();
+    return currentState;
   }
 
   function publishDataMutation(): void {
@@ -338,10 +376,56 @@ export function restLevelSource<F = unknown>(
     return String(err);
   }
 
-  function refetch(): void {
+  function resolvePendingLoad(result: SourceLoadResult<F>): void {
+    if (!pendingLoad) return;
+    pendingLoad.resolve(result);
+    pendingLoad = null;
+  }
+
+  function resolveCurrentLoad(
+    token: number,
+    result: SourceLoadResult<F>,
+  ): void {
+    if (pendingLoad?.token !== token) return;
+    pendingLoad.resolve(result);
+    pendingLoad = null;
+  }
+
+  function publishLoadError(
+    err: unknown,
+    req: FetchPageRequest<F>,
+  ): Extract<LevelSourceState<F>, { status: "initialError" | "refreshError" }> {
+    const error = err instanceof Error ? err : new Error(reasonOf(err));
+    invalidate();
+    const display = snapshot();
+    if (committedSnapshot) {
+      currentState = {
+        status: "refreshError",
+        snapshot: display,
+        previous: committedSnapshot,
+        error,
+        retry: req,
+      };
+    } else {
+      currentState = {
+        status: "initialError",
+        snapshot: display,
+        error,
+        retry: req,
+      };
+    }
+    emit();
+    return currentState;
+  }
+
+  function refetch(): Promise<SourceLoadResult<F>> {
+    // A caller may await a page turn, refresh button, or sort command. Starting
+    // a load settles any in-flight awaited operation as `superseded`; user
+    // workflows wait only for the load whose token can still publish state.
+    resolvePendingLoad({ kind: "superseded" });
     const myToken = ++fetchToken;
     const req = request();
-    displayQuery = req;
+    displayRequest = req;
     invalidate();
     const display = snapshot();
     if (committedSnapshot) {
@@ -359,87 +443,57 @@ export function restLevelSource<F = unknown>(
       };
     }
     emit();
+    // Subscribers observe `initialLoading` or `refreshing` before the promise
+    // is returned. React hooks that subscribe to source state can render loading
+    // chrome in the same turn in which the caller receives the load promise.
+    const promise = new Promise<SourceLoadResult<F>>((resolve) => {
+      pendingLoad = { token: myToken, resolve };
+    });
     // Invoke directly — `fetchPage` returns a Promise synchronously; tests
     // and the runtime expect the host call to land before the next
     // microtask, not after a wrapping `Promise.resolve()`.
-    opts.fetchPage(req).then(
+    let fetchPromise: Promise<FetchPageResponse>;
+    try {
+      fetchPromise = opts.fetchPage(req);
+    } catch (err) {
+      if (!disposed && myToken === fetchToken) {
+        const errorState = publishLoadError(err, req);
+        resolveCurrentLoad(myToken, { kind: "error", state: errorState });
+      }
+      return promise;
+    }
+    fetchPromise.then(
       (res) => {
         if (disposed || myToken !== fetchToken) return;
         nodes = res.nodes;
         footerRows = res.footerRows;
         totalCount = res.totalCount;
-        publishReady();
+        const readyState = publishReady();
+        resolveCurrentLoad(myToken, { kind: "ready", state: readyState });
       },
       (err) => {
         if (disposed || myToken !== fetchToken) return;
-        const error = err instanceof Error ? err : new Error(reasonOf(err));
-        invalidate();
-        const display = snapshot();
-        if (committedSnapshot) {
-          currentState = {
-            status: "refreshError",
-            snapshot: display,
-            previous: committedSnapshot,
-            error,
-            retry: req,
-          };
-        } else {
-          currentState = {
-            status: "initialError",
-            snapshot: display,
-            error,
-            retry: req,
-          };
-        }
-        emit();
+        const errorState = publishLoadError(err, req);
+        resolveCurrentLoad(myToken, { kind: "error", state: errorState });
       },
     );
-  }
-
-  function setSourceOwnedPage(p: number, ps: number): void {
-    if (hostOwned) return;
-    assertPageWindow(p, ps);
-    if (page === p && pageSize === ps) return;
-    page = p;
-    pageSize = ps;
-    if (opts.serverManaged.pagination) {
-      refetch();
-    } else {
-      publishReady();
-    }
+    return promise;
   }
 
   // Initial fetch — every REST source starts in `loading`.
-  refetch();
+  void refetch();
 
-  function sourceOwnedPageBoundaryNavigation():
-    | PageBoundaryNavigation
-    | undefined {
-    if (hostOwned) return undefined;
-    // For a REST-backed table that owns its paging controls, boundary keys
-    // should behave like the visible pagination buttons: enabled only when the
-    // current page has finished loading and another page is known to exist.
-    return {
-      canGoPrevious: () => currentState?.status === "ready" && page > 0,
-      canGoNext: () => {
-        if (currentState?.status !== "ready") return false;
-        if (!Number.isFinite(pageSize)) return false;
-        if (totalCount !== undefined) {
-          return (page + 1) * pageSize < totalCount;
-        }
-        return nodes.length >= pageSize;
-      },
-      goPrevious: () => {
-        if (currentState?.status !== "ready") return;
-        if (page <= 0) return;
-        setSourceOwnedPage(page - 1, pageSize);
-      },
-      goNext: () => {
-        if (currentState?.status !== "ready") return;
-        if (!Number.isFinite(pageSize)) return;
-        setSourceOwnedPage(page + 1, pageSize);
-      },
-    };
+  function readyResult(): Promise<SourceLoadResult<F>> {
+    // Client-managed sort, filter, and pagination do not call `fetchPage`.
+    // They still publish a fresh ready state so displayed-row derivation and
+    // chrome read the new effective request before the command promise settles.
+    displayRequest = request();
+    const readyState = publishReady();
+    return Promise.resolve({ kind: "ready", state: readyState });
+  }
+
+  function unchangedResult(): Promise<SourceLoadResult<F>> {
+    return Promise.resolve({ kind: "unchanged", state: state() });
   }
 
   const read: ReadonlyLevelDataSource = {
@@ -452,45 +506,37 @@ export function restLevelSource<F = unknown>(
       };
     },
     setSort(s) {
-      // Host-owned mode: the host owns query state and calls `refetch()`
-      // directly after mutating its store. The verb is a no-op so the
-      // `LevelDataSource` interface stays uniform without forcing
-      // host-owned sources to expose verbs they would never use.
-      if (hostOwned) return;
-      if (sort === s) return;
-      sort = s;
-      if (opts.serverManaged.sort) {
-        refetch();
-      } else {
-        publishReady();
-      }
+      const changed = opts.rowQuery.setSort(s);
+      if (changed === "unchanged") return unchangedResult();
+      if (opts.serverManaged.sort) return refetch();
+      return readyResult();
     },
     setFilter(f) {
-      if (hostOwned) return;
       // The cross-source `LevelDataSource.setFilter` accepts `unknown` so
       // the runtime can wire any source uniformly; this concrete source
       // was typed at construction over `F`, so the cast lands the value
       // back into the source's grammar slot. There is no validation —
       // `F` is opaque to the grid by design.
       const next = f as F | undefined;
-      if (filter === next) return;
-      filter = next;
-      if (opts.serverManaged.filter) {
-        refetch();
-      } else {
-        publishReady();
-      }
+      const changed = opts.rowQuery.setFilter(next);
+      if (changed === "unchanged") return unchangedResult();
+      if (opts.serverManaged.filter) return refetch();
+      return readyResult();
     },
     setPage(p, ps) {
-      setSourceOwnedPage(p, ps);
+      assertPageWindow(p, ps);
+      const changed = opts.rowQuery.setPage(p, ps);
+      if (changed === "unchanged") return unchangedResult();
+      if (opts.serverManaged.pagination) return refetch();
+      return readyResult();
     },
     refetch,
-    pageBoundaryNavigation:
-      opts.pageBoundaryNavigation ?? sourceOwnedPageBoundaryNavigation(),
     dispose() {
       disposed = true;
-      // Bump tokens so any still-pending resolution short-circuits.
+      // Disposal is observable to awaiting callers. Tokens prevent late network
+      // callbacks from publishing rows or errors after subscribers are cleared.
       fetchToken++;
+      resolvePendingLoad({ kind: "disposed" });
       cellTokens.clear();
       subs.clear();
       reconcileSubs.clear();
@@ -594,7 +640,7 @@ export function restLevelSource<F = unknown>(
           });
           return;
         case "reload":
-          refetch();
+          void refetch();
           emitReconcile({
             kind: "agreed",
             rowKey,
@@ -870,7 +916,6 @@ export function restLevelSource<F = unknown>(
     setFilter: read.setFilter,
     setPage: read.setPage,
     refetch: read.refetch,
-    pageBoundaryNavigation: read.pageBoundaryNavigation,
     dispose: read.dispose,
     setCell,
     applyChanges,
@@ -892,4 +937,8 @@ function assertPageWindow(page: number, pageSize: number): void {
     min: 1,
     makeError: (message) => new Error(message),
   });
+}
+
+function identityRowsRequest<F>(query: RowQuery<F>): FetchPageRequest<F> {
+  return query;
 }

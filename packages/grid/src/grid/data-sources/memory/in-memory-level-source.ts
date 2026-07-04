@@ -56,9 +56,9 @@ import { assertBoundedInteger } from "@sapporta/shared/validation";
 import type {
   LevelSnapshot,
   LevelSourceState,
-  PageBoundaryNavigation,
   ReadonlyLevelDataSource,
   ReconcileEvent,
+  SourceLoadResult,
   WritableLevelDataSource,
 } from "../types";
 
@@ -106,9 +106,8 @@ const SERVER_MANAGED = Object.freeze({
 
 type Core<F> = {
   read: ReadonlyLevelDataSource;
-  // Edit verbs — present only on writable sources, but built here so the
-  // readonly factory can simply omit them rather than wire a separate
-  // implementation.
+  // Edit verbs are present only on writable sources. The readonly factory omits
+  // these verbs; the writable factory attaches this same implementation.
   setCell: WritableLevelDataSource["setCell"];
   applyChanges: WritableLevelDataSource["applyChanges"];
   createNode: WritableLevelDataSource["createNode"];
@@ -294,14 +293,33 @@ function buildCore<F>(opts: InMemoryLevelSourceOpts<F>): Core<F> {
     return idx;
   }
 
-  function setClientPage(p: number, ps: number): void {
-    if (opts.paginationMode === "none") return;
+  function setClientPage(p: number, ps: number): "changed" | "unchanged" {
+    if (opts.paginationMode === "none") return "unchanged";
     assertPageWindow(p, ps);
-    if (page === p && pageSize === ps) return;
+    if (page === p && pageSize === ps) return "unchanged";
     page = p;
     pageSize = ps;
     invalidate();
     notify();
+    return "changed";
+  }
+
+  function readyResult(): Promise<SourceLoadResult<F>> {
+    // In-memory commands publish synchronously because all rows are local.
+    // The resolved promise keeps the same caller contract as REST sources:
+    // after `await source.setPage(...)`, `state()` already exposes the
+    // recomputed ready snapshot.
+    ensureFresh();
+    const state = cachedState!;
+    if (state.status !== "ready") {
+      throw new Error("inMemoryLevelSource: expected ready state");
+    }
+    return Promise.resolve({ kind: "ready", state });
+  }
+
+  function unchangedResult(): Promise<SourceLoadResult<F>> {
+    ensureFresh();
+    return Promise.resolve({ kind: "unchanged", state: cachedState! });
   }
 
   function applyOne(rowKey: RowKey, colId: ColId, value: unknown): void {
@@ -326,52 +344,32 @@ function buildCore<F>(opts: InMemoryLevelSourceOpts<F>): Core<F> {
       };
     },
     setSort(s) {
-      if (opts.sortMode === "none") return;
-      if (sort === s) return;
+      if (opts.sortMode === "none") return unchangedResult();
+      if (sort === s) return unchangedResult();
       sort = s;
       invalidate();
       notify();
+      return readyResult();
     },
     setFilter(f) {
-      if (opts.filterMode === "none") return;
+      if (opts.filterMode === "none") return unchangedResult();
       // `LevelDataSource.setFilter` is `unknown` to keep the cross-source
       // surface uniform; this source was typed at construction over `F`.
       const next = f as F | undefined;
-      if (filter === next) return;
+      if (filter === next) return unchangedResult();
       filter = next;
       invalidate();
       notify();
+      return readyResult();
     },
     setPage(p, ps) {
-      setClientPage(p, ps);
+      const changed = setClientPage(p, ps);
+      return changed === "changed" ? readyResult() : unchangedResult();
     },
     refetch() {
       // No upstream — refetch is a no-op for in-memory sources.
+      return unchangedResult();
     },
-    pageBoundaryNavigation:
-      opts.paginationMode === "client"
-        ? {
-            canGoPrevious: () => page > 0,
-            canGoNext: () => {
-              // In-memory tables can filter and sort before paging. Use the
-              // same published row window the user sees when deciding whether
-              // PageDown can move to another page.
-              ensureFresh();
-              const totalCount = cachedSnapshot!.pagination?.totalCount ?? 0;
-              return Number.isFinite(pageSize)
-                ? (page + 1) * pageSize < totalCount
-                : false;
-            },
-            goPrevious: () => {
-              if (page <= 0) return;
-              setClientPage(page - 1, pageSize);
-            },
-            goNext: () => {
-              if (!Number.isFinite(pageSize)) return;
-              setClientPage(page + 1, pageSize);
-            },
-          }
-        : undefined,
     dispose() {
       disposed = true;
       subs.clear();
@@ -460,7 +458,6 @@ export function inMemoryLevelSource<F = unknown>(
     setFilter: core.read.setFilter,
     setPage: core.read.setPage,
     refetch: core.read.refetch,
-    pageBoundaryNavigation: core.read.pageBoundaryNavigation,
     dispose: core.read.dispose,
     setCell: core.setCell,
     applyChanges: core.applyChanges,
@@ -485,7 +482,6 @@ export function inMemoryReadonlyLevelSource<F = unknown>(
     setFilter: core.read.setFilter,
     setPage: core.read.setPage,
     refetch: core.read.refetch,
-    pageBoundaryNavigation: core.read.pageBoundaryNavigation,
     dispose: core.read.dispose,
   };
 }

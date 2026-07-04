@@ -373,6 +373,7 @@ export {
   createGridRuntime,
   createTableController,
   type GridRuntime,
+  type PageBoundaryNavigationRequest,
   type RuntimeArgs,
   type RowInteractionCommands,
   type RowInteractionSnapshot,
@@ -410,7 +411,12 @@ export {
   type GridPresentation,
 } from "./react";
 
-export { inMemoryGridDataSource, restGridDataSource } from "./data-sources";
+export {
+  hostBackedRowQuery,
+  inMemoryGridDataSource,
+  restGridDataSource,
+  sourceOwnedRowQuery,
+} from "./data-sources";
 export {
   createDisplayedRowsStore,
   buildDisplayedRowSequence,
@@ -429,10 +435,10 @@ export type {
   LevelSnapshot,
   LevelSourceState,
   LevelRequest,
+  SourceLoadResult,
   CellChange,
   CreateNodeResult,
   ReconcileEvent,
-  PageBoundaryNavigation,
   ReadonlyLevelDataSource,
   WritableLevelDataSource,
   LevelDataSource,
@@ -444,7 +450,11 @@ export type {
   InMemoryLevelOpts,
   RestGridDataSourceOpts,
   RestEndpointFactory,
+  BuildRowsRequest,
   PatchCellResponse,
+  RowQuery,
+  RowQueryChange,
+  RowQueryState,
 } from "./data-sources";
 
 export type {

@@ -140,6 +140,7 @@ import type {
   LevelSourceState,
   LevelStatus,
   RuntimeLevelDataSource,
+  SourceLoadResult,
   WritableLevelDataSource,
 } from "../data-sources/types";
 import {
@@ -181,6 +182,19 @@ export type RuntimeArgs = {
   interaction?: GridInteractionConfig;
   initialPhantomsByPath?: Map<GridPath, PhantomRow[]>;
   phantomRows?: PhantomRowsConfig;
+  // A host can own displayed-row edge policy for paged tables. The runtime
+  // provides the exact source, path, and ready state at the edge. The host
+  // starts the source command and returns its load promise. Returning `false`
+  // is authoritative: the host considered the edge and declined the page turn.
+  // The runtime must not infer another page number because
+  // `snapshot.pagination.page` does not encode whether the source uses 0-based
+  // or 1-based pages. After a ready result, the runtime samples displayed rows
+  // and moves the cursor according to the original key request.
+  onPageBoundaryNavigation?: (args: {
+    navigation: PageBoundaryNavigationRequest;
+    source: RuntimeLevelDataSource;
+    state: Extract<LevelSourceState, { status: "ready" }>;
+  }) => Promise<SourceLoadResult> | false;
   on?: { [E in keyof GridEvents]?: (payload: GridEvents[E]) => void };
 };
 
@@ -285,7 +299,7 @@ export type GridRuntime = {
   ) => CellCursor | null;
   phantomBoundaryRowTarget: (path: GridPath) => RowCursor | null;
   requestPageBoundaryNavigation: (
-    navigation: PendingPageBoundaryNavigation,
+    navigation: PageBoundaryNavigationRequest,
   ) => boolean;
 
   on: GridEmitter["on"];
@@ -309,7 +323,7 @@ type PendingPhantomCreate = {
   atIndex?: number;
 };
 
-type PendingPageBoundaryNavigation =
+export type PageBoundaryNavigationRequest =
   | {
       kind: "cell";
       path: GridPath;
@@ -324,6 +338,8 @@ type PendingPageBoundaryNavigation =
       direction: "next" | "previous";
       extend: boolean;
     };
+
+type PendingPageBoundaryNavigation = PageBoundaryNavigationRequest;
 
 export function createGridRuntime(args: RuntimeArgs): GridRuntime {
   const { schema, dataSource } = args;
@@ -408,9 +424,8 @@ export function createGridRuntime(args: RuntimeArgs): GridRuntime {
   const schemaCache = new Map<GridPath, LevelSchema>();
 
   // useSyncExternalStore-style subscribers fired on every registry-key
-  // change. Replaces the old `subscribePathTopology` — consumers who
-  // previously rebuilt a topology now re-read whatever they need
-  // (commonly `materializedChildren`) on the next tick.
+  // change. Consumers re-read the path-derived view they need, commonly
+  // `materializedChildren`, on the next tick.
   const registryListeners = new Set<() => void>();
   let registeredPathSnapshot: GridPath[] | null = null;
 
@@ -688,25 +703,75 @@ export function createGridRuntime(args: RuntimeArgs): GridRuntime {
     const src = sources.get(navigation.path);
     if (!src) return false;
     // While a page is loading, repeated key presses should not skip ahead based
-    // on old page counts. Wait until the app's latest rows are settled before
+    // on stale page counts. Wait until the app's latest rows are settled before
     // accepting another boundary turn.
-    if (src.state().status !== "ready") return false;
-    const pageNavigation = src.pageBoundaryNavigation;
-    if (!pageNavigation) return false;
-    const canTurn =
-      navigation.direction === "next"
-        ? pageNavigation.canGoNext()
-        : pageNavigation.canGoPrevious();
-    if (!canTurn) return false;
-    // Apps may store page state locally, in route state, or behind custom
-    // controls. Use the same page-turn hook as those controls, then finish the
-    // keyboard move when the new rows arrive.
-    pendingPageBoundaryNavigation = navigation;
-    if (navigation.direction === "next") {
-      pageNavigation.goNext();
-    } else {
-      pageNavigation.goPrevious();
+    const state = src.state();
+    if (state.status !== "ready") return false;
+    // When installed, the host hook owns boundary policy for this runtime. A
+    // falsy return is a deliberate "no turn", not permission to fall through to
+    // the generic 0-based fallback below.
+    if (args.onPageBoundaryNavigation) {
+      const hostLoad = args.onPageBoundaryNavigation({
+        navigation,
+        source: sourceFor(navigation.path),
+        state,
+      });
+      if (!hostLoad) return false;
+      pendingPageBoundaryNavigation = navigation;
+      void hostLoad.then((result) => {
+        if (result.kind === "ready") {
+          resolvePendingPageBoundaryNavigation(navigation.path);
+          return;
+        }
+        if (pendingPageBoundaryNavigation === navigation) {
+          pendingPageBoundaryNavigation = null;
+        }
+      });
+      return true;
     }
+    // The fallback covers sources whose snapshot pagination is directly
+    // commandable by `setPage`. It treats `snapshot.pagination.page` as the
+    // source's own page coordinate and performs no route or application-state
+    // updates. Hosts that use a different page coordinate should handle the edge
+    // in `onPageBoundaryNavigation`.
+    const pagination = state.snapshot.pagination;
+    if (!pagination) return false;
+    if (!Number.isFinite(pagination.pageSize)) return false;
+    const nextPage =
+      navigation.direction === "next"
+        ? pagination.page + 1
+        : pagination.page - 1;
+    if (nextPage < 0) return false;
+    if (
+      navigation.direction === "next" &&
+      pagination.totalCount !== undefined &&
+      (pagination.page + 1) * pagination.pageSize >= pagination.totalCount
+    ) {
+      return false;
+    }
+    if (
+      navigation.direction === "next" &&
+      pagination.totalCount === undefined &&
+      state.snapshot.nodes.length < pagination.pageSize
+    ) {
+      return false;
+    }
+    // The source promise marks the data load boundary only. The runtime waits
+    // for a ready result, then samples displayed rows synchronously and lands
+    // focus. Loading failures and unchanged results leave the cursor where it
+    // started.
+    pendingPageBoundaryNavigation = navigation;
+    void src
+      .setPage(nextPage, pagination.pageSize)
+      .then((result: SourceLoadResult) => {
+        if (result.kind === "ready") {
+          resolvePendingPageBoundaryNavigation(navigation.path);
+          return;
+        }
+        if (pendingPageBoundaryNavigation === navigation) {
+          pendingPageBoundaryNavigation = null;
+        }
+      });
     return true;
   }
 
@@ -830,40 +895,20 @@ export function createGridRuntime(args: RuntimeArgs): GridRuntime {
       },
       setSort: (sort) => {
         assertLive();
-        src.setSort(sort);
+        return src.setSort(sort);
       },
       setFilter: (filter) => {
         assertLive();
-        src.setFilter(filter);
+        return src.setFilter(filter);
       },
       setPage: (page, pageSize) => {
         assertLive();
-        src.setPage(page, pageSize);
+        return src.setPage(page, pageSize);
       },
       refetch: () => {
         assertLive();
-        src.refetch();
+        return src.refetch();
       },
-      pageBoundaryNavigation: src.pageBoundaryNavigation
-        ? {
-            canGoPrevious: () => {
-              assertLive();
-              return src.pageBoundaryNavigation?.canGoPrevious() ?? false;
-            },
-            canGoNext: () => {
-              assertLive();
-              return src.pageBoundaryNavigation?.canGoNext() ?? false;
-            },
-            goPrevious: () => {
-              assertLive();
-              src.pageBoundaryNavigation?.goPrevious();
-            },
-            goNext: () => {
-              assertLive();
-              src.pageBoundaryNavigation?.goNext();
-            },
-          }
-        : undefined,
       onReconcile(fn) {
         assertLive();
         if (!src.writable) return () => {};
@@ -989,9 +1034,9 @@ export function createGridRuntime(args: RuntimeArgs): GridRuntime {
     const src = requireWritable(path);
     const levelSchema = schemaForPath(path);
     const snapshot = src.state().snapshot;
-    // Read prior values BEFORE the source applies the change — once
-    // applyChanges returns, the snapshot will reflect the writes and
-    // we can no longer recover the priors for the events.
+    // Read prior values BEFORE the source applies the change. Once
+    // applyChanges returns, the snapshot reflects the writes and the prior
+    // values are unavailable for mutation events.
     const priors = changes.map((c) =>
       readCellValue(snapshot, levelSchema, c.rowKey, c.colId),
     );

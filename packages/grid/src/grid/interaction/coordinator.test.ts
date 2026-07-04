@@ -6,6 +6,7 @@ import type {
   GridDataSource,
   LevelDataSource,
   LevelSnapshot,
+  SourceLoadResult,
 } from "../data-sources/types";
 import { childPath, makeRowId, rootPath } from "../types/identity";
 import type { GridPath, RowId } from "../types/identity";
@@ -210,29 +211,14 @@ function pagedRootDataSource(
         subscribers.delete(fn);
       };
     },
-    setSort: () => {},
-    setFilter: () => {},
+    setSort: () => readyLoadResult(source.state()),
+    setFilter: () => readyLoadResult(source.state()),
     setPage: (nextPage) => {
       page = nextPage;
       publish();
+      return readyLoadResult(source.state());
     },
-    refetch: () => {},
-    pageBoundaryNavigation: {
-      canGoPrevious: () => page > 0,
-      canGoNext: () => page < pages.length - 1,
-      goPrevious: () => {
-        if (page > 0) {
-          page -= 1;
-          publish();
-        }
-      },
-      goNext: () => {
-        if (page < pages.length - 1) {
-          page += 1;
-          publish();
-        }
-      },
-    },
+    refetch: () => readyLoadResult(source.state()),
     dispose: () => {
       subscribers.clear();
     },
@@ -244,6 +230,15 @@ function pagedRootDataSource(
     },
     dispose: source.dispose,
   };
+}
+
+function readyLoadResult(
+  state: ReturnType<LevelDataSource["state"]>,
+): Promise<SourceLoadResult> {
+  if (state.status !== "ready") {
+    return Promise.resolve({ kind: "unchanged", state });
+  }
+  return Promise.resolve({ kind: "ready", state });
 }
 
 function pagedRuntime(
@@ -439,7 +434,7 @@ describe("GridCoordinator", () => {
 
   it("ArrowUp at the first loaded cell turns to the previous page and focuses its last row", () => {
     const rt = pagedRuntime();
-    rt.sourceFor(root).pageBoundaryNavigation?.goNext();
+    rt.sourceFor(root).setPage(1, 1);
     const second = {
       path: root,
       rowId: makeRowId(root, "Veg"),
@@ -549,7 +544,7 @@ describe("GridCoordinator", () => {
         { levelName: "cat", columns: { name: "Veg" } },
       ],
     ]);
-    rt.sourceFor(root).pageBoundaryNavigation?.goNext();
+    rt.sourceFor(root).setPage(1, 1);
     rt.cursorManager.moveCellCursorTo({
       path: root,
       rowId: makeRowId(root, "Veg"),
@@ -698,7 +693,7 @@ describe("GridCoordinator", () => {
       ],
       ROW_MULTISELECT_LIST,
     );
-    rt.sourceFor(root).pageBoundaryNavigation?.goNext();
+    rt.sourceFor(root).setPage(1, 1);
     rt.cursorManager.moveRowCursorTo({
       path: root,
       rowId: makeRowId(root, "Veg"),

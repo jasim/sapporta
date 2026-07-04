@@ -99,9 +99,9 @@ export type LevelStatus = LevelSourceState["status"];
 //
 // They are orthogonal because they answer orthogonal questions: "what is
 // the host's current filter state?" vs. "how does the pipeline drop rows
-// right now?" Conflating them was the previous design's bug — a single
-// `Record<ColId, predicate>` shape served both roles and forced any host
-// with a richer wire grammar to smuggle data past the contract.
+// right now?" The host filter state travels as data, while displayed-row
+// derivation consumes executable behavior. A host can keep a rich wire
+// grammar and still give the grid a plain predicate for local filtering.
 export type LevelSnapshot<F = unknown> = {
   // The nodes displayed-row derivation sees. Already windowed/sorted/filtered
   // if the source declared those concerns server-managed. Identity-stable.
@@ -163,6 +163,27 @@ export type LevelSourceState<F = unknown> =
       retry: LevelRequest<F>;
     };
 
+export type SourceLoadResult<F = unknown> =
+  // A source command promise resolves after the source has published the state
+  // that the caller can observe through `state()` and subscriptions. The result
+  // describes the data-source load only. It does not describe React rendering,
+  // DOM focus, scroll position, URL state, or any host workflow that may run
+  // after the load settles.
+  | {
+      kind: "ready";
+      state: Extract<LevelSourceState<F>, { status: "ready" }>;
+    }
+  | {
+      kind: "error";
+      state: Extract<
+        LevelSourceState<F>,
+        { status: "initialError" | "refreshError" }
+      >;
+    }
+  | { kind: "unchanged"; state: LevelSourceState<F> }
+  | { kind: "superseded" }
+  | { kind: "disposed" };
+
 export type CellChange = { rowKey: RowKey; colId: ColId; value: unknown };
 
 export type CreateNodeResult = {
@@ -208,13 +229,6 @@ export type ReconcileEvent =
       priorValue: unknown;
     };
 
-export type PageBoundaryNavigation = {
-  canGoPrevious(): boolean;
-  canGoNext(): boolean;
-  goPrevious(): void;
-  goNext(): void;
-};
-
 // Read surface — every source has this. Sources that cannot mutate stop
 // here. The grid statically knows not to show edit affordances for them.
 //
@@ -226,9 +240,9 @@ export type PageBoundaryNavigation = {
 // any source uniformly regardless of grammar, so the cross-source contract
 // erases `F` to `unknown` here. Type-safe filter wiring lives one layer up:
 // `RestLevelSourceOpts<F>` / `InMemoryLevelSourceOpts<F>` thread `F` through
-// `query()` and `fetchPage(req)`, and the source's internal state is typed
-// over `F`. The runtime never reads `setFilter`'s argument; only the host
-// (which knows its own grammar) does.
+// row-query storage, request building, and local filter compilation. The
+// source's internal state is typed over `F`. The runtime never reads
+// `setFilter`'s argument; only the host, which knows its own grammar, does.
 export type ReadonlyLevelDataSource = {
   writable: false;
   state(): LevelSourceState;
@@ -236,15 +250,18 @@ export type ReadonlyLevelDataSource = {
   // consumers re-read `state()` after the callback fires. Returns an
   // unsubscribe function.
   subscribe(fn: () => void): () => void;
-  setSort: (s?: SortDescriptor[]) => void;
+  // Query commands update the source's effective query state before they load
+  // or recompute rows. Subscribers run synchronously when state changes. The
+  // promise resolves after the source has published the resulting state or has
+  // established that nothing changed.
+  setSort: (s?: SortDescriptor[]) => Promise<SourceLoadResult>;
   // `unknown` here is the cross-source contract's type erasure (see the
   // type comment above). A typed source casts internally; an untyped caller
   // can pass anything but cannot meaningfully construct one without knowing
   // the grammar.
-  setFilter: (f?: unknown) => void;
-  setPage: (page: number, pageSize: number) => void;
-  refetch: () => void;
-  pageBoundaryNavigation?: PageBoundaryNavigation;
+  setFilter: (f?: unknown) => Promise<SourceLoadResult>;
+  setPage: (page: number, pageSize: number) => Promise<SourceLoadResult>;
+  refetch: () => Promise<SourceLoadResult>;
   // Tear down the source. After dispose, `subscribe` callbacks must NOT
   // fire — the source is expected to drop its subscriber list on dispose
   // rather than emit a final synthetic event.
@@ -354,8 +371,8 @@ export type PatchCellRequest = {
 };
 
 // `patchCell` can return the authoritative cell value, a row patch, a full
-// row replacement, or request a reload. The simple `{ value }` shape remains
-// supported for low-level sources and legacy table updates.
+// row replacement, or request a reload. The simple `{ value }` shape is the
+// source-level contract for direct cell updates.
 export type PatchCellResponse =
   | { value: unknown }
   | { kind: "value"; value: unknown }

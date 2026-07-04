@@ -4,13 +4,16 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { act, createElement, isValidElement, type ReactElement } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import type { Row, TableSchema } from "@sapporta/shared/contracts";
-import { eqCondition } from "@sapporta/shared/filter";
+import { eqCondition, type FilterCondition } from "@sapporta/shared/filter";
 import type {
+  FetchPageRequest,
   CellEditorProps,
   CellEditorStart,
   GridRuntime,
   LevelRow,
   RestEndpointFactory,
+  RowQueryState,
+  SortDescriptor,
 } from "@sapporta/grid";
 import { ExpandableCellFrame } from "@sapporta/grid";
 import { makeRowId, rootPath } from "@sapporta/grid";
@@ -46,6 +49,54 @@ type RowsByLevel = {
   "orders.lines": LineRow;
   "orders.lines.allocations": AllocationRow;
 };
+
+function makeHostRowQueryState(seed: {
+  page: number;
+  pageSize: number;
+  sort: readonly SortDescriptor[];
+  filters: readonly FilterCondition[];
+  search: string | null;
+}): RowQueryState<TGridFilter> {
+  let state = {
+    page: seed.page,
+    pageSize: seed.pageSize,
+    sort: [...seed.sort],
+    filters: [...seed.filters],
+    search: seed.search,
+  };
+  return {
+    current: () => ({
+      page: state.page,
+      pageSize: state.pageSize,
+      sort: [...state.sort],
+      filter: { conditions: [...state.filters], search: state.search },
+    }),
+    setSort: (sort) => {
+      state = { ...state, sort: sort ? [...sort] : [], page: 1 };
+      return "changed";
+    },
+    setFilter: (filter) => {
+      state = {
+        ...state,
+        filters: [...(filter?.conditions ?? [])],
+        search: filter?.search ?? null,
+        page: 1,
+      };
+      return "changed";
+    },
+    setPage: (page, pageSize) => {
+      state = { ...state, page, pageSize };
+      return "changed";
+    },
+  };
+}
+
+function rowsRequest(
+  endpoint: ReturnType<RestEndpointFactory<TGridFilter>>,
+): FetchPageRequest<TGridFilter> {
+  const buildRowsRequest = endpoint.buildRowsRequest ?? ((query) => query);
+  return buildRowsRequest(endpoint.rowQuery.current());
+}
 
 describe("compileTGridRuntimeConfig", () => {
   let mounted: { root: Root; container: HTMLElement } | null = null;
@@ -172,13 +223,14 @@ describe("compileTGridRuntimeConfig", () => {
         },
       },
       columnMapper: createTGridColumnMapper(lookupResolver),
-      hostQueryState: () => ({
-        page: 2,
-        pageSize: 25,
-        sort: [{ colId: "customer", direction: "asc" }],
-        filters: [],
-        search: "acme",
-      }),
+      hostRowQueryState: () =>
+        makeHostRowQueryState({
+          page: 2,
+          pageSize: 25,
+          sort: [{ colId: "customer", direction: "asc" }],
+          filters: [],
+          search: "acme",
+        }),
     });
   }
 
@@ -260,13 +312,14 @@ describe("compileTGridRuntimeConfig", () => {
         },
       },
       columnMapper: createTGridColumnMapper(lookupResolver),
-      hostQueryState: () => ({
-        page: 1,
-        pageSize: 25,
-        sort: [],
-        filters: [],
-        search: null,
-      }),
+      hostRowQueryState: () =>
+        makeHostRowQueryState({
+          page: 1,
+          pageSize: 25,
+          sort: [],
+          filters: [],
+          search: null,
+        }),
     });
 
     expect(config.gridSchema.levels.orders.columns.map((c) => c.id)).toEqual([
@@ -315,13 +368,14 @@ describe("compileTGridRuntimeConfig", () => {
         },
       },
       columnMapper: createTGridColumnMapper(lookupResolver),
-      hostQueryState: () => ({
-        page: 1,
-        pageSize: 25,
-        sort: [],
-        filters: [],
-        search: null,
-      }),
+      hostRowQueryState: () =>
+        makeHostRowQueryState({
+          page: 1,
+          pageSize: 25,
+          sort: [],
+          filters: [],
+          search: null,
+        }),
     });
 
     expect(
@@ -378,7 +432,7 @@ describe("compileTGridRuntimeConfig", () => {
       ancestors: [{ levelName: "orders", rowKey: "7" as never }],
     });
 
-    await endpoint.fetchPage(endpoint.query!());
+    await endpoint.fetchPage(rowsRequest(endpoint));
 
     expect(fetch).toHaveBeenCalledWith({
       tableName: "lines",
@@ -438,17 +492,18 @@ describe("compileTGridRuntimeConfig", () => {
         },
       },
       columnMapper: createTGridColumnMapper(lookupResolver),
-      hostQueryState: () => ({
-        page: 1,
-        pageSize: 25,
-        sort: [],
-        filters: [userFilter],
-        search: null,
-      }),
+      hostRowQueryState: () =>
+        makeHostRowQueryState({
+          page: 1,
+          pageSize: 25,
+          sort: [],
+          filters: [userFilter],
+          search: null,
+        }),
     });
 
     const endpoint = config.endpointFactoriesByLevel.orders({ ancestors: [] });
-    await endpoint.fetchPage(endpoint.query!());
+    await endpoint.fetchPage(rowsRequest(endpoint));
 
     expect(fetch).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -530,20 +585,21 @@ describe("compileTGridRuntimeConfig", () => {
         },
       },
       columnMapper: createTGridColumnMapper(lookupResolver),
-      hostQueryState: () => ({
-        page: 1,
-        pageSize: 25,
-        sort: [],
-        filters: [],
-        search: null,
-      }),
+      hostRowQueryState: () =>
+        makeHostRowQueryState({
+          page: 1,
+          pageSize: 25,
+          sort: [],
+          filters: [],
+          search: null,
+        }),
     });
 
     const endpoint = config.endpointFactoriesByLevel["orders.lines"]({
       ancestors: [{ levelName: "orders", rowKey: "7" as never }],
     });
 
-    await endpoint.fetchPage(endpoint.query!());
+    await endpoint.fetchPage(rowsRequest(endpoint));
 
     expect(fetch).toHaveBeenCalledWith(
       expect.objectContaining({ page: 3, limit: 10 }),
@@ -581,20 +637,21 @@ describe("compileTGridRuntimeConfig", () => {
         },
       },
       columnMapper: createTGridColumnMapper(lookupResolver),
-      hostQueryState: () => ({
-        page: 1,
-        pageSize: 25,
-        sort: [],
-        filters: [],
-        search: null,
-      }),
+      hostRowQueryState: () =>
+        makeHostRowQueryState({
+          page: 1,
+          pageSize: 25,
+          sort: [],
+          filters: [],
+          search: null,
+        }),
     });
 
     const endpoint = config.endpointFactoriesByLevel["orders.lines"]({
       ancestors: [{ levelName: "orders", rowKey: "7" as never }],
     });
 
-    expect(endpoint.query!().sort).toEqual([
+    expect(rowsRequest(endpoint).sort).toEqual([
       { colId: "sku", direction: "desc" },
     ]);
   });
@@ -678,13 +735,14 @@ describe("compileTGridRuntimeConfig", () => {
       },
       columnMapper: createTGridColumnMapper(lookupResolver),
       sessionContext: () => session,
-      hostQueryState: () => ({
-        page: 1,
-        pageSize: 25,
-        sort: [],
-        filters: [],
-        search: null,
-      }),
+      hostRowQueryState: () =>
+        makeHostRowQueryState({
+          page: 1,
+          pageSize: 25,
+          sort: [],
+          filters: [],
+          search: null,
+        }),
     });
 
     expect(config.gridSchema.levels.orders.columns.map((c) => c.id)).toEqual([
@@ -775,13 +833,14 @@ describe("compileTGridRuntimeConfig", () => {
       },
       columnMapper: createTGridColumnMapper(lookupResolver),
       sessionContext: () => session,
-      hostQueryState: () => ({
-        page: 1,
-        pageSize: 25,
-        sort: [],
-        filters: [],
-        search: null,
-      }),
+      hostRowQueryState: () =>
+        makeHostRowQueryState({
+          page: 1,
+          pageSize: 25,
+          sort: [],
+          filters: [],
+          search: null,
+        }),
     });
     const editor = config.gridSchema.levels.orders.columns[0].edit?.editor;
     expect(editor).toBeDefined();

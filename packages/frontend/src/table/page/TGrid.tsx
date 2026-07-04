@@ -87,14 +87,22 @@ export function TGrid<
       {
         renderColumnHeaderMenu: renderTGridHeaderMenu,
         commandOverrides: (level) => {
-          const queryStore = sessionContext.levels[
-            runtime.schemaAt(level.path).name
-          ]?.queryStore as { getState(): TGridLevelQueryState } | undefined;
+          const levelId = runtime.schemaAt(level.path).name;
+          const queryStore = sessionContext.levels[levelId]?.queryStore as
+            | { getState(): TGridLevelQueryState }
+            | undefined;
           if (!queryStore) return {};
+          // Header controls run against the concrete GridPath that rendered the
+          // header. A level id names shared query state; a path names one loaded
+          // source instance. Expanded child levels can have many paths, so sort,
+          // filter, and page commands pass both values through the session.
           return {
-            setSort: (sort) => queryStore.getState().setSort(sort ?? []),
-            setFilter: (filter) => queryStore.getState().setFilter(filter),
-            setPage: (page) => queryStore.getState().setPage(page),
+            setSort: (sort) =>
+              session.setLevelSort(levelId, level.path, sort ? [...sort] : []),
+            setFilter: (filter) =>
+              session.setLevelFilter(levelId, level.path, filter),
+            setPage: (page, pageSize) =>
+              session.setLevelPage(levelId, level.path, page, pageSize),
           };
         },
       },

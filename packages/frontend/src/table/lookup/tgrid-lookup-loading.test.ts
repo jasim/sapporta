@@ -8,6 +8,7 @@ import {
   type GridRuntime,
   type LevelSchema,
   type RuntimeLevelDataSource,
+  type SourceLoadResult,
   type TreeNode,
 } from "@sapporta/grid";
 import { columnPreset } from "@sapporta/grid/column-preset";
@@ -101,13 +102,19 @@ function makeSource(nodes: TreeNode[]) {
       },
     }),
     subscribe: vi.fn(() => unsubscribe),
-    setSort: () => {},
-    setFilter: () => {},
-    setPage: () => {},
-    refetch: () => {},
+    setSort: () => unchangedResult(source.state()),
+    setFilter: () => unchangedResult(source.state()),
+    setPage: () => unchangedResult(source.state()),
+    refetch: () => unchangedResult(source.state()),
     onReconcile: () => () => {},
   };
   return { source, unsubscribe };
+}
+
+function unchangedResult(
+  state: ReturnType<RuntimeLevelDataSource["state"]>,
+): Promise<SourceLoadResult> {
+  return Promise.resolve({ kind: "unchanged", state });
 }
 
 function makeValueLookup(args: {

@@ -3,10 +3,10 @@ export type {
   LevelSnapshot,
   LevelSourceState,
   LevelRequest,
+  SourceLoadResult,
   CellChange,
   CreateNodeResult,
   ReconcileEvent,
-  PageBoundaryNavigation,
   ReadonlyLevelDataSource,
   WritableLevelDataSource,
   RuntimeLevelDataSource,
@@ -40,8 +40,18 @@ export type {
   InMemoryLevelOpts,
 } from "./memory/in-memory-grid-source";
 
-export { restLevelSource } from "./rest/rest-level-source";
-export type { RestLevelSourceOpts } from "./rest/rest-level-source";
+export {
+  restLevelSource,
+  sourceOwnedRowQuery,
+  hostBackedRowQuery,
+} from "./rest/rest-level-source";
+export type {
+  BuildRowsRequest,
+  RestLevelSourceOpts,
+  RowQuery,
+  RowQueryChange,
+  RowQueryState,
+} from "./rest/rest-level-source";
 
 export { restGridDataSource } from "./rest/rest-grid-source";
 export type {

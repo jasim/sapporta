@@ -5,7 +5,10 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { GridDataSource, SortDescriptor } from "../../grid";
 import { createGridRuntime, rootPath } from "../../grid";
-import { restLevelSource } from "../../grid/data-sources/rest/rest-level-source";
+import {
+  hostBackedRowQuery,
+  restLevelSource,
+} from "../../grid/data-sources/rest/rest-level-source";
 import { GridRuntimeProvider } from "../../grid/react/GridRuntimeProvider";
 import type { TreeNode } from "../../grid/types/level-row";
 import type { GridSchema } from "../../grid/types/schema";
@@ -78,10 +81,18 @@ describe("ColumnPresetHeader sorting", () => {
     let sort: SortDescriptor[] = [];
     const source = restLevelSource({
       fetchPage: vi.fn(async () => ({ nodes: nodes() })),
-      query: () => ({
-        page: 0,
-        pageSize: 50,
-        sort,
+      rowQuery: hostBackedRowQuery({
+        current: () => ({
+          page: 0,
+          pageSize: 50,
+          sort,
+        }),
+        setSort: (next) => {
+          sort = next ?? [];
+          return "changed";
+        },
+        setFilter: () => "unchanged",
+        setPage: () => "unchanged",
       }),
       serverManaged: { sort: true, filter: true, pagination: true },
       rowKey: (node) => String(node.columns.id),
@@ -104,10 +115,7 @@ describe("ColumnPresetHeader sorting", () => {
           schema: schema.levels.rows.columns,
           options: {
             commandOverrides: () => ({
-              setSort: (next) => {
-                sort = next ?? [];
-                source.refetch();
-              },
+              setSort: (next) => source.setSort(next),
             }),
           },
         }),
