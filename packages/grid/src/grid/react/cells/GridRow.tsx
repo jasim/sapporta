@@ -5,6 +5,7 @@ import type { ColumnSchema } from "../../types/schema";
 import { capabilitiesFor } from "../../types/capabilities";
 import { useDisplayedRow, useGridRuntime } from "../GridRuntimeProvider";
 import type { GridPresentation } from "../Grid";
+import { gridRowIdentityAttrs } from "../internal/dom-targets";
 import { GridDataCell } from "./GridDataCell";
 
 export type RowChromeState = {
@@ -51,8 +52,7 @@ export const GridRow = memo(function GridRow({
 
   return (
     <div
-      data-grid-part="row"
-      data-row-id={row.id}
+      {...gridRowIdentityAttrs(row.id)}
       data-row-kind={row.kind}
       data-row-phantom-state={
         row.kind === "phantom" ? row.source.state.kind : undefined

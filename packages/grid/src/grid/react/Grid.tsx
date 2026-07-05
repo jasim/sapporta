@@ -7,6 +7,10 @@ import { GridHeader } from "./GridHeader";
 import { CellEditorOverlay } from "./cells/CellEditorOverlay";
 import { EffectRunner } from "./EffectRunner";
 import { useGridRuntime } from "./GridRuntimeProvider";
+import {
+  eventBelongsToGridRoot,
+  gridRootIdentityAttrs,
+} from "./internal/dom-targets";
 import styles from "./grid.module.css";
 import { cn } from "@sapporta/ui";
 
@@ -88,22 +92,24 @@ export function Grid({
   useEffect(() => {
     const node = containerRef.current;
     if (!node) return;
+    // Capture the element used for this effect. The same root receives the
+    // native listener and later removes it during cleanup, even if React writes
+    // a new ref value before the cleanup runs.
+    const root = node;
     function onKeyDown(e: KeyboardEvent) {
       // With nested grids, every ancestor grid sees the bubbling event.
       // Only the innermost grid containing the event target should act —
       // otherwise a key inside a child grid would also move the parent.
-      const target = e.target as Element | null;
-      const closest = target?.closest("[data-grid-path]");
-      if (closest !== node) return;
+      if (!eventBelongsToGridRoot(e.target, root)) return;
       // handleKey returns true iff it consumed the event — that's the only
       // signal we need to decide whether to suppress browser defaults.
       if (controller.handleKey(e, presentation)) {
         e.preventDefault();
       }
     }
-    node.addEventListener("keydown", onKeyDown);
+    root.addEventListener("keydown", onKeyDown);
     return () => {
-      node.removeEventListener("keydown", onKeyDown);
+      root.removeEventListener("keydown", onKeyDown);
     };
   }, [controller, presentation]);
 
@@ -113,9 +119,8 @@ export function Grid({
       className={cn(styles.root, className)}
       tabIndex={0}
       role="grid"
-      data-grid-part="root"
+      {...gridRootIdentityAttrs(path)}
       data-grid-presentation={presentation}
-      data-grid-path={path}
       data-grid-depth={depth}
       data-active={String(isActive)}
       style={{ position: "relative", outline: "none", ...style }}

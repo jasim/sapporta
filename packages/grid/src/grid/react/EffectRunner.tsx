@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { useStore } from "zustand";
 import type { GridControllerPublic } from "../interaction/controller";
 import type { GridEffect } from "../types/effects";
+import { findGridCellElement, findGridRowElement } from "./internal/dom-targets";
 
 // The single `useEffect` over data in the entire grid (per path).
 //
@@ -45,32 +46,21 @@ function runEffect(e: GridEffect, container: HTMLDivElement | null) {
     }
     case "scrollFocusIntoView": {
       if (!container) return;
-      const cell = container.querySelector<HTMLElement>(
-        `[data-row-id="${cssEscape(e.coord.rowId)}"] [data-col-id="${cssEscape(e.coord.colId)}"]`,
-      );
+      // Scroll effects carry path-local coordinates. The grid root supplies the
+      // path scope, and the DOM helper resolves the current cell node only if it
+      // is mounted for this paint.
+      const cell = findGridCellElement(container, e.coord);
       cell?.scrollIntoView({ block: "nearest", inline: "nearest" });
       return;
     }
     case "scrollRowIntoView": {
       if (!container) return;
-      const row = container.querySelector<HTMLElement>(
-        `[data-row-id="${cssEscape(e.rowId)}"]`,
-      );
+      // Boundary navigation can queue a row scroll before the target grid is
+      // visible. A missing row is a valid one-shot no-op; the controller keeps
+      // logical focus independently of DOM presence.
+      const row = findGridRowElement(container, e.rowId);
       row?.scrollIntoView({ block: "nearest", inline: "nearest" });
       return;
     }
   }
-}
-
-function cssEscape(s: string): string {
-  if (
-    typeof window !== "undefined" &&
-    (window as Window & { CSS?: { escape?: (s: string) => string } }).CSS
-      ?.escape
-  ) {
-    return (
-      window as Window & { CSS: { escape: (s: string) => string } }
-    ).CSS.escape(s);
-  }
-  return s.replace(/[^\w-]/g, (c) => `\\${c.charCodeAt(0).toString(16)} `);
 }

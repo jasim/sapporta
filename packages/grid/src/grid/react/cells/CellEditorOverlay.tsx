@@ -4,6 +4,7 @@ import type { ColumnSchema } from "../../types/schema";
 import type { ControllerState } from "../../types/controller-state";
 import type { GridPath } from "../../types/identity";
 import { useGridRuntime } from "../GridRuntimeProvider";
+import { findGridCellElement } from "../internal/dom-targets";
 
 // Singleton per path. When `editing` is non-null, find the focused cell DOM
 // node, position absolutely on top, and render the column's editor. When null,
@@ -45,14 +46,20 @@ export function CellEditorOverlay({
       return;
     }
     const container = containerRef.current;
-    const cellSelector = `[data-row-id="${cssEscape(editing.coord.rowId)}"] [data-col-id="${cssEscape(editing.coord.colId)}"]`;
+    // This effect follows one editing cell. When editing moves or closes,
+    // React runs cleanup and starts a new effect, so scroll/resize callbacks use
+    // the coordinate captured for this observer subscription.
+    const coord = editing.coord;
     let observedCell: HTMLElement | null = null;
     let ro: ResizeObserver | null = null;
 
     function recompute() {
-      const cell = container.querySelector<HTMLElement>(cellSelector);
+      const cell = findGridCellElement(container, coord);
       if (!cell) return;
       if (ro && observedCell !== cell) {
+        // The same logical cell can remount under the same row/column identity
+        // after a structural change. Observe the live DOM node so editor chrome
+        // tracks the current cell box.
         if (observedCell) ro.unobserve(observedCell);
         ro.observe(cell);
         observedCell = cell;
@@ -75,6 +82,9 @@ export function CellEditorOverlay({
       typeof ResizeObserver !== "undefined"
         ? new ResizeObserver(recompute)
         : null;
+    // The first recompute positions the editor and starts observing the current
+    // cell. Container observation catches track-size changes that move the cell
+    // without changing the cell element itself.
     ro?.observe(container);
     recompute();
     return () => {
@@ -118,18 +128,4 @@ export function CellEditorOverlay({
       />
     </div>
   );
-}
-
-function cssEscape(s: string): string {
-  // Minimal escaping for our identifier shapes (paths and ids contain ".").
-  if (
-    typeof window !== "undefined" &&
-    (window as Window & { CSS?: { escape?: (s: string) => string } }).CSS
-      ?.escape
-  ) {
-    return (
-      window as Window & { CSS: { escape: (s: string) => string } }
-    ).CSS.escape(s);
-  }
-  return s.replace(/[^\w-]/g, (c) => `\\${c.charCodeAt(0).toString(16)} `);
 }
