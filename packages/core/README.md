@@ -20,7 +20,7 @@ pnpm dev      # backend (port 3000) + frontend dev server
 pnpm start    # production: node dist/boot.js
 ```
 
-CLI commands that hit the API auto-detect the project by walking up from `cwd` looking for `sapporta.json`. Use `--sapporta-project-dir <path>` to override, or set `SAPPORTA_API_URL` to point at a non-default host/port.
+CLI commands that hit the API use `http://localhost:3000` by default. Set `SAPPORTA_API_URL` when the app API runs elsewhere. For protected apps, expose `SAPPORTA_API_TOKEN` to the agent or session instead of passing raw tokens in command text.
 
 ## Row-scoped table operations
 
@@ -50,10 +50,8 @@ Use `auth.rowSecurity.forTable(table)` directly for advanced Drizzle workflows s
 | Variable                         | Purpose                                                                                                                                  |
 | -------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
 | `SAPPORTA_DEV_MODE_PACKAGE_ROOT` | Monorepo root. When set, `create-project` uses `link:` specs instead of published versions. Must be set explicitly — see DEVELOPMENT.md. |
-| `SAPPORTA_PROJECT_DIR`           | Resolved project directory.                                                                                                              |
-| `SAPPORTA_DATA_DIR`              | Data directory. Default: `{projectDir}/data`.                                                                                            |
-| `SAPPORTA_CODE_DIR`              | Code directory. Default: `{projectDir}/code`.                                                                                            |
 | `SAPPORTA_API_URL`               | Server URL for CLI commands. Default: `http://localhost:3000`.                                                                           |
+| `SAPPORTA_API_TOKEN`             | Bearer token for protected API-backed CLI commands. Preferred for agents and automation.                                                 |
 | `SAPPORTA_OUTPUT_FORMAT`         | Default CLI output format: `json` or `table`.                                                                                            |
 | `PORT`                           | Server port. Default: `3000`.                                                                                                            |
 | `LOG_FORMAT`                     | Set to `json` for structured logging.                                                                                                    |
@@ -103,10 +101,11 @@ sapporta endpoints show "POST /api/tables/accounts"
 ```bash
 --output json     # Structured JSON output (auto-detected when stdout is not a TTY)
 --output table    # Human-readable table output (default in terminal)
---api-url <url>   # Server URL (default: http://localhost:3000)
---api-token <token>
---project-dir <path>
+--api-url <url>   # One-off override for SAPPORTA_API_URL
+--api-token <token> # One-off override for SAPPORTA_API_TOKEN
 ```
+
+For API-backed data commands, set `SAPPORTA_API_URL` when the app API is not on `http://localhost:3000`. For protected apps, expose `SAPPORTA_API_TOKEN` to the agent or session. Use `--api-url` for one-off overrides; avoid passing raw tokens on the command line unless there is no safer option.
 
 ### Table Definition Commands
 
@@ -200,9 +199,9 @@ sapporta api put /api/custom-route/123 --body '{"field":"updated"}'
 sapporta api delete /api/custom-route/123
 ```
 
-## Project Context
+## API Target
 
-The CLI auto-detects the project by walking up from `cwd` looking for `sapporta.json` (created by `sapporta init`). Override with `--sapporta-project-dir <path>` when running from outside the project tree.
+The CLI is a regular API client. API-backed commands call `http://localhost:3000` unless `SAPPORTA_API_URL` or `--api-url` selects another running app server.
 
 ## API Namespaces (Per-Project)
 

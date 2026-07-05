@@ -2,10 +2,10 @@ import { Command } from "commander";
 import { OperationError } from "../../introspect/types.js";
 import { SapportaCliClient } from "../client/app-client.js";
 import {
-  renderCommandError,
-  renderCommandResult,
-  resolveOutputFormat,
-} from "../render/output.js";
+  resolveCliRuntimeConfig,
+  type CliRuntimeConfig,
+} from "../runtime-config.js";
+import { renderCommandError, renderCommandResult } from "../render/output.js";
 import type { CliCommandContext, CliCommandSpec, CliProgram } from "./types.js";
 
 const GROUP_DESCRIPTIONS: Record<string, string> = {
@@ -22,13 +22,18 @@ export function createCliProgram(
 ): CliProgram {
   const program = new Command("sapporta")
     .version(version)
-    .option("--api-url <url>", "Server URL (default: http://localhost:3000)")
+    .option(
+      "--api-url <url>",
+      "API server URL (overrides SAPPORTA_API_URL; default: http://localhost:3000)",
+    )
     .option(
       "--api-token <token>",
-      "Bearer token for authenticated API requests",
+      "Bearer token for authenticated API requests (prefer SAPPORTA_API_TOKEN)",
     )
-    .option("--project-dir <path>", "Project root directory")
-    .option("--output <format>", "Output format: table or json");
+    .option(
+      "--output <format>",
+      "Output format: table or json (overrides SAPPORTA_OUTPUT_FORMAT)",
+    );
 
   for (const spec of commands) {
     registerCommand(program, spec);
@@ -66,15 +71,15 @@ function registerCommand(program: Command, spec: CliCommandSpec): void {
   }
 
   command.action(async (...received: unknown[]) => {
-    const output = safeResolveOutput(program);
+    const runtimeConfig = safeResolveRuntimeConfig(program);
     try {
       const commandOptions = readCommanderOptions(received);
       const input = buildCommandInput(spec, received, commandOptions);
-      const context = createCommandContext(program, output);
+      const context = createCommandContext(runtimeConfig);
       const result = await spec.run(input, context);
-      renderCommandResult(result, output);
+      renderCommandResult(result, runtimeConfig.output);
     } catch (err) {
-      renderCommandError(err, output);
+      renderCommandError(err, runtimeConfig.output);
     }
   });
 }
@@ -114,30 +119,19 @@ function buildCommandInput(
   return input;
 }
 
-function createCommandContext(
-  program: Command,
-  output: CliCommandContext["output"],
-): CliCommandContext {
-  const options = readRecord(program.opts());
-  const apiUrl = readString(options.apiUrl) ?? "http://localhost:3000";
-  const apiToken = readString(options.apiToken);
-  const projectDir = readString(options.projectDir);
-
+function createCommandContext(config: CliRuntimeConfig): CliCommandContext {
   return {
-    apiUrl: apiUrl.replace(/\/+$/, ""),
-    ...(apiToken ? { apiToken } : {}),
-    ...(projectDir ? { projectDir } : {}),
-    output,
+    ...config,
     client: new SapportaCliClient({
-      apiUrl: apiUrl.replace(/\/+$/, ""),
-      ...(apiToken ? { apiToken } : {}),
+      apiUrl: config.apiUrl,
+      ...(config.apiToken ? { apiToken: config.apiToken } : {}),
     }),
   };
 }
 
-function safeResolveOutput(program: Command): CliCommandContext["output"] {
+function safeResolveRuntimeConfig(program: Command): CliRuntimeConfig {
   try {
-    return resolveOutputFormat(readRecord(program.opts()));
+    return resolveCliRuntimeConfig(readRecord(program.opts()));
   } catch (err) {
     if (err instanceof OperationError) {
       renderCommandError(err, "table");
@@ -157,8 +151,4 @@ function readRecord(value: unknown): Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value)
     ? (value as Record<string, unknown>)
     : {};
-}
-
-function readString(value: unknown): string | undefined {
-  return typeof value === "string" && value.length > 0 ? value : undefined;
 }

@@ -1,24 +1,7 @@
 import { ErrorCode, OperationError } from "../../introspect/types.js";
 import { formatTable } from "../format.js";
 import type { CliCommandResult } from "../commands/types.js";
-
-export type OutputFormat = "table" | "json";
-
-export function resolveOutputFormat(
-  flags: Record<string, unknown>,
-  env: Record<string, string | undefined> = process.env,
-): OutputFormat {
-  const explicit = readString(flags.output) ?? env.SAPPORTA_OUTPUT_FORMAT;
-  if (explicit === "json") return "json";
-  if (explicit === "table") return "table";
-  if (explicit !== undefined) {
-    throw new OperationError(
-      `--output must be table or json, got ${JSON.stringify(explicit)}`,
-      ErrorCode.VALIDATION_FAILED,
-    );
-  }
-  return process.stdout.isTTY ? "table" : "json";
-}
+import type { OutputFormat } from "../runtime-config.js";
 
 export function renderCommandResult(
   result: CliCommandResult,
@@ -76,8 +59,4 @@ function resultToJsonEnvelope(result: CliCommandResult): unknown {
         }
       : {}),
   };
-}
-
-function readString(value: unknown): string | undefined {
-  return typeof value === "string" && value.length > 0 ? value : undefined;
 }

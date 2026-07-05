@@ -1,6 +1,6 @@
 import type { z } from "zod";
 import type { SapportaCliClient } from "../client/app-client.js";
-import type { OutputFormat } from "../render/output.js";
+import type { OutputFormat } from "../runtime-config.js";
 
 export type CliOptionKind = "string" | "boolean";
 
@@ -29,7 +29,6 @@ export interface CliCommandContext {
   apiUrl: string;
   apiToken?: string;
   output: OutputFormat;
-  projectDir?: string;
   client: SapportaCliClient;
 }
 

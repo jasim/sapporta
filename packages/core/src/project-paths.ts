@@ -88,9 +88,8 @@ const MAX_MARKER_WALK = 100;
  * Walk up from `startDir` looking for a `sapporta.json` marker file.
  * Returns the directory containing the marker, or `null` if none found.
  *
- * Lives here (rather than in cli/find-project-root.ts) so this module
- * stays the single source of truth for path-and-marker knowledge.
- * cli/find-project-root.ts re-exports this.
+ * Lives here so this module stays the single source of truth for
+ * path-and-marker knowledge.
  */
 export function findProjectRootFrom(
   startDir: string = process.cwd(),
