@@ -18,9 +18,10 @@
 // picked by the caller.
 
 import type { ColumnSchema, LevelSchema } from "../types/schema";
-import type { ColId, GridPath, RowId } from "../types/identity";
+import type { CellCursor, ColId, GridPath, RowId } from "../types/identity";
 import { makeRowId, rootPath, rowKeyOfRowId } from "../types/identity";
 import type { LevelRow, LevelRowKind } from "../types/level-row";
+import type { RowCursor } from "../types/row-selection";
 import type { RowCapabilities } from "../types/capabilities";
 import type { ColPolicy, RowDirection } from "../types/action";
 import type { GridRuntime } from "../runtime/create-grid-runtime";
@@ -28,27 +29,16 @@ import type { GridCoordinatorPublic } from "./coordinator";
 
 export type { ColPolicy, RowDirection } from "../types/action";
 
-export type VisibleCursor = {
-  path: GridPath;
-  rowId: RowId;
-  colId: ColId;
-};
-
-export type VisibleRowPosition = {
-  path: GridPath;
-  rowId: RowId;
-};
-
 export type ColDirection = "left" | "right" | "start" | "end";
 export type NavigationOverflow = "previous" | "next";
 
 export type CellRowNavigationResult = {
-  target: VisibleCursor | null;
+  target: CellCursor | null;
   overflow: NavigationOverflow | null;
 };
 
 export type RowNavigationResult = {
-  target: VisibleRowPosition | null;
+  target: RowCursor | null;
   overflow: NavigationOverflow | null;
 };
 
@@ -191,7 +181,7 @@ function makeCursor(
   runtime: GridRuntime,
   sourceColId: ColId,
   policy: ColPolicy,
-): VisibleCursor | null {
+): CellCursor | null {
   const targetSchema = runtime.schemaAt(step.path);
   const colId = resolveColumn(targetSchema, sourceColId, policy);
   if (colId === null) return null;
@@ -266,7 +256,7 @@ export type NextVisibleRowDeps = {
 export function resolveVisibleRowNavigation(
   runtime: GridRuntime,
   coordinator: GridCoordinatorPublic,
-  from: VisibleCursor,
+  from: CellCursor,
   dir: RowDirection,
   colPolicy: ColPolicy,
   deps: NextVisibleRowDeps,
@@ -311,7 +301,7 @@ export function resolveVisibleRowNavigation(
 export function resolveRowSelectableNavigation(
   runtime: GridRuntime,
   coordinator: GridCoordinatorPublic,
-  from: VisibleRowPosition,
+  from: RowCursor,
   direction: "up" | "down" | "first" | "last" | { delta: number },
 ): RowNavigationResult {
   const steps = collect(runtime, coordinator);

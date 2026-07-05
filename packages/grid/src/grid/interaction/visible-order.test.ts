@@ -4,14 +4,13 @@ import {
   resolveRowSelectableNavigation,
   resolveVisibleRowNavigation,
   visibleRows,
-  type VisibleCursor,
 } from "./visible-order";
 import { capabilitiesFor } from "../types/capabilities";
 import { createGridRuntime } from "../runtime/create-grid-runtime";
 import type { GridRuntime } from "../runtime/create-grid-runtime";
 import { inMemoryGridDataSource } from "../data-sources/memory/in-memory-grid-source";
 import { childPath, makeRowId, rootPath } from "../types/identity";
-import type { GridPath, RowId } from "../types/identity";
+import type { CellCursor, GridPath, RowId } from "../types/identity";
 import type { TreeNode } from "../types/level-row";
 import type { LevelRow } from "../types/level-row";
 import { buildSchemaTopology } from "../schema";
@@ -87,11 +86,11 @@ const deps = { capabilitiesFor };
 function cellTarget(
   runtime: GridRuntime,
   coordinator: GridRuntime["coordinator"],
-  from: VisibleCursor,
+  from: CellCursor,
   dir: RowDirection,
   colPolicy: ColPolicy,
   resolveDeps: typeof deps,
-): VisibleCursor | null {
+): CellCursor | null {
   return resolveVisibleRowNavigation(
     runtime,
     coordinator,
@@ -218,7 +217,7 @@ describe("visibleRows", () => {
 describe("resolveVisibleRowNavigation", () => {
   it("ArrowDown from a parent row enters its expanded child", () => {
     const rt = setup({ expand: ["Fruit"] });
-    const from: VisibleCursor = {
+    const from: CellCursor = {
       path: root,
       rowId: makeRowId(root, "Fruit"),
       colId: "name",
@@ -240,7 +239,7 @@ describe("resolveVisibleRowNavigation", () => {
 
   it("ArrowDown from last child row crosses to the parent's next row", () => {
     const rt = setup({ expand: ["Fruit"] });
-    const from: VisibleCursor = {
+    const from: CellCursor = {
       path: fruitItems,
       rowId: makeRowId(fruitItems, "Banana"),
       colId: "name",
@@ -262,7 +261,7 @@ describe("resolveVisibleRowNavigation", () => {
 
   it("ArrowUp from a parent row drills into the previous expanded child", () => {
     const rt = setup({ expand: ["Fruit"] });
-    const from: VisibleCursor = {
+    const from: CellCursor = {
       path: root,
       rowId: makeRowId(root, "Veg"),
       colId: "name",
@@ -284,7 +283,7 @@ describe("resolveVisibleRowNavigation", () => {
 
   it("first lands on the very first focusable row", () => {
     const rt = setup({ expand: ["Veg"] });
-    const from: VisibleCursor = {
+    const from: CellCursor = {
       path: vegItems,
       rowId: makeRowId(vegItems, "Carrot"),
       colId: "name",
@@ -306,7 +305,7 @@ describe("resolveVisibleRowNavigation", () => {
 
   it("last lands on the deepest visible focusable row", () => {
     const rt = setup({ expand: ["Fruit", "Veg"] });
-    const from: VisibleCursor = {
+    const from: CellCursor = {
       path: root,
       rowId: makeRowId(root, "Fruit"),
       colId: "name",
@@ -328,7 +327,7 @@ describe("resolveVisibleRowNavigation", () => {
 
   it("colPolicy 'preserve' carries the source colId when the target schema has it", () => {
     const rt = setup({ expand: ["Fruit"] });
-    const from: VisibleCursor = {
+    const from: CellCursor = {
       path: root,
       rowId: makeRowId(root, "Fruit"),
       colId: "name", // both root and items declare 'name'
@@ -346,7 +345,7 @@ describe("resolveVisibleRowNavigation", () => {
 
   it("colPolicy 'preserve' falls back to the target's first column when the schema differs", () => {
     const rt = setup({ expand: ["Fruit"] });
-    const from: VisibleCursor = {
+    const from: CellCursor = {
       path: root,
       rowId: makeRowId(root, "Fruit"),
       colId: "qty", // items has no 'qty' column
@@ -364,7 +363,7 @@ describe("resolveVisibleRowNavigation", () => {
 
   it("colPolicy 'first' always lands on the target's first column, ignoring the source", () => {
     const rt = setup({ expand: ["Fruit"] });
-    const from: VisibleCursor = {
+    const from: CellCursor = {
       path: root,
       rowId: makeRowId(root, "Fruit"),
       colId: "qty", // schema differs but 'first' policy applies regardless
@@ -380,7 +379,7 @@ describe("resolveVisibleRowNavigation", () => {
     expect(next?.colId).toBe("name");
 
     // Even when the source colId IS valid on the target, "first" overrides.
-    const from2: VisibleCursor = {
+    const from2: CellCursor = {
       path: root,
       rowId: makeRowId(root, "Fruit"),
       colId: "name",
@@ -398,7 +397,7 @@ describe("resolveVisibleRowNavigation", () => {
 
   it("returns null when the move would land on the same step", () => {
     const rt = setup();
-    const from: VisibleCursor = {
+    const from: CellCursor = {
       path: root,
       rowId: makeRowId(root, "Veg"),
       colId: "name",
@@ -410,7 +409,7 @@ describe("resolveVisibleRowNavigation", () => {
 
   it("delta jump moves across cross-level visible sequence", () => {
     const rt = setup({ expand: ["Fruit", "Veg"] });
-    const from: VisibleCursor = {
+    const from: CellCursor = {
       path: root,
       rowId: makeRowId(root, "Fruit"),
       colId: "name",
