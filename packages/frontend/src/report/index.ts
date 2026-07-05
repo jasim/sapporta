@@ -1,6 +1,5 @@
 export {
   ReportGridDataset,
-  type ReportGridFooterLinkContext,
   type ReportGridDatasetProps,
   type ReportGridLink,
   type ReportGridLinkContext,

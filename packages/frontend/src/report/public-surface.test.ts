@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import * as report from "./index";
 import type {
-  ReportGridFooterLinkContext,
   ReportGridLink,
   ReportGridLinkContext,
   ReportGridLinkResolvers,
@@ -28,12 +27,10 @@ describe("@sapporta/frontend/report public surface", () => {
     const resolvers = {
       row: {
         row: (_context: ReportGridLinkContext) => [link],
-        footer: (_context: ReportGridFooterLinkContext) => [link],
       },
     } satisfies ReportGridLinkResolvers;
 
     expect(resolvers.row.row).toBeDefined();
-    expect(resolvers.row.footer).toBeDefined();
   });
 
   it("does not export the lower grid runtime adapter layer", () => {

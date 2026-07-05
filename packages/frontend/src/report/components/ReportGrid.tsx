@@ -1,18 +1,22 @@
 import { useLayoutEffect, useMemo, type ReactNode } from "react";
 import {
   CELL_GRID_WITH_ACTIVE_ROW,
+  describeCellActivation,
   childPath,
   createGridRuntime,
-  footerSourceForRow,
   GridLevel,
   GridRuntimeProvider,
   inMemoryGridDataSource,
   makeRowId,
   rootPath,
-  trailingEdge,
+  rowExpansionActivation,
   useGridRuntimeEffect,
   withRowExpansionColumn,
+  type CellActivation,
+  type CellActivationContext,
+  type CellActivationGesture,
   type CellRenderProps,
+  type CellActivationTrigger,
   type ColumnSchema,
   type GridPath,
   type GridSchema,
@@ -28,7 +32,6 @@ import {
 import type {
   GridDataset,
   GridDatasetColumn,
-  GridDatasetFooterRow,
   GridDatasetNode,
 } from "@sapporta/shared/grid-dataset";
 import { cn } from "@sapporta/ui/cn";
@@ -56,12 +59,6 @@ export type ReportGridLinkContext<TInput = unknown> = {
   value?: unknown;
 };
 
-export type ReportGridFooterLinkContext<TInput = unknown> = {
-  dataset: GridDataset;
-  footerRow: GridDatasetFooterRow;
-  input: TInput | undefined;
-};
-
 export type ReportGridLinkResolvers<TInput = unknown> = Record<
   string,
   {
@@ -70,9 +67,10 @@ export type ReportGridLinkResolvers<TInput = unknown> = Record<
       string,
       (context: ReportGridLinkContext<TInput>) => ReportGridLink[]
     >;
-    footer?: (context: ReportGridFooterLinkContext<TInput>) => ReportGridLink[];
   }
 >;
+
+type ReportGridLinkCache = Map<string, ReportGridLink | null>;
 
 type ReportGridBinding = {
   dataset: GridDataset;
@@ -175,23 +173,30 @@ function buildReportGridModel<TInput>(
 } {
   const levels: GridSchema["levels"] = {};
   const sourceLevels: Record<string, InMemoryLevelOpts> = {};
+  const linkCache: ReportGridLinkCache = new Map();
 
   for (const [levelName, level] of Object.entries(dataset.levels)) {
     const visible = level.columns.filter(
       (column) => column.visuallyHidden !== true,
     );
+    // Row-level links have no column identity, so render them once as a
+    // fallback on the first visible cell. Column-specific cell resolvers still
+    // own every column that has its own drill-down destination.
+    const rowLinkFallbackColumnId = visible[0]?.id ?? null;
+    const expansionControlColumnId =
+      level.childLevels.length > 0 ? rowLinkFallbackColumnId : null;
     const columns = visible.map((column) =>
       gridColumnForDatasetColumn({
         dataset,
+        levelName,
         column,
+        isRowLinkFallbackColumn: column.id === rowLinkFallbackColumnId,
+        isExpansionControlColumn: column.id === expansionControlColumnId,
         links,
         input,
+        linkCache,
       }),
     );
-
-    if (level.childLevels.length > 0 && columns.length > 0) {
-      columns[0] = expandableColumn(columns[0]);
-    }
 
     levels[levelName] = {
       name: level.label ?? levelName,
@@ -271,14 +276,22 @@ function expandNodesAtPath({
 
 function gridColumnForDatasetColumn<TInput>({
   dataset,
+  levelName,
   column,
+  isRowLinkFallbackColumn,
+  isExpansionControlColumn,
   links,
   input,
+  linkCache,
 }: {
   dataset: GridDataset;
+  levelName: string;
   column: GridDatasetColumn;
+  isRowLinkFallbackColumn: boolean;
+  isExpansionControlColumn: boolean;
   links: ReportGridLinkResolvers<TInput> | undefined;
   input: TInput | undefined;
+  linkCache: ReportGridLinkCache;
 }): ColumnSchema {
   const options = {
     id: column.id,
@@ -312,81 +325,264 @@ function gridColumnForDatasetColumn<TInput>({
   }
 
   const renderCell = gridColumn.renderCell;
-  return {
+  const reportColumn = {
     ...gridColumn,
     renderCell: (props: CellRenderProps) =>
       renderReportCell({
         props,
         content: renderCell(props),
         dataset,
+        levelName,
         column,
+        isRowLinkFallbackColumn,
         links,
         input,
+        linkCache,
       }),
   };
-}
 
-function expandableColumn(column: ColumnSchema): ColumnSchema {
-  return withRowExpansionColumn(column);
+  const activatesPrimaryLink = canResolvePrimaryReportLink({
+    links,
+    levelName,
+    columnId: column.id,
+    isRowLinkFallbackColumn,
+  });
+  if (!activatesPrimaryLink) {
+    return isExpansionControlColumn
+      ? withRowExpansionColumn(reportColumn)
+      : reportColumn;
+  }
+
+  const activation = reportGridPrimaryLinkActivation({
+    activatesExpansion: isExpansionControlColumn,
+    linkCache,
+  });
+
+  return isExpansionControlColumn
+    ? withRowExpansionColumn(reportColumn, { activation })
+    : { ...reportColumn, activation };
 }
 
 function renderReportCell<TInput>({
   props,
   content,
   dataset,
+  levelName,
   column,
+  isRowLinkFallbackColumn,
   links,
   input,
+  linkCache,
 }: {
   props: CellRenderProps;
   content: ReactNode;
   dataset: GridDataset;
+  levelName: string;
   column: GridDatasetColumn;
+  isRowLinkFallbackColumn: boolean;
   links: ReportGridLinkResolvers<TInput> | undefined;
   input: TInput | undefined;
+  linkCache: ReportGridLinkCache;
 }): ReactNode {
-  const levelName =
-    trailingEdge(props.path)?.childLevelName ?? dataset.rootLevel;
-  const footerRow = footerSourceForRow(props.row);
-  const footerLinks = footerRow
-    ? (links?.[levelName]?.footer?.({ dataset, footerRow, input }) ?? [])
-    : [];
-  const node = gridDatasetNodeForRow(props.row);
-  const ancestors = node
-    ? gridDatasetAncestorsForPath(dataset, props.path)
-    : [];
-  const rowLinks = node
-    ? (links?.[levelName]?.row?.({
-        dataset,
-        node,
-        levelName,
-        input,
-        ancestors,
-      }) ?? [])
-    : [];
-  const cellLinks = node
-    ? (links?.[levelName]?.cell?.[column.id]?.({
-        dataset,
-        node,
-        levelName,
-        input,
-        ancestors,
-        column,
-        value: props.value,
-      }) ?? [])
-    : [];
-  const link =
-    (cellLinks.length > 0 ? cellLinks : footerLinks)[0] ?? rowLinks[0];
-  if (!link) return content;
+  const primaryLink = resolvePrimaryReportGridLink({
+    dataset,
+    levelName,
+    column,
+    isRowLinkFallbackColumn,
+    links,
+    input,
+    path: props.path,
+    row: props.row,
+    value: props.value,
+  });
+  linkCache.set(reportGridLinkCacheKey(props), primaryLink);
+
+  if (!primaryLink) return content;
+  return (
+    <span
+      className="sapporta-report-tgrid__linked-value"
+      data-grid-part="report-linked-value"
+    >
+      <ReportGridPrimaryLink link={primaryLink}>
+        {content}
+      </ReportGridPrimaryLink>
+    </span>
+  );
+}
+
+function resolvePrimaryReportGridLink<TInput>({
+  dataset,
+  levelName,
+  column,
+  isRowLinkFallbackColumn,
+  links,
+  input,
+  path,
+  row,
+  value,
+}: {
+  dataset: GridDataset;
+  levelName: string;
+  column: GridDatasetColumn;
+  isRowLinkFallbackColumn: boolean;
+  links: ReportGridLinkResolvers<TInput> | undefined;
+  input: TInput | undefined;
+  path: GridPath;
+  row: CellRenderProps["row"];
+  value: unknown;
+}): ReportGridLink | null {
+  const node = gridDatasetNodeForRow(row);
+  if (!node) return null;
+
+  const ancestors = gridDatasetAncestorsForPath(dataset, path);
+  const cellLinks =
+    links?.[levelName]?.cell?.[column.id]?.({
+      dataset,
+      node,
+      levelName,
+      input,
+      ancestors,
+      column,
+      value,
+    }) ?? [];
+  if (cellLinks.length > 0) return cellLinks[0] ?? null;
+
+  if (!isRowLinkFallbackColumn) return null;
+
+  const rowLinks =
+    links?.[levelName]?.row?.({
+      dataset,
+      node,
+      levelName,
+      input,
+      ancestors,
+      column,
+      value,
+    }) ?? [];
+  return rowLinks[0] ?? null;
+}
+
+function canResolvePrimaryReportLink<TInput>({
+  links,
+  levelName,
+  columnId,
+  isRowLinkFallbackColumn,
+}: {
+  links: ReportGridLinkResolvers<TInput> | undefined;
+  levelName: string;
+  columnId: string;
+  isRowLinkFallbackColumn: boolean;
+}): boolean {
+  const levelLinks = links?.[levelName];
+  return Boolean(
+    levelLinks?.cell?.[columnId] ||
+    (isRowLinkFallbackColumn && levelLinks?.row),
+  );
+}
+
+function reportGridPrimaryLinkActivation({
+  activatesExpansion,
+  linkCache,
+}: {
+  activatesExpansion: boolean;
+  linkCache: ReportGridLinkCache;
+}): CellActivation {
+  const startsOn: CellActivationGesture[] = ["enter"];
+  if (activatesExpansion) startsOn.push("space");
+
+  const expansionActivation = activatesExpansion
+    ? rowExpansionActivation({ startsOn: ["space"] })
+    : null;
+
+  return {
+    startsOn,
+    describe: (context) => {
+      if (expansionActivation && isReportExpansionTrigger(context.trigger)) {
+        return describeCellActivation(expansionActivation, context);
+      }
+
+      const link = primaryActivationLink(linkCache, context);
+      if (link) return { label: link.label, availability: { kind: "enabled" } };
+      if (expansionActivation) {
+        return describeCellActivation(expansionActivation, context);
+      }
+      return {
+        label: "Open link",
+        availability: {
+          kind: "disabled",
+          reason: "No drill-down link is available for this cell.",
+        },
+      };
+    },
+    run: (context) => {
+      if (expansionActivation && isReportExpansionTrigger(context.trigger)) {
+        expansionActivation.run(context);
+        return;
+      }
+
+      const link = primaryActivationLink(linkCache, context);
+      if (link) {
+        openReportGridLink(link);
+        return;
+      }
+      expansionActivation?.run(context);
+    },
+  } satisfies CellActivation;
+}
+
+function primaryActivationLink(
+  linkCache: ReportGridLinkCache,
+  context: CellActivationContext,
+): ReportGridLink | null {
+  return linkCache.get(reportGridLinkCacheKey(context)) ?? null;
+}
+
+function isReportExpansionTrigger(trigger: CellActivationTrigger): boolean {
+  return trigger.kind === "pointer" || trigger.gesture === "space";
+}
+
+function ReportGridPrimaryLink({
+  link,
+  children,
+}: {
+  link: ReportGridLink;
+  children: ReactNode;
+}) {
   return (
     <a
       href={link.href}
       target={link.target}
-      className="min-w-0 text-sap-brand hover:underline"
-      rel={link.target === "_blank" ? "noreferrer" : undefined}
+      tabIndex={-1}
+      className="sapporta-report-tgrid__primary-link"
+      rel={linkRel(link)}
       title={link.label}
+      data-grid-part="report-primary-link"
     >
-      {content}
+      {children}
     </a>
   );
+}
+
+function linkRel(link: ReportGridLink): string | undefined {
+  return link.target === "_blank" ? "noopener noreferrer" : undefined;
+}
+
+function openReportGridLink(link: ReportGridLink) {
+  if (link.target === "_blank") {
+    window.open(link.href, "_blank", "noopener,noreferrer");
+    return;
+  }
+  window.location.assign(link.href);
+}
+
+function reportGridLinkCacheKey({
+  path,
+  row,
+  column,
+}: {
+  path: GridPath;
+  row: { id: string };
+  column: { id: string };
+}): string {
+  return JSON.stringify([path, row.id, column.id]);
 }

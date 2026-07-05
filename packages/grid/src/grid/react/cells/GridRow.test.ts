@@ -9,7 +9,7 @@ import { createGridRuntime } from "../../runtime/create-grid-runtime";
 import { ROW_MULTISELECT_LIST } from "../../types/interaction";
 import { rootPath } from "../../types/identity";
 import type { TreeNode } from "../../types/level-row";
-import type { GridSchema } from "../../types/schema";
+import type { CellActivation, GridSchema } from "../../types/schema";
 import { GridLevel } from "../GridLevel";
 import { GridRuntimeProvider } from "../GridRuntimeProvider";
 import { withRowExpansionColumn } from "./ExpandableCellFrame";
@@ -27,6 +27,33 @@ describe("rowChromeStateFromInteractionStatus", () => {
     ["cursor-selected", { active: true, selected: true }],
   ] as const)("projects %s into orthogonal row chrome", (status, chrome) => {
     expect(rowChromeStateFromInteractionStatus(status)).toEqual(chrome);
+  });
+});
+
+describe("withRowExpansionColumn", () => {
+  it("uses a supplied activation while preserving edit gesture filtering", () => {
+    const TestEditor = () => null;
+    const activation = {
+      startsOn: ["enter"],
+      describe: "Open link",
+      run: () => {},
+    } satisfies CellActivation;
+
+    const column = withRowExpansionColumn(
+      {
+        id: "name",
+        name: "Name",
+        renderCell: ({ value }: { value: unknown }) => String(value ?? ""),
+        edit: {
+          editor: TestEditor,
+          startsOn: ["enter", "f2", "type", "doubleClick"],
+        },
+      },
+      { activation },
+    );
+
+    expect(column.activation).toBe(activation);
+    expect(column.edit?.startsOn).toEqual(["f2", "type", "doubleClick"]);
   });
 });
 

@@ -80,9 +80,16 @@ export function ExpandableCellFrame({
   );
 }
 
-export function withRowExpansionColumn(column: ColumnSchema): ColumnSchema {
+export type RowExpansionColumnOptions = {
+  activation?: CellActivation;
+};
+
+export function withRowExpansionColumn(
+  column: ColumnSchema,
+  options: RowExpansionColumnOptions = {},
+): ColumnSchema {
   const renderCell = column.renderCell;
-  const activation = rowExpansionActivation();
+  const activation = options.activation ?? rowExpansionActivation();
   const edit = column.edit
     ? {
         ...column.edit,
