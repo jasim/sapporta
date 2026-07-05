@@ -140,6 +140,19 @@ describe("refreshScaffoldProject", () => {
       readFileSync(join(target, "packages/api/schema/accounts.ts"), "utf-8"),
     ).toBe("schema\n");
     expect(existsSync(join(target, "packages/frontend/src/api.ts"))).toBe(true);
+    expect(existsSync(join(target, "packages/api/app/sample-report.ts"))).toBe(
+      false,
+    );
+    expect(
+      existsSync(
+        join(target, "packages/frontend/src/reports/SampleReport.tsx"),
+      ),
+    ).toBe(false);
+    expect(
+      existsSync(
+        join(target, "packages/shared/src/contracts/sample-report.ts"),
+      ),
+    ).toBe(false);
 
     const apiPackageJson = JSON.parse(
       readFileSync(join(target, "packages/api/package.json"), "utf-8"),

@@ -34,6 +34,7 @@ export interface DateRangeFieldProps {
   required?: boolean;
   value: DateRangeState;
   onChange: (state: DateRangeState) => void;
+  error?: string | null;
 }
 
 export function DateRangeField({
@@ -41,6 +42,7 @@ export function DateRangeField({
   required = false,
   value,
   onChange,
+  error,
 }: DateRangeFieldProps) {
   const selectKey = selectKeyFromState(value);
 
@@ -61,7 +63,10 @@ export function DateRangeField({
       </span>
 
       <Select value={selectKey} onValueChange={handleSelect}>
-        <SelectTrigger className="h-sap-ctl w-[150px] text-sap-emph rounded-[5px]">
+        <SelectTrigger
+          aria-invalid={error ? true : undefined}
+          className="h-sap-ctl w-[150px] text-sap-emph rounded-[5px]"
+        >
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
@@ -80,6 +85,7 @@ export function DateRangeField({
             value={customBoundString(value, "start")}
             onChange={(e) => handleBoundChange("start", e.target.value)}
             aria-label="Custom range start"
+            aria-invalid={error ? true : undefined}
             className="h-sap-ctl w-[140px] text-sap-emph rounded-[5px] mono"
           />
           <span className="text-sap-subtle">→</span>
@@ -88,10 +94,13 @@ export function DateRangeField({
             value={customBoundString(value, "end")}
             onChange={(e) => handleBoundChange("end", e.target.value)}
             aria-label="Custom range end"
+            aria-invalid={error ? true : undefined}
             className="h-sap-ctl w-[140px] text-sap-emph rounded-[5px] mono"
           />
         </>
       )}
+
+      {error ? <span className="text-sap-negative">{error}</span> : null}
     </label>
   );
 }

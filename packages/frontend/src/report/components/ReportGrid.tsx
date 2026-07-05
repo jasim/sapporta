@@ -74,44 +74,31 @@ export type ReportGridLinkResolvers<TInput = unknown> = Record<
   }
 >;
 
-export type ReportGridBinding = {
+type ReportGridBinding = {
   dataset: GridDataset;
   runtime: GridRuntime;
   root: GridPath;
 };
 
-export type DisposableReportGridSession = ReportGridBinding & {
-  dispose(): void;
-};
-
-export type ReportGridResourceArgs<TInput = unknown> = {
-  dataset: GridDataset;
-  links?: ReportGridLinkResolvers<TInput>;
-  input?: TInput;
-};
-
-export interface ReportGridProps<TInput = unknown> {
+interface ReportGridProps<TInput = unknown> {
   dataset: GridDataset;
   links?: ReportGridLinkResolvers<TInput>;
   input?: TInput;
 }
 
-export function ReportGrid<TInput = unknown>({
+function ReportGrid<TInput = unknown>({
   dataset,
   links,
   input,
 }: ReportGridProps<TInput>) {
-  const runtime = useGridRuntimeEffect(
-    () => {
-      const model = buildReportGridModel(dataset, links, input);
-      return createGridRuntime({
-        schema: model.schema,
-        dataSource: model.dataSource,
-        interaction: CELL_GRID_WITH_ACTIVE_ROW,
-      });
-    },
-    [dataset, links, input],
-  );
+  const runtime = useGridRuntimeEffect(() => {
+    const model = buildReportGridModel(dataset, links, input);
+    return createGridRuntime({
+      schema: model.schema,
+      dataSource: model.dataSource,
+      interaction: CELL_GRID_WITH_ACTIVE_ROW,
+    });
+  }, [dataset, links, input]);
 
   if (!runtime) {
     return (
@@ -126,69 +113,6 @@ export function ReportGrid<TInput = unknown>({
       <ReportGridBody
         session={{ dataset, runtime, root: rootPath(dataset.rootLevel) }}
       />
-    </GridRuntimeProvider>
-  );
-}
-
-export function useReportGridBinding<TInput = unknown>({
-  dataset,
-  links,
-  input,
-}: ReportGridResourceArgs<TInput>): ReportGridBinding | null {
-  const runtime = useGridRuntimeEffect(
-    () => {
-      const model = buildReportGridModel(dataset, links, input);
-      return createGridRuntime({
-        schema: model.schema,
-        dataSource: model.dataSource,
-        interaction: CELL_GRID_WITH_ACTIVE_ROW,
-      });
-    },
-    [dataset, links, input],
-  );
-
-  useLayoutEffect(() => {
-    if (!runtime) return;
-    expandDefaultReportRows(runtime, dataset);
-  }, [dataset, runtime]);
-
-  return useMemo<ReportGridBinding | null>(
-    () =>
-      runtime
-        ? {
-            dataset,
-            runtime,
-            root: rootPath(dataset.rootLevel),
-          }
-        : null,
-    [dataset, runtime],
-  );
-}
-
-export function createReportGridSession<TInput = unknown>({
-  dataset,
-  links,
-  input,
-}: ReportGridResourceArgs<TInput>): DisposableReportGridSession {
-  const model = buildReportGridModel(dataset, links, input);
-  const runtime = createGridRuntime({
-    schema: model.schema,
-    dataSource: model.dataSource,
-    interaction: CELL_GRID_WITH_ACTIVE_ROW,
-  });
-  expandDefaultReportRows(runtime, dataset);
-  return {
-    dataset,
-    runtime,
-    root: rootPath(dataset.rootLevel),
-    dispose: () => runtime.dispose(),
-  };
-}
-
-export function ReportGridView({ session }: { session: ReportGridBinding }) {
-  return (
-    <GridRuntimeProvider runtime={session.runtime}>
-      <ReportGridBody session={session} />
     </GridRuntimeProvider>
   );
 }

@@ -254,6 +254,13 @@ describe("renderScaffoldFiles", () => {
     expect(byDest.get("packages/api/app/public-api-sample.ts")).toContain(
       'auth.ability.can("read", "public_api_sample")',
     );
+    expect(byDest.has("packages/api/app/sample-report.ts")).toBe(false);
+    expect(byDest.has("packages/shared/src/contracts/sample-report.ts")).toBe(
+      false,
+    );
+    expect(byDest.has("packages/frontend/src/reports/SampleReport.tsx")).toBe(
+      false,
+    );
     expect(byDest.get("packages/api/authz/ability.ts")).toContain(
       'can("read", "public_api_sample")',
     );

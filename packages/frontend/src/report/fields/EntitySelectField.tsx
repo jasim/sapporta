@@ -7,11 +7,13 @@ export function EntitySelectField({
   label,
   value,
   onChange,
+  error,
 }: {
   tableName: string;
   label?: string;
   value: string;
   onChange: (value: string) => void;
+  error?: string | null;
 }) {
   const [options, setOptions] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
@@ -49,12 +51,21 @@ export function EntitySelectField({
     : `Select ${label ?? tableName}`;
 
   return (
-    <Combobox
-      value={stringValue}
-      onChange={(v) => onChange(v ?? "")}
-      options={options}
-      placeholder={placeholder}
-      className="h-sap-ctl min-w-[140px] text-sap-emph rounded-[5px]"
-    />
+    <label className="flex items-center gap-2 text-sap-data">
+      {label ? (
+        <span className="text-sap-subtle">
+          {label.toLowerCase()}
+          {":"}
+        </span>
+      ) : null}
+      <Combobox
+        value={stringValue}
+        onChange={(v) => onChange(v ?? "")}
+        options={options}
+        placeholder={placeholder}
+        className="h-sap-ctl min-w-[140px] text-sap-emph rounded-[5px]"
+      />
+      {error ? <span className="text-sap-negative">{error}</span> : null}
+    </label>
   );
 }
