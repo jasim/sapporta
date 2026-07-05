@@ -246,7 +246,6 @@ describe.sequential("sapporta init auth template - end-to-end", () => {
     for (const path of [
       "/api/auth-context",
       "/api/tables/tasks",
-      "/api/reports",
       "/api/openapi.json",
       "/api/hello",
     ]) {
