@@ -66,14 +66,15 @@
   --sap-fg-subtle: #a1a1aa;
 
   /* Brand / emphasis */
-  --sap-brand: #e23d18;
-  --sap-brand-soft: #fff1ed;
+  --sap-brand: #8b5d3c;
+  --sap-brand-soft: #f3ece6;
   --sap-selection: #eeeeee;
-  --sap-focus-ring: #d4d4d8;
+  --sap-focus-ring: rgb(139 93 60 / 0.42);
   --sap-link: #1f6fb0;
 
   /* Numeric emphasis (any deltas / gains-losses / data accents) */
   --sap-positive: #1a4d2e;
+  --sap-warning: #8a5a00;
   --sap-negative: #8b2f2f;
 
   /* Nav chrome */
@@ -87,7 +88,11 @@
 
   /* Project switcher */
   --sap-proj-bg: #ffffff;
-  --sap-proj-grad: linear-gradient(135deg, #111111 0 58%, #e23d18 58% 100%);
+  --sap-proj-grad: linear-gradient(
+    135deg,
+    var(--sap-fg) 0 58%,
+    var(--sap-brand) 58% 100%
+  );
 
   /* Radii */
   --radius: 6px;
@@ -130,8 +135,8 @@
   --sap-z-modal-content: 70;
 }
 
-/* Terminal-inspired dark: warm-tinted near-blacks, amber emphasis, bright-
-   green positives, soft-red negatives, warm-green selection. Same structure
+/* Terminal-inspired dark: warm-tinted near-blacks, fruit-brown brand emphasis,
+   bright-green positives, soft-red negatives, warm-brown selection. Same structure
    as light — only values change. */
 [data-theme="dark"] {
   --sap-bg: #0e0f0b;
@@ -151,16 +156,17 @@
   --sap-fg-muted: #9a998a;
   --sap-fg-subtle: #6a6a5c;
 
-  --sap-brand: #e8b34a;
-  --sap-brand-soft: rgba(232, 179, 74, 0.1);
-  --sap-selection: #2a3a1e;
-  --sap-focus-ring: #a8841d;
+  --sap-brand: #dca86b;
+  --sap-brand-soft: rgb(220 168 107 / 0.14);
+  --sap-selection: #3a2a1e;
+  --sap-focus-ring: rgb(220 168 107 / 0.42);
   --sap-link: #6dc0e0;
 
   --sap-positive: #7bc67b;
+  --sap-warning: #f2c14e;
   --sap-negative: #e08070;
 
-  --sap-active-nav-bg: rgba(232, 179, 74, 0.1);
+  --sap-active-nav-bg: rgb(220 168 107 / 0.14);
   --sap-nav-count-bg: #1f1f17;
 
   --sap-kbd-bg: #1a1b13;
@@ -168,7 +174,7 @@
   --sap-proj-chip-kbd-bg: #1a1b13;
 
   --sap-proj-bg: #14150f;
-  --sap-proj-grad: linear-gradient(135deg, #e8b34a, #c8723a);
+  --sap-proj-grad: linear-gradient(135deg, var(--sap-fg), var(--sap-brand));
 }
 
 /* ────────────────────────────────────────────────────────────────────────────
@@ -212,6 +218,7 @@
   --color-sap-link: var(--sap-link);
 
   --color-sap-positive: var(--sap-positive);
+  --color-sap-warning: var(--sap-warning);
   --color-sap-negative: var(--sap-negative);
 
   --color-sap-active-nav: var(--sap-active-nav-bg);

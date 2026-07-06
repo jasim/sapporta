@@ -310,7 +310,7 @@ function DiagnosticRow({ result }: { result: DiagnosticResult }) {
     result.status === "pass"
       ? "text-sap-positive"
       : result.status === "warn"
-        ? "text-sap-brand"
+        ? "text-sap-warning"
         : "text-sap-negative";
 
   return (
