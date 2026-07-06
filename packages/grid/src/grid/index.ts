@@ -479,6 +479,8 @@ export type {
   PathEdge,
   PathDecomposition,
   ColumnSchema,
+  GridCopyColumn,
+  GridColumnCopyBehavior,
   CellEditGesture,
   NonTypedCellEditGesture,
   CellEditBehavior,

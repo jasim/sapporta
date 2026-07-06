@@ -1,4 +1,9 @@
-import type { CellEditGesture } from "@sapporta/grid";
+import type {
+  CellEditGesture,
+  GridCopyColumn,
+  GridPath,
+  GridRuntime,
+} from "@sapporta/grid";
 import type { ComponentType } from "react";
 import type { ColumnWidth } from "@sapporta/grid/column-preset";
 import type {
@@ -11,11 +16,29 @@ import type {
   TGridCellEditorContext,
   TGridCellActivation,
   TGridCellWriteHandler,
+  TGridColumnContext,
 } from "./tgrid-cell-context";
 
 // Level-scoped builder input types used to describe visible columns.
 // Every returned spec is attached to the same level id and typed row shape.
 // These options are for real table fields and keep row-level typing intact.
+
+export type TGridColumnCopyBehavior<
+  RowsByLevel extends TGridRowsByLevel,
+  AppServices,
+  LevelId extends TGridLevelId<RowsByLevel>,
+  TValue,
+> = (context: {
+  levelId: LevelId;
+  path: GridPath;
+  column: TGridColumnContext<RowsByLevel[LevelId]>;
+  rows: readonly Readonly<RowsByLevel[LevelId]>[];
+  values: readonly TValue[];
+  runtime: GridRuntime;
+  appServices: AppServices;
+}) =>
+  | readonly GridCopyColumn<Readonly<RowsByLevel[LevelId]>>[]
+  | Promise<readonly GridCopyColumn<Readonly<RowsByLevel[LevelId]>>[]>;
 
 export type TableColumnOptions<
   RowsByLevel extends TGridRowsByLevel,
@@ -41,6 +64,12 @@ export type TableColumnOptions<
   activation?: TGridCellActivation<RowsByLevel, AppServices, LevelId>;
   renderCell?: ComponentType<
     TGridCellContext<RowsByLevel, AppServices, LevelId>
+  >;
+  copy?: TGridColumnCopyBehavior<
+    RowsByLevel,
+    AppServices,
+    LevelId,
+    RowsByLevel[LevelId][K]
   >;
   saveCellValue?: TGridCellWriteHandler<RowsByLevel, AppServices, LevelId, K>;
 };
@@ -74,6 +103,7 @@ export type ClientColumnOptions<
   renderCell?: ComponentType<
     TGridCellContext<RowsByLevel, AppServices, LevelId>
   >;
+  copy?: TGridColumnCopyBehavior<RowsByLevel, AppServices, LevelId, unknown>;
 };
 
 // Spec that binds a real table field to a level's column list.

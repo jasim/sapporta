@@ -6,6 +6,7 @@ import type {
   CellEditorProps,
   CellRenderProps,
   ColumnSchema,
+  GridColumnCopyBehavior,
 } from "../grid/types/schema";
 import type { ColId, Coord, GridPath, RowKey } from "../grid/types/identity";
 import type { SortDescriptor } from "../grid/pipeline/types";
@@ -128,6 +129,7 @@ export type ColumnPresetOptions<TMeta = unknown> = {
     props: ColumnHeaderMenuProps<TMeta, unknown>,
   ) => ReactNode;
   activation?: CellActivation;
+  copy?: GridColumnCopyBehavior;
   meta?: TMeta;
 };
 

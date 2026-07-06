@@ -146,6 +146,17 @@ export type CellEditorProps = {
   cancel: () => void;
 };
 
+export type GridCopyColumn<TRow = LevelRow> = {
+  header: string;
+  valueAt: (row: TRow, rowIndex: number) => unknown;
+};
+
+export type GridColumnCopyBehavior = (context: {
+  path: GridPath;
+  column: ColumnSchema;
+  rows: readonly LevelRow[];
+}) => readonly GridCopyColumn[] | Promise<readonly GridCopyColumn[]>;
+
 export type ColumnSchema = {
   id: ColId;
   name: string;
@@ -153,6 +164,7 @@ export type ColumnSchema = {
   compare?: (a: unknown, b: unknown) => number;
   edit?: CellEditBehavior;
   activation?: CellActivation;
+  copy?: GridColumnCopyBehavior;
   meta?: unknown;
 };
 

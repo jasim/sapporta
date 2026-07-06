@@ -1,9 +1,14 @@
 import { isValidElement } from "react";
 import { describe, expect, it } from "vitest";
+import type { LevelRow } from "../grid/types/level-row";
 import type { CellEditorProps } from "../grid/types/schema";
 import { rootPath, childPath } from "../grid/types/identity";
 import { TextCell } from "./cells/TextCell";
-import { StaticSearchLookup, StaticValueLookup } from "../lookup";
+import {
+  CachedValueLookup,
+  StaticSearchLookup,
+  StaticValueLookup,
+} from "../lookup";
 import {
   foreignKey,
   columnPresetWidthForSizing,
@@ -99,6 +104,66 @@ describe("columnPreset columns", () => {
       { value: "oz", label: "oz" },
       { value: "serving", label: "serving" },
     ]);
+  });
+
+  it("select copy emits raw values and normalized labels", async () => {
+    const column = select({
+      id: "status",
+      name: "Status",
+      options: [
+        { value: "open", label: "Open" },
+        { value: "closed", label: "Closed" },
+      ],
+    });
+    if (!column.copy) throw new Error("expected select copy behavior");
+    const rows = [
+      levelRow({ status: "open" }),
+      levelRow({ status: "unknown" }),
+    ];
+
+    const copyColumns = await column.copy({
+      path: rootPath("books"),
+      column,
+      rows,
+    });
+
+    expect(copyColumns.map((copyColumn) => copyColumn.header)).toEqual([
+      "status",
+      "status_label",
+    ]);
+    expect(
+      copyColumns.map((copyColumn) => copyColumn.valueAt(rows[0], 0)),
+    ).toEqual(["open", "Open"]);
+    expect(
+      copyColumns.map((copyColumn) => copyColumn.valueAt(rows[1], 1)),
+    ).toEqual(["unknown", "unknown"]);
+  });
+
+  it("preset copy options replace labeled-value defaults", async () => {
+    const column = select({
+      id: "status",
+      name: "Status",
+      options: [{ value: "open", label: "Open" }],
+      copy: () => [
+        {
+          header: "workflow_status",
+          valueAt: (row) => row.columns.status,
+        },
+      ],
+    });
+    if (!column.copy) throw new Error("expected custom copy behavior");
+    const row = levelRow({ status: "open" });
+
+    const copyColumns = await column.copy({
+      path: rootPath("books"),
+      column,
+      rows: [row],
+    });
+
+    expect(copyColumns.map((copyColumn) => copyColumn.header)).toEqual([
+      "workflow_status",
+    ]);
+    expect(copyColumns[0].valueAt(row, 0)).toBe("open");
   });
 
   it("text display opts the preset renderer into four-line clamping", () => {
@@ -216,6 +281,55 @@ describe("columnPreset columns", () => {
     expect(fkPreset.lookup.searchLookup).toBe(searchLookup);
   });
 
+  it("lookup-backed copy loads labels and falls back to formatted values", async () => {
+    let loadedValues: readonly string[] = [];
+    const valueLookup = new CachedValueLookup({
+      loadEntriesForValues: async (values) => {
+        loadedValues = values;
+        return [{ value: "acct_123", label: "Cash" }];
+      },
+    });
+    const column = foreignKey({
+      id: "account_id",
+      name: "Account",
+      valueLookup,
+    });
+    if (!column.copy) throw new Error("expected lookup copy behavior");
+    const rows = [
+      levelRow({ account_id: "acct_123" }),
+      levelRow({ account_id: "acct_missing" }),
+    ];
+
+    const copyColumns = await column.copy({
+      path: rootPath("books"),
+      column,
+      rows,
+    });
+
+    expect(new Set(loadedValues)).toEqual(
+      new Set(["acct_123", "acct_missing"]),
+    );
+    expect(copyColumns.map((copyColumn) => copyColumn.header)).toEqual([
+      "account_id",
+      "account_id_label",
+    ]);
+    expect(
+      copyColumns.map((copyColumn) => copyColumn.valueAt(rows[0], 0)),
+    ).toEqual(["acct_123", "Cash"]);
+    expect(
+      copyColumns.map((copyColumn) => copyColumn.valueAt(rows[1], 1)),
+    ).toEqual(["acct_missing", "acct_missing"]);
+    expect(
+      lookupValue({
+        id: "meal_id",
+        name: "Meal",
+        valueLookup: new StaticValueLookup([
+          { value: "1", label: "Breakfast" },
+        ]),
+      }).copy,
+    ).toBeDefined();
+  });
+
   it("public preset exposes only inspectable preset facts", () => {
     const parser = (value: string, _props: CellEditorProps) => Number(value);
     const column = columnPreset.column({
@@ -238,6 +352,17 @@ describe("columnPreset columns", () => {
     expect(presetRuntime(column)?.valueCodec.parse).toBe(parser);
   });
 });
+
+function levelRow(columns: Record<string, unknown>): LevelRow {
+  return {
+    kind: "data",
+    id: "books#1" as never,
+    rowSelectable: true,
+    columns,
+    hasChildren: false,
+    source: { levelName: "books", columns },
+  };
+}
 
 describe("base grid chrome context helpers", () => {
   it("derives the schema level key from the path", () => {

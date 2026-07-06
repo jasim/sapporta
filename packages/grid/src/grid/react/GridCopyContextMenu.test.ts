@@ -154,7 +154,7 @@ describe("GridCopyContextMenu", () => {
     await clickButton(container, "Copy with headers");
 
     expect(writeText).toHaveBeenCalledWith(
-      "Account,Debit\nCash,125\nRevenue,0",
+      "account,debit\nCash,125\nRevenue,0",
     );
   });
 

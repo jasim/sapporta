@@ -261,7 +261,7 @@ describe("compileTGridRuntimeConfig", () => {
       bundleFor: () => undefined,
     };
     const message =
-      'non-root level \'orders.lines\' cannot use query.owner "host"';
+      "non-root level 'orders.lines' cannot use query.owner \"host\"";
 
     expect(() =>
       defineTGrid<RowsByLevel>({
@@ -436,6 +436,101 @@ describe("compileTGridRuntimeConfig", () => {
     expect(
       config.gridSchema.levels["orders.lines"].columns.map((c) => c.id),
     ).toEqual(["order_id", "line_no", "sku"]);
+  });
+
+  it("adapts typed table and client copy behavior to grid rows", async () => {
+    const lookupResolver: TGridLookupResolver = {
+      bundleFor: () => undefined,
+    };
+    type CopyRowsByLevel = { orders: OrderRow };
+    type CopyServices = { suffix: string };
+    const orderColumns = createTGridColumnsBuilder<
+      CopyRowsByLevel,
+      CopyServices,
+      "orders"
+    >("orders");
+    const runtime = {} as GridRuntime;
+    const session: TGridSessionContext<CopyRowsByLevel, CopyServices> = {
+      rootLevel: "orders",
+      runtime,
+      levels: {} as TGridSessionContext<
+        CopyRowsByLevel,
+        CopyServices
+      >["levels"],
+      appServices: { suffix: "!" },
+      lookupRegistry: {} as TableLookupRegistry,
+    };
+    const config = compileTGridRuntimeConfig<CopyRowsByLevel, CopyServices>({
+      rootLevel: "orders",
+      levels: {
+        orders: {
+          table: orderSchema,
+          childLevels: [],
+          columns: [
+            orderColumns.table("customer", {
+              copy: ({ values, runtime: copyRuntime, appServices }) => {
+                expect(copyRuntime).toBe(runtime);
+                return [
+                  {
+                    header: "customer_name",
+                    valueAt: (row, rowIndex) =>
+                      `${values[rowIndex]}:${row.id}${appServices.suffix}`,
+                  },
+                ];
+              },
+            }),
+            orderColumns.client("customer_badge", {
+              label: "Badge",
+              copy: ({ rows, values }) => [
+                {
+                  header: "badge",
+                  valueAt: (row, rowIndex) =>
+                    `${row.customer}:${String(values[rowIndex])}:${rows.length}`,
+                },
+              ],
+            }),
+          ],
+        },
+      },
+      columnMapper: createTGridColumnMapper(lookupResolver),
+      sessionContext: () => session,
+    });
+    const row: LevelRow = {
+      kind: "data",
+      id: makeRowId(rootPath("orders"), "7"),
+      rowSelectable: true,
+      columns: { id: 7, customer: "Acme" },
+      hasChildren: false,
+      source: {
+        levelName: "orders",
+        columns: { id: 7, customer: "Acme" },
+      },
+    };
+    const [customerColumn, badgeColumn] =
+      config.gridSchema.levels.orders.columns;
+    if (!customerColumn.copy || !badgeColumn.copy) {
+      throw new Error("expected typed copy behavior");
+    }
+
+    const tableCopyColumns = await customerColumn.copy({
+      path: rootPath("orders"),
+      column: customerColumn,
+      rows: [row],
+    });
+    const clientCopyColumns = await badgeColumn.copy({
+      path: rootPath("orders"),
+      column: badgeColumn,
+      rows: [row],
+    });
+
+    expect(tableCopyColumns.map((copyColumn) => copyColumn.header)).toEqual([
+      "customer_name",
+    ]);
+    expect(tableCopyColumns[0].valueAt(row, 0)).toBe("Acme:7!");
+    expect(clientCopyColumns.map((copyColumn) => copyColumn.header)).toEqual([
+      "badge",
+    ]);
+    expect(clientCopyColumns[0].valueAt(row, 0)).toBe("Acme:undefined:1");
   });
 
   it("builds emitted columns through column-preset constructors", () => {

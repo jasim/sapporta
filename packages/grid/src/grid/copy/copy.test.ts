@@ -27,9 +27,7 @@ import {
   gridRootIdentityAttrs,
   gridRowIdentityAttrs,
 } from "../react/internal/dom-targets";
-import {
-  serializeGridCopyTargetToCsv,
-} from "./index";
+import { serializeGridCopyTargetToCsv } from "./index";
 import { prepareGridCopyTarget } from "./target";
 
 const root = rootPath("accounts");
@@ -54,7 +52,10 @@ const schema: GridSchema = {
     },
     entries: {
       name: "entries",
-      columns: [column("description", "Description"), column("amount", "Amount")],
+      columns: [
+        column("description", "Description"),
+        column("amount", "Amount"),
+      ],
       options: { rowKey: (node, localIdx) => node.rowKey ?? String(localIdx) },
       childLevels: [],
     },
@@ -103,11 +104,11 @@ afterEach(() => {
 });
 
 describe("serializeGridCopyTargetToCsv", () => {
-  it("serializes a single cell", () => {
+  it("serializes a single cell", async () => {
     const runtime = makeRuntime();
 
     expect(
-      serializeGridCopyTargetToCsv(
+      await serializeGridCopyTargetToCsv(
         runtime,
         {
           path: root,
@@ -118,11 +119,11 @@ describe("serializeGridCopyTargetToCsv", () => {
     ).toBe("Cash");
   });
 
-  it("serializes a multi-cell range in visible order", () => {
+  it("serializes a multi-cell range in visible order", async () => {
     const runtime = makeRuntime();
 
     expect(
-      serializeGridCopyTargetToCsv(
+      await serializeGridCopyTargetToCsv(
         runtime,
         {
           path: root,
@@ -136,11 +137,11 @@ describe("serializeGridCopyTargetToCsv", () => {
     ).toBe("Cash,125\nRevenue,0");
   });
 
-  it("prepends selected visible column headers", () => {
+  it("prepends stable source column headers", async () => {
     const runtime = makeRuntime();
 
     expect(
-      serializeGridCopyTargetToCsv(
+      await serializeGridCopyTargetToCsv(
         runtime,
         {
           path: root,
@@ -151,14 +152,14 @@ describe("serializeGridCopyTargetToCsv", () => {
         },
         { includeHeaders: true },
       ),
-    ).toBe("Account,Debit\nCash,125\nRevenue,0");
+    ).toBe("account,debit\nCash,125\nRevenue,0");
   });
 
-  it("normalizes reversed row ranges", () => {
+  it("normalizes reversed row ranges", async () => {
     const runtime = makeRuntime();
 
     expect(
-      serializeGridCopyTargetToCsv(
+      await serializeGridCopyTargetToCsv(
         runtime,
         {
           path: root,
@@ -172,11 +173,11 @@ describe("serializeGridCopyTargetToCsv", () => {
     ).toBe("Cash\nRevenue");
   });
 
-  it("normalizes reversed column ranges", () => {
+  it("normalizes reversed column ranges", async () => {
     const runtime = makeRuntime();
 
     expect(
-      serializeGridCopyTargetToCsv(
+      await serializeGridCopyTargetToCsv(
         runtime,
         {
           path: root,
@@ -190,11 +191,11 @@ describe("serializeGridCopyTargetToCsv", () => {
     ).toBe("Cash,125");
   });
 
-  it("normalizes reversed row and column ranges together", () => {
+  it("normalizes reversed row and column ranges together", async () => {
     const runtime = makeRuntime();
 
     expect(
-      serializeGridCopyTargetToCsv(
+      await serializeGridCopyTargetToCsv(
         runtime,
         {
           path: root,
@@ -208,11 +209,11 @@ describe("serializeGridCopyTargetToCsv", () => {
     ).toBe("Cash,125\nRevenue,0");
   });
 
-  it("returns null for stale row or column endpoints", () => {
+  it("returns null for stale row or column endpoints", async () => {
     const runtime = makeRuntime();
 
     expect(
-      serializeGridCopyTargetToCsv(
+      await serializeGridCopyTargetToCsv(
         runtime,
         {
           path: root,
@@ -226,7 +227,7 @@ describe("serializeGridCopyTargetToCsv", () => {
     ).toBeNull();
 
     expect(
-      serializeGridCopyTargetToCsv(
+      await serializeGridCopyTargetToCsv(
         runtime,
         {
           path: root,
@@ -240,11 +241,11 @@ describe("serializeGridCopyTargetToCsv", () => {
     ).toBeNull();
   });
 
-  it("escapes raw grid values as valid CSV", () => {
+  it("escapes raw grid values as valid CSV", async () => {
     const runtime = makeRuntime();
 
     expect(
-      serializeGridCopyTargetToCsv(
+      await serializeGridCopyTargetToCsv(
         runtime,
         {
           path: root,
@@ -256,6 +257,180 @@ describe("serializeGridCopyTargetToCsv", () => {
         { includeHeaders: false },
       ),
     ).toBe(`"bank, ""main"""\n"line 1\nline 2"`);
+  });
+
+  it("lets one source column contribute multiple clipboard columns", async () => {
+    const copyRoot = rootPath("copyAccounts");
+    const firstId = makeRowId(copyRoot, "cash");
+    const secondId = makeRowId(copyRoot, "revenue");
+    const runtime = makeRuntimeWithSchema(
+      {
+        rootLevel: "copyAccounts",
+        levels: {
+          copyAccounts: {
+            name: "copyAccounts",
+            columns: [
+              {
+                ...column("account_id", "Account"),
+                copy: ({ column }) => [
+                  {
+                    header: column.id,
+                    valueAt: (row) => row.columns[column.id],
+                  },
+                  {
+                    header: `${column.id}_label`,
+                    valueAt: (row) => row.columns.account_name,
+                  },
+                ],
+              },
+            ],
+            options: {
+              rowKey: (node, localIdx) => node.rowKey ?? String(localIdx),
+            },
+            childLevels: [],
+          },
+        },
+      },
+      [
+        {
+          rowKey: "cash",
+          levelName: "copyAccounts",
+          columns: { account_id: "acct_123", account_name: "Cash" },
+        },
+        {
+          rowKey: "revenue",
+          levelName: "copyAccounts",
+          columns: { account_id: "acct_456", account_name: "Revenue" },
+        },
+      ],
+    );
+
+    expect(
+      await serializeGridCopyTargetToCsv(
+        runtime,
+        {
+          path: copyRoot,
+          selection: {
+            anchor: { rowId: firstId, colId: "account_id" },
+            head: { rowId: secondId, colId: "account_id" },
+          },
+        },
+        { includeHeaders: true },
+      ),
+    ).toBe("account_id,account_id_label\nacct_123,Cash\nacct_456,Revenue");
+  });
+
+  it("awaits async column copy behavior before materializing rows", async () => {
+    const copyRoot = rootPath("asyncCopy");
+    const rowId = makeRowId(copyRoot, "one");
+    let loaded = false;
+    const runtime = makeRuntimeWithSchema(
+      {
+        rootLevel: "asyncCopy",
+        levels: {
+          asyncCopy: {
+            name: "asyncCopy",
+            columns: [
+              {
+                ...column("status", "Status"),
+                copy: async ({ column }) => {
+                  await Promise.resolve();
+                  loaded = true;
+                  return [
+                    {
+                      header: `${column.id}_label`,
+                      valueAt: () => (loaded ? "Loaded" : "Pending"),
+                    },
+                  ];
+                },
+              },
+            ],
+            options: {
+              rowKey: (node, localIdx) => node.rowKey ?? String(localIdx),
+            },
+            childLevels: [],
+          },
+        },
+      },
+      [
+        {
+          rowKey: "one",
+          levelName: "asyncCopy",
+          columns: { status: "queued" },
+        },
+      ],
+    );
+
+    expect(
+      await serializeGridCopyTargetToCsv(
+        runtime,
+        {
+          path: copyRoot,
+          selection: makeSelection({ rowId, colId: "status" }),
+        },
+        { includeHeaders: true },
+      ),
+    ).toBe("status_label\nLoaded");
+  });
+
+  it("deduplicates contributed headers in output order", async () => {
+    const copyRoot = rootPath("duplicateHeaders");
+    const rowId = makeRowId(copyRoot, "one");
+    const runtime = makeRuntimeWithSchema(
+      {
+        rootLevel: "duplicateHeaders",
+        levels: {
+          duplicateHeaders: {
+            name: "duplicateHeaders",
+            columns: [
+              {
+                ...column("first", "First"),
+                copy: () => [
+                  {
+                    header: "value",
+                    valueAt: (row) => row.columns.first,
+                  },
+                ],
+              },
+              {
+                ...column("second", "Second"),
+                copy: () => [
+                  {
+                    header: "value",
+                    valueAt: (row) => row.columns.second,
+                  },
+                ],
+              },
+            ],
+            options: {
+              rowKey: (node, localIdx) => node.rowKey ?? String(localIdx),
+            },
+            childLevels: [],
+          },
+        },
+      },
+      [
+        {
+          rowKey: "one",
+          levelName: "duplicateHeaders",
+          columns: { first: "A", second: "B" },
+        },
+      ],
+    );
+
+    expect(
+      await serializeGridCopyTargetToCsv(
+        runtime,
+        {
+          path: copyRoot,
+          selection: {
+            anchor: { rowId, colId: "first" },
+            head: { rowId, colId: "second" },
+          },
+        },
+        { includeHeaders: true },
+      ),
+    ).toBe("value,value_2\nA,B");
   });
 });
 
@@ -317,12 +492,12 @@ describe("prepareGridCopyTarget", () => {
       colId: "account",
     });
 
-    expect(prepareGridCopyTarget(runtime, document.createElement("div"))).toEqual(
-      {
-        path: root,
-        selection: makeSelection({ rowId: cashId, colId: "account" }),
-      },
-    );
+    expect(
+      prepareGridCopyTarget(runtime, document.createElement("div")),
+    ).toEqual({
+      path: root,
+      selection: makeSelection({ rowId: cashId, colId: "account" }),
+    });
   });
 
   it("returns no target when there is no active cell", () => {
@@ -333,7 +508,7 @@ describe("prepareGridCopyTarget", () => {
     ).toBeNull();
   });
 
-  it("keeps selections scoped to the clicked child path", () => {
+  it("keeps selections scoped to the clicked child path", async () => {
     const runtime = makeRuntime();
     runtime.coordinator.expand(root, cashId);
     const entriesPath = childPath(root, "cash", "entries");
@@ -363,7 +538,7 @@ describe("prepareGridCopyTarget", () => {
     });
     expect(
       target
-        ? serializeGridCopyTargetToCsv(runtime, target, {
+        ? await serializeGridCopyTargetToCsv(runtime, target, {
             includeHeaders: false,
           })
         : null,
@@ -393,23 +568,29 @@ function column(id: ColId, name: string): ColumnSchema {
 function makeRuntime(
   interaction: GridInteractionConfig = CELL_GRID_WITH_ACTIVE_ROW,
 ): GridRuntime {
+  return makeRuntimeWithSchema(schema, tree, interaction);
+}
+
+function makeRuntimeWithSchema(
+  gridSchema: GridSchema,
+  gridTree: TreeNode[],
+  interaction: GridInteractionConfig = CELL_GRID_WITH_ACTIVE_ROW,
+): GridRuntime {
   const runtime = createGridRuntime({
-    schema,
+    schema: gridSchema,
     dataSource: inMemoryGridDataSource({
-      schema,
-      tree,
-      levels: {
-        accounts: {
-          sortMode: "none",
-          filterMode: "none",
-          paginationMode: "none",
-        },
-        entries: {
-          sortMode: "none",
-          filterMode: "none",
-          paginationMode: "none",
-        },
-      },
+      schema: gridSchema,
+      tree: gridTree,
+      levels: Object.fromEntries(
+        Object.keys(gridSchema.levels).map((levelName) => [
+          levelName,
+          {
+            sortMode: "none" as const,
+            filterMode: "none" as const,
+            paginationMode: "none" as const,
+          },
+        ]),
+      ),
     }),
     interaction,
   });
@@ -417,7 +598,11 @@ function makeRuntime(
   return runtime;
 }
 
-function renderCellTarget(path: GridPath, rowId: RowId, colId: ColId): {
+function renderCellTarget(
+  path: GridPath,
+  rowId: RowId,
+  colId: ColId,
+): {
   content: HTMLElement;
 } {
   const rootElement = document.createElement("div");
@@ -438,10 +623,7 @@ function renderCellTarget(path: GridPath, rowId: RowId, colId: ColId): {
   return { content };
 }
 
-function applyAttrs(
-  element: HTMLElement,
-  attrs: Record<string, string>,
-): void {
+function applyAttrs(element: HTMLElement, attrs: Record<string, string>): void {
   for (const [name, value] of Object.entries(attrs)) {
     element.setAttribute(name, value);
   }

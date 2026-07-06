@@ -7,8 +7,10 @@ import type {
   CellEditBehavior,
   ColId,
   ColumnSchema as GridColumnSchema,
+  GridColumnCopyBehavior,
   GridPath,
   GridRuntime,
+  LevelRow,
   RowKey,
 } from "@sapporta/grid";
 import { rowKeyOfRowId } from "@sapporta/grid";
@@ -32,6 +34,7 @@ import type {
   TGridTableColumnSpec,
   TGridClientColumnSpec,
   TableColumnOptions,
+  TGridColumnCopyBehavior,
 } from "./tgrid-column-spec";
 import {
   tgridCellContext,
@@ -288,6 +291,9 @@ function customizeTableColumn<
       sessionContext,
     );
   }
+  if (options.copy) {
+    next.copy = typedCopy(levelId, options.copy, columnContext, sessionContext);
+  }
   return next;
 }
 
@@ -341,6 +347,9 @@ function clientColumnFor<
           sessionContext,
         )
       : gridColumn.renderCell,
+    copy: spec.options.copy
+      ? typedCopy(levelId, spec.options.copy, columnContext, sessionContext)
+      : gridColumn.copy,
   };
 }
 
@@ -378,6 +387,49 @@ function typedRenderCell<
         createElement(RenderCell, context),
       ),
     );
+  };
+}
+
+function typedCopy<
+  RowsByLevel extends TGridRowsByLevel,
+  AppServices,
+  LevelId extends TGridLevelId<RowsByLevel>,
+  TValue,
+>(
+  levelId: LevelId,
+  copy: TGridColumnCopyBehavior<RowsByLevel, AppServices, LevelId, TValue>,
+  column: TGridColumnContext<RowsByLevel[LevelId]>,
+  sessionContext: () => TGridSessionContext<RowsByLevel, AppServices>,
+): GridColumnCopyBehavior {
+  return async ({ path, column: sourceColumn, rows }) => {
+    const session = sessionContext();
+    const typedRows = typedRowsFromLevelRows<RowsByLevel, LevelId>(rows);
+    const values = rows.map(
+      (row) => row.columns[sourceColumn.id],
+    ) as readonly TValue[];
+    const typedColumn: TGridColumnContext<RowsByLevel[LevelId]> = {
+      ...column,
+      id: sourceColumn.id,
+      gridColumn: sourceColumn,
+    };
+    const copyColumns = await copy({
+      levelId,
+      path,
+      column: typedColumn,
+      rows: typedRows,
+      values,
+      runtime: session.runtime,
+      appServices: session.appServices,
+    });
+
+    return copyColumns.map((copyColumn) => ({
+      header: copyColumn.header,
+      valueAt: (row: LevelRow, rowIndex: number) =>
+        copyColumn.valueAt(
+          row.columns as Readonly<RowsByLevel[LevelId]>,
+          rowIndex,
+        ),
+    }));
   };
 }
 
@@ -529,6 +581,13 @@ function typedEditor<
       ),
     );
   };
+}
+
+function typedRowsFromLevelRows<
+  RowsByLevel extends TGridRowsByLevel,
+  LevelId extends TGridLevelId<RowsByLevel>,
+>(rows: readonly LevelRow[]): readonly Readonly<RowsByLevel[LevelId]>[] {
+  return rows.map((row) => row.columns as Readonly<RowsByLevel[LevelId]>);
 }
 
 function cellContextFor<

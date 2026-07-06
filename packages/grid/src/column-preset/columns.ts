@@ -1,4 +1,9 @@
-import type { CellRenderProps, ColumnSchema } from "../grid/types/schema";
+import type {
+  CellRenderProps,
+  ColumnSchema,
+  GridColumnCopyBehavior,
+  GridCopyColumn,
+} from "../grid/types/schema";
 import { defaultsFor } from "./defaults";
 import { normalizeOptions } from "./lookup";
 import {
@@ -10,6 +15,9 @@ import {
   presetRuntime,
   width,
   type ColumnPreset,
+  type ForeignKeyPreset,
+  type LookupPreset,
+  type SelectPreset,
 } from "./preset";
 import type { ColumnPresetRuntime } from "./runtime";
 import { renderWithPresetRuntime } from "./render";
@@ -99,6 +107,7 @@ function constructColumn<TMeta>(
 ): ColumnSchema {
   const columnPreset = normalizePreset(options);
   const runtime = normalizePresetRuntime(options, columnPreset);
+  const copy = options.copy ?? defaultCopyBehavior(columnPreset, runtime);
   const out: ColumnWithPresetRuntime<TMeta> = {
     id: options.id,
     name: options.name,
@@ -108,6 +117,7 @@ function constructColumn<TMeta>(
     activation: runtime.activation,
     meta: options.meta,
   };
+  if (copy) out.copy = copy;
   out[GRID_COLUMN_PRESET_RUNTIME] = runtime;
   return out;
 }
@@ -257,6 +267,77 @@ function resolvePresetEdit<TMeta>(
     editor,
     startsOn: option.startsOn ?? defaultEdit?.startsOn ?? [],
   };
+}
+
+function defaultCopyBehavior<TMeta>(
+  columnPreset: ColumnPreset,
+  runtime: ColumnPresetRuntime<TMeta>,
+): GridColumnCopyBehavior | undefined {
+  if (isSelectCopyPreset(columnPreset)) {
+    return ({ column }) => [
+      rawCopyColumn(column),
+      {
+        header: `${column.id}_label`,
+        valueAt: (row) =>
+          selectLabelForValue(row.columns[column.id], columnPreset, runtime),
+      },
+    ];
+  }
+
+  if (isLookupCopyPreset(columnPreset)) {
+    return async ({ column, rows }) => {
+      const values = rows.map((row) => row.columns[column.id]);
+      await columnPreset.lookup.valueLookup
+        .loadMissingEntries(values)
+        .catch(() => {});
+      return [
+        rawCopyColumn(column),
+        {
+          header: `${column.id}_label`,
+          valueAt: (row) => {
+            const value = row.columns[column.id];
+            return (
+              columnPreset.lookup.valueLookup.entryForValue(value)?.label ??
+              runtime.valueCodec.format(value)
+            );
+          },
+        },
+      ];
+    };
+  }
+
+  return undefined;
+}
+
+function rawCopyColumn(column: ColumnSchema): GridCopyColumn {
+  return {
+    header: column.id,
+    valueAt: (row) => row.columns[column.id],
+  };
+}
+
+function selectLabelForValue<TMeta>(
+  value: unknown,
+  columnPreset: SelectPreset,
+  runtime: ColumnPresetRuntime<TMeta>,
+): string {
+  return (
+    columnPreset.select.options.find((option) => Object.is(option.value, value))
+      ?.label ?? runtime.valueCodec.format(value)
+  );
+}
+
+function isSelectCopyPreset(preset: ColumnPreset): preset is SelectPreset {
+  return preset.kind === "select" && "select" in preset;
+}
+
+function isLookupCopyPreset(
+  preset: ColumnPreset,
+): preset is LookupPreset | ForeignKeyPreset {
+  return (
+    (preset.kind === "lookupValue" || preset.kind === "foreignKey") &&
+    "lookup" in preset
+  );
 }
 
 function numberDisplay<TMeta>(options: NumberColumnOptions<TMeta>) {

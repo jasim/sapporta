@@ -5,10 +5,7 @@ import {
   ContextMenuItem,
   ContextMenuTrigger,
 } from "@sapporta/ui/context-menu";
-import {
-  serializeGridCopyTargetToCsv,
-  type GridCopyTarget,
-} from "../copy";
+import { serializeGridCopyTargetToCsv, type GridCopyTarget } from "../copy";
 import { prepareGridCopyTarget } from "../copy/target";
 import { useGridRuntime } from "./GridRuntimeProvider";
 
@@ -27,10 +24,10 @@ export function GridCopyContextMenu({ children }: GridCopyContextMenuProps) {
     setHasCopyTarget(target !== null);
   }
 
-  function copy(includeHeaders: boolean): void {
+  async function copy(includeHeaders: boolean): Promise<void> {
     const target = targetRef.current;
     if (!target) return;
-    const csv = serializeGridCopyTargetToCsv(runtime, target, {
+    const csv = await serializeGridCopyTargetToCsv(runtime, target, {
       includeHeaders,
     });
     if (csv == null) return;
@@ -43,10 +40,16 @@ export function GridCopyContextMenu({ children }: GridCopyContextMenuProps) {
         <div data-grid-copy-menu-scope="true">{children}</div>
       </ContextMenuTrigger>
       <ContextMenuContent>
-        <ContextMenuItem disabled={!hasCopyTarget} onSelect={() => copy(false)}>
+        <ContextMenuItem
+          disabled={!hasCopyTarget}
+          onSelect={() => void copy(false)}
+        >
           Copy
         </ContextMenuItem>
-        <ContextMenuItem disabled={!hasCopyTarget} onSelect={() => copy(true)}>
+        <ContextMenuItem
+          disabled={!hasCopyTarget}
+          onSelect={() => void copy(true)}
+        >
           Copy with headers
         </ContextMenuItem>
       </ContextMenuContent>
