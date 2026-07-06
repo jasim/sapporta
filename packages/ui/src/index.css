@@ -71,6 +71,8 @@
   --sap-selection: #eeeeee;
   --sap-focus-ring: rgb(139 93 60 / 0.42);
   --sap-link: #1f6fb0;
+  --sap-drill-down-link: var(--sap-link);
+  --sap-drill-down-link-soft: rgb(31 111 176 / 0.12);
 
   /* Numeric emphasis (any deltas / gains-losses / data accents) */
   --sap-positive: #1a4d2e;
@@ -161,6 +163,8 @@
   --sap-selection: #3a2a1e;
   --sap-focus-ring: rgb(220 168 107 / 0.42);
   --sap-link: #6dc0e0;
+  --sap-drill-down-link: var(--sap-link);
+  --sap-drill-down-link-soft: rgb(109 192 224 / 0.14);
 
   --sap-positive: #7bc67b;
   --sap-warning: #f2c14e;
@@ -216,6 +220,8 @@
   --color-sap-selection: var(--sap-selection);
   --color-sap-focus-ring: var(--sap-focus-ring);
   --color-sap-link: var(--sap-link);
+  --color-sap-drill-down-link: var(--sap-drill-down-link);
+  --color-sap-drill-down-link-soft: var(--sap-drill-down-link-soft);
 
   --color-sap-positive: var(--sap-positive);
   --color-sap-warning: var(--sap-warning);

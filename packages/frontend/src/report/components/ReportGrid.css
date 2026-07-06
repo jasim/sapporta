@@ -1,5 +1,58 @@
+/* Reports are readonly analysis surfaces. The gray wash and quiet focus ring
+   keep keyboard drill-down visible without making cells look edit-ready. */
 .sapporta-report-tgrid {
-  background: var(--sap-surface);
+  --sap-report-grid-background: color-mix(
+    in oklab,
+    var(--sap-surface) 35%,
+    var(--sap-sidebar)
+  );
+  --sap-report-grid-focus-background: color-mix(
+    in oklab,
+    var(--sap-report-grid-background) 72%,
+    var(--sap-border-soft)
+  );
+  --sap-report-grid-focus-ring: color-mix(
+    in oklab,
+    var(--sap-border-strong) 78%,
+    var(--sap-fg-subtle)
+  );
+
+  background: var(--sap-report-grid-background);
+}
+
+/* Nested report levels use the same grid preset as table pages, so carry the
+   readonly report treatment through every level. */
+.sapporta-report-tgrid .sapporta-report-tgrid__level {
+  --grid-background: var(--sap-report-grid-background);
+  --grid-header-background: var(--sap-report-grid-background);
+  --grid-editor-background: var(--sap-report-grid-background);
+  --grid-row-hover-background: color-mix(
+    in oklab,
+    var(--sap-report-grid-background) 84%,
+    var(--sap-border-soft)
+  );
+  --grid-cell-focus-ring-width: 1px;
+  --grid-cell-active-focus-background: var(--sap-report-grid-focus-background);
+  --grid-cell-active-focus-ring-color: var(--sap-report-grid-focus-ring);
+  --grid-cell-active-selection-background: var(
+    --sap-report-grid-focus-background
+  );
+  --grid-cell-ghost-focus-background: color-mix(
+    in oklab,
+    var(--sap-report-grid-background) 86%,
+    var(--sap-border-soft)
+  );
+  --grid-cell-ghost-focus-ring-color: var(--sap-border);
+  --grid-cell-ghost-selection-background: color-mix(
+    in oklab,
+    var(--sap-report-grid-background) 90%,
+    var(--sap-border-soft)
+  );
+}
+
+.sapporta-report-tgrid
+  .sapporta-report-tgrid__level[data-grid-depth]:not([data-grid-depth="0"]) {
+  background: var(--grid-background);
 }
 
 .sapporta-report-tgrid
@@ -10,7 +63,7 @@
     [data-grid-part="row"][data-row-kind="opening"],
     [data-grid-part="row"][data-row-kind="closing"]
   ) {
-  --grid-row-base-background: var(--sap-chip);
+  --grid-row-base-background: var(--sap-chip-bg);
 
   font-weight: 650;
 }
@@ -43,7 +96,7 @@
 }
 
 .sapporta-report-tgrid__primary-link {
-  color: var(--sap-brand);
+  color: var(--sap-drill-down-link);
   display: inline-flex;
   max-width: 100%;
   min-width: 0;

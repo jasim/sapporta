@@ -1,3 +1,25 @@
+/* Editable table pages should read like white working documents. The stronger
+   focus ring makes keyboard position feel edit-ready and distinct from report
+   drill focus. */
+:where(.sapporta-table-grid--editable) {
+  --grid-background: var(--sap-surface);
+  --grid-header-background: var(--sap-surface);
+  --grid-editor-background: var(--sap-surface);
+  --grid-cell-focus-ring-width: 1.5px;
+  --grid-cell-active-focus-background: color-mix(
+    in oklab,
+    var(--sap-brand-soft) 68%,
+    var(--sap-surface)
+  );
+  --grid-cell-active-focus-ring-color: var(--sap-focus-ring);
+  --grid-cell-ghost-focus-background: var(--sap-selection);
+  --grid-cell-ghost-focus-ring-color: color-mix(
+    in oklab,
+    var(--sap-focus-ring) 50%,
+    transparent
+  );
+}
+
 :where(.sapporta-table-grid[data-grid-presentation="cards"]) {
   --grid-card-background: color-mix(
     in oklab,

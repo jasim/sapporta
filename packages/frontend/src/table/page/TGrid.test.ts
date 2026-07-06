@@ -112,6 +112,9 @@ describe("TGrid", () => {
     expect(
       container.querySelector('[data-grid-copy-menu-scope="true"]'),
     ).toBeInstanceOf(HTMLElement);
+    expect(
+      container.querySelector(".sapporta-table-grid--editable"),
+    ).toBeInstanceOf(HTMLElement);
     expect(container.textContent).toContain("Cash");
   });
 });

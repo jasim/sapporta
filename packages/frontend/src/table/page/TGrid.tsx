@@ -163,6 +163,9 @@ function mergeTGridChrome({
     levelContainerClassName: (ctx) =>
       cn(
         chrome.levelContainerClassName?.(ctx),
+        // Table grids opt into editable chrome; report grids reuse the base
+        // preset but keep their own readonly focus and surface treatment.
+        "sapporta-table-grid--editable",
         ctx.path === root && className,
         ctx.path !== root &&
           viewRelatedRows &&
