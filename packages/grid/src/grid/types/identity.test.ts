@@ -221,7 +221,6 @@ describe("capabilitiesFor", () => {
       focusable: true,
       selectable: true,
       rowSelectable: true,
-      hasContextMenu: true,
       canExpand: true,
     });
   });

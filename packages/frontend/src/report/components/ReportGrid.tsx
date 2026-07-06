@@ -4,6 +4,7 @@ import {
   describeCellActivation,
   childPath,
   createGridRuntime,
+  GridCopyContextMenu,
   GridLevel,
   GridRuntimeProvider,
   inMemoryGridDataSource,
@@ -123,9 +124,11 @@ function ReportGridBody({ session }: { session: ReportGridBinding }) {
   }, [session.dataset, session.runtime]);
 
   return (
-    <div className="sapporta-report-tgrid min-w-full">
-      <GridLevel path={session.root} chrome={chrome} presentation="tabular" />
-    </div>
+    <GridCopyContextMenu>
+      <div className="sapporta-report-tgrid min-w-full">
+        <GridLevel path={session.root} chrome={chrome} presentation="tabular" />
+      </div>
+    </GridCopyContextMenu>
   );
 }
 

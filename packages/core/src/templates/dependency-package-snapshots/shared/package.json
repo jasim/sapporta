@@ -58,6 +58,11 @@
       "sapporta:source": "./src/daterange.ts",
       "default": "./dist/daterange.js"
     },
+    "./csv": {
+      "types": "./dist/csv.d.ts",
+      "sapporta:source": "./src/csv.ts",
+      "default": "./dist/csv.js"
+    },
     "./grid-dataset": {
       "types": "./dist/grid-dataset/index.d.ts",
       "sapporta:source": "./src/grid-dataset/index.ts",

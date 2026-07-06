@@ -24,7 +24,6 @@ export type RowCapabilities = {
   focusable: boolean;
   selectable: boolean;
   rowSelectable: boolean;
-  hasContextMenu: boolean;
   canExpand: boolean;
 };
 
@@ -39,7 +38,6 @@ export function capabilitiesFor(kind: LevelRowKind): RowCapabilities {
         focusable: true,
         selectable: true,
         rowSelectable: true,
-        hasContextMenu: true,
         canExpand: true,
       };
     case "rollup":
@@ -48,7 +46,6 @@ export function capabilitiesFor(kind: LevelRowKind): RowCapabilities {
         focusable: true,
         selectable: true,
         rowSelectable: true,
-        hasContextMenu: true,
         canExpand: false,
       };
     case "opening":
@@ -58,7 +55,6 @@ export function capabilitiesFor(kind: LevelRowKind): RowCapabilities {
         focusable: true,
         selectable: false,
         rowSelectable: false,
-        hasContextMenu: false,
         canExpand: false,
       };
     case "subtotal":
@@ -67,7 +63,6 @@ export function capabilitiesFor(kind: LevelRowKind): RowCapabilities {
         focusable: true,
         selectable: true,
         rowSelectable: false,
-        hasContextMenu: false,
         canExpand: false,
       };
     case "footer":
@@ -76,7 +71,6 @@ export function capabilitiesFor(kind: LevelRowKind): RowCapabilities {
         focusable: false,
         selectable: false,
         rowSelectable: false,
-        hasContextMenu: false,
         canExpand: false,
       };
     case "phantom":
@@ -85,7 +79,6 @@ export function capabilitiesFor(kind: LevelRowKind): RowCapabilities {
         focusable: true,
         selectable: true,
         rowSelectable: true,
-        hasContextMenu: false,
         canExpand: false,
       };
     default: {

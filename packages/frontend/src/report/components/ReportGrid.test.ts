@@ -311,6 +311,9 @@ describe("ReportGridDataset", () => {
     );
 
     await waitForText(container, "Opening balance");
+    expect(
+      container.querySelector('[data-grid-copy-menu-scope="true"]'),
+    ).toBeInstanceOf(HTMLElement);
     expect(container.innerHTML).toContain('href="/tables/accounts/acct-1"');
     expect(container.innerHTML).toContain('href="/tables/journals/journal-1"');
     expect(container.textContent).toContain("125.00");

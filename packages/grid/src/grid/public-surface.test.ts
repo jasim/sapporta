@@ -18,6 +18,8 @@ describe("grid public surface", () => {
 
     expect(typeof mod.createGridRuntime).toBe("function");
     expect(typeof mod.GridRuntimeProvider).toBe("function");
+    expect(typeof mod.GridCopyContextMenu).toBe("function");
+    expect(typeof mod.serializeGridCopyTargetToCsv).toBe("function");
     expect(typeof mod.useGridRuntimeEffect).toBe("function");
     expect(typeof mod.GridLevel).toBe("function");
     expect(typeof mod.inMemoryGridDataSource).toBe("function");

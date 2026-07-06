@@ -2,6 +2,7 @@ import { useMemo, type CSSProperties } from "react";
 import { Table2 } from "lucide-react";
 import {
   trailingEdge,
+  GridCopyContextMenu,
   GridLevel,
   GridRuntimeProvider,
   rootPath,
@@ -117,13 +118,15 @@ export function TGrid<
 
   return (
     <GridRuntimeProvider runtime={runtime}>
-      {withTGridSessionContext(
-        sessionContext as unknown as TGridSessionContext<
-          TGridRowsByLevel,
-          unknown
-        >,
-        <GridLevel path={root} chrome={chrome} presentation={presentation} />,
-      )}
+      <GridCopyContextMenu>
+        {withTGridSessionContext(
+          sessionContext as unknown as TGridSessionContext<
+            TGridRowsByLevel,
+            unknown
+          >,
+          <GridLevel path={root} chrome={chrome} presentation={presentation} />,
+        )}
+      </GridCopyContextMenu>
     </GridRuntimeProvider>
   );
 }
@@ -155,7 +158,8 @@ function mergeTGridChrome({
       ),
     renderStatus: (ctx) =>
       ctx.path === root ? null : chrome.renderStatus?.(ctx),
-    renderEmpty: (ctx) => (ctx.path === root ? null : chrome.renderEmpty?.(ctx)),
+    renderEmpty: (ctx) =>
+      ctx.path === root ? null : chrome.renderEmpty?.(ctx),
     levelContainerClassName: (ctx) =>
       cn(
         chrome.levelContainerClassName?.(ctx),

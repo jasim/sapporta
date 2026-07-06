@@ -1,5 +1,9 @@
 export { useGridRuntimeEffect } from "./GridRuntimeEffect";
 export {
+  GridCopyContextMenu,
+  type GridCopyContextMenuProps,
+} from "./GridCopyContextMenu";
+export {
   GridRuntimeProvider,
   useActiveCell,
   useActiveCellForPath,

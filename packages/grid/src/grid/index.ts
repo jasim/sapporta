@@ -384,6 +384,7 @@ export {
 
 export {
   GridRuntimeProvider,
+  GridCopyContextMenu,
   useGridRuntimeEffect,
   useActiveCell,
   useActiveCellForPath,
@@ -408,7 +409,14 @@ export {
   type GridEmptyContext,
   type GridLevelChrome,
   type GridPresentation,
+  type GridCopyContextMenuProps,
 } from "./react";
+
+export {
+  serializeGridCopyTargetToCsv,
+  type GridCopyCsvOptions,
+  type GridCopyTarget,
+} from "./copy";
 
 export {
   hostBackedRowQuery,

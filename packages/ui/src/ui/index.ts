@@ -10,6 +10,20 @@ export {
   CommandList,
 } from "./primitives/command";
 export {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuGroup,
+  ContextMenuItem,
+  ContextMenuLabel,
+  ContextMenuPortal,
+  ContextMenuRadioGroup,
+  ContextMenuSeparator,
+  ContextMenuSub,
+  ContextMenuSubContent,
+  ContextMenuSubTrigger,
+  ContextMenuTrigger,
+} from "./primitives/context-menu";
+export {
   Dialog,
   DialogClose,
   DialogContent,
