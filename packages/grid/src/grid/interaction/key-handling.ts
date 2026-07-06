@@ -42,9 +42,13 @@ function directionForKey(e: KeyEventLike): NavigationDirection | null {
     case "ArrowDown":
       return ctrl ? "end" : "down";
     case "ArrowLeft":
-      return ctrl ? "rowStart" : "left";
+      // Let keyboard users go back in the browser with Cmd+Left.
+      if (e.metaKey) return null;
+      return e.ctrlKey ? "rowStart" : "left";
     case "ArrowRight":
-      return ctrl ? "rowEnd" : "right";
+      // Let keyboard users go forward in the browser with Cmd+Right.
+      if (e.metaKey) return null;
+      return e.ctrlKey ? "rowEnd" : "right";
     case "Home":
       return ctrl ? "start" : "rowStart";
     case "End":
