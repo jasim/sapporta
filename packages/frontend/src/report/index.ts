@@ -1,9 +1,9 @@
 export {
   ReportGridDataset,
   type ReportGridDatasetProps,
-  type ReportGridLink,
-  type ReportGridLinkContext,
-  type ReportGridLinkResolvers,
+  type ReportCellLink,
+  type ReportCellLinkContext,
+  type ReportCellLinkResolvers,
 } from "./components/ReportGrid";
 export {
   ReportSummaryStats,

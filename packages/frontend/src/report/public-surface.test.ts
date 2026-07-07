@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 import * as report from "./index";
 import type {
-  ReportGridLink,
-  ReportGridLinkContext,
-  ReportGridLinkResolvers,
+  ReportCellLink,
+  ReportCellLinkContext,
+  ReportCellLinkResolvers,
 } from "./index";
 
 describe("@sapporta/frontend/report public surface", () => {
@@ -23,14 +23,16 @@ describe("@sapporta/frontend/report public surface", () => {
       label: "Open report",
       href: "/reports/sample",
       kind: "route",
-    } satisfies ReportGridLink;
+    } satisfies ReportCellLink;
     const resolvers = {
-      row: {
-        row: (_context: ReportGridLinkContext) => [link],
+      summary: {
+        cell: {
+          total: (_context: ReportCellLinkContext) => [link],
+        },
       },
-    } satisfies ReportGridLinkResolvers;
+    } satisfies ReportCellLinkResolvers;
 
-    expect(resolvers.row.row).toBeDefined();
+    expect(resolvers.summary.cell?.total).toBeDefined();
   });
 
   it("does not export the lower grid runtime adapter layer", () => {

@@ -6,8 +6,8 @@ import type { ReactElement } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import {
   ReportGridDataset,
-  type ReportGridLinkContext,
-  type ReportGridLinkResolvers,
+  type ReportCellLinkContext,
+  type ReportCellLinkResolvers,
 } from "./ReportGrid";
 import type { GridDataset } from "@sapporta/shared/grid-dataset";
 
@@ -224,7 +224,7 @@ describe("ReportGridDataset", () => {
     });
   }
 
-  it("renders nested rows with app-owned row and cell links", async () => {
+  it("renders nested rows with app-owned cell links", async () => {
     const dataset = {
       name: "account-ledger",
       label: "Account Ledger",
@@ -285,13 +285,15 @@ describe("ReportGridDataset", () => {
 
     const links = {
       account: {
-        row: ({ node }) => [
-          {
-            label: "Open account",
-            href: `/tables/accounts/${node.columns.account_id}`,
-            kind: "record",
-          },
-        ],
+        cell: {
+          name: ({ node }) => [
+            {
+              label: "Open account",
+              href: `/tables/accounts/${node.columns.account_id}`,
+              kind: "record",
+            },
+          ],
+        },
       },
       entry: {
         cell: {
@@ -304,7 +306,7 @@ describe("ReportGridDataset", () => {
           ],
         },
       },
-    } satisfies ReportGridLinkResolvers;
+    } satisfies ReportCellLinkResolvers;
 
     const container = await renderClient(
       createElement(ReportGridDataset, { dataset, links }),
@@ -349,7 +351,7 @@ describe("ReportGridDataset", () => {
       ],
     } satisfies GridDataset;
 
-    const row = vi.fn((context: ReportGridLinkContext) => [
+    const account = vi.fn((context: ReportCellLinkContext) => [
       {
         label: "Open account",
         href: `/reports/accounts/${context.node.columns.account}`,
@@ -358,9 +360,11 @@ describe("ReportGridDataset", () => {
     ]);
     const links = {
       account: {
-        row,
+        cell: {
+          account,
+        },
       },
-    } satisfies ReportGridLinkResolvers;
+    } satisfies ReportCellLinkResolvers;
 
     const container = await renderClient(
       createElement(ReportGridDataset, { dataset, links }),
@@ -370,22 +374,24 @@ describe("ReportGridDataset", () => {
     expect(container.innerHTML).toContain('href="/reports/accounts/Cash"');
     const footerCell = cellByColumn(container, "account", "Grand Total");
     expect(footerCell.querySelector("a")).toBeNull();
-    expect(row).toHaveBeenCalledTimes(1);
+    expect(account).toHaveBeenCalledTimes(1);
   });
 
-  it("renders row primary links only in the first visible column", async () => {
+  it("renders cell primary links only in the configured column", async () => {
     const dataset = accountLedgerDataset();
     const links = {
       account: {
-        row: ({ node }) => [
-          {
-            label: "Open ledger",
-            href: `/reports/account-ledger?account=${node.columns.account_id}`,
-            target: "_blank",
-          },
-        ],
+        cell: {
+          name: ({ node }) => [
+            {
+              label: "Open ledger",
+              href: `/reports/account-ledger?account=${node.columns.account_id}`,
+              target: "_blank",
+            },
+          ],
+        },
       },
-    } satisfies ReportGridLinkResolvers;
+    } satisfies ReportCellLinkResolvers;
 
     const container = await renderClient(
       createElement(ReportGridDataset, { dataset, links }),
@@ -417,16 +423,6 @@ describe("ReportGridDataset", () => {
     const dataset = accountLedgerDataset();
     const links = {
       account: {
-        row: ({ node }) => [
-          {
-            label: "Open account record",
-            href: `/tables/accounts/${node.columns.account_id}`,
-          },
-          {
-            label: "Open transactions",
-            href: `/tables/transactions?account=${node.columns.account_id}`,
-          },
-        ],
         cell: {
           name: ({ node }) => [
             {
@@ -451,7 +447,7 @@ describe("ReportGridDataset", () => {
           ],
         },
       },
-    } satisfies ReportGridLinkResolvers;
+    } satisfies ReportCellLinkResolvers;
 
     const container = await renderClient(
       createElement(ReportGridDataset, { dataset, links }),
@@ -488,11 +484,8 @@ describe("ReportGridDataset", () => {
       ),
     ).toBeNull();
     expect(
-      document.body.querySelector('a[href="/tables/accounts/acct-1"]'),
-    ).toBeNull();
-    expect(
       document.body.querySelector(
-        'a[href="/tables/transactions?account=acct-1"]',
+        'a[href="/tables/transactions?account=acct-1&side=debit"]',
       ),
     ).toBeNull();
   });
@@ -501,15 +494,17 @@ describe("ReportGridDataset", () => {
     const dataset = accountLedgerDataset({ defaultCollapsed: true });
     const links = {
       account: {
-        row: ({ node }) => [
-          {
-            label: "Open ledger",
-            href: `/reports/account-ledger?account=${node.columns.account_id}`,
-            target: "_blank",
-          },
-        ],
+        cell: {
+          name: ({ node }) => [
+            {
+              label: "Open ledger",
+              href: `/reports/account-ledger?account=${node.columns.account_id}`,
+              target: "_blank",
+            },
+          ],
+        },
       },
-    } satisfies ReportGridLinkResolvers;
+    } satisfies ReportCellLinkResolvers;
     const open = vi.spyOn(window, "open").mockImplementation(() => null);
     try {
       const container = await renderClient(
@@ -539,7 +534,7 @@ describe("ReportGridDataset", () => {
 
   it("does not invoke link resolvers again when Enter follows the drill-down link", async () => {
     const dataset = accountLedgerDataset({ defaultCollapsed: true });
-    const row = vi.fn((context: ReportGridLinkContext) => [
+    const nameLink = vi.fn((context: ReportCellLinkContext) => [
       {
         label: "Open ledger",
         href: `/reports/account-ledger?account=${context.node.columns.account_id}`,
@@ -547,8 +542,12 @@ describe("ReportGridDataset", () => {
       },
     ]);
     const links = {
-      account: { row },
-    } satisfies ReportGridLinkResolvers;
+      account: {
+        cell: {
+          name: nameLink,
+        },
+      },
+    } satisfies ReportCellLinkResolvers;
     const open = vi.spyOn(window, "open").mockImplementation(() => null);
     try {
       const container = await renderClient(
@@ -558,7 +557,7 @@ describe("ReportGridDataset", () => {
       await waitForText(container, "Cash");
       const nameCell = cellByColumn(container, "name", "Cash");
       await mouseDown(nameCell);
-      const callsBeforeEnter = row.mock.calls.length;
+      const callsBeforeEnter = nameLink.mock.calls.length;
       await keyDown(gridRootFor(nameCell), "Enter");
 
       expect(open).toHaveBeenCalledWith(
@@ -566,7 +565,7 @@ describe("ReportGridDataset", () => {
         "_blank",
         "noopener,noreferrer",
       );
-      expect(row).toHaveBeenCalledTimes(callsBeforeEnter);
+      expect(nameLink).toHaveBeenCalledTimes(callsBeforeEnter);
     } finally {
       open.mockRestore();
     }
@@ -594,13 +593,8 @@ describe("ReportGridDataset", () => {
 
   it("toggles nested report rows with Enter when the focused cell resolves no link", async () => {
     const dataset = accountLedgerDataset({ defaultCollapsed: true });
-    const links = {
-      account: {
-        row: () => [],
-      },
-    } satisfies ReportGridLinkResolvers;
     const container = await renderClient(
-      createElement(ReportGridDataset, { dataset, links }),
+      createElement(ReportGridDataset, { dataset }),
     );
 
     await waitForText(container, "Cash");
@@ -621,15 +615,17 @@ describe("ReportGridDataset", () => {
     const dataset = accountLedgerDataset({ defaultCollapsed: true });
     const links = {
       account: {
-        row: ({ node }) => [
-          {
-            label: "Open ledger",
-            href: `/reports/account-ledger?account=${node.columns.account_id}`,
-            target: "_blank",
-          },
-        ],
+        cell: {
+          name: ({ node }) => [
+            {
+              label: "Open ledger",
+              href: `/reports/account-ledger?account=${node.columns.account_id}`,
+              target: "_blank",
+            },
+          ],
+        },
       },
-    } satisfies ReportGridLinkResolvers;
+    } satisfies ReportCellLinkResolvers;
     const open = vi.spyOn(window, "open").mockImplementation(() => null);
     try {
       const container = await renderClient(
