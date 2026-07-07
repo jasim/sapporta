@@ -434,6 +434,77 @@
   justify-content: center;
 }
 
+.levelStatus,
+.levelEmpty {
+  align-items: center;
+  background: var(--sap-surface);
+  border-bottom: 1px solid var(--sap-border-soft);
+  color: var(--sap-fg-muted);
+  display: flex;
+  font-size: var(--text-sap-data);
+  gap: 10px;
+  line-height: 1.38;
+  min-height: var(--height-sap-header);
+  min-width: 0;
+  padding: 8px 10px;
+}
+
+.levelStatus[data-grid-depth="1"],
+.levelEmpty[data-grid-depth="1"] {
+  margin-inline-start: 58px;
+}
+
+.levelStatus[data-grid-depth]:not([data-grid-depth="0"]):not(
+    [data-grid-depth="1"]
+  ),
+.levelEmpty[data-grid-depth]:not([data-grid-depth="0"]):not(
+    [data-grid-depth="1"]
+  ) {
+  margin-inline-start: 46px;
+}
+
+.levelStatus[data-grid-depth]:not([data-grid-depth="0"]),
+.levelEmpty[data-grid-depth]:not([data-grid-depth="0"]) {
+  background: var(--sap-nested-bg);
+}
+
+.levelStatus[data-grid-status="loading"] {
+  border-left: 2px solid var(--sap-loading-indicator-bar);
+}
+
+.levelStatus[data-grid-status="error"] {
+  background: color-mix(in oklab, var(--sap-negative) 8%, var(--sap-surface));
+  border-left: 2px solid var(--sap-negative);
+  color: var(--sap-negative);
+}
+
+.levelStatusText {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.levelStatusRetry {
+  align-items: center;
+  background: var(--sap-surface);
+  border: 1px solid
+    color-mix(in oklab, var(--sap-negative) 28%, var(--sap-border));
+  border-radius: var(--radius-sm);
+  color: var(--sap-negative);
+  cursor: pointer;
+  display: inline-flex;
+  flex: none;
+  font: inherit;
+  font-size: var(--text-sap-data);
+  font-weight: 650;
+  height: 24px;
+  margin-left: auto;
+  padding: 0 8px;
+}
+
+.levelStatusRetry:hover {
+  background: color-mix(in oklab, var(--sap-negative) 10%, var(--sap-surface));
+}
+
 .presetGrid[data-grid-depth]:not([data-grid-depth="0"]) {
   --grid-cell-min-height: 31px;
 

@@ -60,7 +60,7 @@ export const TableGridSurface = forwardRef<
           aria-live="polite"
           className="h-[2px] shrink-0 overflow-hidden bg-sap-border-soft"
         >
-          <div className="h-full w-1/3 animate-pulse bg-sap-brand" />
+          <div className="h-full w-1/3 animate-pulse bg-sap-loading-indicator-bar" />
         </div>
       )}
 

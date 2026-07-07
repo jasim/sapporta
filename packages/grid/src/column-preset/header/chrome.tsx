@@ -6,6 +6,7 @@ import {
 import type { PresetChromeOptions } from "../types";
 import { templateColumns } from "../width";
 import styles from "../sapporta-preset.module.css";
+import { PresetEmptyLevel, PresetLevelStatusBand } from "../LevelStateChrome";
 import { ColumnPresetHeader } from "./ColumnPresetHeader";
 
 export function chrome<TMeta = unknown, TFilter = unknown>(
@@ -13,6 +14,8 @@ export function chrome<TMeta = unknown, TFilter = unknown>(
 ): GridLevelChrome {
   return {
     ...defaultGridLevelChrome,
+    renderStatus: ({ path }) => <PresetLevelStatusBand path={path} />,
+    renderEmpty: ({ path }) => <PresetEmptyLevel path={path} />,
     renderHeader: ({ path, levelName, presentation, schema }) =>
       presentation === "tabular" ? (
         <ColumnPresetHeader

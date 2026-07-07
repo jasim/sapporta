@@ -73,6 +73,7 @@
   --sap-link: #1f6fb0;
   --sap-drill-down-link: var(--sap-link);
   --sap-drill-down-link-soft: rgb(31 111 176 / 0.12);
+  --sap-loading-indicator-bar: #2f6f9f;
 
   /* Numeric emphasis (any deltas / gains-losses / data accents) */
   --sap-positive: #1a4d2e;
@@ -165,6 +166,7 @@
   --sap-link: #6dc0e0;
   --sap-drill-down-link: var(--sap-link);
   --sap-drill-down-link-soft: rgb(109 192 224 / 0.14);
+  --sap-loading-indicator-bar: #6fb6df;
 
   --sap-positive: #7bc67b;
   --sap-warning: #f2c14e;
@@ -222,6 +224,7 @@
   --color-sap-link: var(--sap-link);
   --color-sap-drill-down-link: var(--sap-drill-down-link);
   --color-sap-drill-down-link-soft: var(--sap-drill-down-link-soft);
+  --color-sap-loading-indicator-bar: var(--sap-loading-indicator-bar);
 
   --color-sap-positive: var(--sap-positive);
   --color-sap-warning: var(--sap-warning);
