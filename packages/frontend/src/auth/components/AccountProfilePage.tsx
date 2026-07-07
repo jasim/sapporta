@@ -113,11 +113,12 @@ export function AccountProfilePage() {
 }
 
 type ExpirationChoice = "never" | "date";
+const tokenNameSuffixLength = 4;
 
 function AgentAccessTokens() {
   const [tokens, setTokens] = useState<AuthToken[]>([]);
   const [isCreateFormOpen, setCreateFormOpen] = useState(false);
-  const [name, setName] = useState("codex-local");
+  const [name, setName] = useState(createDefaultTokenName);
   const [expiresAt, setExpiresAt] = useState("");
   const [expirationChoice, setExpirationChoice] =
     useState<ExpirationChoice>("never");
@@ -155,7 +156,7 @@ function AgentAccessTokens() {
       });
       setRawToken(created.rawToken);
       setTokens((current) => [created.token, ...current]);
-      setName("codex-local");
+      setName(createDefaultTokenName());
       setExpiresAt("");
       setExpirationChoice("never");
       setCreateFormOpen(false);
@@ -186,6 +187,9 @@ function AgentAccessTokens() {
 
   async function copyRawToken() {
     if (!rawToken) return;
+    if (typeof navigator === "undefined" || !navigator.clipboard) {
+      throw new Error("Clipboard is not available.");
+    }
     await navigator.clipboard.writeText(rawToken);
   }
 
@@ -202,7 +206,10 @@ function AgentAccessTokens() {
           <Button
             type="button"
             className="bg-sap-brand text-white hover:bg-sap-brand/90"
-            onClick={() => setCreateFormOpen(true)}
+            onClick={() => {
+              setName(createDefaultTokenName());
+              setCreateFormOpen(true);
+            }}
           >
             <Plus className="h-4 w-4" strokeWidth={1.9} />
             Create new access token
@@ -361,6 +368,16 @@ function AgentAccessTokens() {
   );
 }
 
+function createDefaultTokenName(): string {
+  return `Agent Token ${randomTokenNameSuffix()}`;
+}
+
+function randomTokenNameSuffix(): string {
+  const value =
+    globalThis.crypto?.randomUUID() ?? Math.random().toString(36).slice(2);
+  return value.replaceAll("-", "").slice(0, tokenNameSuffixLength);
+}
+
 function CreatedTokenDialog({
   rawToken,
   onClose,
@@ -368,8 +385,37 @@ function CreatedTokenDialog({
 }: {
   rawToken: string | null;
   onClose: () => void;
-  onCopy: () => void;
+  onCopy: () => Promise<void>;
 }) {
+  const [copyStatus, setCopyStatus] = useState<CopyStatus>("idle");
+
+  useEffect(() => {
+    setCopyStatus("idle");
+  }, [rawToken]);
+
+  useEffect(() => {
+    if (copyStatus === "idle") return;
+    const timeout = window.setTimeout(() => setCopyStatus("idle"), 2200);
+    return () => window.clearTimeout(timeout);
+  }, [copyStatus]);
+
+  async function handleCopy() {
+    if (!rawToken) return;
+    try {
+      await onCopy();
+      setCopyStatus("copied");
+    } catch {
+      setCopyStatus("failed");
+    }
+  }
+
+  const copyStatusText =
+    copyStatus === "copied"
+      ? "Token copied to clipboard."
+      : copyStatus === "failed"
+        ? "Token could not be copied. Select it and copy manually."
+        : null;
+
   return (
     <Dialog
       open={rawToken !== null}
@@ -395,21 +441,28 @@ function CreatedTokenDialog({
           </div>
         </DialogHeader>
 
-        <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_36px]">
+        <div className="grid gap-2">
           <Input
             aria-label="New agent access token"
             className="min-w-0 border-sap-border bg-sap-surface font-mono text-[12px] text-sap-fg"
             value={rawToken ?? ""}
             readOnly
           />
-          <button
-            className="flex h-9 w-9 items-center justify-center rounded-[7px] border border-sap-border bg-sap-surface text-sap-muted hover:text-sap-fg"
-            type="button"
-            title="Copy token"
-            onClick={onCopy}
-          >
-            <Copy className="h-4 w-4" strokeWidth={1.8} />
-          </button>
+          <div className="min-h-[18px]">
+            {copyStatusText ? (
+              <p
+                className={
+                  copyStatus === "copied"
+                    ? "text-sap-data text-sap-brand"
+                    : "text-sap-data text-red-600"
+                }
+                role="status"
+                aria-live="polite"
+              >
+                {copyStatusText}
+              </p>
+            ) : null}
+          </div>
         </div>
 
         <DialogFooter>
@@ -425,7 +478,7 @@ function CreatedTokenDialog({
           <Button
             type="button"
             className="bg-sap-brand text-white hover:bg-sap-brand/90"
-            onClick={onCopy}
+            onClick={() => void handleCopy()}
           >
             <Copy className="h-4 w-4" strokeWidth={1.8} />
             Copy token
@@ -435,6 +488,8 @@ function CreatedTokenDialog({
     </Dialog>
   );
 }
+
+type CopyStatus = "idle" | "copied" | "failed";
 
 function ProfileRow({
   icon,
