@@ -587,6 +587,16 @@
   white-space: pre-wrap;
 }
 
+.textCellTooltipContent {
+  font-size: var(--text-sap-body);
+  line-height: 1.45;
+  max-height: min(40vh, var(--radix-tooltip-content-available-height));
+  max-width: min(56ch, calc(100vw - 32px));
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
 .textEditorMultiline {
   height: 100%;
 }

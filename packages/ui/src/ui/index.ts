@@ -53,6 +53,12 @@ export {
   SheetTitle,
 } from "./primitives/sheet";
 export { Switch } from "./primitives/switch";
+export {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "./primitives/tooltip";
 export { Combobox, ComboboxList } from "./composite/combobox";
 export { Kbd } from "./composite/kbd";
 export { ParamPill, type ParamPillProps } from "./composite/param-pill";

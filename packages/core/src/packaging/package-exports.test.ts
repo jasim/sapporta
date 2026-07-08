@@ -184,6 +184,7 @@ describe("Sapporta package exports", () => {
       const representativeSpecifiers = [
         "@sapporta/ui/button",
         "@sapporta/ui/context-menu",
+        "@sapporta/ui/tooltip",
         "@sapporta/shared/csv",
         "@sapporta/shared/filter",
         "@sapporta/grid/lookup/react",
@@ -268,6 +269,7 @@ describe("Sapporta package exports", () => {
           import * as uiContextMenu from "@sapporta/ui/context-menu";
           import * as uiCn from "@sapporta/ui/cn";
           import * as uiPopover from "@sapporta/ui/popover";
+          import * as uiTooltip from "@sapporta/ui/tooltip";
           import * as shared from "@sapporta/shared";
           import * as sharedCsv from "@sapporta/shared/csv";
           import * as contracts from "@sapporta/shared/contracts";
@@ -284,6 +286,7 @@ describe("Sapporta package exports", () => {
             uiContextMenu,
             uiCn,
             uiPopover,
+            uiTooltip,
             shared,
             sharedCsv,
             sharedError,

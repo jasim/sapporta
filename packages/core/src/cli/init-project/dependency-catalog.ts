@@ -269,6 +269,7 @@ export const DEV_MODE_IDENTITY_PACKAGES = [
   "@radix-ui/react-popover",
   "@radix-ui/react-select",
   "@radix-ui/react-switch",
+  "@radix-ui/react-tooltip",
 ] as const;
 
 export function tokensForCatalog(

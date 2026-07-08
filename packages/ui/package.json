@@ -106,6 +106,11 @@
       "sapporta:source": "./src/ui/primitives/switch.tsx",
       "default": "./dist/switch.js"
     },
+    "./tooltip": {
+      "types": "./dist/ui/primitives/tooltip.d.ts",
+      "sapporta:source": "./src/ui/primitives/tooltip.tsx",
+      "default": "./dist/tooltip.js"
+    },
     "./combobox": {
       "types": "./dist/ui/composite/combobox.d.ts",
       "sapporta:source": "./src/ui/composite/combobox.tsx",
@@ -154,6 +159,7 @@
     "@radix-ui/react-popover": "^1.1.15",
     "@radix-ui/react-select": "^2.2.5",
     "@radix-ui/react-switch": "^1.2.6",
+    "@radix-ui/react-tooltip": ">=1.2.11 <1.2.12",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "react": "^19.1.0",
@@ -167,6 +173,7 @@
     "@radix-ui/react-popover": "^1.1.17",
     "@radix-ui/react-select": "^2.3.1",
     "@radix-ui/react-switch": "^1.3.1",
+    "@radix-ui/react-tooltip": "1.2.11",
     "@tailwindcss/vite": "^4.3.1",
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",

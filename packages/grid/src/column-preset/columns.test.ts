@@ -1,4 +1,9 @@
-import { isValidElement } from "react";
+import {
+  Children,
+  isValidElement,
+  type ReactElement,
+  type ReactNode,
+} from "react";
 import { describe, expect, it } from "vitest";
 import type { LevelRow } from "../grid/types/level-row";
 import type { CellEditorProps } from "../grid/types/schema";
@@ -196,16 +201,18 @@ describe("columnPreset columns", () => {
         activation: null,
       });
 
-      expect(isValidElement(rendered)).toBe(true);
-      const className = isValidElement<{ className?: unknown }>(rendered)
-        ? rendered.props.className
-        : null;
+      const textSpan = findElementByClassName(rendered, "textCell");
+      expect(textSpan).not.toBeNull();
+      const className = textSpan?.props.className;
       expect(className).toEqual(expect.stringContaining("textCell"));
       expect(className).toEqual(expect.stringContaining("multiLineTextCell"));
+      expect(
+        findElementByGridPart(rendered, "text-cell-tooltip-content"),
+      ).not.toBeNull();
     }
   });
 
-  it("plain text cells keep single-line truncation in the preset", () => {
+  it("plain text cells keep single-line truncation and render a full-text tooltip", () => {
     const column = columnPreset.text({ id: "title", name: "Title" });
     const p = preset(column);
     if (!p || p.kind !== "text") throw new Error("expected text preset");
@@ -226,12 +233,69 @@ describe("columnPreset columns", () => {
       activation: null,
     });
 
-    expect(isValidElement(rendered)).toBe(true);
-    const className = isValidElement<{ className?: unknown }>(rendered)
-      ? rendered.props.className
-      : null;
+    const textSpan = findElementByClassName(rendered, "textCell");
+    expect(textSpan).not.toBeNull();
+    const className = textSpan?.props.className;
     expect(className).toEqual(expect.stringContaining("textCell"));
     expect(className).not.toEqual(expect.stringContaining("multiLineTextCell"));
+    expect(
+      findElementByGridPart(rendered, "text-cell-tooltip-trigger"),
+    ).not.toBeNull();
+    expect(
+      findElementByGridPart(rendered, "text-cell-tooltip-content"),
+    ).not.toBeNull();
+  });
+
+  it("empty text cells do not render a tooltip", () => {
+    const column = columnPreset.text({ id: "title", name: "Title" });
+
+    const rendered = TextCell({
+      value: "",
+      runtime: presetRuntime(column)!,
+      column,
+      path: rootPath("books"),
+      row: {
+        kind: "data",
+        id: "books#1" as never,
+        rowSelectable: true,
+        columns: { title: "" },
+        hasChildren: false,
+        source: { levelName: "books", columns: { title: "" } },
+      },
+      activation: null,
+    });
+
+    expect(findElementByClassName(rendered, "textCell")).not.toBeNull();
+    expect(
+      findElementByGridPart(rendered, "text-cell-tooltip-content"),
+    ).toBeNull();
+  });
+
+  it("identifier text cells do not render a tooltip", () => {
+    const column = identifier({ id: "id", name: "ID" });
+
+    const rendered = TextCell({
+      value: "books#1",
+      runtime: presetRuntime(column)!,
+      column,
+      path: rootPath("books"),
+      row: {
+        kind: "data",
+        id: "books#1" as never,
+        rowSelectable: true,
+        columns: { id: "books#1" },
+        hasChildren: false,
+        source: { levelName: "books", columns: { id: "books#1" } },
+      },
+      activation: null,
+    });
+
+    expect(
+      findElementByClassName(rendered, "identifierTextCell"),
+    ).not.toBeNull();
+    expect(
+      findElementByGridPart(rendered, "text-cell-tooltip-content"),
+    ).toBeNull();
   });
 
   it("converts character sizing hints to preset width tracks", () => {
@@ -353,6 +417,45 @@ describe("columnPreset columns", () => {
     expect(presetRuntime(column)?.valueCodec.parse).toBe(parser);
   });
 });
+
+type TestElementProps = {
+  children?: ReactNode;
+  className?: unknown;
+  "data-grid-part"?: unknown;
+};
+
+function findElementByClassName(
+  rendered: ReactNode,
+  expectedClassName: string,
+): ReactElement<TestElementProps> | null {
+  return findElement(rendered, (props) => {
+    return (
+      typeof props.className === "string" &&
+      props.className.includes(expectedClassName)
+    );
+  });
+}
+
+function findElementByGridPart(
+  rendered: ReactNode,
+  gridPart: string,
+): ReactElement<TestElementProps> | null {
+  return findElement(rendered, (props) => props["data-grid-part"] === gridPart);
+}
+
+function findElement(
+  rendered: ReactNode,
+  predicate: (props: TestElementProps) => boolean,
+): ReactElement<TestElementProps> | null {
+  if (!isValidElement<TestElementProps>(rendered)) return null;
+  if (predicate(rendered.props)) return rendered;
+
+  for (const child of Children.toArray(rendered.props.children)) {
+    const match = findElement(child, predicate);
+    if (match) return match;
+  }
+  return null;
+}
 
 function levelRow(columns: Record<string, unknown>): LevelRow {
   return {

@@ -1,5 +1,11 @@
 import type { CellRenderProps } from "../../grid/types/schema";
-import { cn } from "@sapporta/ui";
+import {
+  cn,
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@sapporta/ui";
 import type { ColumnPreset } from "../preset";
 import type { ColumnPresetCellRenderRuntime } from "../runtime";
 import styles from "../sapporta-preset.module.css";
@@ -24,5 +30,23 @@ export function TextCell({
     textMode && styles.multiLineTextCell,
   );
 
-  return <span className={className}>{value}</span>;
+  const content = <span className={className}>{value}</span>;
+  if (preset.kind !== "text" || value === "") return content;
+
+  return (
+    <TooltipProvider delayDuration={100}>
+      <Tooltip>
+        <TooltipTrigger asChild data-grid-part="text-cell-tooltip-trigger">
+          {content}
+        </TooltipTrigger>
+        <TooltipContent
+          data-grid-part="text-cell-tooltip-content"
+          sideOffset={6}
+          className={styles.textCellTooltipContent}
+        >
+          {value}
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  );
 }
