@@ -19,7 +19,7 @@ import {
 import type { ColumnSchema } from "@sapporta/shared/contracts";
 import type { SortDescriptor } from "@sapporta/grid";
 import { isLookupValue, type LookupValue } from "@sapporta/grid/lookup";
-import type { LookupForColumn } from "../lookup/column-lookup";
+import type { LookupForColumn } from "../../lookup";
 import { Popover, PopoverContent, PopoverTrigger } from "@sapporta/ui/popover";
 import { ConditionEditor } from "./ConditionEditor";
 import {
@@ -29,7 +29,6 @@ import {
 } from "./column-catalog";
 
 export interface HeaderFilterPopoverProps {
-  tableName?: string;
   column: ColumnSchema;
   columns: ColumnSchema[];
   filters: TypedFilterCondition[];
@@ -44,7 +43,6 @@ export interface HeaderFilterPopoverProps {
 }
 
 export interface HeaderFilterMenuContentProps {
-  tableName?: string;
   column: ColumnSchema;
   columns: ColumnSchema[];
   filters: TypedFilterCondition[];
@@ -59,7 +57,6 @@ export interface HeaderFilterMenuContentProps {
 }
 
 export function HeaderFilterPopover({
-  tableName,
   column,
   columns,
   filters,
@@ -83,7 +80,6 @@ export function HeaderFilterPopover({
         className="p-1 w-[240px] border-sap-border bg-sap-surface"
       >
         <HeaderFilterMenuContent
-          tableName={tableName}
           column={column}
           columns={columns}
           filters={filters}
@@ -102,7 +98,6 @@ export function HeaderFilterPopover({
 }
 
 export function HeaderFilterMenuContent({
-  tableName,
   column,
   columns,
   filters,
@@ -119,10 +114,7 @@ export function HeaderFilterMenuContent({
   const type = inferFilterColumnType(column);
   const columnName = column.name;
   const resolved = resolveColumnOptions(column, type);
-  const lookup =
-    tableName && column.foreignKey
-      ? lookupForColumn?.({ tableName, column })
-      : undefined;
+  const lookup = column.foreignKey ? lookupForColumn?.(column) : undefined;
   const quickEntry =
     catalog[type].ops.find(
       (entry) => entry.valueShape === "list" && entry.op === "in",
@@ -234,7 +226,6 @@ export function HeaderFilterMenuContent({
           <ConditionEditor
             columns={columns}
             lockedColumn={column}
-            tableName={tableName}
             lookupForColumn={lookupForColumn}
             onApply={(cond) => {
               onAddFilter(cond);

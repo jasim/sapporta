@@ -1,7 +1,7 @@
 import { useStore } from "zustand";
 import type { ColumnSchema } from "@sapporta/shared/contracts";
 import type { TypedFilterCondition } from "@sapporta/shared/filter";
-import type { LookupForColumn } from "../lookup/column-lookup";
+import type { LookupForColumn } from "../../lookup";
 import type {
   TGridLevelId,
   TGridRowsByLevel,

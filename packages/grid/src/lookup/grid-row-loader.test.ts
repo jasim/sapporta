@@ -22,7 +22,6 @@ function makeLookup(): ValueLookup {
     entryForValue: vi.fn(),
     loadMissingEntries: vi.fn(async () => {}),
     subscribeToLookupChanges: vi.fn(() => () => {}),
-    dispose: vi.fn(),
   };
 }
 

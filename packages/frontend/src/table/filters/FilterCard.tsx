@@ -6,13 +6,12 @@ import type { ColumnSchema } from "@sapporta/shared/contracts";
 import { Popover, PopoverContent, PopoverTrigger } from "@sapporta/ui/popover";
 import { isLookupValue } from "@sapporta/grid/lookup";
 import { useLookupValueLabels } from "@sapporta/grid/lookup/react";
-import type { LookupForColumn } from "../lookup/column-lookup";
+import type { LookupForColumn } from "../../lookup";
 import { ConditionEditor } from "./ConditionEditor";
 import { findEntryForCondition, inferFilterColumnType } from "./column-catalog";
 
 export interface FilterCardProps {
   condition: TypedFilterCondition;
-  tableName?: string;
   columns: ColumnSchema[];
   lookupForColumn?: LookupForColumn;
   onUpdate: (id: string, patch: TypedFilterCondition) => void;
@@ -28,7 +27,6 @@ export interface FilterCardProps {
  *  trailing × removes it. */
 export function FilterCard({
   condition,
-  tableName,
   columns,
   lookupForColumn,
   onUpdate,
@@ -42,7 +40,6 @@ export function FilterCard({
   const opLabel = summarizeOperator(condition, column);
   const valueSummary = useFilterValueSummary(
     condition,
-    tableName,
     column,
     lookupForColumn,
   );
@@ -88,7 +85,6 @@ export function FilterCard({
           columns={columns}
           lockedColumn={column}
           initial={condition}
-          tableName={tableName}
           lookupForColumn={lookupForColumn}
           onApply={(patch) => {
             onUpdate(condition.id, patch);
@@ -121,16 +117,12 @@ export function summarizeOperator(
 
 function useFilterValueSummary(
   cond: TypedFilterCondition,
-  tableName: string | undefined,
   column: ColumnSchema | null,
   lookupForColumn: LookupForColumn | undefined,
 ): string {
   const values =
     cond.op === "is" ? [] : "values" in cond ? cond.values : [cond.value];
-  const lookup =
-    tableName && column?.foreignKey
-      ? lookupForColumn?.({ tableName, column })
-      : undefined;
+  const lookup = column?.foreignKey ? lookupForColumn?.(column) : undefined;
   const lookupValues = values.filter(isLookupValue);
   const labels = useLookupValueLabels(lookup?.valueLookup, lookupValues);
   if (cond.op === "is") return "";

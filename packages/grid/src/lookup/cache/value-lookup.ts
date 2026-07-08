@@ -22,7 +22,6 @@ export type LookupEntry<TValue extends LookupValue = LookupValue> = {
 
 export type LookupSubscription = {
   subscribeToLookupChanges(listener: () => void): () => void;
-  dispose?(): void;
 };
 
 export type ValueLookup<TValue extends LookupValue = LookupValue> =
@@ -70,10 +69,14 @@ function uniqueSortedValueRequests<TValue extends LookupValue>(
   );
 }
 
+// Lookup caches are ordinary memoized objects. They stay live for as long as a
+// reference exists and rely on `useSyncExternalStore` to manage React
+// subscriptions. An in-flight request that resolves after every listener has
+// unsubscribed simply stores its entries and notifies an empty listener set —
+// a no-op. The cache remains usable if a new subscriber attaches later.
 class ValueLookupStore<TValue extends LookupValue> {
   protected readonly entriesByValue = new Map<string, LookupEntry<TValue>>();
   private readonly listeners = new Set<() => void>();
-  protected disposed = false;
 
   entryForValue(value: unknown): LookupEntry<TValue> | undefined {
     const key = valueKey(value);
@@ -81,22 +84,13 @@ class ValueLookupStore<TValue extends LookupValue> {
   }
 
   subscribeToLookupChanges(listener: () => void): () => void {
-    if (this.disposed) return () => {};
     this.listeners.add(listener);
     return () => {
       this.listeners.delete(listener);
     };
   }
 
-  dispose(): void {
-    this.disposed = true;
-    this.listeners.clear();
-    this.entriesByValue.clear();
-  }
-
   protected setEntries(entries: readonly LookupEntry<TValue>[]): boolean {
-    if (this.disposed) return false;
-
     let changed = false;
     for (const entry of entries) {
       const key = valueKey(entry.value);
@@ -108,7 +102,6 @@ class ValueLookupStore<TValue extends LookupValue> {
   }
 
   protected notifyLookupChanged(): void {
-    if (this.disposed) return;
     for (const listener of Array.from(this.listeners)) {
       listener();
     }
@@ -153,8 +146,6 @@ export class CachedValueLookup<TValue extends LookupValue = LookupValue>
   }
 
   async loadMissingEntries(values: readonly unknown[]): Promise<void> {
-    if (this.disposed) return;
-
     const missingRequests = uniqueSortedValueRequests<TValue>(values).filter(
       ({ key }) => !this.entriesByValue.has(key),
     );
@@ -181,11 +172,6 @@ export class CachedValueLookup<TValue extends LookupValue = LookupValue>
     }
 
     await Promise.all(pendingLoads);
-  }
-
-  override dispose(): void {
-    super.dispose();
-    this.loadingEntriesByValueKey.clear();
   }
 
   private async loadAndStoreEntries(

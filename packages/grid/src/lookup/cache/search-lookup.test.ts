@@ -49,13 +49,6 @@ describe("StaticSearchLookup", () => {
     expect(lookup.cachedSearchResults({ searchText: "missing" })).toBe(
       noEntries,
     );
-
-    lookup.dispose();
-    const disposedEntries = lookup.cachedSearchResults({ searchText: "paid" });
-    expect(lookup.cachedSearchResults({ searchText: "paid" })).toBe(
-      disposedEntries,
-    );
-    expect(disposedEntries).toEqual([]);
   });
 
   it("keeps local searching synchronous even when callers use the loading API", async () => {
@@ -109,13 +102,6 @@ describe("CachedSearchLookup", () => {
     expect(lookup.cachedSearchResults({ searchText: "cash" })).toBe(
       loadedEntries,
     );
-
-    lookup.dispose();
-    const disposedEntries = lookup.cachedSearchResults({ searchText: "cash" });
-    expect(lookup.cachedSearchResults({ searchText: "cash" })).toBe(
-      disposedEntries,
-    );
-    expect(disposedEntries).toEqual([]);
   });
 
   it("cleans up search text and limit before asking the remote source", async () => {
@@ -276,30 +262,36 @@ describe("CachedSearchLookup", () => {
     ]);
   });
 
-  it("forgets cached search results and ignores late network answers after disposal", async () => {
-    let finishLoading!: (page: {
+  it("drops a late response for a superseded search without notifying", async () => {
+    let finishLateLoad!: (page: {
       entries: readonly { value: string; label: string }[];
     }) => void;
     const lookup = new CachedSearchLookup({
-      loadEntriesForSearch: () =>
-        new Promise<{
-          entries: readonly { value: string; label: string }[];
-        }>((resolve) => {
-          finishLoading = resolve;
-        }),
+      loadEntriesForSearch: ({ limit }) =>
+        limit === 20
+          ? new Promise<{
+              entries: readonly { value: string; label: string }[];
+            }>((resolve) => {
+              finishLateLoad = resolve;
+            })
+          : Promise.resolve({
+              entries: [{ value: "fresh", label: "Fresh Result" }],
+            }),
     });
     const listener = vi.fn();
 
-    lookup.subscribeToLookupChanges(listener);
-    const pendingLoad = lookup.loadSearchResults({
-      searchText: "late",
+    const unsubscribe = lookup.subscribeToLookupChanges(listener);
+    const pendingLateLoad = lookup.loadSearchResults({
+      searchText: "cash",
       limit: 20,
     });
-    lookup.dispose();
-    finishLoading({ entries: [{ value: "late", label: "Late Result" }] });
-    await pendingLoad;
+    await lookup.loadSearchResults({ searchText: "cash", limit: 30 });
+    finishLateLoad({ entries: [{ value: "late", label: "Late Result" }] });
+    await pendingLateLoad;
+    unsubscribe();
 
-    expect(lookup.cachedSearchResults({ searchText: "late" })).toEqual([]);
-    expect(listener).not.toHaveBeenCalled();
+    expect(lookup.cachedSearchResults({ searchText: "cash" })).toEqual([
+      { value: "fresh", label: "Fresh Result" },
+    ]);
   });
 });

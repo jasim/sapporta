@@ -20,6 +20,10 @@ export {
   type RecordFormStore,
   type RecordFormValues,
 } from "./form/record-form-store";
+export {
+  buildRecordFormFields,
+  type RecordFormFieldModel,
+} from "./form/record-form-fields";
 export * from "./grid-adapter/schema-tgrid";
 export {
   defineTGrid,
@@ -31,7 +35,6 @@ export * from "./grid-adapter/tgrid-column-spec";
 export * from "./grid-adapter/tgrid-filter";
 export * from "./grid-adapter/tgrid-level-config";
 export * from "./grid-adapter/tgrid-column-mapper";
-export * from "./grid-adapter/tgrid-lookup-resolver";
 export * from "./grid-adapter/tgrid-column-builder";
 export * from "./grid-adapter/tgrid-binding";
 export * from "./grid-adapter/tgrid-types";
@@ -41,7 +44,6 @@ export {
   type PaginationRangeItem,
 } from "./grid-adapter/visible-pagination-items";
 export * from "./lookup/tgrid-lookup-loading";
-export * from "./lookup/table-lookup-registry";
 export { TGrid } from "./page/TGrid";
 export type {
   TGridPresentation,

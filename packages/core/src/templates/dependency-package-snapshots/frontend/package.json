@@ -90,6 +90,11 @@
       "sapporta:source": "./src/report/index.ts",
       "default": "./dist/report.js"
     },
+    "./lookup": {
+      "types": "./dist/lookup/index.d.ts",
+      "sapporta:source": "./src/lookup/index.ts",
+      "default": "./dist/lookup.js"
+    },
     "./layout": {
       "types": "./dist/shell/components/SidebarShell.d.ts",
       "sapporta:source": "./src/shell/components/SidebarShell.tsx",

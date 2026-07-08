@@ -8,24 +8,22 @@ import {
   createTGridColumnMapper,
   tableColumnPresetWidth,
 } from "./tgrid-column-mapper";
-import type { TGridLookupResolver } from "./tgrid-lookup-resolver";
-import type { TableForeignKeyLookupBundle } from "../lookup/table-lookup-registry";
+import type { LookupCapabilities } from "@sapporta/grid/lookup";
+import type { LookupStore } from "../../lookup";
 
 const valueLookup = new StaticValueLookup([{ value: "a", label: "Alpha" }]);
 const searchLookup = new StaticSearchLookup([{ value: "b", label: "Beta" }]);
-const bundle: TableForeignKeyLookupBundle = {
-  key: "things.owner_id->users.id",
-  sourceTable: "things",
-  sourceColumn: "owner_id",
-  targetTable: "users",
-  targetColumn: "id",
+const lookup: LookupCapabilities = {
   valueLookup,
   searchLookup,
 };
-const lookupResolver: TGridLookupResolver = {
-  bundleFor: () => bundle,
+const lookups: LookupStore = {
+  table: () => lookup,
+  foreignKey: () => lookup,
+  requireForeignKey: () => lookup,
+  clear: () => undefined,
 };
-const columnMapper = createTGridColumnMapper(lookupResolver);
+const columnMapper = createTGridColumnMapper({ lookups });
 
 function table(columns: ColumnSchema[], immutable = false): TableSchema {
   return {

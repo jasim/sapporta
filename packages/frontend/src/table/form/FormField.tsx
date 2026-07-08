@@ -1,11 +1,6 @@
-import { useState } from "react";
-import { ChevronDown } from "lucide-react";
-import { Button } from "@sapporta/ui/button";
 import { Checkbox } from "@sapporta/ui/checkbox";
-import { ComboboxList } from "@sapporta/ui/combobox";
 import { Input } from "@sapporta/ui/input";
 import { Label } from "@sapporta/ui/label";
-import { Popover, PopoverContent, PopoverTrigger } from "@sapporta/ui/popover";
 import {
   Select,
   SelectContent,
@@ -13,14 +8,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@sapporta/ui/select";
-import {
-  isLookupValue,
-  type LookupCapabilities,
-  type LookupValue,
-} from "@sapporta/grid/lookup";
-import { inferDisplayType } from "../model/column-types";
-import type { ColumnSchema } from "@sapporta/shared/contracts";
-import { useLookupOptions } from "@sapporta/grid/lookup/react";
+import { isLookupValue } from "@sapporta/grid/lookup";
+import { LookupPicker } from "../../lookup";
+import type { RecordFormFieldModel } from "./record-form-fields";
 import {
   formatInstantForDateTimeLocalInput,
   formatPlainDateForDateInput,
@@ -29,14 +19,13 @@ import {
 } from "@sapporta/shared/temporal";
 
 interface FormFieldProps {
-  column: ColumnSchema;
+  field: RecordFormFieldModel;
   value: unknown;
   onChange: (value: unknown) => void;
-  lookup?: LookupCapabilities;
 }
 
-export function FormField({ column, value, onChange, lookup }: FormFieldProps) {
-  const type = inferDisplayType(column);
+export function FormField({ field, value, onChange }: FormFieldProps) {
+  const { column } = field;
   const id = `field-${column.name}`;
 
   return (
@@ -48,7 +37,7 @@ export function FormField({ column, value, onChange, lookup }: FormFieldProps) {
         )}
       </Label>
 
-      {type === "checkbox" && (
+      {field.kind === "checkbox" && (
         <div className="flex items-center pt-1">
           <Checkbox
             id={id}
@@ -58,7 +47,7 @@ export function FormField({ column, value, onChange, lookup }: FormFieldProps) {
         </div>
       )}
 
-      {type === "select" && column.select && (
+      {field.kind === "select" && (
         <Select
           value={value != null ? String(value) : ""}
           onValueChange={(v) => onChange(v)}
@@ -67,7 +56,7 @@ export function FormField({ column, value, onChange, lookup }: FormFieldProps) {
             <SelectValue placeholder={`Select ${column.name}`} />
           </SelectTrigger>
           <SelectContent>
-            {column.select.options.map((opt) => (
+            {field.options.map((opt) => (
               <SelectItem key={opt} value={opt}>
                 {opt}
               </SelectItem>
@@ -76,7 +65,7 @@ export function FormField({ column, value, onChange, lookup }: FormFieldProps) {
         </Select>
       )}
 
-      {type === "date" && (
+      {field.kind === "date" && (
         <Input
           id={id}
           type="date"
@@ -87,7 +76,7 @@ export function FormField({ column, value, onChange, lookup }: FormFieldProps) {
         />
       )}
 
-      {type === "timestamp" && (
+      {field.kind === "timestamp" && (
         <Input
           id={id}
           type="datetime-local"
@@ -101,7 +90,7 @@ export function FormField({ column, value, onChange, lookup }: FormFieldProps) {
         />
       )}
 
-      {type === "currency" && (
+      {field.kind === "currency" && (
         <Input
           id={id}
           type="number"
@@ -111,7 +100,7 @@ export function FormField({ column, value, onChange, lookup }: FormFieldProps) {
         />
       )}
 
-      {(type === "number" || type === "percentage") && (
+      {(field.kind === "number" || field.kind === "percentage") && (
         <Input
           id={id}
           type="number"
@@ -122,28 +111,19 @@ export function FormField({ column, value, onChange, lookup }: FormFieldProps) {
         />
       )}
 
-      {type === "fk" && lookup?.searchLookup ? (
-        <LookupFormField
+      {field.kind === "foreignKey" && (
+        <LookupPicker
           id={id}
-          column={column}
-          value={value}
+          lookup={field.lookup}
+          value={isLookupValue(value) ? value : null}
           onChange={onChange}
-          lookup={lookup}
+          placeholder={`Select ${column.label}`}
+          className="w-full"
         />
-      ) : (
-        type === "fk" && (
-          <Input
-            id={id}
-            type="text"
-            value={value != null ? String(value) : ""}
-            placeholder={`${column.foreignKey!.table} ID`}
-            onChange={(e) => onChange(e.target.value || null)}
-          />
-        )
       )}
 
-      {(type === "text" || type === "pk") &&
-        (type === "text" && column.textDisplay ? (
+      {field.kind === "text" &&
+        (column.textDisplay ? (
           <textarea
             id={id}
             value={value != null ? String(value) : ""}
@@ -159,76 +139,5 @@ export function FormField({ column, value, onChange, lookup }: FormFieldProps) {
           />
         ))}
     </div>
-  );
-}
-
-function LookupFormField({
-  id,
-  column,
-  value,
-  onChange,
-  lookup,
-}: {
-  id: string;
-  column: ColumnSchema;
-  value: unknown;
-  onChange: (value: unknown) => void;
-  lookup: LookupCapabilities;
-}) {
-  const [open, setOpen] = useState(false);
-  const [searchText, setSearchText] = useState("");
-  const selectedValue: LookupValue | null = isLookupValue(value)
-    ? value
-    : null;
-  const entries = useLookupOptions({
-    valueLookup: lookup.valueLookup,
-    searchLookup: lookup.searchLookup,
-    selectedValues: selectedValue == null ? [] : [selectedValue],
-    searchText,
-    limit: 50,
-  });
-  const options = entries.map((entry) => ({
-    id: entry.value,
-    label: entry.label,
-  }));
-
-  const selectedLabel = selectedValue != null
-    ? (entries.find((entry) => Object.is(entry.value, selectedValue))?.label ??
-      String(selectedValue))
-    : null;
-
-  return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <Button
-          id={id}
-          type="button"
-          variant="outline"
-          className="w-full justify-between font-normal"
-        >
-          <span className={selectedLabel ? "" : "text-sap-muted"}>
-            {selectedLabel ?? `Select ${column.label}`}
-          </span>
-          <ChevronDown className="h-4 w-4 opacity-50" />
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent
-        className="w-[--radix-popover-trigger-width] p-0"
-        align="start"
-        sideOffset={4}
-      >
-        <ComboboxList
-          value={selectedValue}
-          options={options}
-          onPick={(pickedValue) => {
-            onChange(pickedValue);
-            setOpen(false);
-          }}
-          searchText={searchText}
-          onSearchTextChange={setSearchText}
-          shouldFilter={false}
-        />
-      </PopoverContent>
-    </Popover>
   );
 }

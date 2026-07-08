@@ -3,7 +3,6 @@ import { useNavigate } from "react-router-dom";
 import { ArrowLeft, Loader2 } from "lucide-react";
 import type { TableSchema } from "@sapporta/shared/contracts";
 import { ApiError } from "@sapporta/shared/client";
-import type { LookupCapabilities } from "@sapporta/grid/lookup";
 import { TopBar, TopBarButton } from "../../shell/components/TopBar";
 import { Button } from "@sapporta/ui/button";
 import { RecordFormField } from "./RecordFormField";
@@ -12,10 +11,9 @@ import {
   compactRecordFormValues,
   createRecordFormStore,
 } from "./record-form-store";
-import { isRecordFormEditableColumn } from "./field-policy";
+import { buildRecordFormFields } from "./record-form-fields";
 import { createRecord } from "../actions/record-actions";
-import { createTableLookupRegistry } from "../lookup/table-lookup-registry";
-import { createColumnLookupResolver } from "../lookup/column-lookup";
+import { useLookupStore } from "../../lookup";
 
 export function NewRecordPage({ tableSchema }: { tableSchema: TableSchema }) {
   const navigate = useNavigate();
@@ -27,37 +25,15 @@ export function NewRecordPage({ tableSchema }: { tableSchema: TableSchema }) {
   );
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const lookupRegistry = useMemo(
-    () => createTableLookupRegistry(),
-    [tableSchema],
+  const lookups = useLookupStore();
+  const formFields = useMemo(
+    () => buildRecordFormFields({ table: tableSchema, lookups }),
+    [lookups, tableSchema],
   );
-  const lookupResolver = useMemo(
-    () => createColumnLookupResolver(lookupRegistry),
-    [lookupRegistry],
-  );
-  const lookupsByColumn = useMemo(() => {
-    const lookups = new Map<string, LookupCapabilities>();
-    for (const col of tableSchema.columns) {
-      if (!isRecordFormEditableColumn(col) || !col.foreignKey) continue;
-      const lookup = lookupResolver.lookupForColumn({
-        tableName: tableSchema.name,
-        column: col,
-      });
-      if (lookup) lookups.set(col.name, lookup);
-    }
-    return lookups;
-  }, [lookupResolver, tableSchema]);
 
   useEffect(() => {
     setError(null);
   }, [tableSchema]);
-
-  useEffect(() => () => lookupRegistry.dispose(), [lookupRegistry]);
-
-  const formColumns = useMemo(
-    () => tableSchema.columns.filter(isRecordFormEditableColumn),
-    [tableSchema],
-  );
 
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -99,12 +75,8 @@ export function NewRecordPage({ tableSchema }: { tableSchema: TableSchema }) {
             className="w-full max-w-[560px] space-y-5"
           >
             <div className="space-y-4">
-              {formColumns.map((col) => (
-                <RecordFormField
-                  key={col.name}
-                  column={col}
-                  lookup={lookupsByColumn.get(col.name)}
-                />
+              {formFields.map((field) => (
+                <RecordFormField key={field.column.name} field={field} />
               ))}
             </div>
 

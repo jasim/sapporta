@@ -23,17 +23,21 @@ import type {
 import { ExpandableCellFrame } from "@sapporta/grid";
 import { makeRowId, rootPath } from "@sapporta/grid";
 import { preset } from "@sapporta/grid/column-preset";
+import {
+  StaticSearchLookup,
+  StaticValueLookup,
+  type LookupCapabilities,
+} from "@sapporta/grid/lookup";
 import { compileTGridRuntimeConfig, defineTGrid } from "./tgrid-runtime-config";
 import type { TableRowsClient } from "./tgrid-level-config";
 import type { TGridFilter } from "./tgrid-filter";
 import { createTGridColumnMapper } from "./tgrid-column-mapper";
-import type { TGridLookupResolver } from "./tgrid-lookup-resolver";
 import { createTGridColumnsBuilder } from "./tgrid-column-spec";
 import type {
   TGridCellEditorContext,
   TGridSessionContext,
 } from "./tgrid-cell-context";
-import type { TableLookupRegistry } from "../lookup/table-lookup-registry";
+import type { LookupStore } from "../../lookup";
 
 (
   globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
@@ -54,6 +58,19 @@ type RowsByLevel = {
   "orders.lines": LineRow;
   "orders.lines.allocations": AllocationRow;
 };
+
+function emptyLookupStore(): LookupStore {
+  const lookup: LookupCapabilities = {
+    valueLookup: new StaticValueLookup([]),
+    searchLookup: new StaticSearchLookup([]),
+  };
+  return {
+    table: () => lookup,
+    foreignKey: () => undefined,
+    requireForeignKey: () => lookup,
+    clear: () => undefined,
+  };
+}
 
 function makeHostRowQueryState(seed: {
   page: number;
@@ -179,9 +196,7 @@ describe("compileTGridRuntimeConfig", () => {
   };
 
   function build(rowsClient?: Partial<TableRowsClient>) {
-    const lookupResolver: TGridLookupResolver = {
-      bundleFor: () => undefined,
-    };
+    const lookups = emptyLookupStore();
     const lineColumns = createTGridColumnsBuilder<
       RowsByLevel,
       unknown,
@@ -234,7 +249,7 @@ describe("compileTGridRuntimeConfig", () => {
           columns: [allocationColumns.table("warehouse")],
         },
       },
-      columnMapper: createTGridColumnMapper(lookupResolver),
+      columnMapper: createTGridColumnMapper({ lookups }),
       hostRowQueryState: () =>
         makeHostRowQueryState({
           page: 2,
@@ -269,9 +284,7 @@ describe("compileTGridRuntimeConfig", () => {
   });
 
   it("rejects host-owned query state on non-root levels", () => {
-    const lookupResolver: TGridLookupResolver = {
-      bundleFor: () => undefined,
-    };
+    const lookups = emptyLookupStore();
     const message =
       "non-root level 'orders.lines' cannot use query.owner \"host\"";
 
@@ -318,7 +331,7 @@ describe("compileTGridRuntimeConfig", () => {
             childLevels: [],
           },
         },
-        columnMapper: createTGridColumnMapper(lookupResolver),
+        columnMapper: createTGridColumnMapper({ lookups }),
       }),
     ).toThrow(message);
   });
@@ -352,9 +365,7 @@ describe("compileTGridRuntimeConfig", () => {
   });
 
   it("uses the level projection when default table columns are generated", () => {
-    const lookupResolver: TGridLookupResolver = {
-      bundleFor: () => undefined,
-    };
+    const lookups = emptyLookupStore();
     const config = compileTGridRuntimeConfig<RowsByLevel>({
       rootLevel: "orders",
       levels: {
@@ -378,7 +389,7 @@ describe("compileTGridRuntimeConfig", () => {
           childLevels: [],
         },
       },
-      columnMapper: createTGridColumnMapper(lookupResolver),
+      columnMapper: createTGridColumnMapper({ lookups }),
       hostRowQueryState: () =>
         makeHostRowQueryState({
           page: 1,
@@ -399,9 +410,7 @@ describe("compileTGridRuntimeConfig", () => {
   });
 
   it("uses the level projection for remaining table columns", () => {
-    const lookupResolver: TGridLookupResolver = {
-      bundleFor: () => undefined,
-    };
+    const lookups = emptyLookupStore();
     const lineColumns = createTGridColumnsBuilder<
       RowsByLevel,
       unknown,
@@ -434,7 +443,7 @@ describe("compileTGridRuntimeConfig", () => {
           childLevels: [],
         },
       },
-      columnMapper: createTGridColumnMapper(lookupResolver),
+      columnMapper: createTGridColumnMapper({ lookups }),
       hostRowQueryState: () =>
         makeHostRowQueryState({
           page: 1,
@@ -451,9 +460,7 @@ describe("compileTGridRuntimeConfig", () => {
   });
 
   it("adapts typed table and client copy behavior to grid rows", async () => {
-    const lookupResolver: TGridLookupResolver = {
-      bundleFor: () => undefined,
-    };
+    const lookups = emptyLookupStore();
     type CopyRowsByLevel = { orders: OrderRow };
     type CopyServices = { suffix: string };
     const orderColumns = createTGridColumnsBuilder<
@@ -470,7 +477,7 @@ describe("compileTGridRuntimeConfig", () => {
         CopyServices
       >["levels"],
       appServices: { suffix: "!" },
-      lookupRegistry: {} as TableLookupRegistry,
+      lookups: emptyLookupStore(),
     };
     const config = compileTGridRuntimeConfig<CopyRowsByLevel, CopyServices>({
       rootLevel: "orders",
@@ -504,7 +511,7 @@ describe("compileTGridRuntimeConfig", () => {
           ],
         },
       },
-      columnMapper: createTGridColumnMapper(lookupResolver),
+      columnMapper: createTGridColumnMapper({ lookups }),
       sessionContext: () => session,
     });
     const row: LevelRow = {
@@ -617,9 +624,7 @@ describe("compileTGridRuntimeConfig", () => {
       data: [{ id: 1, customer: "ACME" }],
       meta: { total: 1, page: 1, limit: 25, pages: 1 },
     }));
-    const lookupResolver: TGridLookupResolver = {
-      bundleFor: () => undefined,
-    };
+    const lookups = emptyLookupStore();
     const userFilter = eqCondition("customer", "ACME");
     const fixedFilter = eqCondition("status", "open");
     const orderSchemaWithStatus: TableSchema = {
@@ -658,7 +663,7 @@ describe("compileTGridRuntimeConfig", () => {
           childLevels: [],
         },
       },
-      columnMapper: createTGridColumnMapper(lookupResolver),
+      columnMapper: createTGridColumnMapper({ lookups }),
       hostRowQueryState: () =>
         makeHostRowQueryState({
           page: 1,
@@ -680,9 +685,7 @@ describe("compileTGridRuntimeConfig", () => {
   });
 
   it("rejects array default sorts that reference unknown columns", () => {
-    const lookupResolver: TGridLookupResolver = {
-      bundleFor: () => undefined,
-    };
+    const lookups = emptyLookupStore();
 
     expect(() =>
       compileTGridRuntimeConfig<RowsByLevel>({
@@ -713,7 +716,7 @@ describe("compileTGridRuntimeConfig", () => {
             query: { owner: "source", pageSize: 10 },
           },
         },
-        columnMapper: createTGridColumnMapper(lookupResolver),
+        columnMapper: createTGridColumnMapper({ lookups }),
       }),
     ).toThrow("unknown column id 'kind'");
   });
@@ -723,9 +726,7 @@ describe("compileTGridRuntimeConfig", () => {
       data: [],
       meta: { total: 0, page: 3, limit: 10, pages: 0 },
     }));
-    const lookupResolver: TGridLookupResolver = {
-      bundleFor: () => undefined,
-    };
+    const lookups = emptyLookupStore();
     const config = compileTGridRuntimeConfig<RowsByLevel>({
       rootLevel: "orders",
       levels: {
@@ -751,7 +752,7 @@ describe("compileTGridRuntimeConfig", () => {
           childLevels: [],
         },
       },
-      columnMapper: createTGridColumnMapper(lookupResolver),
+      columnMapper: createTGridColumnMapper({ lookups }),
       hostRowQueryState: () =>
         makeHostRowQueryState({
           page: 1,
@@ -778,9 +779,7 @@ describe("compileTGridRuntimeConfig", () => {
       data: [],
       meta: { total: 0, page: 1, limit: 10, pages: 0 },
     }));
-    const lookupResolver: TGridLookupResolver = {
-      bundleFor: () => undefined,
-    };
+    const lookups = emptyLookupStore();
     const config = compileTGridRuntimeConfig<RowsByLevel>({
       rootLevel: "orders",
       levels: {
@@ -810,7 +809,7 @@ describe("compileTGridRuntimeConfig", () => {
           childLevels: [],
         },
       },
-      columnMapper: createTGridColumnMapper(lookupResolver),
+      columnMapper: createTGridColumnMapper({ lookups }),
       hostRowQueryState: () =>
         makeHostRowQueryState({
           page: 1,
@@ -841,9 +840,7 @@ describe("compileTGridRuntimeConfig", () => {
   });
 
   it("uses a child level initialSort before falling back to parent defaultSort", () => {
-    const lookupResolver: TGridLookupResolver = {
-      bundleFor: () => undefined,
-    };
+    const lookups = emptyLookupStore();
     const config = compileTGridRuntimeConfig<RowsByLevel>({
       rootLevel: "orders",
       levels: {
@@ -870,7 +867,7 @@ describe("compileTGridRuntimeConfig", () => {
           childLevels: [],
         },
       },
-      columnMapper: createTGridColumnMapper(lookupResolver),
+      columnMapper: createTGridColumnMapper({ lookups }),
       hostRowQueryState: () =>
         makeHostRowQueryState({
           page: 1,
@@ -922,15 +919,13 @@ describe("compileTGridRuntimeConfig", () => {
       rootLevel: "orders",
       runtime: {} as unknown as GridRuntime,
       appServices: { suffix: "saved" },
-      lookupRegistry: {} as unknown as TableLookupRegistry,
+      lookups: emptyLookupStore(),
       levels: {} as unknown as TGridSessionContext<
         RowsByLevel,
         Services
       >["levels"],
     };
-    const lookupResolver: TGridLookupResolver = {
-      bundleFor: () => undefined,
-    };
+    const lookups = emptyLookupStore();
     const config = compileTGridRuntimeConfig<RowsByLevel, Services>({
       rootLevel: "orders",
       levels: {
@@ -967,7 +962,7 @@ describe("compileTGridRuntimeConfig", () => {
           childLevels: [],
         },
       },
-      columnMapper: createTGridColumnMapper(lookupResolver),
+      columnMapper: createTGridColumnMapper({ lookups }),
       sessionContext: () => session,
       hostRowQueryState: () =>
         makeHostRowQueryState({
@@ -1029,15 +1024,13 @@ describe("compileTGridRuntimeConfig", () => {
       rootLevel: "orders",
       runtime: {} as unknown as GridRuntime,
       appServices: { suffix: "saved" },
-      lookupRegistry: {} as unknown as TableLookupRegistry,
+      lookups: emptyLookupStore(),
       levels: {} as unknown as TGridSessionContext<
         RowsByLevel,
         Services
       >["levels"],
     };
-    const lookupResolver: TGridLookupResolver = {
-      bundleFor: () => undefined,
-    };
+    const lookups = emptyLookupStore();
     const config = compileTGridRuntimeConfig<RowsByLevel, Services>({
       rootLevel: "orders",
       levels: {
@@ -1065,7 +1058,7 @@ describe("compileTGridRuntimeConfig", () => {
           childLevels: [],
         },
       },
-      columnMapper: createTGridColumnMapper(lookupResolver),
+      columnMapper: createTGridColumnMapper({ lookups }),
       sessionContext: () => session,
       hostRowQueryState: () =>
         makeHostRowQueryState({

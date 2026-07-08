@@ -79,25 +79,21 @@ function entryMatchesSearchText(
   );
 }
 
+// Lookup caches are ordinary memoized objects; see value-lookup.ts for the
+// lifetime rationale. Stale search responses are rejected by request key, not
+// by disposal — a late response for a superseded search is dropped because its
+// request key no longer matches the latest request for that search text.
 class SearchLookupStore<TValue extends LookupValue> {
   protected readonly listeners = new Set<() => void>();
-  protected disposed = false;
 
   subscribeToLookupChanges(listener: () => void): () => void {
-    if (this.disposed) return () => {};
     this.listeners.add(listener);
     return () => {
       this.listeners.delete(listener);
     };
   }
 
-  dispose(): void {
-    this.disposed = true;
-    this.listeners.clear();
-  }
-
   protected notifyLookupChanged(): void {
-    if (this.disposed) return;
     for (const listener of Array.from(this.listeners)) {
       listener();
     }
@@ -122,26 +118,18 @@ export class StaticSearchLookup<TValue extends LookupValue = LookupValue>
   cachedSearchResults(
     request?: Pick<LookupSearchRequest, "searchText">,
   ): readonly LookupEntry<TValue>[] {
-    if (this.disposed) return EMPTY_SEARCH_RESULTS;
     return this.entriesForSearchText(normalizeSearchText(request?.searchText));
   }
 
   async loadSearchResults(
     request: LookupSearchRequest = {},
   ): Promise<LookupSearchPage<TValue>> {
-    if (this.disposed) return { entries: EMPTY_SEARCH_RESULTS };
-
     const searchText = normalizeSearchText(request.searchText);
     const limit = normalizeLimit(request.limit, this.entries.length);
     const entries = this.entriesForSearchText(searchText);
     return {
       entries: entries.length <= limit ? entries : entries.slice(0, limit),
     };
-  }
-
-  override dispose(): void {
-    super.dispose();
-    this.entriesBySearchText.clear();
   }
 
   private entriesForSearchText(
@@ -197,8 +185,6 @@ export class CachedSearchLookup<TValue extends LookupValue = LookupValue>
   cachedSearchResults(
     request?: Pick<LookupSearchRequest, "searchText">,
   ): readonly LookupEntry<TValue>[] {
-    if (this.disposed) return EMPTY_SEARCH_RESULTS;
-
     const searchText = normalizeSearchText(request?.searchText);
     return (
       this.searchPagesByText.get(searchText)?.page.entries ??
@@ -209,8 +195,6 @@ export class CachedSearchLookup<TValue extends LookupValue = LookupValue>
   async loadSearchResults(
     request: LookupSearchRequest = {},
   ): Promise<LookupSearchPage<TValue>> {
-    if (this.disposed) return { entries: EMPTY_SEARCH_RESULTS };
-
     const normalizedRequest = this.normalizeRequest(request);
     const requestKey = searchRequestKey(normalizedRequest);
     const cachedPage = this.searchPagesByText.get(normalizedRequest.searchText);
@@ -226,13 +210,6 @@ export class CachedSearchLookup<TValue extends LookupValue = LookupValue>
     const load = this.loadAndStoreSearchPage(normalizedRequest, requestKey);
     this.loadingSearchesByRequest.set(requestKey, load);
     return load;
-  }
-
-  override dispose(): void {
-    super.dispose();
-    this.searchPagesByText.clear();
-    this.loadingSearchesByRequest.clear();
-    this.latestRequestBySearchText.clear();
   }
 
   private normalizeRequest(
@@ -254,7 +231,6 @@ export class CachedSearchLookup<TValue extends LookupValue = LookupValue>
     try {
       const page = await this.loadEntriesForSearch(request);
       if (
-        !this.disposed &&
         this.latestRequestBySearchText.get(request.searchText) === requestKey
       ) {
         this.searchPagesByText.set(request.searchText, { page, requestKey });

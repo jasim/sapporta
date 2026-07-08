@@ -62,6 +62,8 @@ export {
 } from "./table/form/record-form-store";
 export * from "./table";
 
+export * from "./lookup";
+
 export * from "./report";
 
 export { AppShell, type AppShellProps } from "./shell/components/AppShell";

@@ -161,7 +161,6 @@ function WideTableHeader({
         }
       />
       <FilterCardsBar
-        tableName={table.name}
         columns={[...query.columns]}
         filters={[...query.filters]}
         lookupForColumn={query.lookupForColumn}
@@ -314,7 +313,6 @@ function NarrowCardTableHeader({
             </SheetDescription>
           </SheetHeader>
           <FilterCardsBar
-            tableName={table.name}
             columns={[...query.columns]}
             filters={[...query.filters]}
             lookupForColumn={query.lookupForColumn}

@@ -2,7 +2,7 @@ import type { ColumnHeaderMenuProps } from "@sapporta/grid/column-preset";
 import type { TypedFilterCondition } from "@sapporta/shared/filter";
 import type { ColumnSchema as GridColumnSchema } from "@sapporta/grid";
 import { lookupCapabilities, preset } from "@sapporta/grid/column-preset";
-import type { LookupForColumn } from "../lookup/column-lookup";
+import type { LookupForColumn } from "../../lookup";
 import { HeaderFilterMenuContent } from "../filters/HeaderFilterPopover";
 import type { TGridFilter } from "./tgrid-filter";
 import type { TGridTableColumnMeta } from "./tgrid-column-mapper";
@@ -37,7 +37,6 @@ function TGridHeaderMenu({
 
   return (
     <HeaderFilterMenuContent
-      tableName={meta.table}
       column={meta.schema}
       columns={columns}
       filters={filter.conditions}
@@ -64,10 +63,10 @@ function TGridHeaderMenu({
 function lookupForGridColumn(
   columns: readonly GridColumnSchema[],
 ): LookupForColumn {
-  return ({ tableName, column }) => {
+  return (column) => {
     const gridColumn = columns.find((candidate) => {
       const meta = tableColumnMetaOf(candidate);
-      return meta?.table === tableName && meta.schema.name === column.name;
+      return meta?.schema.name === column.name;
     });
     if (!gridColumn) return undefined;
     const columnPreset = preset(gridColumn);

@@ -1,18 +1,15 @@
 import { useState, useMemo } from "react";
 import { Plus } from "lucide-react";
-import type {
-  TypedFilterCondition,
-} from "@sapporta/shared/filter";
+import type { TypedFilterCondition } from "@sapporta/shared/filter";
 import type { ColumnSchema } from "@sapporta/shared/contracts";
 import { cn } from "@sapporta/ui/cn";
 import { Popover, PopoverContent, PopoverTrigger } from "@sapporta/ui/popover";
-import type { LookupForColumn } from "../lookup/column-lookup";
+import type { LookupForColumn } from "../../lookup";
 import { ConditionEditor } from "./ConditionEditor";
 import { FilterCard } from "./FilterCard";
 import { DateRangeCard, groupDateRanges } from "./DateRangeCard";
 
 export interface FilterCardsBarProps {
-  tableName?: string;
   columns: ColumnSchema[];
   filters: TypedFilterCondition[];
   lookupForColumn?: LookupForColumn;
@@ -28,7 +25,6 @@ export interface FilterCardsBarProps {
  *  collapses to a single `+ Add filter` affordance. Each card owns its own
  *  ConditionEditor popover; the bar itself owns the "add" popover. */
 export function FilterCardsBar({
-  tableName,
   columns,
   filters,
   lookupForColumn,
@@ -73,7 +69,6 @@ export function FilterCardsBar({
           <FilterCard
             key={entry.condition.id}
             condition={entry.condition}
-            tableName={tableName}
             columns={filterableColumns}
             lookupForColumn={lookupForColumn}
             onUpdate={onUpdate}
@@ -99,7 +94,6 @@ export function FilterCardsBar({
         >
           <ConditionEditor
             columns={filterableColumns}
-            tableName={tableName}
             lookupForColumn={lookupForColumn}
             onApply={(cond) => {
               onAdd(cond);

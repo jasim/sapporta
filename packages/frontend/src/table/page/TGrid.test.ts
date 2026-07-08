@@ -96,7 +96,7 @@ describe("TGrid", () => {
       levels: {},
       levelInfoById: {},
       appServices: undefined,
-      lookupRegistry: {},
+      lookups: {},
       setLevelSort: vi.fn(),
       setLevelFilter: vi.fn(),
     } as unknown as TGridSession<Rows>;

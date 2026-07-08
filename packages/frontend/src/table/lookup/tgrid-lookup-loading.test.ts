@@ -122,7 +122,6 @@ function makeValueLookup(args: {
     entryForValue: vi.fn(),
     loadMissingEntries: args.loadMissingEntries,
     subscribeToLookupChanges: vi.fn(() => () => {}),
-    dispose: vi.fn(),
   };
 }
 

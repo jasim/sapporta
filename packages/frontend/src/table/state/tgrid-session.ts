@@ -38,15 +38,11 @@ import type {
   TGridRuntimeLevel,
   TGridSessionContext,
 } from "../grid-adapter/tgrid-cell-context";
-import { createTGridLookupResolver } from "../grid-adapter/tgrid-lookup-resolver";
 import {
-  createTableLookupRegistry,
-  type TableLookupRegistry,
-} from "../lookup/table-lookup-registry";
-import {
-  createColumnLookupResolver,
+  createLookupStore,
   type LookupForColumn,
-} from "../lookup/column-lookup";
+  type LookupStore,
+} from "../../lookup";
 import { buildTableRowsQuery } from "../api/rows";
 import { getApiBase } from "../../platform/client";
 import type {
@@ -143,6 +139,7 @@ export type TGridSession<
     pageSize: number,
   ): Promise<SourceLoadResult>;
   setErrorBanner(message: string | null): void;
+  lookups: LookupStore;
   lookupForColumn: LookupForColumn;
   csvExportUrl(levelId?: TGridLevelId<RowsByLevel>): string;
   dispose(): void;
@@ -188,7 +185,7 @@ class DefaultTGridSession<
   >;
   readonly runtime: GridRuntime;
   readonly rootSource: RuntimeLevelDataSource;
-  readonly lookupRegistry: TableLookupRegistry;
+  readonly lookups: LookupStore;
   readonly lookupForColumn: LookupForColumn;
   readonly columnMapper: TGridColumnMapper;
   readonly levelInfoById: Record<TGridLevelId<RowsByLevel>, TGridLevelInfo>;
@@ -201,13 +198,9 @@ class DefaultTGridSession<
     this.liveInputsRef = liveInputsRef;
     this.rootLevel = definition.rootLevel;
     this.rootTableName = definition.levels[definition.rootLevel].table.name;
-    this.lookupRegistry = createTableLookupRegistry();
-    this.lookupForColumn = createColumnLookupResolver(
-      this.lookupRegistry,
-    ).lookupForColumn;
-
-    const lookupResolver = createTGridLookupResolver(this.lookupRegistry);
-    this.columnMapper = createTGridColumnMapper(lookupResolver);
+    this.lookups = createLookupStore();
+    this.lookupForColumn = (column) => this.lookups.foreignKey(column);
+    this.columnMapper = createTGridColumnMapper({ lookups: this.lookups });
 
     // Levels with visible table controls need query stores so filters, search,
     // paging, export links, and row fetches all use the same state.
@@ -377,7 +370,7 @@ class DefaultTGridSession<
 
   dispose(): void {
     this.runtime.dispose();
-    this.lookupRegistry.dispose();
+    this.lookups.clear();
   }
 
   private createRuntimeLevels(

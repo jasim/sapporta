@@ -21,7 +21,7 @@ import type {
   ColumnSchema as TableColumnSchema,
 } from "@sapporta/shared/contracts";
 import type { ColumnSchema as GridColumnSchema } from "@sapporta/grid";
-import type { TableLookupRegistry } from "../lookup/table-lookup-registry";
+import type { LookupStore } from "../../lookup";
 import type {
   RowFieldName,
   TGridLevelId,
@@ -69,7 +69,7 @@ export type TGridSessionContext<
     >;
   };
   appServices: AppServices;
-  lookupRegistry: TableLookupRegistry;
+  lookups: LookupStore;
 };
 
 // Runtime contract passed into renderers for every visible cell.

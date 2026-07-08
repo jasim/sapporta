@@ -160,7 +160,7 @@ describe("CachedValueLookup", () => {
     expect(listener).toHaveBeenCalledTimes(1);
   });
 
-  it("forgets cached labels and ignores late network answers after disposal", async () => {
+  it("keeps late network answers so a cache stays usable after its subscriber leaves", async () => {
     let finishLoading!: (
       entries: readonly { value: string; label: string }[],
     ) => void;
@@ -172,13 +172,13 @@ describe("CachedValueLookup", () => {
     });
     const listener = vi.fn();
 
-    lookup.subscribeToLookupChanges(listener);
+    const unsubscribe = lookup.subscribeToLookupChanges(listener);
     const pendingLoad = lookup.loadMissingEntries(["9"]);
-    lookup.dispose();
+    unsubscribe();
     finishLoading([{ value: "9", label: "Late Label" }]);
     await pendingLoad;
 
-    expect(lookup.entryForValue("9")).toBeUndefined();
+    expect(lookup.entryForValue("9")?.label).toBe("Late Label");
     expect(listener).not.toHaveBeenCalled();
   });
 });

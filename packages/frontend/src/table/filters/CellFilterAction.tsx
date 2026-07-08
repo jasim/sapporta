@@ -9,12 +9,11 @@ import { useState } from "react";
 import { Filter } from "lucide-react";
 import type { TypedFilterCondition } from "@sapporta/shared/filter";
 import type { ColumnSchema } from "@sapporta/shared/contracts";
-import type { LookupForColumn } from "../lookup/column-lookup";
+import type { LookupForColumn } from "../../lookup";
 import { Popover, PopoverContent, PopoverTrigger } from "@sapporta/ui/popover";
 import { ConditionEditor } from "./ConditionEditor";
 
 export interface CellFilterActionProps {
-  tableName?: string;
   column: ColumnSchema;
   columns: ColumnSchema[];
   cellValue: unknown;
@@ -23,7 +22,6 @@ export interface CellFilterActionProps {
 }
 
 export function CellFilterAction({
-  tableName,
   column,
   columns,
   cellValue,
@@ -53,7 +51,6 @@ export function CellFilterAction({
           columns={columns}
           lockedColumn={column}
           seedValue={cellValue}
-          tableName={tableName}
           lookupForColumn={lookupForColumn}
           onApply={(cond) => {
             onAddFilter(cond);

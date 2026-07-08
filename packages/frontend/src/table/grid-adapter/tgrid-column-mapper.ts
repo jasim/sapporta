@@ -10,9 +10,8 @@ import {
   type ColumnWidth,
 } from "@sapporta/grid/column-preset";
 import { inferDisplayType, type DisplayType } from "../model/column-types";
-import type { TableForeignKeyLookupBundle } from "../lookup/table-lookup-registry";
+import type { LookupStore } from "../../lookup";
 import type { TableColumnName } from "./tgrid-types";
-import type { TGridLookupResolver } from "./tgrid-lookup-resolver";
 
 export type TGridTableColumnMeta = {
   table: string;
@@ -39,15 +38,16 @@ export type TGridColumnMapper = {
   ): TGridTableColumnMeta | undefined;
 };
 
-export function createTGridColumnMapper(
-  lookupResolver: TGridLookupResolver,
-): TGridColumnMapper {
+export function createTGridColumnMapper(args: {
+  lookups: LookupStore;
+}): TGridColumnMapper {
+  const { lookups } = args;
   return {
     columnsFor(options) {
-      return columnsFor(lookupResolver, options);
+      return columnsFor(lookups, options);
     },
-    columnFor(args) {
-      return columnFor(lookupResolver, args);
+    columnFor(columnArgs) {
+      return columnFor(lookups, columnArgs);
     },
     metaOf(column) {
       return tgridTableColumnMetaOf(column);
@@ -56,14 +56,14 @@ export function createTGridColumnMapper(
 }
 
 function columnsFor(
-  lookupResolver: TGridLookupResolver,
+  lookups: LookupStore,
   options: TGridColumnMapOptions,
 ): GridColumnSchema[] {
   const included = includeColumns(options.table, options.includedColumnNames);
   const columns = included
     .filter((c) => !c.visuallyHidden)
     .map((column) =>
-      columnFor(lookupResolver, {
+      columnFor(lookups, {
         tableName: options.table.name,
         column,
         immutable: options.immutable,
@@ -78,7 +78,7 @@ function columnsFor(
 }
 
 function columnFor(
-  lookupResolver: TGridLookupResolver,
+  lookups: LookupStore,
   args: {
     tableName: string;
     column: TableColumnSchema;
@@ -111,16 +111,14 @@ function columnFor(
         edit: "none",
       });
     case "fk": {
-      const bundle = lookupResolver.bundleFor({ tableName, column });
-      if (!bundle) {
-        throw new Error(
-          `TGridColumnMapper.columnFor: FK column '${tableName}.${column.name}' has no lookup bundle`,
-        );
-      }
+      const lookup = lookups.requireForeignKey({
+        tableName,
+        column,
+      });
       return columnPreset.foreignKey({
         ...common,
-        valueLookup: bundle.valueLookup,
-        searchLookup: bundle.searchLookup,
+        valueLookup: lookup.valueLookup,
+        searchLookup: lookup.searchLookup,
       });
     }
     case "select":

@@ -18,7 +18,7 @@ import {
 } from "@sapporta/shared/filter";
 import type { ColumnSchema } from "@sapporta/shared/contracts";
 import { isLookupValue } from "@sapporta/grid/lookup";
-import type { LookupForColumn } from "../lookup/column-lookup";
+import type { LookupForColumn } from "../../lookup";
 import {
   Select,
   SelectContent,
@@ -58,7 +58,6 @@ export interface ConditionEditorProps {
    *  per-cell filter icon so the draft opens with the clicked cell's value
    *  already filled in (scalar or list depending on the default operator). */
   seedValue?: unknown;
-  tableName?: string;
   lookupForColumn?: LookupForColumn;
   /** Called on Apply with a table-aware typed condition. */
   onApply: (cond: TypedFilterCondition) => void;
@@ -132,7 +131,6 @@ export function ConditionEditor({
   lockedColumn,
   initial,
   seedValue,
-  tableName,
   lookupForColumn,
   onApply,
   onCancel,
@@ -206,10 +204,7 @@ export function ConditionEditor({
 
   const resolved =
     draft.column && type ? resolveColumnOptions(draft.column, type) : null;
-  const lookup =
-    draft.column && tableName
-      ? lookupForColumn?.({ tableName, column: draft.column })
-      : undefined;
+  const lookup = draft.column ? lookupForColumn?.(draft.column) : undefined;
 
   return (
     <div

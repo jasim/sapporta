@@ -20,5 +20,4 @@ export {
   type ReportToolbarProps,
 } from "./components/ReportChrome";
 export { DateRangeField } from "./fields/DateRangeField";
-export { EntitySelectField } from "./fields/EntitySelectField";
 export * from "./url/report-url";

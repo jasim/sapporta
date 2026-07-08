@@ -58,10 +58,7 @@ type TGridRenderableSessionContext = {
   levels: Record<string, { table?: TableSchema; queryStore?: unknown }>;
   levelInfoById: Record<string, TGridLevelInfo>;
   appServices: unknown;
-  lookupRegistry: TGridSessionContext<
-    TGridRowsByLevel,
-    unknown
-  >["lookupRegistry"];
+  lookups: TGridSessionContext<TGridRowsByLevel, unknown>["lookups"];
 };
 
 export function TGrid<

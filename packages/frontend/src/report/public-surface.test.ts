@@ -15,7 +15,6 @@ describe("@sapporta/frontend/report public surface", () => {
     expect(report).toHaveProperty("ReportError");
     expect(report).toHaveProperty("ReportSummaryStats");
     expect(report).toHaveProperty("DateRangeField");
-    expect(report).toHaveProperty("EntitySelectField");
     expect(report).toHaveProperty("buildSearchParams");
     expect(report).toHaveProperty("createSnapshotUrl");
 
