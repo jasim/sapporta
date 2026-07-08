@@ -5,6 +5,10 @@ import {
 } from "../../grid/react";
 import type { PresetChromeOptions } from "../types";
 import { templateColumns } from "../width";
+import {
+  loadColumnSizingOverrides,
+  resolveColumnSizing,
+} from "../column-sizing";
 import styles from "../sapporta-preset.module.css";
 import { PresetEmptyLevel, PresetLevelStatusBand } from "../LevelStateChrome";
 import { ColumnPresetHeader } from "./ColumnPresetHeader";
@@ -26,9 +30,15 @@ export function chrome<TMeta = unknown, TFilter = unknown>(
         />
       ) : null,
     levelContainerClassName: () => `${styles.presetGrid} sapporta-table-grid`,
-    levelContainerStyle: ({ schema }) => {
+    levelContainerStyle: ({ path, levelName, schema }) => {
+      const sizing = resolveColumnSizing(options.columnSizing, {
+        path,
+        levelName,
+        schema,
+      });
+      const overrides = loadColumnSizingOverrides(sizing, schema);
       return {
-        "--grid-template-columns": templateColumns(schema),
+        "--grid-template-columns": templateColumns(schema, overrides),
       } as CSSProperties;
     },
   };

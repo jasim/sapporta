@@ -34,5 +34,19 @@ export {
   columnPresetWidthForSizing,
   type CharacterColumnSizing,
 } from "./sizing";
+export {
+  DEFAULT_COLUMN_RESIZE_MIN_PX,
+  clampColumnPixelWidth,
+  columnSizingTemplateColumns,
+  loadColumnSizingOverrides,
+  resolveColumnSizing,
+  sanitizeColumnSizingOverrides,
+  saveColumnSizingOverrides,
+  type ColumnSizingOptions,
+  type ColumnSizingOverrides,
+  type ColumnSizingStorageKey,
+  type ColumnSizingStorageKeyContext,
+  type ResolvedColumnSizing,
+} from "./column-sizing";
 export { chrome } from "./header/chrome";
 export { ColumnPresetHeader } from "./header/ColumnPresetHeader";

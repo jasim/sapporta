@@ -17,6 +17,7 @@ import type {
 import type { TreeNode } from "../grid/types/level-row";
 import type { SearchLookup, ValueLookup } from "../lookup";
 import type { ColumnPreset } from "./preset";
+import type { ColumnSizingOptions } from "./column-sizing";
 
 export type BuiltInColumnPresetKind =
   | "identifier"
@@ -96,6 +97,7 @@ export type ColumnHeaderMenuProps<TMeta = unknown, TFilter = unknown> = {
 };
 
 export type PresetChromeOptions<TMeta = unknown, TFilter = unknown> = {
+  columnSizing?: ColumnSizingOptions;
   renderColumnHeaderMenu?: (
     props: ColumnHeaderMenuProps<TMeta, TFilter>,
   ) => ReactNode;

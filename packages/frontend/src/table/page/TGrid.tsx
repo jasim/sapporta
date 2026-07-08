@@ -86,6 +86,10 @@ export function TGrid<
   const chrome = useMemo(() => {
     const presetChrome = columnPreset.chrome<TGridTableColumnMeta, TGridFilter>(
       {
+        columnSizing: {
+          storageKey: ({ levelName }) =>
+            `sapporta:grid-columns:${session.rootTableName}:${levelName}`,
+        },
         renderColumnHeaderMenu: renderTGridHeaderMenu,
         commandOverrides: (level) => {
           const levelId = runtime.schemaAt(level.path).name;

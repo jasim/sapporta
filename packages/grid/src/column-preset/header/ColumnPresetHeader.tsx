@@ -1,4 +1,10 @@
-import { useState, type MouseEvent, type ReactNode } from "react";
+import {
+  useRef,
+  useState,
+  type MouseEvent,
+  type PointerEvent,
+  type ReactNode,
+} from "react";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import type { ColumnSchema } from "../../grid/types/schema";
 import type { GridPath } from "../../grid/types/identity";
@@ -10,6 +16,15 @@ import {
 } from "../../grid/react/GridRuntimeProvider";
 import { cn, Popover, PopoverContent, PopoverTrigger } from "@sapporta/ui";
 import { meta, preset, presetRuntime } from "../preset";
+import {
+  clampColumnPixelWidth,
+  columnSizingTemplateColumns,
+  loadColumnSizingOverrides,
+  resolveColumnSizing,
+  saveColumnSizingOverrides,
+  type ColumnSizingOptions,
+  type ColumnSizingOverrides,
+} from "../column-sizing";
 import styles from "../sapporta-preset.module.css";
 import type {
   GridLevelCommands,
@@ -78,6 +93,7 @@ export function ColumnPresetHeader<TMeta = unknown, TFilter = unknown>({
             }}
             commands={commands}
             renderColumnHeaderMenu={options.renderColumnHeaderMenu}
+            columnSizing={options.columnSizing}
           />
         ))}
       </div>
@@ -90,6 +106,7 @@ function HeaderCell<TMeta = unknown, TFilter = unknown>({
   column,
   commands,
   renderColumnHeaderMenu,
+  columnSizing,
 }: {
   level: HeaderLevelState<TFilter>;
   column: HeaderColumn<TMeta>;
@@ -98,8 +115,10 @@ function HeaderCell<TMeta = unknown, TFilter = unknown>({
     TMeta,
     TFilter
   >["renderColumnHeaderMenu"];
+  columnSizing?: ColumnSizingOptions;
 }) {
   const [open, setOpen] = useState(false);
+  const resizeDrag = useRef<ResizeDragState | null>(null);
   const columnPreset = column.preset;
   const runtime = presetRuntime<TMeta>(column.column);
   const customHeader = runtime?.headerBehavior.renderColumnHeader?.({
@@ -124,6 +143,11 @@ function HeaderCell<TMeta = unknown, TFilter = unknown>({
     runtime?.headerBehavior.sortable === true && commands.setSort !== undefined;
   const close = () => setOpen(false);
   const headerName = column.column.name;
+  const sizing = resolveColumnSizing(columnSizing, {
+    path: level.path,
+    levelName: level.levelName,
+    schema: level.schema,
+  });
 
   function handleHeaderClick(e: MouseEvent<HTMLDivElement>) {
     if (!sortable) return;
@@ -134,6 +158,69 @@ function HeaderCell<TMeta = unknown, TFilter = unknown>({
         e.shiftKey ? "extend" : "replace",
       ),
     );
+  }
+
+  function handleResizePointerDown(e: PointerEvent<HTMLButtonElement>) {
+    if (!sizing.enabled) return;
+    if (e.button !== 0) return;
+
+    const handle = e.currentTarget;
+    const headerCell = handle.closest('[data-grid-part="header-cell"]');
+    const root = handle.closest("[data-grid-path]");
+    if (!(headerCell instanceof HTMLElement)) return;
+    if (!(root instanceof HTMLElement)) return;
+
+    e.preventDefault();
+    e.stopPropagation();
+
+    const startWidth = headerCell.getBoundingClientRect().width;
+    resizeDrag.current = {
+      pointerId: e.pointerId,
+      startX: e.clientX,
+      startWidth,
+      root,
+      handle,
+      overrides: loadColumnSizingOverrides(sizing, level.schema),
+    };
+    handle.dataset.resizing = "true";
+    handle.setPointerCapture?.(e.pointerId);
+  }
+
+  function handleResizePointerMove(e: PointerEvent<HTMLButtonElement>) {
+    const drag = resizeDrag.current;
+    if (!drag || drag.pointerId !== e.pointerId) return;
+
+    e.preventDefault();
+    e.stopPropagation();
+
+    const nextWidth = clampColumnPixelWidth(
+      column.column,
+      drag.startWidth + e.clientX - drag.startX,
+      sizing.minPx,
+    );
+    drag.overrides = {
+      ...drag.overrides,
+      [column.column.id]: nextWidth,
+    };
+    applyColumnSizingToElement(
+      drag.root,
+      level.schema,
+      drag.overrides,
+      sizing.minPx,
+    );
+  }
+
+  function finishResize(e: PointerEvent<HTMLButtonElement>) {
+    const drag = resizeDrag.current;
+    if (!drag || drag.pointerId !== e.pointerId) return;
+
+    e.preventDefault();
+    e.stopPropagation();
+
+    saveColumnSizingOverrides(sizing, level.schema, drag.overrides);
+    drag.handle.releasePointerCapture?.(e.pointerId);
+    delete drag.handle.dataset.resizing;
+    resizeDrag.current = null;
   }
 
   return (
@@ -187,7 +274,41 @@ function HeaderCell<TMeta = unknown, TFilter = unknown>({
           </Popover>
         ) : null}
       </div>
+      {sizing.enabled ? (
+        <button
+          type="button"
+          aria-label={`Resize ${column.column.name} column`}
+          className={styles.columnResizeHandle}
+          data-grid-part="column-resize-handle"
+          onClick={(e) => e.stopPropagation()}
+          onPointerDown={handleResizePointerDown}
+          onPointerMove={handleResizePointerMove}
+          onPointerUp={finishResize}
+          onPointerCancel={finishResize}
+        />
+      ) : null}
     </div>
+  );
+}
+
+type ResizeDragState = {
+  pointerId: number;
+  startX: number;
+  startWidth: number;
+  root: HTMLElement;
+  handle: HTMLButtonElement;
+  overrides: ColumnSizingOverrides;
+};
+
+function applyColumnSizingToElement(
+  root: HTMLElement,
+  schema: readonly ColumnSchema[],
+  overrides: ColumnSizingOverrides,
+  minPx: number,
+) {
+  root.style.setProperty(
+    "--grid-template-columns",
+    columnSizingTemplateColumns(schema, overrides, minPx),
   );
 }
 

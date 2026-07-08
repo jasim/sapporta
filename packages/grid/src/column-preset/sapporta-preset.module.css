@@ -205,6 +205,35 @@
   cursor: default;
 }
 
+.columnResizeHandle {
+  background: transparent;
+  border: 0;
+  bottom: 0;
+  cursor: col-resize;
+  padding: 0;
+  position: absolute;
+  right: -4px;
+  top: 0;
+  touch-action: none;
+  width: 8px;
+  z-index: calc(var(--sap-z-grid-header) + 1);
+}
+
+.columnResizeHandle::after {
+  background: transparent;
+  bottom: 8px;
+  content: "";
+  position: absolute;
+  right: 3px;
+  top: 8px;
+  width: 1px;
+}
+
+.columnResizeHandle:hover::after,
+.columnResizeHandle[data-resizing="true"]::after {
+  background: var(--sap-border-strong, var(--sap-border));
+}
+
 :where(.presetGrid [data-grid-part="cell"][data-cell-status="focus"]) {
   --grid-cell-background: var(--grid-current-focus-background);
 
