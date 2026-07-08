@@ -147,8 +147,7 @@ function lookupCellValue(value: unknown): {
   if (value == null || value === "") return { value: null, empty: true };
   if (
     typeof value === "string" ||
-    typeof value === "number" ||
-    typeof value === "boolean"
+    typeof value === "number"
   ) {
     return { value, empty: false };
   }

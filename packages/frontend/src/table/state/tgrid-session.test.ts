@@ -1,6 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
 import type { TableSchema } from "@sapporta/shared/contracts";
-import { eqCondition } from "@sapporta/shared/filter";
+import {
+  eqCondition,
+  parseFiltersForTable,
+  type FilterCondition,
+} from "@sapporta/shared/filter";
 import { makeRowId, rootPath } from "@sapporta/grid";
 import { createTGridSession } from "./tgrid-session";
 import { defineTGrid } from "../grid-adapter/tgrid-runtime-config";
@@ -28,6 +32,10 @@ const ordersTable: TableSchema = {
   ],
   children: [],
 };
+
+function typedFilters(filters: readonly FilterCondition[]) {
+  return parseFiltersForTable(filters, ordersTable);
+}
 
 async function flush(): Promise<void> {
   for (let i = 0; i < 5; i += 1) await Promise.resolve();
@@ -69,10 +77,50 @@ describe("TGridSession", () => {
 
     try {
       expect(session.getQueryState()).toMatchObject({
-        filters: [initialFilter],
+        filters: [
+          expect.objectContaining({
+            column: "status",
+            op: "eq",
+            kind: "text",
+            value: "open",
+          }),
+        ],
         search: "acme",
         page: 2,
       });
+    } finally {
+      session.dispose();
+    }
+  });
+
+  it("uses typed route filters from the URL boundary", () => {
+    const definition = defineTGrid<RowsByLevel>({
+      rootLevel: "orders",
+      levels: {
+        orders: {
+          table: ordersTable,
+          childLevels: [],
+          query: { owner: "host" },
+        },
+      },
+    });
+    const session = createTGridSession<RowsByLevel>(definition, {
+      routeQuerySeeds: {
+        orders: {
+          filters: typedFilters([eqCondition("id", "7")]),
+        },
+      },
+    });
+
+    try {
+      expect(session.getQueryState().filters).toEqual([
+        expect.objectContaining({
+          column: "id",
+          op: "eq",
+          kind: "number",
+          value: 7,
+        }),
+      ]);
     } finally {
       session.dispose();
     }
@@ -162,7 +210,7 @@ describe("TGridSession", () => {
       routeQuerySeeds: {
         orders: {
           page: 4,
-          filters: [eqCondition("customer", "ACME")],
+          filters: typedFilters([eqCondition("customer", "ACME")]),
           search: null,
           sort: [],
         },
@@ -173,7 +221,14 @@ describe("TGridSession", () => {
       session.queryStore.getState().syncFromUrl({});
       expect(session.getQueryState()).toMatchObject({
         page: 2,
-        filters: [initialFilter],
+        filters: [
+          expect.objectContaining({
+            column: "status",
+            op: "eq",
+            kind: "text",
+            value: "open",
+          }),
+        ],
         search: "acme",
         sort: [{ colId: "customer", direction: "asc" }],
       });
@@ -199,7 +254,7 @@ describe("TGridSession", () => {
     const session = createTGridSession<RowsByLevel>(definition, {
       routeQuerySeeds: {
         orders: {
-          filters: [eqCondition("customer", "ACME")],
+          filters: typedFilters([eqCondition("customer", "ACME")]),
         },
       },
     });

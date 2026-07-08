@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
 import { sapportaTable } from "../schema/table.js";
-import { ValidationError } from "../db/errors.js";
+import { QueryParseError, ValidationError } from "../db/errors.js";
 import { createTestAuthContext } from "../testing/auth-context.js";
 import { createTestDb } from "../testing/test-utils.js";
 import {
@@ -183,21 +183,61 @@ describe("scopedRows", () => {
     await rows.create({ name: "Revenue", type: "revenue" });
     await rows.create({ name: "Rent", type: "expense" });
 
-    await expect(rows.lookup({ ids: "1,2" })).resolves.toEqual({
-      "1": "Cash",
-      "2": "Revenue",
+    await expect(rows.lookup({ ids: "1,2" })).resolves.toEqual([
+      { value: 1, label: "Cash" },
+      { value: 2, label: "Revenue" },
+    ]);
+    await expect(rows.lookup({ q: "re" })).resolves.toEqual([
+      { value: 2, label: "Revenue" },
+      { value: 3, label: "Rent" },
+    ]);
+    await expect(rows.lookup({ q: "re", limit: "1" })).resolves.toEqual([
+      { value: 2, label: "Revenue" },
+    ]);
+    await expect(rows.lookup({ limit: "2" })).resolves.toEqual([
+      { value: 1, label: "Cash" },
+      { value: 2, label: "Revenue" },
+    ]);
+  });
+
+  it("rejects non-numeric lookup ids for numeric primary keys", async () => {
+    const { rows } = setupAccounts();
+
+    await expect(rows.lookup({ ids: "not-a-number" })).rejects.toBeInstanceOf(
+      QueryParseError,
+    );
+  });
+
+  it("keeps lookup ids as strings for text primary keys", async () => {
+    const agentsTable = sqliteTable("agents", {
+      id: text("id").primaryKey(),
+      name: text("name").notNull(),
     });
-    await expect(rows.lookup({ q: "re" })).resolves.toEqual({
-      "2": "Revenue",
-      "3": "Rent",
+    const agents = sapportaTable({
+      drizzle: agentsTable,
+      meta: {
+        rowScope: "systemGlobal",
+        rowLabelColumns: ["name"],
+      },
     });
-    await expect(rows.lookup({ q: "re", limit: "1" })).resolves.toEqual({
-      "2": "Revenue",
-    });
-    await expect(rows.lookup({ limit: "2" })).resolves.toEqual({
-      "1": "Cash",
-      "2": "Revenue",
-    });
+
+    const { db, sqlite } = createTestDb();
+    sqlite.exec(`
+      CREATE TABLE agents (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL
+      );
+      INSERT INTO agents (id, name) VALUES ('001', 'Agent One');
+    `);
+    const rows = scopedRows(
+      db,
+      createTestAuthContext({ tables: [agents] }),
+      agents,
+    );
+
+    await expect(rows.lookup({ ids: "001" })).resolves.toEqual([
+      { value: "001", label: "Agent One" },
+    ]);
   });
 
   it("counts grouped rows inside row scope", async () => {

@@ -88,6 +88,13 @@ export type NewFilterCondition = FilterCondition extends infer T
     : never
   : never;
 
+export type FilterDraftValue = string | number;
+
+export type FilterDraftCondition =
+  | { column: string; op: ScalarOp; value: string }
+  | { column: string; op: ListOp; values: readonly FilterDraftValue[] }
+  | { column: string; op: NullOp; polarity: Polarity };
+
 /** Wire-format key for a column+op pair: `filter[col][op]`. */
 export function wireKey(column: string, op: Operator): string {
   return `filter[${column}][${op}]`;
@@ -141,6 +148,14 @@ export type TypedFilterCondition =
       kind: ValueKind;
       polarity: Polarity;
     };
+
+export type FilterTableLike = {
+  columns: readonly { name: string; kind: ValueKind }[];
+};
+
+type FilterTableInput = {
+  columns: readonly { name: string; kind?: ValueKind }[];
+};
 
 /** Typed version of `FilterParseError` failure codes. */
 export type TypedFilterParseCode =
@@ -250,6 +265,11 @@ export function serializeTypedValue(v: TypedValue): unknown {
   return v;
 }
 
+export function encodeTypedValue(v: TypedValue): string {
+  const serialized = serializeTypedValue(v);
+  return serialized == null ? "" : String(serialized);
+}
+
 /**
  * Boundary parse: convert raw filter conditions to typed ones.
  *
@@ -314,6 +334,68 @@ export function parseFilters(
   return out;
 }
 
+export function parseFilterForTable(
+  filter: FilterCondition,
+  table: FilterTableLike,
+): TypedFilterCondition;
+export function parseFilterForTable(
+  filter: FilterCondition,
+  table: FilterTableInput,
+): TypedFilterCondition;
+export function parseFilterForTable(
+  filter: FilterCondition,
+  table: FilterTableInput,
+): TypedFilterCondition {
+  const [typed] = parseFilters([filter], (column) =>
+    table.columns.find((candidate) => candidate.name === column)?.kind,
+  );
+  return typed;
+}
+
+export function parseFiltersForTable(
+  filters: readonly FilterCondition[],
+  table: FilterTableLike,
+): TypedFilterCondition[];
+export function parseFiltersForTable(
+  filters: readonly FilterCondition[],
+  table: FilterTableInput,
+): TypedFilterCondition[];
+export function parseFiltersForTable(
+  filters: readonly FilterCondition[],
+  table: FilterTableInput,
+): TypedFilterCondition[] {
+  return filters.map((filter) => parseFilterForTable(filter, table));
+}
+
+export function encodeTypedCondition(
+  cond: TypedFilterCondition,
+): FilterCondition {
+  switch (cond.op) {
+    case "in":
+    case "nin":
+      return {
+        id: cond.id,
+        column: cond.column,
+        op: cond.op,
+        values: cond.values.map(encodeTypedValue),
+      };
+    case "is":
+      return {
+        id: cond.id,
+        column: cond.column,
+        op: cond.op,
+        polarity: cond.polarity,
+      };
+    default:
+      return {
+        id: cond.id,
+        column: cond.column,
+        op: cond.op,
+        value: encodeTypedValue(cond.value),
+      };
+  }
+}
+
 /** Serialize a condition's value for transmission. */
 export function encodeFilterValue(cond: FilterCondition): string {
   switch (cond.op) {
@@ -332,12 +414,21 @@ export function encodeFilterValue(cond: FilterCondition): string {
  * The same column may appear more than once (the grammar AND-combines them),
  * so we call `append`, not `set`. Ids are intentionally not serialized.
  */
-export function encodeFilters(filters: FilterCondition[]): URLSearchParams {
+export function encodeFilters(
+  filters: readonly FilterCondition[],
+): URLSearchParams {
   const params = new URLSearchParams();
   for (const cond of filters) {
     params.append(wireKey(cond.column, cond.op), encodeFilterValue(cond));
   }
   return params;
+}
+
+/** Edge adapter for URL/API calls that already carry typed conditions. */
+export function encodeTypedFilters(
+  filters: readonly TypedFilterCondition[],
+): URLSearchParams {
+  return encodeFilters(filters.map(encodeTypedCondition));
 }
 
 /** Closed taxonomy of grammar-level parse failures. These mirror the
@@ -448,11 +539,121 @@ export function mintFilterId(column: string, op: string): string {
   return `fc_${nextFilterId}_${column}_${op}`;
 }
 
+export function materializeFilterCondition(
+  cond: NewFilterCondition,
+  id = mintFilterId(cond.column, cond.op),
+): FilterCondition {
+  switch (cond.op) {
+    case "in":
+    case "nin":
+      return { id, column: cond.column, op: cond.op, values: cond.values };
+    case "is":
+      return {
+        id,
+        column: cond.column,
+        op: cond.op,
+        polarity: cond.polarity,
+      };
+    default:
+      return { id, column: cond.column, op: cond.op, value: cond.value };
+  }
+}
+
+function resolveColumnKind(
+  table: FilterTableInput,
+  column: string,
+): ValueKind {
+  const kind = table.columns.find((candidate) => candidate.name === column)
+    ?.kind;
+  if (!kind) {
+    throw new TypedFilterParseError(
+      "unknown_column",
+      `unknown column "${column}"`,
+    );
+  }
+  return kind;
+}
+
+function parseFilterDraftValue(
+  kind: ValueKind,
+  value: FilterDraftValue,
+): TypedValue {
+  if (typeof value === "number") {
+    if (kind === "number") return value;
+    return parseFilterValue(kind, String(value));
+  }
+  return parseFilterValue(kind, value);
+}
+
+export function materializeTypedFilterCondition(
+  draft: FilterDraftCondition,
+  table: FilterTableLike,
+  id?: string,
+): TypedFilterCondition;
+export function materializeTypedFilterCondition(
+  draft: FilterDraftCondition,
+  table: FilterTableInput,
+  id?: string,
+): TypedFilterCondition;
+export function materializeTypedFilterCondition(
+  draft: FilterDraftCondition,
+  table: FilterTableInput,
+  id = mintFilterId(draft.column, draft.op),
+): TypedFilterCondition {
+  const kind = resolveColumnKind(table, draft.column);
+  checkOperatorApplicable(kind, draft.op, draft.column);
+  switch (draft.op) {
+    case "in":
+    case "nin":
+      return {
+        id,
+        column: draft.column,
+        op: draft.op,
+        kind,
+        values: draft.values.map((value) => parseFilterDraftValue(kind, value)),
+      };
+    case "is":
+      return {
+        id,
+        column: draft.column,
+        op: draft.op,
+        kind,
+        polarity: draft.polarity,
+      };
+    default:
+      return {
+        id,
+        column: draft.column,
+        op: draft.op,
+        kind,
+        value: parseFilterDraftValue(kind, draft.value),
+      };
+  }
+}
+
+export function updateTypedFilterCondition(
+  existing: TypedFilterCondition,
+  draft: FilterDraftCondition,
+  table: FilterTableLike,
+): TypedFilterCondition;
+export function updateTypedFilterCondition(
+  existing: TypedFilterCondition,
+  draft: FilterDraftCondition,
+  table: FilterTableInput,
+): TypedFilterCondition;
+export function updateTypedFilterCondition(
+  existing: TypedFilterCondition,
+  draft: FilterDraftCondition,
+  table: FilterTableInput,
+): TypedFilterCondition {
+  return materializeTypedFilterCondition(draft, table, existing.id);
+}
+
 /** Deep equality on the `column + op + value` content of a condition. Ids
  *  are ignored — they are not stable across a URL round-trip. */
 export function conditionContentEqual(
-  a: FilterCondition,
-  b: FilterCondition,
+  a: TypedFilterCondition,
+  b: TypedFilterCondition,
 ): boolean {
   if (a.column !== b.column || a.op !== b.op) return false;
   // The shared op discriminator narrows `a`; `b` has the same runtime
@@ -462,24 +663,29 @@ export function conditionContentEqual(
     case "nin": {
       const bv = (b as typeof a).values;
       return (
-        a.values.length === bv.length && a.values.every((v, i) => v === bv[i])
+        a.values.length === bv.length &&
+        a.values.every((v, i) => typedValueContentEqual(v, bv[i]))
       );
     }
     case "is":
       return a.polarity === (b as typeof a).polarity;
     default:
-      return a.value === (b as typeof a).value;
+      return typedValueContentEqual(a.value, (b as typeof a).value);
   }
 }
 
 /** List-order-sensitive equality. The URL is a sequence; list-position is
  *  what we push back to the URL. */
 export function filtersEqual(
-  a: FilterCondition[],
-  b: FilterCondition[],
+  a: readonly TypedFilterCondition[],
+  b: readonly TypedFilterCondition[],
 ): boolean {
   if (a.length !== b.length) return false;
   return a.every((ca, i) => conditionContentEqual(ca, b[i]));
+}
+
+function typedValueContentEqual(a: TypedValue, b: TypedValue): boolean {
+  return serializeTypedValue(a) === serializeTypedValue(b);
 }
 
 // ── Construction helpers ─────────────────────────────────────────────────

@@ -1,9 +1,5 @@
 import type { ColumnHeaderMenuProps } from "@sapporta/grid/column-preset";
-import {
-  mintFilterId,
-  type FilterCondition,
-  type NewFilterCondition,
-} from "@sapporta/shared/filter";
+import type { TypedFilterCondition } from "@sapporta/shared/filter";
 import type { ColumnSchema as GridColumnSchema } from "@sapporta/grid";
 import { lookupCapabilities, preset } from "@sapporta/grid/column-preset";
 import type { LookupForColumn } from "../lookup/column-lookup";
@@ -36,7 +32,7 @@ function TGridHeaderMenu({
 
   if (!commands.setFilter || !commands.setSort) return null;
 
-  const setConditions = (conditions: FilterCondition[]) =>
+  const setConditions = (conditions: TypedFilterCondition[]) =>
     commands.setFilter?.({ ...filter, conditions });
 
   return (
@@ -49,13 +45,11 @@ function TGridHeaderMenu({
       sort={level.sort ? [...level.sort] : []}
       sortColumnId={column.column.id}
       onSort={commands.setSort}
-      onAddFilter={(cond) =>
-        setConditions([...filter.conditions, withFilterId(cond)])
-      }
+      onAddFilter={(cond) => setConditions([...filter.conditions, cond])}
       onUpdateFilter={(id, patch) =>
         setConditions(
           filter.conditions.map((cond) =>
-            cond.id === id ? ({ ...patch, id } as FilterCondition) : cond,
+            cond.id === id ? { ...patch, id } : cond,
           ),
         )
       }
@@ -65,10 +59,6 @@ function TGridHeaderMenu({
       close={close}
     />
   );
-}
-
-function withFilterId(cond: NewFilterCondition): FilterCondition {
-  return { ...cond, id: mintFilterId(cond.column, cond.op) } as FilterCondition;
 }
 
 function lookupForGridColumn(

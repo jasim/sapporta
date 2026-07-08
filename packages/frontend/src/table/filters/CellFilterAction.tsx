@@ -7,7 +7,7 @@
 
 import { useState } from "react";
 import { Filter } from "lucide-react";
-import type { NewFilterCondition } from "@sapporta/shared/filter";
+import type { TypedFilterCondition } from "@sapporta/shared/filter";
 import type { ColumnSchema } from "@sapporta/shared/contracts";
 import type { LookupForColumn } from "../lookup/column-lookup";
 import { Popover, PopoverContent, PopoverTrigger } from "@sapporta/ui/popover";
@@ -19,7 +19,7 @@ export interface CellFilterActionProps {
   columns: ColumnSchema[];
   cellValue: unknown;
   lookupForColumn?: LookupForColumn;
-  onAddFilter: (cond: NewFilterCondition) => void;
+  onAddFilter: (cond: TypedFilterCondition) => void;
 }
 
 export function CellFilterAction({

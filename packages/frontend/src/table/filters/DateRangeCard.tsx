@@ -12,9 +12,10 @@
 
 import { useState } from "react";
 import { X } from "lucide-react";
-import type {
-  FilterCondition,
-  NewFilterCondition,
+import type { TypedFilterCondition } from "@sapporta/shared/filter";
+import {
+  encodeTypedValue,
+  materializeTypedFilterCondition,
 } from "@sapporta/shared/filter";
 import { Input } from "@sapporta/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@sapporta/ui/popover";
@@ -24,13 +25,13 @@ import { inferDisplayType } from "../model/column-types";
 /** A date-range pair. `gte` is always the lower bound, `lte` the upper. */
 export interface DateRange {
   column: ColumnSchema;
-  gte: FilterCondition & { op: "gte"; value: string };
-  lte: FilterCondition & { op: "lte"; value: string };
+  gte: TypedFilterCondition & { op: "gte" };
+  lte: TypedFilterCondition & { op: "lte" };
 }
 
 /** Row in the cards bar — either a single condition or a date range. */
 export type CardEntry =
-  | { kind: "single"; condition: FilterCondition }
+  | { kind: "single"; condition: TypedFilterCondition }
   | { kind: "range"; range: DateRange };
 
 /**
@@ -40,7 +41,7 @@ export type CardEntry =
  * that doesn't participate in a range becomes a `single` entry. Pure.
  */
 export function groupDateRanges(
-  filters: FilterCondition[],
+  filters: TypedFilterCondition[],
   columnsByName: Map<string, ColumnSchema>,
 ): CardEntry[] {
   const claimed = new Set<string>();
@@ -87,7 +88,7 @@ export function groupDateRanges(
 
 export interface DateRangeCardProps {
   range: DateRange;
-  onUpdate: (id: string, patch: NewFilterCondition) => void;
+  onUpdate: (id: string, patch: TypedFilterCondition) => void;
   onRemove: (id: string) => void;
 }
 
@@ -99,6 +100,8 @@ export function DateRangeCard({
   const [open, setOpen] = useState(false);
   const { column, gte, lte } = range;
   const label = column.label;
+  const gteValue = encodeTypedValue(gte.value);
+  const lteValue = encodeTypedValue(lte.value);
 
   function removeBoth() {
     onRemove(gte.id);
@@ -116,7 +119,7 @@ export function DateRangeCard({
             <span className="truncate text-sap-muted">{label}</span>
             <span className="shrink-0 text-sap-subtle">between</span>
             <span className="truncate font-medium">
-              {gte.value || "…"} – {lte.value || "…"}
+              {gteValue || "…"} – {lteValue || "…"}
             </span>
           </button>
         </PopoverTrigger>
@@ -138,13 +141,20 @@ export function DateRangeCard({
           <FieldLabel label="From">
             <Input
               type="date"
-              value={gte.value}
+              value={gteValue}
               onChange={(e) =>
-                onUpdate(gte.id, {
-                  column: column.name,
-                  op: "gte",
-                  value: e.target.value,
-                })
+                onUpdate(
+                  gte.id,
+                  materializeTypedFilterCondition(
+                    {
+                      column: column.name,
+                      op: "gte",
+                      value: e.target.value,
+                    },
+                    { columns: [column] },
+                    gte.id,
+                  ),
+                )
               }
               className="h-sap-ctl"
             />
@@ -152,13 +162,20 @@ export function DateRangeCard({
           <FieldLabel label="To">
             <Input
               type="date"
-              value={lte.value}
+              value={lteValue}
               onChange={(e) =>
-                onUpdate(lte.id, {
-                  column: column.name,
-                  op: "lte",
-                  value: e.target.value,
-                })
+                onUpdate(
+                  lte.id,
+                  materializeTypedFilterCondition(
+                    {
+                      column: column.name,
+                      op: "lte",
+                      value: e.target.value,
+                    },
+                    { columns: [column] },
+                    lte.id,
+                  ),
+                )
               }
               className="h-sap-ctl"
             />

@@ -8,10 +8,16 @@
 import { useMemo, useState } from "react";
 import { ChevronDown } from "lucide-react";
 import type {
-  FilterCondition,
-  NewFilterCondition,
+  FilterDraftValue,
+  TypedFilterCondition,
+  TypedValue,
+} from "@sapporta/shared/filter";
+import {
+  encodeTypedValue,
+  materializeTypedFilterCondition,
 } from "@sapporta/shared/filter";
 import type { ColumnSchema } from "@sapporta/shared/contracts";
+import { isLookupValue } from "@sapporta/grid/lookup";
 import type { LookupForColumn } from "../lookup/column-lookup";
 import {
   Select,
@@ -47,16 +53,15 @@ export interface ConditionEditorProps {
    *  is used. Opened from header / card for that column. */
   lockedColumn?: ColumnSchema | null;
   /** Existing condition to edit, if any. */
-  initial?: FilterCondition | null;
+  initial?: TypedFilterCondition | null;
   /** Cell value to prepopulate when there is no `initial`. Used by the
    *  per-cell filter icon so the draft opens with the clicked cell's value
    *  already filled in (scalar or list depending on the default operator). */
   seedValue?: unknown;
   tableName?: string;
   lookupForColumn?: LookupForColumn;
-  /** Called on Apply with a fresh condition (no id yet — the controller
-   *  mints one on addFilter, or preserves it on updateFilter). */
-  onApply: (cond: NewFilterCondition) => void;
+  /** Called on Apply with a table-aware typed condition. */
+  onApply: (cond: TypedFilterCondition) => void;
   onCancel: () => void;
 }
 
@@ -67,10 +72,10 @@ interface DraftState {
   column: ColumnSchema | null;
   opKey: string;
   scalarValue: string;
-  listValues: string[];
+  listValues: FilterDraftValue[];
 }
 
-function seedToString(seed: unknown): string {
+function seedToScalarString(seed: unknown): string {
   if (seed == null) return "";
   if (typeof seed === "string") return seed;
   if (typeof seed === "number" || typeof seed === "boolean")
@@ -78,8 +83,19 @@ function seedToString(seed: unknown): string {
   return "";
 }
 
+function seedToListValue(seed: unknown): FilterDraftValue | null {
+  if (typeof seed === "string" || typeof seed === "number") return seed;
+  if (typeof seed === "boolean") return String(seed);
+  return null;
+}
+
+function draftListValue(value: TypedValue): FilterDraftValue {
+  if (typeof value === "string" || typeof value === "number") return value;
+  return encodeTypedValue(value);
+}
+
 function initialDraft(
-  initial: FilterCondition | null | undefined,
+  initial: TypedFilterCondition | null | undefined,
   lockedColumn: ColumnSchema | null | undefined,
   columns: ColumnSchema[],
   seedValue: unknown,
@@ -94,10 +110,11 @@ function initialDraft(
   if (!initial) {
     const opKey = catalog[type].defaultKey;
     const defaultEntry = findOpEntry(type, opKey) ?? catalog[type].ops[0];
-    const seed = seedToString(seedValue);
-    const scalarValue = defaultEntry.valueShape === "scalar" ? seed : "";
+    const scalarSeed = seedToScalarString(seedValue);
+    const listSeed = seedToListValue(seedValue);
+    const scalarValue = defaultEntry.valueShape === "scalar" ? scalarSeed : "";
     const listValues =
-      defaultEntry.valueShape === "list" && seed !== "" ? [seed] : [];
+      defaultEntry.valueShape === "list" && listSeed !== null ? [listSeed] : [];
     return { column, opKey, scalarValue, listValues };
   }
   const polarity = initial.op === "is" ? initial.polarity : null;
@@ -105,8 +122,8 @@ function initialDraft(
   return {
     column,
     opKey: entry.key,
-    scalarValue: "value" in initial ? initial.value : "",
-    listValues: "values" in initial ? initial.values : [],
+    scalarValue: "value" in initial ? encodeTypedValue(initial.value) : "",
+    listValues: "values" in initial ? initial.values.map(draftListValue) : [],
   };
 }
 
@@ -151,13 +168,31 @@ export function ConditionEditor({
     const column = draft.column.name;
     switch (entry.valueShape) {
       case "scalar":
-        onApply({ column, op: entry.op, value: draft.scalarValue });
+        onApply(
+          materializeTypedFilterCondition(
+            { column, op: entry.op, value: draft.scalarValue },
+            { columns },
+            initial?.id,
+          ),
+        );
         return;
       case "list":
-        onApply({ column, op: entry.op, values: draft.listValues });
+        onApply(
+          materializeTypedFilterCondition(
+            { column, op: entry.op, values: draft.listValues },
+            { columns },
+            initial?.id,
+          ),
+        );
         return;
       case "none":
-        onApply({ column, op: "is", polarity: entry.polarity });
+        onApply(
+          materializeTypedFilterCondition(
+            { column, op: "is", polarity: entry.polarity },
+            { columns },
+            initial?.id,
+          ),
+        );
         return;
     }
   }
@@ -279,15 +314,33 @@ export function ConditionEditor({
 
       {entry && draft.column && entry.valueShape === "list" && (
         <Field label="Value">
-          <entry.Input
-            values={draft.listValues}
-            onChange={(next) => setDraft({ ...draft, listValues: next })}
-            column={draft.column}
-            lookup={lookup}
-            options={resolved?.options}
-            labels={resolved?.labels}
-            autoFocus={!!lockedColumn}
-          />
+          {entry.inputKind === "tag" && (
+            <entry.Input
+              values={draft.listValues.map(String)}
+              onChange={(next) => setDraft({ ...draft, listValues: next })}
+              column={draft.column}
+              autoFocus={!!lockedColumn}
+            />
+          )}
+          {entry.inputKind === "static" && resolved && (
+            <entry.Input
+              values={draft.listValues.map(String)}
+              onChange={(next) => setDraft({ ...draft, listValues: next })}
+              column={draft.column}
+              options={resolved.options}
+              labels={resolved.labels}
+              autoFocus={!!lockedColumn}
+            />
+          )}
+          {entry.inputKind === "lookup" && lookup && (
+            <entry.Input
+              values={draft.listValues.filter(isLookupValue)}
+              onChange={(next) => setDraft({ ...draft, listValues: next })}
+              column={draft.column}
+              lookup={lookup}
+              autoFocus={!!lockedColumn}
+            />
+          )}
         </Field>
       )}
 

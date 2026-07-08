@@ -13,7 +13,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@sapporta/ui/select";
-import type { LookupCapabilities } from "@sapporta/grid/lookup";
+import {
+  isLookupValue,
+  type LookupCapabilities,
+  type LookupValue,
+} from "@sapporta/grid/lookup";
 import { inferDisplayType } from "../model/column-types";
 import type { ColumnSchema } from "@sapporta/shared/contracts";
 import { useLookupOptions } from "@sapporta/grid/lookup/react";
@@ -173,22 +177,24 @@ function LookupFormField({
 }) {
   const [open, setOpen] = useState(false);
   const [searchText, setSearchText] = useState("");
-  const selectedValue = value == null || value === "" ? null : String(value);
+  const selectedValue: LookupValue | null = isLookupValue(value)
+    ? value
+    : null;
   const entries = useLookupOptions({
     valueLookup: lookup.valueLookup,
     searchLookup: lookup.searchLookup,
-    selectedValues: selectedValue ? [selectedValue] : [],
+    selectedValues: selectedValue == null ? [] : [selectedValue],
     searchText,
     limit: 50,
   });
   const options = entries.map((entry) => ({
-    id: String(entry.value),
+    id: entry.value,
     label: entry.label,
   }));
 
-  const selectedLabel = selectedValue
-    ? (entries.find((entry) => String(entry.value) === selectedValue)?.label ??
-      selectedValue)
+  const selectedLabel = selectedValue != null
+    ? (entries.find((entry) => Object.is(entry.value, selectedValue))?.label ??
+      String(selectedValue))
     : null;
 
   return (
@@ -214,8 +220,8 @@ function LookupFormField({
         <ComboboxList
           value={selectedValue}
           options={options}
-          onPick={(pickedId) => {
-            onChange(pickedId || null);
+          onPick={(pickedValue) => {
+            onChange(pickedValue);
             setOpen(false);
           }}
           searchText={searchText}

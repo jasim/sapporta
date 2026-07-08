@@ -192,7 +192,7 @@ async function handleLookup<E extends Env>(
   rows: ReturnType<typeof scopedRows>,
 ): Promise<Response> {
   try {
-    return c.json({ data: await rows.lookup(queryParams(c)) }, 200);
+    return c.json({ entries: await rows.lookup(queryParams(c)) }, 200);
   } catch (err) {
     return tableReadErrorResponse(c, err);
   }

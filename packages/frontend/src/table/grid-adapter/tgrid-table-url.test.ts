@@ -7,12 +7,18 @@ import {
 } from "./tgrid-table-url";
 import type { ColId } from "@sapporta/grid";
 import type { ColumnSchema } from "@sapporta/shared/contracts";
+import {
+  parseFiltersForTable,
+  type FilterCondition,
+} from "@sapporta/shared/filter";
 
-const COLS: ReadonlySet<ColId> = new Set(["name", "created_at"] as ColId[]);
-const FILTER_COLS: ReadonlySet<ColId> = new Set([
-  "book_id",
-  "title",
-] as ColId[]);
+const COLS: readonly ColumnSchema[] = [
+  { name: "name", label: "Name", kind: "text" },
+  { name: "created_at", label: "Created", kind: "timestamp" },
+];
+const COL_IDS: ReadonlySet<ColId> = new Set(
+  COLS.map((column) => column.name as ColId),
+);
 const FILTER_COLUMNS: ColumnSchema[] = [
   {
     name: "book_id",
@@ -22,6 +28,10 @@ const FILTER_COLUMNS: ColumnSchema[] = [
   },
   { name: "title", label: "Title", kind: "text" },
 ];
+
+function typedFilters(filters: readonly FilterCondition[]) {
+  return parseFiltersForTable(filters, { columns: FILTER_COLUMNS });
+}
 
 describe("parseTableSearchParams - page", () => {
   test("defaults to page 1 when absent", () => {
@@ -108,7 +118,6 @@ describe("parseTableSearchParams - filters", () => {
   test("canonicalizes foreign-key equality to single-value membership", () => {
     const r = parseTableSearchParams(
       new URLSearchParams("filter%5Bbook_id%5D%5Beq%5D=6"),
-      FILTER_COLS,
       FILTER_COLUMNS,
     );
 
@@ -116,14 +125,13 @@ describe("parseTableSearchParams - filters", () => {
     expect(r.filters[0]).toMatchObject({
       column: "book_id",
       op: "in",
-      values: ["6"],
+      values: [6],
     });
   });
 
   test("canonicalizes foreign-key inequality to single-value exclusion", () => {
     const r = parseTableSearchParams(
       new URLSearchParams("filter%5Bbook_id%5D%5Bneq%5D=6"),
-      FILTER_COLS,
       FILTER_COLUMNS,
     );
 
@@ -131,14 +139,13 @@ describe("parseTableSearchParams - filters", () => {
     expect(r.filters[0]).toMatchObject({
       column: "book_id",
       op: "nin",
-      values: ["6"],
+      values: [6],
     });
   });
 
   test("leaves non-foreign-key equality as scalar equality", () => {
     const r = parseTableSearchParams(
       new URLSearchParams("filter%5Btitle%5D%5Beq%5D=Draft"),
-      FILTER_COLS,
       FILTER_COLUMNS,
     );
 
@@ -156,7 +163,7 @@ describe("buildTableSearchParams - sort", () => {
     const sp = buildTableSearchParams({
       page: 1,
       sort: undefined,
-      filters: [],
+      filters: typedFilters([]),
       search: null,
     });
     expect(sp.has("sort")).toBe(false);
@@ -166,7 +173,7 @@ describe("buildTableSearchParams - sort", () => {
     const sp = buildTableSearchParams({
       page: 1,
       sort: [],
-      filters: [],
+      filters: typedFilters([]),
       search: null,
     });
     expect(sp.has("sort")).toBe(false);
@@ -179,7 +186,7 @@ describe("buildTableSearchParams - sort", () => {
         { colId: "name" as ColId, direction: "asc" },
         { colId: "created_at" as ColId, direction: "desc" },
       ],
-      filters: [],
+      filters: typedFilters([]),
       search: null,
     });
     expect(sp.get("sort")).toBe("name,-created_at");
@@ -217,7 +224,7 @@ describe("sanitizeSortDescriptors", () => {
           { colId: "name", direction: "asc" },
           { colId: "created_at", direction: "desc" },
         ],
-        COLS,
+        COL_IDS,
       ),
     ).toEqual([
       { colId: "name", direction: "asc" },
@@ -236,7 +243,7 @@ describe("sanitizeSortDescriptors", () => {
           { colId: "name", direction: "asc" },
           { colId: "name", direction: "desc" },
         ],
-        COLS,
+        COL_IDS,
       ),
     ).toEqual([{ colId: "name", direction: "asc" }]);
   });

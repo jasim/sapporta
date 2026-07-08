@@ -1,13 +1,14 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   CachedValueLookup,
+  type LookupValue,
   RecordValueLookup,
   StaticValueLookup,
 } from "./value-lookup";
 
 describe("StaticValueLookup", () => {
   it("shows a friendly label for a saved value that already lives in the app", () => {
-    const lookup = new StaticValueLookup([
+    const lookup = new StaticValueLookup<LookupValue>([
       { value: "draft", label: "Draft" },
       { value: "paid", label: "Paid" },
     ]);
@@ -42,7 +43,7 @@ describe("RecordValueLookup", () => {
 
 describe("CachedValueLookup", () => {
   it("starts empty, loads labels for saved values, then lets callers read them right away", async () => {
-    const loadEntriesForValues = vi.fn(async (values: readonly string[]) =>
+    const loadEntriesForValues = vi.fn(async (values: readonly LookupValue[]) =>
       values.map((value) => ({ value, label: `Customer ${value}` })),
     );
     const lookup = new CachedValueLookup({ loadEntriesForValues });
@@ -59,7 +60,7 @@ describe("CachedValueLookup", () => {
   });
 
   it("asks the loader only for values it does not already know", async () => {
-    const loadEntriesForValues = vi.fn(async (values: readonly string[]) =>
+    const loadEntriesForValues = vi.fn(async (values: readonly LookupValue[]) =>
       values.map((value) => ({ value, label: `Customer ${value}` })),
     );
     const lookup = new CachedValueLookup({ loadEntriesForValues });
@@ -73,23 +74,52 @@ describe("CachedValueLookup", () => {
   });
 
   it("cleans messy row values before loading so the backend gets one sorted list", async () => {
-    const loadEntriesForValues = vi.fn(async (values: readonly string[]) =>
+    const loadEntriesForValues = vi.fn(async (values: readonly LookupValue[]) =>
       values.map((value) => ({ value, label: `Value ${value}` })),
     );
     const lookup = new CachedValueLookup({ loadEntriesForValues });
 
-    await lookup.loadMissingEntries([
-      "b",
-      null,
-      "a",
-      undefined,
-      "",
-      "b",
-      2,
-      true,
+    await lookup.loadMissingEntries(["b", null, "a", undefined, "", "b", 2]);
+
+    expect(loadEntriesForValues).toHaveBeenCalledWith([2, "a", "b"]);
+  });
+
+  it("passes numeric lookup values to the loader without stringifying them", async () => {
+    const loadEntriesForValues = vi.fn(async (values: readonly LookupValue[]) =>
+      values.map((value) => ({ value, label: `Value ${value}` })),
+    );
+    const lookup = new CachedValueLookup({ loadEntriesForValues });
+
+    await lookup.loadMissingEntries([1]);
+
+    expect(loadEntriesForValues).toHaveBeenCalledWith([1]);
+    expect(lookup.entryForValue(1)).toEqual({ value: 1, label: "Value 1" });
+  });
+
+  it("loads numeric and text ids with the same display string as separate values", async () => {
+    const loadEntriesForValues = vi.fn(async (values: readonly LookupValue[]) =>
+      values.map((value) => ({
+        value,
+        label: `${typeof value}:${String(value)}`,
+      })),
+    );
+    const lookup = new CachedValueLookup({ loadEntriesForValues });
+
+    await lookup.loadMissingEntries([1, "1"]);
+
+    expect(loadEntriesForValues).toHaveBeenCalledWith([1, "1"]);
+    expect(lookup.entryForValue(1)?.label).toBe("number:1");
+    expect(lookup.entryForValue("1")?.label).toBe("string:1");
+  });
+
+  it("stores numeric and text ids with the same display string as distinct entries", () => {
+    const lookup = new StaticValueLookup<LookupValue>([
+      { value: 1, label: "Numeric one" },
+      { value: "1", label: "Text one" },
     ]);
 
-    expect(loadEntriesForValues).toHaveBeenCalledWith(["2", "a", "b", "true"]);
+    expect(lookup.entryForValue(1)?.label).toBe("Numeric one");
+    expect(lookup.entryForValue("1")?.label).toBe("Text one");
   });
 
   it("shares work when the same value is requested again before the first request finishes", async () => {

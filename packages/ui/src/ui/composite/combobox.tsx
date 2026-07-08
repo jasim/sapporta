@@ -12,13 +12,12 @@ import {
 } from "../primitives/command";
 import { cn } from "../utils/cn";
 
-type ComboboxValue = string;
+type ComboboxValue = string | number;
 
-interface ComboboxListProps {
-  value: ComboboxValue | null;
-  options: Array<{ id: string; label: string }>;
-  /** Called with the picked id. Empty string means "clear". */
-  onPick: (id: string) => void;
+interface ComboboxListProps<TValue extends ComboboxValue> {
+  value: TValue | null;
+  options: Array<{ id: TValue; label: string }>;
+  onPick: (id: TValue | null) => void;
   inputRef?: Ref<HTMLInputElement>;
   searchText?: string;
   onSearchTextChange?: (value: string) => void;
@@ -32,7 +31,7 @@ interface ComboboxListProps {
 /** The searchable list body — Command + input + items. Exposed so grid-style
  *  editors can mount it inside their own Popover with custom focus handling.
  *  Most callers want `Combobox` instead. */
-export function ComboboxList({
+export function ComboboxList<TValue extends ComboboxValue>({
   value,
   options,
   onPick,
@@ -44,7 +43,7 @@ export function ComboboxList({
   className,
   inputClassName,
   listClassName,
-}: ComboboxListProps) {
+}: ComboboxListProps<TValue>) {
   return (
     <Command shouldFilter={shouldFilter} className={className}>
       <CommandInput
@@ -58,18 +57,18 @@ export function ComboboxList({
         <CommandEmpty>No results.</CommandEmpty>
         <CommandGroup>
           {allowClear && (
-            <CommandItem onSelect={() => onPick("")} value="— Clear —">
+            <CommandItem onSelect={() => onPick(null)} value="Clear">
               <span className="text-sap-muted italic">Clear</span>
             </CommandItem>
           )}
           {options.map((opt) => (
             <CommandItem
-              key={opt.id}
+              key={comboboxKey(opt.id)}
               value={opt.label}
               onSelect={() => onPick(opt.id)}
             >
               {opt.label}
-              {value === opt.id && (
+              {Object.is(value, opt.id) && (
                 <span className="ml-auto text-xs text-sap-muted">✓</span>
               )}
             </CommandItem>
@@ -80,31 +79,32 @@ export function ComboboxList({
   );
 }
 
-interface ComboboxProps {
-  value: ComboboxValue | null;
-  onChange: (value: ComboboxValue | null) => void;
-  /** id → display label. */
-  options: Record<string, string>;
+interface ComboboxProps<TValue extends ComboboxValue> {
+  value: TValue | null;
+  onChange: (value: TValue | null) => void;
+  options: Array<{ id: TValue; label: string }>;
   placeholder?: string;
   disabled?: boolean;
   /** Applied to the Button trigger. */
   className?: string;
 }
 
-export function Combobox({
+export function Combobox<TValue extends ComboboxValue>({
   value,
   onChange,
   options,
   placeholder = "Select…",
   disabled,
   className,
-}: ComboboxProps) {
+}: ComboboxProps<TValue>) {
   const [open, setOpen] = useState(false);
-  const entries = Object.entries(options).map(([id, label]) => ({ id, label }));
-  const selectedLabel = value != null ? options[value] : undefined;
+  const selectedLabel =
+    value != null
+      ? options.find((option) => Object.is(option.id, value))?.label
+      : undefined;
 
-  const handlePick = (id: string) => {
-    onChange(id || null);
+  const handlePick = (id: TValue | null) => {
+    onChange(id);
     setOpen(false);
   };
 
@@ -127,8 +127,12 @@ export function Combobox({
         align="start"
         sideOffset={4}
       >
-        <ComboboxList value={value} options={entries} onPick={handlePick} />
+        <ComboboxList value={value} options={options} onPick={handlePick} />
       </PopoverContent>
     </Popover>
   );
+}
+
+function comboboxKey(value: ComboboxValue): string {
+  return `${typeof value}:${String(value)}`;
 }

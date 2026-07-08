@@ -19,7 +19,12 @@
  */
 
 import type { ColumnSchema } from "@sapporta/shared/contracts";
-import type { ListInputComponent, ScalarInputComponent } from "./inputs/types";
+import type {
+  LookupListInputComponent,
+  ScalarInputComponent,
+  StaticListInputComponent,
+  TagListInputComponent,
+} from "./inputs/types";
 import { TextInput, NumberInput, DateInput } from "./inputs/ScalarInput";
 import { TagInput } from "./inputs/TagInput";
 import { CheckboxList } from "./inputs/CheckboxList";
@@ -48,8 +53,25 @@ export type OpEntry =
       key: string;
       label: string;
       valueShape: "list";
+      inputKind: "tag";
       op: ListOp;
-      Input: ListInputComponent;
+      Input: TagListInputComponent;
+    }
+  | {
+      key: string;
+      label: string;
+      valueShape: "list";
+      inputKind: "static";
+      op: ListOp;
+      Input: StaticListInputComponent;
+    }
+  | {
+      key: string;
+      label: string;
+      valueShape: "list";
+      inputKind: "lookup";
+      op: ListOp;
+      Input: LookupListInputComponent;
     }
   | {
       key: string;
@@ -123,12 +145,40 @@ const scalar = (
   Input: ScalarInputComponent,
 ): OpEntry => ({ key, label, valueShape: "scalar", op, Input });
 
-const list = (
+const tagList = (
   key: string,
   label: string,
   op: ListOp,
-  Input: ListInputComponent,
-): OpEntry => ({ key, label, valueShape: "list", op, Input });
+  Input: TagListInputComponent,
+): OpEntry => ({ key, label, valueShape: "list", inputKind: "tag", op, Input });
+
+const staticList = (
+  key: string,
+  label: string,
+  op: ListOp,
+  Input: StaticListInputComponent,
+): OpEntry => ({
+  key,
+  label,
+  valueShape: "list",
+  inputKind: "static",
+  op,
+  Input,
+});
+
+const lookupList = (
+  key: string,
+  label: string,
+  op: ListOp,
+  Input: LookupListInputComponent,
+): OpEntry => ({
+  key,
+  label,
+  valueShape: "list",
+  inputKind: "lookup",
+  op,
+  Input,
+});
 
 // ── Per-type catalogs ────────────────────────────────────────────────────
 
@@ -140,8 +190,8 @@ const text: ColumnTypeEntry = {
     scalar("neq", "does not equal", "neq", TextInput),
     scalar("startswith", "starts with", "startswith", TextInput),
     scalar("endswith", "ends with", "endswith", TextInput),
-    list("in", "is one of", "in", TagInput),
-    list("nin", "is not one of", "nin", TagInput),
+    tagList("in", "is one of", "in", TagInput),
+    tagList("nin", "is not one of", "nin", TagInput),
     isEmpty,
     isNotEmpty,
   ],
@@ -156,8 +206,8 @@ const number: ColumnTypeEntry = {
     scalar("gte", "greater than or equal", "gte", NumberInput),
     scalar("lt", "less than", "lt", NumberInput),
     scalar("lte", "less than or equal", "lte", NumberInput),
-    list("in", "is one of", "in", TagInput),
-    list("nin", "is not one of", "nin", TagInput),
+    tagList("in", "is one of", "in", TagInput),
+    tagList("nin", "is not one of", "nin", TagInput),
     isEmpty,
     isNotEmpty,
   ],
@@ -185,8 +235,8 @@ const boolean: ColumnTypeEntry = {
 const enumType: ColumnTypeEntry = {
   defaultKey: "in",
   ops: [
-    list("in", "is one of", "in", CheckboxList),
-    list("nin", "is not one of", "nin", CheckboxList),
+    staticList("in", "is one of", "in", CheckboxList),
+    staticList("nin", "is not one of", "nin", CheckboxList),
     isEmpty,
     isNotEmpty,
   ],
@@ -195,8 +245,8 @@ const enumType: ColumnTypeEntry = {
 const fk: ColumnTypeEntry = {
   defaultKey: "in",
   ops: [
-    list("in", "is one of", "in", LookupCheckboxList),
-    list("nin", "is not one of", "nin", LookupCheckboxList),
+    lookupList("in", "is one of", "in", LookupCheckboxList),
+    lookupList("nin", "is not one of", "nin", LookupCheckboxList),
     isEmpty,
     isNotEmpty,
   ],

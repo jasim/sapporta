@@ -8,6 +8,7 @@ import {
   CachedValueLookup,
   StaticSearchLookup,
   StaticValueLookup,
+  type LookupValue,
 } from "../lookup";
 import {
   foreignKey,
@@ -282,7 +283,7 @@ describe("columnPreset columns", () => {
   });
 
   it("lookup-backed copy loads labels and falls back to formatted values", async () => {
-    let loadedValues: readonly string[] = [];
+    let loadedValues: readonly LookupValue[] = [];
     const valueLookup = new CachedValueLookup({
       loadEntriesForValues: async (values) => {
         loadedValues = values;

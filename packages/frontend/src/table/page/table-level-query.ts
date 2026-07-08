@@ -1,9 +1,6 @@
 import { useStore } from "zustand";
 import type { ColumnSchema } from "@sapporta/shared/contracts";
-import type {
-  FilterCondition,
-  NewFilterCondition,
-} from "@sapporta/shared/filter";
+import type { TypedFilterCondition } from "@sapporta/shared/filter";
 import type { LookupForColumn } from "../lookup/column-lookup";
 import type {
   TGridLevelId,
@@ -14,14 +11,14 @@ import { requireHostQueryStore } from "./table-query-store";
 
 export type TableLevelQuery = {
   columns: readonly ColumnSchema[];
-  filters: readonly FilterCondition[];
+  filters: readonly TypedFilterCondition[];
   search: string | null;
   searchable: boolean;
   hasSort: boolean;
   activeFilterCount: number;
   lookupForColumn?: LookupForColumn;
-  addFilter: (condition: NewFilterCondition) => void;
-  updateFilter: (id: string, patch: NewFilterCondition) => void;
+  addFilter: (condition: TypedFilterCondition) => void;
+  updateFilter: (id: string, patch: TypedFilterCondition) => void;
   removeFilter: (id: string) => void;
   setSearch: (query: string | null) => void;
   clearSort: () => void;

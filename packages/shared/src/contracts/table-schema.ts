@@ -34,9 +34,17 @@ export type PaginatedRows = z.output<typeof paginatedRowsSchema>;
 export const singleRowSchema = z.object({ data: rowSchema });
 export type SingleRow = z.output<typeof singleRowSchema>;
 
-/** FK display-value lookup: { id → human label }. */
+const lookupValueSchema = z.union([z.string(), z.number()]);
+
+/** FK display-value lookup entries. */
+export const lookupEntrySchema = z.object({
+  value: lookupValueSchema,
+  label: z.string(),
+});
+export type LookupEntry = z.output<typeof lookupEntrySchema>;
+
 export const lookupResponseSchema = z.object({
-  data: z.record(z.string(), z.string()),
+  entries: z.array(lookupEntrySchema),
 });
 export type LookupResponse = z.output<typeof lookupResponseSchema>;
 

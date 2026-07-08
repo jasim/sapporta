@@ -4,7 +4,12 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { act, createElement, isValidElement, type ReactElement } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import type { Row, TableSchema } from "@sapporta/shared/contracts";
-import { eqCondition, type FilterCondition } from "@sapporta/shared/filter";
+import {
+  eqCondition,
+  parseFiltersForTable,
+  type FilterCondition,
+  type TypedFilterCondition,
+} from "@sapporta/shared/filter";
 import type {
   FetchPageRequest,
   CellEditorProps,
@@ -54,7 +59,7 @@ function makeHostRowQueryState(seed: {
   page: number;
   pageSize: number;
   sort: readonly SortDescriptor[];
-  filters: readonly FilterCondition[];
+  filters: readonly TypedFilterCondition[];
   search: string | null;
 }): RowQueryState<TGridFilter> {
   let state = {
@@ -89,6 +94,13 @@ function makeHostRowQueryState(seed: {
       return "changed";
     },
   };
+}
+
+function typedFilters(
+  table: TableSchema,
+  filters: readonly FilterCondition[],
+): TypedFilterCondition[] {
+  return parseFiltersForTable(filters, table);
 }
 
 function rowsRequest(
@@ -593,7 +605,7 @@ describe("compileTGridRuntimeConfig", () => {
         expect.objectContaining({
           column: "order_id",
           op: "eq",
-          value: "7",
+          value: 7,
         }),
       ],
       search: undefined,
@@ -610,17 +622,22 @@ describe("compileTGridRuntimeConfig", () => {
     };
     const userFilter = eqCondition("customer", "ACME");
     const fixedFilter = eqCondition("status", "open");
+    const orderSchemaWithStatus: TableSchema = {
+      ...orderSchema,
+      columns: [
+        ...orderSchema.columns,
+        { name: "status", label: "Status", kind: "text" },
+      ],
+    };
+    const [typedUserFilter] = typedFilters(orderSchemaWithStatus, [userFilter]);
+    const [typedFixedFilter] = typedFilters(orderSchemaWithStatus, [
+      fixedFilter,
+    ]);
     const config = compileTGridRuntimeConfig<RowsByLevel>({
       rootLevel: "orders",
       levels: {
         orders: {
-          table: {
-            ...orderSchema,
-            columns: [
-              ...orderSchema.columns,
-              { name: "status", label: "Status", kind: "text" },
-            ],
-          },
+          table: orderSchemaWithStatus,
           childLevels: [],
           query: { owner: "host", fixedFilters: [fixedFilter] },
           rowsClient: {
@@ -647,7 +664,7 @@ describe("compileTGridRuntimeConfig", () => {
           page: 1,
           pageSize: 25,
           sort: [],
-          filters: [userFilter],
+          filters: [typedUserFilter],
           search: null,
         }),
     });
@@ -657,7 +674,7 @@ describe("compileTGridRuntimeConfig", () => {
 
     expect(fetch).toHaveBeenCalledWith(
       expect.objectContaining({
-        filters: [fixedFilter, userFilter],
+        filters: [typedFixedFilter, typedUserFilter],
       }),
     );
   });
@@ -753,6 +770,73 @@ describe("compileTGridRuntimeConfig", () => {
 
     expect(fetch).toHaveBeenCalledWith(
       expect.objectContaining({ page: 3, limit: 10 }),
+    );
+  });
+
+  it("source-owned endpoints type initial filters before row requests", async () => {
+    const fetch = vi.fn(async () => ({
+      data: [],
+      meta: { total: 0, page: 1, limit: 10, pages: 0 },
+    }));
+    const lookupResolver: TGridLookupResolver = {
+      bundleFor: () => undefined,
+    };
+    const config = compileTGridRuntimeConfig<RowsByLevel>({
+      rootLevel: "orders",
+      levels: {
+        orders: {
+          table: orderSchema,
+          childLevels: ["orders.lines"],
+        },
+        "orders.lines": {
+          table: lineSchema,
+          parent: { level: "orders", foreignKey: "order_id" },
+          childLevels: [],
+          query: {
+            owner: "source",
+            pageSize: 10,
+            initialFilters: [eqCondition("cost", "12")],
+          },
+          rowsClient: {
+            fetch,
+            create: vi.fn(),
+            update: vi.fn(),
+            remove: vi.fn(),
+          } as TableRowsClient,
+        },
+        "orders.lines.allocations": {
+          table: allocationSchema,
+          parent: { level: "orders.lines", foreignKey: "line_id" },
+          childLevels: [],
+        },
+      },
+      columnMapper: createTGridColumnMapper(lookupResolver),
+      hostRowQueryState: () =>
+        makeHostRowQueryState({
+          page: 1,
+          pageSize: 25,
+          sort: [],
+          filters: [],
+          search: null,
+        }),
+    });
+
+    const endpoint = config.endpointFactoriesByLevel["orders.lines"]({
+      ancestors: [{ levelName: "orders", rowKey: "7" as never }],
+    });
+
+    await endpoint.fetchPage(rowsRequest(endpoint));
+
+    expect(fetch).toHaveBeenCalledWith(
+      expect.objectContaining({
+        filters: expect.arrayContaining([
+          expect.objectContaining({
+            column: "cost",
+            kind: "number",
+            value: 12,
+          }),
+        ]),
+      }),
     );
   });
 

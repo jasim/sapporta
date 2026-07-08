@@ -15,7 +15,9 @@ export function EntitySelectField({
   onChange: (value: string) => void;
   error?: string | null;
 }) {
-  const [options, setOptions] = useState<Record<string, string>>({});
+  const [options, setOptions] = useState<Array<{ id: string; label: string }>>(
+    [],
+  );
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -29,13 +31,14 @@ export function EntitySelectField({
       .then((res) => {
         if (cancelled) return;
         setOptions(
-          Object.fromEntries(
-            res.entries.map((entry) => [String(entry.value), entry.label]),
-          ),
+          res.entries.map((entry) => ({
+            id: String(entry.value),
+            label: entry.label,
+          })),
         );
       })
       .catch(() => {
-        if (!cancelled) setOptions({});
+        if (!cancelled) setOptions([]);
       })
       .finally(() => {
         if (!cancelled) setLoading(false);

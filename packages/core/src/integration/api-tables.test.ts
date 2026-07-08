@@ -229,14 +229,15 @@ describe("/api/tables table operations", () => {
       expect(res.status).toBe(200);
 
       const body = await res.json();
-      expect(body.data).toBeDefined();
-      expect(typeof body.data).toBe("object");
+      expect(Array.isArray(body.entries)).toBe(true);
 
-      const entries = Object.entries(body.data);
+      const entries = body.entries as Array<{ value: unknown; label: unknown }>;
       expect(entries.length).toBeGreaterThan(0);
-      for (const [id, display] of entries) {
-        expect(typeof id).toBe("string");
-        expect(typeof display).toBe("string");
+      for (const entry of entries) {
+        expect(
+          typeof entry.value === "string" || typeof entry.value === "number",
+        ).toBe(true);
+        expect(typeof entry.label).toBe("string");
       }
     });
   });
@@ -364,8 +365,10 @@ describe("/api/tables table operations", () => {
       );
       expect(res.status).toBe(200);
       const body = await res.json();
-      expect(body.data[uuid1]).toBe("Alpha Renamed");
-      expect(body.data[uuid2]).toBe("Bravo");
+      expect(body.entries).toEqual([
+        { value: uuid1, label: "Alpha Renamed" },
+        { value: uuid2, label: "Bravo" },
+      ]);
     });
 
     it("POST duplicate UUID returns 409", async () => {

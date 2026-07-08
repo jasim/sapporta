@@ -5,6 +5,7 @@ import type {
   LookupValue,
   ValueLookup,
 } from "../cache/value-lookup";
+import { lookupValueKey } from "../cache/value-lookup";
 
 const EMPTY_LOOKUP_ENTRIES: readonly LookupEntry[] = [];
 
@@ -31,8 +32,8 @@ export function useLookupSearchResults<
 
 export function useLookupValueLabels(
   valueLookup: ValueLookup | undefined,
-  values: readonly unknown[],
-): Record<string, string> {
+  values: readonly LookupValue[],
+): { labelFor(value: LookupValue): string | null } {
   const valueKey = lookupValuesKey(values);
 
   useEffect(() => {
@@ -55,19 +56,19 @@ export function useLookupValueLabels(
   );
 
   return useMemo(() => {
-    const labels: Record<string, string> = {};
-    for (const value of values) {
-      const key = lookupValueKey(value);
-      labels[key] = valueLookup?.entryForValue(value)?.label ?? key;
-    }
-    return labels;
+    void snapshot;
+    return {
+      labelFor(value: LookupValue): string | null {
+        return valueLookup?.entryForValue(value)?.label ?? null;
+      },
+    };
   }, [snapshot, valueKey, valueLookup]);
 }
 
 export function useLookupOptions(args: {
   valueLookup: ValueLookup | undefined;
   searchLookup: SearchLookup | undefined;
-  selectedValues: readonly unknown[];
+  selectedValues: readonly LookupValue[];
   searchText: string;
   limit: number;
 }): readonly LookupEntry[] {
@@ -87,8 +88,8 @@ export function useLookupOptions(args: {
     for (const value of args.selectedValues) {
       const key = lookupValueKey(value);
       byValue.set(key, {
-        value: key,
-        label: selectedLabels[key] ?? key,
+        value,
+        label: selectedLabels.labelFor(value) ?? String(value),
       });
     }
     for (const entry of searchEntries) {
@@ -98,20 +99,8 @@ export function useLookupOptions(args: {
   }, [args.selectedValues, searchEntries, selectedKey, selectedLabels]);
 }
 
-function lookupValuesKey(values: readonly unknown[]): string {
+function lookupValuesKey(values: readonly LookupValue[]): string {
   return values.map(lookupValueKey).join("\u0000");
-}
-
-function lookupValueKey(value: unknown): string {
-  if (value == null) return "";
-  if (
-    typeof value === "string" ||
-    typeof value === "number" ||
-    typeof value === "boolean"
-  ) {
-    return String(value);
-  }
-  return "";
 }
 
 function subscribeNoop(): void {}

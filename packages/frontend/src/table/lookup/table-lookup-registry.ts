@@ -14,8 +14,8 @@ export type TableForeignKeyLookupBundle = {
   sourceColumn: string;
   targetTable: string;
   targetColumn: string;
-  valueLookup: ValueLookup<string>;
-  searchLookup: SearchLookup<string>;
+  valueLookup: ValueLookup;
+  searchLookup: SearchLookup;
 };
 
 export type TableLookupRegistry = {
@@ -39,11 +39,11 @@ export function createTableLookupRegistry(): TableLookupRegistry {
       const existing = bundles.get(key);
       if (existing) return existing;
 
-      const valueLookup = new CachedValueLookup<string>({
+      const valueLookup = new CachedValueLookup({
         loadEntriesForValues: (values) =>
           fetchLookupEntriesForValues(targetTable, values),
       });
-      const searchLookup = new CachedSearchLookup<string>({
+      const searchLookup = new CachedSearchLookup({
         loadEntriesForSearch: ({ searchText, limit }) =>
           fetchLookupEntriesForSearch({
             tableName: targetTable,

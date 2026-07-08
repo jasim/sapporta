@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import type { ColumnSchema } from "@sapporta/shared/contracts";
-import type { ColId } from "@sapporta/grid";
 import { summarizeOperator } from "./FilterCard";
 import { parseTableSearchParams } from "../grid-adapter/tgrid-table-url";
 
@@ -15,7 +14,13 @@ describe("summarizeOperator", () => {
   it("uses direct equality wording for one selected list value", () => {
     expect(
       summarizeOperator(
-        { id: "filter-1", column: "author_id", op: "in", values: ["jack"] },
+        {
+          id: "filter-1",
+          column: "author_id",
+          op: "in",
+          kind: "number",
+          values: ["jack"],
+        },
         authorColumn,
       ),
     ).toBe("is");
@@ -28,6 +33,7 @@ describe("summarizeOperator", () => {
           id: "filter-1",
           column: "author_id",
           op: "in",
+          kind: "number",
           values: ["jack", "jane"],
         },
         authorColumn,
@@ -38,7 +44,13 @@ describe("summarizeOperator", () => {
   it("uses direct negative wording for one excluded list value", () => {
     expect(
       summarizeOperator(
-        { id: "filter-1", column: "author_id", op: "nin", values: ["jack"] },
+        {
+          id: "filter-1",
+          column: "author_id",
+          op: "nin",
+          kind: "number",
+          values: ["jack"],
+        },
         authorColumn,
       ),
     ).toBe("is not");
@@ -46,8 +58,7 @@ describe("summarizeOperator", () => {
 
   it("uses direct equality wording for a URL foreign-key equality filter", () => {
     const parsed = parseTableSearchParams(
-      new URLSearchParams("filter%5Bauthor_id%5D%5Beq%5D=jack"),
-      new Set(["author_id"] as ColId[]),
+      new URLSearchParams("filter%5Bauthor_id%5D%5Beq%5D=42"),
       [authorColumn],
     );
     const condition = parsed.filters[0];
@@ -56,7 +67,7 @@ describe("summarizeOperator", () => {
     expect(condition).toMatchObject({
       column: "author_id",
       op: "in",
-      values: ["jack"],
+      values: [42],
     });
     expect(summarizeOperator(condition, authorColumn)).toBe("is");
   });

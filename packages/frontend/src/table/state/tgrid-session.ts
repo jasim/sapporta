@@ -15,11 +15,10 @@ import {
 } from "@sapporta/grid";
 import {
   filtersEqual,
-  mintFilterId,
-  normalizeFilters,
-  type FilterCondition,
-  type NewFilterCondition,
+  parseFiltersForTable,
+  type TypedFilterCondition,
 } from "@sapporta/shared/filter";
+import type { TableSchema } from "@sapporta/shared/contracts";
 import { sortOrderEqual } from "@sapporta/grid";
 import {
   compileTGridRuntimeConfig,
@@ -73,7 +72,7 @@ export type CreateTGridSessionArgs<
     level: TGridLevelId<RowsByLevel>;
     page: number;
     sort: SortDescriptor[];
-    filters: FilterCondition[];
+    filters: TypedFilterCondition[];
     search: string | null;
   }) => void;
   routeQuerySeeds?: Partial<
@@ -412,8 +411,10 @@ class DefaultTGridSession<
     const hasQueryState = state !== undefined;
     const sort = hasQueryState ? state.sort : (query.initialSort ?? []);
     const filters = [
-      ...(query.fixedFilters ?? []),
-      ...(hasQueryState ? state.filters : (query.initialFilters ?? [])),
+      ...parseFiltersForTable(query.fixedFilters ?? [], level.table),
+      ...(hasQueryState
+        ? state.filters
+        : parseFiltersForTable(query.initialFilters ?? [], level.table)),
     ];
     const search = hasQueryState ? state.search : (query.initialSearch ?? null);
     const queryString = new URLSearchParams(
@@ -543,12 +544,13 @@ class DefaultTGridSession<
     const initial = initialQueryState(
       level.query,
       this.routeQuerySeed(levelId),
+      level.table,
     );
 
     return createStore<TGridLevelQueryState<TGridTableRow>>()((set, get) => ({
       level: levelId,
       sort: [...initial.sort],
-      filters: normalizeFilters([...initial.filters]),
+      filters: [...initial.filters],
       search: initial.search,
       page: initial.page,
       pageSize: initial.pageSize,
@@ -565,7 +567,7 @@ class DefaultTGridSession<
         return "changed";
       },
       setFilterState: (filter) => {
-        const nextFilters = normalizeFilters(filter?.conditions ?? []);
+        const nextFilters = [...(filter?.conditions ?? [])];
         const nextSearch =
           filter?.search && filter.search.trim() !== "" ? filter.search : null;
         const cur = get();
@@ -607,10 +609,7 @@ class DefaultTGridSession<
         );
       },
       addFilter: (cond) => {
-        const next = [
-          ...get().filters,
-          { ...cond, id: mintFilterId(cond.column, cond.op) },
-        ];
+        const next = [...get().filters, cond];
         void this.setLevelFilter(
           levelId,
           this.requireLoadPath(levelId, undefined, "addFilter"),
@@ -624,7 +623,7 @@ class DefaultTGridSession<
         const idx = get().filters.findIndex((f) => f.id === id);
         if (idx < 0) return;
         const next = [...get().filters];
-        next[idx] = { ...patch, id } as FilterCondition;
+        next[idx] = { ...patch, id };
         void this.setLevelFilter(
           levelId,
           this.requireLoadPath(levelId, undefined, "updateFilter"),
@@ -691,7 +690,7 @@ class DefaultTGridSession<
       syncFromUrl: (seed) => {
         // Browser back/forward restores the table from the URL without pushing a
         // new history entry. Direct table-control changes update the URL instead.
-        const next = initialQueryState(level.query, seed);
+        const next = initialQueryState(level.query, seed, level.table);
         const cur = get();
         const patch: Partial<TGridLevelQueryState<TGridTableRow>> = {};
         if (cur.page !== next.page) patch.page = next.page;
@@ -763,6 +762,7 @@ class DefaultTGridSession<
 function initialQueryState(
   query: TGridLevelConfig<TGridRowsByLevel>["query"] | undefined,
   seed: TGridRouteQuerySeed | undefined,
+  table: TableSchema,
 ): Pick<
   TGridLevelQueryState<TGridTableRow>,
   "sort" | "filters" | "search" | "page" | "pageSize"
@@ -771,9 +771,10 @@ function initialQueryState(
   // value means the user or URL intentionally cleared that default.
   return {
     sort: [...(seed?.sort ?? query?.initialSort ?? [])],
-    filters: normalizeFilters([
-      ...(seed?.filters ?? query?.initialFilters ?? []),
-    ]),
+    filters: [
+      ...(seed?.filters ??
+        parseFiltersForTable(query?.initialFilters ?? [], table)),
+    ],
     search: normalizeSearch(
       seed && "search" in seed ? (seed.search ?? null) : query?.initialSearch,
     ),

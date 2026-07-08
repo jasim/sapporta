@@ -1,9 +1,12 @@
 import {
   decodeFilters,
+  encodeTypedFilters,
   encodeFilters,
   eqCondition,
+  parseFiltersForTable,
   mintFilterId,
   type FilterCondition,
+  type TypedFilterCondition,
 } from "@sapporta/shared/filter";
 import { parseBoundedInteger } from "@sapporta/shared/validation";
 import type { ColId, SortDescriptor } from "@sapporta/grid";
@@ -16,7 +19,7 @@ export interface TableUrlState {
   // [] = explicit "no sort" (wins over persisted).
   // non-empty = explicit sort (wins over persisted).
   sort: SortDescriptor[] | undefined;
-  filters: FilterCondition[];
+  filters: TypedFilterCondition[];
   search: string | null;
 }
 
@@ -47,8 +50,13 @@ export function sanitizeSortDescriptors(
   return clean;
 }
 
-export function buildTableSearchParams(state: TableUrlState): URLSearchParams {
-  const params = encodeFilters(state.filters);
+export function buildTableSearchParams(state: {
+  page: number;
+  sort: SortDescriptor[] | undefined;
+  filters: readonly TypedFilterCondition[];
+  search: string | null;
+}): URLSearchParams {
+  const params = encodeTypedFilters(state.filters);
 
   if (state.page > 1) {
     params.set("page", String(state.page));
@@ -92,12 +100,7 @@ export function tableFilteredByUrl(
   const conditions: FilterCondition[] = entries.map(([col, v]) =>
     eqCondition(col, String(v)),
   );
-  const params = buildTableSearchParams({
-    page: 1,
-    sort: undefined,
-    filters: conditions,
-    search: null,
-  });
+  const params = encodeFilters(conditions);
   return `/tables/${table}?${params.toString()}`;
 }
 
@@ -114,21 +117,18 @@ export function relatedRowsTableHref({
   parentRowId,
   routePath = `/tables/${tableName}`,
 }: RelatedRowsTableHrefInput): string {
-  const params = buildTableSearchParams({
-    page: 1,
-    sort: undefined,
-    filters: [eqCondition(foreignKey, parentRowId)],
-    search: null,
-  });
+  const params = encodeFilters([eqCondition(foreignKey, parentRowId)]);
   const queryString = params.toString();
   return `${routePath}${queryString ? `?${queryString}` : ""}`;
 }
 
 export function parseTableSearchParams(
   searchParams: URLSearchParams,
-  validColIds: ReadonlySet<ColId>,
-  columns?: readonly ColumnSchema[],
+  columns: readonly ColumnSchema[],
 ): TableUrlState {
+  const validColIds: ReadonlySet<ColId> = new Set(
+    columns.map((column) => column.name as ColId),
+  );
   const page = parseTablePage(searchParams.get("page"));
 
   // `has("sort")` distinguishes URL-silent (undefined) from explicit empty
@@ -143,10 +143,11 @@ export function parseTableSearchParams(
   const qRaw = searchParams.get("q");
   const search = qRaw && qRaw.trim() !== "" ? qRaw : null;
 
-  const filters = normalizeForeignKeyScalarFilters(
+  const rawFilters = normalizeForeignKeyScalarFilters(
     decodeFilters(searchParams),
     columns,
   );
+  const filters = parseFiltersForTable(rawFilters, { columns });
 
   return { page, sort, filters, search };
 }

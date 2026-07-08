@@ -36,10 +36,12 @@ import type { SapportaAuthContext } from "../auth/context.js";
 import { QueryParseError, ValidationError } from "../db/errors.js";
 import { parseOptionalBoundedInteger } from "@sapporta/shared/validation";
 import { findPkColumn } from "../schema/pk.js";
+import { resolveColumnKind } from "../schema/resolve-kind.js";
 import type { TableDef } from "../schema/table.js";
 import { savePipeline } from "./save-pipeline.js";
 import { parseQuery, type ParsedQuery } from "./query-parser.js";
 import { rowLabeller } from "./row-label.js";
+import type { LookupEntry } from "@sapporta/shared/contracts";
 
 export interface ListRowsInput {
   [key: string]: string | undefined;
@@ -64,7 +66,7 @@ export interface ScopedRows {
   update(id: RowId, patch: unknown): Promise<Record<string, unknown>>;
   delete(id: RowId): Promise<Record<string, unknown>>;
   exportRows(query?: ListRowsInput): Promise<Record<string, unknown>[]>;
-  lookup(query?: ListRowsInput): Promise<Record<string, string>>;
+  lookup(query?: ListRowsInput): Promise<LookupEntry[]>;
   count(query?: ListRowsInput): Promise<Record<string, number>>;
 }
 
@@ -230,8 +232,8 @@ export function scopedRows(
           ? query
           : query.limit(limit))) as Record<string, unknown>[];
       } else {
-        const ids = parseIds(idsParam);
-        if (ids.length === 0) return {};
+        const ids = parseLookupIds(idsParam, table, pk.pkCol.name);
+        if (ids.length === 0) return [];
         rows = (await db
           .select()
           .from(table.drizzle)
@@ -241,7 +243,7 @@ export function scopedRows(
         >[];
       }
 
-      const data: Record<string, string> = {};
+      const entries: LookupEntry[] = [];
       let count = 0;
       for (const row of rows) {
         const rowLabel = label(row);
@@ -252,13 +254,16 @@ export function scopedRows(
         ) {
           continue;
         }
-        data[String(row[pkName])] = rowLabel;
+        const value = row[pkName];
+        if (typeof value === "string" || typeof value === "number") {
+          entries.push({ value, label: rowLabel });
+        }
         count += 1;
         if (idsParam === undefined && limit !== undefined) {
           if (count >= limit) break;
         }
       }
-      return data;
+      return entries;
     },
 
     async count(input = {}) {
@@ -362,6 +367,42 @@ function parseIds(idsParam: string): string[] {
     .split(",")
     .map((value) => value.trim())
     .filter(Boolean);
+}
+
+function parseLookupIds(
+  idsParam: string,
+  table: TableDef,
+  primaryKeyColumn: string,
+): Array<string | number> {
+  const ids = parseIds(idsParam);
+  const kind = resolveColumnKind(table, primaryKeyColumn);
+  switch (kind) {
+    case "text":
+      return ids;
+    case "number":
+      return ids.map((id) => {
+        const value = Number(id);
+        if (!Number.isFinite(value)) {
+          throw new QueryParseError(
+            "bad_value",
+            `lookup id for column "${primaryKeyColumn}" must be a finite number, got ${JSON.stringify(id)}`,
+          );
+        }
+        return value;
+      });
+    case "boolean":
+    case "date":
+    case "timestamp":
+      throw new QueryParseError(
+        "bad_value",
+        `lookup does not support ${kind} primary keys`,
+      );
+    case undefined:
+      throw new QueryParseError(
+        "unknown_column",
+        `Column "${primaryKeyColumn}" not found`,
+      );
+  }
 }
 
 function parseLookupLimit(limitParam: string | undefined): number | undefined {

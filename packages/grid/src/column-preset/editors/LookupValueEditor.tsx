@@ -1,10 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import type { CellEditorProps } from "../../grid/types/schema";
 import { ComboboxList } from "@sapporta/ui";
+import { isLookupValue, type LookupValue } from "../../lookup";
 import { lookupCapabilities, presetRuntime } from "../preset";
 import { useLookupOptions } from "../../lookup/react";
-
-type RowId = string;
 
 const SEARCH_LIMIT = 50;
 
@@ -24,16 +23,18 @@ export function LookupValueEditor(props: CellEditorProps) {
     inputRef.current?.focus();
   }, []);
 
-  const selectedValue = props.value == null ? null : String(props.value);
+  const selectedValue: LookupValue | null = isLookupValue(props.value)
+    ? props.value
+    : null;
   const options = useLookupOptions({
     valueLookup: capabilities?.valueLookup,
     searchLookup,
-    selectedValues: selectedValue ? [selectedValue] : [],
+    selectedValues: selectedValue == null ? [] : [selectedValue],
     searchText,
     limit: SEARCH_LIMIT,
   });
   const comboboxOptions = options.map((entry) => ({
-    id: String(entry.value),
+    id: entry.value,
     label: entry.label,
   }));
 
@@ -72,11 +73,10 @@ export function LookupValueEditor(props: CellEditorProps) {
       }}
     >
       <ComboboxList
-        value={selectedValue as RowId | null}
+        value={selectedValue}
         options={comboboxOptions}
-        onPick={(id) => {
-          const entry = options.find((option) => String(option.value) === id);
-          props.commit(entry ? entry.value : id);
+        onPick={(value) => {
+          if (value != null) props.commit(value);
         }}
         inputRef={inputRef}
         searchText={searchText}

@@ -4,7 +4,12 @@ import type {
   Row,
   TableSchema,
 } from "@sapporta/shared/contracts";
-import { eqCondition, type FilterCondition } from "@sapporta/shared/filter";
+import {
+  eqCondition,
+  parseFilterForTable,
+  parseFiltersForTable,
+  type TypedFilterCondition,
+} from "@sapporta/shared/filter";
 import {
   childPath,
   hostBackedRowQuery,
@@ -394,13 +399,20 @@ function makeEndpointFactory(args: {
       args.queryConfig.owner === "host"
         ? requireHostRowQuery(args.levelId, args.rowQueryState)
         : sourceOwnedRowQuery<TGridFilter>(
-            initialSourceOwnedQuery(args.queryConfig, args.parent),
+            initialSourceOwnedQuery(args.queryConfig, args.parent, args.table),
           );
+    const parentConstraint = args.parent
+      ? parseFilterForTable(
+          eqCondition(args.parent.foreignKey, String(parentRowKey)),
+          args.table,
+        )
+      : null;
     const buildRowsRequest = buildTGridRowsRequest({
-      fixedFilters: args.queryConfig.fixedFilters ?? [],
-      parentConstraint: args.parent
-        ? eqCondition(args.parent.foreignKey, String(parentRowKey))
-        : null,
+      fixedFilters: parseFiltersForTable(
+        args.queryConfig.fixedFilters ?? [],
+        args.table,
+      ),
+      parentConstraint,
     });
     return {
       rowQuery,
@@ -502,21 +514,22 @@ function initialSourceOwnedQuery(
         defaultSort: SortDescriptor[];
       }
     | undefined,
+  table: TableSchema,
 ) {
   return {
     page: queryConfig.initialPage ?? 1,
     pageSize: defaultPageSize(queryConfig.pageSize),
     sort: [...(queryConfig.initialSort ?? parent?.defaultSort ?? [])],
     filter: {
-      conditions: [...(queryConfig.initialFilters ?? [])],
+      conditions: parseFiltersForTable(queryConfig.initialFilters ?? [], table),
       search: queryConfig.initialSearch ?? null,
     },
   };
 }
 
 function buildTGridRowsRequest(args: {
-  fixedFilters: readonly FilterCondition[];
-  parentConstraint: FilterCondition | null;
+  fixedFilters: readonly TypedFilterCondition[];
+  parentConstraint: TypedFilterCondition | null;
 }): BuildRowsRequest<TGridFilter> {
   // Request building is sampled for loading states, retry state, snapshots, and
   // fetch calls. The order below makes constraints visible in a stable way:

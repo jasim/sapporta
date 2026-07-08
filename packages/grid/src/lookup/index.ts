@@ -7,6 +7,9 @@ export {
 } from "./cache/search-lookup";
 export {
   CachedValueLookup,
+  isLookupValue,
+  lookupValueEquals,
+  lookupValueKey,
   RecordValueLookup,
   StaticValueLookup,
   type LookupEntry,

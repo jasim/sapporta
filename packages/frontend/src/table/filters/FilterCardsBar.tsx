@@ -1,8 +1,7 @@
 import { useState, useMemo } from "react";
 import { Plus } from "lucide-react";
 import type {
-  FilterCondition,
-  NewFilterCondition,
+  TypedFilterCondition,
 } from "@sapporta/shared/filter";
 import type { ColumnSchema } from "@sapporta/shared/contracts";
 import { cn } from "@sapporta/ui/cn";
@@ -15,10 +14,10 @@ import { DateRangeCard, groupDateRanges } from "./DateRangeCard";
 export interface FilterCardsBarProps {
   tableName?: string;
   columns: ColumnSchema[];
-  filters: FilterCondition[];
+  filters: TypedFilterCondition[];
   lookupForColumn?: LookupForColumn;
-  onAdd: (cond: NewFilterCondition) => void;
-  onUpdate: (id: string, patch: NewFilterCondition) => void;
+  onAdd: (cond: TypedFilterCondition) => void;
+  onUpdate: (id: string, patch: TypedFilterCondition) => void;
   onRemove: (id: string) => void;
   /** Per-condition backend error keyed by condition id. */
   filterErrors?: Record<string, string>;

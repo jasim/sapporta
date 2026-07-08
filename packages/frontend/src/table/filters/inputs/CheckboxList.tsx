@@ -1,6 +1,6 @@
 import { useState, useMemo } from "react";
 import { Check, Search } from "lucide-react";
-import type { ListInputProps } from "./types";
+import type { StaticListInputProps } from "./types";
 
 /** Searchable list of ticked options. Used by enum / fk columns for `in`
  *  and `nin`, and by the HeaderFilterPopover's quick-equality picker.
@@ -11,19 +11,18 @@ export function CheckboxList({
   options,
   labels,
   autoFocus,
-}: ListInputProps) {
+}: StaticListInputProps) {
   const selected = new Set(values);
   const [query, setQuery] = useState("");
 
-  const opts = options ?? [];
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return opts;
-    return opts.filter((o) => {
+    if (!q) return options;
+    return options.filter((o) => {
       const label = labels?.[o] ?? o;
       return o.toLowerCase().includes(q) || label.toLowerCase().includes(q);
     });
-  }, [opts, labels, query]);
+  }, [options, labels, query]);
 
   function toggle(opt: string) {
     const next = new Set(selected);

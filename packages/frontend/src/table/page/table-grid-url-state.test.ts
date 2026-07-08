@@ -1,10 +1,21 @@
 import { describe, expect, it } from "vitest";
 import type { SortDescriptor } from "@sapporta/grid";
-import { eqCondition } from "@sapporta/shared/filter";
+import {
+  parseFiltersForTable,
+  type FilterCondition,
+} from "@sapporta/shared/filter";
 import {
   tableGridUrlForQueryState,
   tableQuerySeedFromUrlState,
 } from "./table-grid-url-state";
+
+const filterTable = {
+  columns: [{ name: "status", kind: "text" as const }],
+};
+
+function typedFilters(filters: readonly FilterCondition[]) {
+  return parseFiltersForTable(filters, filterTable);
+}
 
 describe("tableGridUrlForQueryState", () => {
   it("builds route-owned page links from query state", () => {
@@ -12,7 +23,9 @@ describe("tableGridUrlForQueryState", () => {
       sort: [
         { colId: "customer", direction: "asc" },
       ] satisfies SortDescriptor[],
-      filters: [eqCondition("status", "open")],
+      filters: typedFilters([
+        { id: "status-open", column: "status", op: "eq", value: "open" },
+      ]),
       search: "acme",
     };
 
@@ -41,7 +54,9 @@ describe("tableQuerySeedFromUrlState", () => {
   });
 
   it("includes only values supplied by URL state or saved sort", () => {
-    const filters = [eqCondition("status", "open")];
+    const filters = typedFilters([
+      { id: "status-open", column: "status", op: "eq", value: "open" },
+    ]);
     const sort = [
       { colId: "customer", direction: "asc" },
     ] satisfies SortDescriptor[];

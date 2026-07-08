@@ -1,22 +1,21 @@
 import { useState } from "react";
 import { X } from "lucide-react";
-import type {
-  FilterCondition,
-  NewFilterCondition,
-} from "@sapporta/shared/filter";
+import type { TypedFilterCondition } from "@sapporta/shared/filter";
+import { encodeTypedValue } from "@sapporta/shared/filter";
 import type { ColumnSchema } from "@sapporta/shared/contracts";
 import { Popover, PopoverContent, PopoverTrigger } from "@sapporta/ui/popover";
+import { isLookupValue } from "@sapporta/grid/lookup";
 import { useLookupValueLabels } from "@sapporta/grid/lookup/react";
 import type { LookupForColumn } from "../lookup/column-lookup";
 import { ConditionEditor } from "./ConditionEditor";
 import { findEntryForCondition, inferFilterColumnType } from "./column-catalog";
 
 export interface FilterCardProps {
-  condition: FilterCondition;
+  condition: TypedFilterCondition;
   tableName?: string;
   columns: ColumnSchema[];
   lookupForColumn?: LookupForColumn;
-  onUpdate: (id: string, patch: NewFilterCondition) => void;
+  onUpdate: (id: string, patch: TypedFilterCondition) => void;
   onRemove: (id: string) => void;
   /** Backend-reported error scoped to this condition (by id). Rendered
    *  under the pill so the user can tie the message to the offending
@@ -103,7 +102,7 @@ export function FilterCard({
 }
 
 export function summarizeOperator(
-  cond: FilterCondition,
+  cond: TypedFilterCondition,
   column: ColumnSchema | null,
 ): string {
   // Keep single-choice list filters conversational:
@@ -121,7 +120,7 @@ export function summarizeOperator(
 }
 
 function useFilterValueSummary(
-  cond: FilterCondition,
+  cond: TypedFilterCondition,
   tableName: string | undefined,
   column: ColumnSchema | null,
   lookupForColumn: LookupForColumn | undefined,
@@ -132,7 +131,14 @@ function useFilterValueSummary(
     tableName && column?.foreignKey
       ? lookupForColumn?.({ tableName, column })
       : undefined;
-  const labels = useLookupValueLabels(lookup?.valueLookup, values);
+  const lookupValues = values.filter(isLookupValue);
+  const labels = useLookupValueLabels(lookup?.valueLookup, lookupValues);
   if (cond.op === "is") return "";
-  return values.map((value) => labels[value] ?? value).join(", ");
+  return values
+    .map((value) =>
+      isLookupValue(value)
+        ? (labels.labelFor(value) ?? String(value))
+        : encodeTypedValue(value),
+    )
+    .join(", ");
 }

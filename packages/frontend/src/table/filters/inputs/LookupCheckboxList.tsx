@@ -1,7 +1,12 @@
 import { useState } from "react";
 import { Check, Search } from "lucide-react";
+import {
+  lookupValueEquals,
+  lookupValueKey,
+  type LookupValue,
+} from "@sapporta/grid/lookup";
 import { useLookupOptions } from "@sapporta/grid/lookup/react";
-import type { ListInputProps } from "./types";
+import type { LookupListInputProps } from "./types";
 
 const SEARCH_LIMIT = 50;
 
@@ -10,20 +15,20 @@ export function LookupCheckboxList({
   onChange,
   lookup,
   autoFocus,
-}: ListInputProps) {
+}: LookupListInputProps) {
   const [query, setQuery] = useState("");
   const options = useLookupOptions({
-    valueLookup: lookup?.valueLookup,
-    searchLookup: lookup?.searchLookup,
+    valueLookup: lookup.valueLookup,
+    searchLookup: lookup.searchLookup,
     selectedValues: values,
     searchText: query,
     limit: SEARCH_LIMIT,
   });
 
-  function toggle(value: string) {
-    const next = new Set(values);
-    if (next.has(value)) next.delete(value);
-    else next.add(value);
+  function toggle(value: LookupValue) {
+    const next = values.some((selected) => lookupValueEquals(selected, value))
+      ? values.filter((selected) => !lookupValueEquals(selected, value))
+      : [...values, value];
     onChange([...next]);
   }
 
@@ -46,11 +51,13 @@ export function LookupCheckboxList({
           </div>
         ) : (
           options.map((option) => {
-            const value = String(option.value);
-            const active = values.includes(value);
+            const value = option.value;
+            const active = values.some((selected) =>
+              lookupValueEquals(selected, value),
+            );
             return (
               <button
-                key={value}
+                key={lookupValueKey(value)}
                 type="button"
                 onClick={() => toggle(value)}
                 className="w-full flex items-center gap-2 px-[10px] py-[5px] text-sap-data rounded-[3px] hover:bg-sap-row-hover text-left"

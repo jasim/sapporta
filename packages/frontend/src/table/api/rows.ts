@@ -7,7 +7,10 @@ import type {
 } from "@sapporta/shared/contracts";
 import { stringifySortOrder } from "@sapporta/grid";
 import type { SortDescriptor } from "@sapporta/grid";
-import { encodeFilters, type FilterCondition } from "@sapporta/shared/filter";
+import {
+  encodeTypedFilters,
+  type TypedFilterCondition,
+} from "@sapporta/shared/filter";
 import type { RowId } from "@sapporta/shared/row-id";
 
 export interface FetchTableRowsParams {
@@ -15,7 +18,7 @@ export interface FetchTableRowsParams {
   page?: number;
   limit?: number;
   sort?: SortDescriptor[];
-  filters?: FilterCondition[];
+  filters?: readonly TypedFilterCondition[];
   search?: string;
 }
 
@@ -29,7 +32,7 @@ export function buildTableRowsQuery(
 ): Record<string, string> {
   const out: Record<string, string> = {};
   if (params.filters) {
-    for (const [k, v] of encodeFilters(params.filters)) out[k] = v;
+    for (const [k, v] of encodeTypedFilters(params.filters)) out[k] = v;
   }
   if (params.page) out.page = String(params.page);
   if (params.limit) out.limit = String(params.limit);

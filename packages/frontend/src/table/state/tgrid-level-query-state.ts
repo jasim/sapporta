@@ -1,8 +1,5 @@
 import type { SortDescriptor } from "@sapporta/grid";
-import type {
-  FilterCondition,
-  NewFilterCondition,
-} from "@sapporta/shared/filter";
+import type { TypedFilterCondition } from "@sapporta/shared/filter";
 import type { TGridFilter } from "../grid-adapter/tgrid-filter";
 import type { TGridTableRow } from "../grid-adapter/tgrid-types";
 
@@ -11,7 +8,7 @@ import type { TGridTableRow } from "../grid-adapter/tgrid-types";
 export type TGridRouteQuerySeed = Partial<{
   page: number;
   sort: readonly SortDescriptor[];
-  filters: readonly FilterCondition[];
+  filters: readonly TypedFilterCondition[];
   search: string | null;
 }>;
 
@@ -20,7 +17,7 @@ export type TGridLevelQueryState<
 > = {
   level: string;
   sort: SortDescriptor[];
-  filters: FilterCondition[];
+  filters: TypedFilterCondition[];
   search: string | null;
   page: number;
   pageSize: number;
@@ -40,8 +37,8 @@ export type TGridLevelQueryState<
   // through the source and then sync application-visible state such as the URL.
   setSort: (sort: SortDescriptor[]) => void;
   clearSort: () => void;
-  addFilter: (cond: NewFilterCondition) => void;
-  updateFilter: (id: string, patch: NewFilterCondition) => void;
+  addFilter: (cond: TypedFilterCondition) => void;
+  updateFilter: (id: string, patch: TypedFilterCondition) => void;
   removeFilter: (id: string) => void;
   clearFilters: () => void;
   setSearch: (q: string | null) => void;

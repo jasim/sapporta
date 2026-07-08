@@ -16,11 +16,18 @@ import {
   LIST_OPS,
   parseFilterValue,
   checkOperatorApplicable,
+  materializeFilterCondition,
+  parseFilterForTable,
   parseFilters,
+  parseFiltersForTable,
   encodeFilters,
+  encodeTypedFilters,
   decodeFilters,
   TypedFilterParseError,
   type FilterCondition,
+  type FilterTableLike,
+  type NewFilterCondition,
+  type TypedFilterCondition,
 } from "./filter.js";
 import { OPERATOR_APPLICABILITY, type ValueKind } from "./value-kind.js";
 import { Temporal } from "./temporal.js";
@@ -222,6 +229,113 @@ describe("parseFilters — kind resolution and error surfaces", () => {
   });
 });
 
+describe("parseFilterForTable / parseFiltersForTable", () => {
+  const table: FilterTableLike = {
+    columns: [
+      { name: "amount", kind: "number" },
+      { name: "status", kind: "text" },
+      { name: "notes", kind: "text" },
+    ],
+  };
+
+  it("parses raw scalar, list, and null conditions with table column kinds", () => {
+    const typed = parseFiltersForTable(
+      [
+        { id: "a", column: "amount", op: "gt", value: "100" },
+        { id: "b", column: "amount", op: "in", values: ["1", "2"] },
+        { id: "c", column: "notes", op: "is", polarity: "notnull" },
+      ],
+      table,
+    );
+
+    expect(typed[0]).toMatchObject({
+      id: "a",
+      column: "amount",
+      op: "gt",
+      kind: "number",
+      value: 100,
+    });
+    expect(typed[1]).toMatchObject({
+      id: "b",
+      column: "amount",
+      op: "in",
+      kind: "number",
+      values: [1, 2],
+    });
+    expect(typed[2]).toMatchObject({
+      id: "c",
+      column: "notes",
+      op: "is",
+      kind: "text",
+      polarity: "notnull",
+    });
+  });
+
+  it("raises typed parse errors for unknown columns and invalid operators", () => {
+    expect(() =>
+      parseFilterForTable(
+        { id: "missing", column: "ghost", op: "eq", value: "x" },
+        table,
+      ),
+    ).toThrow(expect.objectContaining({ code: "unknown_column" }));
+
+    expect(() =>
+      parseFilterForTable(
+        { id: "bad-op", column: "amount", op: "contains", value: "1" },
+        table,
+      ),
+    ).toThrow(expect.objectContaining({ code: "op_not_applicable" }));
+  });
+});
+
+describe("materializeFilterCondition", () => {
+  it("mints ids for scalar, list, and null draft variants", () => {
+    const drafts: NewFilterCondition[] = [
+      { column: "status", op: "eq", value: "paid" },
+      { column: "status", op: "in", values: ["paid", "void"] },
+      { column: "notes", op: "is", polarity: "null" },
+    ];
+
+    const materialized = drafts.map((draft) =>
+      materializeFilterCondition(draft),
+    );
+
+    expect(materialized[0]).toMatchObject({
+      column: "status",
+      op: "eq",
+      value: "paid",
+    });
+    expect(materialized[1]).toMatchObject({
+      column: "status",
+      op: "in",
+      values: ["paid", "void"],
+    });
+    expect(materialized[2]).toMatchObject({
+      column: "notes",
+      op: "is",
+      polarity: "null",
+    });
+    expect(
+      materialized.every((condition) => condition.id.startsWith("fc_")),
+    ).toBe(true);
+    expect(new Set(materialized.map((condition) => condition.id)).size).toBe(3);
+  });
+
+  it("preserves caller-supplied ids", () => {
+    expect(
+      materializeFilterCondition(
+        { column: "amount", op: "gte", value: "10" },
+        "existing-id",
+      ),
+    ).toEqual({
+      id: "existing-id",
+      column: "amount",
+      op: "gte",
+      value: "10",
+    });
+  });
+});
+
 // ── Layer 4: URL round-trip (grammar level) ─────────────────────────────
 
 describe("encodeFilters → decodeFilters → parseFilters round-trip", () => {
@@ -283,6 +397,24 @@ describe("encodeFilters → decodeFilters → parseFilters round-trip", () => {
       op: "contains",
       value: "50%_off",
     });
+  });
+
+  it("encodes typed conditions through the explicit edge adapter", () => {
+    const original: TypedFilterCondition[] = [
+      { id: "a", column: "amount", op: "gt", kind: "number", value: 100 },
+      {
+        id: "b",
+        column: "due",
+        op: "lte",
+        kind: "date",
+        value: new Temporal.PlainDate(2024, 12, 31),
+      },
+    ];
+
+    expect(decodeFilters(encodeTypedFilters(original))).toMatchObject([
+      { column: "amount", op: "gt", value: "100" },
+      { column: "due", op: "lte", value: "2024-12-31" },
+    ]);
   });
 });
 

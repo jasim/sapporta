@@ -11,12 +11,14 @@
 
 import { useState } from "react";
 import { ArrowDown, ArrowUp, SlidersHorizontal, X } from "lucide-react";
-import type {
-  FilterCondition,
-  NewFilterCondition,
+import type { TypedFilterCondition } from "@sapporta/shared/filter";
+import {
+  encodeTypedValue,
+  materializeTypedFilterCondition,
 } from "@sapporta/shared/filter";
 import type { ColumnSchema } from "@sapporta/shared/contracts";
 import type { SortDescriptor } from "@sapporta/grid";
+import { isLookupValue, type LookupValue } from "@sapporta/grid/lookup";
 import type { LookupForColumn } from "../lookup/column-lookup";
 import { Popover, PopoverContent, PopoverTrigger } from "@sapporta/ui/popover";
 import { ConditionEditor } from "./ConditionEditor";
@@ -30,13 +32,13 @@ export interface HeaderFilterPopoverProps {
   tableName?: string;
   column: ColumnSchema;
   columns: ColumnSchema[];
-  filters: FilterCondition[];
+  filters: TypedFilterCondition[];
   lookupForColumn?: LookupForColumn;
   sort: SortDescriptor[];
   sortColumnId?: string;
   onSort: (sort: SortDescriptor[]) => void;
-  onAddFilter: (cond: NewFilterCondition) => void;
-  onUpdateFilter: (id: string, patch: NewFilterCondition) => void;
+  onAddFilter: (cond: TypedFilterCondition) => void;
+  onUpdateFilter: (id: string, patch: TypedFilterCondition) => void;
   onRemoveFilter: (id: string) => void;
   children: React.ReactNode;
 }
@@ -45,13 +47,13 @@ export interface HeaderFilterMenuContentProps {
   tableName?: string;
   column: ColumnSchema;
   columns: ColumnSchema[];
-  filters: FilterCondition[];
+  filters: TypedFilterCondition[];
   lookupForColumn?: LookupForColumn;
   sort: SortDescriptor[];
   sortColumnId?: string;
   onSort: (sort: SortDescriptor[]) => void;
-  onAddFilter: (cond: NewFilterCondition) => void;
-  onUpdateFilter: (id: string, patch: NewFilterCondition) => void;
+  onAddFilter: (cond: TypedFilterCondition) => void;
+  onUpdateFilter: (id: string, patch: TypedFilterCondition) => void;
   onRemoveFilter: (id: string) => void;
   close: () => void;
 }
@@ -125,30 +127,32 @@ export function HeaderFilterMenuContent({
     catalog[type].ops.find(
       (entry) => entry.valueShape === "list" && entry.op === "in",
     ) ?? null;
-  const QuickInput =
-    quickEntry?.valueShape === "list" ? quickEntry.Input : null;
-
   // The header's quick picker owns exactly one condition on this column:
   // the `in` condition (if any). Other operators live solely as cards.
   const quickCondition = filters.find(
-    (f): f is FilterCondition & { op: "in" } =>
+    (f): f is TypedFilterCondition & { op: "in" } =>
       f.column === columnName && f.op === "in",
   );
   const quickValues = quickCondition ? quickCondition.values : [];
 
-  function applyQuick(next: string[]) {
+  function applyQuick(next: readonly (string | number)[]) {
     if (next.length === 0) {
       if (quickCondition) onRemoveFilter(quickCondition.id);
       return;
     }
-    if (quickCondition) {
-      onUpdateFilter(quickCondition.id, {
+    const condition = materializeTypedFilterCondition(
+      {
         column: columnName,
         op: "in",
         values: next,
-      });
+      },
+      { columns },
+      quickCondition?.id,
+    );
+    if (quickCondition) {
+      onUpdateFilter(quickCondition.id, condition);
     } else {
-      onAddFilter({ column: columnName, op: "in", values: next });
+      onAddFilter(condition);
     }
   }
 
@@ -187,16 +191,27 @@ export function HeaderFilterMenuContent({
       {showQuickPicker && (
         <>
           <div className="px-[6px] py-[4px]">
-            {QuickInput && (
-              <QuickInput
-                values={quickValues}
-                onChange={applyQuick}
-                column={column}
-                lookup={lookup}
-                options={resolved?.options}
-                labels={resolved?.labels}
-              />
-            )}
+            {quickEntry?.valueShape === "list" &&
+              quickEntry.inputKind === "static" &&
+              resolved && (
+                <quickEntry.Input
+                  values={quickValues.map(encodeTypedValue)}
+                  onChange={applyQuick}
+                  column={column}
+                  options={resolved.options}
+                  labels={resolved.labels}
+                />
+              )}
+            {quickEntry?.valueShape === "list" &&
+              quickEntry.inputKind === "lookup" &&
+              lookup && (
+                <quickEntry.Input
+                  values={quickValues.filter(isLookupValue)}
+                  onChange={(next: LookupValue[]) => applyQuick(next)}
+                  column={column}
+                  lookup={lookup}
+                />
+              )}
           </div>
           <Divider />
         </>

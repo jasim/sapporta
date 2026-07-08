@@ -1,19 +1,19 @@
 import { useState, useRef } from "react";
 import { X } from "lucide-react";
 import { Input } from "@sapporta/ui/input";
-import type { ListInputProps } from "./types";
+import type { TagListInputProps } from "./types";
 
 /** Free-form tag entry for `in` / `nin` on text or number columns.
  *  Enter or comma commits the current input as a tag. Backspace on an
  *  empty field removes the last tag. */
-export function TagInput({ values, onChange, autoFocus }: ListInputProps) {
+export function TagInput({ values, onChange, autoFocus }: TagListInputProps) {
   const [draft, setDraft] = useState("");
   const inputRef = useRef<HTMLInputElement | null>(null);
 
   function commit() {
     const trimmed = draft.trim();
     if (!trimmed) return;
-    if (values.includes(trimmed)) {
+    if (values.some((value) => String(value) === trimmed)) {
       setDraft("");
       return;
     }
@@ -30,25 +30,28 @@ export function TagInput({ values, onChange, autoFocus }: ListInputProps) {
       className="flex flex-wrap items-center gap-[4px] min-h-sap-ctl px-[6px] py-[3px] rounded-[5px] border border-sap-border bg-sap-surface focus-within:border-sap-brand"
       onClick={() => inputRef.current?.focus()}
     >
-      {values.map((t, i) => (
-        <span
-          key={`${t}-${i}`}
-          className="inline-flex items-center gap-[4px] h-[18px] px-[6px] rounded-[3px] bg-sap-chip text-sap-fg text-sap-emph"
-        >
-          {t}
-          <button
-            type="button"
-            aria-label={`Remove ${t}`}
-            onClick={(e) => {
-              e.stopPropagation();
-              removeTag(i);
-            }}
-            className="text-sap-muted hover:text-sap-fg"
+      {values.map((value, i) => {
+        const label = String(value);
+        return (
+          <span
+            key={`${label}-${i}`}
+            className="inline-flex items-center gap-[4px] h-[18px] px-[6px] rounded-[3px] bg-sap-chip text-sap-fg text-sap-emph"
           >
-            <X className="h-[10px] w-[10px]" />
-          </button>
-        </span>
-      ))}
+            {label}
+            <button
+              type="button"
+              aria-label={`Remove ${label}`}
+              onClick={(e) => {
+                e.stopPropagation();
+                removeTag(i);
+              }}
+              className="text-sap-muted hover:text-sap-fg"
+            >
+              <X className="h-[10px] w-[10px]" />
+            </button>
+          </span>
+        );
+      })}
       <Input
         ref={inputRef}
         autoFocus={autoFocus}

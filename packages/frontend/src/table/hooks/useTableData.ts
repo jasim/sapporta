@@ -4,7 +4,9 @@ import type { SortDescriptor } from "@sapporta/grid";
 import type { Row } from "@sapporta/shared/contracts";
 import {
   normalizeFilters,
+  parseFiltersForTable,
   type FilterCondition,
+  type FilterTableLike,
 } from "@sapporta/shared/filter";
 
 export interface UseTableDataResult {
@@ -36,6 +38,7 @@ export function useTableData(
      *  `filterConditions` instead. */
     filters?: Record<string, string>;
     filterConditions?: FilterCondition[];
+    table?: FilterTableLike;
     page?: number;
   },
 ): UseTableDataResult {
@@ -50,6 +53,15 @@ export function useTableData(
     // the record on every render.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [JSON.stringify(filtersRecord), conditionsOverride]);
+  const typedFilterConditions = useMemo(() => {
+    if (filterConditions.length === 0) return [];
+    if (!opts?.table) {
+      throw new Error(
+        "Pass table metadata to useTableData when using filters.",
+      );
+    }
+    return parseFiltersForTable(filterConditions, opts.table);
+  }, [filterConditions, opts?.table]);
 
   const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(true);
@@ -67,7 +79,7 @@ export function useTableData(
         page,
         limit,
         sort,
-        filters: filterConditions,
+        filters: typedFilterConditions,
       });
       setRows(res.data);
       setTotalCount(res.meta.total);
@@ -77,7 +89,7 @@ export function useTableData(
     } finally {
       setLoading(false);
     }
-  }, [tableName, page, limit, sort, filterConditions]);
+  }, [tableName, page, limit, sort, typedFilterConditions]);
 
   useEffect(() => {
     load();

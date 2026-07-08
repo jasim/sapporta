@@ -2,7 +2,7 @@ import { useCallback, useMemo } from "react";
 import type { StoreApi } from "zustand/vanilla";
 import type { ColId, SortDescriptor } from "@sapporta/grid";
 import type { ColumnSchema } from "@sapporta/shared/contracts";
-import type { FilterCondition } from "@sapporta/shared/filter";
+import type { TypedFilterCondition } from "@sapporta/shared/filter";
 import { loadPref, savePref } from "../../platform/prefs";
 import {
   buildTableSearchParams,
@@ -78,8 +78,8 @@ export function useTableGridUrlState<RowsByLevel extends TGridRowsByLevel>({
   );
   const prefKey = sortPreferenceKey ?? `sapporta:grid-sort:${tableName}`;
   const parsed = useMemo(
-    () => parseTableSearchParams(searchParams, validColIds, columns),
-    [searchParams, validColIds, columns],
+    () => parseTableSearchParams(searchParams, columns),
+    [searchParams, columns],
   );
   const initialSort = useMemo(
     () => parsed.sort ?? loadSortPref(prefKey, validColIds),
@@ -123,7 +123,7 @@ export function useTableGridUrlState<RowsByLevel extends TGridRowsByLevel>({
 
   const syncSessionFromUrl = useCallback(
     <AppServices>(session: TGridSession<RowsByLevel, AppServices>) => {
-      const params = parseTableSearchParams(searchParams, validColIds, columns);
+      const params = parseTableSearchParams(searchParams, columns);
       const seed = tableQuerySeedFromUrlState({
         searchParams,
         parsed: params,
@@ -153,10 +153,11 @@ export function useTableGridUrlState<RowsByLevel extends TGridRowsByLevel>({
 export function tableGridUrlForQueryState(
   routePath: string,
   page: number,
-  state: Pick<
-    TGridLevelQueryState<TGridTableRow>,
-    "sort" | "filters" | "search"
-  >,
+  state: {
+    sort: TGridLevelQueryState<TGridTableRow>["sort"];
+    filters: readonly TypedFilterCondition[];
+    search: TGridLevelQueryState<TGridTableRow>["search"];
+  },
 ): string {
   const params = buildTableSearchParams({
     page,
@@ -182,7 +183,7 @@ export function tableQuerySeedFromUrlState(args: {
   searchParams: URLSearchParams;
   parsed: {
     page: number;
-    filters: FilterCondition[];
+    filters: TypedFilterCondition[];
     search: string | null;
   };
   sort: SortDescriptor[] | undefined;
