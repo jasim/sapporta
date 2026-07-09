@@ -958,6 +958,67 @@ export function createGridRuntime(args: RuntimeArgs): GridRuntime {
     });
   }
 
+  // If the user has selected multiple cells (of the same column, across many rows),
+  // then a change made to a single cell inside it, is expected to replace the values
+  // of all other cells (of the same column) in the selection as well. Example:
+  // when I'm editing Draft Transactions, and want to mass-replace the target account for
+  // a set of entries (that I've filtered to be of the same type), then I want to be able
+  // to just select all of them, and make a single change and have it fan-out.
+  //
+  // This function does that; the existing public `writeCell` deliberately does not fan-out.
+  function writeCellOrSelectedColumnCells(
+    path: GridPath,
+    coord: Coord,
+    value: unknown,
+  ): void {
+    const selection = controllerCursorPortFor(path).getState().cellSelection;
+
+    // No selection, just a single cell; or selection exist, but they span multiple
+    // columns. In both cases, do the regular single cell update.
+    if (
+      !selection ||
+      selection.anchor.colId !== selection.head.colId ||
+      selection.anchor.colId !== coord.colId
+    ) {
+      writeCell(path, coord, value);
+      return;
+    }
+
+    const displayed = displayedRowsFor(path);
+    const selectedRowIds = rowsInSelection(selection, displayed);
+    if (selectedRowIds.length <= 1 || !selectedRowIds.includes(coord.rowId)) {
+      writeCell(path, coord, value);
+      return;
+    }
+
+    requireWritable(path);
+
+    // Keep source-backed data rows in one batched mutation event, while phantom
+    // rows stay in the local phantom channel and do not emit mutationCommitted.
+    const changes: CellChange[] = [];
+    for (const rowId of selectedRowIds) {
+      const row = displayed.rowById.get(rowId);
+      if (!row || !capabilitiesFor(row.kind).editable) continue;
+
+      if (row.kind === "data") {
+        changes.push({
+          rowKey: rowKeyOfRowId(rowId),
+          colId: coord.colId,
+          value,
+        });
+        continue;
+      }
+
+      if (row.kind === "phantom") {
+        const phantomKey = phantomKeyFromDisplayedRowId(rowId);
+        if (!phantomKey) continue;
+        phantomLifecycle.setPhantomCell(path, phantomKey, coord.colId, value);
+      }
+    }
+
+    if (changes.length > 0) applyChanges(path, changes);
+  }
+
   function commitPhantomRow(
     path: GridPath,
     rowKey: RowKey,
@@ -1120,7 +1181,7 @@ export function createGridRuntime(args: RuntimeArgs): GridRuntime {
       clearCellRange: (path) => cursorManager.clearCellRange(path),
       clearRowSelection: (path) => cursorManager.clearRowSelection(path),
       writeValue: (coord, newValue) => {
-        writeCell(path, coord, newValue);
+        writeCellOrSelectedColumnCells(path, coord, newValue);
       },
       activateCell: (coord, trigger) => {
         activateCell(path, coord, trigger);

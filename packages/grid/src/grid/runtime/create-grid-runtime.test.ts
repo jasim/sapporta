@@ -884,6 +884,138 @@ describe("GridRuntime", () => {
     );
   });
 
+  it("controller commitEdit fans out across a single-column multi-row selection", () => {
+    const handler = vi.fn();
+    const rt = createGridRuntime({
+      schema: tableSchema,
+      dataSource: tableDataSource(),
+      on: { mutationCommitted: handler },
+    });
+    const c = rt.controllerFor(rowsRoot);
+    const aQty = { rowId: makeRowId(rowsRoot, "a"), colId: "qty" };
+    const bQty = { rowId: makeRowId(rowsRoot, "b"), colId: "qty" };
+
+    rt.cursorManager.setCellRange(rowsRoot, aQty, bQty);
+    c.startEdit(aQty, "f2");
+    c.commitEdit(42);
+
+    expect(rt.displayedRowFor(rowsRoot, aQty.rowId)?.columns.qty).toBe(42);
+    expect(rt.displayedRowFor(rowsRoot, bQty.rowId)?.columns.qty).toBe(42);
+    expect(rt.displayedRowFor(rowsRoot, aQty.rowId)?.columns.name).toBe(
+      "Apple",
+    );
+    expect(handler).toHaveBeenCalledWith({
+      kind: "cells",
+      path: rowsRoot,
+      edits: [
+        {
+          coord: aQty,
+          oldValue: 1,
+          newValue: 42,
+        },
+        {
+          coord: bQty,
+          oldValue: 2,
+          newValue: 42,
+        },
+      ],
+    });
+  });
+
+  it("controller commitEdit keeps multi-column selections to one cell", () => {
+    const handler = vi.fn();
+    const rt = createGridRuntime({
+      schema: tableSchema,
+      dataSource: tableDataSource(),
+      on: { mutationCommitted: handler },
+    });
+    const c = rt.controllerFor(rowsRoot);
+    const aName = { rowId: makeRowId(rowsRoot, "a"), colId: "name" };
+    const aQty = { rowId: makeRowId(rowsRoot, "a"), colId: "qty" };
+    const bQty = { rowId: makeRowId(rowsRoot, "b"), colId: "qty" };
+
+    rt.cursorManager.setCellRange(rowsRoot, aName, bQty);
+    c.startEdit(aQty, "f2");
+    c.commitEdit(42);
+
+    expect(rt.displayedRowFor(rowsRoot, aQty.rowId)?.columns.qty).toBe(42);
+    expect(rt.displayedRowFor(rowsRoot, bQty.rowId)?.columns.qty).toBe(2);
+    expect(handler).toHaveBeenCalledWith({
+      kind: "cell",
+      path: rowsRoot,
+      coord: aQty,
+      oldValue: 1,
+      newValue: 42,
+    });
+  });
+
+  it("controller commitEdit without selection keeps the single-cell write", () => {
+    const handler = vi.fn();
+    const rt = createGridRuntime({
+      schema: tableSchema,
+      dataSource: tableDataSource(),
+      on: { mutationCommitted: handler },
+    });
+    const c = rt.controllerFor(rowsRoot);
+    const coord = { rowId: makeRowId(rowsRoot, "a"), colId: "qty" };
+
+    c.startEdit(coord, "f2");
+    c.commitEdit(42);
+
+    expect(rt.displayedRowFor(rowsRoot, coord.rowId)?.columns.qty).toBe(42);
+    expect(
+      rt.displayedRowFor(rowsRoot, makeRowId(rowsRoot, "b"))?.columns.qty,
+    ).toBe(2);
+    expect(handler).toHaveBeenCalledWith({
+      kind: "cell",
+      path: rowsRoot,
+      coord,
+      oldValue: 1,
+      newValue: 42,
+    });
+  });
+
+  it("controller commitEdit fans out to phantom cells without mutation events for those cells", () => {
+    const handler = vi.fn();
+    const phantomRowKey = "draft1";
+    const phantomRowId = makeRowId(
+      rowsRoot,
+      displayedPhantomRowKey(phantomRowKey),
+    );
+    const rt = createGridRuntime({
+      schema: tableSchema,
+      dataSource: tableDataSource(),
+      initialPhantomsByPath: new Map([
+        [rowsRoot, [phantom(phantomRowKey, { id: "c", name: "", qty: null })]],
+      ]),
+      on: { mutationCommitted: handler },
+    });
+    const c = rt.controllerFor(rowsRoot);
+    const bQty = { rowId: makeRowId(rowsRoot, "b"), colId: "qty" };
+    const phantomQty = { rowId: phantomRowId, colId: "qty" };
+
+    rt.cursorManager.setCellRange(rowsRoot, bQty, phantomQty);
+    c.startEdit(bQty, "f2");
+    c.commitEdit(42);
+
+    expect(
+      rt.displayedRowFor(rowsRoot, makeRowId(rowsRoot, "a"))?.columns.qty,
+    ).toBe(1);
+    expect(rt.displayedRowFor(rowsRoot, bQty.rowId)?.columns.qty).toBe(42);
+    expect(rt.displayedRowFor(rowsRoot, phantomRowId)?.columns.qty).toBe(42);
+    expect(handler).toHaveBeenCalledWith({
+      kind: "cells",
+      path: rowsRoot,
+      edits: [
+        {
+          coord: bQty,
+          oldValue: 2,
+          newValue: 42,
+        },
+      ],
+    });
+  });
+
   it("subscribeDisplayedRowSequence wakes on create and remove", async () => {
     const rt = createGridRuntime({
       schema: tableSchema,
