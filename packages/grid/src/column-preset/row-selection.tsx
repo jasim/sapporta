@@ -1,4 +1,3 @@
-import { type MouseEvent } from "react";
 import type { ColId } from "../grid/types/identity";
 import type { ColumnSchema } from "../grid/types/schema";
 import type { ColumnWidth } from "./types";
@@ -48,14 +47,14 @@ function RowSelectionCell({
     rowInteractionStatus === "cursor-selected";
   const disabled = !row.rowSelectable;
 
-  function onClick(event: MouseEvent<HTMLButtonElement>) {
+  function onCheckedChange(event: Event) {
     event.preventDefault();
     event.stopPropagation();
     if (disabled) return;
     // Checkbox gestures mutate operation targets only. They intentionally do
     // not move the cell cursor, row cursor, or live focus; keyboard routing
     // remains whatever `runtime.interaction.mode` said at construction time.
-    if (event.shiftKey) {
+    if (event instanceof MouseEvent && event.shiftKey) {
       runtime.rowInteraction.extendRowSelectionTo(path, row.id);
     } else {
       runtime.rowInteraction.toggleRowSelection(path, row.id);
@@ -64,7 +63,13 @@ function RowSelectionCell({
 
   return (
     <div className={styles.rowSelectionCell}>
-      <Checkbox checked={checked} disabled={disabled} onClick={onClick} />
+      <Checkbox
+        checked={checked}
+        disabled={disabled}
+        onCheckedChange={(_, eventDetails) =>
+          onCheckedChange(eventDetails.event)
+        }
+      />
     </div>
   );
 }

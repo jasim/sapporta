@@ -276,9 +276,7 @@
   padding: var(--grid-cell-padding, 0 10px);
 }
 
-:where(
-  .presetGrid [data-grid-part="editor-overlay"] [cmdk-input-wrapper] input
-) {
+:where(.presetGrid [data-grid-part="editor-overlay"] input) {
   font-size: var(--text-sap-body);
   line-height: var(--grid-line-height, 1.45);
   padding: var(--grid-cell-padding, 0 10px);
@@ -355,7 +353,8 @@
 
 :where(
   .presetGrid [data-grid-part="expand-chevron"]:hover,
-  .presetGrid [data-grid-part="expand-cell"][data-expanded="true"]
+  .presetGrid
+    [data-grid-part="expand-cell"][data-expanded="true"]
     [data-grid-part="expand-chevron"],
   .presetGrid
     [data-grid-part="cell"][data-cell-status="focus"]
@@ -616,10 +615,10 @@
   white-space: pre-wrap;
 }
 
-.textCellTooltipContent {
+.cellTooltipContent {
   font-size: var(--text-sap-body);
   line-height: 1.45;
-  max-height: min(40vh, var(--radix-tooltip-content-available-height));
+  max-height: min(40vh, var(--available-height));
   max-width: min(56ch, calc(100vw - 32px));
   overflow: auto;
   white-space: pre-wrap;

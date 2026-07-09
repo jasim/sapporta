@@ -48,22 +48,24 @@ export function FilterCard({
     <Popover open={open} onOpenChange={setOpen}>
       <div className="inline-flex max-w-full flex-col gap-[2px]">
         <div className="inline-flex h-sap-ctl max-w-full items-center gap-1">
-          <PopoverTrigger asChild>
-            <button
-              type="button"
-              className={
-                "flex min-w-0 max-w-full items-center gap-[6px] border-b bg-transparent px-0 pb-[2px] text-[17px] leading-[1.25] font-[620] text-sap-fg hover:border-sap-muted " +
-                (error ? "border-sap-negative" : "border-sap-border-strong")
-              }
-            >
-              <span className="truncate text-sap-muted">{label}</span>
-              <span className="shrink-0 text-sap-subtle">{opLabel}</span>
-              {valueSummary && (
-                <span className="truncate max-w-[180px] text-sap-fg">
-                  {valueSummary}
-                </span>
-              )}
-            </button>
+          <PopoverTrigger
+            render={
+              <button
+                type="button"
+                className={
+                  "flex min-w-0 max-w-full items-center gap-[6px] border-b bg-transparent px-0 pb-[2px] text-[17px] leading-[1.25] font-[620] text-sap-fg hover:border-sap-muted " +
+                  (error ? "border-sap-negative" : "border-sap-border-strong")
+                }
+              />
+            }
+          >
+            <span className="truncate text-sap-muted">{label}</span>
+            <span className="shrink-0 text-sap-subtle">{opLabel}</span>
+            {valueSummary && (
+              <span className="truncate max-w-[180px] text-sap-fg">
+                {valueSummary}
+              </span>
+            )}
           </PopoverTrigger>
           <button
             type="button"

@@ -78,14 +78,16 @@ export function FilterCardsBar({
         ),
       )}
       <Popover open={addOpen} onOpenChange={setAddOpen}>
-        <PopoverTrigger asChild>
-          <button
-            type="button"
-            className="inline-flex items-center gap-[4px] h-sap-ctl px-[10px] rounded-[6px] border border-sap-border-soft text-sap-muted hover:text-sap-fg hover:bg-sap-row-hover text-sap-data font-semibold"
-          >
-            <Plus className="h-[11px] w-[11px]" />
-            Add filter
-          </button>
+        <PopoverTrigger
+          render={
+            <button
+              type="button"
+              className="inline-flex items-center gap-[4px] h-sap-ctl px-[10px] rounded-[6px] border border-sap-border-soft text-sap-muted hover:text-sap-fg hover:bg-sap-row-hover text-sap-data font-semibold"
+            />
+          }
+        >
+          <Plus className="h-[11px] w-[11px]" />
+          Add filter
         </PopoverTrigger>
         <PopoverContent
           align="start"

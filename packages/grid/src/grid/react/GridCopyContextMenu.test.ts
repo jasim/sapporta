@@ -3,7 +3,10 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   act,
+  cloneElement,
   createElement,
+  isValidElement,
+  type HTMLAttributes,
   type MouseEventHandler,
   type ReactElement,
   type ReactNode,
@@ -41,35 +44,47 @@ vi.mock("@sapporta/ui/context-menu", async () => {
     ContextMenuTrigger: ({
       children,
       onContextMenuCapture,
+      render,
     }: {
-      asChild?: boolean;
       children: ReactNode;
       onContextMenuCapture?: MouseEventHandler<HTMLDivElement>;
+      render?: ReactElement<
+        HTMLAttributes<HTMLDivElement> & { "data-testid"?: string }
+      >;
     }) =>
-      h(
-        "div",
-        {
-          "data-testid": "context-menu-trigger",
-          onContextMenuCapture,
-        },
-        children,
-      ),
+      isValidElement(render)
+        ? cloneElement(
+            render,
+            {
+              "data-testid": "context-menu-trigger",
+              onContextMenuCapture,
+            },
+            children,
+          )
+        : h(
+            "div",
+            {
+              "data-testid": "context-menu-trigger",
+              onContextMenuCapture,
+            },
+            children,
+          ),
     ContextMenuContent: ({ children }: { children: ReactNode }) =>
       h("div", { "data-testid": "context-menu-content" }, children),
     ContextMenuItem: ({
       children,
       disabled,
-      onSelect,
+      onClick,
     }: {
       children: ReactNode;
       disabled?: boolean;
-      onSelect?: () => void;
+      onClick?: () => void;
     }) =>
       h(
         "button",
         {
           disabled,
-          onClick: () => onSelect?.(),
+          onClick: () => onClick?.(),
           type: "button",
         },
         children,

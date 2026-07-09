@@ -249,16 +249,18 @@ function HeaderCell<TMeta = unknown, TFilter = unknown>({
         {customHeader ?? defaultHeader(headerName, sort?.direction, sortRank)}
         {menu ? (
           <Popover open={open} onOpenChange={setOpen}>
-            <PopoverTrigger asChild>
-              <button
-                type="button"
-                aria-label={`${column.column.name} menu`}
-                aria-expanded={open}
-                data-grid-part="header-menu-button"
-                onClick={(e) => e.stopPropagation()}
-              >
-                <ChevronDown aria-hidden="true" size={11} strokeWidth={1.8} />
-              </button>
+            <PopoverTrigger
+              render={
+                <button
+                  type="button"
+                  aria-label={`${column.column.name} menu`}
+                  aria-expanded={open}
+                  data-grid-part="header-menu-button"
+                  onClick={(e) => e.stopPropagation()}
+                />
+              }
+            >
+              <ChevronDown aria-hidden="true" size={11} strokeWidth={1.8} />
             </PopoverTrigger>
             <PopoverContent
               align="end"

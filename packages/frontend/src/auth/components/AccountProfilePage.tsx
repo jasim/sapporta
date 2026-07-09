@@ -466,14 +466,16 @@ function CreatedTokenDialog({
         </div>
 
         <DialogFooter>
-          <DialogClose asChild>
-            <Button
-              type="button"
-              variant="outline"
-              className="border-sap-border bg-sap-surface text-sap-muted hover:text-sap-fg"
-            >
-              Close
-            </Button>
+          <DialogClose
+            render={
+              <Button
+                type="button"
+                variant="outline"
+                className="border-sap-border bg-sap-surface text-sap-muted hover:text-sap-fg"
+              />
+            }
+          >
+            Close
           </DialogClose>
           <Button
             type="button"

@@ -9,7 +9,7 @@
  *   - "Clear filter" — removes every condition on this column.
  */
 
-import { useState } from "react";
+import { isValidElement, useState } from "react";
 import { ArrowDown, ArrowUp, SlidersHorizontal, X } from "lucide-react";
 import type { TypedFilterCondition } from "@sapporta/shared/filter";
 import {
@@ -70,10 +70,11 @@ export function HeaderFilterPopover({
   children,
 }: HeaderFilterPopoverProps) {
   const [open, setOpen] = useState(false);
+  const trigger = isValidElement(children) ? children : <span>{children}</span>;
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>{children}</PopoverTrigger>
+      <PopoverTrigger render={trigger} />
       <PopoverContent
         align="start"
         sideOffset={4}
@@ -209,14 +210,16 @@ export function HeaderFilterMenuContent({
         </>
       )}
       <Popover open={editorOpen} onOpenChange={setEditorOpen}>
-        <PopoverTrigger asChild>
-          <button
-            type="button"
-            className="w-full flex items-center gap-2 px-[10px] py-[5px] text-sap-data rounded-[3px] hover:bg-sap-row-hover text-left text-sap-emph"
-          >
-            <SlidersHorizontal className="h-[12px] w-[12px] text-sap-subtle" />
-            <span className="flex-1">Filter by condition...</span>
-          </button>
+        <PopoverTrigger
+          render={
+            <button
+              type="button"
+              className="w-full flex items-center gap-2 px-[10px] py-[5px] text-sap-data rounded-[3px] hover:bg-sap-row-hover text-left text-sap-emph"
+            />
+          }
+        >
+          <SlidersHorizontal className="h-[12px] w-[12px] text-sap-subtle" />
+          <span className="flex-1">Filter by condition...</span>
         </PopoverTrigger>
         <PopoverContent
           align="start"

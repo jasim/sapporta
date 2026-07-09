@@ -96,12 +96,12 @@ function buttonByText(text: string): HTMLButtonElement {
   return button;
 }
 
-function commandItemByText(text: string): Element {
-  const element = Array.from(document.querySelectorAll("[cmdk-item]")).find(
-    (candidate) => candidate.textContent?.includes(text),
-  );
+function comboboxOptionByText(text: string): Element {
+  const element = Array.from(
+    document.querySelectorAll('[role="option"], button'),
+  ).find((candidate) => candidate.textContent?.includes(text));
   if (!element) {
-    throw new Error(`Could not find command item '${text}'.`);
+    throw new Error(`Could not find combobox option '${text}'.`);
   }
   return element;
 }
@@ -171,7 +171,7 @@ describe("LookupPicker", () => {
 
     await renderLookupPicker(lookup, { value: 7, onChange });
     await click(buttonByText("Seven"));
-    await click(commandItemByText("Clear"));
+    await click(comboboxOptionByText("Clear"));
 
     expect(onChange).toHaveBeenCalledWith(null);
   });
@@ -185,7 +185,7 @@ describe("LookupPicker", () => {
 
     await renderLookupPicker(lookup, { value: null, onChange });
     await click(buttonByText("Select person"));
-    await click(commandItemByText("Forty two"));
+    await click(comboboxOptionByText("Forty two"));
 
     expect(onChange).toHaveBeenCalledWith(42);
   });

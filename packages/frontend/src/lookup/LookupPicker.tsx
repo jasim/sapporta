@@ -55,22 +55,24 @@ export function LookupPicker<TValue extends LookupValue = LookupValue>({
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <Button
-          id={id}
-          type="button"
-          variant="outline"
-          disabled={disabled}
-          className={cn("justify-between font-normal", className)}
-        >
-          <span className={selectedLabel ? "" : "text-sap-muted"}>
-            {selectedLabel ?? placeholder}
-          </span>
-          <ChevronDown className="h-4 w-4 opacity-50" />
-        </Button>
+      <PopoverTrigger
+        render={
+          <Button
+            id={id}
+            type="button"
+            variant="outline"
+            disabled={disabled}
+            className={cn("justify-between font-normal", className)}
+          />
+        }
+      >
+        <span className={selectedLabel ? "" : "text-sap-muted"}>
+          {selectedLabel ?? placeholder}
+        </span>
+        <ChevronDown className="h-4 w-4 opacity-50" />
       </PopoverTrigger>
       <PopoverContent
-        className="w-[--radix-popover-trigger-width] p-0"
+        className="w-[--anchor-width] p-0"
         align="start"
         sideOffset={4}
       >

@@ -111,17 +111,19 @@ export function DateRangeCard({
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <div className="inline-flex h-sap-ctl max-w-full items-stretch overflow-hidden rounded-[5px] border border-sap-border">
-        <PopoverTrigger asChild>
-          <button
-            type="button"
-            className="flex min-w-0 items-center gap-[6px] bg-sap-surface px-[10px] text-sap-emph text-sap-fg hover:bg-sap-row-hover"
-          >
-            <span className="truncate text-sap-muted">{label}</span>
-            <span className="shrink-0 text-sap-subtle">between</span>
-            <span className="truncate font-medium">
-              {gteValue || "…"} – {lteValue || "…"}
-            </span>
-          </button>
+        <PopoverTrigger
+          render={
+            <button
+              type="button"
+              className="flex min-w-0 items-center gap-[6px] bg-sap-surface px-[10px] text-sap-emph text-sap-fg hover:bg-sap-row-hover"
+            />
+          }
+        >
+          <span className="truncate text-sap-muted">{label}</span>
+          <span className="shrink-0 text-sap-subtle">between</span>
+          <span className="truncate font-medium">
+            {gteValue || "…"} – {lteValue || "…"}
+          </span>
         </PopoverTrigger>
         <button
           type="button"

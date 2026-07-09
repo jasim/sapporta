@@ -34,15 +34,18 @@ export function TextCell({
   if (preset.kind !== "text" || value === "") return content;
 
   return (
-    <TooltipProvider delayDuration={100}>
+    <TooltipProvider delay={100}>
       <Tooltip>
-        <TooltipTrigger asChild data-grid-part="text-cell-tooltip-trigger">
+        <TooltipTrigger
+          render={<span className={className} />}
+          data-grid-part="text-cell-tooltip-trigger"
+        >
           {content}
         </TooltipTrigger>
         <TooltipContent
           data-grid-part="text-cell-tooltip-content"
           sideOffset={6}
-          className={styles.textCellTooltipContent}
+          className={styles.cellTooltipContent}
         >
           {value}
         </TooltipContent>

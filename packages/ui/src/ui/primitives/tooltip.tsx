@@ -1,27 +1,49 @@
 import * as React from "react";
-import * as TooltipPrimitive from "@radix-ui/react-tooltip";
+import { Tooltip as TooltipPrimitive } from "@base-ui/react/tooltip";
 import { cn } from "../utils/cn";
 
 const TooltipProvider = TooltipPrimitive.Provider;
+
 const Tooltip = TooltipPrimitive.Root;
-const TooltipTrigger = TooltipPrimitive.Trigger;
+
+const TooltipTrigger = React.forwardRef<HTMLButtonElement, TooltipTriggerProps>(
+  (props, ref) => <TooltipPrimitive.Trigger ref={ref} {...props} />,
+);
+TooltipTrigger.displayName = "TooltipTrigger";
 
 const TooltipContent = React.forwardRef<
-  React.ComponentRef<typeof TooltipPrimitive.Content>,
-  React.ComponentPropsWithoutRef<typeof TooltipPrimitive.Content>
->(({ className, sideOffset = 4, ...props }, ref) => (
+  React.ComponentRef<typeof TooltipPrimitive.Popup>,
+  TooltipContentProps
+>(({ className, align, alignOffset, side, sideOffset = 4, ...props }, ref) => (
   <TooltipPrimitive.Portal>
-    <TooltipPrimitive.Content
-      ref={ref}
+    <TooltipPrimitive.Positioner
+      align={align}
+      alignOffset={alignOffset}
+      side={side}
       sideOffset={sideOffset}
-      className={cn(
-        "z-[var(--sap-z-popover)] overflow-hidden rounded-md border bg-popover px-3 py-1.5 text-sm text-popover-foreground shadow-md outline-none data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[state=delayed-open]:animate-in data-[state=instant-open]:animate-in data-[state=delayed-open]:fade-in-0 data-[state=instant-open]:fade-in-0 data-[state=delayed-open]:zoom-in-95 data-[state=instant-open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2",
-        className,
-      )}
-      {...props}
-    />
+      className="isolate z-[var(--sap-z-popover)] outline-none"
+    >
+      <TooltipPrimitive.Popup
+        ref={ref}
+        className={cn(
+          "z-[var(--sap-z-popover)] overflow-hidden rounded-md border bg-popover px-3 py-1.5 text-sm text-popover-foreground shadow-md outline-none transition-[opacity,transform] data-starting-style:opacity-0 data-ending-style:opacity-0 data-starting-style:scale-95 data-ending-style:scale-95 data-[side=bottom]:data-starting-style:-translate-y-2 data-[side=bottom]:data-ending-style:-translate-y-2 data-[side=left]:data-starting-style:translate-x-2 data-[side=left]:data-ending-style:translate-x-2 data-[side=right]:data-starting-style:-translate-x-2 data-[side=right]:data-ending-style:-translate-x-2 data-[side=top]:data-starting-style:translate-y-2 data-[side=top]:data-ending-style:translate-y-2",
+          className,
+        )}
+        {...props}
+      />
+    </TooltipPrimitive.Positioner>
   </TooltipPrimitive.Portal>
 ));
-TooltipContent.displayName = TooltipPrimitive.Content.displayName;
+TooltipContent.displayName = "TooltipContent";
+
+type TooltipTriggerProps = TooltipPrimitive.Trigger.Props;
+
+interface TooltipContentProps
+  extends
+    TooltipPrimitive.Popup.Props,
+    Pick<
+      TooltipPrimitive.Positioner.Props,
+      "align" | "alignOffset" | "side" | "sideOffset"
+    > {}
 
 export { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider };

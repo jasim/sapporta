@@ -49,6 +49,10 @@ export function FormField({ field, value, onChange }: FormFieldProps) {
 
       {field.kind === "select" && (
         <Select
+          items={field.options.map((option) => ({
+            label: option,
+            value: option,
+          }))}
           value={value != null ? String(value) : ""}
           onValueChange={(v) => onChange(v)}
         >

@@ -27,14 +27,7 @@ import {
   SelectValue,
 } from "@sapporta/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@sapporta/ui/popover";
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from "@sapporta/ui/command";
+import { ComboboxList } from "@sapporta/ui/combobox";
 import {
   catalog,
   findEntryForCondition,
@@ -222,52 +215,37 @@ export function ConditionEditor({
       {!lockedColumn && (
         <Field label="Column">
           <Popover open={columnPickerOpen} onOpenChange={setColumnPickerOpen}>
-            <PopoverTrigger asChild>
-              <button
-                type="button"
-                className="h-sap-ctl flex items-center justify-between gap-[6px] px-[10px] rounded-[5px] border border-sap-border bg-sap-surface text-sap-fg text-left hover:bg-sap-row-hover"
-              >
-                <span className={draft.column ? "" : "text-sap-muted"}>
-                  {draft.column ? draft.column.label : "Pick a column"}
-                </span>
-                <ChevronDown className="h-4 w-4 opacity-50" />
-              </button>
+            <PopoverTrigger
+              render={
+                <button
+                  type="button"
+                  className="h-sap-ctl flex items-center justify-between gap-[6px] px-[10px] rounded-[5px] border border-sap-border bg-sap-surface text-sap-fg text-left hover:bg-sap-row-hover"
+                />
+              }
+            >
+              <span className={draft.column ? "" : "text-sap-muted"}>
+                {draft.column ? draft.column.label : "Pick a column"}
+              </span>
+              <ChevronDown className="h-4 w-4 opacity-50" />
             </PopoverTrigger>
             <PopoverContent
-              className="w-[--radix-popover-trigger-width] p-0"
+              className="w-[--anchor-width] p-0"
               align="start"
               sideOffset={4}
             >
-              <Command>
-                <CommandInput placeholder="Search columns..." />
-                <CommandList>
-                  <CommandEmpty>No columns.</CommandEmpty>
-                  <CommandGroup>
-                    {columns.map((c) => {
-                      const label = c.label;
-                      const name = c.name;
-                      const selected = draft.column?.name === name;
-                      return (
-                        <CommandItem
-                          key={name}
-                          value={`${label} ${name}`}
-                          onSelect={() => {
-                            handleColumnChange(name);
-                            setColumnPickerOpen(false);
-                          }}
-                        >
-                          {label}
-                          {selected && (
-                            <span className="ml-auto text-xs text-sap-muted">
-                              ✓
-                            </span>
-                          )}
-                        </CommandItem>
-                      );
-                    })}
-                  </CommandGroup>
-                </CommandList>
-              </Command>
+              <ComboboxList
+                value={draft.column?.name ?? null}
+                options={columns.map((column) => ({
+                  id: column.name,
+                  label: column.label,
+                }))}
+                onPick={(name) => {
+                  if (name == null) return;
+                  handleColumnChange(name);
+                  setColumnPickerOpen(false);
+                }}
+                allowClear={false}
+              />
             </PopoverContent>
           </Popover>
         </Field>
@@ -276,8 +254,14 @@ export function ConditionEditor({
       {type && (
         <Field label="Operator">
           <Select
+            items={catalog[type].ops.map((op) => ({
+              label: op.label,
+              value: op.key,
+            }))}
             value={draft.opKey}
-            onValueChange={(nextKey) => setDraft({ ...draft, opKey: nextKey })}
+            onValueChange={(nextKey) => {
+              if (nextKey !== null) setDraft({ ...draft, opKey: nextKey });
+            }}
           >
             <SelectTrigger className="h-sap-ctl">
               <SelectValue />

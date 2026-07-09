@@ -36,19 +36,22 @@ export function GridCopyContextMenu({ children }: GridCopyContextMenuProps) {
 
   return (
     <ContextMenu>
-      <ContextMenuTrigger asChild onContextMenuCapture={prepareTarget}>
-        <div data-grid-copy-menu-scope="true">{children}</div>
+      <ContextMenuTrigger
+        render={<div data-grid-copy-menu-scope="true" />}
+        onContextMenuCapture={prepareTarget}
+      >
+        {children}
       </ContextMenuTrigger>
       <ContextMenuContent>
         <ContextMenuItem
           disabled={!hasCopyTarget}
-          onSelect={() => void copy(false)}
+          onClick={() => void copy(false)}
         >
           Copy
         </ContextMenuItem>
         <ContextMenuItem
           disabled={!hasCopyTarget}
-          onSelect={() => void copy(true)}
+          onClick={() => void copy(true)}
         >
           Copy with headers
         </ContextMenuItem>

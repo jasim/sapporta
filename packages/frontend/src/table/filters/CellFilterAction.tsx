@@ -32,15 +32,17 @@ export function CellFilterAction({
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <button
-          type="button"
-          aria-label={`Filter by ${column.label}`}
-          className="flex items-center justify-center h-6 w-6 rounded border border-sap-border bg-sap-surface text-sap-subtle hover:text-sap-fg hover:bg-sap-row-hover shadow-sm"
-          onClick={(e) => e.stopPropagation()}
-        >
-          <Filter className="h-4 w-4" />
-        </button>
+      <PopoverTrigger
+        render={
+          <button
+            type="button"
+            aria-label={`Filter by ${column.label}`}
+            className="flex items-center justify-center h-6 w-6 rounded border border-sap-border bg-sap-surface text-sap-subtle hover:text-sap-fg hover:bg-sap-row-hover shadow-sm"
+            onClick={(e) => e.stopPropagation()}
+          />
+        }
+      >
+        <Filter className="h-4 w-4" />
       </PopoverTrigger>
       <PopoverContent
         align="end"

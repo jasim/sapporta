@@ -2,14 +2,6 @@ export { Badge, badgeVariants } from "./primitives/badge";
 export { Button, buttonVariants } from "./primitives/button";
 export { Checkbox } from "./primitives/checkbox";
 export {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from "./primitives/command";
-export {
   ContextMenu,
   ContextMenuContent,
   ContextMenuGroup,

@@ -18,12 +18,6 @@ const root = resolve(new URL("..", import.meta.url).pathname);
 const minimumSpecs = {
   "@hono/node-server": "1.14.1",
   "@js-temporal/polyfill": "0.5.1",
-  "@radix-ui/react-checkbox": "1.3.2",
-  "@radix-ui/react-dialog": "1.1.14",
-  "@radix-ui/react-label": "2.1.7",
-  "@radix-ui/react-popover": "1.1.15",
-  "@radix-ui/react-select": "2.2.5",
-  "@radix-ui/react-switch": "1.2.6",
   "@sapporta/rest-core": "3.52.2",
   "better-sqlite3": "12.0.0",
   "class-variance-authority": "0.7.1",
@@ -103,6 +97,7 @@ function copyWorktree(destination) {
 
   for (const file of files) {
     const source = join(root, file);
+    if (!existsSync(source)) continue;
     const target = join(destination, file);
     mkdirSync(dirname(target), { recursive: true });
     copyFileSync(source, target);

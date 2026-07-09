@@ -46,7 +46,8 @@ export function DateRangeField({
 }: DateRangeFieldProps) {
   const selectKey = selectKeyFromState(value);
 
-  const handleSelect = (key: DateRangeSelectKey) => {
+  const handleSelect = (key: DateRangeSelectKey | null) => {
+    if (key === null) return;
     onChange(stateFromSelectKey(key, value));
   };
 
@@ -62,7 +63,14 @@ export function DateRangeField({
         {":"}
       </span>
 
-      <Select value={selectKey} onValueChange={handleSelect}>
+      <Select
+        items={DATE_RANGE_SELECT_KEYS.map((key) => ({
+          label: SELECT_LABELS[key],
+          value: key,
+        }))}
+        value={selectKey}
+        onValueChange={handleSelect}
+      >
         <SelectTrigger
           aria-invalid={error ? true : undefined}
           className="h-sap-ctl w-[150px] text-sap-emph rounded-[5px]"

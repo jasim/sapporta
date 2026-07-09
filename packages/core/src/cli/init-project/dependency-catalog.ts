@@ -263,13 +263,6 @@ export const DEV_MODE_IDENTITY_PACKAGES = [
   "react-dom",
   "react-router-dom",
   "zustand",
-  "@radix-ui/react-checkbox",
-  "@radix-ui/react-dialog",
-  "@radix-ui/react-label",
-  "@radix-ui/react-popover",
-  "@radix-ui/react-select",
-  "@radix-ui/react-switch",
-  "@radix-ui/react-tooltip",
 ] as const;
 
 export function tokensForCatalog(
@@ -368,7 +361,6 @@ export function buildPnpmOverrides(opts: {
   installedSpec: (fromPackageJsonPath: string, packageName: string) => string;
 }): PnpmOverrides {
   const packagePathFor = (packageName: string): string => {
-    if (packageName.startsWith("@radix-ui/")) return opts.uiPackageJsonPath;
     if (packageName === "@js-temporal/polyfill")
       return opts.sharedPackageJsonPath;
     if (

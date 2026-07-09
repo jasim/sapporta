@@ -2,8 +2,12 @@
 
 import {
   act,
+  cloneElement,
   createElement,
+  isValidElement,
+  type HTMLAttributes,
   type MouseEventHandler,
+  type ReactElement,
   type ReactNode,
 } from "react";
 import { createRoot, type Root } from "react-dom/client";
@@ -35,11 +39,15 @@ vi.mock("@sapporta/ui/context-menu", async () => {
     ContextMenuTrigger: ({
       children,
       onContextMenuCapture,
+      render,
     }: {
-      asChild?: boolean;
       children: ReactNode;
       onContextMenuCapture?: MouseEventHandler<HTMLDivElement>;
-    }) => h("div", { onContextMenuCapture }, children),
+      render?: ReactElement<HTMLAttributes<HTMLDivElement>>;
+    }) =>
+      isValidElement(render)
+        ? cloneElement(render, { onContextMenuCapture }, children)
+        : h("div", { onContextMenuCapture }, children),
     ContextMenuContent: ({ children }: { children: ReactNode }) =>
       h("div", null, children),
     ContextMenuItem: ({ children }: { children: ReactNode }) =>
