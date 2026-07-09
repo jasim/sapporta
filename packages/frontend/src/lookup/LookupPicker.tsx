@@ -1,15 +1,14 @@
 import { useMemo, useState } from "react";
-import { ChevronDown } from "lucide-react";
-import type { LookupCapabilities, LookupValue } from "@sapporta/grid/lookup";
+import { Check, ChevronDown, X } from "lucide-react";
 import {
-  isLookupValue,
+  lookupValueEquals,
   lookupValueKey,
+  type LookupCapabilities,
   type LookupEntry,
+  type LookupValue,
 } from "@sapporta/grid/lookup";
 import { useLookupOptions } from "@sapporta/grid/lookup/react";
-import { Button } from "@sapporta/ui/button";
-import { ComboboxList } from "@sapporta/ui/combobox";
-import { Popover, PopoverContent, PopoverTrigger } from "@sapporta/ui/popover";
+import { Combobox, comboboxClassNames } from "@sapporta/ui/combobox";
 import { cn } from "@sapporta/ui/cn";
 
 const DEFAULT_SEARCH_LIMIT = 50;
@@ -37,7 +36,6 @@ export function LookupPicker<TValue extends LookupValue = LookupValue>({
   id,
   className,
 }: LookupPickerProps<TValue>) {
-  const [open, setOpen] = useState(false);
   const [searchText, setSearchText] = useState("");
   const selectedValues = useMemo(() => (value == null ? [] : [value]), [value]);
   const entries = useLookupOptions({
@@ -47,60 +45,85 @@ export function LookupPicker<TValue extends LookupValue = LookupValue>({
     searchText,
     limit: searchLimit,
   });
-  const options = useMemo(
-    () => entries.map((entry) => ({ id: entry.value, label: entry.label })),
-    [entries],
+  const selectedEntry = useMemo(
+    () =>
+      value == null
+        ? null
+        : (entries.find((entry) => lookupValueEquals(entry.value, value)) ??
+          null),
+    [entries, value],
   );
-  const selectedLabel = selectedLabelForValue(entries, value);
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger
-        render={
-          <Button
-            id={id}
-            type="button"
-            variant="outline"
-            disabled={disabled}
-            className={cn("justify-between font-normal", className)}
-          />
-        }
+    <Combobox.Root
+      items={entries}
+      value={selectedEntry}
+      onValueChange={(pickedEntry) => {
+        setSearchText("");
+        onChange((pickedEntry?.value ?? null) as TValue | null);
+      }}
+      onInputValueChange={(nextSearchText, { reason }) => {
+        setSearchText(reason === "input-change" ? nextSearchText : "");
+      }}
+      isItemEqualToValue={(entry, selected) =>
+        lookupValueEquals(entry.value, selected.value)
+      }
+      filter={null}
+      disabled={disabled}
+    >
+      <Combobox.InputGroup
+        className={cn(comboboxClassNames.inputGroup, className)}
       >
-        <span className={selectedLabel ? "" : "text-sap-muted"}>
-          {selectedLabel ?? placeholder}
-        </span>
-        <ChevronDown className="h-4 w-4 opacity-50" />
-      </PopoverTrigger>
-      <PopoverContent
-        className="w-[--anchor-width] p-0"
-        align="start"
-        sideOffset={4}
-      >
-        <ComboboxList
-          value={value}
-          options={options}
-          onPick={(pickedValue) => {
-            onChange(pickedValue as TValue | null);
-            setOpen(false);
-          }}
-          searchText={searchText}
-          onSearchTextChange={setSearchText}
-          shouldFilter={false}
-          allowClear={allowClear}
+        <Combobox.Input
+          id={id}
+          placeholder={placeholder}
+          className={comboboxClassNames.input}
         />
-      </PopoverContent>
-    </Popover>
-  );
-}
-
-function selectedLabelForValue(
-  entries: readonly LookupEntry[],
-  value: LookupValue | null,
-): string | null {
-  if (!isLookupValue(value)) return null;
-  const key = lookupValueKey(value);
-  return (
-    entries.find((entry) => lookupValueKey(entry.value) === key)?.label ??
-    String(value)
+        {allowClear && (
+          <Combobox.Clear
+            aria-label="Clear selection"
+            className={comboboxClassNames.action}
+          >
+            <X aria-hidden />
+          </Combobox.Clear>
+        )}
+        <Combobox.Trigger
+          aria-label="Open popup"
+          className={cn(comboboxClassNames.action, "me-1")}
+        >
+          <ChevronDown aria-hidden />
+        </Combobox.Trigger>
+      </Combobox.InputGroup>
+      <Combobox.Portal>
+        <Combobox.Positioner
+          align="start"
+          sideOffset={4}
+          className={comboboxClassNames.positioner}
+        >
+          <Combobox.Popup className={comboboxClassNames.popup}>
+            <Combobox.Empty className={comboboxClassNames.empty}>
+              No results.
+            </Combobox.Empty>
+            <Combobox.List className={comboboxClassNames.list}>
+              {(entry: LookupEntry) => (
+                <Combobox.Item
+                  key={lookupValueKey(entry.value)}
+                  value={entry}
+                  disabled={entry.disabled}
+                  className={comboboxClassNames.item}
+                >
+                  {entry.label}
+                  <Combobox.ItemIndicator
+                    className={comboboxClassNames.itemIndicator}
+                  >
+                    <Check aria-hidden />
+                  </Combobox.ItemIndicator>
+                </Combobox.Item>
+              )}
+            </Combobox.List>
+          </Combobox.Popup>
+        </Combobox.Positioner>
+      </Combobox.Portal>
+    </Combobox.Root>
   );
 }

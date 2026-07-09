@@ -1,7 +1,15 @@
 import { useEffect, useRef, useState } from "react";
+import { Check } from "lucide-react";
 import type { CellEditorProps } from "../../grid/types/schema";
-import { ComboboxList } from "@sapporta/ui";
-import { isLookupValue, type LookupValue } from "../../lookup";
+import { Combobox, comboboxClassNames } from "@sapporta/ui";
+import { cn } from "@sapporta/ui/cn";
+import {
+  isLookupValue,
+  lookupValueEquals,
+  lookupValueKey,
+  type LookupEntry,
+  type LookupValue,
+} from "../../lookup";
 import { lookupCapabilities, presetRuntime } from "../preset";
 import { useLookupOptions } from "../../lookup/react";
 
@@ -33,10 +41,12 @@ export function LookupValueEditor(props: CellEditorProps) {
     searchText,
     limit: SEARCH_LIMIT,
   });
-  const comboboxOptions = options.map((entry) => ({
-    id: entry.value,
-    label: entry.label,
-  }));
+  const selectedEntry =
+    selectedValue == null
+      ? null
+      : (options.find((entry) =>
+          lookupValueEquals(entry.value, selectedValue),
+        ) ?? null);
 
   if (!searchLookup) {
     return (
@@ -72,21 +82,59 @@ export function LookupValueEditor(props: CellEditorProps) {
         }
       }}
     >
-      <ComboboxList
-        value={selectedValue}
-        options={comboboxOptions}
-        onPick={(value) => {
-          if (value != null) props.commit(value);
+      <Combobox.Root
+        items={options}
+        value={selectedEntry}
+        onValueChange={(entry) => {
+          if (entry !== null) props.commit(entry.value);
         }}
-        inputRef={inputRef}
-        searchText={searchText}
-        onSearchTextChange={setSearchText}
-        shouldFilter={false}
-        allowClear={false}
-        className="h-full rounded-none border-0 bg-transparent shadow-none"
-        inputClassName="h-full py-0 text-sap-body"
-        listClassName="absolute left-0 top-full z-[var(--sap-z-popover)] mt-1 max-h-64 min-w-full overflow-auto rounded-md border border-sap-border bg-sap-surface shadow-lg"
-      />
+        inputValue={searchText}
+        onInputValueChange={setSearchText}
+        isItemEqualToValue={(entry, selected) =>
+          lookupValueEquals(entry.value, selected.value)
+        }
+        filter={null}
+        open
+      >
+        <Combobox.InputGroup
+          className={cn(
+            comboboxClassNames.inputGroup,
+            "h-full rounded-none border-0 bg-transparent shadow-none",
+          )}
+        >
+          <Combobox.Input
+            ref={inputRef}
+            placeholder="Search…"
+            className={cn(
+              comboboxClassNames.input,
+              "h-full py-0 text-sap-body",
+            )}
+            data-grid-part="editor-input"
+          />
+        </Combobox.InputGroup>
+        <div className="absolute left-0 top-full z-[var(--sap-z-popover)] mt-1 min-w-full overflow-hidden rounded-md border border-sap-border bg-sap-surface shadow-lg">
+          <Combobox.Empty className={comboboxClassNames.empty}>
+            No results.
+          </Combobox.Empty>
+          <Combobox.List className={cn(comboboxClassNames.list, "max-h-64")}>
+            {(entry: LookupEntry) => (
+              <Combobox.Item
+                key={lookupValueKey(entry.value)}
+                value={entry}
+                disabled={entry.disabled}
+                className={comboboxClassNames.item}
+              >
+                {entry.label}
+                <Combobox.ItemIndicator
+                  className={comboboxClassNames.itemIndicator}
+                >
+                  <Check aria-hidden />
+                </Combobox.ItemIndicator>
+              </Combobox.Item>
+            )}
+          </Combobox.List>
+        </div>
+      </Combobox.Root>
     </div>
   );
 }

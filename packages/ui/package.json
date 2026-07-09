@@ -107,8 +107,8 @@
       "default": "./dist/tooltip.js"
     },
     "./combobox": {
-      "types": "./dist/ui/composite/combobox.d.ts",
-      "sapporta:source": "./src/ui/composite/combobox.tsx",
+      "types": "./dist/ui/styles/combobox.d.ts",
+      "sapporta:source": "./src/ui/styles/combobox.ts",
       "default": "./dist/combobox.js"
     },
     "./kbd": {

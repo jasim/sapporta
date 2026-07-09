@@ -51,7 +51,7 @@ export {
   TooltipProvider,
   TooltipTrigger,
 } from "./primitives/tooltip";
-export { Combobox, ComboboxList } from "./composite/combobox";
+export { Combobox, comboboxClassNames } from "./styles/combobox";
 export { Kbd } from "./composite/kbd";
 export { ParamPill, type ParamPillProps } from "./composite/param-pill";
 export { useDebounce } from "./hooks/useDebounce";

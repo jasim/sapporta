@@ -23,6 +23,9 @@ async function renderLookupPicker(
   args: {
     value: string | number | null;
     onChange?: (value: string | number | null) => void;
+    disabled?: boolean;
+    allowClear?: boolean;
+    id?: string;
   },
 ): Promise<HTMLElement> {
   const container = document.createElement("div");
@@ -37,6 +40,9 @@ async function renderLookupPicker(
         value: args.value,
         onChange: args.onChange ?? vi.fn(),
         placeholder: "Select person",
+        disabled: args.disabled,
+        allowClear: args.allowClear,
+        id: args.id,
       }),
     );
   });
@@ -62,7 +68,21 @@ async function typeInto(
       "value",
     )?.set;
     valueSetter?.call(element, value);
-    element.dispatchEvent(new Event("input", { bubbles: true }));
+    element.dispatchEvent(
+      new InputEvent("input", {
+        bubbles: true,
+        data: value.at(-1) ?? null,
+        inputType: "insertText",
+      }),
+    );
+  });
+}
+
+async function pressKey(element: Element, key: string): Promise<void> {
+  await act(async () => {
+    element.dispatchEvent(
+      new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true }),
+    );
   });
 }
 
@@ -86,20 +106,26 @@ function textContent(): string {
   return document.body.textContent ?? "";
 }
 
-function buttonByText(text: string): HTMLButtonElement {
-  const button = Array.from(document.querySelectorAll("button")).find(
-    (candidate) => candidate.textContent?.includes(text),
-  );
+function comboboxInput(): HTMLInputElement {
+  const input = document.querySelector('input[role="combobox"]');
+  if (!(input instanceof HTMLInputElement)) {
+    throw new Error("Could not find combobox input.");
+  }
+  return input;
+}
+
+function buttonByLabel(label: string): HTMLButtonElement {
+  const button = document.querySelector(`button[aria-label="${label}"]`);
   if (!(button instanceof HTMLButtonElement)) {
-    throw new Error(`Could not find button '${text}'.`);
+    throw new Error(`Could not find button labelled '${label}'.`);
   }
   return button;
 }
 
 function comboboxOptionByText(text: string): Element {
-  const element = Array.from(
-    document.querySelectorAll('[role="option"], button'),
-  ).find((candidate) => candidate.textContent?.includes(text));
+  const element = Array.from(document.querySelectorAll('[role="option"]')).find(
+    (candidate) => candidate.textContent?.includes(text),
+  );
   if (!element) {
     throw new Error(`Could not find combobox option '${text}'.`);
   }
@@ -130,18 +156,22 @@ describe("LookupPicker", () => {
     await renderLookupPicker(lookup, { value: 12 });
 
     await waitFor(() => {
-      expect(textContent()).toContain("User 12");
+      expect(comboboxInput().value).toBe("User 12");
     });
   });
 
-  it("searches through the lookup source without applying local filtering", async () => {
+  it("drives remote search from cumulative input without local filtering", async () => {
+    const searchedFor: string[] = [];
     const searchLookup = new CachedSearchLookup({
-      loadEntriesForSearch: async ({ searchText }) => ({
-        entries:
-          searchText === "zz"
-            ? [{ value: "remote", label: "Visible remote result" }]
-            : [],
-      }),
+      loadEntriesForSearch: async ({ searchText }) => {
+        searchedFor.push(searchText);
+        return {
+          entries:
+            searchText === "zz"
+              ? [{ value: "remote", label: "Visible remote result" }]
+              : [],
+        };
+      },
     });
     const lookup: LookupCapabilities = {
       valueLookup: new StaticValueLookup([]),
@@ -149,17 +179,17 @@ describe("LookupPicker", () => {
     };
 
     await renderLookupPicker(lookup, { value: null });
-    await click(buttonByText("Select person"));
-    const input = document.querySelector("input");
-    if (!(input instanceof HTMLInputElement)) {
-      throw new Error("Expected combobox input.");
-    }
+    const input = comboboxInput();
 
+    await typeInto(input, "z");
     await typeInto(input, "zz");
 
     await waitFor(() => {
       expect(textContent()).toContain("Visible remote result");
     });
+    expect(input.value).toBe("zz");
+    expect(searchedFor).toContain("z");
+    expect(searchedFor).toContain("zz");
   });
 
   it("clears to null", async () => {
@@ -170,23 +200,54 @@ describe("LookupPicker", () => {
     };
 
     await renderLookupPicker(lookup, { value: 7, onChange });
-    await click(buttonByText("Seven"));
-    await click(comboboxOptionByText("Clear"));
+    await waitFor(() => {
+      expect(comboboxInput().value).toBe("Seven");
+    });
+    await click(buttonByLabel("Clear selection"));
 
     expect(onChange).toHaveBeenCalledWith(null);
   });
 
-  it("preserves numeric ids", async () => {
+  it.each([
+    ["numeric", 42],
+    ["string", "42"],
+  ] as const)("preserves %s ids", async (_kind, expectedValue) => {
     const onChange = vi.fn();
     const lookup: LookupCapabilities = {
       valueLookup: new StaticValueLookup([]),
-      searchLookup: new StaticSearchLookup([{ value: 42, label: "Forty two" }]),
+      searchLookup: new StaticSearchLookup([
+        { value: expectedValue, label: "Forty two" },
+      ]),
     };
 
     await renderLookupPicker(lookup, { value: null, onChange });
-    await click(buttonByText("Select person"));
+    await pressKey(comboboxInput(), "ArrowDown");
     await click(comboboxOptionByText("Forty two"));
 
-    expect(onChange).toHaveBeenCalledWith(42);
+    expect(onChange).toHaveBeenCalledWith(expectedValue);
+  });
+
+  it("passes through the id, disabled state, and clear policy", async () => {
+    const lookup: LookupCapabilities = {
+      valueLookup: new StaticValueLookup([{ value: 7, label: "Seven" }]),
+      searchLookup: new StaticSearchLookup([{ value: 7, label: "Seven" }]),
+    };
+
+    await renderLookupPicker(lookup, {
+      value: 7,
+      disabled: true,
+      allowClear: false,
+      id: "person-id",
+    });
+
+    await waitFor(() => {
+      expect(comboboxInput().value).toBe("Seven");
+    });
+    expect(comboboxInput().id).toBe("person-id");
+    expect(comboboxInput().disabled).toBe(true);
+    expect(buttonByLabel("Open popup").disabled).toBe(true);
+    expect(
+      document.querySelector('button[aria-label="Clear selection"]'),
+    ).toBeNull();
   });
 });

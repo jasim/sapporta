@@ -6,7 +6,7 @@
  */
 
 import { useMemo, useState } from "react";
-import { ChevronDown } from "lucide-react";
+import { Check, ChevronDown } from "lucide-react";
 import type {
   FilterDraftValue,
   TypedFilterCondition,
@@ -26,8 +26,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@sapporta/ui/select";
-import { Popover, PopoverContent, PopoverTrigger } from "@sapporta/ui/popover";
-import { ComboboxList } from "@sapporta/ui/combobox";
+import { Combobox, comboboxClassNames } from "@sapporta/ui/combobox";
+import { cn } from "@sapporta/ui/cn";
 import {
   catalog,
   findEntryForCondition,
@@ -131,7 +131,6 @@ export function ConditionEditor({
   const [draft, setDraft] = useState<DraftState>(() =>
     initialDraft(initial, lockedColumn, columns, seedValue),
   );
-  const [columnPickerOpen, setColumnPickerOpen] = useState(false);
 
   const type: FilterColumnType | null = draft.column
     ? inferFilterColumnType(draft.column)
@@ -214,8 +213,21 @@ export function ConditionEditor({
     >
       {!lockedColumn && (
         <Field label="Column">
-          <Popover open={columnPickerOpen} onOpenChange={setColumnPickerOpen}>
-            <PopoverTrigger
+          <Combobox.Root<ColumnSchema>
+            items={columns}
+            value={draft.column}
+            onValueChange={(column) => {
+              if (column !== null) handleColumnChange(column.name);
+            }}
+            itemToStringLabel={(column) => column.label}
+            itemToStringValue={(column) => column.name}
+            isItemEqualToValue={(column, selected) =>
+              column.name === selected.name
+            }
+          >
+            <Combobox.Trigger
+              aria-label="Choose column"
+              className={comboboxClassNames.trigger}
               render={
                 <button
                   type="button"
@@ -223,31 +235,47 @@ export function ConditionEditor({
                 />
               }
             >
-              <span className={draft.column ? "" : "text-sap-muted"}>
-                {draft.column ? draft.column.label : "Pick a column"}
-              </span>
-              <ChevronDown className="h-4 w-4 opacity-50" />
-            </PopoverTrigger>
-            <PopoverContent
-              className="w-[--anchor-width] p-0"
-              align="start"
-              sideOffset={4}
-            >
-              <ComboboxList
-                value={draft.column?.name ?? null}
-                options={columns.map((column) => ({
-                  id: column.name,
-                  label: column.label,
-                }))}
-                onPick={(name) => {
-                  if (name == null) return;
-                  handleColumnChange(name);
-                  setColumnPickerOpen(false);
-                }}
-                allowClear={false}
-              />
-            </PopoverContent>
-          </Popover>
+              <Combobox.Value placeholder="Pick a column" />
+              <ChevronDown aria-hidden />
+            </Combobox.Trigger>
+            <Combobox.Portal>
+              <Combobox.Positioner
+                align="start"
+                sideOffset={4}
+                className={comboboxClassNames.positioner}
+              >
+                <Combobox.Popup className={comboboxClassNames.popup}>
+                  <Combobox.Input
+                    aria-label="Search columns"
+                    placeholder="Search…"
+                    className={cn(
+                      comboboxClassNames.input,
+                      "h-9 w-full border-b py-3",
+                    )}
+                  />
+                  <Combobox.Empty className={comboboxClassNames.empty}>
+                    No results.
+                  </Combobox.Empty>
+                  <Combobox.List className={comboboxClassNames.list}>
+                    {(column: ColumnSchema) => (
+                      <Combobox.Item
+                        key={column.name}
+                        value={column}
+                        className={comboboxClassNames.item}
+                      >
+                        {column.label}
+                        <Combobox.ItemIndicator
+                          className={comboboxClassNames.itemIndicator}
+                        >
+                          <Check aria-hidden />
+                        </Combobox.ItemIndicator>
+                      </Combobox.Item>
+                    )}
+                  </Combobox.List>
+                </Combobox.Popup>
+              </Combobox.Positioner>
+            </Combobox.Portal>
+          </Combobox.Root>
         </Field>
       )}
 
