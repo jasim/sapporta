@@ -266,9 +266,18 @@ export function createGridController(
   function applyCellIntent(intent: CellNavigationIntent): boolean {
     const focus = store.getState().liveCellFocus;
     switch (intent.type) {
-      case "clearCellSelection":
-        store.clearCellSelection();
+      case "clearCellSelection": {
+        // Controllers created by GridRuntime have a navigation callback. The
+        // callback keeps keyboard clearing on the same coordinator path as
+        // pointer selection. A standalone controller with a cursor port can
+        // still clear its own path when no coordinator is attached.
+        if (args.onNavigateCell) {
+          args.onNavigateCell(intent);
+        } else {
+          store.clearCellSelection();
+        }
         return true;
+      }
       case "clearRowSelection":
         args.onNavigateCell?.(intent);
         return !!args.onNavigateCell;
@@ -304,6 +313,8 @@ export function createGridController(
       case "moveRowDelta":
       case "moveGridEdge":
       case "commitMove":
+      case "cellPressed":
+      case "rowPressed":
         args.onNavigateCell?.(intent);
         return !!args.onNavigateCell;
     }
@@ -312,9 +323,17 @@ export function createGridController(
 
   function applyRowIntent(intent: RowNavigationIntent): boolean {
     switch (intent.type) {
-      case "clearRowSelection":
-        store.clearRowSelection();
+      case "clearRowSelection": {
+        // Row-list Escape is path-scoped, but the coordinator remains the
+        // runtime authority for resolving that scope. The fallback preserves
+        // the path-local controller contract outside a GridRuntime.
+        if (args.onNavigateRow) {
+          args.onNavigateRow(intent);
+        } else {
+          store.clearRowSelection();
+        }
         return true;
+      }
       case "focusFirstRow":
       case "moveActiveRow":
       case "moveActiveRowDelta":

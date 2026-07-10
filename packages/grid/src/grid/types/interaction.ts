@@ -32,6 +32,12 @@
 
 export type RowSelectionMode = "single" | "range" | "multi";
 
+// A row-selection control reduces platform input to one of three stable
+// meanings. Replace starts a new operation selection. Extend keeps the current
+// path's anchor. Toggle changes one row's membership while preserving selected
+// rows in other materialized child tables.
+export type RowSelectionGesture = "replace" | "extend" | "toggle";
+
 // Row selection can either be derived from the active row or stored
 // independently. "Follows active row" is deliberately read-only at the
 // storage layer: the effective selected rows are computed from the active row,

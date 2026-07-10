@@ -16,7 +16,10 @@ import type { GridPath, RowId } from "../types/identity";
 import type { FooterRow, TreeNode } from "../types/level-row";
 import type { GridSchema } from "../types/schema";
 import type { GridInteractionConfig } from "../types/interaction";
-import { ROW_MULTISELECT_LIST } from "../types/interaction";
+import {
+  CELL_GRID_WITH_INDEPENDENT_ROW_SELECTION,
+  ROW_MULTISELECT_LIST,
+} from "../types/interaction";
 import { withRowExpansionColumn } from "../react/cells/ExpandableCellFrame";
 
 const TestEditor = () => null;
@@ -130,14 +133,14 @@ const booksTree: TreeNode[] = [
   },
 ];
 
-function setupExpanded() {
-  const rt = setupCollapsed();
+function setupExpanded(interaction?: GridInteractionConfig) {
+  const rt = setupCollapsed(interaction);
   rt.coordinator.toggleExpand(root, makeRowId(root, "Fruit"));
   rt.coordinator.toggleExpand(root, makeRowId(root, "Veg"));
   return rt;
 }
 
-function setupCollapsed() {
+function setupCollapsed(interaction?: GridInteractionConfig) {
   const ds = inMemoryGridDataSource({
     schema: reportSchema,
     tree,
@@ -146,7 +149,11 @@ function setupCollapsed() {
       items: { sortMode: "none", filterMode: "none", paginationMode: "none" },
     },
   });
-  return createGridRuntime({ schema: reportSchema, dataSource: ds });
+  return createGridRuntime({
+    schema: reportSchema,
+    dataSource: ds,
+    interaction,
+  });
 }
 
 function setupRowList() {
@@ -363,6 +370,112 @@ describe("GridCoordinator", () => {
     });
 
     expect(rt.controllerFor(root).getState().cellSelection).toBe(null);
+  });
+
+  it("cell presses clear row selection across registered paths", () => {
+    const rt = setupExpanded(CELL_GRID_WITH_INDEPENDENT_ROW_SELECTION);
+    rt.rowInteraction.selectRow(root, makeRowId(root, "Fruit"));
+    rt.rowInteraction.selectRow(fruitItems, makeRowId(fruitItems, "Apple"));
+
+    rt.coordinator.navigateCell(root, {
+      type: "cellPressed",
+      target: { rowId: makeRowId(root, "Veg"), colId: "qty" },
+      extend: false,
+    });
+
+    expect(rt.selectedRowIds(root)).toEqual([]);
+    expect(rt.selectedRowIds(fruitItems)).toEqual([]);
+    expect(rt.coordinator.getState().cellCursor).toEqual({
+      path: root,
+      rowId: makeRowId(root, "Veg"),
+      colId: "qty",
+    });
+  });
+
+  it("replacing row selection clears cell ranges and selections in other paths", () => {
+    const rt = setupExpanded(CELL_GRID_WITH_INDEPENDENT_ROW_SELECTION);
+    rt.cursorManager.setCellRange(
+      root,
+      { rowId: makeRowId(root, "Fruit"), colId: "name" },
+      { rowId: makeRowId(root, "Fruit"), colId: "qty" },
+    );
+    rt.cursorManager.setCellRange(
+      fruitItems,
+      { rowId: makeRowId(fruitItems, "Apple"), colId: "name" },
+      { rowId: makeRowId(fruitItems, "Banana"), colId: "qty" },
+    );
+    rt.rowInteraction.selectRow(root, makeRowId(root, "Fruit"));
+    rt.rowInteraction.selectRow(fruitItems, makeRowId(fruitItems, "Apple"));
+
+    rt.coordinator.navigateCell(fruitItems, {
+      type: "rowPressed",
+      target: makeRowId(fruitItems, "Banana"),
+      origin: {
+        kind: "cell",
+        target: { rowId: makeRowId(fruitItems, "Banana"), colId: "name" },
+      },
+      gesture: "replace",
+    });
+
+    expect(rt.controllerFor(root).getState().cellSelection).toBe(null);
+    expect(rt.controllerFor(fruitItems).getState().cellSelection).toBe(null);
+    expect(rt.selectedRowIds(root)).toEqual([]);
+    expect(rt.selectedRowIds(fruitItems)).toEqual([
+      makeRowId(fruitItems, "Banana"),
+    ]);
+    expect(rt.coordinator.getState().cellCursor).toEqual({
+      path: fruitItems,
+      rowId: makeRowId(fruitItems, "Banana"),
+      colId: "name",
+    });
+  });
+
+  it("toggling a row control preserves other-path rows and clears cell focus", () => {
+    const rt = setupExpanded(CELL_GRID_WITH_INDEPENDENT_ROW_SELECTION);
+    rt.cursorManager.setCellRange(
+      root,
+      { rowId: makeRowId(root, "Fruit"), colId: "name" },
+      { rowId: makeRowId(root, "Fruit"), colId: "qty" },
+    );
+    rt.rowInteraction.selectRow(root, makeRowId(root, "Fruit"));
+
+    rt.coordinator.navigateCell(fruitItems, {
+      type: "rowPressed",
+      target: makeRowId(fruitItems, "Apple"),
+      origin: { kind: "row-control" },
+      gesture: "toggle",
+    });
+
+    expect(rt.coordinator.getState().cellCursor).toBe(null);
+    expect(rt.controllerFor(root).getState().cellSelection).toBe(null);
+    expect(rt.selectedRowIds(root)).toEqual([makeRowId(root, "Fruit")]);
+    expect(rt.selectedRowIds(fruitItems)).toEqual([
+      makeRowId(fruitItems, "Apple"),
+    ]);
+  });
+
+  it("keyboard row toggles clear cell ranges without moving cell focus", () => {
+    const rt = setupExpanded(CELL_GRID_WITH_INDEPENDENT_ROW_SELECTION);
+    const anchor = { rowId: makeRowId(root, "Fruit"), colId: "name" as const };
+    const head = { rowId: makeRowId(root, "Fruit"), colId: "qty" as const };
+    rt.cursorManager.setCellRange(root, anchor, head);
+
+    expect(
+      rt.controllerFor(root).handleKey({
+        key: " ",
+        ctrlKey: false,
+        metaKey: false,
+        shiftKey: false,
+        altKey: false,
+      } as KeyboardEvent),
+    ).toBe(true);
+
+    expect(rt.controllerFor(root).getState().cellSelection).toBe(null);
+    expect(rt.coordinator.getState().cellCursor).toEqual({
+      path: root,
+      ...head,
+    });
+    expect(rt.selectedRowIds(root)).toEqual([makeRowId(root, "Fruit")]);
   });
 
   it("direct cursor moves update focus without requesting scroll", () => {

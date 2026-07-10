@@ -7,12 +7,9 @@ import type { CellSelectionStatus } from "../../types/selection";
 import { selectionContainsCoord } from "../../types/selection";
 import type { ControllerState } from "../../types/controller-state";
 import type { ColId } from "../../types/identity";
+import { rowSelectionGestureFromModifiers } from "../../interaction/key-handling";
 import { CellShell } from "./CellShell";
 import { useGridRuntime } from "../GridRuntimeProvider";
-import {
-  applyRowHeaderSelection,
-  clearRowSelectionAcrossGrid,
-} from "./RowHeaderCell";
 
 // Per-cell view. One narrow subscription on the transient channel:
 //
@@ -53,25 +50,31 @@ export function GridDataCell({
     ),
   );
 
+  // Pointer interaction has two ordered phases. Mouse down establishes the
+  // cursor and selection before click or double-click asks the controller to
+  // activate or edit cell content. Preventing the browser default keeps DOM
+  // focus from moving into arbitrary rendered content. A cursor change queues
+  // `focusContainer`, and this path's EffectRunner focuses the grid root after
+  // React commits the state change.
   function onMouseDown(e: MouseEvent) {
     if (e.button !== 0) return;
     if (runtime.interaction.mode !== "cell-grid") return;
     e.preventDefault();
     const coord = { rowId: row.id, colId: column.id };
     if (rowHeader) {
-      runtime.cursorManager.moveCellCursorTo({ path, ...coord });
-      applyRowHeaderSelection(runtime, path, row.id, e);
+      runtime.coordinator.navigateCell(path, {
+        type: "rowPressed",
+        target: row.id,
+        origin: { kind: "cell", target: coord },
+        gesture: rowSelectionGestureFromModifiers(e),
+      });
       return;
     }
-    clearRowSelectionAcrossGrid(runtime);
-    // Cell mousedown owns only cell-grid interaction. In row-list mode the row
-    // shell handles row focus, so a click inside a cell does not create a cell
-    // cursor or change cell selection.
-    if (e.shiftKey) {
-      runtime.cursorManager.extendCellSelectionTo({ path, ...coord });
-    } else {
-      runtime.cursorManager.moveCellCursorTo({ path, ...coord });
-    }
+    runtime.coordinator.navigateCell(path, {
+      type: "cellPressed",
+      target: coord,
+      extend: e.shiftKey,
+    });
   }
 
   function onClick() {
@@ -85,7 +88,15 @@ export function GridDataCell({
     if (runtime.interaction.mode !== "cell-grid") return;
     if (rowHeader) return;
     const coord = { rowId: row.id, colId: column.id };
-    runtime.cursorManager.moveCellCursorTo({ path, ...coord });
+    // Editing assumes the logical cursor and the path-local live-focus mirror
+    // already identify the edited cell. Reapplying a plain cell press is
+    // idempotent for the normal browser sequence and also preserves that
+    // invariant for synthesized double-click events.
+    runtime.coordinator.navigateCell(path, {
+      type: "cellPressed",
+      target: coord,
+      extend: false,
+    });
     controller.handleCellPointer(coord, "doubleClick");
   }
 

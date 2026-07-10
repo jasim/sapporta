@@ -1,9 +1,10 @@
-import type { Coord } from "./identity";
+import type { Coord, RowId } from "./identity";
 import type {
   CellActivationTrigger,
   CellEditGesture,
   NonTypedCellEditGesture,
 } from "./schema";
+import type { RowSelectionGesture } from "./interaction";
 
 export type NavigationDirection =
   | "up"
@@ -48,10 +49,11 @@ export type RowDirection = "up" | "down" | "first" | "last" | { delta: number };
 // "last" — always use the target's last focusable column.
 export type ColPolicy = "preserve" | "first" | "last";
 
-// Navigation intents are split by domain so a row operation never has to be
-// smuggled through a cell movement shape. The controller chooses the parser
-// from `interaction.mode`, then the coordinator resolves the intent using the
-// matching global cursor.
+// Interaction intents are split by the runtime's keyboard-routing domain. A
+// cell-grid may still expose row-selection controls, but using one does not
+// switch Arrow-key routing to the row-list domain. Controllers and pointer
+// adapters emit the matching intent; the coordinator applies it using the
+// canonical cursors and path-local selection state.
 export type CellNavigationIntent =
   | {
       type: "commitMove";
@@ -88,6 +90,19 @@ export type CellNavigationIntent =
       initial?: never;
     }
   | { type: "activateCell"; coord: Coord; trigger: CellActivationTrigger }
+  // Pointer selection enters through the same coordinator as keyboard
+  // navigation. The coordinator can therefore apply one cross-path selection
+  // rule before the cursor manager updates path-local focus and ranges.
+  | { type: "cellPressed"; target: Coord; extend: boolean }
+  | {
+      type: "rowPressed";
+      target: RowId;
+      // A data-backed row header remains the active cell and therefore supplies
+      // a cell coordinate. A structural row control owns DOM focus and has no
+      // cell coordinate, so the coordinator clears the logical cell cursor.
+      origin: { kind: "cell"; target: Coord } | { kind: "row-control" };
+      gesture: RowSelectionGesture;
+    }
   | { type: "clearCellSelection" }
   | { type: "clearRowSelection" }
   | { type: "focusFirstCell" }

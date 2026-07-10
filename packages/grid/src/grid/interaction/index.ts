@@ -21,7 +21,11 @@ export {
   type CursorManagerDeps,
 } from "./cursor-manager";
 
-export { keyEventToCellIntent, keyEventToRowIntent } from "./key-handling";
+export {
+  keyEventToCellIntent,
+  keyEventToRowIntent,
+  rowSelectionGestureFromModifiers,
+} from "./key-handling";
 export {
   normalizeInteraction,
   assertValidInteraction,

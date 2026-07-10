@@ -1,6 +1,6 @@
 import type { KeyboardEvent, MouseEvent } from "react";
-import type { GridRuntime } from "../../runtime/create-grid-runtime";
-import type { GridPath, RowId } from "../../types/identity";
+import { rowSelectionGestureFromModifiers } from "../../interaction/key-handling";
+import type { GridPath } from "../../types/identity";
 import type { LevelRow } from "../../types/level-row";
 import { useGridRuntime } from "../GridRuntimeProvider";
 
@@ -14,30 +14,49 @@ export function EmptyRowHeaderCell({
   selected: boolean;
 }) {
   const runtime = useGridRuntime();
+  // `rowSelectable` is the displayed-row capability used by navigation,
+  // operation targeting, and row-selection normalization. Synthetic totals and
+  // footers therefore expose the same disabled state in every interaction path.
   const disabled = !row.rowSelectable;
 
+  // The structural control has no cell coordinate. It owns DOM focus while
+  // the coordinator clears logical cell focus and applies row selection.
+  // Consuming the event here prevents surrounding row and cell handlers from
+  // starting a second interaction for the same input.
   function selectFromPointer(event: MouseEvent<HTMLButtonElement>) {
     event.preventDefault();
     event.stopPropagation();
     if (disabled) return;
-    clearCellInteractionAcrossGrid(runtime);
-    applyRowHeaderSelection(runtime, path, row.id, event);
+    runtime.coordinator.navigateCell(path, {
+      type: "rowPressed",
+      target: row.id,
+      origin: { kind: "row-control" },
+      gesture: rowSelectionGestureFromModifiers(event),
+    });
   }
 
+  // Grid installs a native keydown listener on each grid root. That listener
+  // ignores `row-header-control` targets because this React handler owns Space
+  // and Escape. The DOM guard and propagation stop work together so one key
+  // produces exactly one row-selection command, including inside nested grids.
   function selectFromKeyboard(event: KeyboardEvent<HTMLButtonElement>) {
     if (event.key === " ") {
       event.preventDefault();
       event.stopPropagation();
       if (!disabled) {
-        clearCellInteractionAcrossGrid(runtime);
-        runtime.rowInteraction.toggleRowSelection(path, row.id);
+        runtime.coordinator.navigateCell(path, {
+          type: "rowPressed",
+          target: row.id,
+          origin: { kind: "row-control" },
+          gesture: "toggle",
+        });
       }
       return;
     }
     if (event.key === "Escape") {
       event.preventDefault();
       event.stopPropagation();
-      clearRowSelectionAcrossGrid(runtime);
+      runtime.coordinator.navigateCell(path, { type: "clearRowSelection" });
     }
   }
 
@@ -58,41 +77,4 @@ export function EmptyRowHeaderCell({
       />
     </div>
   );
-}
-
-export function applyRowHeaderSelection(
-  runtime: GridRuntime,
-  path: GridPath,
-  rowId: RowId,
-  modifiers: Pick<MouseEvent, "ctrlKey" | "metaKey" | "shiftKey">,
-): void {
-  if (modifiers.ctrlKey || modifiers.metaKey) {
-    runtime.rowInteraction.toggleRowSelection(path, rowId);
-    return;
-  }
-
-  clearRowSelectionAcrossGrid(runtime, path);
-  if (modifiers.shiftKey) {
-    runtime.rowInteraction.extendRowSelectionTo(path, rowId);
-  } else {
-    runtime.rowInteraction.selectRow(path, rowId);
-  }
-}
-
-export function clearRowSelectionAcrossGrid(
-  runtime: GridRuntime,
-  exceptPath?: GridPath,
-): void {
-  for (const registeredPath of runtime.registeredPaths()) {
-    if (registeredPath !== exceptPath) {
-      runtime.rowInteraction.clearRowSelection(registeredPath);
-    }
-  }
-}
-
-function clearCellInteractionAcrossGrid(runtime: GridRuntime): void {
-  for (const registeredPath of runtime.registeredPaths()) {
-    runtime.cursorManager.clearCellRange(registeredPath);
-  }
-  runtime.cursorManager.clearCellCursor();
 }

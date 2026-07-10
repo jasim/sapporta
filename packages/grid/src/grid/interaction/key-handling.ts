@@ -10,6 +10,7 @@ import type {
 } from "../types/action";
 import type {
   CellGridInteractionConfig,
+  RowSelectionGesture,
   RowListInteractionConfig,
 } from "../types/interaction";
 import { activationStartsOn, editStartsOn } from "../types/schema";
@@ -33,6 +34,18 @@ export type KeyEventLike = Pick<
   KeyboardEvent,
   "key" | "ctrlKey" | "metaKey" | "shiftKey" | "altKey"
 >;
+
+export function rowSelectionGestureFromModifiers(modifiers: {
+  ctrlKey: boolean;
+  metaKey: boolean;
+  shiftKey: boolean;
+}): RowSelectionGesture {
+  // The platform toggle modifier takes precedence over Shift. A combined
+  // Ctrl/Cmd+Shift gesture changes one row's membership; it does not rebuild a
+  // range from the current anchor.
+  if (modifiers.ctrlKey || modifiers.metaKey) return "toggle";
+  return modifiers.shiftKey ? "extend" : "replace";
+}
 
 function directionForKey(e: KeyEventLike): NavigationDirection | null {
   const ctrl = e.ctrlKey || e.metaKey;

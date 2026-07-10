@@ -19,11 +19,19 @@
 // snapshot": render and navigation read the same live inputs and so
 // cannot disagree.
 //
-// Navigation: a key handler emits either a `CellNavigationIntent` or a
+// Interaction adapters emit either a `CellNavigationIntent` or a
 // `RowNavigationIntent` depending on `interaction.mode`. The coordinator
-// resolves that intent from the canonical cursor, then dispatches through the
-// cursor manager — the sole writer of global cursors and controller live-focus
-// mirrors. The per-controller reducer is not in either cursor movement path.
+// resolves keyboard and pointer intent from the canonical cursors, then
+// dispatches through the cursor manager — the sole writer of global cursors
+// and controller live-focus mirrors. The per-controller reducer is not in
+// either cursor movement path.
+//
+// In cell-grid mode, the coordinator also owns the transition between cell
+// ranges and independent row-operation selection. A cell press clears row
+// selection before it moves the cell cursor. A row press clears cell ranges
+// before it applies the row gesture. CursorManager and `rowInteraction` stay
+// path-local; callers that use those lower-level commands retain explicit
+// control over their own composition.
 //
 // `setCellCursor` and `setRowCursor` are invoked only by the cursor manager.
 // Every other call site (movement, navigate, click) goes through the cursor
@@ -454,22 +462,113 @@ export function createGridCoordinator(
       : null;
   }
 
+  function clearCellRangesAcrossGrid(
+    runtime: GridRuntime,
+    cursorManager: CursorManager,
+  ): void {
+    if (runtime.interaction.mode !== "cell-grid") return;
+    // Controllers and child sources survive collapse. A range in a collapsed
+    // child table is still live state and will reappear when that child mounts
+    // again. `registeredPaths()` includes those materialized children, so a
+    // row interaction clears every retained range rather than only visible
+    // levels. `clearCellRange` leaves the global cell cursor unchanged.
+    for (const path of runtime.registeredPaths()) {
+      cursorManager.clearCellRange(path);
+    }
+  }
+
+  function clearRowSelectionAcrossGrid(
+    runtime: GridRuntime,
+    exceptPath?: GridPath,
+  ): void {
+    // Row selection is stored per path and outlives DOM presence. Replace and
+    // extend leave the current path for the final write; extend can therefore
+    // reuse that path's anchor, while replace overwrites its selection. Cell
+    // presses and explicit whole-grid clears omit the exception and remove
+    // operation targets from every materialized level.
+    for (const path of runtime.registeredPaths()) {
+      if (path !== exceptPath) runtime.rowInteraction.clearRowSelection(path);
+    }
+  }
+
+  function applyRowPress(
+    runtime: GridRuntime,
+    cursorManager: CursorManager,
+    fromPath: GridPath,
+    intent: Extract<CellNavigationIntent, { type: "rowPressed" }>,
+  ): void {
+    // Ordering is observable. Cell ranges disappear before row-selection
+    // subscribers run. The origin then establishes the correct logical focus:
+    // a data-backed row header remains the active cell, while a structural
+    // control leaves its button as the interaction target and clears the cell
+    // cursor. Row selection is written last so subscribers see the completed
+    // cell-to-row transition.
+    clearCellRangesAcrossGrid(runtime, cursorManager);
+    if (intent.origin.kind === "cell") {
+      cursorManager.moveCellCursorTo({
+        path: fromPath,
+        ...intent.origin.target,
+      });
+    } else {
+      cursorManager.clearCellCursor();
+    }
+
+    if (intent.gesture === "toggle") {
+      // Toggle supports multi-selection across parent and child tables. It
+      // changes one path without discarding selected rows in other paths.
+      runtime.rowInteraction.toggleRowSelection(fromPath, intent.target);
+      return;
+    }
+
+    // Replace and extend establish one active row-selection path. Clearing
+    // other paths first prevents subscribers from briefly observing the new
+    // selection together with stale operation targets elsewhere in the grid.
+    clearRowSelectionAcrossGrid(runtime, fromPath);
+    if (intent.gesture === "extend") {
+      runtime.rowInteraction.extendRowSelectionTo(fromPath, intent.target);
+    } else {
+      runtime.rowInteraction.selectRow(fromPath, intent.target);
+    }
+  }
+
   store.navigateCell = (fromPath, intent) => {
     const runtime = args.getRuntime();
     const cursorManager = args.getCursorManager();
+    if (intent.type === "cellPressed") {
+      // A cell press starts cell interaction for the whole grid. Explicit row
+      // operation targets are cleared before the cursor move publishes new
+      // live focus. The cursor manager deliberately does not mutate row
+      // selection, so this coordination belongs at this boundary.
+      clearRowSelectionAcrossGrid(runtime);
+      const target = { path: fromPath, ...intent.target };
+      if (intent.extend) {
+        cursorManager.extendCellSelectionTo(target);
+      } else {
+        cursorManager.moveCellCursorTo(target);
+      }
+      return;
+    }
+    if (intent.type === "rowPressed") {
+      applyRowPress(runtime, cursorManager, fromPath, intent);
+      return;
+    }
+    if (intent.type === "clearCellSelection") {
+      cursorManager.clearCellRange(fromPath);
+      return;
+    }
     if (intent.type === "toggleActiveRowSelection") {
-      // Space in a cell-grid may toggle the effective active row, but it still
-      // routes through rowInteraction so the operation target changes without
-      // moving the cell cursor.
+      // In cell-grid mode the active row is derived from the cell cursor.
+      // Resolve it before any selection writes, clear remembered ranges, and
+      // keep the cursor in place so Space toggles an operation target without
+      // moving keyboard focus.
       const active = runtime.activeRowFor(fromPath);
-      if (active)
-        runtime.rowInteraction.toggleRowSelection(active.path, active.rowId);
+      if (!active) return;
+      clearCellRangesAcrossGrid(runtime, cursorManager);
+      runtime.rowInteraction.toggleRowSelection(active.path, active.rowId);
       return;
     }
     if (intent.type === "clearRowSelection") {
-      for (const path of runtime.registeredPaths()) {
-        runtime.rowInteraction.clearRowSelection(path);
-      }
+      clearRowSelectionAcrossGrid(runtime);
       return;
     }
     const current = cursorManager.currentCellCursor();

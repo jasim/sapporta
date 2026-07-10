@@ -69,24 +69,30 @@
 // A concrete scenario — what happens when you click a cell
 // =====================================================================
 //
-// 1. The cell's mousedown handler calls
-//    `runtime.cursorManager.moveCellCursorTo(...)` for a plain click, or
-//    `extendCellSelectionTo(...)` for a shift-click range.
+// 1. The cell's mousedown handler sends a `cellPressed` intent to the
+//    coordinator. The coordinator clears any row-operation selection, then
+//    asks the cursor manager to move or extend the cell selection.
 // 2. The cursor manager writes the global cursor on the coordinator and
-//    the per-path `liveCellFocus` mirror on the controller, in lockstep.
+//    the per-path `liveCellFocus` mirror on the controller in lockstep. When
+//    the cursor changes, it also queues `focusContainer` on the target
+//    controller's effects channel.
 //    Two cells flip their `status` selector: old focus → "none", new
 //    focus → "focus". That's exactly two React re-renders across the
 //    entire grid. Cells subscribe only to their own controller's
 //    `liveCellFocus`, so cursor moves in unrelated paths produce zero
 //    re-renders here.
-// 3. `Grid` subscribes to `cellCursor?.path === path` and updates its
+// 3. The target Grid's EffectRunner subscribes to that effects channel. Its
+//    React effect focuses the grid root after the cursor state commits, then
+//    flushes the queue. Controllers and queued effects survive collapsed DOM,
+//    so a remounted child Grid can drain focus work queued before it mounted.
+// 4. `Grid` subscribes to `cellCursor?.path === path` and updates its
 //    container's `data-active` attribute; cells stay idle and the CSS
 //    cascade applies the active/ghost visual treatment. Active-ness is
 //    level-scoped, so it lives at level scope on the DOM rather than
 //    as a per-cell subscription. If the cursor's path didn't change,
 //    the selector returns the same boolean and `Grid` doesn't even
 //    re-render.
-// 4. The static channel (props / context) is untouched. Schema, level
+// 5. The static channel (props / context) is untouched. Schema, level
 //    columns, renderers — none of that changes on a click.
 //
 // The key invariant: a change in one channel never causes subscribers of
@@ -528,6 +534,7 @@ export type {
   GridAction,
   ColPolicy,
   RowDirection,
+  RowSelectionGesture,
   CellNavigationIntent,
   RowNavigationIntent,
   SortDescriptor,

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   keyEventToCellIntent as parseCellIntent,
   keyEventToRowIntent as parseRowIntent,
+  rowSelectionGestureFromModifiers,
 } from "./key-handling";
 import { capabilitiesFor } from "../types/capabilities";
 import {
@@ -105,6 +106,39 @@ function ev(key: string, mods: Partial<KeyboardEvent> = {}): KeyboardEvent {
     ...mods,
   } as unknown as KeyboardEvent;
 }
+
+describe("rowSelectionGestureFromModifiers", () => {
+  it("maps plain, Shift, and platform-toggle gestures", () => {
+    expect(
+      rowSelectionGestureFromModifiers({
+        ctrlKey: false,
+        metaKey: false,
+        shiftKey: false,
+      }),
+    ).toBe("replace");
+    expect(
+      rowSelectionGestureFromModifiers({
+        ctrlKey: false,
+        metaKey: false,
+        shiftKey: true,
+      }),
+    ).toBe("extend");
+    expect(
+      rowSelectionGestureFromModifiers({
+        ctrlKey: true,
+        metaKey: false,
+        shiftKey: true,
+      }),
+    ).toBe("toggle");
+    expect(
+      rowSelectionGestureFromModifiers({
+        ctrlKey: false,
+        metaKey: true,
+        shiftKey: false,
+      }),
+    ).toBe("toggle");
+  });
+});
 
 describe("keyEventToCellIntent", () => {
   const displayed = makeRows([
