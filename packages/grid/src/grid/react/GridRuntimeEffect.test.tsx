@@ -63,6 +63,7 @@ describe("useGridRuntimeEffect", () => {
       levels: {
         [rootLevel]: {
           name: rootLevel,
+          rowHeaderColumn: "none",
           columns: [
             {
               id: "name",

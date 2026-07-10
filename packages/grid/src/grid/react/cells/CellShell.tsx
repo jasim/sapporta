@@ -13,6 +13,7 @@ import { gridCellIdentityAttrs } from "../internal/dom-targets";
 export function CellShell(props: {
   status: CellSelectionStatus;
   column: ColumnSchema;
+  rowHeader?: boolean;
   children: ReactNode;
   onMouseDown?: (e: MouseEvent) => void;
   onClick?: (e: MouseEvent) => void;
@@ -20,8 +21,9 @@ export function CellShell(props: {
 }) {
   return (
     <div
-      role="gridcell"
+      role={props.rowHeader ? "rowheader" : "gridcell"}
       {...gridCellIdentityAttrs(props.column.id)}
+      data-row-header-kind={props.rowHeader ? "column" : undefined}
       data-cell-status={props.status}
       onMouseDown={props.onMouseDown}
       onClick={props.onClick}

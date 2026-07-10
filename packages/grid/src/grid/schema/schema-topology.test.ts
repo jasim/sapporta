@@ -8,11 +8,17 @@ function level(
   childLevels: string[] = [],
   options: LevelOptions = {},
 ): LevelSchema {
-  return { name, columns: [], options, childLevels };
+  return { name, columns: [], rowHeaderColumn: "none", options, childLevels };
 }
 
 function levelWithColumns(name: string, columns: ColumnSchema[]): LevelSchema {
-  return { name, columns, options: {}, childLevels: [] };
+  return {
+    name,
+    columns,
+    rowHeaderColumn: "none",
+    options: {},
+    childLevels: [],
+  };
 }
 
 function column(
@@ -157,6 +163,82 @@ describe("buildSchemaTopology", () => {
     expect(() => buildSchemaTopology(bad)).toThrow(
       /level "rows" has duplicate column id "name"/,
     );
+  });
+
+  it("requires every strict level to declare rowHeaderColumn", () => {
+    const bad: GridSchema = {
+      rootLevel: "rows",
+      levels: {
+        rows: {
+          ...level("rows"),
+          rowHeaderColumn: undefined as never,
+        },
+      },
+    };
+
+    expect(() => buildSchemaTopology(bad)).toThrow(
+      /level "rows" must declare rowHeaderColumn/,
+    );
+  });
+
+  it("validates data-backed row-header existence, ordering, and readonly state", () => {
+    const name = column("name");
+    const id = column("id");
+    const editableId = column("id", {
+      edit: { editor: () => null, startsOn: ["enter"] },
+    });
+
+    const missing: GridSchema = {
+      rootLevel: "rows",
+      levels: {
+        rows: {
+          ...levelWithColumns("rows", [id, name]),
+          rowHeaderColumn: { column: "missing" },
+        },
+      },
+    };
+    const nonLeftMost: GridSchema = {
+      rootLevel: "rows",
+      levels: {
+        rows: {
+          ...levelWithColumns("rows", [name, id]),
+          rowHeaderColumn: { column: "id" },
+        },
+      },
+    };
+    const editable: GridSchema = {
+      rootLevel: "rows",
+      levels: {
+        rows: {
+          ...levelWithColumns("rows", [editableId, name]),
+          rowHeaderColumn: { column: "id" },
+        },
+      },
+    };
+
+    expect(() => buildSchemaTopology(missing)).toThrow(
+      /requested column "missing".*available columns: \[id, name\]/,
+    );
+    expect(() => buildSchemaTopology(nonLeftMost)).toThrow(
+      /requested column "id".*left-most column is "name"/,
+    );
+    expect(() => buildSchemaTopology(editable)).toThrow(
+      /requested column "id".*editable.*must be readonly/,
+    );
+  });
+
+  it("accepts a readonly left-most data row header", () => {
+    const ok: GridSchema = {
+      rootLevel: "rows",
+      levels: {
+        rows: {
+          ...levelWithColumns("rows", [column("id"), column("name")]),
+          rowHeaderColumn: { column: "id" },
+        },
+      },
+    };
+
+    expect(() => buildSchemaTopology(ok)).not.toThrow();
   });
 
   it("throws when an editable column has repeated gestures", () => {

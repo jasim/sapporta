@@ -1,5 +1,8 @@
 import type { TableSchema } from "@sapporta/shared/contracts";
-import type { GridInteractionConfig } from "@sapporta/grid";
+import {
+  CELL_GRID_WITH_INDEPENDENT_ROW_SELECTION,
+  type GridInteractionConfig,
+} from "@sapporta/grid";
 import { defineTGrid, type TGridDefinition } from "./tgrid-runtime-config";
 import type {
   TGridLevelQueryConfig,
@@ -68,7 +71,7 @@ export function defineSchemaTGrid({
 }: DefineSchemaTGridArgs): TGridDefinition<SchemaTableRowsByLevel> {
   return defineTGrid<SchemaTableRowsByLevel>({
     ...buildSchemaTGridConfig(config),
-    interaction,
+    interaction: interaction ?? CELL_GRID_WITH_INDEPENDENT_ROW_SELECTION,
     phantomRows: {},
   });
 }

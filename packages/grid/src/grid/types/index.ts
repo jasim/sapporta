@@ -46,6 +46,7 @@ export type {
   CellEditorStart,
   CellRenderProps,
   CellEditorProps,
+  RowHeaderColumn,
   LevelSchema,
   GridSchema,
 } from "./schema";

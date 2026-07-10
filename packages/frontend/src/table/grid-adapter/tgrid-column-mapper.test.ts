@@ -1,7 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isValidElement } from "react";
-import type { ColumnSchema, TableSchema } from "@sapporta/shared/contracts";
-import { ExpandableCellFrame } from "@sapporta/grid";
+import type { ColumnSchema } from "@sapporta/shared/contracts";
 import { preset } from "@sapporta/grid/column-preset";
 import { StaticSearchLookup, StaticValueLookup } from "@sapporta/grid/lookup";
 import {
@@ -25,54 +23,48 @@ const lookups: LookupStore = {
 };
 const columnMapper = createTGridColumnMapper({ lookups });
 
-function table(columns: ColumnSchema[], immutable = false): TableSchema {
-  return {
-    name: "things",
-    label: "Things",
+function mapColumn(column: ColumnSchema, immutable = false) {
+  return columnMapper.columnFor({
+    tableName: "things",
+    column,
     immutable,
-    rowLabelColumns: ["name"],
-    columns,
-    children: [],
-  };
+  });
 }
 
-describe("TGridColumnMapper.columnsFor", () => {
+describe("TGridColumnMapper.columnFor", () => {
   it("maps every table display type to the matching preset kind", () => {
-    const columns = columnMapper.columnsFor({
-      table: table([
-        { name: "id", label: "ID", primary: true, kind: "number" },
-        {
-          name: "owner_id",
-          label: "Owner",
-          kind: "number",
-          foreignKey: { table: "users", column: "id" },
-        },
-        {
-          name: "status",
-          label: "Status",
-          kind: "text",
-          select: { options: ["draft", "done"] },
-        },
-        { name: "active", label: "Active", kind: "boolean" },
-        { name: "created_at", label: "Created at", kind: "timestamp" },
-        { name: "qty", label: "Qty", kind: "number" },
-        {
-          name: "price",
-          label: "Price",
-          kind: "number",
-          displayFormat: "currency",
-        },
-        {
-          name: "rate",
-          label: "Rate",
-          kind: "number",
-          displayFormat: "percentage",
-        },
-        { name: "name", label: "Name", kind: "text" },
-      ]),
-      immutable: false,
-      expandable: false,
-    });
+    const tableColumns = [
+      { name: "id", label: "ID", primary: true, kind: "number" },
+      {
+        name: "owner_id",
+        label: "Owner",
+        kind: "number",
+        foreignKey: { table: "users", column: "id" },
+      },
+      {
+        name: "status",
+        label: "Status",
+        kind: "text",
+        select: { options: ["draft", "done"] },
+      },
+      { name: "active", label: "Active", kind: "boolean" },
+      { name: "created_at", label: "Created at", kind: "timestamp" },
+      { name: "qty", label: "Qty", kind: "number" },
+      {
+        name: "price",
+        label: "Price",
+        kind: "number",
+        displayFormat: "currency",
+      },
+      {
+        name: "rate",
+        label: "Rate",
+        kind: "number",
+        displayFormat: "percentage",
+      },
+      { name: "name", label: "Name", kind: "text" },
+    ] satisfies ColumnSchema[];
+    const columns = tableColumns.map((column) => mapColumn(column));
 
     expect(columns.map((c) => preset(c)?.kind)).toEqual([
       "identifier",
@@ -87,26 +79,15 @@ describe("TGridColumnMapper.columnsFor", () => {
     ]);
   });
 
-  it("applies projection, hidden columns, editability, and metadata", () => {
-    const columns = columnMapper.columnsFor({
-      table: table(
-        [
-          { name: "id", label: "ID", primary: true, kind: "number" },
-          { name: "name", label: "Name", kind: "text" },
-          { name: "created_at", label: "Created at", kind: "date" },
-          {
-            name: "secret",
-            label: "Secret",
-            kind: "text",
-            visuallyHidden: true,
-          },
-        ],
-        false,
-      ),
-      includedColumnNames: ["name", "secret", "created_at"],
-      immutable: false,
-      expandable: false,
-    });
+  it("applies editability and table metadata", () => {
+    const columns = [
+      mapColumn({ name: "name", label: "Name", kind: "text" }),
+      mapColumn({
+        name: "created_at",
+        label: "Created at",
+        kind: "date",
+      }),
+    ];
 
     expect(columns.map((c) => c.id)).toEqual(["name", "created_at"]);
     expect(columns[0].name).toBe("Name");
@@ -120,29 +101,22 @@ describe("TGridColumnMapper.columnsFor", () => {
   });
 
   it("makes immutable tables read-only", () => {
-    const columns = columnMapper.columnsFor({
-      table: table([{ name: "name", label: "Name", kind: "text" }], true),
-      immutable: true,
-      expandable: false,
-    });
+    const column = mapColumn(
+      { name: "name", label: "Name", kind: "text" },
+      true,
+    );
 
-    expect(columns[0].edit).toBeUndefined();
+    expect(column.edit).toBeUndefined();
   });
 
   it("maps textDisplay into the text preset display", () => {
-    const columns = columnMapper.columnsFor({
-      table: table([
-        {
-          name: "body",
-          label: "Body",
-          kind: "text",
-          textDisplay: "markdown",
-        },
-      ]),
-      immutable: false,
-      expandable: false,
+    const column = mapColumn({
+      name: "body",
+      label: "Body",
+      kind: "text",
+      textDisplay: "markdown",
     });
-    const p = preset(columns[0]);
+    const p = preset(column);
 
     expect(p?.kind).toBe("text");
     if (!p || !("text" in p)) throw new Error("expected text preset");
@@ -150,22 +124,16 @@ describe("TGridColumnMapper.columnsFor", () => {
   });
 
   it("maps numeric display metadata into the numeric preset display", () => {
-    const columns = columnMapper.columnsFor({
-      table: table([
-        {
-          name: "balance",
-          label: "Balance",
-          kind: "number",
-          displayFormat: "currency",
-          colorRule: "signed",
-          zeroDisplay: "dot",
-          strong: true,
-        },
-      ]),
-      immutable: false,
-      expandable: false,
+    const column = mapColumn({
+      name: "balance",
+      label: "Balance",
+      kind: "number",
+      displayFormat: "currency",
+      colorRule: "signed",
+      zeroDisplay: "dot",
+      strong: true,
     });
-    const p = preset(columns[0]);
+    const p = preset(column);
 
     expect(p?.kind).toBe("currency");
     if (!p || !("currency" in p)) throw new Error("expected currency preset");
@@ -177,19 +145,13 @@ describe("TGridColumnMapper.columnsFor", () => {
   });
 
   it("defaults currency zero display to a dot", () => {
-    const columns = columnMapper.columnsFor({
-      table: table([
-        {
-          name: "price",
-          label: "Price",
-          kind: "number",
-          displayFormat: "currency",
-        },
-      ]),
-      immutable: false,
-      expandable: false,
+    const column = mapColumn({
+      name: "price",
+      label: "Price",
+      kind: "number",
+      displayFormat: "currency",
     });
-    const p = preset(columns[0]);
+    const p = preset(column);
 
     expect(p?.kind).toBe("currency");
     if (!p || !("currency" in p)) throw new Error("expected currency preset");
@@ -197,54 +159,18 @@ describe("TGridColumnMapper.columnsFor", () => {
   });
 
   it("assigns FK label and editor lookups to preset data", () => {
-    const columns = columnMapper.columnsFor({
-      table: table([
-        {
-          name: "owner_id",
-          label: "Owner",
-          kind: "number",
-          foreignKey: { table: "users", column: "id" },
-        },
-      ]),
-      immutable: false,
-      expandable: false,
+    const column = mapColumn({
+      name: "owner_id",
+      label: "Owner",
+      kind: "number",
+      foreignKey: { table: "users", column: "id" },
     });
-    const p = preset(columns[0]);
+    const p = preset(column);
 
     expect(p?.kind).toBe("foreignKey");
     if (!p || !("lookup" in p)) throw new Error("expected FK preset");
     expect(p.lookup.valueLookup.entryForValue("a")?.label).toBe("Alpha");
     expect(p.lookup.searchLookup).toBe(searchLookup);
-  });
-
-  it("wraps the first visible column for expandable levels", () => {
-    const columns = columnMapper.columnsFor({
-      table: table([
-        { name: "id", label: "ID", primary: true, kind: "number" },
-      ]),
-      immutable: false,
-      expandable: true,
-    });
-    const rendered = columns[0].renderCell({
-      value: 1,
-      column: columns[0],
-      path: "things" as never,
-      row: {
-        kind: "data",
-        id: "things#1" as never,
-        rowSelectable: true,
-        columns: { id: 1 },
-        hasChildren: false,
-        source: { levelName: "things", columns: { id: 1 } },
-      },
-      activation: null,
-    });
-
-    expect(isValidElement(rendered)).toBe(true);
-    expect(isValidElement(rendered) ? rendered.type : null).toBe(
-      ExpandableCellFrame,
-    );
-    expect(columns[0].activation).toBeDefined();
   });
 });
 

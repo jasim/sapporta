@@ -1,10 +1,5 @@
 import { useCallback, useState, useSyncExternalStore } from "react";
-import {
-  collectRowOperationTargets,
-  type GridPath,
-  type GridRuntime,
-  type RowKey,
-} from "@sapporta/grid";
+import type { GridPath, GridRuntime, RowKey } from "@sapporta/grid";
 import { errorMessage } from "../../platform/http";
 import type { TGridRowsByLevel } from "../grid-adapter/tgrid-types";
 import type { TGridSession } from "../state/tgrid-session";
@@ -98,13 +93,18 @@ export function selectedTableDeleteTargets(
   const runtime = session.runtime;
   const targets: Array<TableDeleteTarget & { depth: number }> = [];
 
-  for (const target of collectRowOperationTargets(runtime)) {
-    if (target.row.kind === "data") {
-      targets.push({
-        path: target.path,
-        rowKey: target.rowKey,
-        depth: pathDepth(target.path),
-      });
+  for (const path of runtime.registeredPaths()) {
+    if (runtime.rowInteractionSnapshotFor(path).selectedRowIds.length === 0) {
+      continue;
+    }
+    for (const target of runtime.rowOperationTargetsFor(path)) {
+      if (target.row.kind === "data") {
+        targets.push({
+          path: target.path,
+          rowKey: target.rowKey,
+          depth: pathDepth(target.path),
+        });
+      }
     }
   }
 
@@ -137,11 +137,6 @@ function subscribeSelectedDataRows(
       if (subscribedPaths.has(path)) continue;
       subscribedPaths.add(path);
       unsubs.push(runtime.subscribeRowInteractionSnapshot(path, notify));
-      unsubs.push(
-        runtime.controllerFor(path).subscribe((state, previous) => {
-          if (state.cellSelection !== previous.cellSelection) notify();
-        }),
-      );
       unsubs.push(runtime.subscribeDisplayedRowSequence(path, notify));
     }
   }

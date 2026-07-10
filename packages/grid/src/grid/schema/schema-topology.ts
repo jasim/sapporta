@@ -9,6 +9,8 @@
 // place that walks a `GridSchema`, it validates structural constraints
 // that must hold for the grid to function correctly:
 //   - Each level's column ids must be unique.
+//   - A data-backed row header must reference the first visible column, and
+//     that column must be readonly.
 //   - Column edit and activation gestures must be internally consistent.
 //   - Expandable levels (`childLevels.length > 0`) must declare an
 //     explicit `options.rowKey` — the default index-derived rowKey
@@ -142,6 +144,48 @@ function validateLevelColumns(levelName: string, level: LevelSchema): void {
     }
     seen.add(column.id);
     validateColumnInteractions(levelName, column);
+  }
+  validateLevelRowHeaderColumn(levelName, level);
+}
+
+export function validateLevelRowHeaderColumn(
+  levelName: string,
+  level: Pick<LevelSchema, "columns" | "rowHeaderColumn">,
+  label = "SchemaTopology",
+): void {
+  const rowHeader = level.rowHeaderColumn;
+  const columns = level.columns;
+  const available = `[${columns.map((column) => column.id).join(", ")}]`;
+  const leftMost = columns[0]?.id ?? "<none>";
+
+  if (rowHeader === undefined || rowHeader === null) {
+    throw new Error(
+      `${label}: level "${levelName}" must declare rowHeaderColumn`,
+    );
+  }
+  if (rowHeader === "empty-selectable-cell" || rowHeader === "none") return;
+  if (typeof rowHeader !== "object" || typeof rowHeader.column !== "string") {
+    throw new Error(
+      `${label}: level "${levelName}" has invalid rowHeaderColumn`,
+    );
+  }
+
+  const requested = rowHeader.column;
+  const column = columns.find((candidate) => candidate.id === requested);
+  if (!column) {
+    throw new Error(
+      `${label}: level "${levelName}" rowHeaderColumn requested column "${requested}", but it is not visible (left-most column: "${leftMost}"; available columns: ${available})`,
+    );
+  }
+  if (columns[0] !== column) {
+    throw new Error(
+      `${label}: level "${levelName}" rowHeaderColumn requested column "${requested}", but the left-most column is "${leftMost}" (available columns: ${available})`,
+    );
+  }
+  if (column.edit) {
+    throw new Error(
+      `${label}: level "${levelName}" rowHeaderColumn requested column "${requested}", but it is editable; row-header columns must be readonly (left-most column: "${leftMost}"; available columns: ${available})`,
+    );
   }
 }
 

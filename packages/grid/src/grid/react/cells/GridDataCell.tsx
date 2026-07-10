@@ -9,6 +9,10 @@ import type { ControllerState } from "../../types/controller-state";
 import type { ColId } from "../../types/identity";
 import { CellShell } from "./CellShell";
 import { useGridRuntime } from "../GridRuntimeProvider";
+import {
+  applyRowHeaderSelection,
+  clearRowSelectionAcrossGrid,
+} from "./RowHeaderCell";
 
 // Per-cell view. One narrow subscription on the transient channel:
 //
@@ -28,11 +32,13 @@ export function GridDataCell({
   column,
   path,
   colOrder,
+  rowHeader = false,
 }: {
   row: LevelRow;
   column: ColumnSchema;
   path: GridPath;
   colOrder: readonly ColId[];
+  rowHeader?: boolean;
 }) {
   const runtime = useGridRuntime();
   const controller = runtime.controllerFor(path);
@@ -51,10 +57,16 @@ export function GridDataCell({
     if (e.button !== 0) return;
     if (runtime.interaction.mode !== "cell-grid") return;
     e.preventDefault();
+    const coord = { rowId: row.id, colId: column.id };
+    if (rowHeader) {
+      runtime.cursorManager.moveCellCursorTo({ path, ...coord });
+      applyRowHeaderSelection(runtime, path, row.id, e);
+      return;
+    }
+    clearRowSelectionAcrossGrid(runtime);
     // Cell mousedown owns only cell-grid interaction. In row-list mode the row
     // shell handles row focus, so a click inside a cell does not create a cell
     // cursor or change cell selection.
-    const coord = { rowId: row.id, colId: column.id };
     if (e.shiftKey) {
       runtime.cursorManager.extendCellSelectionTo({ path, ...coord });
     } else {
@@ -64,12 +76,14 @@ export function GridDataCell({
 
   function onClick() {
     if (runtime.interaction.mode !== "cell-grid") return;
+    if (rowHeader) return;
     const coord = { rowId: row.id, colId: column.id };
     if (controller.handleCellPointer(coord, "click")) return;
   }
 
   function onDoubleClick() {
     if (runtime.interaction.mode !== "cell-grid") return;
+    if (rowHeader) return;
     const coord = { rowId: row.id, colId: column.id };
     runtime.cursorManager.moveCellCursorTo({ path, ...coord });
     controller.handleCellPointer(coord, "doubleClick");
@@ -89,6 +103,7 @@ export function GridDataCell({
     <CellShell
       status={status}
       column={column}
+      rowHeader={rowHeader}
       onMouseDown={onMouseDown}
       onClick={onClick}
       onDoubleClick={onDoubleClick}

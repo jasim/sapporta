@@ -47,11 +47,13 @@ const schema: GridSchema = {
     accounts: {
       name: "accounts",
       columns,
+      rowHeaderColumn: "none",
       options: { rowKey: (node, localIdx) => node.rowKey ?? String(localIdx) },
       childLevels: ["entries"],
     },
     entries: {
       name: "entries",
+      rowHeaderColumn: "none",
       columns: [
         column("description", "Description"),
         column("amount", "Amount"),
@@ -269,6 +271,7 @@ describe("serializeGridCopyTargetToCsv", () => {
         levels: {
           copyAccounts: {
             name: "copyAccounts",
+            rowHeaderColumn: "none",
             columns: [
               {
                 ...column("account_id", "Account"),
@@ -330,6 +333,7 @@ describe("serializeGridCopyTargetToCsv", () => {
         levels: {
           asyncCopy: {
             name: "asyncCopy",
+            rowHeaderColumn: "none",
             columns: [
               {
                 ...column("status", "Status"),
@@ -382,6 +386,7 @@ describe("serializeGridCopyTargetToCsv", () => {
         levels: {
           duplicateHeaders: {
             name: "duplicateHeaders",
+            rowHeaderColumn: "none",
             columns: [
               {
                 ...column("first", "First"),

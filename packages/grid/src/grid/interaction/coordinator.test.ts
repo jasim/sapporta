@@ -35,6 +35,7 @@ const reportSchema: GridSchema = {
   levels: {
     cat: {
       name: "cat",
+      rowHeaderColumn: "none",
       columns: [
         withRowExpansionColumn(testColumn("name", "Name")),
         testColumn("qty", "Qty"),
@@ -44,6 +45,7 @@ const reportSchema: GridSchema = {
     },
     items: {
       name: "items",
+      rowHeaderColumn: "none",
       columns: [testColumn("name", "Name"), testColumn("qty", "Qty")],
       options: { rowKey: (n: TreeNode) => String(n.columns.name) },
       childLevels: [],
@@ -80,6 +82,7 @@ const booksSchema: GridSchema = {
   levels: {
     books: {
       name: "books",
+      rowHeaderColumn: "none",
       columns: [
         withRowExpansionColumn(testColumn("title", "Title")),
         testColumn("author", "Author"),
@@ -89,6 +92,7 @@ const booksSchema: GridSchema = {
     },
     quotes: {
       name: "quotes",
+      rowHeaderColumn: "none",
       columns: [testColumn("text", "Quote")],
       options: { rowKey: (n: TreeNode) => String(n.columns.id) },
       childLevels: [],

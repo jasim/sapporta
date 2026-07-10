@@ -26,6 +26,7 @@ const schema: GridSchema = {
   levels: {
     rows: {
       name: "rows",
+      rowHeaderColumn: "none",
       columns: [
         columnPreset.text({
           id: "v",
@@ -116,6 +117,7 @@ describe("ColumnPresetHeader sorting", () => {
           path: rowsPath,
           levelName: "rows",
           schema: schema.levels.rows.columns,
+          rowHeaderColumn: "none",
           options: {
             commandOverrides: () => ({
               setSort: (next) => source.query!.sort!.set(next),
@@ -214,6 +216,7 @@ describe("ColumnPresetHeader sorting", () => {
             path: rowsPath,
             levelName: "rows",
             schema: schema.levels.rows.columns,
+            rowHeaderColumn: "none",
             options: {
               columnSizing: { storageKey },
               commandOverrides: () => ({
@@ -288,6 +291,7 @@ describe("ColumnPresetHeader sorting", () => {
         levelName: "rows",
         presentation: "tabular",
         schema: schema.levels.rows.columns,
+        rowHeaderColumn: "none",
       }),
     ).toEqual({
       "--grid-template-columns": "132px minmax(0, 1fr)",

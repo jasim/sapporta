@@ -100,6 +100,7 @@ function buildSchema(config: BenchDatasetConfig): GridSchema {
     levels[levelName(levelIndex)] = {
       name: levelName(levelIndex),
       columns: buildColumns(config.columns),
+      rowHeaderColumn: "none",
       options: {
         rowKey: (node) => node.columns.id as RowKey,
         allowPhantoms: true,

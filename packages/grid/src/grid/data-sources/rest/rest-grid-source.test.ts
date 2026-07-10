@@ -32,18 +32,21 @@ const schema: GridSchema = {
   levels: {
     orders: {
       name: "orders",
+      rowHeaderColumn: "none",
       columns: orderColumns,
       options: { rowKey: (n) => String(n.columns.id) },
       childLevels: ["lines"],
     },
     lines: {
       name: "lines",
+      rowHeaderColumn: "none",
       columns: lineColumns,
       options: { rowKey: (n) => String(n.columns.id) },
       childLevels: ["notes"],
     },
     notes: {
       name: "notes",
+      rowHeaderColumn: "none",
       columns: noteColumns,
       options: { rowKey: (n) => String(n.columns.id) },
       childLevels: [],

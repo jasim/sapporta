@@ -91,6 +91,7 @@ const tableSchema: GridSchema = {
   levels: {
     rows: {
       name: "rows",
+      rowHeaderColumn: "none",
       columns: cols,
       options: {
         rowKey: (n: TreeNode) => String(n.columns.id),
@@ -111,6 +112,7 @@ const reportSchema: GridSchema = {
   levels: {
     cat: {
       name: "cat",
+      rowHeaderColumn: "none",
       columns: [
         {
           id: "name",
@@ -123,6 +125,7 @@ const reportSchema: GridSchema = {
     } as LevelSchema,
     items: {
       name: "items",
+      rowHeaderColumn: "none",
       columns: [
         {
           id: "name",
@@ -154,6 +157,7 @@ const booksSchema: GridSchema = {
   levels: {
     books: {
       name: "books",
+      rowHeaderColumn: "none",
       columns: [textColumn("title", "Title")],
       options: {
         rowKey: (n: TreeNode) => String(n.columns.id),
@@ -163,6 +167,7 @@ const booksSchema: GridSchema = {
     },
     quotes: {
       name: "quotes",
+      rowHeaderColumn: "none",
       columns: [textColumn("text", "Quote")],
       options: {
         rowKey: (n: TreeNode) => String(n.columns.id),
@@ -642,18 +647,21 @@ describe("GridRuntime", () => {
       levels: {
         cat: {
           name: "cat",
+          rowHeaderColumn: "none",
           columns: [textColumn("name", "C")],
           options: { rowKey: (n: TreeNode) => String(n.columns.name) },
           childLevels: ["a", "b"],
         } as LevelSchema,
         a: {
           name: "a",
+          rowHeaderColumn: "none",
           columns: [textColumn("v", "V")],
           options: { rowKey: (n: TreeNode) => String(n.columns.v) },
           childLevels: [],
         } as LevelSchema,
         b: {
           name: "b",
+          rowHeaderColumn: "none",
           columns: [textColumn("v", "V")],
           options: { rowKey: (n: TreeNode) => String(n.columns.v) },
           childLevels: [],

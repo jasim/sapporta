@@ -66,18 +66,21 @@ const schema: GridSchema = {
   levels: {
     orders: {
       name: "orders",
+      rowHeaderColumn: "none",
       columns: ordersColumns,
       options: { rowKey: (n) => String(n.columns.id) },
       childLevels: ["lines"],
     },
     lines: {
       name: "lines",
+      rowHeaderColumn: "none",
       columns: linesColumns,
       options: { rowKey: (n) => String(n.columns.id) },
       childLevels: ["notes"],
     },
     notes: {
       name: "notes",
+      rowHeaderColumn: "none",
       columns: notesColumns,
       options: { rowKey: (n) => String(n.columns.id) },
       childLevels: [],
@@ -425,6 +428,7 @@ describe("Success metric: REST source rows are already shaped for display", () =
     levels: {
       orders: {
         name: "orders",
+        rowHeaderColumn: "none",
         columns: ordersColumns,
         options: { rowKey: (n) => String(n.columns.id) },
         childLevels: [],
@@ -554,6 +558,7 @@ describe("Success metric: switching source kinds requires no schema or component
     levels: {
       orders: {
         name: "orders",
+        rowHeaderColumn: "none",
         columns: ordersColumns,
         options: { rowKey: (n) => String(n.columns.id) },
         childLevels: [],

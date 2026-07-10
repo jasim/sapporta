@@ -6,7 +6,7 @@ import {
   type ReactNode,
 } from "react";
 import type { ColId, GridPath } from "../types/identity";
-import type { ColumnSchema } from "../types/schema";
+import type { ColumnSchema, RowHeaderColumn } from "../types/schema";
 import { Grid, type GridChromeContext, type GridPresentation } from "./Grid";
 import { GridRow } from "./cells/GridRow";
 import {
@@ -74,6 +74,8 @@ export function GridLevel({
   const controller = runtime.controllerFor(path);
   const level = runtime.schemaAt(path);
   const schema = level.columns;
+  const rowHeaderColumn: RowHeaderColumn =
+    runtime.interaction.mode === "cell-grid" ? level.rowHeaderColumn : "none";
   const state = useLevelSourceState(path);
   const phantoms = usePhantoms(path);
   const colOrder = useMemo(() => schema.map((c) => c.id), [schema]);
@@ -82,6 +84,7 @@ export function GridLevel({
     levelName: level.name,
     presentation,
     schema,
+    rowHeaderColumn,
   };
   const retry = runtime.sourceFor(path).query?.refetch;
   // Status chrome is sampled before the body so loading/error information stays
@@ -107,6 +110,7 @@ export function GridLevel({
       <Grid
         path={path}
         schema={schema}
+        rowHeaderColumn={rowHeaderColumn}
         controller={controller}
         presentation={presentation}
         renderHeader={chrome?.renderHeader}
@@ -116,6 +120,7 @@ export function GridLevel({
         <DisplayedRowsBody
           path={path}
           schema={schema}
+          rowHeaderColumn={rowHeaderColumn}
           colOrder={colOrder}
           chrome={chrome}
           presentation={presentation}
@@ -129,12 +134,14 @@ export function GridLevel({
 function DisplayedRowsBody({
   path,
   schema,
+  rowHeaderColumn,
   colOrder,
   chrome,
   presentation,
 }: {
   path: GridPath;
   schema: ColumnSchema[];
+  rowHeaderColumn: RowHeaderColumn;
   colOrder: readonly ColId[];
   chrome?: GridLevelChrome;
   presentation: GridPresentation;
@@ -161,6 +168,7 @@ function DisplayedRowsBody({
             <GridRow
               rowId={rowRef.id}
               schema={schema}
+              rowHeaderColumn={rowHeaderColumn}
               path={path}
               colOrder={colOrder}
               presentation={presentation}
@@ -208,11 +216,14 @@ function ChildLevelMount({
   const runtime = useGridRuntime();
   const level = runtime.schemaAt(path);
   const schema = level.columns;
+  const rowHeaderColumn: RowHeaderColumn =
+    runtime.interaction.mode === "cell-grid" ? level.rowHeaderColumn : "none";
   const chromeContext: GridChromeContext = {
     path,
     levelName: level.name,
     presentation,
     schema,
+    rowHeaderColumn,
   };
   const retry = runtime.sourceFor(path).query?.refetch;
   return (

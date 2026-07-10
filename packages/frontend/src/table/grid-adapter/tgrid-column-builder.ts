@@ -11,9 +11,10 @@ import type {
   GridPath,
   GridRuntime,
   LevelRow,
+  RowHeaderColumn,
   RowKey,
 } from "@sapporta/grid";
-import { rowKeyOfRowId } from "@sapporta/grid";
+import { rowKeyOfRowId, validateLevelRowHeaderColumn } from "@sapporta/grid";
 import { withRowExpansionColumn } from "@sapporta/grid";
 import { columnPreset, type ColumnWidth } from "@sapporta/grid/column-preset";
 import type {
@@ -48,11 +49,9 @@ import {
   type TGridSessionContext,
 } from "./tgrid-cell-context";
 
-// Builds concrete grid columns and write handlers from level-local specs.
-// This is where abstract spec types become render-ready Grid schema columns.
-
 export type TGridColumnBuildResult = {
   columns: GridColumnSchema[];
+  rowHeaderColumn: RowHeaderColumn;
   saveCellValueByColumn: ReadonlyMap<
     ColId,
     TGridRuntimeCellWriteHandler<TGridRowsByLevel, unknown, string>
@@ -94,6 +93,7 @@ export type TGridColumnBuildArgs<
   table: TableSchema;
   specs?: readonly TGridColumnSpec<RowsByLevel, AppServices, LevelId>[];
   includedColumnNames?: readonly TableColumnName[];
+  rowHeaderColumn?: RowHeaderColumn | null;
   immutable: boolean;
   expandable: boolean;
   columnMapper: TGridColumnMapper;
@@ -102,8 +102,15 @@ export type TGridColumnBuildArgs<
 
 type TGridUnknownRowsByLevel = Record<string, Record<string, unknown>>;
 
-// Entrypoint that compiles one level's column specs into concrete grid columns.
-// This is where `table`, `client`, and `remainingTable` become rendered columns.
+// Build the visible columns and cell behavior for one TGrid table level.
+//
+// `compileTGridRuntimeConfig` calls this once for each level before a table
+// session starts. An ordinary table view can omit `specs` and show its visible
+// table fields in schema order. A custom view can instead arrange particular
+// fields, add client-computed columns, and place the remaining table fields
+// wherever they belong. The result tells the session how those columns render,
+// interact, and save edits. It also resolves row selection and expansion after
+// the final visible order is known, since both behaviors belong at the left edge.
 export function buildTGridColumnsForTable<
   RowsByLevel extends TGridRowsByLevel,
   AppServices,
@@ -111,20 +118,8 @@ export function buildTGridColumnsForTable<
 >(
   args: TGridColumnBuildArgs<RowsByLevel, AppServices, LevelId>,
 ): TGridColumnBuildResult {
-  if (!args.specs) {
-    // No overrides: reuse table schema order and metadata so this still behaves
-    // like a plain table grid with expanders and identity columns.
-    return {
-      columns: args.columnMapper.columnsFor({
-        table: args.table,
-        includedColumnNames: args.includedColumnNames,
-        immutable: args.immutable,
-        expandable: args.expandable,
-      }),
-      saveCellValueByColumn: new Map(),
-    };
-  }
-
+  // Remember table fields already positioned by the application so a later
+  // `remainingTable` placeholder fills only the gaps.
   const usedTableColumns = new Set<TableColumnName>();
   const saveCellValueByColumn = new Map<
     ColId,
@@ -132,10 +127,18 @@ export function buildTGridColumnsForTable<
   >();
   const columns: GridColumnSchema[] = [];
 
-  for (const spec of args.specs) {
-    // Specs are applied in declaration order; first table/cell decides which
-    // column shows up first at this level.
+  // Omitting column specs means the ordinary table view, not an empty view.
+  // An explicit empty array remains meaningful and produces no data columns.
+  const specs: readonly TGridColumnSpec<RowsByLevel, AppServices, LevelId>[] =
+    args.specs ?? [{ kind: "remainingTable" }];
+
+  for (const spec of specs) {
+    // Declaration order is layout order. Each spec either emits one column or,
+    // for `remainingTable`, expands in the underlying table schema order.
     if (spec.kind === "remainingTable") {
+      // `includedColumnNames` limits fields added by this placeholder, while an
+      // explicit field can still opt in outside that list. Hidden, previously
+      // positioned, and locally excluded fields are never added here.
       const excluded = new Set(spec.exclude ?? []);
       for (const column of tableColumnsForProjection(
         args.table,
@@ -158,15 +161,19 @@ export function buildTGridColumnsForTable<
     }
 
     if (spec.kind === "client") {
+      // Client columns can render and interact like table fields, but they do
+      // not represent stored table data.
       columns.push(clientColumnFor(args.levelId, spec, args.sessionContext));
       continue;
     }
 
+    // Explicit table fields retain their normal formatting and lookup behavior,
+    // then apply the view's render, edit, activation, and copy overrides.
     const tableColumn = tableColumnByName(
       args.table,
       spec.columnName as TableColumnName,
     );
-    const gridColumn = args.columnMapper.columnFor({
+    const baseColumn = args.columnMapper.columnFor({
       tableName: args.table.name,
       column: applyTableColumnOptions(tableColumn, spec.options),
       immutable: args.immutable,
@@ -174,7 +181,7 @@ export function buildTGridColumnsForTable<
     columns.push(
       customizeTableColumn(
         args.levelId,
-        gridColumn,
+        baseColumn,
         tableColumn,
         spec,
         args.sessionContext,
@@ -183,23 +190,55 @@ export function buildTGridColumnsForTable<
     usedTableColumns.add(tableColumn.name);
 
     if (spec.options?.saveCellValue) {
+      // A custom save callback belongs to the same field declaration but runs
+      // only when an edited value is persisted. Key it by the visible column so
+      // the table session can choose the correct callback for that edit.
       saveCellValueByColumn.set(
-        gridColumn.id,
+        baseColumn.id,
         toRuntimeCellWriteHandler(args.levelId, spec.options.saveCellValue, {
-          id: gridColumn.id,
+          id: baseColumn.id,
           tableColumnName: spec.columnName,
           schema: tableColumn,
-          gridColumn,
+          gridColumn: baseColumn,
         }) as TGridRuntimeCellWriteHandler<TGridRowsByLevel, unknown, string>,
       );
     }
   }
 
-  if (args.expandable && columns.length > 0) {
-    columns[0] = withRowExpansionColumn(columns[0]);
+  // Row-header inference is deliberately based on the completed visible list.
+  // A data-backed header must be the left-most column and readonly; otherwise
+  // selection gets its own structural cell. `null` and `undefined` both request
+  // this inference, while an explicit structural/disabled choice is preserved.
+  const rowHeaderColumn: RowHeaderColumn =
+    args.rowHeaderColumn ??
+    (columns[0]?.id === "id"
+      ? ({ column: "id" } satisfies RowHeaderColumn)
+      : "empty-selectable-cell");
+
+  const firstColumn = columns[0];
+  if (firstColumn) {
+    const rowHeaderReadyColumn =
+      typeof rowHeaderColumn === "object" &&
+      rowHeaderColumn.column === firstColumn.id
+        ? { ...firstColumn, edit: undefined }
+        : firstColumn;
+
+    // Expansion decorates the same left-most cell with disclosure behavior.
+    // Apply it after row-header policy so a data-backed header stays readonly.
+    columns[0] = args.expandable
+      ? withRowExpansionColumn(rowHeaderReadyColumn)
+      : rowHeaderReadyColumn;
   }
 
-  return { columns, saveCellValueByColumn };
+  // Report invalid explicit row-header choices with the level name and final
+  // visible columns, so the application can correct the declaration directly.
+  validateLevelRowHeaderColumn(
+    String(args.levelId),
+    { columns, rowHeaderColumn },
+    "buildTGridColumnsForTable",
+  );
+
+  return { columns, rowHeaderColumn, saveCellValueByColumn };
 }
 
 function tableColumnsForProjection(

@@ -100,7 +100,8 @@ export function keyEventToCellIntent(
   if (state.editing) return null;
 
   if (e.key === "Escape") {
-    return state.cellSelection ? { type: "clearCellSelection" } : null;
+    if (state.cellSelection) return { type: "clearCellSelection" };
+    return state.rowSelection ? { type: "clearRowSelection" } : null;
   }
 
   const direction = directionForKey(e);

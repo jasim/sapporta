@@ -466,6 +466,12 @@ export function createGridCoordinator(
         runtime.rowInteraction.toggleRowSelection(active.path, active.rowId);
       return;
     }
+    if (intent.type === "clearRowSelection") {
+      for (const path of runtime.registeredPaths()) {
+        runtime.rowInteraction.clearRowSelection(path);
+      }
+      return;
+    }
     const current = cursorManager.currentCellCursor();
     const target = resolveMovement(intent, fromPath, current, runtime);
     if (!target) return;

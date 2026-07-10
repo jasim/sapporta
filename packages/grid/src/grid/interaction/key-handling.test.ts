@@ -191,6 +191,25 @@ describe("keyEventToCellIntent", () => {
     ).toEqual({ type: "clearCellSelection" });
   });
 
+  it("Escape clears row selection when no cell range exists", () => {
+    const state = focusAt("r0", "a");
+    state.cellSelection = null;
+    state.rowSelection = {
+      kind: "single",
+      rowId: makeRowId(path, "r0"),
+    };
+
+    expect(
+      keyEventToCellIntent(
+        ev("Escape"),
+        state,
+        displayed,
+        cols,
+        capabilitiesFor,
+      ),
+    ).toEqual({ type: "clearRowSelection" });
+  });
+
   it("ArrowDown emits a moveRow intent", () => {
     const r = keyEventToCellIntent(
       ev("ArrowDown"),

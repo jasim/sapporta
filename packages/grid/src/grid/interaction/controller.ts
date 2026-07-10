@@ -269,6 +269,9 @@ export function createGridController(
       case "clearCellSelection":
         store.clearCellSelection();
         return true;
+      case "clearRowSelection":
+        args.onNavigateCell?.(intent);
+        return !!args.onNavigateCell;
       case "focusFirstCell": {
         args.onNavigateCell?.(intent);
         return !!args.onNavigateCell;

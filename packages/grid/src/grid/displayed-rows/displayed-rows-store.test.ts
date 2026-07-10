@@ -13,7 +13,13 @@ const rowB = row("b", { name: "B" });
 function input(): DisplayedRowsInput {
   return {
     path,
-    schema: { name: "rows", columns: [], options: {}, childLevels: [] },
+    schema: {
+      name: "rows",
+      columns: [],
+      rowHeaderColumn: "none",
+      options: {},
+      childLevels: [],
+    },
     sourceSnapshot: {
       nodes: [],
     },

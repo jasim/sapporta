@@ -1,12 +1,13 @@
 import { createContext, memo, useContext, type ReactNode } from "react";
 import type { ColId, GridPath, RowId } from "../../types/identity";
 import type { RowInteractionStatus } from "../../types/row-selection";
-import type { ColumnSchema } from "../../types/schema";
+import type { ColumnSchema, RowHeaderColumn } from "../../types/schema";
 import { capabilitiesFor } from "../../types/capabilities";
 import { useDisplayedRow, useGridRuntime } from "../GridRuntimeProvider";
 import type { GridPresentation } from "../Grid";
 import { gridRowIdentityAttrs } from "../internal/dom-targets";
 import { GridDataCell } from "./GridDataCell";
+import { EmptyRowHeaderCell } from "./RowHeaderCell";
 
 export type RowChromeState = {
   active: boolean;
@@ -37,6 +38,7 @@ export const GridRow = memo(function GridRow({
   colOrder,
   presentation = "tabular",
   rowInteractionStatus,
+  rowHeaderColumn,
 }: {
   rowId: RowId;
   schema: ColumnSchema[];
@@ -44,6 +46,7 @@ export const GridRow = memo(function GridRow({
   colOrder: readonly ColId[];
   presentation?: GridPresentation;
   rowInteractionStatus: RowInteractionStatus;
+  rowHeaderColumn: RowHeaderColumn;
 }) {
   const runtime = useGridRuntime();
   const row = useDisplayedRow(path, rowId);
@@ -62,6 +65,7 @@ export const GridRow = memo(function GridRow({
       data-row-presentation={presentation}
       data-row-interaction-status={rowInteractionStatus}
       data-row-selectable={String(capabilitiesFor(row.kind).rowSelectable)}
+      data-has-row-header={rowHeaderColumn !== "none" ? "true" : undefined}
       aria-selected={selected ? true : undefined}
       role="row"
       onMouseDown={(event) => {
@@ -83,6 +87,9 @@ export const GridRow = memo(function GridRow({
       }}
     >
       <RowInteractionStatusProvider status={rowInteractionStatus}>
+        {rowHeaderColumn === "empty-selectable-cell" ? (
+          <EmptyRowHeaderCell row={row} path={path} selected={selected} />
+        ) : null}
         {schema.map((col) => (
           <RowCellSlot key={col.id} column={col} presentation={presentation}>
             <GridDataCell
@@ -90,6 +97,10 @@ export const GridRow = memo(function GridRow({
               column={col}
               path={path}
               colOrder={colOrder}
+              rowHeader={
+                typeof rowHeaderColumn === "object" &&
+                rowHeaderColumn.column === col.id
+              }
             />
           </RowCellSlot>
         ))}

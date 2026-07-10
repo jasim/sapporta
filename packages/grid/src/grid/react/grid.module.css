@@ -15,6 +15,12 @@
   outline: none;
 }
 
+.root[data-grid-path][data-row-header-kind="empty-selectable-cell"] {
+  grid-template-columns:
+    var(--grid-row-header-column-width, 40px)
+    var(--grid-template-columns, repeat(auto-fit, minmax(80px, 1fr)));
+}
+
 .root[data-grid-presentation="cards"] {
   display: block;
   min-width: 0;
@@ -97,11 +103,45 @@
 
 :where(.root) [data-grid-part="cell"],
 :where(.root) [data-grid-part="header-cell"],
+:where(.root) [data-grid-part="row-header-cell"],
+:where(.root) [data-grid-part="row-header-header-cell"],
 :where(.root) [data-grid-part="level-label-cell"] {
   box-sizing: border-box;
   position: relative;
   overflow: visible;
   min-width: 0;
+}
+
+:where(.root) [data-grid-part="row-header-control"] {
+  background: transparent;
+  border: 0;
+  box-sizing: border-box;
+  cursor: pointer;
+  display: block;
+  height: 100%;
+  min-height: inherit;
+  padding: 0;
+  width: 100%;
+}
+
+:where(.root) [data-grid-part="row-header-control"]:disabled {
+  cursor: default;
+}
+
+:where(
+    .root[data-grid-presentation="cards"][data-row-header-kind="empty-selectable-cell"]
+  )
+  [data-grid-part="row"] {
+  box-sizing: border-box;
+  padding-inline-start: var(--grid-row-header-column-width, 40px);
+}
+
+:where(.root[data-grid-presentation="cards"])
+  [data-grid-part="row-header-cell"] {
+  inset-block: 0;
+  inset-inline-start: 0;
+  position: absolute;
+  width: var(--grid-row-header-column-width, 40px);
 }
 
 :where(.root) [data-grid-part="cell-content"] {

@@ -6,10 +6,18 @@ import { afterEach, describe, expect, it } from "vitest";
 import { columnPreset } from "../../../column-preset";
 import { inMemoryGridDataSource } from "../../data-sources/memory/in-memory-grid-source";
 import { createGridRuntime } from "../../runtime/create-grid-runtime";
-import { ROW_MULTISELECT_LIST } from "../../types/interaction";
-import { rootPath } from "../../types/identity";
+import {
+  CELL_GRID_WITH_INDEPENDENT_ROW_SELECTION,
+  ROW_MULTISELECT_LIST,
+  type GridInteractionConfig,
+} from "../../types/interaction";
+import { childPath, rootPath } from "../../types/identity";
 import type { TreeNode } from "../../types/level-row";
-import type { CellActivation, GridSchema } from "../../types/schema";
+import type {
+  CellActivation,
+  GridSchema,
+  RowHeaderColumn,
+} from "../../types/schema";
 import { GridLevel } from "../GridLevel";
 import { GridRuntimeProvider } from "../GridRuntimeProvider";
 import { withRowExpansionColumn } from "./ExpandableCellFrame";
@@ -69,6 +77,7 @@ const schema: GridSchema = {
   levels: {
     quotes: {
       name: "quotes",
+      rowHeaderColumn: "none",
       columns: [
         testColumn("id", "ID", { displayType: "pk" }),
         testColumn("book_id", "Book"),
@@ -86,6 +95,7 @@ const expandableIdentifierSchema: GridSchema = {
   levels: {
     quotes: {
       name: "quotes",
+      rowHeaderColumn: "none",
       columns: [
         withRowExpansionColumn(
           columnPreset.identifier({
@@ -175,6 +185,90 @@ function createExpandableIdentifierRuntime() {
         },
       },
     }),
+  });
+}
+
+function createRowHeaderRuntime(
+  rowHeaderColumn: RowHeaderColumn,
+  interaction: GridInteractionConfig = CELL_GRID_WITH_INDEPENDENT_ROW_SELECTION,
+) {
+  const rowHeaderSchema: GridSchema = {
+    ...schema,
+    levels: {
+      quotes: {
+        ...schema.levels.quotes,
+        rowHeaderColumn,
+      },
+    },
+  };
+  return createGridRuntime({
+    schema: rowHeaderSchema,
+    dataSource: inMemoryGridDataSource({
+      schema: rowHeaderSchema,
+      tree,
+      levels: {
+        quotes: {
+          sortMode: "none",
+          filterMode: "none",
+          paginationMode: "none",
+        },
+      },
+    }),
+    interaction,
+  });
+}
+
+function createExpandableRowHeaderRuntime(rowHeaderColumn: RowHeaderColumn) {
+  const expandableSchema: GridSchema = {
+    rootLevel: "orders",
+    levels: {
+      orders: {
+        name: "orders",
+        columns: [
+          withRowExpansionColumn(testColumn("id", "ID")),
+          testColumn("customer", "Customer"),
+        ],
+        rowHeaderColumn,
+        options: { rowKey: (node) => String(node.columns.id) },
+        childLevels: ["lines"],
+      },
+      lines: {
+        name: "lines",
+        columns: [testColumn("id", "ID"), testColumn("sku", "SKU")],
+        rowHeaderColumn: "empty-selectable-cell",
+        options: { rowKey: (node) => String(node.columns.id) },
+        childLevels: [],
+      },
+    },
+  };
+  const expandableTree: TreeNode[] = [
+    {
+      levelName: "orders",
+      columns: { id: "o1", customer: "Alice" },
+      children: {
+        lines: [{ levelName: "lines", columns: { id: "l1", sku: "SKU-1" } }],
+      },
+    },
+  ];
+  return createGridRuntime({
+    schema: expandableSchema,
+    dataSource: inMemoryGridDataSource({
+      schema: expandableSchema,
+      tree: expandableTree,
+      levels: {
+        orders: {
+          sortMode: "none",
+          filterMode: "none",
+          paginationMode: "none",
+        },
+        lines: {
+          sortMode: "none",
+          filterMode: "none",
+          paginationMode: "none",
+        },
+      },
+    }),
+    interaction: CELL_GRID_WITH_INDEPENDENT_ROW_SELECTION,
   });
 }
 
@@ -368,5 +462,383 @@ describe("GridRow cards presentation", () => {
 
     expect(row.getAttribute("data-row-active")).toBe("true");
     expect(runtime.coordinator.getState().rowCursor?.rowId).toContain("q1");
+  });
+});
+
+describe("GridRow row headers", () => {
+  let mounted: { root: Root; container: HTMLElement } | null = null;
+
+  afterEach(async () => {
+    if (mounted) {
+      await unmount(mounted.root, mounted.container);
+      mounted = null;
+    }
+  });
+
+  async function renderRowHeaders(
+    rowHeaderColumn: RowHeaderColumn,
+    options: {
+      presentation?: "tabular" | "cards";
+      interaction?: GridInteractionConfig;
+    } = {},
+  ) {
+    const runtime = createRowHeaderRuntime(
+      rowHeaderColumn,
+      options.interaction,
+    );
+    mounted = await render(
+      createElement(GridRuntimeProvider, {
+        runtime,
+        children: createElement(GridLevel, {
+          path: rootPath("quotes"),
+          chrome: columnPreset.chrome(),
+          presentation: options.presentation ?? "tabular",
+        }),
+      }),
+    );
+    return runtime;
+  }
+
+  it("identifies a data-backed first cell as the row header without replacing its content", async () => {
+    await renderRowHeaders({ column: "id" });
+
+    const rowHeaders = mounted!.container.querySelectorAll(
+      '[role="rowheader"][data-col-id="id"]',
+    );
+    expect(rowHeaders).toHaveLength(2);
+    expect(rowHeaders[0]?.textContent).toBe("q1");
+    expect(
+      mounted!.container.querySelector('[data-grid-part="row-header-cell"]'),
+    ).toBeNull();
+    expect(
+      mounted!.container
+        .querySelector('[role="rowheader"][data-col-id="id"]')
+        ?.getAttribute("data-row-header-kind"),
+    ).toBe("column");
+  });
+
+  it("renders an empty structural handle and blank header outside data-column identity", async () => {
+    await renderRowHeaders("empty-selectable-cell");
+
+    const handles = mounted!.container.querySelectorAll(
+      '[data-grid-part="row-header-cell"]',
+    );
+    expect(handles).toHaveLength(2);
+    expect(handles[0]?.hasAttribute("data-col-id")).toBe(false);
+    expect(
+      handles[0]?.querySelector('[data-grid-part="row-header-control"]'),
+    ).toBeInstanceOf(HTMLButtonElement);
+    expect(
+      mounted!.container.querySelectorAll(
+        '[data-grid-part="row-header-header-cell"]',
+      ),
+    ).toHaveLength(1);
+    expect(
+      mounted!.container.querySelectorAll('[data-grid-part="cell"]'),
+    ).toHaveLength(8);
+  });
+
+  it("preserves the existing row and header DOM when row headers are disabled", async () => {
+    await renderRowHeaders("none");
+
+    expect(mounted!.container.querySelector('[role="rowheader"]')).toBeNull();
+    expect(
+      mounted!.container.querySelector(
+        '[data-grid-part="row-header-header-cell"]',
+      ),
+    ).toBeNull();
+    expect(
+      mounted!.container.querySelectorAll('[role="gridcell"]'),
+    ).toHaveLength(8);
+  });
+
+  it("hides row-header behavior in row-list interaction mode", async () => {
+    const runtime = createRowHeaderRuntime(
+      "empty-selectable-cell",
+      ROW_MULTISELECT_LIST,
+    );
+    mounted = await render(
+      createElement(GridRuntimeProvider, {
+        runtime,
+        children: createElement(GridLevel, {
+          path: rootPath("quotes"),
+          chrome: columnPreset.chrome(),
+        }),
+      }),
+    );
+
+    expect(
+      mounted.container.querySelector('[data-grid-part="row-header-cell"]'),
+    ).toBeNull();
+    expect(
+      mounted.container.querySelector(
+        '[data-grid-part="row-header-header-cell"]',
+      ),
+    ).toBeNull();
+  });
+
+  it("renders the empty handle as a leading card control rather than a row field", async () => {
+    await renderRowHeaders("empty-selectable-cell", {
+      presentation: "cards",
+    });
+
+    const firstRow = mounted!.container.querySelector(
+      '[data-row-id="quotes#q1"]',
+    );
+    const handle = firstRow?.querySelector(
+      '[data-grid-part="row-header-cell"]',
+    );
+    expect(handle).toBeInstanceOf(HTMLElement);
+    expect(handle?.closest('[data-grid-part="row-field"]')).toBeNull();
+    expect(
+      mounted!.container
+        .querySelector('[data-grid-path="quotes"]')
+        ?.getAttribute("data-row-header-kind"),
+    ).toBe("empty-selectable-cell");
+  });
+
+  it("reuses row-selection gestures and clears row selection on ordinary cell click", async () => {
+    const runtime = await renderRowHeaders({ column: "id" });
+    const path = rootPath("quotes");
+    const firstHeader = mounted!.container.querySelector(
+      '[data-row-id="quotes#q1"] [role="rowheader"]',
+    );
+    const secondHeader = mounted!.container.querySelector(
+      '[data-row-id="quotes#q2"] [role="rowheader"]',
+    );
+    const dataCell = mounted!.container.querySelector(
+      '[data-row-id="quotes#q2"] [data-grid-part="cell"][data-col-id="text"]',
+    );
+    if (
+      !(firstHeader instanceof HTMLElement) ||
+      !(secondHeader instanceof HTMLElement) ||
+      !(dataCell instanceof HTMLElement)
+    ) {
+      throw new Error("expected row headers and data cell");
+    }
+
+    await act(async () => {
+      firstHeader.dispatchEvent(
+        new MouseEvent("mousedown", { bubbles: true, button: 0 }),
+      );
+    });
+    expect(runtime.selectedRowIds(path)).toHaveLength(1);
+
+    await act(async () => {
+      secondHeader.dispatchEvent(
+        new MouseEvent("mousedown", {
+          bubbles: true,
+          button: 0,
+          metaKey: true,
+        }),
+      );
+    });
+    expect(runtime.selectedRowIds(path)).toHaveLength(2);
+
+    await act(async () => {
+      firstHeader.dispatchEvent(
+        new MouseEvent("mousedown", { bubbles: true, button: 0 }),
+      );
+      secondHeader.dispatchEvent(
+        new MouseEvent("mousedown", {
+          bubbles: true,
+          button: 0,
+          shiftKey: true,
+        }),
+      );
+    });
+    expect(runtime.controllerFor(path).getState().rowSelection?.kind).toBe(
+      "range",
+    );
+    expect(runtime.selectedRowIds(path)).toHaveLength(2);
+
+    await act(async () => {
+      dataCell.dispatchEvent(
+        new MouseEvent("mousedown", { bubbles: true, button: 0 }),
+      );
+    });
+    expect(runtime.selectedRowIds(path)).toEqual([]);
+    expect(runtime.coordinator.getState().cellCursor?.colId).toBe("text");
+  });
+
+  it("supports Space and Escape on both data-backed and structural row headers", async () => {
+    const dataRuntime = await renderRowHeaders({ column: "id" });
+    const path = rootPath("quotes");
+    const dataHeader = mounted!.container.querySelector(
+      '[data-row-id="quotes#q1"] [role="rowheader"]',
+    );
+    const gridRoot = mounted!.container.querySelector(
+      '[data-grid-path="quotes"]',
+    );
+    if (
+      !(dataHeader instanceof HTMLElement) ||
+      !(gridRoot instanceof HTMLElement)
+    ) {
+      throw new Error("expected data row header and grid root");
+    }
+    await act(async () => {
+      dataHeader.dispatchEvent(
+        new MouseEvent("mousedown", { bubbles: true, button: 0 }),
+      );
+      gridRoot.dispatchEvent(
+        new KeyboardEvent("keydown", { bubbles: true, key: " " }),
+      );
+    });
+    expect(dataRuntime.selectedRowIds(path)).toEqual([]);
+
+    await unmount(mounted!.root, mounted!.container);
+    mounted = null;
+    const structuralRuntime = await renderRowHeaders("empty-selectable-cell");
+    const control = mounted!.container.querySelector(
+      '[data-row-id="quotes#q1"] [data-grid-part="row-header-control"]',
+    );
+    if (!(control instanceof HTMLButtonElement)) {
+      throw new Error("expected structural row-header control");
+    }
+    await act(async () => {
+      control.dispatchEvent(
+        new KeyboardEvent("keydown", { bubbles: true, key: " " }),
+      );
+    });
+    expect(structuralRuntime.selectedRowIds(path)).toHaveLength(1);
+    await act(async () => {
+      control.dispatchEvent(
+        new KeyboardEvent("keydown", { bubbles: true, key: "Escape" }),
+      );
+    });
+    expect(structuralRuntime.selectedRowIds(path)).toEqual([]);
+  });
+
+  it("preserves expansion for data-backed and structural row-header composition", async () => {
+    const dataRuntime = createExpandableRowHeaderRuntime({ column: "id" });
+    mounted = await render(
+      createElement(GridRuntimeProvider, {
+        runtime: dataRuntime,
+        children: createElement(GridLevel, {
+          path: rootPath("orders"),
+          chrome: columnPreset.chrome(),
+        }),
+      }),
+    );
+    const value = mounted.container.querySelector(
+      '[role="rowheader"] [data-grid-part="expand-content"]',
+    );
+    const root = mounted.container.querySelector('[data-grid-path="orders"]');
+    if (!(value instanceof HTMLElement) || !(root instanceof HTMLElement)) {
+      throw new Error("expected expandable data row header");
+    }
+    await act(async () => {
+      value.dispatchEvent(
+        new MouseEvent("mousedown", { bubbles: true, button: 0 }),
+      );
+      value.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    });
+    expect(dataRuntime.selectedRowIds(rootPath("orders"))).toHaveLength(1);
+    expect(
+      dataRuntime.coordinator.getState().expansion.get(rootPath("orders")),
+    ).toBeUndefined();
+
+    await act(async () => {
+      root.dispatchEvent(
+        new KeyboardEvent("keydown", { bubbles: true, key: "Enter" }),
+      );
+    });
+    expect(
+      dataRuntime.coordinator.getState().expansion.get(rootPath("orders")),
+    ).toBeDefined();
+
+    await unmount(mounted.root, mounted.container);
+    mounted = null;
+    const structuralRuntime = createExpandableRowHeaderRuntime(
+      "empty-selectable-cell",
+    );
+    mounted = await render(
+      createElement(GridRuntimeProvider, {
+        runtime: structuralRuntime,
+        children: createElement(GridLevel, {
+          path: rootPath("orders"),
+          chrome: columnPreset.chrome(),
+        }),
+      }),
+    );
+    const firstRow = mounted.container.querySelector(
+      '[data-row-id="orders#o1"]',
+    );
+    const handle = firstRow?.querySelector(
+      '[data-grid-part="row-header-cell"]',
+    );
+    const firstDataCell = firstRow?.querySelector(
+      '[data-grid-part="cell"][data-col-id="id"]',
+    );
+    const chevron = firstDataCell?.querySelector("button");
+    expect(firstRow?.firstElementChild).toBe(handle);
+    expect(handle?.nextElementSibling).toBe(firstDataCell);
+    if (!(chevron instanceof HTMLButtonElement)) {
+      throw new Error("expected expansion chevron after structural handle");
+    }
+    await act(async () => {
+      chevron.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    });
+    expect(
+      structuralRuntime.coordinator
+        .getState()
+        .expansion.get(rootPath("orders")),
+    ).toBeDefined();
+    expect(structuralRuntime.selectedRowIds(rootPath("orders"))).toEqual([]);
+    expect(
+      mounted.container.querySelector(
+        '[data-grid-depth="1"] [data-grid-part="row-header-cell"]',
+      ),
+    ).toBeInstanceOf(HTMLElement);
+  });
+
+  it("plain and modified row-header clicks coordinate selection across paths", async () => {
+    const runtime = createExpandableRowHeaderRuntime({ column: "id" });
+    const ordersPath = rootPath("orders");
+    const linesPath = childPath(ordersPath, "o1", "lines");
+    mounted = await render(
+      createElement(GridRuntimeProvider, {
+        runtime,
+        children: createElement(GridLevel, {
+          path: ordersPath,
+          chrome: columnPreset.chrome(),
+        }),
+      }),
+    );
+    const rootHeader = mounted.container.querySelector(
+      '[data-row-id="orders#o1"] [role="rowheader"]',
+    );
+    const root = mounted.container.querySelector('[data-grid-path="orders"]');
+    if (!(rootHeader instanceof HTMLElement) || !(root instanceof HTMLElement)) {
+      throw new Error("expected root row header");
+    }
+    await act(async () => {
+      rootHeader.dispatchEvent(
+        new MouseEvent("mousedown", { bubbles: true, button: 0 }),
+      );
+      root.dispatchEvent(
+        new KeyboardEvent("keydown", { bubbles: true, key: "Enter" }),
+      );
+    });
+    const childControl = mounted.container.querySelector(
+      '[data-grid-depth="1"] [data-grid-part="row-header-control"]',
+    );
+    if (!(childControl instanceof HTMLButtonElement)) {
+      throw new Error("expected child row-header control");
+    }
+
+    await act(async () => {
+      childControl.dispatchEvent(
+        new MouseEvent("click", { bubbles: true, metaKey: true }),
+      );
+    });
+    expect(runtime.selectedRowIds(ordersPath)).toHaveLength(1);
+    expect(runtime.selectedRowIds(linesPath)).toHaveLength(1);
+
+    await act(async () => {
+      childControl.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    });
+    expect(runtime.selectedRowIds(ordersPath)).toEqual([]);
+    expect(runtime.selectedRowIds(linesPath)).toHaveLength(1);
   });
 });

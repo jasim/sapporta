@@ -1,9 +1,5 @@
-import type {
-  ColumnSchema as TableColumnSchema,
-  TableSchema,
-} from "@sapporta/shared/contracts";
+import type { ColumnSchema as TableColumnSchema } from "@sapporta/shared/contracts";
 import type { ColId, ColumnSchema as GridColumnSchema } from "@sapporta/grid";
-import { withRowExpansionColumn } from "@sapporta/grid";
 import {
   columnPreset,
   columnPresetWidthForSizing,
@@ -11,7 +7,6 @@ import {
 } from "@sapporta/grid/column-preset";
 import { inferDisplayType, type DisplayType } from "../model/column-types";
 import type { LookupStore } from "../../lookup";
-import type { TableColumnName } from "./tgrid-types";
 
 export type TGridTableColumnMeta = {
   table: string;
@@ -19,15 +14,7 @@ export type TGridTableColumnMeta = {
   displayType: DisplayType;
 };
 
-export type TGridColumnMapOptions = {
-  table: TableSchema;
-  includedColumnNames?: readonly TableColumnName[];
-  immutable: boolean;
-  expandable: boolean;
-};
-
 export type TGridColumnMapper = {
-  columnsFor(options: TGridColumnMapOptions): GridColumnSchema[];
   columnFor(args: {
     tableName: string;
     column: TableColumnSchema;
@@ -43,9 +30,6 @@ export function createTGridColumnMapper(args: {
 }): TGridColumnMapper {
   const { lookups } = args;
   return {
-    columnsFor(options) {
-      return columnsFor(lookups, options);
-    },
     columnFor(columnArgs) {
       return columnFor(lookups, columnArgs);
     },
@@ -53,28 +37,6 @@ export function createTGridColumnMapper(args: {
       return tgridTableColumnMetaOf(column);
     },
   };
-}
-
-function columnsFor(
-  lookups: LookupStore,
-  options: TGridColumnMapOptions,
-): GridColumnSchema[] {
-  const included = includeColumns(options.table, options.includedColumnNames);
-  const columns = included
-    .filter((c) => !c.visuallyHidden)
-    .map((column) =>
-      columnFor(lookups, {
-        tableName: options.table.name,
-        column,
-        immutable: options.immutable,
-      }),
-    );
-
-  if (options.expandable && columns.length > 0) {
-    columns[0] = withRowExpansionColumn(columns[0]);
-  }
-
-  return columns;
 }
 
 function columnFor(
@@ -171,15 +133,6 @@ function tgridTableColumnMetaOf(
   if (!isRecord(column.meta.schema)) return undefined;
   if (typeof column.meta.table !== "string") return undefined;
   return column.meta as TGridTableColumnMeta;
-}
-
-function includeColumns(
-  table: TableSchema,
-  includedColumnNames: readonly TableColumnName[] | undefined,
-): TableColumnSchema[] {
-  if (!includedColumnNames) return table.columns;
-  const included = new Set(includedColumnNames);
-  return table.columns.filter((c) => included.has(c.name));
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

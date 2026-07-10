@@ -1,4 +1,4 @@
-import type { SortDescriptor } from "@sapporta/grid";
+import type { RowHeaderColumn, SortDescriptor } from "@sapporta/grid";
 import type { ChildSchema, TableSchema } from "@sapporta/shared/contracts";
 import type { FilterCondition } from "@sapporta/shared/filter";
 import type {
@@ -71,6 +71,7 @@ export type TGridLevelConfig<
   // Default table projection for generated columns at this level. Explicit
   // `columns.table(...)` entries may still include table fields outside it.
   includedColumnNames?: readonly TableColumnName[];
+  rowHeaderColumn?: RowHeaderColumn | null;
   columns?:
     | TGridColumnSpecBuilder<RowsByLevel, AppServices, LevelId>
     | readonly TGridColumnSpec<RowsByLevel, AppServices, LevelId>[];

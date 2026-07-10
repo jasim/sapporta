@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { TableSchema } from "@sapporta/shared/contracts";
+import { CELL_GRID_WITH_INDEPENDENT_ROW_SELECTION } from "@sapporta/grid";
 import { defineTGrid } from "./tgrid-runtime-config";
 import { buildSchemaTGridConfig, defineSchemaTGrid } from "./schema-tgrid";
 
@@ -65,6 +66,13 @@ describe("schema TGrid helpers", () => {
     expect(definition.levels["orders.order_lines"].includedColumnNames).toEqual(
       ["line_no"],
     );
+    expect(definition.levels.orders.rowHeaderColumn).toBeUndefined();
+    expect(
+      definition.levels["orders.order_lines"].rowHeaderColumn,
+    ).toBeUndefined();
+    expect(definition.interaction).toBe(
+      CELL_GRID_WITH_INDEPENDENT_ROW_SELECTION,
+    );
   });
 
   it("applies root query defaults", () => {
@@ -128,8 +136,15 @@ describe("schema TGrid helpers", () => {
     });
 
     config.levels.orders.columns = columns;
+    config.levels.orders.rowHeaderColumn = "none";
+    config.levels["orders.order_lines"].rowHeaderColumn =
+      "empty-selectable-cell";
     const definition = defineTGrid(config);
 
     expect(definition.levels.orders.columns).toBe(columns);
+    expect(definition.levels.orders.rowHeaderColumn).toBe("none");
+    expect(definition.levels["orders.order_lines"].rowHeaderColumn).toBe(
+      "empty-selectable-cell",
+    );
   });
 });

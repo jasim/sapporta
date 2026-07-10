@@ -28,12 +28,14 @@ const reportSchema: GridSchema = {
   levels: {
     cat: {
       name: "cat",
+      rowHeaderColumn: "none",
       columns: [testColumn("name", "Name"), testColumn("qty", "Qty")],
       options: { rowKey: (n: TreeNode) => String(n.columns.name) },
       childLevels: ["items"],
     },
     items: {
       name: "items",
+      rowHeaderColumn: "none",
       columns: [testColumn("name", "Name"), testColumn("weight", "Weight")],
       options: { rowKey: (n: TreeNode) => String(n.columns.name) },
       childLevels: [],

@@ -198,6 +198,7 @@ function buildReportGridModel<TInput>(
     levels[levelName] = {
       name: level.label ?? levelName,
       columns,
+      rowHeaderColumn: "none",
       options: {
         rowKey: (node, localIdx) => node.rowKey ?? String(localIdx),
         defaultCollapsed: level.defaultCollapsed,

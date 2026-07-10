@@ -29,7 +29,7 @@ import {
   type LookupCapabilities,
 } from "@sapporta/grid/lookup";
 import { compileTGridRuntimeConfig, defineTGrid } from "./tgrid-runtime-config";
-import type { TableRowsClient } from "./tgrid-level-config";
+import type { TableRowsClient, TGridLevelConfig } from "./tgrid-level-config";
 import type { TGridFilter } from "./tgrid-filter";
 import { createTGridColumnMapper } from "./tgrid-column-mapper";
 import { createTGridColumnsBuilder } from "./tgrid-column-spec";
@@ -58,6 +58,7 @@ type RowsByLevel = {
   "orders.lines": LineRow;
   "orders.lines.allocations": AllocationRow;
 };
+type OrdersOnlyRows = { orders: OrderRow };
 
 function emptyLookupStore(): LookupStore {
   const lookup: LookupCapabilities = {
@@ -261,6 +262,22 @@ describe("compileTGridRuntimeConfig", () => {
     });
   }
 
+  function buildOrdersOnly(
+    overrides: Partial<TGridLevelConfig<OrdersOnlyRows>> = {},
+  ) {
+    return compileTGridRuntimeConfig<OrdersOnlyRows>({
+      rootLevel: "orders",
+      levels: {
+        orders: {
+          table: orderSchema,
+          childLevels: [],
+          ...overrides,
+        },
+      },
+      columnMapper: createTGridColumnMapper({ lookups: emptyLookupStore() }),
+    }).gridSchema.levels.orders;
+  }
+
   it("emits stable semantic levels with child topology and table metadata", () => {
     const config = build();
 
@@ -362,6 +379,111 @@ describe("compileTGridRuntimeConfig", () => {
         (c) => c.id,
       ),
     ).toEqual(["warehouse"]);
+  });
+
+  it("resolves row headers from each level's final visible columns", () => {
+    const config = build();
+
+    expect(config.gridSchema.levels.orders.rowHeaderColumn).toEqual({
+      column: "id",
+    });
+    expect(config.gridSchema.levels["orders.lines"].rowHeaderColumn).toBe(
+      "empty-selectable-cell",
+    );
+    expect(
+      config.gridSchema.levels["orders.lines.allocations"].rowHeaderColumn,
+    ).toBe("empty-selectable-cell");
+  });
+
+  it.each([undefined, null])(
+    "infers a left-most visible id for %s",
+    (rowHeaderColumn) => {
+      const level = buildOrdersOnly({ rowHeaderColumn });
+
+      expect(level.rowHeaderColumn).toEqual({ column: "id" });
+      expect(level.columns[0]?.id).toBe("id");
+      expect(level.columns[0]?.edit).toBeUndefined();
+    },
+  );
+
+  it("uses an empty selectable cell when id is not left-most or not visible", () => {
+    const columns = createTGridColumnsBuilder<
+      OrdersOnlyRows,
+      unknown,
+      "orders"
+    >("orders");
+    const nonLeftMost = buildOrdersOnly({
+      columns: [columns.table("customer"), columns.table("id")],
+    });
+    const missing = buildOrdersOnly({
+      columns: [columns.table("customer")],
+    });
+    const empty = buildOrdersOnly({ columns: [] });
+
+    expect(nonLeftMost.rowHeaderColumn).toBe("empty-selectable-cell");
+    expect(nonLeftMost.columns.map((column) => column.id)).toEqual([
+      "customer",
+      "id",
+    ]);
+    expect(missing.rowHeaderColumn).toBe("empty-selectable-cell");
+    expect(empty.rowHeaderColumn).toBe("empty-selectable-cell");
+  });
+
+  it("preserves explicit structural and disabled row headers", () => {
+    expect(
+      buildOrdersOnly({ rowHeaderColumn: "empty-selectable-cell" })
+        .rowHeaderColumn,
+    ).toBe("empty-selectable-cell");
+    expect(buildOrdersOnly({ rowHeaderColumn: "none" }).rowHeaderColumn).toBe(
+      "none",
+    );
+  });
+
+  it("makes an explicit left-most data row header readonly after column overrides", () => {
+    const columns = createTGridColumnsBuilder<
+      OrdersOnlyRows,
+      unknown,
+      "orders"
+    >("orders");
+    const CustomEditor = () => null;
+    const level = buildOrdersOnly({
+      rowHeaderColumn: { column: "customer" },
+      columns: [
+        columns.table("customer", {
+          edit: { editor: CustomEditor, startsOn: ["enter"] },
+        }),
+        columns.table("id"),
+      ],
+    });
+
+    expect(level.rowHeaderColumn).toEqual({ column: "customer" });
+    expect(level.columns[0]?.id).toBe("customer");
+    expect(level.columns[0]?.edit).toBeUndefined();
+  });
+
+  it("rejects missing and non-left-most explicit row-header columns with context", () => {
+    const columns = createTGridColumnsBuilder<
+      OrdersOnlyRows,
+      unknown,
+      "orders"
+    >("orders");
+
+    expect(() =>
+      buildOrdersOnly({
+        rowHeaderColumn: { column: "missing" },
+        columns: [columns.table("customer"), columns.table("id")],
+      }),
+    ).toThrow(
+      /requested column "missing".*left-most column: "customer".*available columns: \[customer, id\]/,
+    );
+    expect(() =>
+      buildOrdersOnly({
+        rowHeaderColumn: { column: "id" },
+        columns: [columns.table("customer"), columns.table("id")],
+      }),
+    ).toThrow(
+      /requested column "id".*left-most column is "customer".*available columns: \[customer, id\]/,
+    );
   });
 
   it("uses the level projection when default table columns are generated", () => {

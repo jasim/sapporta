@@ -418,6 +418,8 @@ export {
   type GridCopyTarget,
 } from "./copy";
 
+export { validateLevelRowHeaderColumn } from "./schema";
+
 export {
   hostBackedRowQuery,
   inMemoryGridDataSource,
@@ -497,6 +499,7 @@ export type {
   CellEditorStart,
   CellRenderProps,
   CellEditorProps,
+  RowHeaderColumn,
   LevelSchema,
   GridSchema,
   TreeNode,

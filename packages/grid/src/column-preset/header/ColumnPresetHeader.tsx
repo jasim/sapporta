@@ -6,7 +6,7 @@ import {
   type ReactNode,
 } from "react";
 import { ChevronDown, ChevronUp } from "lucide-react";
-import type { ColumnSchema } from "../../grid/types/schema";
+import type { ColumnSchema, RowHeaderColumn } from "../../grid/types/schema";
 import type { GridPath } from "../../grid/types/identity";
 import { decomposePath } from "../../grid/types/identity";
 import { cycleSort } from "../../grid/sort";
@@ -37,11 +37,13 @@ export function ColumnPresetHeader<TMeta = unknown, TFilter = unknown>({
   path,
   levelName,
   schema,
+  rowHeaderColumn,
   options,
 }: {
   path: GridPath;
   levelName: string;
   schema: ColumnSchema[];
+  rowHeaderColumn: RowHeaderColumn;
   options: PresetChromeOptions<TMeta, TFilter>;
 }) {
   const runtime = useGridRuntime();
@@ -81,6 +83,12 @@ export function ColumnPresetHeader<TMeta = unknown, TFilter = unknown>({
         <LevelLabelRow label={levelLabel} title={levelName} />
       ) : null}
       <div data-grid-part="header-row" role="row">
+        {rowHeaderColumn === "empty-selectable-cell" ? (
+          <div
+            role="columnheader"
+            data-grid-part="row-header-header-cell"
+          />
+        ) : null}
         {schema.map((column, columnIndex) => (
           <HeaderCell
             key={column.id}

@@ -29,6 +29,7 @@
   --grid-header-cursor: pointer;
   --grid-phantom-row-background: var(--sap-surface);
   --grid-editor-background: var(--sap-surface);
+  --grid-row-header-column-width: 40px;
 
   --grid-active-focus-background: var(
     --grid-cell-active-focus-background,
@@ -164,6 +165,8 @@
 :where(
   .presetGrid [data-grid-part="cell"],
   .presetGrid [data-grid-part="header-cell"],
+  .presetGrid [data-grid-part="row-header-cell"],
+  .presetGrid [data-grid-part="row-header-header-cell"],
   .presetGrid [data-grid-part="level-label-cell"]
 ) {
   border-right: var(--grid-cell-border-inline-end, 1px solid var(--sap-border));
@@ -172,6 +175,8 @@
 :where(
   .presetGrid [data-grid-part="cell"]:last-child,
   .presetGrid [data-grid-part="header-cell"]:last-child,
+  .presetGrid [data-grid-part="row-header-cell"]:last-child,
+  .presetGrid [data-grid-part="row-header-header-cell"]:last-child,
   .presetGrid [data-grid-part="level-label-cell"]:last-child
 ) {
   border-right: none;
@@ -185,6 +190,23 @@
 :where(.presetGrid [data-grid-part="header-cell"]) {
   cursor: var(--grid-header-cursor, default);
   user-select: none;
+}
+
+:where(.presetGrid [data-grid-part="row-header-header-cell"]) {
+  min-height: var(--grid-header-min-height, var(--height-sap-header));
+}
+
+:where(.presetGrid [data-grid-part="row-header-cell"]) {
+  min-height: var(--grid-cell-min-height, var(--height-sap-row));
+}
+
+:where(.presetGrid [data-grid-part="row-header-control"]:focus-visible) {
+  box-shadow: inset 0 0 0 1.5px var(--grid-current-focus-ring-color);
+  outline: none;
+}
+
+:where(.presetGrid [data-grid-part="row-header-control"]:hover) {
+  background: color-mix(in oklab, var(--sap-row-hover) 70%, transparent);
 }
 
 :where(
@@ -535,6 +557,7 @@
 
 .presetGrid[data-grid-depth]:not([data-grid-depth="0"]) {
   --grid-cell-min-height: 31px;
+  --grid-row-header-column-width: 30px;
 
   background: var(--sap-nested-bg);
   padding-block-end: 14px;

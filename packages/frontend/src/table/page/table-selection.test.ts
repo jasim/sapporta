@@ -37,6 +37,19 @@ describe("table selection", () => {
     ]);
   });
 
+  it("does not expose cell-range operation targets as selected rows", () => {
+    const root = rootPath("orders");
+    const rowId = makeRowId(root, "10" as never);
+    const session = makeSession({
+      paths: [root],
+      selectedByPath: new Map(),
+      operationTargetIdsByPath: new Map([[root, [rowId]]]),
+      dataRowIds: new Set([rowId]),
+    });
+
+    expect(selectedTableDeleteTargets(session)).toEqual([]);
+  });
+
   it("removes selected rows through the grid runtime and clears selection after success", async () => {
     const root = rootPath("orders");
     const rowId = makeRowId(root, "10" as never);
@@ -81,6 +94,7 @@ describe("table selection", () => {
 function makeSession(args: {
   paths: GridPath[];
   selectedByPath: Map<GridPath, RowId[]>;
+  operationTargetIdsByPath?: Map<GridPath, RowId[]>;
   dataRowIds: Set<RowId>;
   clearRowSelection?: (path: GridPath) => void;
   removeRow?: GridRuntime["removeRow"];
@@ -96,7 +110,11 @@ function makeSession(args: {
     runtime: {
       registeredPaths: () => args.paths,
       rowOperationTargetsFor: (path: GridPath) =>
-        (args.selectedByPath.get(path) ?? []).map((rowId) => ({
+        (
+          args.operationTargetIdsByPath?.get(path) ??
+          args.selectedByPath.get(path) ??
+          []
+        ).map((rowId) => ({
           path,
           rowId,
           rowKey: rowKeyOfRowId(rowId),

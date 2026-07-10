@@ -1,6 +1,6 @@
 import { useEffect, useRef, type CSSProperties, type ReactNode } from "react";
 import { useStore } from "zustand";
-import type { ColumnSchema } from "../types/schema";
+import type { ColumnSchema, RowHeaderColumn } from "../types/schema";
 import { decomposePath, type GridPath } from "../types/identity";
 import type { GridControllerPublic } from "../interaction/controller";
 import { GridHeader } from "./GridHeader";
@@ -19,6 +19,7 @@ export type GridChromeContext = {
   levelName: string;
   presentation: GridPresentation;
   schema: ColumnSchema[];
+  rowHeaderColumn: RowHeaderColumn;
 };
 
 export type GridPresentation = "tabular" | "cards";
@@ -55,6 +56,7 @@ export type GridPresentation = "tabular" | "cards";
 export function Grid({
   path,
   schema,
+  rowHeaderColumn,
   controller,
   renderHeader,
   levelContainerClassName,
@@ -64,6 +66,7 @@ export function Grid({
 }: {
   path: GridPath;
   schema: ColumnSchema[];
+  rowHeaderColumn: RowHeaderColumn;
   controller: GridControllerPublic;
   presentation?: GridPresentation;
   renderHeader?: (ctx: GridChromeContext) => ReactNode;
@@ -83,6 +86,7 @@ export function Grid({
     levelName: levelNameFromPath(path),
     presentation,
     schema,
+    rowHeaderColumn,
   };
   const header = renderHeader?.(chromeContext);
   const className = levelContainerClassName?.(chromeContext);
@@ -101,6 +105,14 @@ export function Grid({
       // Only the innermost grid containing the event target should act —
       // otherwise a key inside a child grid would also move the parent.
       if (!eventBelongsToGridRoot(e.target, root)) return;
+      // Structural row-header controls own Space and Escape themselves. They
+      // deliberately have no cell coordinate for the grid key handler to use.
+      if (
+        e.target instanceof Element &&
+        e.target.closest('[data-grid-part="row-header-control"]')
+      ) {
+        return;
+      }
       // handleKey returns true iff it consumed the event — that's the only
       // signal we need to decide whether to suppress browser defaults.
       if (controller.handleKey(e, presentation)) {
@@ -122,11 +134,14 @@ export function Grid({
       {...gridRootIdentityAttrs(path)}
       data-grid-presentation={presentation}
       data-grid-depth={depth}
+      data-row-header-kind={rowHeaderKind(rowHeaderColumn)}
       data-active={String(isActive)}
       style={{ position: "relative", outline: "none", ...style }}
     >
       {header ??
-        (presentation === "tabular" ? <GridHeader schema={schema} /> : null)}
+        (presentation === "tabular" ? (
+          <GridHeader schema={schema} rowHeaderColumn={rowHeaderColumn} />
+        ) : null)}
       {children}
       <CellEditorOverlay
         containerRef={containerRef}
@@ -140,6 +155,15 @@ export function Grid({
       />
     </div>
   );
+}
+
+function rowHeaderKind(
+  rowHeaderColumn: RowHeaderColumn,
+): "column" | "empty-selectable-cell" | undefined {
+  if (typeof rowHeaderColumn === "object") return "column";
+  return rowHeaderColumn === "empty-selectable-cell"
+    ? rowHeaderColumn
+    : undefined;
 }
 
 export function levelNameFromPath(path: GridPath): string {

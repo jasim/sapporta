@@ -20,12 +20,19 @@ export function chrome<TMeta = unknown, TFilter = unknown>(
     ...defaultGridLevelChrome,
     renderStatus: ({ path }) => <PresetLevelStatusBand path={path} />,
     renderEmpty: ({ path }) => <PresetEmptyLevel path={path} />,
-    renderHeader: ({ path, levelName, presentation, schema }) =>
+    renderHeader: ({
+      path,
+      levelName,
+      presentation,
+      schema,
+      rowHeaderColumn,
+    }) =>
       presentation === "tabular" ? (
         <ColumnPresetHeader
           path={path}
           levelName={levelName}
           schema={schema}
+          rowHeaderColumn={rowHeaderColumn}
           options={options}
         />
       ) : null,

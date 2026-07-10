@@ -46,6 +46,7 @@ const schema: GridSchema = {
   levels: {
     rows: {
       name: "rows",
+      rowHeaderColumn: "none",
       columns: cols,
       options: {
         rowKey: (n: TreeNode) => String(n.columns.id),

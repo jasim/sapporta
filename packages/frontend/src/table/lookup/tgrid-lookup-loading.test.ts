@@ -81,6 +81,7 @@ function makeLevel(args: {
         valueLookup: args.valueLookupByColumn?.[column.name],
       }),
     ),
+    rowHeaderColumn: "none",
     options: {},
     childLevels: [],
   };

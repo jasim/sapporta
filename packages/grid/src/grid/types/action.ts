@@ -89,6 +89,7 @@ export type CellNavigationIntent =
     }
   | { type: "activateCell"; coord: Coord; trigger: CellActivationTrigger }
   | { type: "clearCellSelection" }
+  | { type: "clearRowSelection" }
   | { type: "focusFirstCell" }
   | { type: "toggleActiveRowSelection" };
 

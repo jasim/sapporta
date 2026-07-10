@@ -101,6 +101,7 @@ const schema: GridSchema = {
   levels: {
     accounts: {
       name: "accounts",
+      rowHeaderColumn: "none",
       columns: [column("account", "Account"), column("debit", "Debit")],
       options: { rowKey: (node, localIdx) => node.rowKey ?? String(localIdx) },
       childLevels: [],

@@ -167,6 +167,7 @@ export function compileTGridRuntimeConfig<
       specs: resolveColumns(levelId, config.columns),
       levelId,
       includedColumnNames: config.includedColumnNames,
+      rowHeaderColumn: config.rowHeaderColumn,
       immutable: table.immutable ?? false,
       expandable: config.childLevels.length > 0,
       columnMapper: args.columnMapper,
@@ -176,6 +177,7 @@ export function compileTGridRuntimeConfig<
     levels[levelId] = {
       name: levelId,
       columns: columnBuild.columns,
+      rowHeaderColumn: columnBuild.rowHeaderColumn,
       options: tableRowIdentity(pkCol.name, table.immutable ?? false),
       childLevels: [...config.childLevels],
     };

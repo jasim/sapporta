@@ -56,7 +56,13 @@ const nodes: TreeNode[] = [
 ];
 
 function makeSchema(options: LevelOptions = opts, columns = cols): LevelSchema {
-  return { name: "root", columns, options, childLevels: [] };
+  return {
+    name: "root",
+    columns,
+    rowHeaderColumn: "none",
+    options,
+    childLevels: [],
+  };
 }
 
 function makeSnapshot(

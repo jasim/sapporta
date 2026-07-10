@@ -168,6 +168,11 @@ export type ColumnSchema = {
   meta?: unknown;
 };
 
+export type RowHeaderColumn<ColumnName extends string = ColId> =
+  | { column: ColumnName }
+  | "empty-selectable-cell"
+  | "none";
+
 export function editStartsOn(
   column: ColumnSchema,
   gesture: CellEditGesture,
@@ -203,6 +208,7 @@ export function describeCellActivation(
 export type LevelSchema = {
   name: string;
   columns: ColumnSchema[];
+  rowHeaderColumn: RowHeaderColumn;
   options: LevelOptions;
   // Names of child levels that hang off rows of this level. Order = render
   // order. A leaf level declares no children.
