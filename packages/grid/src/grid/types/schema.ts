@@ -129,6 +129,8 @@ export type CellRenderProps = {
   row: LevelRow;
   column: ColumnSchema;
   path: GridPath;
+  /** Whether this cell is also the data-backed row-selection header. */
+  rowHeader?: boolean;
   activation: CellRenderActivation | null;
 };
 

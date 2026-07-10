@@ -32,9 +32,17 @@
   --grid-row-header-column-width: 40px;
   --grid-row-header-background: color-mix(
     in oklab,
-    var(--sap-row-hover) 38%,
-    transparent
+    var(--sap-row-hover) 78%,
+    var(--sap-surface)
   );
+  --grid-row-header-hover-background: var(--sap-row-hover);
+  --grid-expand-chevron-background: color-mix(
+    in oklab,
+    var(--sap-row-hover) 45%,
+    var(--sap-surface)
+  );
+  --grid-row-header-expand-gap: 7px;
+  --grid-row-header-expand-padding-inline-end: 10px;
 
   --grid-active-focus-background: var(
     --grid-cell-active-focus-background,
@@ -290,11 +298,85 @@
 }
 
 :where(.presetGrid [role="rowheader"]) {
-  background: var(--grid-row-header-background);
+  --grid-row-header-current-background: var(--grid-row-header-background);
+
+  background: var(--grid-row-header-current-background);
 }
 
 :where(.presetGrid [data-row-selectable="true"] [role="rowheader"]) {
   cursor: pointer;
+}
+
+:where(.presetGrid [role="rowheader"]:hover) {
+  --grid-row-header-current-background: var(
+    --grid-row-header-hover-background,
+    var(--sap-row-hover)
+  );
+}
+
+:where(
+  .presetGrid
+    [data-grid-part="row"][data-row-selected="true"]
+    [role="rowheader"],
+  .presetGrid [role="rowheader"][data-cell-status="in-selection"]
+) {
+  --grid-row-header-current-background: var(
+    --grid-current-selection-background
+  );
+}
+
+:where(.presetGrid [role="rowheader"][data-cell-status="focus"]) {
+  --grid-row-header-current-background: var(--grid-current-focus-background);
+}
+
+/* A data-backed row header can also carry the expansion control. Keep the
+   selection surface distinct from the lighter control, with the grid surface
+   showing through as a narrow vertical separator. */
+:where(
+  .presetGrid
+    [role="rowheader"]:has(
+      > [data-grid-part="cell-content"]
+        > [data-grid-part="expand-cell"]
+    )
+) {
+  background: var(--grid-background, var(--sap-surface));
+}
+
+:where(
+  .presetGrid
+    [role="rowheader"]:has(
+      > [data-grid-part="cell-content"]
+        > [data-grid-part="expand-cell"]
+    )
+    > [data-grid-part="cell-content"]
+) {
+  padding: 0;
+}
+
+:where(
+  .presetGrid
+    [role="rowheader"]
+    [data-grid-part="expand-cell"]
+) {
+  align-self: stretch;
+  background: var(--grid-background, var(--sap-surface));
+  box-sizing: border-box;
+  gap: var(--grid-row-header-expand-gap, 7px);
+  padding-inline-end: var(--grid-row-header-expand-padding-inline-end, 10px);
+}
+
+:where(
+  .presetGrid
+    [role="rowheader"]
+    [data-grid-part="expand-cell"]
+    > [data-grid-part="expand-content"]
+) {
+  align-items: center;
+  align-self: stretch;
+  background: var(--grid-row-header-current-background);
+  box-sizing: border-box;
+  display: flex;
+  padding: var(--grid-cell-padding, 0 10px);
 }
 
 :where(.presetGrid [data-grid-part="editor-overlay"]) {
@@ -370,7 +452,7 @@
 
 :where(.presetGrid [data-grid-part="expand-chevron"]) {
   align-items: center;
-  background: color-mix(in srgb, var(--sap-row-hover) 55%, transparent);
+  background: var(--grid-expand-chevron-background);
   border: 0;
   border-radius: var(--radius-sm);
   color: var(--sap-fg-subtle);

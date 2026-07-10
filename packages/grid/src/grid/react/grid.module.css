@@ -199,7 +199,6 @@
 }
 
 :where(.root) [data-grid-part="expand-content"] {
-  display: block;
   flex: 1 1 auto;
   min-width: 0;
   overflow: hidden;

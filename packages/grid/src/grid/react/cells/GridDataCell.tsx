@@ -107,6 +107,7 @@ export function GridDataCell({
     row,
     column,
     path,
+    rowHeader,
     activation: runtime.cellActivationFor(path, coord),
   });
 

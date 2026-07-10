@@ -50,6 +50,7 @@
   --grid-cell-border-inline-end: none;
   --grid-cell-min-height: 28px;
   --grid-cell-padding: 0;
+  --grid-row-header-expand-padding-inline-end: 0;
 
   border: 0;
   border-radius: 6px;

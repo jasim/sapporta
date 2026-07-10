@@ -11,7 +11,7 @@ import {
   ROW_MULTISELECT_LIST,
   type GridInteractionConfig,
 } from "../../types/interaction";
-import { childPath, rootPath } from "../../types/identity";
+import { childPath, makeRowId, rootPath } from "../../types/identity";
 import type { TreeNode } from "../../types/level-row";
 import type {
   CellActivation,
@@ -343,6 +343,15 @@ describe("GridRow cards presentation", () => {
         .querySelector('[data-grid-part="expand-content"]')
         ?.textContent?.trim(),
     ).toBe("q1");
+    const expandCell = pkField.querySelector('[data-grid-part="expand-cell"]');
+    const expandContent = pkField.querySelector(
+      '[data-grid-part="expand-content"]',
+    );
+    const expandChevron = pkField.querySelector(
+      '[data-grid-part="expand-chevron"]',
+    );
+    expect(expandCell?.firstElementChild).toBe(expandContent);
+    expect(expandCell?.lastElementChild).toBe(expandChevron);
   });
 
   it("does not render tabular column headers in cards presentation", async () => {
@@ -709,6 +718,51 @@ describe("GridRow row headers", () => {
     expect(structuralRuntime.selectedRowIds(path)).toEqual([]);
   });
 
+  it("continues from a deleted structural selection and restores grid focus", async () => {
+    const runtime = await renderRowHeaders("empty-selectable-cell");
+    const path = rootPath("quotes");
+    const firstControl = mounted!.container.querySelector(
+      '[data-row-id="quotes#q1"] [data-grid-part="row-header-control"]',
+    );
+    const gridRoot = mounted!.container.querySelector(
+      '[data-grid-path="quotes"]',
+    );
+    if (
+      !(firstControl instanceof HTMLButtonElement) ||
+      !(gridRoot instanceof HTMLElement)
+    ) {
+      throw new Error("expected structural row control and grid root");
+    }
+
+    await act(async () => {
+      firstControl.dispatchEvent(
+        new MouseEvent("click", { bubbles: true, button: 0 }),
+      );
+    });
+    expect(runtime.coordinator.getState().cellCursor).toBe(null);
+    expect(runtime.coordinator.getState().rowSelectionLead?.rowId).toContain(
+      "q1",
+    );
+
+    const continuation = runtime.planCursorContinuationForRowRemoval([
+      { path, rowId: makeRowId(path, "q1") },
+    ]);
+    await act(async () => {
+      runtime.applyCursorContinuation(continuation);
+      await runtime.removeRow(path, "q1");
+    });
+
+    const nextCell = mounted!.container.querySelector(
+      '[data-row-id="quotes#q2"] [data-grid-part="cell"][data-col-id="id"]',
+    );
+    expect(continuation).toEqual({
+      kind: "cell",
+      target: { path, rowId: makeRowId(path, "q2"), colId: "id" },
+    });
+    expect(nextCell?.getAttribute("data-cell-status")).toBe("focus");
+    expect(document.activeElement).toBe(gridRoot);
+  });
+
   it("preserves expansion for data-backed and structural row-header composition", async () => {
     const dataRuntime = createExpandableRowHeaderRuntime({ column: "id" });
     mounted = await render(
@@ -723,10 +777,20 @@ describe("GridRow row headers", () => {
     const value = mounted.container.querySelector(
       '[role="rowheader"] [data-grid-part="expand-content"]',
     );
+    const expandCell = value?.parentElement;
+    const dataHeaderChevron = expandCell?.querySelector(
+      '[data-grid-part="expand-chevron"]',
+    );
     const root = mounted.container.querySelector('[data-grid-path="orders"]');
-    if (!(value instanceof HTMLElement) || !(root instanceof HTMLElement)) {
+    if (
+      !(value instanceof HTMLElement) ||
+      !(dataHeaderChevron instanceof HTMLButtonElement) ||
+      !(root instanceof HTMLElement)
+    ) {
       throw new Error("expected expandable data row header");
     }
+    expect(expandCell?.firstElementChild).toBe(value);
+    expect(value.nextElementSibling).toBe(dataHeaderChevron);
     await act(async () => {
       value.dispatchEvent(
         new MouseEvent("mousedown", { bubbles: true, button: 0 }),
@@ -809,7 +873,10 @@ describe("GridRow row headers", () => {
       '[data-row-id="orders#o1"] [role="rowheader"]',
     );
     const root = mounted.container.querySelector('[data-grid-path="orders"]');
-    if (!(rootHeader instanceof HTMLElement) || !(root instanceof HTMLElement)) {
+    if (
+      !(rootHeader instanceof HTMLElement) ||
+      !(root instanceof HTMLElement)
+    ) {
       throw new Error("expected root row header");
     }
     await act(async () => {

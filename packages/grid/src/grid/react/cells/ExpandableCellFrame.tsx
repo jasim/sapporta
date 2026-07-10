@@ -57,6 +57,18 @@ export function ExpandableCellFrame({
       runtime.coordinator.getState().expansion.get(path)?.has(rowId) ?? false,
   );
   const enabled = activation?.availability.kind === "enabled";
+  const expansionControl = activation ? (
+    <CellActivationButton activation={activation} gridPart="expand-chevron">
+      {isExpanded ? (
+        <ChevronDown aria-hidden="true" size={14} strokeWidth={1.75} />
+      ) : (
+        <ChevronRight aria-hidden="true" size={14} strokeWidth={1.75} />
+      )}
+    </CellActivationButton>
+  ) : (
+    <span data-grid-part="expand-placeholder" />
+  );
+  const content = <span data-grid-part="expand-content">{children}</span>;
 
   return (
     <span
@@ -64,18 +76,8 @@ export function ExpandableCellFrame({
       data-expandable={enabled ? "true" : undefined}
       data-expanded={enabled ? String(isExpanded) : undefined}
     >
-      {activation ? (
-        <CellActivationButton activation={activation}>
-          {isExpanded ? (
-            <ChevronDown aria-hidden="true" size={14} strokeWidth={1.75} />
-          ) : (
-            <ChevronRight aria-hidden="true" size={14} strokeWidth={1.75} />
-          )}
-        </CellActivationButton>
-      ) : (
-        <span data-grid-part="expand-placeholder" />
-      )}
-      <span data-grid-part="expand-content">{children}</span>
+      {content}
+      {expansionControl}
     </span>
   );
 }
