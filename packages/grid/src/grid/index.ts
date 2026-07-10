@@ -375,6 +375,8 @@ export {
   createGridRuntime,
   createTableController,
   type GridRuntime,
+  type CursorContinuation,
+  type RowRemovalRef,
   type LoadedRowsBoundaryEvent,
   type RuntimeArgs,
   type RowInteractionCommands,

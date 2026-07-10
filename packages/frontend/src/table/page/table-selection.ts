@@ -1,8 +1,23 @@
 import { useCallback, useState, useSyncExternalStore } from "react";
-import type { GridPath, GridRuntime, RowKey } from "@sapporta/grid";
-import { errorMessage } from "../../platform/http";
+import type { GridPath } from "@sapporta/grid";
 import type { TGridRowsByLevel } from "../grid-adapter/tgrid-types";
 import type { TGridSession } from "../state/tgrid-session";
+import {
+  clearTableSelection,
+  deleteSelectedTableRows,
+  selectedTableDeleteTargets,
+  type TableSelectionSession,
+} from "./table-row-deletion";
+
+export {
+  clearTableSelection,
+  deleteSelectedTableRows,
+  planTableRowDeletion,
+  selectedTableDeleteTargets,
+  type TableDeleteTarget,
+  type TableRowDeletionPlan,
+  type TableSelectionSession,
+} from "./table-row-deletion";
 
 export type TableSelection =
   | {
@@ -15,16 +30,6 @@ export type TableSelection =
       clear: () => void;
       deleteSelected: () => Promise<void>;
     };
-
-type TableSelectionSession = {
-  runtime: GridRuntime;
-  setErrorBanner: (message: string | null) => void;
-};
-
-type TableDeleteTarget = {
-  path: GridPath;
-  rowKey: RowKey;
-};
 
 export function useTableSelection<
   RowsByLevel extends TGridRowsByLevel,
@@ -47,69 +52,6 @@ export function useTableSelection<
 
   if (count === 0) return { kind: "none", count };
   return { kind: "rows", count, clear, deleteSelected };
-}
-
-export function clearTableSelection(
-  session: TableSelectionSession | undefined,
-): void {
-  if (!session) return;
-  const runtime = session.runtime;
-  for (const path of runtime.registeredPaths()) {
-    if (runtime.rowInteractionSnapshotFor(path).selectedRowIds.length === 0) {
-      continue;
-    }
-    runtime.rowInteraction.clearRowSelection(path);
-  }
-}
-
-export async function deleteSelectedTableRows(
-  session: TableSelectionSession | undefined,
-): Promise<void> {
-  if (!session) return;
-  const targets = selectedTableDeleteTargets(session);
-  if (targets.length === 0) return;
-
-  const touchedPaths = new Set<GridPath>();
-  for (const target of targets) {
-    try {
-      await session.runtime.removeRow(target.path, target.rowKey);
-      touchedPaths.add(target.path);
-    } catch (err) {
-      touchedPaths.add(target.path);
-      refetchPaths(session.runtime, touchedPaths);
-      session.setErrorBanner(`Failed to delete row: ${errorMessage(err)}`);
-      return;
-    }
-  }
-
-  refetchPaths(session.runtime, touchedPaths);
-  clearTableSelection(session);
-}
-
-export function selectedTableDeleteTargets(
-  session: TableSelectionSession | undefined,
-): Array<TableDeleteTarget> {
-  if (!session) return [];
-  const runtime = session.runtime;
-  const targets: Array<TableDeleteTarget & { depth: number }> = [];
-
-  for (const path of runtime.registeredPaths()) {
-    if (runtime.rowInteractionSnapshotFor(path).selectedRowIds.length === 0) {
-      continue;
-    }
-    for (const target of runtime.rowOperationTargetsFor(path)) {
-      if (target.row.kind === "data") {
-        targets.push({
-          path: target.path,
-          rowKey: target.rowKey,
-          depth: pathDepth(target.path),
-        });
-      }
-    }
-  }
-
-  targets.sort((a, b) => b.depth - a.depth);
-  return targets.map(({ path, rowKey }) => ({ path, rowKey }));
 }
 
 function useSelectedDataRowCount(
@@ -152,17 +94,4 @@ function subscribeSelectedDataRows(
   return () => {
     for (const unsub of unsubs) unsub();
   };
-}
-
-function pathDepth(path: GridPath): number {
-  return String(path).split(".").length;
-}
-
-function refetchPaths(
-  runtime: GridRuntime,
-  paths: ReadonlySet<GridPath>,
-): void {
-  for (const path of paths) {
-    void runtime.sourceFor(path).query?.refetch?.();
-  }
 }

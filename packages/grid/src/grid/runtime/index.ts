@@ -11,6 +11,10 @@ export type {
   RowInteractionSnapshot,
   RowInteractionStatus,
 } from "../types/row-selection";
+export type {
+  CursorContinuation,
+  RowRemovalRef,
+} from "../interaction/cursor-continuation";
 
 export type { GridEmitter, GridEvents } from "./emitter";
 

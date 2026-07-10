@@ -4,7 +4,11 @@ import type { CellCursor } from "../types/identity";
 import type { CellSelectionState } from "../types/selection";
 import type { GridInteractionConfig } from "../types/interaction";
 import type { RowCursor, RowSelection } from "../types/row-selection";
-import { normalizeRowSelection, rowCursorEqual } from "../types/row-selection";
+import {
+  normalizeRowSelection,
+  rowCursorEqual,
+  rowIdsInRowSelection,
+} from "../types/row-selection";
 import type { GridCoordinatorStore } from "./coordinator";
 import type { GridControllerCursorPort } from "./controller";
 import type { DisplayedRows } from "../types/level-row";
@@ -222,8 +226,17 @@ export function createCursorManager(deps: CursorManagerDeps): CursorManager {
       selectedRows.mode,
     );
     const ctrl = deps.controllerCursorPortFor(path);
-    if (ctrl.getState().rowSelection === next) return;
-    ctrl.setRowSelection(next);
+    if (ctrl.getState().rowSelection !== next) ctrl.setRowSelection(next);
+
+    // Gesture history is recorded by rowInteraction, where the acted-on row is
+    // explicit. Normalization may invalidate that history, but it must not
+    // reconstruct a gesture lead from selection membership.
+    const currentLead = deps.coordinator.getState().rowSelectionLead;
+    if (currentLead?.path !== path) return;
+    const selectedIds = rowIdsInRowSelection(next, deps.displayedRowsFor(path));
+    if (!selectedIds.includes(currentLead.rowId)) {
+      deps.coordinator.setRowSelectionLead(null);
+    }
   }
 
   function clearRowSelection(path: GridPath): void {

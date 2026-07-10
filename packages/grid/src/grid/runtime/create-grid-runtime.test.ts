@@ -1956,6 +1956,116 @@ describe("GridRuntime", () => {
     });
   });
 
+  it("plans and applies cursor continuation before a row removal", async () => {
+    const rt = createGridRuntime({
+      schema: tableSchema,
+      dataSource: tableDataSource(),
+      interaction: CELL_GRID_WITH_INDEPENDENT_ROW_SELECTION,
+    });
+    const b = makeRowId(rowsRoot, "b");
+    const c = makeRowId(rowsRoot, "c");
+    await rt.createRow(rowsRoot, {
+      levelName: "rows",
+      columns: { id: "c", name: "Cherry", qty: 3 },
+    });
+    rt.cursorManager.moveCellCursorTo({
+      path: rowsRoot,
+      rowId: b,
+      colId: "qty",
+    });
+    rt.controllerFor(rowsRoot).flushEffects();
+
+    const continuation = rt.planCursorContinuationForRowRemoval([
+      { path: rowsRoot, rowId: b },
+    ]);
+    expect(continuation).toEqual({
+      kind: "cell",
+      target: { path: rowsRoot, rowId: c, colId: "qty" },
+    });
+
+    rt.applyCursorContinuation(continuation);
+
+    expect(rt.cursorManager.currentCellCursor()).toEqual({
+      path: rowsRoot,
+      rowId: c,
+      colId: "qty",
+    });
+    expect(
+      rt
+        .controllerFor(rowsRoot)
+        .effects.getState()
+        .map((effect) => effect.type),
+    ).toEqual(["focusContainer", "scrollFocusIntoView"]);
+
+    await rt.removeRow(rowsRoot, "b");
+    expect(rt.cursorManager.currentCellCursor()?.rowId).toBe(c);
+  });
+
+  it("records the latest selection gesture lead and clears it with selection", () => {
+    const rt = createGridRuntime({
+      schema: tableSchema,
+      dataSource: tableDataSource(),
+      interaction: CELL_GRID_WITH_INDEPENDENT_ROW_SELECTION,
+    });
+    const a = makeRowId(rowsRoot, "a");
+    const b = makeRowId(rowsRoot, "b");
+
+    rt.rowInteraction.selectRow(rowsRoot, a);
+    expect(rt.coordinator.getState().rowSelectionLead).toEqual({
+      path: rowsRoot,
+      rowId: a,
+    });
+
+    rt.rowInteraction.extendRowSelectionTo(rowsRoot, b);
+    expect(rt.coordinator.getState().rowSelectionLead).toEqual({
+      path: rowsRoot,
+      rowId: b,
+    });
+
+    rt.rowInteraction.clearRowSelection(rowsRoot);
+    expect(rt.coordinator.getState().rowSelectionLead).toBe(null);
+  });
+
+  it("skips an expanded child subtree when its parent row is removed", () => {
+    const rt = createGridRuntime({
+      schema: reportSchema,
+      dataSource: inMemoryGridDataSource({
+        schema: reportSchema,
+        tree: [...reportTree, { levelName: "cat", columns: { name: "Veg" } }],
+        levels: {
+          cat: { sortMode: "none", filterMode: "none", paginationMode: "none" },
+          items: {
+            sortMode: "none",
+            filterMode: "none",
+            paginationMode: "none",
+          },
+        },
+      }),
+      interaction: CELL_GRID_WITH_INDEPENDENT_ROW_SELECTION,
+    });
+    const fruit = makeRowId(reportRoot, "Fruit");
+    const itemsPath = childPath(reportRoot, "Fruit", "items");
+    rt.coordinator.toggleExpand(reportRoot, fruit);
+    rt.cursorManager.moveCellCursorTo({
+      path: itemsPath,
+      rowId: makeRowId(itemsPath, "Apple"),
+      colId: "name",
+    });
+
+    expect(
+      rt.planCursorContinuationForRowRemoval([
+        { path: reportRoot, rowId: fruit },
+      ]),
+    ).toEqual({
+      kind: "cell",
+      target: {
+        path: reportRoot,
+        rowId: makeRowId(reportRoot, "Veg"),
+        colId: "name",
+      },
+    });
+  });
+
   it("cursorManager rejects cursor commands from the wrong interaction mode", () => {
     const rowList = createGridRuntime({
       schema: tableSchema,

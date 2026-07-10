@@ -1,7 +1,8 @@
 // The structural channel — one store per runtime.
 //
-// Owns cross-path state: the global `cellCursor`, the global `rowCursor`, and
-// which rows are expanded. These are cross-path decisions because:
+// Owns cross-path state: the global `cellCursor`, the global `rowCursor`, the
+// latest independent-row-selection lead, and which rows are expanded. These
+// are cross-path decisions because:
 //
 //   - A cursor is a single piece of state across the whole grid. In cell-grid
 //     mode the active path is derived from `cellCursor?.path`; in row-list mode
@@ -72,6 +73,10 @@ import { firstFocusableRow } from "../types/level-row-traversal";
 export type CoordinatorState = {
   cellCursor: CellCursor | null;
   rowCursor: RowCursor | null;
+  // Last row that a gesture made the lead of independent row selection. A
+  // structural row selector has no cell coordinate, so deletion continuation
+  // uses this value when neither interaction cursor identifies an origin.
+  rowSelectionLead: RowCursor | null;
   expansion: Map<GridPath, Set<RowId>>;
 };
 
@@ -96,6 +101,7 @@ export type GridCoordinatorStore = StoreApi<CoordinatorState> &
     // Internal: only the cursor manager writes the cursor.
     setCellCursor: (cursor: CellCursor | null) => void;
     setRowCursor: (cursor: RowCursor | null) => void;
+    setRowSelectionLead: (lead: RowCursor | null) => void;
   };
 
 export type CreateCoordinatorArgs = {
@@ -131,6 +137,7 @@ export function createGridCoordinator(
   const initial: CoordinatorState = {
     cellCursor: null,
     rowCursor: null,
+    rowSelectionLead: null,
     expansion: new Map(),
   };
   const store = createStore<CoordinatorState>(
@@ -149,6 +156,21 @@ export function createGridCoordinator(
     const cur = store.getState();
     if (cur.rowCursor === cursor) return;
     store.setState({ ...cur, rowCursor: cursor }, true);
+  };
+
+  store.setRowSelectionLead = (lead) => {
+    const cur = store.getState();
+    const previous = cur.rowSelectionLead;
+    if (
+      (!previous && !lead) ||
+      (previous &&
+        lead &&
+        previous.path === lead.path &&
+        previous.rowId === lead.rowId)
+    ) {
+      return;
+    }
+    store.setState({ ...cur, rowSelectionLead: lead }, true);
   };
 
   store.expand = (path, rowId) => {

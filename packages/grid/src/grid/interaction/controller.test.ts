@@ -123,7 +123,7 @@ describe("GridController — verbs", () => {
       target: "next",
     });
   });
-  
+
   it("commitEdit with commit='down' emits a commit movement intent", () => {
     const onNavigate = vi.fn();
     const c = makeController({ onNavigate });

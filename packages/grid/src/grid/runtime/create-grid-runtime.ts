@@ -79,11 +79,13 @@
 import { capabilitiesFor } from "../types/capabilities";
 import {
   childPath as makeChildPath,
+  cursorEqual,
   decomposePath,
   makeRowId,
   phantomKeyFromDisplayedRowId,
   rootPath,
   rowKeyOfRowId,
+  trailingEdge,
 } from "../types/identity";
 import type {
   CellCursor,
@@ -110,6 +112,7 @@ import {
   normalizeRowSelection,
   rowIdsInRowSelection,
   rowSelectionContainsRow as rowSelectionHasRow,
+  rowCursorEqual,
   selectedRowsFor,
 } from "../types/row-selection";
 import type {
@@ -166,6 +169,13 @@ import {
   createCursorManager,
   type CursorManager,
 } from "../interaction/cursor-manager";
+import {
+  planCursorContinuation,
+  type CursorContinuation,
+  type CursorContinuationRow,
+  type RowRemovalRef,
+} from "../interaction/cursor-continuation";
+import { visibleRows } from "../interaction/visible-order";
 import { createPhantomChannel } from "../data-sources/phantom-channel";
 import { createEmitter, type GridEmitter, type GridEvents } from "./emitter";
 import type { PhantomChannel } from "../data-sources/types";
@@ -280,6 +290,13 @@ export type GridRuntime = {
     atIndex?: number,
   ) => Promise<CreateNodeResult>;
   removeRow: (path: GridPath, rowKey: RowKey) => Promise<void>;
+  // Plan against the current visible tree before row mutations begin, then
+  // apply once so logical focus and DOM focus continue independently of source
+  // timing. The host remains responsible for deciding which rows to remove.
+  planCursorContinuationForRowRemoval: (
+    removals: readonly RowRemovalRef[],
+  ) => CursorContinuation;
+  applyCursorContinuation: (continuation: CursorContinuation) => void;
   commitPhantomRow: (
     path: GridPath,
     rowKey: RowKey,
@@ -687,7 +704,7 @@ export function createGridRuntime(args: RuntimeArgs): GridRuntime {
       displayedRowsFor(path),
       selectedRows.mode,
     );
-    if (next !== current) controller.setRowSelection(next);
+    if (next !== current) cursorManager.setRowSelection(path, next);
   }
 
   function requestLoadedRowsBoundary(
@@ -1164,6 +1181,122 @@ export function createGridRuntime(args: RuntimeArgs): GridRuntime {
   });
   cursorManagerRef = cursorManager;
 
+  function cursorContinuationRows(
+    removalsByPath: ReadonlyMap<GridPath, ReadonlySet<RowId>>,
+  ): CursorContinuationRow[] {
+    if (!runtimeRef) {
+      throw new Error(
+        "GridRuntime: cursor continuation requested before runtime construction completed.",
+      );
+    }
+    return Array.from(visibleRows(runtimeRef, coordinator, root)).map(
+      ({ path, rowId }) => {
+        const row = displayedRowFor(path, rowId);
+        const rowCapabilities = row ? capabilitiesFor(row.kind) : null;
+        return {
+          path,
+          rowId,
+          survivesRemoval: rowSurvivesRemoval(path, rowId, removalsByPath),
+          cellFocusable: rowCapabilities?.focusable ?? false,
+          rowSelectable: row?.rowSelectable ?? false,
+          colIds: schemaForPath(path).columns.map((column) => column.id),
+        };
+      },
+    );
+  }
+
+  function rowSurvivesRemoval(
+    path: GridPath,
+    rowId: RowId,
+    removalsByPath: ReadonlyMap<GridPath, ReadonlySet<RowId>>,
+  ): boolean {
+    if (removalsByPath.get(path)?.has(rowId)) return false;
+
+    let currentPath = path;
+    let edge = trailingEdge(currentPath);
+    while (edge) {
+      const parentRowId = makeRowId(edge.parentPath, edge.parentRowKey);
+      if (removalsByPath.get(edge.parentPath)?.has(parentRowId)) return false;
+      currentPath = edge.parentPath;
+      edge = trailingEdge(currentPath);
+    }
+    return true;
+  }
+
+  function planCursorContinuationForRowRemoval(
+    removals: readonly RowRemovalRef[],
+  ): CursorContinuation {
+    assertLive();
+    const removalsByPath = new Map<GridPath, Set<RowId>>();
+    for (const removal of removals) {
+      const ids = removalsByPath.get(removal.path) ?? new Set<RowId>();
+      ids.add(removal.rowId);
+      removalsByPath.set(removal.path, ids);
+    }
+    const rows = cursorContinuationRows(removalsByPath);
+    const state = coordinator.getState();
+    return interaction.mode === "cell-grid"
+      ? planCursorContinuation({
+          mode: "cell-grid",
+          rows,
+          cellCursor: state.cellCursor,
+          rowSelectionLead: state.rowSelectionLead,
+          fallbackPath: root,
+        })
+      : planCursorContinuation({
+          mode: "row-list",
+          rows,
+          rowCursor: state.rowCursor,
+          rowSelectionLead: state.rowSelectionLead,
+          fallbackPath: root,
+        });
+  }
+
+  function applyCursorContinuation(continuation: CursorContinuation): void {
+    assertLive();
+    if (continuation.kind === "cell") {
+      if (interaction.mode !== "cell-grid") {
+        throw new Error(
+          "GridRuntime.applyCursorContinuation: cell landing requires cell-grid interaction.",
+        );
+      }
+      const alreadyThere = cursorEqual(
+        cursorManager.currentCellCursor(),
+        continuation.target,
+      );
+      cursorManager.applyCellCursor(continuation.target);
+      const controller = controllerCursorPortFor(continuation.target.path);
+      if (alreadyThere) controller.queueEffect({ type: "focusContainer" });
+      controller.revealCell({
+        rowId: continuation.target.rowId,
+        colId: continuation.target.colId,
+      });
+      return;
+    }
+    if (continuation.kind === "row") {
+      if (interaction.mode !== "row-list") {
+        throw new Error(
+          "GridRuntime.applyCursorContinuation: row landing requires row-list interaction.",
+        );
+      }
+      const alreadyThere = rowCursorEqual(
+        cursorManager.currentRowCursor(),
+        continuation.target,
+      );
+      cursorManager.applyRowCursor(continuation.target);
+      const controller = controllerCursorPortFor(continuation.target.path);
+      if (alreadyThere) controller.queueEffect({ type: "focusContainer" });
+      controller.revealRow(continuation.target.rowId);
+      return;
+    }
+
+    if (interaction.mode === "cell-grid") cursorManager.clearCellCursor();
+    else cursorManager.clearRowCursor();
+    controllerCursorPortFor(continuation.path).queueEffect({
+      type: "focusContainer",
+    });
+  }
+
   function controllerCursorPortFor(path: GridPath): GridControllerStore {
     let c = controllers.get(path);
     if (c) return c;
@@ -1520,6 +1653,12 @@ export function createGridRuntime(args: RuntimeArgs): GridRuntime {
     };
   }
 
+  function recordRowSelectionLead(path: GridPath, rowId: RowId): void {
+    const selection = controllerCursorPortFor(path).getState().rowSelection;
+    if (!rowSelectionHasRow(selection, rowId, displayedRowsFor(path))) return;
+    coordinator.setRowSelectionLead({ path, rowId });
+  }
+
   const rowInteraction: RowInteractionCommands = {
     setRowCursor(target) {
       if (interaction.mode !== "row-list") return;
@@ -1535,6 +1674,7 @@ export function createGridRuntime(args: RuntimeArgs): GridRuntime {
     },
     selectRow(path, rowId) {
       cursorManager.setRowSelection(path, makeSingleRowSelection(rowId));
+      recordRowSelectionLead(path, rowId);
     },
     setRowSelection(path, selection) {
       cursorManager.setRowSelection(path, selection);
@@ -1547,12 +1687,12 @@ export function createGridRuntime(args: RuntimeArgs): GridRuntime {
         return;
       const current = controllerCursorPortFor(path).getState().rowSelection;
       if (config.mode === "single") {
+        const selecting = !rowSelectionHasRow(current, rowId, displayed);
         cursorManager.setRowSelection(
           path,
-          rowSelectionHasRow(current, rowId, displayed)
-            ? null
-            : makeSingleRowSelection(rowId),
+          selecting ? makeSingleRowSelection(rowId) : null,
         );
+        if (selecting) recordRowSelectionLead(path, rowId);
         return;
       }
       // Multi/range toggles rebuild from displayed-order projection. That
@@ -1562,6 +1702,9 @@ export function createGridRuntime(args: RuntimeArgs): GridRuntime {
       if (ids.has(rowId)) ids.delete(rowId);
       else ids.add(rowId);
       cursorManager.setRowSelection(path, makeRowSetSelection(ids));
+      if (ids.has(rowId)) {
+        recordRowSelectionLead(path, rowId);
+      }
     },
     extendRowSelectionTo(path, rowId) {
       const displayed = displayedRowsFor(path);
@@ -1580,6 +1723,7 @@ export function createGridRuntime(args: RuntimeArgs): GridRuntime {
               ? currentCursor.rowId
               : rowId;
       cursorManager.setRowSelection(path, makeRowRangeSelection(anchor, rowId));
+      recordRowSelectionLead(path, rowId);
     },
     extendRowSelectionToCursor(target) {
       if (interaction.mode !== "row-list") return;
@@ -1655,6 +1799,8 @@ export function createGridRuntime(args: RuntimeArgs): GridRuntime {
     applyChanges,
     createRow,
     removeRow,
+    planCursorContinuationForRowRemoval,
+    applyCursorContinuation,
     commitPhantomRow,
     phantomBoundaryCellTarget: phantomLifecycle.boundaryCellTarget,
     phantomBoundaryRowTarget: phantomLifecycle.boundaryRowTarget,

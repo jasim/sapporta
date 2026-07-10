@@ -55,6 +55,9 @@ describe("table selection", () => {
     const rowId = makeRowId(root, "10" as never);
     const clearRowSelection = vi.fn();
     const removeRow = vi.fn(async () => {});
+    const continuation = { kind: "grid" as const, path: root };
+    const planCursorContinuationForRowRemoval = vi.fn(() => continuation);
+    const applyCursorContinuation = vi.fn();
     const refetch = vi.fn();
     const session = makeSession({
       paths: [root],
@@ -62,13 +65,51 @@ describe("table selection", () => {
       dataRowIds: new Set([rowId]),
       clearRowSelection,
       removeRow,
+      planCursorContinuationForRowRemoval,
+      applyCursorContinuation,
       refetchByPath: new Map([[root, refetch]]),
     });
 
     await deleteSelectedTableRows(session);
 
+    expect(planCursorContinuationForRowRemoval).toHaveBeenCalledWith([
+      { path: root, rowId },
+    ]);
+    expect(applyCursorContinuation).toHaveBeenCalledWith(continuation);
+    expect(applyCursorContinuation.mock.invocationCallOrder[0]).toBeLessThan(
+      removeRow.mock.invocationCallOrder[0],
+    );
     expect(removeRow).toHaveBeenCalledWith(root, "10");
     expect(refetch).toHaveBeenCalledTimes(1);
+    expect(clearRowSelection).toHaveBeenCalledWith(root);
+  });
+
+  it("does not complete the deletion workflow until affected paths settle", async () => {
+    const root = rootPath("orders");
+    const rowId = makeRowId(root, "10" as never);
+    const clearRowSelection = vi.fn();
+    let resolveRefetch: (() => void) | undefined;
+    const refetch = vi.fn(
+      () =>
+        new Promise<void>((resolve) => {
+          resolveRefetch = resolve;
+        }),
+    );
+    const session = makeSession({
+      paths: [root],
+      selectedByPath: new Map([[root, [rowId]]]),
+      dataRowIds: new Set([rowId]),
+      clearRowSelection,
+      refetchByPath: new Map([[root, refetch]]),
+    });
+
+    const deleting = deleteSelectedTableRows(session);
+    await vi.waitFor(() => expect(refetch).toHaveBeenCalledTimes(1));
+    expect(clearRowSelection).not.toHaveBeenCalled();
+
+    resolveRefetch?.();
+    await deleting;
+
     expect(clearRowSelection).toHaveBeenCalledWith(root);
   });
 
@@ -155,6 +196,8 @@ function makeSession(args: {
   dataRowIds: Set<RowId>;
   clearRowSelection?: (path: GridPath) => void;
   removeRow?: GridRuntime["removeRow"];
+  planCursorContinuationForRowRemoval?: GridRuntime["planCursorContinuationForRowRemoval"];
+  applyCursorContinuation?: GridRuntime["applyCursorContinuation"];
   setErrorBanner?: (message: string | null) => void;
   refetchByPath?: Map<GridPath, ReturnType<typeof vi.fn>>;
 }): {
@@ -188,6 +231,10 @@ function makeSession(args: {
       displayedRowFor: (_path: GridPath, rowId: RowId) =>
         displayedRowFor(args.dataRowIds, rowId),
       rowInteraction: { clearRowSelection },
+      planCursorContinuationForRowRemoval:
+        args.planCursorContinuationForRowRemoval ??
+        vi.fn(() => ({ kind: "grid", path: args.paths[0] })),
+      applyCursorContinuation: args.applyCursorContinuation ?? vi.fn(() => {}),
       removeRow: args.removeRow ?? vi.fn(async () => {}),
       sourceFor: (path: GridPath) => ({
         query: { refetch: refetchByPath.get(path) },

@@ -22,6 +22,14 @@ export {
 } from "./cursor-manager";
 
 export {
+  planCursorContinuation,
+  type CursorContinuation,
+  type CursorContinuationInput,
+  type CursorContinuationRow,
+  type RowRemovalRef,
+} from "./cursor-continuation";
+
+export {
   keyEventToCellIntent,
   keyEventToRowIntent,
   rowSelectionGestureFromModifiers,
