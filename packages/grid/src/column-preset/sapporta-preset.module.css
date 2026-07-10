@@ -30,6 +30,11 @@
   --grid-phantom-row-background: var(--sap-surface);
   --grid-editor-background: var(--sap-surface);
   --grid-row-header-column-width: 40px;
+  --grid-row-header-background: color-mix(
+    in oklab,
+    var(--sap-row-hover) 38%,
+    transparent
+  );
 
   --grid-active-focus-background: var(
     --grid-cell-active-focus-background,
@@ -193,6 +198,7 @@
 }
 
 :where(.presetGrid [data-grid-part="row-header-header-cell"]) {
+  background: var(--grid-row-header-background);
   min-height: var(--grid-header-min-height, var(--height-sap-header));
 }
 
@@ -203,10 +209,6 @@
 :where(.presetGrid [data-grid-part="row-header-control"]:focus-visible) {
   box-shadow: inset 0 0 0 1.5px var(--grid-current-focus-ring-color);
   outline: none;
-}
-
-:where(.presetGrid [data-grid-part="row-header-control"]:hover) {
-  background: color-mix(in oklab, var(--sap-row-hover) 70%, transparent);
 }
 
 :where(
@@ -285,6 +287,14 @@
   --grid-cell-background: var(--grid-current-selection-background);
 
   background: var(--grid-cell-background);
+}
+
+:where(.presetGrid [role="rowheader"]) {
+  background: var(--grid-row-header-background);
+}
+
+:where(.presetGrid [data-row-selectable="true"] [role="rowheader"]) {
+  cursor: pointer;
 }
 
 :where(.presetGrid [data-grid-part="editor-overlay"]) {

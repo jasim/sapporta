@@ -11,7 +11,7 @@ export const comboboxClassNames = {
   positioner: "isolate z-[var(--sap-z-popover)] outline-none",
   popup:
     "w-[--anchor-width] overflow-hidden rounded-md border bg-popover p-0 text-popover-foreground shadow-md outline-none transition-[opacity,transform] data-starting-style:scale-95 data-starting-style:opacity-0 data-ending-style:scale-95 data-ending-style:opacity-0",
-  empty: "py-6 text-center text-sm",
+  empty: "py-6 text-center text-sm empty:py-0",
   list: "max-h-[300px] overflow-x-hidden overflow-y-auto p-1",
   item: "relative flex w-full cursor-default select-none items-center gap-2 rounded-sm px-2 py-1.5 pr-8 text-sm outline-none data-highlighted:bg-accent data-highlighted:text-accent-foreground data-disabled:pointer-events-none data-disabled:opacity-50",
   itemIndicator: "absolute right-2 text-sap-muted [&_svg]:size-3.5",
