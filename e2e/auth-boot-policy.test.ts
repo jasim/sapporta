@@ -123,6 +123,15 @@ describe("sapporta init auth template - CORS and health policy", () => {
     );
   });
 
+  it("rejects conflicting Sapporta and hosting-platform ports", async () => {
+    const failure = await expectBuiltServerBootFailure(project!, {
+      PORT: "1",
+    });
+    expect(failure.output.join("")).toContain(
+      "SAPPORTA_API_PORT and PORT must match when both are set",
+    );
+  });
+
   it("serves public health without a session", async () => {
     server = await startBuiltServer(
       project!,

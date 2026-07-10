@@ -1912,11 +1912,11 @@ export async function startBuiltServer(
       env: {
         ...project.env,
         ...envOverrides,
-        SAPPORTA_PUBLIC_BASE_URL:
-          envOverrides.SAPPORTA_PUBLIC_BASE_URL ?? baseUrl,
+        SAPPORTA_PUBLIC_APP_URL:
+          envOverrides.SAPPORTA_PUBLIC_APP_URL ?? baseUrl,
         SAPPORTA_REQUIRE_VERIFIED_EMAIL:
           envOverrides.SAPPORTA_REQUIRE_VERIFIED_EMAIL ?? "false",
-        PORT: String(port),
+        SAPPORTA_API_PORT: String(port),
       },
       stdio: "pipe",
     });
@@ -1951,11 +1951,10 @@ export async function expectBuiltServerBootFailure(
     env: {
       ...project.env,
       ...envOverrides,
-      SAPPORTA_PUBLIC_BASE_URL:
-        envOverrides.SAPPORTA_PUBLIC_BASE_URL ?? baseUrl,
+      SAPPORTA_PUBLIC_APP_URL: envOverrides.SAPPORTA_PUBLIC_APP_URL ?? baseUrl,
       SAPPORTA_REQUIRE_VERIFIED_EMAIL:
         envOverrides.SAPPORTA_REQUIRE_VERIFIED_EMAIL ?? "false",
-      PORT: String(port),
+      SAPPORTA_API_PORT: String(port),
     },
     stdio: "pipe",
   });
@@ -2016,6 +2015,7 @@ export async function buildAndRunDockerProject(
 
   const imageTag = `${tagPrefix}:${Date.now()}`;
   const port = await getFreePort();
+  const containerPort = 3100;
   const baseUrl = `http://127.0.0.1:${port}`;
 
   await step("docker build generated project", () =>
@@ -2034,7 +2034,11 @@ export async function buildAndRunDockerProject(
           "run",
           "-d",
           "-p",
-          `127.0.0.1:${port}:3000`,
+          `127.0.0.1:${port}:${containerPort}`,
+          // Hosting platforms conventionally assign PORT. Exercise that
+          // compatibility path instead of Sapporta's namespaced override.
+          "-e",
+          `PORT=${containerPort}`,
           // The generated auth template is production-shaped even in tests: it
           // refuses to boot without a Better Auth secret/public URL, and Better
           // Auth checks request origins on credentialed auth routes. Use the
@@ -2042,7 +2046,7 @@ export async function buildAndRunDockerProject(
           "-e",
           `BETTER_AUTH_SECRET=${project.env.BETTER_AUTH_SECRET ?? "sapporta-e2e-generated-project-secret"}`,
           "-e",
-          `SAPPORTA_PUBLIC_BASE_URL=${baseUrl}`,
+          `SAPPORTA_PUBLIC_APP_URL=${baseUrl}`,
           "-e",
           `SAPPORTA_FRONTEND_ORIGINS=${baseUrl}`,
           "-e",

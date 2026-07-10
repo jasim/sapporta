@@ -40,7 +40,7 @@ export function createBetterAuth({
 }: CreateBetterAuthOptions): ProjectBetterAuth {
   const auth: ProjectBetterAuth = betterAuth({
     basePath: projectAuthBasePath,
-    baseURL: env.publicBaseUrl,
+    baseURL: env.publicAppUrl,
     secret: env.betterAuthSecret,
     trustedOrigins: env.trustedOrigins,
     database: drizzleAdapter(conn.db, {

@@ -53,7 +53,8 @@ Use `auth.rowSecurity.forTable(table)` directly for advanced Drizzle workflows s
 | `SAPPORTA_API_URL`               | Server URL for CLI commands. Default: `http://localhost:3000`.                                                                           |
 | `SAPPORTA_API_TOKEN`             | Bearer token for protected API-backed CLI commands. Preferred for agents and automation.                                                 |
 | `SAPPORTA_OUTPUT_FORMAT`         | Default CLI output format: `json` or `table`.                                                                                            |
-| `PORT`                           | Server port. Default: `3000`.                                                                                                            |
+| `SAPPORTA_API_PORT`              | Explicit app API port. Defaults to `3000` when neither port variable is set.                                                             |
+| `PORT`                           | Hosting-platform API port used when `SAPPORTA_API_PORT` is absent.                                                                       |
 | `LOG_FORMAT`                     | Set to `json` for structured logging.                                                                                                    |
 | `LOG_LEVEL`                      | Log level. Default: `debug`.                                                                                                             |
 

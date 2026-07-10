@@ -49,7 +49,6 @@ RUN pnpm install --frozen-lockfile
 FROM node:${NODE_VERSION} AS runtime
 ARG PNPM_VERSION
 ENV NODE_ENV=production
-ENV PORT=3000
 WORKDIR /app
 RUN corepack enable \
   && corepack prepare pnpm@${PNPM_VERSION} --activate
@@ -85,6 +84,6 @@ VOLUME ["/app/data"]
 # The OpenAPI endpoint is mounted after framework and user routes register; a
 # successful response proves the Hono process booted and Sapporta loaded.
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-  CMD node -e "fetch('http://127.0.0.1:' + (process.env.PORT || 3000) + '/api/openapi.json').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"
+  CMD node -e "fetch('http://127.0.0.1:' + (process.env.SAPPORTA_API_PORT || process.env.PORT || 3000) + '/api/openapi.json').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"
 
 CMD ["sh", "-c", "pnpm --filter ./packages/api db:migrate && node packages/api/dist/boot.js"]

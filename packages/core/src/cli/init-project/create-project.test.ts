@@ -234,8 +234,12 @@ describe("renderScaffoldFiles", () => {
     expect(byDest.get(".env.development")).toMatch(
       /BETTER_AUTH_SECRET=[A-Za-z0-9_-]{43}/,
     );
+    expect(byDest.get(".env.development")).toContain("SAPPORTA_API_PORT=3000");
     expect(byDest.get(".env.development")).toContain(
-      "SAPPORTA_PUBLIC_BASE_URL=http://localhost:5173",
+      "SAPPORTA_FRONTEND_PORT=5173",
+    );
+    expect(byDest.get(".env.development")).toContain(
+      "SAPPORTA_PUBLIC_APP_URL=http://localhost:5173",
     );
     expect(byDest.has("packages/frontend/src/SapportaApp.tsx")).toBe(true);
     expect(byDest.has("packages/frontend/src/Sidebar.tsx")).toBe(false);

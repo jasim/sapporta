@@ -219,7 +219,7 @@ describe("project mailer template", () => {
 function authEnv(overrides: NodeJS.ProcessEnv = {}): NodeJS.ProcessEnv {
   return {
     BETTER_AUTH_SECRET: "secret",
-    SAPPORTA_PUBLIC_BASE_URL: "http://localhost:5173",
+    SAPPORTA_PUBLIC_APP_URL: "http://localhost:5173",
     SAPPORTA_MAIL_TRANSPORT: "stream",
     SAPPORTA_MAIL_FROM: "Sapporta <no-reply@example.test>",
     ...overrides,

@@ -39,22 +39,33 @@ Shape (c) loses both; its extra configuration follows from that.
 - `.env.production.example` — placeholder production values. Copy the values
   into your deployment environment; `pnpm start` does not load development env.
 
-`SAPPORTA_PUBLIC_BASE_URL` is the public browser-facing app origin. Sapporta
+`SAPPORTA_API_PORT` is the explicit application setting for the Hono listener.
+If it is absent, Sapporta accepts the conventional `PORT` value assigned by
+managed hosting platforms. The API defaults to `3000` when neither is set. If
+both variables are present, they must contain the same port so deployment
+configuration cannot silently disagree.
+
+`SAPPORTA_PUBLIC_APP_URL` is the public browser-facing app origin. Sapporta
 uses it as Better Auth's public base URL and as the server-owned return URL for
 auth emails. It must be an origin only, such as `https://app.example.com`, and
 `/api/auth/*` must be reachable from that origin.
 
 `SAPPORTA_FRONTEND_ORIGINS` is the list of browser origins allowed to make
-credentialed API/auth requests in addition to `SAPPORTA_PUBLIC_BASE_URL`.
+credentialed API/auth requests in addition to `SAPPORTA_PUBLIC_APP_URL`.
 
-In development, set `SAPPORTA_PUBLIC_BASE_URL` to the Vite dev-server origin
-and `FRONTEND_DEV_PORT` to the same port. Vite proxies `/api/*` to Hono, so
+In development, set `SAPPORTA_PUBLIC_APP_URL` to the Vite frontend-server origin
+and `SAPPORTA_FRONTEND_PORT` to the same port. Vite proxies `/api/*` to Hono, so
 auth links like `/api/auth/verify-email` work from the public dev origin. Set
 `SAPPORTA_FRONTEND_ORIGINS` only when you need additional browser origins.
 
 `VITE_API_URL` is different: it is baked into the browser bundle only when the
 SPA and API are deployed to different origins. It is not used in development or
 same-origin production.
+
+`SAPPORTA_API_URL` belongs to API clients such as the Sapporta CLI and
+automation. Set it in the client process, or pass `--api-url` for one command.
+The running application does not read it to choose its own port; that is the
+role of `SAPPORTA_API_PORT` or its hosting-compatible `PORT` fallback.
 
 ## The `serveStatic` block
 
@@ -66,12 +77,13 @@ same-origin production.
 
 ## Shape (a) — Single process (default)
 
-One Hono process serves `/api/*` and the built SPA on a single `PORT`; no proxy in front.
+One Hono process serves `/api/*` and the built SPA on a single
+`SAPPORTA_API_PORT`; no proxy in front.
 
 ```bash
 pnpm build                 # tsc → packages/api/dist/, vite build → packages/frontend/dist/
 pnpm --filter ./packages/api db:migrate
-PORT=3000 pnpm start       # node packages/api/dist/boot.js
+SAPPORTA_API_PORT=3000 pnpm start  # node packages/api/dist/boot.js
 ```
 
 The browser loads the SPA from `http://your-host:3000/`, and its relative `fetch("/api/foo")` calls hit the same process.
@@ -84,7 +96,8 @@ The browser loads the SPA from `http://your-host:3000/`, and its relative `fetch
 Scaffolded projects include a production `Dockerfile` for this same-origin
 shape. It builds the shared package, API, and frontend, installs production
 dependencies, copies the built SPA into `packages/frontend/dist/`, exposes
-`PORT` defaulting to `3000`, and health-checks `/api/openapi.json`.
+port `3000`, and health-checks `/api/openapi.json`. At runtime the image accepts
+either `SAPPORTA_API_PORT` or the conventional `PORT` assigned by a host.
 
 ```bash
 docker build -t %%SAPPORTA:SLUG%% .
@@ -106,7 +119,8 @@ origin, so frontend API calls remain relative.
 
 ## Shape (b) — Reverse proxy (nginx, Caddy, etc.)
 
-A reverse proxy serves `packages/frontend/dist/` directly and proxies `/api/` to Hono (still run via `PORT=3000 pnpm start`).
+A reverse proxy serves `packages/frontend/dist/` directly and proxies `/api/`
+to Hono (still run via `SAPPORTA_API_PORT=3000 pnpm start`).
 
 ```nginx
 server {
@@ -152,10 +166,10 @@ The SPA ships to a CDN (Cloudflare Pages, Netlify, Vercel, S3 + CloudFront, …)
 
 ### 1. Public app origin and trusted origins
 
-Set `SAPPORTA_PUBLIC_BASE_URL` on the API server:
+Set `SAPPORTA_PUBLIC_APP_URL` on the API server:
 
 ```env
-SAPPORTA_PUBLIC_BASE_URL=https://app.example.com
+SAPPORTA_PUBLIC_APP_URL=https://app.example.com
 ```
 
 Sapporta includes that origin in Better Auth `trustedOrigins` and uses it for
@@ -183,7 +197,7 @@ Only `VITE_`-prefixed env vars reach the client bundle — Vite's rule. Don't sm
 
 ### 3. Route auth callbacks from the public origin
 
-Auth email links are generated on `SAPPORTA_PUBLIC_BASE_URL`, for example
+Auth email links are generated on `SAPPORTA_PUBLIC_APP_URL`, for example
 `https://app.example.com/api/auth/verify-email`. In split topology, configure
 the CDN or frontend host to proxy `/api/auth/*` to the API host. This keeps
 email links and post-verification redirects on the app's public origin while the
@@ -196,7 +210,7 @@ Dead code in this shape (see the `serveStatic` section).
 ### 5. Deploy in two halves
 
 - **SPA:** `vite build` → `packages/frontend/dist/`. Upload to the CDN and configure an SPA fallback (`/* → /index.html`) so React Router handles deep links on hard reload.
-- **API:** `tsc` → `packages/api/dist/`. Run `node packages/api/dist/boot.js` with `PORT`, `BETTER_AUTH_SECRET`, `SAPPORTA_PUBLIC_BASE_URL`, and any extra `SAPPORTA_FRONTEND_ORIGINS` set.
+- **API:** `tsc` → `packages/api/dist/`. Run `node packages/api/dist/boot.js` with `SAPPORTA_API_PORT`, `BETTER_AUTH_SECRET`, `SAPPORTA_PUBLIC_APP_URL`, and any extra `SAPPORTA_FRONTEND_ORIGINS` set.
 
 Fit:
 
@@ -207,10 +221,11 @@ Fit:
 
 | Variable                          | Read from            | Dev | (a)      | (b)      | (c)      | Purpose                                                                       |
 | --------------------------------- | -------------------- | --- | -------- | -------- | -------- | ----------------------------------------------------------------------------- |
-| `PORT`                            | API host process env | yes | yes      | yes      | yes      | Port Hono binds to. Defaults to `3000`.                                       |
-| `FRONTEND_DEV_PORT`               | Dev process env      | yes | —        | —        | —        | Vite dev-server port. Match it to `SAPPORTA_PUBLIC_BASE_URL` in dev.          |
+| `SAPPORTA_API_PORT`               | API host process env | yes | yes      | yes      | yes      | Port Hono binds to. Defaults to `3000`.                                       |
+| `PORT`                            | API host process env | —   | yes      | yes      | yes      | Hosting-platform fallback when `SAPPORTA_API_PORT` is absent.                 |
+| `SAPPORTA_FRONTEND_PORT`          | Dev process env      | yes | —        | —        | —        | Vite frontend-server port. Match it to `SAPPORTA_PUBLIC_APP_URL` in dev.      |
 | `BETTER_AUTH_SECRET`              | API host process env | yes | yes      | yes      | yes      | Better Auth signing secret. Generated only for local development.             |
-| `SAPPORTA_PUBLIC_BASE_URL`        | API host process env | yes | yes      | yes      | yes      | Public app origin used for Better Auth links, callbacks, and default trust.   |
+| `SAPPORTA_PUBLIC_APP_URL`         | API host process env | yes | yes      | yes      | yes      | Public app origin used for Better Auth links, callbacks, and default trust.   |
 | `SAPPORTA_FRONTEND_ORIGINS`       | API host process env | yes | yes      | yes      | yes      | Extra browser origins trusted for credentialed API/auth requests.             |
 | `SAPPORTA_REQUIRE_VERIFIED_EMAIL` | API host process env | yes | optional | optional | optional | Whether email/password sign-up requires verified email.                       |
 | `SAPPORTA_HEALTH_POLICY`          | API host process env | yes | optional | optional | optional | Access policy for health endpoints: `public`, `authenticated`, or `disabled`. |
