@@ -182,6 +182,7 @@ describe("Sapporta package exports", () => {
     const tempProject = createLinkedConsumerProject();
     try {
       const representativeSpecifiers = [
+        "@sapporta/ui/alert-dialog",
         "@sapporta/ui/button",
         "@sapporta/ui/context-menu",
         "@sapporta/ui/tooltip",
@@ -265,6 +266,7 @@ describe("Sapporta package exports", () => {
           import * as grid from "@sapporta/grid";
           import * as gridRuntime from "@sapporta/grid/grid";
           import * as ui from "@sapporta/ui";
+          import * as uiAlertDialog from "@sapporta/ui/alert-dialog";
           import * as uiButton from "@sapporta/ui/button";
           import * as uiContextMenu from "@sapporta/ui/context-menu";
           import * as uiCn from "@sapporta/ui/cn";
@@ -282,6 +284,7 @@ describe("Sapporta package exports", () => {
             grid,
             gridRuntime,
             ui,
+            uiAlertDialog,
             uiButton,
             uiContextMenu,
             uiCn,

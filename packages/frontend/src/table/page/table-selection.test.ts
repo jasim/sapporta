@@ -55,39 +55,96 @@ describe("table selection", () => {
     const rowId = makeRowId(root, "10" as never);
     const clearRowSelection = vi.fn();
     const removeRow = vi.fn(async () => {});
+    const refetch = vi.fn();
     const session = makeSession({
       paths: [root],
       selectedByPath: new Map([[root, [rowId]]]),
       dataRowIds: new Set([rowId]),
       clearRowSelection,
       removeRow,
+      refetchByPath: new Map([[root, refetch]]),
     });
 
     await deleteSelectedTableRows(session);
 
     expect(removeRow).toHaveBeenCalledWith(root, "10");
+    expect(refetch).toHaveBeenCalledTimes(1);
     expect(clearRowSelection).toHaveBeenCalledWith(root);
   });
 
-  it("reports delete failures through the table error banner", async () => {
+  it("deletes selected child rows before parents and refetches every touched path", async () => {
     const root = rootPath("orders");
+    const lines = childPath(root, "10" as never, "orders.lines");
     const orderRow = makeRowId(root, "10" as never);
-    const setErrorBanner = vi.fn();
+    const lineRow = makeRowId(lines, "501" as never);
+    const removeRow = vi.fn(async () => {});
+    const refetchRoot = vi.fn();
+    const refetchLines = vi.fn();
     const session = makeSession({
-      paths: [root],
-      selectedByPath: new Map([[root, [orderRow]]]),
-      dataRowIds: new Set([orderRow]),
-      removeRow: vi.fn(async () => {
-        throw new Error("permission denied");
-      }),
-      setErrorBanner,
+      paths: [root, lines],
+      selectedByPath: new Map([
+        [root, [orderRow]],
+        [lines, [lineRow]],
+      ]),
+      dataRowIds: new Set([orderRow, lineRow]),
+      removeRow,
+      refetchByPath: new Map([
+        [root, refetchRoot],
+        [lines, refetchLines],
+      ]),
     });
 
     await deleteSelectedTableRows(session);
 
+    expect(removeRow.mock.calls).toEqual([
+      [lines, "501"],
+      [root, "10"],
+    ]);
+    expect(refetchLines).toHaveBeenCalledTimes(1);
+    expect(refetchRoot).toHaveBeenCalledTimes(1);
+  });
+
+  it("stops after a failure, reports it, and retains rows that remain for retry", async () => {
+    const root = rootPath("orders");
+    const firstRow = makeRowId(root, "10" as never);
+    const failingRow = makeRowId(root, "20" as never);
+    const unattemptedRow = makeRowId(root, "30" as never);
+    const dataRowIds = new Set([firstRow, failingRow, unattemptedRow]);
+    const clearRowSelection = vi.fn();
+    const setErrorBanner = vi.fn();
+    const refetch = vi.fn();
+    const removeRow = vi.fn(async (_path: GridPath, rowKey: string) => {
+      if (rowKey === "10") {
+        dataRowIds.delete(firstRow);
+        return;
+      }
+      throw new Error("permission denied");
+    });
+    const session = makeSession({
+      paths: [root],
+      selectedByPath: new Map([[root, [firstRow, failingRow, unattemptedRow]]]),
+      dataRowIds,
+      clearRowSelection,
+      removeRow,
+      setErrorBanner,
+      refetchByPath: new Map([[root, refetch]]),
+    });
+
+    await deleteSelectedTableRows(session);
+
+    expect(removeRow.mock.calls).toEqual([
+      [root, "10"],
+      [root, "20"],
+    ]);
+    expect(clearRowSelection).not.toHaveBeenCalled();
+    expect(refetch).toHaveBeenCalledTimes(1);
     expect(setErrorBanner).toHaveBeenCalledWith(
       "Failed to delete row: permission denied",
     );
+    expect(selectedTableDeleteTargets(session)).toEqual([
+      { path: root, rowKey: "20" },
+      { path: root, rowKey: "30" },
+    ]);
   });
 });
 
@@ -99,12 +156,15 @@ function makeSession(args: {
   clearRowSelection?: (path: GridPath) => void;
   removeRow?: GridRuntime["removeRow"];
   setErrorBanner?: (message: string | null) => void;
+  refetchByPath?: Map<GridPath, ReturnType<typeof vi.fn>>;
 }): {
   runtime: GridRuntime;
   setErrorBanner: (message: string | null) => void;
 } {
   const clearRowSelection = args.clearRowSelection ?? vi.fn();
-  const refetch = vi.fn();
+  const refetchByPath =
+    args.refetchByPath ??
+    new Map(args.paths.map((path) => [path, vi.fn()] as const));
   return {
     setErrorBanner: args.setErrorBanner ?? vi.fn(),
     runtime: {
@@ -129,7 +189,9 @@ function makeSession(args: {
         displayedRowFor(args.dataRowIds, rowId),
       rowInteraction: { clearRowSelection },
       removeRow: args.removeRow ?? vi.fn(async () => {}),
-      sourceFor: () => ({ refetch }),
+      sourceFor: (path: GridPath) => ({
+        query: { refetch: refetchByPath.get(path) },
+      }),
     } as unknown as GridRuntime,
   };
 }

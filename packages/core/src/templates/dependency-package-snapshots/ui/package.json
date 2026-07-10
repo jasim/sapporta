@@ -46,6 +46,11 @@
       "sapporta:source": "./src/index.css",
       "default": "./dist/index.css"
     },
+    "./alert-dialog": {
+      "types": "./dist/ui/primitives/alert-dialog.d.ts",
+      "sapporta:source": "./src/ui/primitives/alert-dialog.tsx",
+      "default": "./dist/alert-dialog.js"
+    },
     "./badge": {
       "types": "./dist/ui/primitives/badge.d.ts",
       "sapporta:source": "./src/ui/primitives/badge.tsx",

@@ -1,3 +1,15 @@
+export {
+  AlertDialog,
+  AlertDialogClose,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogOverlay,
+  AlertDialogPortal,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "./primitives/alert-dialog";
 export { Badge, badgeVariants } from "./primitives/badge";
 export { Button, buttonVariants } from "./primitives/button";
 export { Checkbox } from "./primitives/checkbox";

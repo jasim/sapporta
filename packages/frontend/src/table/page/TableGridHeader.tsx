@@ -1,13 +1,24 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import {
   Download,
   ListFilter,
+  Loader2,
   MoreHorizontal,
   Plus,
   Trash2,
   X,
 } from "lucide-react";
 import type { TableSchema } from "@sapporta/shared/contracts";
+import {
+  AlertDialog,
+  AlertDialogClose,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@sapporta/ui/alert-dialog";
+import { Button } from "@sapporta/ui/button";
 import {
   Sheet,
   SheetContent,
@@ -32,8 +43,18 @@ import {
 import type { TablePageMode } from "./table-page-mode";
 import type { TableViewPreference } from "./table-view-pref";
 import { useTableLevelQuery, type TableLevelQuery } from "./table-level-query";
-import { useTableSelection, type TableSelection } from "./table-selection";
+import { useTableSelection } from "./table-selection";
 import { useTGridSourceStatus } from "./tgrid-source-status";
+
+type TableDeleteRequest = {
+  count: number;
+  deleteSelected: () => Promise<void>;
+};
+
+type TableDeleteControl = {
+  count: number;
+  onRequest: () => void;
+};
 
 export function TableGridHeader<
   RowsByLevel extends TGridRowsByLevel,
@@ -59,39 +80,57 @@ export function TableGridHeader<
   const selection = useTableSelection(session);
   const status = useTGridSourceStatus(session);
   const totalCount = status.totalCount;
+  const [deleteRequest, setDeleteRequest] = useState<TableDeleteRequest | null>(
+    null,
+  );
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const deleteControl =
+    !table.immutable && selection.kind === "rows"
+      ? {
+          count: selection.count,
+          onRequest: () => {
+            setDeleteRequest({
+              count: selection.count,
+              deleteSelected: selection.deleteSelected,
+            });
+            setDeleteDialogOpen(true);
+          },
+        }
+      : undefined;
 
-  if (selection.kind !== "none") {
-    return (
-      <SelectedRowsTableHeader
-        table={table}
-        totalCount={totalCount}
-        selection={selection}
-      />
-    );
-  }
-
-  if (mode === "narrowCards") {
-    return (
+  const header =
+    mode === "narrowCards" ? (
       <NarrowCardTableHeader
         table={table}
         totalCount={totalCount}
         query={query}
         exportUrl={session.csvExportUrl(level)}
+        deleteControl={deleteControl}
+        onNewRecord={onNewRecord}
+      />
+    ) : (
+      <WideTableHeader
+        table={table}
+        totalCount={totalCount}
+        query={query}
+        exportUrl={session.csvExportUrl(level)}
+        viewPreference={viewPreference}
+        onViewPreferenceChange={onViewPreferenceChange}
+        deleteControl={deleteControl}
         onNewRecord={onNewRecord}
       />
     );
-  }
 
   return (
-    <WideTableHeader
-      table={table}
-      totalCount={totalCount}
-      query={query}
-      exportUrl={session.csvExportUrl(level)}
-      viewPreference={viewPreference}
-      onViewPreferenceChange={onViewPreferenceChange}
-      onNewRecord={onNewRecord}
-    />
+    <>
+      {header}
+      <DeleteSelectedRowsDialog
+        request={deleteRequest}
+        open={deleteDialogOpen}
+        onOpenChange={setDeleteDialogOpen}
+        onClosed={() => setDeleteRequest(null)}
+      />
+    </>
   );
 }
 
@@ -102,6 +141,7 @@ function WideTableHeader({
   exportUrl,
   viewPreference,
   onViewPreferenceChange,
+  deleteControl,
   onNewRecord,
 }: {
   table: TableSchema;
@@ -110,6 +150,7 @@ function WideTableHeader({
   exportUrl: string;
   viewPreference: TableViewPreference;
   onViewPreferenceChange: (view: TableViewPreference) => void;
+  deleteControl?: TableDeleteControl;
   onNewRecord?: () => void;
 }) {
   const tableLabel = table.label ?? table.name;
@@ -147,6 +188,15 @@ function WideTableHeader({
             >
               Export
             </TopBarButton>
+            {deleteControl && (
+              <TopBarButton
+                tone="danger"
+                icon={<Trash2 className="h-[12px] w-[12px]" />}
+                onClick={deleteControl.onRequest}
+              >
+                {deleteRowsLabel(deleteControl.count)}
+              </TopBarButton>
+            )}
             {onNewRecord && (
               <TopBarButton
                 tone="primary"
@@ -177,12 +227,14 @@ function NarrowCardTableHeader({
   totalCount,
   query,
   exportUrl,
+  deleteControl,
   onNewRecord,
 }: {
   table: TableSchema;
   totalCount: number;
   query: TableLevelQuery;
   exportUrl: string;
+  deleteControl?: TableDeleteControl;
   onNewRecord?: () => void;
 }) {
   const [actionsOpen, setActionsOpen] = useState(false);
@@ -219,23 +271,36 @@ function NarrowCardTableHeader({
               </span>
             </h1>
           </div>
-          {onNewRecord && (
+          {deleteControl ? (
             <CompactHeaderButton
-              aria-label="New record"
-              title="New record"
-              tone="primary"
-              icon={<Plus className="h-4 w-4 shrink-0" />}
-              onClick={onNewRecord}
-              className="h-10 min-w-10 shrink-0 px-0"
-            />
+              tone="danger"
+              icon={<Trash2 className="h-4 w-4 shrink-0" />}
+              onClick={deleteControl.onRequest}
+              className="h-10 shrink-0"
+            >
+              {deleteRowsLabel(deleteControl.count)}
+            </CompactHeaderButton>
+          ) : (
+            <>
+              {onNewRecord && (
+                <CompactHeaderButton
+                  aria-label="New record"
+                  title="New record"
+                  tone="primary"
+                  icon={<Plus className="h-4 w-4 shrink-0" />}
+                  onClick={onNewRecord}
+                  className="h-10 min-w-10 shrink-0 px-0"
+                />
+              )}
+              <CompactHeaderButton
+                aria-label="Open table actions"
+                title="More actions"
+                icon={<MoreHorizontal className="h-4 w-4" />}
+                onClick={() => setActionsOpen(true)}
+                className="h-10 min-w-10 shrink-0 px-0"
+              />
+            </>
           )}
-          <CompactHeaderButton
-            aria-label="Open table actions"
-            title="More actions"
-            icon={<MoreHorizontal className="h-4 w-4" />}
-            onClick={() => setActionsOpen(true)}
-            className="h-10 min-w-10 shrink-0 px-0"
-          />
         </div>
 
         {(query.searchable || canFilter) && (
@@ -327,43 +392,84 @@ function NarrowCardTableHeader({
   );
 }
 
-function SelectedRowsTableHeader({
-  table,
-  totalCount,
-  selection,
+function DeleteSelectedRowsDialog({
+  request,
+  open,
+  onOpenChange,
+  onClosed,
 }: {
-  table: TableSchema;
-  totalCount: number;
-  selection: Extract<TableSelection, { kind: "rows" }>;
+  request: TableDeleteRequest | null;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onClosed: () => void;
 }) {
-  const tableLabel = table.label ?? table.name;
+  const deletingRef = useRef(false);
+  const [deleting, setDeleting] = useState(false);
+
+  if (!request) return null;
+
+  const deleteLabel = deleteRowsLabel(request.count);
+
+  async function handleDelete(): Promise<void> {
+    if (deletingRef.current || !request) return;
+    deletingRef.current = true;
+    setDeleting(true);
+
+    try {
+      await request.deleteSelected();
+    } finally {
+      deletingRef.current = false;
+      setDeleting(false);
+      onOpenChange(false);
+    }
+  }
 
   return (
-    <div className="sticky top-0 z-[var(--sap-z-shell-sticky)] border-b border-sap-border-soft bg-sap-surface/95 px-4 py-3">
-      <div className="flex min-w-0 items-center gap-3">
-        <div className="min-w-0 flex-1">
-          <h1 className="truncate text-[15px] font-[720] leading-5 text-sap-fg">
-            {selection.count} selected
-          </h1>
-          <p className="mono mt-[1px] truncate text-[11.5px] text-sap-muted">
-            {tableLabel} - {formatRecordCount(totalCount)}
-          </p>
-        </div>
-        <CompactHeaderButton
-          tone="danger"
-          icon={<Trash2 className="h-4 w-4 shrink-0" />}
-          onClick={() => void selection.deleteSelected()}
-        >
-          Delete
-        </CompactHeaderButton>
-        <CompactHeaderButton
-          aria-label="Clear row selection"
-          title="Clear selection"
-          icon={<X className="h-4 w-4" />}
-          onClick={selection.clear}
-          className="shrink-0 px-0"
-        />
-      </div>
-    </div>
+    <AlertDialog
+      open={open}
+      onOpenChange={(nextOpen, eventDetails) => {
+        if (!nextOpen && deletingRef.current) {
+          eventDetails.cancel();
+          return;
+        }
+        onOpenChange(nextOpen);
+      }}
+      onOpenChangeComplete={(nextOpen) => {
+        if (!nextOpen) onClosed();
+      }}
+    >
+      <AlertDialogContent aria-busy={deleting}>
+        <AlertDialogHeader>
+          <AlertDialogTitle>{deleteLabel}?</AlertDialogTitle>
+          <AlertDialogDescription>
+            This action cannot be undone.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogClose
+            render={<Button type="button" variant="outline" />}
+            disabled={deleting}
+          >
+            Cancel
+          </AlertDialogClose>
+          <Button
+            type="button"
+            variant="destructive"
+            disabled={deleting}
+            aria-busy={deleting}
+            onClick={() => void handleDelete()}
+          >
+            {deleting && (
+              <Loader2 data-icon="inline-start" className="animate-spin" />
+            )}
+            {deleting ? "Deleting…" : deleteLabel}
+          </Button>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   );
+}
+
+function deleteRowsLabel(count: number): string {
+  return `Delete ${count} row${count === 1 ? "" : "s"}`;
 }
