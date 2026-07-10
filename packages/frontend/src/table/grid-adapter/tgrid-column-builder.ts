@@ -93,6 +93,7 @@ export type TGridColumnBuildArgs<
   table: TableSchema;
   specs?: readonly TGridColumnSpec<RowsByLevel, AppServices, LevelId>[];
   includedColumnNames?: readonly TableColumnName[];
+  rowKeyColumn: TableColumnName;
   rowHeaderColumn?: RowHeaderColumn | null;
   immutable: boolean;
   expandable: boolean;
@@ -211,8 +212,8 @@ export function buildTGridColumnsForTable<
   // this inference, while an explicit structural/disabled choice is preserved.
   const rowHeaderColumn: RowHeaderColumn =
     args.rowHeaderColumn ??
-    (columns[0]?.id === "id"
-      ? ({ column: "id" } satisfies RowHeaderColumn)
+    (columns[0]?.id === args.rowKeyColumn
+      ? ({ column: args.rowKeyColumn } satisfies RowHeaderColumn)
       : "empty-selectable-cell");
 
   const firstColumn = columns[0];

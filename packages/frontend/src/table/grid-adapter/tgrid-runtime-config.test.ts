@@ -396,7 +396,7 @@ describe("compileTGridRuntimeConfig", () => {
   });
 
   it.each([undefined, null])(
-    "infers a left-most visible id for %s",
+    "infers a left-most visible row-key column for %s",
     (rowHeaderColumn) => {
       const level = buildOrdersOnly({ rowHeaderColumn });
 
@@ -406,7 +406,48 @@ describe("compileTGridRuntimeConfig", () => {
     },
   );
 
-  it("uses an empty selectable cell when id is not left-most or not visible", () => {
+  it("uses the declared primary column that supplies rowKey", () => {
+    type KeyedRows = {
+      orders: { order_no: string; customer: string };
+    };
+    const keyedTable: TableSchema = {
+      name: "orders",
+      label: "Orders",
+      immutable: false,
+      rowLabelColumns: ["customer"],
+      columns: [
+        {
+          name: "order_no",
+          label: "Order no",
+          primary: true,
+          kind: "text",
+        },
+        { name: "customer", label: "Customer", kind: "text" },
+      ],
+      children: [],
+    };
+
+    const level = compileTGridRuntimeConfig<KeyedRows>({
+      rootLevel: "orders",
+      levels: {
+        orders: { table: keyedTable, childLevels: [] },
+      },
+      columnMapper: createTGridColumnMapper({ lookups: emptyLookupStore() }),
+    }).gridSchema.levels.orders;
+
+    expect(level.rowHeaderColumn).toEqual({ column: "order_no" });
+    expect(
+      level.options.rowKey?.(
+        {
+          levelName: "orders",
+          columns: { order_no: "ORD-17", customer: "Acme" },
+        },
+        0,
+      ),
+    ).toBe("ORD-17");
+  });
+
+  it("uses an empty selectable cell when the row-key column is not left-most or visible", () => {
     const columns = createTGridColumnsBuilder<
       OrdersOnlyRows,
       unknown,

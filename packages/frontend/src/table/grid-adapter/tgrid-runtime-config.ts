@@ -11,6 +11,7 @@ import {
   type TypedFilterCondition,
 } from "@sapporta/shared/filter";
 import {
+  CELL_GRID_WITH_INDEPENDENT_ROW_SELECTION,
   childPath,
   hostBackedRowQuery,
   rootPath,
@@ -92,7 +93,11 @@ export function defineTGrid<
     definition.levels,
     "defineTGrid",
   );
-  return definition;
+  return {
+    ...definition,
+    interaction:
+      definition.interaction ?? CELL_GRID_WITH_INDEPENDENT_ROW_SELECTION,
+  };
 }
 
 // Inputs needed to prepare a TGrid definition for a mounted table view.
@@ -167,6 +172,7 @@ export function compileTGridRuntimeConfig<
       specs: resolveColumns(levelId, config.columns),
       levelId,
       includedColumnNames: config.includedColumnNames,
+      rowKeyColumn: pkCol.name,
       rowHeaderColumn: config.rowHeaderColumn,
       immutable: table.immutable ?? false,
       expandable: config.childLevels.length > 0,

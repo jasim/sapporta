@@ -1,7 +1,10 @@
 import { createElement } from "react";
 import { describe, expect, it } from "vitest";
 import type { TableSchema } from "@sapporta/shared/contracts";
-import { CELL_EDITING_GRID, ROW_PRIMARY_MASTER_DETAIL } from "@sapporta/grid";
+import {
+  CELL_GRID_WITH_INDEPENDENT_ROW_SELECTION,
+  ROW_PRIMARY_MASTER_DETAIL,
+} from "@sapporta/grid";
 import {
   createTGridSession,
   defineTGrid,
@@ -237,6 +240,7 @@ describe("TGRID-USAGE examples", () => {
         invoices: {
           table: invoicesTable,
           childLevels: [],
+          rowHeaderColumn: "none",
           query: { owner: "host", pageSize: 50 },
           columns: (columns) => [
             columns.table("customer_id", { edit: "none" }),
@@ -267,7 +271,9 @@ describe("TGRID-USAGE examples", () => {
 
     const defaultSession = createTGridSession(defaultDefinition);
     try {
-      expect(defaultSession.runtime.interaction).toBe(CELL_EDITING_GRID);
+      expect(defaultSession.runtime.interaction).toBe(
+        CELL_GRID_WITH_INDEPENDENT_ROW_SELECTION,
+      );
     } finally {
       defaultSession.dispose();
     }

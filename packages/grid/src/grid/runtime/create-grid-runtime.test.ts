@@ -369,6 +369,33 @@ describe("GridRuntime", () => {
   const rowsRoot = rootPath("rows");
   const reportRoot = rootPath("cat");
 
+  it("rejects cell-grid row headers without independent row selection", () => {
+    const rowHeaderSchema: GridSchema = {
+      ...tableSchema,
+      levels: {
+        rows: {
+          ...tableSchema.levels.rows,
+          rowHeaderColumn: "empty-selectable-cell",
+        },
+      },
+    };
+
+    expect(() =>
+      createGridRuntime({
+        schema: rowHeaderSchema,
+        dataSource: tableDataSource(),
+        interaction: CELL_EDITING_GRID,
+      }),
+    ).toThrow(/row headers require independent row selection/);
+
+    const runtime = createGridRuntime({
+      schema: rowHeaderSchema,
+      dataSource: tableDataSource(),
+      interaction: CELL_GRID_WITH_INDEPENDENT_ROW_SELECTION,
+    });
+    runtime.dispose();
+  });
+
   it("displayedRowsFor is identity-stable across no-op calls", () => {
     const rt = createGridRuntime({
       schema: tableSchema,

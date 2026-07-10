@@ -337,6 +337,7 @@ export function createGridRuntime(args: RuntimeArgs): GridRuntime {
   const { schema, dataSource } = args;
   const interaction = normalizeInteraction(args.interaction);
   const schemaTopology = buildSchemaTopology(schema);
+  assertRowHeaderInteractionCompatibility(schema, interaction);
 
   const emitter = createEmitter();
   const phantoms = createPhantomChannel(args.initialPhantomsByPath);
@@ -1683,6 +1684,26 @@ function readCellValue(
     }
   }
   return undefined;
+}
+
+function assertRowHeaderInteractionCompatibility(
+  schema: GridSchema,
+  interaction: GridInteractionConfig,
+): void {
+  if (interaction.mode !== "cell-grid") return;
+  if (
+    interaction.selectedRows.kind === "enabled" &&
+    interaction.selectedRows.sync.kind === "independent"
+  ) {
+    return;
+  }
+
+  for (const [levelName, level] of Object.entries(schema.levels)) {
+    if (level.rowHeaderColumn === "none") continue;
+    throw new Error(
+      `GridRuntime: level "${levelName}" declares a row header, but cell-grid row headers require independent row selection. Set rowHeaderColumn to "none" or configure interaction.selectedRows.sync as "independent".`,
+    );
+  }
 }
 
 function isPromiseLike(value: unknown): value is PromiseLike<unknown> {
