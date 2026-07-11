@@ -5,7 +5,10 @@ import {
   type ReactNode,
 } from "react";
 import { useStore } from "zustand";
-import type { GridRuntime } from "../runtime/create-grid-runtime";
+import {
+  runtimeInternalsFor,
+  type GridRuntime,
+} from "../runtime/create-grid-runtime";
 import type { LevelSnapshot, LevelSourceState } from "../data-sources/types";
 import type { CellCursor, Coord, GridPath, RowId } from "../types/identity";
 import type { CellSelectionState } from "../types/selection";
@@ -54,31 +57,34 @@ export function useGridRuntime(): GridRuntime {
 // `useState` would create a second source of truth that drifts from the store.
 export function useLevelSnapshot(path: GridPath): LevelSnapshot {
   const runtime = useGridRuntime();
+  const level = runtime.level(path);
   return useSyncExternalStore(
-    (cb) => runtime.sourceFor(path).subscribe(cb),
-    () => runtime.snapshotFor(path),
-    () => runtime.snapshotFor(path),
+    level.data.subscribe,
+    () => level.data.state().snapshot,
+    () => level.data.state().snapshot,
   );
 }
 
 export function useLevelSourceState(path: GridPath): LevelSourceState {
   const runtime = useGridRuntime();
+  const level = runtime.level(path);
   return useSyncExternalStore(
-    (cb) => runtime.sourceFor(path).subscribe(cb),
-    () => runtime.sourceStateFor(path),
-    () => runtime.sourceStateFor(path),
+    level.data.subscribe,
+    level.data.state,
+    level.data.state,
   );
 }
 
 // Subscribe to one path's phantom array. Identity-stable: the phantom
 // channel returns the same reference until the path's phantom set
 // actually changes.
-export function usePhantoms(path: GridPath): PhantomRow[] {
+export function usePhantoms(path: GridPath): readonly PhantomRow[] {
   const runtime = useGridRuntime();
+  const level = runtime.level(path);
   return useSyncExternalStore(
-    (cb) => runtime.phantoms.subscribe(path, cb),
-    () => runtime.phantoms.get(path),
-    () => runtime.phantoms.get(path),
+    level.drafts.subscribe,
+    level.drafts.get,
+    level.drafts.get,
   );
 }
 
@@ -86,19 +92,21 @@ export function usePhantoms(path: GridPath): PhantomRow[] {
 // cell values and lookup maps so row content edits do not wake the body.
 export function useDisplayedRowSequence(path: GridPath): DisplayedRowSequence {
   const runtime = useGridRuntime();
+  const level = runtime.level(path);
   return useSyncExternalStore(
-    (cb) => runtime.subscribeDisplayedRowSequence(path, cb),
-    () => runtime.displayedRowSequenceFor(path),
-    () => runtime.displayedRowSequenceFor(path),
+    level.subscribeDisplayedRowSequence,
+    level.displayedRowSequence,
+    level.displayedRowSequence,
   );
 }
 
 export function useDisplayedRow(path: GridPath, rowId: RowId): LevelRow {
   const runtime = useGridRuntime();
+  const level = runtime.level(path);
   return useSyncExternalStore(
-    (cb) => runtime.subscribeDisplayedRow(path, rowId, cb),
+    (cb) => level.subscribeDisplayedRow(rowId, cb),
     () => {
-      const row = runtime.displayedRowFor(path, rowId);
+      const row = level.displayedRow(rowId);
       if (!row) {
         throw new Error(
           `GridRuntime: displayed row "${rowId}" no longer exists at path "${path}".`,
@@ -107,7 +115,7 @@ export function useDisplayedRow(path: GridPath, rowId: RowId): LevelRow {
       return row;
     },
     () => {
-      const row = runtime.displayedRowFor(path, rowId);
+      const row = level.displayedRow(rowId);
       if (!row) {
         throw new Error(
           `GridRuntime: displayed row "${rowId}" no longer exists at path "${path}".`,
@@ -120,13 +128,14 @@ export function useDisplayedRow(path: GridPath, rowId: RowId): LevelRow {
 
 export function useActiveCell(): CellCursor | null {
   const runtime = useGridRuntime();
-  return useStore(runtime.coordinator, (s) => s.cellCursor);
+  const internals = runtimeInternalsFor(runtime);
+  return useStore(internals.coordinator, (s) => s.cellCursor);
 }
 
 export function useActiveCellForPath(path: GridPath): Coord | null {
   const runtime = useGridRuntime();
   return useStore(
-    runtime.controllerFor(path),
+    runtimeInternalsFor(runtime).controllerFor(path),
     (s: ControllerState) => s.liveCellFocus,
   );
 }
@@ -134,35 +143,38 @@ export function useActiveCellForPath(path: GridPath): Coord | null {
 export function useCellSelection(path: GridPath): CellSelectionState | null {
   const runtime = useGridRuntime();
   return useStore(
-    runtime.controllerFor(path),
+    runtimeInternalsFor(runtime).controllerFor(path),
     (s: ControllerState) => s.cellSelection,
   );
 }
 
 export function useActiveRow(path: GridPath): RowCursor | null {
   const runtime = useGridRuntime();
+  const level = runtime.level(path);
   return useSyncExternalStore(
-    (cb) => runtime.subscribeActiveRow(path, cb),
-    () => runtime.activeRowFor(path),
+    level.subscribeActiveRow,
+    level.activeRow,
     () => null,
   );
 }
 
 export function useSelectedRows(path: GridPath): RowSelection {
   const runtime = useGridRuntime();
+  const level = runtime.level(path);
   return useSyncExternalStore(
-    (cb) => runtime.subscribeSelectedRows(path, cb),
-    () => runtime.selectedRowsFor(path),
+    level.subscribeSelectedRows,
+    level.selectedRows,
     () => null,
   );
 }
 
 export function useSelectedRowIds(path: GridPath): readonly RowId[] {
   const runtime = useGridRuntime();
+  const level = runtime.level(path);
   return useSyncExternalStore(
-    (cb) => runtime.subscribeSelectedRowIds(path, cb),
-    () => runtime.selectedRowIds(path),
-    () => [],
+    level.subscribeSelectedRowIds,
+    level.selectedRowIds,
+    () => EMPTY_ROW_IDS,
   );
 }
 
@@ -170,9 +182,10 @@ export function useRowInteractionSnapshot(
   path: GridPath,
 ): RowInteractionSnapshot {
   const runtime = useGridRuntime();
+  const level = runtime.level(path);
   return useSyncExternalStore(
-    (cb) => runtime.subscribeRowInteractionSnapshot(path, cb),
-    () => runtime.rowInteractionSnapshotFor(path),
+    level.subscribeRowInteractionSnapshot,
+    level.rowInteractionSnapshot,
     () => EMPTY_ROW_INTERACTION,
   );
 }

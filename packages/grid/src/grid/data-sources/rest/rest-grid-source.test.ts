@@ -34,21 +34,21 @@ const schema: GridSchema = {
       name: "orders",
       rowHeaderColumn: "none",
       columns: orderColumns,
-      options: { rowKey: (n) => String(n.columns.id) },
+      options: {},
       childLevels: ["lines"],
     },
     lines: {
       name: "lines",
       rowHeaderColumn: "none",
       columns: lineColumns,
-      options: { rowKey: (n) => String(n.columns.id) },
+      options: {},
       childLevels: ["notes"],
     },
     notes: {
       name: "notes",
       rowHeaderColumn: "none",
       columns: noteColumns,
-      options: { rowKey: (n) => String(n.columns.id) },
+      options: {},
       childLevels: [],
     },
   },
@@ -150,7 +150,7 @@ describe("restGridDataSource", () => {
     expect(a).not.toBe(b);
   });
 
-  it("dispose chains to root and to every source produced via resolveChild", () => {
+  it("dispose does not dispose level sources returned to the runtime", () => {
     const ds = restGridDataSource({
       schema,
       endpoints: {
@@ -167,12 +167,12 @@ describe("restGridDataSource", () => {
 
     ds.dispose();
 
-    // query.sort would normally trigger subscribers via the loading transition;
-    // post-dispose the subscriber set is cleared.
+    // GridDataSource owns only its endpoint factory state. The runtime owns and
+    // later disposes each returned level source.
     void root.query!.sort!.set([{ colId: "id", direction: "asc" }]);
     void lines.query!.sort!.set([{ colId: "id", direction: "asc" }]);
-    expect(rootSub).not.toHaveBeenCalled();
-    expect(linesSub).not.toHaveBeenCalled();
+    expect(rootSub).toHaveBeenCalledTimes(1);
+    expect(linesSub).toHaveBeenCalledTimes(1);
   });
 
   it("throws at construction when schema.rootLevel is not in schema.levels", () => {

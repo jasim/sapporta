@@ -6,17 +6,14 @@ export function GridHeader({
   schema,
   rowHeaderColumn,
 }: {
-  schema: ColumnSchema[];
+  schema: readonly ColumnSchema[];
   rowHeaderColumn: RowHeaderColumn;
 }) {
   return (
     <div data-grid-part="header" role="rowgroup">
       <div data-grid-part="header-row" role="row">
         {rowHeaderColumn === "empty-selectable-cell" ? (
-          <div
-            role="columnheader"
-            data-grid-part="row-header-header-cell"
-          />
+          <div role="columnheader" data-grid-part="row-header-header-cell" />
         ) : null}
         {schema.map((col) => (
           <div

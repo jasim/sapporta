@@ -50,11 +50,11 @@ export type NonTypedCellEditGesture = Exclude<CellEditGesture, "type">;
 
 export type CellEditorStart =
   | {
-      trigger: "type";
-      typedSeed: string;
+      readonly trigger: "type";
+      readonly typedSeed: string;
     }
   | {
-      trigger: NonTypedCellEditGesture;
+      readonly trigger: NonTypedCellEditGesture;
     };
 
 export const DEFAULT_CELL_EDIT_GESTURES: readonly CellEditGesture[] = [
@@ -65,19 +65,19 @@ export const DEFAULT_CELL_EDIT_GESTURES: readonly CellEditGesture[] = [
 ] as const;
 
 export type CellEditBehavior = {
-  editor: ComponentType<CellEditorProps>;
-  startsOn: readonly CellEditGesture[];
+  readonly editor: ComponentType<CellEditorProps>;
+  readonly startsOn: readonly CellEditGesture[];
 };
 
 export type CellActivationGesture = "enter" | "space" | "click" | "doubleClick";
 
 export type CellAvailability =
-  | { kind: "enabled" }
-  | { kind: "disabled"; reason?: string };
+  | { readonly kind: "enabled" }
+  | { readonly kind: "disabled"; readonly reason?: string };
 
 export type CellActivationState = {
-  label: string;
-  availability: CellAvailability;
+  readonly label: string;
+  readonly availability: CellAvailability;
 };
 
 export type CellActivationDescription =
@@ -85,17 +85,23 @@ export type CellActivationDescription =
   | ((ctx: CellActivationContext) => CellActivationState);
 
 export type CellActivationTrigger =
-  | { kind: "keyboard"; gesture: "enter" | "space" }
-  | { kind: "pointer"; gesture: "click" | "doubleClick" };
+  | {
+      readonly kind: "keyboard";
+      readonly gesture: "enter" | "space";
+    }
+  | {
+      readonly kind: "pointer";
+      readonly gesture: "click" | "doubleClick";
+    };
 
 export type CellActivationColumnContext = {
-  id: ColId;
-  name: string;
-  meta?: unknown;
+  readonly id: ColId;
+  readonly name: string;
+  readonly meta?: unknown;
 };
 
 export type CellActionApi = {
-  rowExpansion: {
+  readonly rowExpansion: {
     canToggle: (target: { path: GridPath; row: LevelRow }) => boolean;
     isExpanded: (target: { path: GridPath; rowId: RowId }) => boolean;
     toggle: (target: { path: GridPath; rowId: RowId }) => void;
@@ -103,75 +109,75 @@ export type CellActionApi = {
 };
 
 export type CellActivationContext = {
-  trigger: CellActivationTrigger;
-  value: unknown;
-  row: LevelRow;
-  column: CellActivationColumnContext;
-  path: GridPath;
-  coord: Coord;
-  actions: CellActionApi;
+  readonly trigger: CellActivationTrigger;
+  readonly value: unknown;
+  readonly row: LevelRow;
+  readonly column: CellActivationColumnContext;
+  readonly path: GridPath;
+  readonly coord: Coord;
+  readonly actions: CellActionApi;
 };
 
 export type CellActivation = {
-  startsOn: readonly CellActivationGesture[];
-  describe: CellActivationDescription;
-  run: (ctx: CellActivationContext) => void | Promise<void>;
+  readonly startsOn: readonly CellActivationGesture[];
+  readonly describe: CellActivationDescription;
+  readonly run: (ctx: CellActivationContext) => void | Promise<void>;
 };
 
 export type CellRenderActivation = {
-  label: string;
-  availability: CellAvailability;
-  run: () => void;
+  readonly label: string;
+  readonly availability: CellAvailability;
+  readonly run: () => void;
 };
 
 export type CellRenderProps = {
-  value: unknown;
-  row: LevelRow;
-  column: ColumnSchema;
-  path: GridPath;
+  readonly value: unknown;
+  readonly row: LevelRow;
+  readonly column: ColumnSchema;
+  readonly path: GridPath;
   /** Whether this cell is also the data-backed row-selection header. */
-  rowHeader?: boolean;
-  activation: CellRenderActivation | null;
+  readonly rowHeader?: boolean;
+  readonly activation: CellRenderActivation | null;
 };
 
 export type CellEditorProps = {
-  editStart: CellEditorStart;
-  value: unknown;
-  row: LevelRow;
-  column: ColumnSchema;
-  path: GridPath;
-  anchor: HTMLElement;
+  readonly editStart: CellEditorStart;
+  readonly value: unknown;
+  readonly row: LevelRow;
+  readonly column: ColumnSchema;
+  readonly path: GridPath;
+  readonly anchor: HTMLElement;
   // `commit` tells the controller where focus should land after the write
   // (next/prev/down/stay/…). Editors omit it for "stay" semantics; Tab
   // passes "next"/"prev"; Enter passes "down".
-  commit: (newValue: unknown, commit?: CommitTarget) => void;
-  cancel: () => void;
+  readonly commit: (newValue: unknown, commit?: CommitTarget) => void;
+  readonly cancel: () => void;
 };
 
 export type GridCopyColumn<TRow = LevelRow> = {
-  header: string;
-  valueAt: (row: TRow, rowIndex: number) => unknown;
+  readonly header: string;
+  readonly valueAt: (row: TRow, rowIndex: number) => unknown;
 };
 
 export type GridColumnCopyBehavior = (context: {
-  path: GridPath;
-  column: ColumnSchema;
-  rows: readonly LevelRow[];
+  readonly path: GridPath;
+  readonly column: ColumnSchema;
+  readonly rows: readonly LevelRow[];
 }) => readonly GridCopyColumn[] | Promise<readonly GridCopyColumn[]>;
 
 export type ColumnSchema = {
-  id: ColId;
-  name: string;
-  renderCell: (props: CellRenderProps) => ReactNode;
-  compare?: (a: unknown, b: unknown) => number;
-  edit?: CellEditBehavior;
-  activation?: CellActivation;
-  copy?: GridColumnCopyBehavior;
-  meta?: unknown;
+  readonly id: ColId;
+  readonly name: string;
+  readonly renderCell: (props: CellRenderProps) => ReactNode;
+  readonly compare?: (a: unknown, b: unknown) => number;
+  readonly edit?: CellEditBehavior;
+  readonly activation?: CellActivation;
+  readonly copy?: GridColumnCopyBehavior;
+  readonly meta?: unknown;
 };
 
 export type RowHeaderColumn<ColumnName extends string = ColId> =
-  | { column: ColumnName }
+  | { readonly column: ColumnName }
   | "empty-selectable-cell"
   | "none";
 
@@ -208,16 +214,16 @@ export function describeCellActivation(
 // It declares which levels exist and how they connect by name. It does NOT
 // describe paths — paths emerge from data as `resolveChild` is invoked.
 export type LevelSchema = {
-  name: string;
-  columns: ColumnSchema[];
-  rowHeaderColumn: RowHeaderColumn;
-  options: LevelOptions;
+  readonly name: string;
+  readonly columns: readonly ColumnSchema[];
+  readonly rowHeaderColumn: RowHeaderColumn;
+  readonly options: LevelOptions;
   // Names of child levels that hang off rows of this level. Order = render
   // order. A leaf level declares no children.
-  childLevels: string[];
+  readonly childLevels: readonly string[];
 };
 
 export type GridSchema = {
-  levels: Record<string, LevelSchema>;
-  rootLevel: string;
+  readonly levels: Readonly<Record<string, LevelSchema>>;
+  readonly rootLevel: string;
 };

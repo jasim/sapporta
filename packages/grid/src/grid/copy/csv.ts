@@ -36,9 +36,10 @@ function readGridCopySelection(
   runtime: GridRuntime,
   target: GridCopyTarget,
 ): GridCopySelection | null {
-  const displayed = safeRead(() => runtime.displayedRowsFor(target.path));
-  const columns = safeRead(() => runtime.schemaAt(target.path).columns);
-  if (!displayed || !columns) return null;
+  const level = safeRead(() => runtime.level(target.path));
+  if (!level) return null;
+  const displayed = level.displayedRows();
+  const columns = level.schema.columns;
 
   const anchorRowIndex = displayed.rowIndexById.get(
     target.selection.anchor.rowId,

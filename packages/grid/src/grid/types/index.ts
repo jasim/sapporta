@@ -17,7 +17,6 @@ export {
   trailingEdge,
   parseChildPath,
   makeRowId,
-  displayedPhantomRowKey,
   phantomKeyFromDisplayedRowId,
   isDisplayedPhantomRowId,
   pathOfRowId,

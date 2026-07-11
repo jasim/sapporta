@@ -42,7 +42,7 @@ describe("identity", () => {
   it("makeRowId / pathOfRowId / rowKeyOfRowId are inverse", () => {
     const path = rootPath("rows");
     const id = makeRowId(path, "row-7");
-    expect(id).toBe("rows#row-7");
+    expect(id).toBe("rows#data#row-7");
     expect(pathOfRowId(id)).toBe(path);
     expect(rowKeyOfRowId(id)).toBe("row-7");
   });

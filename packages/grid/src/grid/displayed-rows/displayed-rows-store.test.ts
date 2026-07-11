@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { rootPath, type RowId } from "../types/identity";
+import { makeRowId, rootPath } from "../types/identity";
 import type { DisplayedRows, LevelRow } from "../types/level-row";
 import type { DisplayedRowsInput, DisplayedRowsState } from "./types";
 import { buildDisplayedRowSequence } from "./compute-displayed-rows";
@@ -31,11 +31,11 @@ function input(): DisplayedRowsInput {
 function row(key: string, columns: Record<string, unknown>): LevelRow {
   return {
     kind: "data",
-    id: `${path}#${key}` as RowId,
+    id: makeRowId(path, key),
     rowSelectable: true,
     columns,
     hasChildren: false,
-    source: { levelName: "rows", columns },
+    source: { rowKey: key, levelName: "rows", columns },
   };
 }
 
@@ -166,7 +166,68 @@ describe("createDisplayedRowsStore", () => {
     expect(listener).not.toHaveBeenCalled();
   });
 
-  it("dispose clears subscribers without notifying", () => {
+  it("reports throwing sequence and row subscribers and continues each list", () => {
+    const first = state([rowA]);
+    const second = state([rowA2, rowB]);
+    const sequenceError = new Error("sequence subscriber");
+    const rowError = new Error("row subscriber");
+    const report = vi.fn();
+    const sequenceLater = vi.fn();
+    const rowLater = vi.fn();
+    const store = createDisplayedRowsStore({
+      readInput: input,
+      deriveDisplayedRowsState: vi
+        .fn()
+        .mockReturnValueOnce(first)
+        .mockReturnValueOnce(second),
+      onObserverError: report,
+    });
+    store.subscribeDisplayedRowSequence(() => {
+      throw sequenceError;
+    });
+    store.subscribeDisplayedRowSequence(sequenceLater);
+    store.subscribeDisplayedRow(rowA.id, () => {
+      throw rowError;
+    });
+    store.subscribeDisplayedRow(rowA.id, rowLater);
+
+    expect(() =>
+      store.invalidateDisplayedRows({ type: "source" }),
+    ).not.toThrow();
+    expect(sequenceLater).toHaveBeenCalledOnce();
+    expect(rowLater).toHaveBeenCalledOnce();
+    expect(report).toHaveBeenNthCalledWith(1, sequenceError);
+    expect(report).toHaveBeenNthCalledWith(2, rowError);
+  });
+
+  it("keeps duplicate sequence callbacks independently registered", () => {
+    const first = state([rowA]);
+    const second = state([rowA, rowB]);
+    const third = state([rowA]);
+    const store = createDisplayedRowsStore({
+      readInput: input,
+      deriveDisplayedRowsState: vi
+        .fn()
+        .mockReturnValueOnce(first)
+        .mockReturnValueOnce(second)
+        .mockReturnValueOnce(third),
+    });
+    const subscriber = vi.fn();
+    const unsubscribeFirst = store.subscribeDisplayedRowSequence(subscriber);
+    const unsubscribeSecond = store.subscribeDisplayedRowSequence(subscriber);
+
+    store.invalidateDisplayedRows({ type: "source" });
+    expect(subscriber).toHaveBeenCalledTimes(2);
+
+    unsubscribeFirst();
+    unsubscribeFirst();
+    store.invalidateDisplayedRows({ type: "source" });
+    expect(subscriber).toHaveBeenCalledTimes(3);
+
+    unsubscribeSecond();
+  });
+
+  it("dispose is idempotent and prevents later subscriptions", () => {
     const first = state([rowA]);
     const second = state([rowA, rowB]);
     const store = createDisplayedRowsStore({
@@ -182,6 +243,9 @@ describe("createDisplayedRowsStore", () => {
     store.subscribeDisplayedRow(rowA.id, rowListener);
 
     store.dispose();
+    store.dispose();
+    store.subscribeDisplayedRowSequence(sequence);
+    store.subscribeDisplayedRow(rowA.id, rowListener);
     store.invalidateDisplayedRows({ type: "source" });
 
     expect(sequence).not.toHaveBeenCalled();

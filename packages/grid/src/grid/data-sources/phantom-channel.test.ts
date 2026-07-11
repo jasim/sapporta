@@ -37,12 +37,33 @@ describe("PhantomChannel", () => {
     expect(ch.get(B)).toBe(beforeB);
   });
 
-  it("add replaces a phantom on rowKey collision", () => {
+  it("add rejects a duplicate rowKey without changing rows or notifying", () => {
     const ch = createPhantomChannel();
     ch.add(A, phantom("p1", { name: "first" }));
-    ch.add(A, phantom("p1", { name: "second" }));
+    const before = ch.get(A);
+    const subscriber = vi.fn();
+    ch.subscribe(A, subscriber);
+
+    expect(() => ch.add(A, phantom("p1", { name: "second" }))).toThrow(
+      'PhantomChannel: duplicate draft rowKey "p1"',
+    );
+
+    expect(ch.get(A)).toBe(before);
     expect(ch.get(A)).toHaveLength(1);
-    expect(ch.get(A)[0].columns.name).toBe("second");
+    expect(ch.get(A)[0].columns.name).toBe("first");
+    expect(subscriber).not.toHaveBeenCalled();
+  });
+
+  it("add rejects an empty rowKey without changing rows or notifying", () => {
+    const ch = createPhantomChannel();
+    const subscriber = vi.fn();
+    ch.subscribe(A, subscriber);
+
+    expect(() => ch.add(A, phantom(""))).toThrow(
+      "PhantomChannel: draft rowKey must not be empty",
+    );
+    expect(ch.get(A)).toHaveLength(0);
+    expect(subscriber).not.toHaveBeenCalled();
   });
 
   it("remove drops the phantom and evicts the path on last-remove", () => {
@@ -126,6 +147,59 @@ describe("PhantomChannel", () => {
     expect(sub).toHaveBeenCalledTimes(1);
   });
 
+  it("reports throwing subscribers and continues in registration order", () => {
+    const observerError = new Error("subscriber failed");
+    const report = vi.fn();
+    const calls: string[] = [];
+    const ch = createPhantomChannel(undefined, report);
+    ch.subscribe(A, () => calls.push("first"));
+    ch.subscribe(A, () => {
+      calls.push("throw");
+      throw observerError;
+    });
+    ch.subscribe(A, () => calls.push("last"));
+
+    expect(() => ch.add(A, phantom("p1"))).not.toThrow();
+    expect(calls).toEqual(["first", "throw", "last"]);
+    expect(report).toHaveBeenCalledWith(observerError);
+  });
+
+  it("keeps duplicate subscriber callbacks independently registered", () => {
+    const ch = createPhantomChannel();
+    const subscriber = vi.fn();
+    const unsubscribeFirst = ch.subscribe(A, subscriber);
+    const unsubscribeSecond = ch.subscribe(A, subscriber);
+
+    ch.add(A, phantom("p1"));
+    expect(subscriber).toHaveBeenCalledTimes(2);
+
+    unsubscribeFirst();
+    unsubscribeFirst();
+    ch.add(A, phantom("p2"));
+    expect(subscriber).toHaveBeenCalledTimes(3);
+
+    unsubscribeSecond();
+    ch.add(A, phantom("p3"));
+    expect(subscriber).toHaveBeenCalledTimes(3);
+  });
+
+  it("dispose is idempotent and prevents later rows or subscriptions", () => {
+    const ch = createPhantomChannel();
+    const beforeDispose = vi.fn();
+    const afterDispose = vi.fn();
+    ch.subscribe(A, beforeDispose);
+    ch.add(A, phantom("p1"));
+
+    ch.dispose();
+    ch.dispose();
+    ch.subscribe(A, afterDispose);
+    ch.add(A, phantom("p2"));
+
+    expect(beforeDispose).toHaveBeenCalledTimes(1);
+    expect(afterDispose).not.toHaveBeenCalled();
+    expect(ch.get(A)).toEqual([]);
+  });
+
   it("seed map preserves entries by reference", () => {
     const seed = new Map<GridPath, PhantomRow[]>();
     const arrA: PhantomRow[] = [phantom("p1", { name: "x" })];
@@ -141,5 +215,14 @@ describe("PhantomChannel", () => {
     const ch = createPhantomChannel(seed);
     const fresh = createPhantomChannel();
     expect(ch.get(A)).toBe(fresh.get(A));
+  });
+
+  it("rejects empty and duplicate rowKeys in the initial map", () => {
+    expect(() => createPhantomChannel(new Map([[A, [phantom("")]]]))).toThrow(
+      "PhantomChannel: draft rowKey must not be empty",
+    );
+    expect(() =>
+      createPhantomChannel(new Map([[A, [phantom("p1"), phantom("p1")]]])),
+    ).toThrow('PhantomChannel: duplicate draft rowKey "p1"');
   });
 });

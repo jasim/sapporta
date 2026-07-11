@@ -6,8 +6,7 @@ import type {
   RowKey,
 } from "../types/identity";
 import {
-  displayedPhantomRowKey,
-  makeRowId,
+  makeLevelRowId,
   phantomKeyFromDisplayedRowId,
 } from "../types/identity";
 import type { LevelDataSource } from "../data-sources/types";
@@ -16,58 +15,58 @@ import type { PhantomRow, PhantomRowsConfig } from "../types/level-row";
 
 export type PhantomRowLifecycle = {
   // Empty writable levels should still offer a place to add the first row.
-  ensureBlankForEmptyPath: (path: GridPath) => PhantomRow | null;
+  readonly ensureBlankForEmptyPath: (path: GridPath) => PhantomRow | null;
   // A blank add-row belongs only where a new row can be appended right now.
-  reconcileBlankAppendPhantoms: (path: GridPath) => void;
+  readonly reconcileBlankAppendPhantoms: (path: GridPath) => void;
   // Moving past the final cell should land on a reusable add-row when allowed.
-  boundaryCellTarget: (
+  readonly boundaryCellTarget: (
     path: GridPath,
     colId: ColId,
     colPolicy: "preserve" | "first" | "last",
   ) => CellCursor | null;
   // Row-list navigation gets the same add-row behavior without a column.
-  boundaryRowTarget: (
+  readonly boundaryRowTarget: (
     path: GridPath,
   ) => { path: GridPath; rowId: RowId } | null;
   // Leaving a filled add-row saves it as an application row.
-  onCellCursorChanging: (
+  readonly onCellCursorChanging: (
     previous: CellCursor | null,
     next: CellCursor | null,
   ) => void;
   // Row-list focus uses the same save-on-leave rule as cell focus.
-  onRowCursorChanging: (
+  readonly onRowCursorChanging: (
     previous: { path: GridPath; rowId: RowId } | null,
     next: { path: GridPath; rowId: RowId } | null,
   ) => void;
-  setPhantomCell: (
+  readonly setPhantomCell: (
     path: GridPath,
     rowKey: RowKey,
     colId: ColId,
     value: unknown,
   ) => void;
   // Apps can decide what "blank" means for their own columns.
-  isBlank: (columns: Record<ColId, unknown>) => boolean;
+  readonly isBlank: (columns: Readonly<Record<ColId, unknown>>) => boolean;
 };
 
 export type PhantomRowLifecycleDeps = {
-  config: PhantomRowsConfig | undefined;
-  getSource: (path: GridPath) => LevelDataSource | undefined;
-  schemaAt: (path: GridPath) => LevelSchema;
-  getPhantoms: (path: GridPath) => readonly PhantomRow[];
-  addPhantom: (path: GridPath, phantom: PhantomRow) => void;
-  removePhantom: (path: GridPath, rowKey: RowKey) => void;
-  setPhantomCell: (
+  readonly config: PhantomRowsConfig | undefined;
+  readonly getSource: (path: GridPath) => LevelDataSource | undefined;
+  readonly schemaAt: (path: GridPath) => LevelSchema;
+  readonly getPhantoms: (path: GridPath) => readonly PhantomRow[];
+  readonly addPhantom: (path: GridPath, phantom: PhantomRow) => void;
+  readonly removePhantom: (path: GridPath, rowKey: RowKey) => void;
+  readonly setPhantomCell: (
     path: GridPath,
     rowKey: RowKey,
     colId: ColId,
     value: unknown,
   ) => void;
-  setPhantomState: (
+  readonly setPhantomState: (
     path: GridPath,
     rowKey: RowKey,
     state: PhantomRow["state"],
   ) => void;
-  commitPhantomRow: (path: GridPath, rowKey: RowKey) => void;
+  readonly commitPhantomRow: (path: GridPath, rowKey: RowKey) => void;
 };
 
 export function createPhantomRowLifecycle(
@@ -182,7 +181,7 @@ export function createPhantomRowLifecycle(
     if (!targetColId) return null;
     return {
       path,
-      rowId: makeRowId(path, displayedPhantomRowKey(phantom.rowKey)),
+      rowId: makeLevelRowId(path, "phantom", phantom.rowKey),
       colId: targetColId,
     };
   }
@@ -194,7 +193,7 @@ export function createPhantomRowLifecycle(
     if (!phantom) return null;
     return {
       path,
-      rowId: makeRowId(path, displayedPhantomRowKey(phantom.rowKey)),
+      rowId: makeLevelRowId(path, "phantom", phantom.rowKey),
     };
   }
 
@@ -246,7 +245,9 @@ export function createPhantomRowLifecycle(
   };
 }
 
-export function defaultIsBlank(columns: Record<ColId, unknown>): boolean {
+export function defaultIsBlank(
+  columns: Readonly<Record<ColId, unknown>>,
+): boolean {
   return Object.values(columns).every(
     (value) => value === null || value === undefined || value === "",
   );

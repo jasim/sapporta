@@ -39,11 +39,22 @@
 // event; row patch/replacement responses can update sibling cells before the
 // host sees `agreed` or `diverged`.
 
-import { defaultRowKey } from "../../pipeline/stages/build-data";
 import { assertBoundedInteger } from "@sapporta/shared/validation";
 import type { ColId, RowKey } from "../../types/identity";
 import type { FooterRow, TreeNode } from "../../types/level-row";
 import type { SortDescriptor } from "../../pipeline/types";
+import {
+  assertTreeNodeCanBeInserted,
+  assertUniqueTreeNodeRowKeys,
+  rowKeyOfTreeNode,
+} from "../../row-identity";
+import { createObserverList } from "../../observer-notification";
+import {
+  createStructuralSnapshotCache,
+  snapshotFooterRows,
+  snapshotTreeNode,
+  snapshotTreeNodes,
+} from "../immutable-snapshot";
 import type {
   FetchPageRequest,
   FetchPageResponse,
@@ -144,10 +155,7 @@ export type RestLevelSourceOpts<F = unknown> = {
     visibleCount: number;
     totalCount: number | undefined;
   }) => boolean;
-  // Per-level rowKey resolver. The grid source forwards this from the
-  // schema's `LevelOptions.rowKey`; hosts wiring `restLevelSource` directly
-  // can override. Defaults to array index.
-  rowKey?: (node: TreeNode, localIdx: number) => RowKey;
+  onObserverError?: (error: unknown) => void;
 };
 
 export function restLevelSource<F = unknown>(
@@ -180,10 +188,10 @@ export function restLevelSource<F = unknown>(
     );
   }
 
-  const rowKeyFn = opts.rowKey ?? defaultRowKey;
   const buildRowsRequest = opts.buildRowsRequest ?? identityRowsRequest<F>;
 
-  let nodes: TreeNode[] = [];
+  const structuralSnapshots = createStructuralSnapshotCache();
+  let nodes: readonly TreeNode[] = Object.freeze([]);
   let footerRows: readonly FooterRow[] | undefined;
   let totalCount: number | undefined;
   // `displayRequest` is the effective request that describes the visible
@@ -205,14 +213,16 @@ export function restLevelSource<F = unknown>(
   const cellTokens = new Map<RowKey, Map<ColId, number>>();
   let cellTokenCounter = 0;
 
-  const subs = new Set<() => void>();
-  const reconcileSubs = new Set<(e: ReconcileEvent) => void>();
+  const subscribers = createObserverList<[]>(opts.onObserverError);
+  const reconcileSubscribers = createObserverList<[ReconcileEvent]>(
+    opts.onObserverError,
+  );
   let disposed = false;
 
   function buildSnapshot(): LevelSnapshot {
-    const snap: LevelSnapshot = { nodes };
-    if (footerRows) snap.footerRows = footerRows;
-    return snap;
+    return footerRows
+      ? Object.freeze({ nodes, footerRows })
+      : Object.freeze({ nodes });
   }
 
   function snapshot(): LevelSnapshot {
@@ -226,10 +236,10 @@ export function restLevelSource<F = unknown>(
 
   function state(): LevelSourceState {
     if (!currentState) {
-      currentState = {
+      currentState = Object.freeze({
         status: "initialLoading",
         snapshot: snapshot(),
-      };
+      });
     }
     return currentState;
   }
@@ -240,7 +250,7 @@ export function restLevelSource<F = unknown>(
 
   function notify(): void {
     if (disposed) return;
-    for (const fn of [...subs]) fn();
+    subscribers.notify();
   }
 
   function emit(): void {
@@ -251,7 +261,7 @@ export function restLevelSource<F = unknown>(
     invalidate();
     const next = snapshot();
     committedSnapshot = next;
-    currentState = { status: "ready", snapshot: next };
+    currentState = Object.freeze({ status: "ready", snapshot: next });
     emit();
     return currentState;
   }
@@ -262,23 +272,31 @@ export function restLevelSource<F = unknown>(
     committedSnapshot = next;
     const cur = currentState;
     if (cur?.status === "refreshing") {
-      currentState = { ...cur, snapshot: next, previous: next };
+      currentState = Object.freeze({
+        ...cur,
+        snapshot: next,
+        previous: next,
+      });
     } else if (cur?.status === "refreshError") {
-      currentState = { ...cur, snapshot: next, previous: next };
+      currentState = Object.freeze({
+        ...cur,
+        snapshot: next,
+        previous: next,
+      });
     } else {
-      currentState = { status: "ready", snapshot: next };
+      currentState = Object.freeze({ status: "ready", snapshot: next });
     }
     emit();
   }
 
   function emitReconcile(event: ReconcileEvent): void {
     if (disposed) return;
-    for (const fn of [...reconcileSubs]) fn(event);
+    reconcileSubscribers.notify(event);
   }
 
   function findNodeIdx(rowKey: RowKey): number {
     for (let i = 0; i < nodes.length; i++) {
-      if (rowKeyFn(nodes[i], i) === rowKey) return i;
+      if (nodes[i].rowKey === rowKey) return i;
     }
     return -1;
   }
@@ -293,8 +311,12 @@ export function restLevelSource<F = unknown>(
 
   function setNodeCell(idx: number, colId: ColId, value: unknown): void {
     const node = nodes[idx];
-    nodes = nodes.slice();
-    nodes[idx] = { ...node, columns: { ...node.columns, [colId]: value } };
+    const next = nodes.slice();
+    next[idx] = snapshotTreeNode(
+      { ...node, columns: { ...node.columns, [colId]: value } },
+      structuralSnapshots,
+    );
+    nodes = Object.freeze(next);
   }
 
   function bumpCellToken(rowKey: RowKey, colId: ColId): number {
@@ -336,10 +358,7 @@ export function restLevelSource<F = unknown>(
     pendingLoad = null;
   }
 
-  function resolveCurrentLoad(
-    token: number,
-    result: SourceLoadResult,
-  ): void {
+  function resolveCurrentLoad(token: number, result: SourceLoadResult): void {
     if (pendingLoad?.token !== token) return;
     pendingLoad.resolve(result);
     pendingLoad = null;
@@ -354,18 +373,18 @@ export function restLevelSource<F = unknown>(
     invalidate();
     const display = snapshot();
     if (committedSnapshot) {
-      currentState = {
+      currentState = Object.freeze({
         status: "refreshError",
         snapshot: display,
         previous: committedSnapshot,
         error,
-      };
+      });
     } else {
-      currentState = {
+      currentState = Object.freeze({
         status: "initialError",
         snapshot: display,
         error,
-      };
+      });
     }
     emit();
     return currentState;
@@ -382,16 +401,16 @@ export function restLevelSource<F = unknown>(
     invalidate();
     const display = snapshot();
     if (committedSnapshot) {
-      currentState = {
+      currentState = Object.freeze({
         status: "refreshing",
         snapshot: display,
         previous: committedSnapshot,
-      };
+      });
     } else {
-      currentState = {
+      currentState = Object.freeze({
         status: "initialLoading",
         snapshot: display,
-      };
+      });
     }
     emit();
     // Subscribers observe `initialLoading` or `refreshing` before the promise
@@ -416,11 +435,23 @@ export function restLevelSource<F = unknown>(
     fetchPromise.then(
       (res) => {
         if (disposed || myToken !== fetchToken) return;
-        nodes = res.nodes.slice();
-        footerRows = res.footerRows;
-        totalCount = res.totalCount;
-        const readyState = publishReady();
-        resolveCurrentLoad(myToken, { kind: "ready", state: readyState });
+        try {
+          const fetchedNodes = res.nodes;
+          assertUniqueTreeNodeRowKeys(
+            fetchedNodes,
+            "restLevelSource.fetchPage response",
+          );
+          nodes = snapshotTreeNodes(fetchedNodes, structuralSnapshots);
+          footerRows = res.footerRows
+            ? snapshotFooterRows(res.footerRows, structuralSnapshots)
+            : undefined;
+          totalCount = res.totalCount;
+          const readyState = publishReady();
+          resolveCurrentLoad(myToken, { kind: "ready", state: readyState });
+        } catch (error) {
+          const errorState = publishLoadError(error, req);
+          resolveCurrentLoad(myToken, { kind: "error", state: errorState });
+        }
       },
       (err) => {
         if (disposed || myToken !== fetchToken) return;
@@ -462,31 +493,25 @@ export function restLevelSource<F = unknown>(
   const read: LevelDataSource = {
     state,
     subscribe(fn) {
-      subs.add(fn);
-      return () => {
-        subs.delete(fn);
-      };
+      return subscribers.subscribe(fn);
     },
     dispose() {
+      if (disposed) return;
       disposed = true;
       // Disposal is observable to awaiting callers. Tokens prevent late network
       // callbacks from publishing rows or errors after subscribers are cleared.
       fetchToken++;
       resolvePendingLoad({ kind: "disposed" });
       cellTokens.clear();
-      subs.clear();
-      reconcileSubs.clear();
+      subscribers.clear();
+      reconcileSubscribers.clear();
     },
     query,
   };
 
   if (!writable) return read;
 
-  const setCell: WriteCapability["setCell"] = (
-    rowKey,
-    colId,
-    value,
-  ) => {
+  const setCell: WriteCapability["setCell"] = (rowKey, colId, value) => {
     const idx = requireNodeIdx(rowKey);
     const priorValue = nodes[idx].columns[colId];
     setNodeCell(idx, colId, value);
@@ -646,7 +671,7 @@ export function restLevelSource<F = unknown>(
     rowKey: RowKey;
     colId: ColId;
     optimisticValue: unknown;
-    patch: Record<ColId, unknown>;
+    patch: Readonly<Record<ColId, unknown>>;
     priorValue: unknown;
   }): void {
     const { rowKey, colId, optimisticValue, patch, priorValue } = args;
@@ -654,11 +679,14 @@ export function restLevelSource<F = unknown>(
     const idx = findNodeIdx(rowKey);
     if (idx >= 0) {
       const next = nodes.slice();
-      next[idx] = {
-        ...next[idx],
-        columns: { ...next[idx].columns, ...patch },
-      };
-      nodes = next;
+      next[idx] = snapshotTreeNode(
+        {
+          ...next[idx],
+          columns: { ...next[idx].columns, ...patch },
+        },
+        structuralSnapshots,
+      );
+      nodes = Object.freeze(next);
       publishDataMutation();
     }
     emitPatchReconcile({
@@ -678,19 +706,43 @@ export function restLevelSource<F = unknown>(
     priorValue: unknown;
   }): void {
     const { rowKey, colId, optimisticValue, node, priorValue } = args;
-    const authoritativeValue = node.columns[colId];
     const idx = findNodeIdx(rowKey);
     if (idx >= 0) {
-      const next = nodes.slice();
-      next[idx] = node;
-      nodes = next;
-      publishDataMutation();
+      try {
+        const authoritativeRowKey = rowKeyOfTreeNode(
+          node,
+          "restLevelSource.patchCell row response",
+        );
+        if (authoritativeRowKey !== rowKey) {
+          throw new Error(
+            `restLevelSource.patchCell row response: TreeNode.rowKey changed from "${rowKey}" to "${authoritativeRowKey}"`,
+          );
+        }
+        const next = nodes.slice();
+        next[idx] = snapshotTreeNode(node, structuralSnapshots);
+        assertUniqueTreeNodeRowKeys(
+          next,
+          "restLevelSource.patchCell row response",
+        );
+        nodes = Object.freeze(next);
+        publishDataMutation();
+      } catch (error) {
+        emitReconcile({
+          kind: "rejected",
+          rowKey,
+          colId,
+          optimisticValue,
+          reason: reasonOf(error),
+          priorValue,
+        });
+        return;
+      }
     }
     emitPatchReconcile({
       rowKey,
       colId,
       optimisticValue,
-      authoritativeValue,
+      authoritativeValue: node.columns[colId],
       priorValue,
     });
   }
@@ -815,34 +867,42 @@ export function restLevelSource<F = unknown>(
     });
   };
 
-  const createNode: WriteCapability["createNode"] = async (
-    node,
-    atIndex,
-  ) => {
-    const serverNode = await opts.insertNode!({ node, atIndex });
+  const createNode: WriteCapability["createNode"] = async (node, atIndex) => {
+    const requestedNode = snapshotTreeNode(node, structuralSnapshots);
+    rowKeyOfTreeNode(requestedNode, "restLevelSource.createNode input");
+    const responseNode = await opts.insertNode!({
+      node: requestedNode,
+      atIndex,
+    });
     const idx = atIndex === undefined ? nodes.length : atIndex;
-    if (disposed) return { node: serverNode, atIndex: idx };
+    const serverNode = snapshotTreeNode(responseNode, structuralSnapshots);
+    rowKeyOfTreeNode(serverNode, "restLevelSource.insertNode response");
+    if (disposed) return Object.freeze({ node: serverNode, atIndex: idx });
+    assertTreeNodeCanBeInserted(
+      nodes,
+      serverNode,
+      "restLevelSource.insertNode response",
+    );
     const next = nodes.slice();
     next.splice(idx, 0, serverNode);
-    nodes = next;
+    nodes = Object.freeze(next);
     publishDataMutation();
-    return { node: serverNode, atIndex: idx };
+    return Object.freeze({ node: serverNode, atIndex: idx });
   };
 
-  const removeNode: WriteCapability["removeNode"] = (rowKey) => {
-    const idx = requireNodeIdx(rowKey);
+  const removeNode: WriteCapability["removeNode"] = async (rowKey) => {
+    await opts.removeNode!({ rowKey });
+    if (disposed) return;
+    const idx = findNodeIdx(rowKey);
+    if (idx < 0) return;
     const next = nodes.slice();
     next.splice(idx, 1);
-    nodes = next;
+    nodes = Object.freeze(next);
     publishDataMutation();
-    return opts.removeNode!({ rowKey });
   };
 
   const onReconcile: WriteCapability["onReconcile"] = (fn) => {
-    reconcileSubs.add(fn);
-    return () => {
-      reconcileSubs.delete(fn);
-    };
+    return reconcileSubscribers.subscribe(fn);
   };
 
   const writableSource: LevelDataSource = {

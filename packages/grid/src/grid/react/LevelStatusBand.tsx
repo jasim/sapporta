@@ -46,8 +46,9 @@ export function levelStatusBandModel(
 
 export function LevelStatusBand({ path }: { path: GridPath }) {
   const runtime = useGridRuntime();
+  const level = runtime.level(path);
   const state = useLevelSourceState(path);
-  const levelName = runtime.schemaAt(path).name;
+  const levelName = level.schema.name;
   const model = levelStatusBandModel(state, levelName);
   if (!model) return null;
 
@@ -77,7 +78,7 @@ export function LevelStatusBand({ path }: { path: GridPath }) {
         type="button"
         data-grid-part="level-status-retry"
         onClick={() => {
-          void runtime.sourceFor(path).query?.refetch?.();
+          void level.data.query?.refetch?.();
         }}
       >
         Retry

@@ -8,7 +8,7 @@ import type {
   ColId,
   ColumnSchema as GridColumnSchema,
   GridColumnCopyBehavior,
-  GridPath,
+  GridLevelRuntime,
   GridRuntime,
   LevelRow,
   RowHeaderColumn,
@@ -67,14 +67,14 @@ export type TGridRuntimeCellWriteResult =
   | { kind: "reload" };
 
 // Runtime-side write handler used by generated columns.
-// It receives level path/value/row data and returns runtime result instructions.
+// It receives the path-bound level/value/row data and returns runtime result instructions.
 export type TGridRuntimeCellWriteHandler<
   RowsByLevel extends TGridRowsByLevel,
   AppServices,
   LevelId extends TGridLevelId<RowsByLevel>,
 > = (context: {
   levelId: LevelId;
-  path: GridPath;
+  level: GridLevelRuntime;
   value: unknown;
   row: Readonly<RowsByLevel[LevelId]>;
   rowKey: RowKey;
@@ -304,37 +304,46 @@ function customizeTableColumn<
     schema: tableColumn,
     gridColumn,
   };
-  const next: GridColumnSchema = { ...gridColumn };
-  if (options.label) next.name = options.label;
-  if (options.edit !== undefined) {
-    next.edit = typedEdit(
-      levelId,
-      next.edit,
-      options.edit,
-      columnContext,
-      sessionContext,
-    );
-  }
-  if (options.activation) {
-    next.activation = typedActivation(
-      levelId,
-      options.activation,
-      columnContext,
-      sessionContext,
-    );
-  }
-  if (options.renderCell) {
-    next.renderCell = typedRenderCell(
-      levelId,
-      options.renderCell,
-      columnContext,
-      sessionContext,
-    );
-  }
-  if (options.copy) {
-    next.copy = typedCopy(levelId, options.copy, columnContext, sessionContext);
-  }
-  return next;
+  return {
+    ...gridColumn,
+    ...(options.label ? { name: options.label } : {}),
+    ...(options.edit !== undefined
+      ? {
+          edit: typedEdit(
+            levelId,
+            gridColumn.edit,
+            options.edit,
+            columnContext,
+            sessionContext,
+          ),
+        }
+      : {}),
+    ...(options.activation
+      ? {
+          activation: typedActivation(
+            levelId,
+            options.activation,
+            columnContext,
+            sessionContext,
+          ),
+        }
+      : {}),
+    ...(options.renderCell
+      ? {
+          renderCell: typedRenderCell(
+            levelId,
+            options.renderCell,
+            columnContext,
+            sessionContext,
+          ),
+        }
+      : {}),
+    ...(options.copy
+      ? {
+          copy: typedCopy(levelId, options.copy, columnContext, sessionContext),
+        }
+      : {}),
+  };
 }
 
 function clientColumnFor<
@@ -443,6 +452,7 @@ function typedCopy<
 ): GridColumnCopyBehavior {
   return async ({ path, column: sourceColumn, rows }) => {
     const session = sessionContext();
+    const level = session.runtime.level(path);
     const typedRows = typedRowsFromLevelRows<RowsByLevel, LevelId>(rows);
     const values = rows.map(
       (row) => row.columns[sourceColumn.id],
@@ -454,7 +464,7 @@ function typedCopy<
     };
     const copyColumns = await copy({
       levelId,
-      path,
+      level,
       column: typedColumn,
       rows: typedRows,
       values,
@@ -644,7 +654,7 @@ function cellContextFor<
 ): TGridCellContext<RowsByLevel, AppServices, LevelId> {
   return {
     levelId,
-    path: props.path,
+    level: session.runtime.level(props.path),
     value: props.value,
     row: props.row.columns as RowsByLevel[LevelId],
     rowKey: rowKeyOfRowId(props.row.id),

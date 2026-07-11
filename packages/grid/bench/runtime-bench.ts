@@ -3,11 +3,12 @@ import {
   createGridRuntime,
   type GridRuntime,
 } from "../src/grid/runtime/create-grid-runtime";
+import type { GridLevelRuntime } from "../src/grid/runtime/grid-level-runtime";
+import { controllerFor, cursorManagerFor } from "../src/advanced";
 import { inMemoryGridDataSource } from "../src/grid/data-sources/memory/in-memory-grid-source";
-import { rootPath } from "../src/grid/types/identity";
+import { childPath } from "../src/grid/types/identity";
 import { CELL_GRID_WITH_INDEPENDENT_ROW_SELECTION } from "../src/grid/types/interaction";
-import type { GridPath, RowId } from "../src/grid/types/identity";
-import type { TreeNode } from "../src/grid/types/level-row";
+import type { RowId } from "../src/grid/types/identity";
 import {
   buildBenchDataset,
   type BenchDataset,
@@ -267,7 +268,7 @@ function runBench(
     }
     if (runtime) {
       const counts = timePhase(timings, "countDisplayed", () => ({
-        paths: runtimeOrThrow(runtime).registeredPaths().length,
+        paths: runtimeOrThrow(runtime).registeredLevels().length,
         rows: countDisplayedRows(runtimeOrThrow(runtime)),
       }));
       pathCount = counts.paths;
@@ -337,138 +338,145 @@ function createRuntime(
 }
 
 function expandRootOnly(runtime: GridRuntime): void {
-  runtime.displayedRowsFor(root(runtime));
+  runtime.root.displayedRows();
 }
 
 function expandFirstBranch(runtime: GridRuntime): void {
-  const rootPathValue = root(runtime);
-  const first = firstRowId(runtime, rootPathValue);
+  const root = runtime.root;
+  const first = firstRowId(root);
   if (!first) return;
-  runtime.coordinator.toggleExpand(rootPathValue, first);
+  root.expand(first);
 }
 
 function expandAll(runtime: GridRuntime): void {
-  const queue: GridPath[] = [root(runtime)];
+  const queue: GridLevelRuntime[] = [runtime.root];
   for (let cursor = 0; cursor < queue.length; cursor++) {
-    const path = queue[cursor];
-    const level = runtime.schemaAt(path);
-    if (level.childLevels.length === 0) continue;
-    for (const row of runtime.displayedRowsFor(path).rows) {
+    const level = queue[cursor];
+    if (level.schema.childLevels.length === 0) continue;
+    for (const row of level.displayedRows().rows) {
       if (row.kind !== "data" || !row.hasChildren) continue;
-      runtime.coordinator.toggleExpand(path, row.id);
-      queue.push(...runtime.materializedChildren(path, row.id));
+      level.expand(row.id);
+      for (const childLevelName of level.schema.childLevels) {
+        queue.push(
+          runtime.level(
+            childPath(level.path, row.source.rowKey, childLevelName),
+          ),
+        );
+      }
     }
   }
 }
 
 function performMoveCell(runtime: GridRuntime): void {
-  const path = root(runtime);
-  const rows = runtime.displayedRowSequenceFor(path).rows;
-  const columns = runtime.schemaAt(path).columns;
+  const level = runtime.root;
+  const rows = level.displayedRowSequence().rows;
+  const columns = level.schema.columns;
   if (rows.length < 2 || columns.length < 2) return;
-  runtime.cursorManager.moveCellCursorTo({
-    path,
+  const cursors = cursorManagerFor(runtime);
+  cursors.moveCellCursorTo({
+    path: level.path,
     rowId: rows[0].id,
     colId: columns[0].id,
   });
-  runtime.cursorManager.moveCellCursorTo({
-    path,
+  cursors.moveCellCursorTo({
+    path: level.path,
     rowId: rows[1].id,
     colId: columns[1].id,
   });
 }
 
 function performMoveCellCrossPath(runtime: GridRuntime): void {
-  const rootPathValue = root(runtime);
-  const rootRow = firstRowId(runtime, rootPathValue);
+  const root = runtime.root;
+  const rootRow = firstRowId(root);
   if (!rootRow) return;
-  const childPath = runtime.materializedChildren(rootPathValue, rootRow)[0];
-  if (!childPath) return;
-  const rootColumn = runtime.schemaAt(rootPathValue).columns[0]?.id;
-  const childColumn = runtime.schemaAt(childPath).columns[0]?.id;
-  const childRow = firstRowId(runtime, childPath);
+  const child = firstChildLevel(runtime, root, rootRow);
+  if (!child) return;
+  const rootColumn = root.schema.columns[0]?.id;
+  const childColumn = child.schema.columns[0]?.id;
+  const childRow = firstRowId(child);
   if (!rootColumn || !childColumn || !childRow) return;
-  runtime.cursorManager.moveCellCursorTo({
-    path: rootPathValue,
+  const cursors = cursorManagerFor(runtime);
+  cursors.moveCellCursorTo({
+    path: root.path,
     rowId: rootRow,
     colId: rootColumn,
   });
-  runtime.cursorManager.moveCellCursorTo({
-    path: childPath,
+  cursors.moveCellCursorTo({
+    path: child.path,
     rowId: childRow,
     colId: childColumn,
   });
 }
 
 function performSelectCellRange(runtime: GridRuntime): void {
-  const path = root(runtime);
-  const rows = runtime.displayedRowSequenceFor(path).rows;
-  const columns = runtime.schemaAt(path).columns;
+  const level = runtime.root;
+  const rows = level.displayedRowSequence().rows;
+  const columns = level.schema.columns;
   if (rows.length < 10 || columns.length < 5) return;
-  runtime.cursorManager.moveCellCursorTo({
-    path,
+  const cursors = cursorManagerFor(runtime);
+  cursors.moveCellCursorTo({
+    path: level.path,
     rowId: rows[0].id,
     colId: columns[0].id,
   });
-  runtime.cursorManager.extendCellSelectionTo({
-    path,
+  cursors.extendCellSelectionTo({
+    path: level.path,
     rowId: rows[9].id,
     colId: columns[4].id,
   });
 }
 
 function performRowSelection(runtime: GridRuntime): void {
-  const path = root(runtime);
-  const rows = runtime.displayedRowSequenceFor(path).rows;
+  const level = runtime.root;
+  const rows = level.displayedRowSequence().rows;
   if (rows.length < 10) return;
-  runtime.rowInteraction.toggleRowSelection(path, rows[0].id);
-  runtime.rowInteraction.extendRowSelectionTo(path, rows[9].id);
-  runtime.rowInteraction.clearRowSelection(path);
+  level.toggleRowSelection(rows[0].id);
+  level.extendRowSelectionTo(rows[9].id);
+  level.clearRowSelection();
 }
 
 function performStartCancelEdit(runtime: GridRuntime): void {
-  const path = root(runtime);
-  const row = firstRowId(runtime, path);
-  const column = runtime.schemaAt(path).columns[1]?.id;
+  const level = runtime.root;
+  const row = firstRowId(level);
+  const column = level.schema.columns[1]?.id;
   if (!row || !column) return;
-  const controller = runtime.controllerFor(path);
+  const controller = controllerFor(runtime, level.path);
   controller.startEdit({ rowId: row, colId: column }, "type", "x");
   controller.cancelEdit();
 }
 
 function performCommitCell(runtime: GridRuntime): void {
-  const path = root(runtime);
-  const row = firstRowId(runtime, path);
-  const column = runtime.schemaAt(path).columns[1]?.id;
+  const level = runtime.root;
+  const row = firstRowId(level);
+  const column = level.schema.columns[1]?.id;
   if (!row || !column) return;
-  runtime.writeCell(path, { rowId: row, colId: column }, "committed");
+  level.writeCell({ rowId: row, colId: column }, "committed");
 }
 
 function performDataRederive(runtime: GridRuntime): void {
-  const path = root(runtime);
-  const source = runtime.sourceFor(path);
-  const rows = runtime.displayedRowSequenceFor(path).rows;
+  const level = runtime.root;
+  const rows = level.displayedRowSequence().rows;
   if (rows.length === 0) return;
-  void source.query?.refetch?.();
-  runtime.writeCell(path, { rowId: rows[0].id, colId: "c1" }, "changed");
-  void source.query?.sort?.set([{ colId: "c1", direction: "asc" }]);
-  void source.query?.sort?.set(undefined);
+  void level.data.query?.refetch?.();
+  level.writeCell({ rowId: rows[0].id, colId: "c1" }, "changed");
+  void level.data.query?.sort?.set([{ colId: "c1", direction: "asc" }]);
+  void level.data.query?.sort?.set(undefined);
 }
 
 function performExpansionLifecycle(runtime: GridRuntime): void {
-  const path = root(runtime);
-  const row = firstRowId(runtime, path);
+  const level = runtime.root;
+  const row = firstRowId(level);
   if (!row) return;
-  runtime.coordinator.toggleExpand(path, row);
-  runtime.coordinator.toggleExpand(path, row);
-  runtime.coordinator.toggleExpand(path, row);
+  level.toggleExpand(row);
+  level.toggleExpand(row);
+  level.toggleExpand(row);
   expandAll(runtime);
 }
 
 function touchAllDisplayed(runtime: GridRuntime): void {
-  for (const path of runtime.registeredPaths()) {
-    runtime.displayedRowSequenceFor(path);
-    runtime.displayedRowsFor(path);
+  for (const level of runtime.registeredLevels()) {
+    level.displayedRowSequence();
+    level.displayedRows();
   }
 }
 
@@ -559,18 +567,28 @@ function timePhase<K extends keyof PhaseTimings, T>(
 
 function countDisplayedRows(runtime: GridRuntime): number {
   let count = 0;
-  for (const path of runtime.registeredPaths()) {
-    count += runtime.displayedRowSequenceFor(path).rows.length;
+  for (const level of runtime.registeredLevels()) {
+    count += level.displayedRowSequence().rows.length;
   }
   return count;
 }
 
-function firstRowId(runtime: GridRuntime, path: GridPath): RowId | null {
-  return runtime.displayedRowSequenceFor(path).rows[0]?.id ?? null;
+function firstRowId(level: GridLevelRuntime): RowId | null {
+  return level.displayedRowSequence().rows[0]?.id ?? null;
 }
 
-function root(runtime: GridRuntime): GridPath {
-  return rootPath(runtime.schemaTopology.rootLevelName);
+function firstChildLevel(
+  runtime: GridRuntime,
+  parent: GridLevelRuntime,
+  rowId: RowId,
+): GridLevelRuntime | null {
+  const row = parent.displayedRow(rowId);
+  if (!row || row.kind !== "data") return null;
+  const childLevelName = parent.schema.childLevels[0];
+  if (!childLevelName) return null;
+  return runtime.level(
+    childPath(parent.path, row.source.rowKey, childLevelName),
+  );
 }
 
 function forceGc(): void {

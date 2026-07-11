@@ -42,13 +42,14 @@ export function ColumnPresetHeader<TMeta = unknown, TFilter = unknown>({
 }: {
   path: GridPath;
   levelName: string;
-  schema: ColumnSchema[];
+  schema: readonly ColumnSchema[];
   rowHeaderColumn: RowHeaderColumn;
   options: PresetChromeOptions<TMeta, TFilter>;
 }) {
   const runtime = useGridRuntime();
+  const level = runtime.level(path);
   const snapshot = useLevelSnapshot(path);
-  const source = runtime.sourceFor(path);
+  const source = level.data;
   const levelState: HeaderLevelState<TFilter> = {
     path,
     levelName,
@@ -64,11 +65,10 @@ export function ColumnPresetHeader<TMeta = unknown, TFilter = unknown>({
       | GridLevelCommands<TFilter>["setFilter"]
       | undefined,
     refetch: source.query?.refetch,
-    createRow: (node, atIndex) => runtime.createRow(path, node, atIndex),
-    removeRow: (rowKey) => runtime.removeRow(path, rowKey),
-    writeCell: (coord, value) => runtime.writeCell(path, coord, value),
-    commitPhantomRow: (rowKey, atIndex) =>
-      runtime.commitPhantomRow(path, rowKey, atIndex),
+    createRow: level.createRow,
+    removeRow: level.removeRow,
+    writeCell: level.writeCell,
+    commitPhantomRow: level.drafts.commit,
   };
   const commands: GridLevelCommands<TFilter> = {
     ...defaultCommands,
@@ -84,10 +84,7 @@ export function ColumnPresetHeader<TMeta = unknown, TFilter = unknown>({
       ) : null}
       <div data-grid-part="header-row" role="row">
         {rowHeaderColumn === "empty-selectable-cell" ? (
-          <div
-            role="columnheader"
-            data-grid-part="row-header-header-cell"
-          />
+          <div role="columnheader" data-grid-part="row-header-header-cell" />
         ) : null}
         {schema.map((column, columnIndex) => (
           <HeaderCell

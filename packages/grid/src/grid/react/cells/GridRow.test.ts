@@ -5,7 +5,10 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, describe, expect, it } from "vitest";
 import { columnPreset } from "../../../column-preset";
 import { inMemoryGridDataSource } from "../../data-sources/memory/in-memory-grid-source";
-import { createGridRuntime } from "../../runtime/create-grid-runtime";
+import {
+  createGridRuntime,
+  runtimeInternalsFor,
+} from "../../runtime/create-grid-runtime";
 import {
   CELL_GRID_WITH_INDEPENDENT_ROW_SELECTION,
   ROW_MULTISELECT_LIST,
@@ -84,7 +87,7 @@ const schema: GridSchema = {
         testColumn("author_id", "Author"),
         testColumn("text", "Text"),
       ],
-      options: { rowKey: (node: TreeNode) => String(node.columns.id) },
+      options: {},
       childLevels: [],
     },
   },
@@ -106,7 +109,7 @@ const expandableIdentifierSchema: GridSchema = {
         ),
         testColumn("text", "Text"),
       ],
-      options: { rowKey: (node: TreeNode) => String(node.columns.id) },
+      options: {},
       childLevels: [],
     },
   },
@@ -114,6 +117,7 @@ const expandableIdentifierSchema: GridSchema = {
 
 const tree: TreeNode[] = [
   {
+    rowKey: "q1",
     levelName: "quotes",
     columns: {
       id: "q1",
@@ -123,6 +127,7 @@ const tree: TreeNode[] = [
     },
   },
   {
+    rowKey: "q2",
     levelName: "quotes",
     columns: {
       id: "q2",
@@ -132,6 +137,10 @@ const tree: TreeNode[] = [
     },
   },
 ];
+
+const quoteOneId = makeRowId(rootPath("quotes"), "q1");
+const quoteTwoId = makeRowId(rootPath("quotes"), "q2");
+const orderOneId = makeRowId(rootPath("orders"), "o1");
 
 async function render(element: ReactElement): Promise<{
   container: HTMLDivElement;
@@ -229,24 +238,31 @@ function createExpandableRowHeaderRuntime(rowHeaderColumn: RowHeaderColumn) {
           testColumn("customer", "Customer"),
         ],
         rowHeaderColumn,
-        options: { rowKey: (node) => String(node.columns.id) },
+        options: {},
         childLevels: ["lines"],
       },
       lines: {
         name: "lines",
         columns: [testColumn("id", "ID"), testColumn("sku", "SKU")],
         rowHeaderColumn: "empty-selectable-cell",
-        options: { rowKey: (node) => String(node.columns.id) },
+        options: {},
         childLevels: [],
       },
     },
   };
   const expandableTree: TreeNode[] = [
     {
+      rowKey: "o1",
       levelName: "orders",
       columns: { id: "o1", customer: "Alice" },
       children: {
-        lines: [{ levelName: "lines", columns: { id: "l1", sku: "SKU-1" } }],
+        lines: [
+          {
+            rowKey: "l1",
+            levelName: "lines",
+            columns: { id: "l1", sku: "SKU-1" },
+          },
+        ],
       },
     },
   ];
@@ -326,7 +342,7 @@ describe("GridRow cards presentation", () => {
     );
 
     const pkField = mounted.container.querySelector(
-      '[data-row-id="quotes#q1"] [data-grid-part="row-field"][data-col-id="id"][data-display-type="pk"]',
+      `[data-row-id="${quoteOneId}"] [data-grid-part="row-field"][data-col-id="id"][data-display-type="pk"]`,
     );
     if (!(pkField instanceof HTMLElement)) {
       throw new Error("expected pk card field");
@@ -400,7 +416,9 @@ describe("GridRow cards presentation", () => {
     });
 
     expect(textCell.getAttribute("data-cell-status")).toBe("focus");
-    expect(runtime.coordinator.getState().cellCursor?.colId).toBe("text");
+    expect(
+      runtimeInternalsFor(runtime).coordinator.getState().cellCursor?.colId,
+    ).toBe("text");
   });
 
   it("moves down through vertical fields and into the next row", async () => {
@@ -416,7 +434,7 @@ describe("GridRow cards presentation", () => {
     );
 
     const firstTextCell = mounted.container.querySelector(
-      '[data-row-id="quotes#q1"] [data-grid-part="cell"][data-col-id="text"]',
+      `[data-row-id="${quoteOneId}"] [data-grid-part="cell"][data-col-id="text"]`,
     );
     const gridRoot = mounted.container.querySelector("[data-grid-path]");
     if (
@@ -438,7 +456,8 @@ describe("GridRow cards presentation", () => {
       );
     });
 
-    const cursor = runtime.coordinator.getState().cellCursor;
+    const cursor =
+      runtimeInternalsFor(runtime).coordinator.getState().cellCursor;
     expect(cursor?.rowId).toContain("q2");
     expect(cursor?.colId).toBe("id");
   });
@@ -470,7 +489,9 @@ describe("GridRow cards presentation", () => {
     });
 
     expect(row.getAttribute("data-row-active")).toBe("true");
-    expect(runtime.coordinator.getState().rowCursor?.rowId).toContain("q1");
+    expect(
+      runtimeInternalsFor(runtime).coordinator.getState().rowCursor?.rowId,
+    ).toContain("q1");
   });
 });
 
@@ -592,7 +613,7 @@ describe("GridRow row headers", () => {
     });
 
     const firstRow = mounted!.container.querySelector(
-      '[data-row-id="quotes#q1"]',
+      `[data-row-id="${quoteOneId}"]`,
     );
     const handle = firstRow?.querySelector(
       '[data-grid-part="row-header-cell"]',
@@ -610,13 +631,13 @@ describe("GridRow row headers", () => {
     const runtime = await renderRowHeaders({ column: "id" });
     const path = rootPath("quotes");
     const firstHeader = mounted!.container.querySelector(
-      '[data-row-id="quotes#q1"] [role="rowheader"]',
+      `[data-row-id="${quoteOneId}"] [role="rowheader"]`,
     );
     const secondHeader = mounted!.container.querySelector(
-      '[data-row-id="quotes#q2"] [role="rowheader"]',
+      `[data-row-id="${quoteTwoId}"] [role="rowheader"]`,
     );
     const dataCell = mounted!.container.querySelector(
-      '[data-row-id="quotes#q2"] [data-grid-part="cell"][data-col-id="text"]',
+      `[data-row-id="${quoteTwoId}"] [data-grid-part="cell"][data-col-id="text"]`,
     );
     if (
       !(firstHeader instanceof HTMLElement) ||
@@ -631,7 +652,7 @@ describe("GridRow row headers", () => {
         new MouseEvent("mousedown", { bubbles: true, button: 0 }),
       );
     });
-    expect(runtime.selectedRowIds(path)).toHaveLength(1);
+    expect(runtime.level(path).selectedRowIds()).toHaveLength(1);
 
     await act(async () => {
       secondHeader.dispatchEvent(
@@ -642,7 +663,7 @@ describe("GridRow row headers", () => {
         }),
       );
     });
-    expect(runtime.selectedRowIds(path)).toHaveLength(2);
+    expect(runtime.level(path).selectedRowIds()).toHaveLength(2);
 
     await act(async () => {
       firstHeader.dispatchEvent(
@@ -656,25 +677,28 @@ describe("GridRow row headers", () => {
         }),
       );
     });
-    expect(runtime.controllerFor(path).getState().rowSelection?.kind).toBe(
-      "range",
-    );
-    expect(runtime.selectedRowIds(path)).toHaveLength(2);
+    expect(
+      runtimeInternalsFor(runtime).controllerFor(path).getState().rowSelection
+        ?.kind,
+    ).toBe("range");
+    expect(runtime.level(path).selectedRowIds()).toHaveLength(2);
 
     await act(async () => {
       dataCell.dispatchEvent(
         new MouseEvent("mousedown", { bubbles: true, button: 0 }),
       );
     });
-    expect(runtime.selectedRowIds(path)).toEqual([]);
-    expect(runtime.coordinator.getState().cellCursor?.colId).toBe("text");
+    expect(runtime.level(path).selectedRowIds()).toEqual([]);
+    expect(
+      runtimeInternalsFor(runtime).coordinator.getState().cellCursor?.colId,
+    ).toBe("text");
   });
 
   it("supports Space and Escape on both data-backed and structural row headers", async () => {
     const dataRuntime = await renderRowHeaders({ column: "id" });
     const path = rootPath("quotes");
     const dataHeader = mounted!.container.querySelector(
-      '[data-row-id="quotes#q1"] [role="rowheader"]',
+      `[data-row-id="${quoteOneId}"] [role="rowheader"]`,
     );
     const gridRoot = mounted!.container.querySelector(
       '[data-grid-path="quotes"]',
@@ -693,13 +717,13 @@ describe("GridRow row headers", () => {
         new KeyboardEvent("keydown", { bubbles: true, key: " " }),
       );
     });
-    expect(dataRuntime.selectedRowIds(path)).toEqual([]);
+    expect(dataRuntime.level(path).selectedRowIds()).toEqual([]);
 
     await unmount(mounted!.root, mounted!.container);
     mounted = null;
     const structuralRuntime = await renderRowHeaders("empty-selectable-cell");
     const control = mounted!.container.querySelector(
-      '[data-row-id="quotes#q1"] [data-grid-part="row-header-control"]',
+      `[data-row-id="${quoteOneId}"] [data-grid-part="row-header-control"]`,
     );
     if (!(control instanceof HTMLButtonElement)) {
       throw new Error("expected structural row-header control");
@@ -709,20 +733,20 @@ describe("GridRow row headers", () => {
         new KeyboardEvent("keydown", { bubbles: true, key: " " }),
       );
     });
-    expect(structuralRuntime.selectedRowIds(path)).toHaveLength(1);
+    expect(structuralRuntime.level(path).selectedRowIds()).toHaveLength(1);
     await act(async () => {
       control.dispatchEvent(
         new KeyboardEvent("keydown", { bubbles: true, key: "Escape" }),
       );
     });
-    expect(structuralRuntime.selectedRowIds(path)).toEqual([]);
+    expect(structuralRuntime.level(path).selectedRowIds()).toEqual([]);
   });
 
   it("continues from a deleted structural selection and restores grid focus", async () => {
     const runtime = await renderRowHeaders("empty-selectable-cell");
     const path = rootPath("quotes");
     const firstControl = mounted!.container.querySelector(
-      '[data-row-id="quotes#q1"] [data-grid-part="row-header-control"]',
+      `[data-row-id="${quoteOneId}"] [data-grid-part="row-header-control"]`,
     );
     const gridRoot = mounted!.container.querySelector(
       '[data-grid-path="quotes"]',
@@ -739,21 +763,22 @@ describe("GridRow row headers", () => {
         new MouseEvent("click", { bubbles: true, button: 0 }),
       );
     });
-    expect(runtime.coordinator.getState().cellCursor).toBe(null);
-    expect(runtime.coordinator.getState().rowSelectionLead?.rowId).toContain(
+    const internals = runtimeInternalsFor(runtime);
+    expect(internals.coordinator.getState().cellCursor).toBe(null);
+    expect(internals.coordinator.getState().rowSelectionLead?.rowId).toContain(
       "q1",
     );
 
-    const continuation = runtime.planCursorContinuationForRowRemoval([
+    const continuation = internals.planCursorContinuationForRowRemoval([
       { path, rowId: makeRowId(path, "q1") },
     ]);
     await act(async () => {
-      runtime.applyCursorContinuation(continuation);
-      await runtime.removeRow(path, "q1");
+      internals.applyCursorContinuation(continuation);
+      await runtime.level(path).removeRow("q1");
     });
 
     const nextCell = mounted!.container.querySelector(
-      '[data-row-id="quotes#q2"] [data-grid-part="cell"][data-col-id="id"]',
+      `[data-row-id="${quoteTwoId}"] [data-grid-part="cell"][data-col-id="id"]`,
     );
     expect(continuation).toEqual({
       kind: "cell",
@@ -797,19 +822,16 @@ describe("GridRow row headers", () => {
       );
       value.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     });
-    expect(dataRuntime.selectedRowIds(rootPath("orders"))).toHaveLength(1);
-    expect(
-      dataRuntime.coordinator.getState().expansion.get(rootPath("orders")),
-    ).toBeUndefined();
+    const orderRowId = makeRowId(rootPath("orders"), "o1");
+    expect(dataRuntime.root.selectedRowIds()).toHaveLength(1);
+    expect(dataRuntime.root.isExpanded(orderRowId)).toBe(false);
 
     await act(async () => {
       root.dispatchEvent(
         new KeyboardEvent("keydown", { bubbles: true, key: "Enter" }),
       );
     });
-    expect(
-      dataRuntime.coordinator.getState().expansion.get(rootPath("orders")),
-    ).toBeDefined();
+    expect(dataRuntime.root.isExpanded(orderRowId)).toBe(true);
 
     await unmount(mounted.root, mounted.container);
     mounted = null;
@@ -826,7 +848,7 @@ describe("GridRow row headers", () => {
       }),
     );
     const firstRow = mounted.container.querySelector(
-      '[data-row-id="orders#o1"]',
+      `[data-row-id="${orderOneId}"]`,
     );
     const handle = firstRow?.querySelector(
       '[data-grid-part="row-header-cell"]',
@@ -843,12 +865,8 @@ describe("GridRow row headers", () => {
     await act(async () => {
       chevron.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     });
-    expect(
-      structuralRuntime.coordinator
-        .getState()
-        .expansion.get(rootPath("orders")),
-    ).toBeDefined();
-    expect(structuralRuntime.selectedRowIds(rootPath("orders"))).toEqual([]);
+    expect(structuralRuntime.root.isExpanded(orderRowId)).toBe(true);
+    expect(structuralRuntime.root.selectedRowIds()).toEqual([]);
     expect(
       mounted.container.querySelector(
         '[data-grid-depth="1"] [data-grid-part="row-header-cell"]',
@@ -870,7 +888,7 @@ describe("GridRow row headers", () => {
       }),
     );
     const rootHeader = mounted.container.querySelector(
-      '[data-row-id="orders#o1"] [role="rowheader"]',
+      `[data-row-id="${orderOneId}"] [role="rowheader"]`,
     );
     const root = mounted.container.querySelector('[data-grid-path="orders"]');
     if (
@@ -899,13 +917,13 @@ describe("GridRow row headers", () => {
         new MouseEvent("click", { bubbles: true, metaKey: true }),
       );
     });
-    expect(runtime.selectedRowIds(ordersPath)).toHaveLength(1);
-    expect(runtime.selectedRowIds(linesPath)).toHaveLength(1);
+    expect(runtime.root.selectedRowIds()).toHaveLength(1);
+    expect(runtime.level(linesPath).selectedRowIds()).toHaveLength(1);
 
     await act(async () => {
       childControl.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     });
-    expect(runtime.selectedRowIds(ordersPath)).toEqual([]);
-    expect(runtime.selectedRowIds(linesPath)).toHaveLength(1);
+    expect(runtime.root.selectedRowIds()).toEqual([]);
+    expect(runtime.level(linesPath).selectedRowIds()).toHaveLength(1);
   });
 });

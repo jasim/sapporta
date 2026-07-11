@@ -1,7 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
-import { rootPath, type GridPath } from "../../types/identity";
+import { childPath, rootPath, type GridPath } from "../../types/identity";
 import type { TreeNode } from "../../types/level-row";
 import type { GridSchema } from "../../types/schema";
+import type { InMemoryLevelSource } from "./in-memory-level-source";
 import {
   inMemoryGridDataSource,
   type InMemoryGridDataSourceOpts,
@@ -36,21 +37,21 @@ const schema: GridSchema = {
       name: "orders",
       rowHeaderColumn: "none",
       columns: orderColumns,
-      options: { rowKey: (n) => String(n.columns.id) },
+      options: {},
       childLevels: ["lines"],
     },
     lines: {
       name: "lines",
       rowHeaderColumn: "none",
       columns: lineColumns,
-      options: { rowKey: (n) => String(n.columns.id) },
+      options: {},
       childLevels: ["notes"],
     },
     notes: {
       name: "notes",
       rowHeaderColumn: "none",
       columns: noteColumns,
-      options: { rowKey: (n) => String(n.columns.id) },
+      options: {},
       childLevels: [],
     },
   },
@@ -65,24 +66,35 @@ const allClient: InMemoryLevelOpts = {
 
 const fixtureTree = (): TreeNode[] => [
   {
+    rowKey: "ord-1",
     levelName: "orders",
     columns: { id: "ord-1", customer: "Alice" },
     children: {
       lines: [
         {
+          rowKey: "ln-1",
           levelName: "lines",
           columns: { id: "ln-1", amount: 10 },
           children: {
             notes: [
-              { levelName: "notes", columns: { id: "n-1", text: "first" } },
+              {
+                rowKey: "n-1",
+                levelName: "notes",
+                columns: { id: "n-1", text: "first" },
+              },
             ],
           },
         },
-        { levelName: "lines", columns: { id: "ln-2", amount: 20 } },
+        {
+          rowKey: "ln-2",
+          levelName: "lines",
+          columns: { id: "ln-2", amount: 20 },
+        },
       ],
     },
   },
   {
+    rowKey: "ord-2",
     levelName: "orders",
     columns: { id: "ord-2", customer: "Bob" },
     // No `children` at all — should resolve to empty.
@@ -208,7 +220,9 @@ describe("inMemoryGridDataSource", () => {
     const ds = inMemoryGridDataSource(baseOpts());
     expect(() =>
       ds.resolveChild("orders.ord-99.lines" as GridPath, "ln-1", "notes"),
-    ).toThrow(/no node with rowKey 'ord-99'/);
+    ).toThrow(
+      /parent level source 'orders\.ord-99\.lines' has not been resolved/,
+    );
   });
 
   it("resolveChild on a parentPath whose root segment doesn't match schema.rootLevel throws", () => {
@@ -228,7 +242,8 @@ describe("inMemoryGridDataSource", () => {
   it("walks two levels deep: order → line → notes", () => {
     const tree = fixtureTree();
     const ds = inMemoryGridDataSource(baseOpts({ tree }));
-    // Path "orders.ord-1.lines" is the lines level under order ord-1.
+    ds.resolveChild(root, "ord-1", "lines");
+    // Path "orders.ord-1.lines" is now the live lines level under order ord-1.
     const notes = ds.resolveChild(
       "orders.ord-1.lines" as GridPath,
       "ln-1",
@@ -256,6 +271,115 @@ describe("inMemoryGridDataSource", () => {
     ]);
   });
 
+  it("resolves children from a parent inserted into the live root source", async () => {
+    const ds = inMemoryGridDataSource(baseOpts());
+    const rootSource = ds.rootSource();
+    if (!rootSource.write) throw new Error("expected writable root");
+    await rootSource.write.createNode({
+      rowKey: "ord-3",
+      levelName: "orders",
+      columns: { id: "ord-3", customer: "Cara" },
+      children: {
+        lines: [
+          {
+            rowKey: "ln-3",
+            levelName: "lines",
+            columns: { id: "ln-3", amount: 30 },
+          },
+        ],
+      },
+    });
+
+    const lines = ds.resolveChild(root, "ord-3", "lines");
+    expect(lines.state().snapshot.nodes.map((node) => node.rowKey)).toEqual([
+      "ln-3",
+    ]);
+  });
+
+  it("resolves restored parent identity from current root data, not constructor seed data", async () => {
+    const ds = inMemoryGridDataSource(baseOpts());
+    const rootSource = ds.rootSource();
+    if (!rootSource.write) throw new Error("expected writable root");
+    const originalLines = ds.resolveChild(root, "ord-1", "lines");
+
+    rootSource.write.removeNode("ord-1");
+    await rootSource.write.createNode({
+      rowKey: "ord-1",
+      levelName: "orders",
+      columns: { id: "ord-1", customer: "Restored" },
+      children: {
+        lines: [
+          {
+            rowKey: "ln-restored",
+            levelName: "lines",
+            columns: { id: "ln-restored", amount: 99 },
+          },
+        ],
+      },
+    });
+
+    const restoredLines = ds.resolveChild(root, "ord-1", "lines");
+    expect(restoredLines).not.toBe(originalLines);
+    expect(
+      restoredLines.state().snapshot.nodes.map((node) => node.rowKey),
+    ).toEqual(["ln-restored"]);
+  });
+
+  it("resolves grandchildren from edits to the live child source", async () => {
+    const ds = inMemoryGridDataSource(baseOpts());
+    const lines = ds.resolveChild(root, "ord-1", "lines");
+    if (!lines.write) throw new Error("expected writable child");
+    await lines.write.createNode({
+      rowKey: "ln-3",
+      levelName: "lines",
+      columns: { id: "ln-3", amount: 30 },
+      children: {
+        notes: [
+          {
+            rowKey: "n-live",
+            levelName: "notes",
+            columns: { id: "n-live", text: "live child" },
+          },
+        ],
+      },
+    });
+
+    const notes = ds.resolveChild(
+      childPath(root, "ord-1", "lines"),
+      "ln-3",
+      "notes",
+    );
+    expect(notes.state().snapshot.nodes.map((node) => node.rowKey)).toEqual([
+      "n-live",
+    ]);
+  });
+
+  it("resolves children from the latest bulk replacement", () => {
+    const ds = inMemoryGridDataSource(baseOpts());
+    const rootSource = ds.rootSource() as InMemoryLevelSource;
+    rootSource.replaceNodes([
+      {
+        rowKey: "ord-1",
+        levelName: "orders",
+        columns: { id: "ord-1", customer: "Replaced" },
+        children: {
+          lines: [
+            {
+              rowKey: "ln-replaced",
+              levelName: "lines",
+              columns: { id: "ln-replaced", amount: 55 },
+            },
+          ],
+        },
+      },
+    ]);
+
+    const lines = ds.resolveChild(root, "ord-1", "lines");
+    expect(lines.state().snapshot.nodes.map((node) => node.rowKey)).toEqual([
+      "ln-replaced",
+    ]);
+  });
+
   it("mutating the returned root source does NOT mutate the input tree array", async () => {
     const tree = fixtureTree();
     const originalFirst = tree[0];
@@ -266,6 +390,7 @@ describe("inMemoryGridDataSource", () => {
     if (!r.write) throw new Error("expected writable root");
     r.write.setCell("ord-1", "customer", "Aliceeee");
     await r.write.createNode({
+      rowKey: "ord-3",
       levelName: "orders",
       columns: { id: "ord-3", customer: "C" },
     });
@@ -275,7 +400,7 @@ describe("inMemoryGridDataSource", () => {
     expect(tree[0].columns.customer).toBe("Alice");
   });
 
-  it("dispose() chains to root and to every source produced via resolveChild", () => {
+  it("dispose() does not dispose level sources returned to the runtime", () => {
     const ds = inMemoryGridDataSource(baseOpts());
     const r = ds.rootSource();
     const lines = ds.resolveChild(root, "ord-1", "lines");
@@ -287,11 +412,12 @@ describe("inMemoryGridDataSource", () => {
 
     ds.dispose();
 
-    // Post-dispose mutations on the underlying sources must not fire subs.
+    // The runtime owns these sources and can still finish in-flight work before
+    // it disposes them itself.
     r.write?.setCell("ord-1", "customer", "X");
     lines.write?.setCell("ln-1", "amount", 999);
-    expect(rootSub).not.toHaveBeenCalled();
-    expect(linesSub).not.toHaveBeenCalled();
+    expect(rootSub).toHaveBeenCalledTimes(1);
+    expect(linesSub).toHaveBeenCalledTimes(1);
   });
 
   it("throws at construction if schema.rootLevel is not in schema.levels", () => {
@@ -312,6 +438,7 @@ describe("inMemoryGridDataSource", () => {
     const ds = inMemoryGridDataSource(
       baseOpts({ levels: { orders: allClient, lines: allClient } }),
     );
+    ds.resolveChild(root, "ord-1", "lines");
     expect(() =>
       ds.resolveChild("orders.ord-1.lines" as GridPath, "ln-1", "notes"),
     ).toThrow(/opts.levels has no entry for level 'notes'/);

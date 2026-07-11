@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { ColumnSchema } from "../../types/schema";
-import type { LevelOptions, TreeNode } from "../../types/level-row";
+import type { TreeNode } from "../../types/level-row";
 import type { RowPredicate } from "../../pipeline/types";
 import {
   inMemoryLevelSource,
@@ -28,16 +28,22 @@ const columns: ColumnSchema[] = [
   },
 ];
 
-const options: LevelOptions = {
-  // Stable rowKey from the id column — robust across sort/filter so the
-  // tests can call setCell after sorting without rowKey collisions.
-  rowKey: (node) => String(node.columns.id),
-};
-
 const fixtureNodes = (): TreeNode[] => [
-  { levelName: "items", columns: { id: "a", amount: 30, name: "Apple" } },
-  { levelName: "items", columns: { id: "b", amount: 10, name: "Banana" } },
-  { levelName: "items", columns: { id: "c", amount: 20, name: "Cherry" } },
+  {
+    rowKey: "a",
+    levelName: "items",
+    columns: { id: "a", amount: 30, name: "Apple" },
+  },
+  {
+    rowKey: "b",
+    levelName: "items",
+    columns: { id: "b", amount: 10, name: "Banana" },
+  },
+  {
+    rowKey: "c",
+    levelName: "items",
+    columns: { id: "c", amount: 20, name: "Cherry" },
+  },
 ];
 
 // A column-keyed predicate map — the simplest test grammar that exercises
@@ -58,7 +64,6 @@ const baseOpts = (
   extra: Partial<InMemoryLevelSourceOpts<TestFilter>> = {},
 ): InMemoryLevelSourceOpts<TestFilter> => ({
   initialNodes: fixtureNodes(),
-  options,
   columns,
   sortMode: "client",
   filterMode: "client",
@@ -89,6 +94,70 @@ describe("inMemoryLevelSource (writable)", () => {
     const s2 = src.state().snapshot;
     expect(s1).toBe(s2);
     expect(s1.nodes).toBe(s2.nodes);
+  });
+
+  it("owns immutable structural snapshots for initial, replaced, and created rows", async () => {
+    const initial = [
+      {
+        rowKey: "initial",
+        levelName: "items",
+        columns: { id: "initial", name: "Initial" },
+        children: {
+          details: [
+            {
+              rowKey: "detail",
+              levelName: "details",
+              columns: { name: "Detail" },
+            },
+          ],
+        },
+      },
+    ];
+    const footerRows = [{ rowKey: "total", columns: { name: "Total" } }];
+    const src = inMemoryLevelSource(
+      baseOpts({ initialNodes: initial, footerRows }),
+    );
+    const first = src.state();
+
+    initial[0].rowKey = "mutated";
+    initial[0].columns.name = "Mutated";
+    initial[0].children.details[0].columns.name = "Mutated detail";
+    footerRows[0].columns.name = "Mutated total";
+
+    expect(src.state()).toBe(first);
+    expect(first.snapshot.nodes[0].rowKey).toBe("initial");
+    expect(first.snapshot.nodes[0].columns.name).toBe("Initial");
+    const details = first.snapshot.nodes[0].children?.details;
+    expect(Array.isArray(details) ? details[0].columns.name : undefined).toBe(
+      "Detail",
+    );
+    expect(first.snapshot.footerRows?.[0].columns.name).toBe("Total");
+    expect(Object.isFrozen(first)).toBe(true);
+    expect(Object.isFrozen(first.snapshot)).toBe(true);
+    expect(Object.isFrozen(first.snapshot.nodes)).toBe(true);
+    expect(Object.isFrozen(first.snapshot.nodes[0].columns)).toBe(true);
+
+    const replacement = [
+      {
+        rowKey: "replacement",
+        levelName: "items",
+        columns: { id: "replacement", name: "Replacement" },
+      },
+    ];
+    src.replaceNodes(replacement);
+    replacement[0].columns.name = "Mutated replacement";
+    expect(src.state().snapshot.nodes[0].columns.name).toBe("Replacement");
+
+    const created = {
+      rowKey: "created",
+      levelName: "items",
+      columns: { id: "created", name: "Created" },
+    };
+    const result = await src.write.createNode(created);
+    created.columns.name = "Mutated created";
+    expect(result.node.columns.name).toBe("Created");
+    expect(src.state().snapshot.nodes[1].columns.name).toBe("Created");
+    expect(Object.isFrozen(result.node)).toBe(true);
   });
 
   it("query.sort re-sorts, allocates new nodes ref, fires subscribers exactly once", async () => {
@@ -127,6 +196,7 @@ describe("inMemoryLevelSource (writable)", () => {
 
   it("windows nodes from private initial pagination state", () => {
     const many: TreeNode[] = Array.from({ length: 25 }, (_, i) => ({
+      rowKey: `r${i}`,
       levelName: "items",
       columns: { id: `r${i}`, amount: i, name: `n${i}` },
     }));
@@ -142,6 +212,7 @@ describe("inMemoryLevelSource (writable)", () => {
 
   it("write.canAppendRow reflects the private pagination boundary", () => {
     const many: TreeNode[] = Array.from({ length: 12 }, (_, i) => ({
+      rowKey: `r${i}`,
       levelName: "items",
       columns: { id: `r${i}`, amount: i, name: `n${i}` },
     }));
@@ -173,6 +244,7 @@ describe("inMemoryLevelSource (writable)", () => {
     const after = src.state().snapshot;
 
     expect(after.nodes).not.toBe(before.nodes);
+    expect(before.nodes[0].columns.amount).toBe(30);
     const a = after.nodes.find((n) => n.columns.id === "a")!;
     expect(a.columns.amount).toBe(999);
   });
@@ -239,11 +311,13 @@ describe("inMemoryLevelSource (writable)", () => {
   it("createNode appends by default and surfaces the new node", async () => {
     const src = inMemoryLevelSource(baseOpts());
     const result = await src.write.createNode({
+      rowKey: "d",
       levelName: "items",
       columns: { id: "d", amount: 5, name: "Date" },
     });
     expect(result).toEqual({
       node: {
+        rowKey: "d",
         levelName: "items",
         columns: { id: "d", amount: 5, name: "Date" },
       },
@@ -257,11 +331,50 @@ describe("inMemoryLevelSource (writable)", () => {
   it("createNode at index puts the node in the right base position", async () => {
     const src = inMemoryLevelSource(baseOpts());
     await src.write.createNode(
-      { levelName: "items", columns: { id: "z", amount: 0, name: "Z" } },
+      {
+        rowKey: "z",
+        levelName: "items",
+        columns: { id: "z", amount: 0, name: "Z" },
+      },
       1,
     );
     const snap = src.state().snapshot;
     expect(snap.nodes.map((n) => n.columns.id)).toEqual(["a", "z", "b", "c"]);
+  });
+
+  it("rejects invalid creates before mutation or notification", async () => {
+    const src = inMemoryLevelSource(baseOpts());
+    const before = src.state().snapshot;
+    const subscriber = vi.fn();
+    src.subscribe(subscriber);
+
+    await expect(
+      src.write.createNode({
+        rowKey: "a",
+        levelName: "items",
+        columns: { id: "replacement-a" },
+      }),
+    ).rejects.toThrow('duplicate TreeNode.rowKey "a"');
+
+    expect(src.state().snapshot).toBe(before);
+    expect(subscriber).not.toHaveBeenCalled();
+  });
+
+  it("validates replaceNodes before replacing the current snapshot", () => {
+    const src = inMemoryLevelSource(baseOpts());
+    const before = src.state().snapshot;
+    const subscriber = vi.fn();
+    src.subscribe(subscriber);
+
+    expect(() =>
+      src.replaceNodes([
+        { rowKey: "same", levelName: "items", columns: { id: "one" } },
+        { rowKey: "same", levelName: "items", columns: { id: "two" } },
+      ]),
+    ).toThrow('duplicate TreeNode.rowKey "same"');
+
+    expect(src.state().snapshot).toBe(before);
+    expect(subscriber).not.toHaveBeenCalled();
   });
 
   it("removeNode drops the node", () => {
@@ -285,6 +398,7 @@ describe("inMemoryLevelSource (writable)", () => {
 
   it("aggregator runs after filter/sort/window; rollups and footerRows reflect the windowed set", () => {
     const many: TreeNode[] = Array.from({ length: 5 }, (_, i) => ({
+      rowKey: `r${i}`,
       levelName: "items",
       columns: { id: `r${i}`, amount: (i + 1) * 10, name: `n${i}` },
     }));
@@ -357,6 +471,28 @@ describe("inMemoryLevelSource (writable)", () => {
     expect(sub).not.toHaveBeenCalled();
   });
 
+  it("reports throwing subscribers, continues in order, and keeps duplicate registrations independent", () => {
+    const observerError = new Error("observer failed");
+    const report = vi.fn();
+    const calls: string[] = [];
+    const duplicate = vi.fn(() => calls.push("duplicate"));
+    const src = inMemoryLevelSource(baseOpts({ onObserverError: report }));
+    const unsubscribeFirst = src.subscribe(duplicate);
+    src.subscribe(() => {
+      calls.push("throw");
+      throw observerError;
+    });
+    src.subscribe(duplicate);
+
+    expect(() => src.write.setCell("a", "amount", 31)).not.toThrow();
+    expect(calls).toEqual(["duplicate", "throw", "duplicate"]);
+    expect(report).toHaveBeenCalledWith(observerError);
+
+    unsubscribeFirst();
+    src.write.setCell("a", "amount", 32);
+    expect(duplicate).toHaveBeenCalledTimes(3);
+  });
+
   it("query.sort with the same reference is a no-op (no notification)", async () => {
     const sort = [{ colId: "amount" as const, direction: "asc" as const }];
     const src = inMemoryLevelSource(baseOpts({ initialSort: sort }));
@@ -381,6 +517,35 @@ describe("inMemoryLevelSource (writable)", () => {
 });
 
 describe("inMemoryReadonlyLevelSource", () => {
+  it("rejects missing, empty, and duplicate initial row keys", () => {
+    const missing = {
+      levelName: "items",
+      columns: { id: "missing" },
+    } as unknown as TreeNode;
+    expect(() =>
+      inMemoryReadonlyLevelSource(baseOpts({ initialNodes: [missing] })),
+    ).toThrow("TreeNode.rowKey is required");
+    expect(() =>
+      inMemoryReadonlyLevelSource(
+        baseOpts({
+          initialNodes: [
+            { rowKey: "", levelName: "items", columns: { id: "empty" } },
+          ],
+        }),
+      ),
+    ).toThrow("TreeNode.rowKey must be non-empty");
+    expect(() =>
+      inMemoryReadonlyLevelSource(
+        baseOpts({
+          initialNodes: [
+            { rowKey: "same", levelName: "items", columns: { id: "one" } },
+            { rowKey: "same", levelName: "items", columns: { id: "two" } },
+          ],
+        }),
+      ),
+    ).toThrow('duplicate TreeNode.rowKey "same"');
+  });
+
   it("omits the write capability", () => {
     const src = inMemoryReadonlyLevelSource(baseOpts());
     expect(src.write).toBeUndefined();
@@ -397,6 +562,7 @@ describe("inMemoryReadonlyLevelSource", () => {
 
   it("query sort/filter work and emit identity-stable snapshots", async () => {
     const many: TreeNode[] = Array.from({ length: 25 }, (_, i) => ({
+      rowKey: `r${i}`,
       levelName: "items",
       columns: { id: `r${i}`, amount: i, name: `n${i}` },
     }));

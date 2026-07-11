@@ -24,7 +24,7 @@ import type { LevelRow, LevelRowKind } from "../types/level-row";
 import type { RowCursor } from "../types/row-selection";
 import type { RowCapabilities } from "../types/capabilities";
 import type { ColPolicy, RowDirection } from "../types/action";
-import type { GridRuntime } from "../runtime/create-grid-runtime";
+import type { GridRuntimeInternals } from "../runtime/create-grid-runtime";
 import type { GridCoordinatorPublic } from "./coordinator";
 
 export type { ColPolicy, RowDirection } from "../types/action";
@@ -54,7 +54,7 @@ type RowStep = { path: GridPath; rowId: RowId };
 // is `ready`. Non-focusable rows are yielded too — the caller filters
 // per its own rule (cursor motion skips them; index lookup needs them).
 export function* visibleRows(
-  runtime: GridRuntime,
+  runtime: GridRuntimeInternals,
   coordinator: GridCoordinatorPublic,
   path: GridPath,
 ): Generator<RowStep> {
@@ -69,16 +69,19 @@ export function* visibleRows(
   }
 }
 
-function rootPathOf(runtime: GridRuntime): GridPath {
+function rootPathOf(runtime: GridRuntimeInternals): GridPath {
   return rootPath(runtime.schemaTopology.rootLevelName);
 }
 
-function getRow(runtime: GridRuntime, step: RowStep): LevelRow | undefined {
+function getRow(
+  runtime: GridRuntimeInternals,
+  step: RowStep,
+): LevelRow | undefined {
   return runtime.displayedRowsFor(step.path).rowById.get(step.rowId);
 }
 
 function isFocusable(
-  runtime: GridRuntime,
+  runtime: GridRuntimeInternals,
   step: RowStep,
   capabilities: CapabilitiesFn,
 ): boolean {
@@ -87,7 +90,10 @@ function isFocusable(
   return capabilities(row.kind).focusable;
 }
 
-function isRowSelectable(runtime: GridRuntime, step: RowStep): boolean {
+function isRowSelectable(
+  runtime: GridRuntimeInternals,
+  step: RowStep,
+): boolean {
   return getRow(runtime, step)?.rowSelectable === true;
 }
 
@@ -97,7 +103,7 @@ function isRowSelectable(runtime: GridRuntime, step: RowStep): boolean {
 // walk that short-circuits at the target. Persisting state would re-
 // introduce the divergence this module exists to prevent.
 function collect(
-  runtime: GridRuntime,
+  runtime: GridRuntimeInternals,
   coordinator: GridCoordinatorPublic,
 ): RowStep[] {
   return Array.from(visibleRows(runtime, coordinator, rootPathOf(runtime)));
@@ -117,7 +123,7 @@ function nextFocusableStep(
   steps: RowStep[],
   fromIndex: number,
   step: 1 | -1,
-  runtime: GridRuntime,
+  runtime: GridRuntimeInternals,
   capabilities: CapabilitiesFn,
 ): RowStep | null {
   for (let i = fromIndex + step; i >= 0 && i < steps.length; i += step) {
@@ -128,7 +134,7 @@ function nextFocusableStep(
 
 function firstFocusableStep(
   steps: RowStep[],
-  runtime: GridRuntime,
+  runtime: GridRuntimeInternals,
   capabilities: CapabilitiesFn,
 ): RowStep | null {
   return nextFocusableStep(steps, -1, 1, runtime, capabilities);
@@ -136,7 +142,7 @@ function firstFocusableStep(
 
 function lastFocusableStep(
   steps: RowStep[],
-  runtime: GridRuntime,
+  runtime: GridRuntimeInternals,
   capabilities: CapabilitiesFn,
 ): RowStep | null {
   return nextFocusableStep(steps, steps.length, -1, runtime, capabilities);
@@ -178,7 +184,7 @@ function resolveColumn(
 
 function makeCursor(
   step: RowStep,
-  runtime: GridRuntime,
+  runtime: GridRuntimeInternals,
   sourceColId: ColId,
   policy: ColPolicy,
 ): CellCursor | null {
@@ -197,7 +203,7 @@ function deltaHop(
   steps: RowStep[],
   fromIndex: number,
   delta: number,
-  runtime: GridRuntime,
+  runtime: GridRuntimeInternals,
   capabilities: CapabilitiesFn,
 ): RowStep | null {
   if (steps.length === 0) return null;
@@ -254,7 +260,7 @@ export type NextVisibleRowDeps = {
 // on those two surfaces. `colPolicy` chooses the column on landing; the
 // dispatch layer never second-guesses the result.
 export function resolveVisibleRowNavigation(
-  runtime: GridRuntime,
+  runtime: GridRuntimeInternals,
   coordinator: GridCoordinatorPublic,
   from: CellCursor,
   dir: RowDirection,
@@ -299,7 +305,7 @@ export function resolveVisibleRowNavigation(
 }
 
 export function resolveRowSelectableNavigation(
-  runtime: GridRuntime,
+  runtime: GridRuntimeInternals,
   coordinator: GridCoordinatorPublic,
   from: RowCursor,
   direction: "up" | "down" | "first" | "last" | { delta: number },
@@ -339,7 +345,7 @@ function nextRowSelectableStep(
   steps: RowStep[],
   fromIndex: number,
   step: 1 | -1,
-  runtime: GridRuntime,
+  runtime: GridRuntimeInternals,
 ): RowStep | null {
   for (let i = fromIndex + step; i >= 0 && i < steps.length; i += step) {
     if (isRowSelectable(runtime, steps[i])) return steps[i];
@@ -351,7 +357,7 @@ function rowDeltaHop(
   steps: RowStep[],
   fromIndex: number,
   delta: number,
-  runtime: GridRuntime,
+  runtime: GridRuntimeInternals,
 ): RowStep | null {
   if (steps.length === 0) return null;
   const target = Math.max(0, Math.min(steps.length - 1, fromIndex + delta));
@@ -387,6 +393,7 @@ export function nextColumn(
 }
 
 // Convenience: derive a `RowId` from a path + rowKey, matching the
-// `RowId = ${GridPath}#${RowKey}` invariant. Re-exported so callers
+// tagged `RowId = ${GridPath}#${LevelRowKind}#${RowKey}` invariant.
+// Re-exported so callers
 // composing visible-order calls don't need to reach into `identity.ts`.
 export { makeRowId, rowKeyOfRowId };

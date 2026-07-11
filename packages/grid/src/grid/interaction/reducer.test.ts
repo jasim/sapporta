@@ -31,7 +31,7 @@ const displayed: DisplayedRows = buildDisplayed([
     rowSelectable: true,
     columns: {},
     hasChildren: false,
-    source: {} as never,
+    source: { rowKey: "r0", levelName: "rows", columns: {} },
   } satisfies LevelRow,
 ]);
 
@@ -61,7 +61,7 @@ describe("reduceController START_EDIT", () => {
         initial: "x",
       }),
     ).toEqual({
-      coord: { rowId: "rows#r0", colId: "a" },
+      coord: { rowId, colId: "a" },
       editStart: {
         trigger: "type",
         typedSeed: "x",
@@ -77,7 +77,7 @@ describe("reduceController START_EDIT", () => {
         trigger: "doubleClick",
       }),
     ).toEqual({
-      coord: { rowId: "rows#r0", colId: "a" },
+      coord: { rowId, colId: "a" },
       editStart: { trigger: "doubleClick" },
     });
   });
@@ -90,7 +90,7 @@ describe("reduceController START_EDIT", () => {
         trigger: "enter",
       }),
     ).toEqual({
-      coord: { rowId: "rows#r0", colId: "a" },
+      coord: { rowId, colId: "a" },
       editStart: { trigger: "enter" },
     });
   });
@@ -103,7 +103,7 @@ describe("reduceController START_EDIT", () => {
         trigger: "f2",
       }),
     ).toEqual({
-      coord: { rowId: "rows#r0", colId: "a" },
+      coord: { rowId, colId: "a" },
       editStart: { trigger: "f2" },
     });
   });

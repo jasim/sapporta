@@ -8,6 +8,7 @@ import type { GridPresentation } from "../Grid";
 import { gridRowIdentityAttrs } from "../internal/dom-targets";
 import { GridDataCell } from "./GridDataCell";
 import { EmptyRowHeaderCell } from "./RowHeaderCell";
+import { runtimeInternalsFor } from "../../runtime/create-grid-runtime";
 
 export type RowChromeState = {
   active: boolean;
@@ -41,7 +42,7 @@ export const GridRow = memo(function GridRow({
   rowHeaderColumn,
 }: {
   rowId: RowId;
-  schema: ColumnSchema[];
+  schema: readonly ColumnSchema[];
   path: GridPath;
   colOrder: readonly ColId[];
   presentation?: GridPresentation;
@@ -49,6 +50,7 @@ export const GridRow = memo(function GridRow({
   rowHeaderColumn: RowHeaderColumn;
 }) {
   const runtime = useGridRuntime();
+  const internals = runtimeInternalsFor(runtime);
   const row = useDisplayedRow(path, rowId);
   const { active, selected } =
     rowChromeStateFromInteractionStatus(rowInteractionStatus);
@@ -77,12 +79,12 @@ export const GridRow = memo(function GridRow({
         // cell click owns the cell cursor instead, so this row shell stays out
         // of the cell interaction path.
         if (event.shiftKey) {
-          runtime.cursorManager.extendRowSelectionToCursor({
+          internals.cursorManager.extendRowSelectionToCursor({
             path,
             rowId: row.id,
           });
         } else {
-          runtime.cursorManager.moveRowCursorTo({ path, rowId: row.id });
+          internals.cursorManager.moveRowCursorTo({ path, rowId: row.id });
         }
       }}
     >

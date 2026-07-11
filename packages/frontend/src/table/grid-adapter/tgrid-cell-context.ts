@@ -9,7 +9,7 @@ import type {
   CellActivationState,
   CellActivationTrigger,
   CellActivationGesture,
-  GridPath,
+  GridLevelRuntime,
   GridRuntime,
   RowKey,
   CommitTarget,
@@ -73,14 +73,14 @@ export type TGridSessionContext<
 };
 
 // Runtime contract passed into renderers for every visible cell.
-// Includes level identity, row value, path, and render helpers.
+// Includes the path-bound grid level, row value, and render helpers.
 export type TGridCellContext<
   RowsByLevel extends TGridRowsByLevel,
   AppServices,
   LevelId extends TGridLevelId<RowsByLevel>,
 > = {
   levelId: LevelId;
-  path: GridPath;
+  level: GridLevelRuntime;
   value: unknown;
   row: Readonly<RowsByLevel[LevelId]>;
   rowKey: RowKey;
@@ -130,7 +130,7 @@ export type TGridCellEditorContext<
 };
 
 // Contract for save handlers before persistence logic runs.
-// Provides typed value, row, path, and app services to custom writers.
+// Provides typed value, row, path-bound level, and app services to custom writers.
 export type TGridCellWriteContext<
   RowsByLevel extends TGridRowsByLevel,
   AppServices,
@@ -138,7 +138,7 @@ export type TGridCellWriteContext<
   K extends RowFieldName<RowsByLevel[LevelId]>,
 > = {
   levelId: LevelId;
-  path: GridPath;
+  level: GridLevelRuntime;
   value: RowsByLevel[LevelId][K];
   row: Readonly<RowsByLevel[LevelId]>;
   rowKey: RowKey;

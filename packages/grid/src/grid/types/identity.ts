@@ -6,15 +6,14 @@
 // is needed (range bounds, scroll), but identity never shifts because a row
 // moved in the array.
 //
-// RowKey comes from the consumer's `levelOptions.rowKey` (default: array
-// index, allowed only on leaf levels — see `schema-topology.ts`). RowId
-// composes GridPath + RowKey into a globally unique handle. This means two
-// rows in different levels can share the same RowKey without colliding.
+// RowKey is carried by every TreeNode. RowId composes GridPath, displayed-row
+// kind, and RowKey into a globally unique handle. This means two rows in
+// different levels or of different displayed kinds can share a RowKey.
 //
 // GridPath encoding: alternating (levelName, rowKey, levelName, rowKey, …,
 // levelName) joined by `.`. Odd length. Root = `rootPath(rootLevelName)`;
 // every step down composes via `childPath(parent, parentRowKey, childKey)`.
-// Both level-name and rowKey segments may contain `.` and `%`; both are
+// Both level-name and rowKey segments may contain `.`, `#`, and `%`; all are
 // percent-encoded inside the segment so the `.` separator stays unambiguous.
 //
 // Why rowKey-keyed instead of index-keyed? The path encoding survives
@@ -30,6 +29,7 @@
 // speedup on the per-row-render hot path.
 
 import type { Brand } from "./brand";
+import type { LevelRowKind } from "./level-row";
 
 export type ColId = string;
 export type RowKey = string;
@@ -41,21 +41,25 @@ export type RowKey = string;
 //   "orders.ord-1.lines.ln-2.notes"                grandchildren
 export type GridPath = Brand<string, "GridPath">;
 
-// Logical row identity within a single GridPath: `${GridPath}#${RowKey}`.
-// Stores key on RowId; arrays are scratch.
+// Logical row identity within a single GridPath. The encoded tuple contains the
+// path, displayed-row kind, and row-local key. Arrays are scratch.
 export type RowId = Brand<string, "RowId">;
 
-export type Coord = { rowId: RowId; colId: ColId };
+export type Coord = { readonly rowId: RowId; readonly colId: ColId };
 
 // Encode `%` first so that decode of e.g. `%2525` yields `%25` and not `%`.
-// The two literal characters that need protecting in a path segment are `.`
-// (the path separator) and `%` (the encoding's own escape).
+// The literal characters that need protecting in a path segment are `.` (the
+// path separator), `#` (the RowId tuple separator), and `%` (the encoding's own
+// escape).
 function encodePathSegment(segment: string): string {
-  return segment.replaceAll("%", "%25").replaceAll(".", "%2E");
+  return segment
+    .replaceAll("%", "%25")
+    .replaceAll(".", "%2E")
+    .replaceAll("#", "%23");
 }
 
 function decodePathSegment(segment: string): string {
-  // Single pass: walk and replace only `%2E` and `%25`. Any other `%XX`-like
+  // Single pass: walk and replace only `%2E`, `%23`, and `%25`. Any other `%XX`-like
   // sequence in the input was never produced by encode and is left as-is.
   let out = "";
   for (let i = 0; i < segment.length; i++) {
@@ -68,6 +72,11 @@ function decodePathSegment(segment: string): string {
       }
       if (code === "25") {
         out += "%";
+        i += 2;
+        continue;
+      }
+      if (code === "23") {
+        out += "#";
         i += 2;
         continue;
       }
@@ -110,14 +119,14 @@ export function childPath(
 
 // One edge of a `GridPath` — the `(rowKey, childLevelName)` pair appended
 // to a parent by `childPath(parent, rowKey, childLevelName)`.
-export type PathEdge = { rowKey: RowKey; levelName: string };
+export type PathEdge = { readonly rowKey: RowKey; readonly levelName: string };
 
 // Structured view of a `GridPath`. `rootLevelName` is the first segment;
 // `edges` is the ordered list of `(rowKey, childLevelName)` steps that
 // descend from it. The last edge's `levelName` is the path's own level.
 export type PathDecomposition = {
-  rootLevelName: string;
-  edges: ReadonlyArray<PathEdge>;
+  readonly rootLevelName: string;
+  readonly edges: readonly PathEdge[];
 };
 
 // Sole owner of `GridPath` parsing. Splits on `.`, validates the
@@ -192,21 +201,24 @@ export function parseChildPath(
   return { rowKey, childKey };
 }
 
-export function makeRowId(path: GridPath, rowKey: RowKey): RowId {
-  return `${path}#${rowKey}` as RowId;
+export function makeLevelRowId(
+  path: GridPath,
+  kind: LevelRowKind,
+  rowKey: RowKey,
+): RowId {
+  if (rowKey === "") {
+    throw new Error("makeLevelRowId: empty rowKey is not permitted");
+  }
+  return `${path}#${kind}#${encodeRowKeySegment(rowKey)}` as RowId;
 }
 
-const DISPLAYED_PHANTOM_ROW_KEY_PREFIX = "phantom:";
-
-export function displayedPhantomRowKey(rowKey: RowKey): RowKey {
-  return `${DISPLAYED_PHANTOM_ROW_KEY_PREFIX}${rowKey}`;
+export function makeRowId(path: GridPath, rowKey: RowKey): RowId {
+  return makeLevelRowId(path, "data", rowKey);
 }
 
 export function phantomKeyFromDisplayedRowId(rowId: RowId): RowKey | null {
-  const rowKey = rowKeyOfRowId(rowId);
-  return rowKey.startsWith(DISPLAYED_PHANTOM_ROW_KEY_PREFIX)
-    ? rowKey.slice(DISPLAYED_PHANTOM_ROW_KEY_PREFIX.length)
-    : null;
+  const parsed = parseRowId(rowId);
+  return parsed.kind === "phantom" ? parsed.rowKey : null;
 }
 
 export function isDisplayedPhantomRowId(rowId: RowId): boolean {
@@ -214,15 +226,51 @@ export function isDisplayedPhantomRowId(rowId: RowId): boolean {
 }
 
 export function pathOfRowId(id: RowId): GridPath {
-  const idx = id.indexOf("#");
-  if (idx < 0) throw new Error(`Malformed RowId: ${id}`);
-  return id.slice(0, idx) as GridPath;
+  return parseRowId(id).path;
 }
 
 export function rowKeyOfRowId(id: RowId): RowKey {
-  const idx = id.indexOf("#");
-  if (idx < 0) throw new Error(`Malformed RowId: ${id}`);
-  return id.slice(idx + 1);
+  return parseRowId(id).rowKey;
+}
+
+export function kindOfRowId(id: RowId): LevelRowKind {
+  return parseRowId(id).kind;
+}
+
+function parseRowId(id: RowId): {
+  path: GridPath;
+  kind: LevelRowKind;
+  rowKey: RowKey;
+} {
+  const first = id.indexOf("#");
+  const second = first < 0 ? -1 : id.indexOf("#", first + 1);
+  if (first <= 0 || second <= first + 1 || id.indexOf("#", second + 1) >= 0) {
+    throw new Error(`Malformed RowId: ${id}`);
+  }
+  const kind = id.slice(first + 1, second);
+  if (!isLevelRowKind(kind)) throw new Error(`Malformed RowId: ${id}`);
+  const rowKey = decodeRowKeySegment(id.slice(second + 1));
+  if (rowKey === "") throw new Error(`Malformed RowId: ${id}`);
+  return {
+    path: id.slice(0, first) as GridPath,
+    kind,
+    rowKey,
+  };
+}
+
+function isLevelRowKind(value: string): value is LevelRowKind {
+  switch (value) {
+    case "data":
+    case "rollup":
+    case "opening":
+    case "closing":
+    case "subtotal":
+    case "footer":
+    case "phantom":
+      return true;
+    default:
+      return false;
+  }
 }
 
 export function coordsEqual(a: Coord, b: Coord): boolean {
@@ -232,7 +280,11 @@ export function coordsEqual(a: Coord, b: Coord): boolean {
 // The canonical location of the live focus across the whole grid. There is
 // at most one. Owned by the cursor manager; the coordinator stores it and the
 // controller for `path` mirrors `(rowId, colId)` as `liveCellFocus`.
-export type CellCursor = { path: GridPath; rowId: RowId; colId: ColId };
+export type CellCursor = {
+  readonly path: GridPath;
+  readonly rowId: RowId;
+  readonly colId: ColId;
+};
 
 export function cursorEqual(
   a: CellCursor | null,

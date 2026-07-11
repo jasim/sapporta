@@ -9,6 +9,11 @@ import type {
   DisplayedRowsInvalidationReason,
   DisplayedRowsState,
 } from "./types";
+import {
+  createObserverList,
+  type ObserverErrorReporter,
+  type ObserverList,
+} from "../observer-notification";
 
 export type CreateDisplayedRowsStoreArgs = {
   readInput(): DisplayedRowsInput;
@@ -16,6 +21,8 @@ export type CreateDisplayedRowsStoreArgs = {
     input: DisplayedRowsInput,
     previous?: DisplayedRowsState,
   ): DisplayedRowsState;
+  beforeNotify?: () => void;
+  onObserverError?: ObserverErrorReporter;
 };
 
 export type DisplayedRowsStore = {
@@ -44,17 +51,18 @@ export function createDisplayedRowsStore(
   args: CreateDisplayedRowsStoreArgs,
 ): DisplayedRowsStore {
   let current = args.deriveDisplayedRowsState(args.readInput(), undefined);
-  const displayedRowSequenceSubscribers = new Set<() => void>();
-  const displayedRowSubscribersById = new Map<RowId, Set<() => void>>();
+  const displayedRowSequenceSubscribers = createObserverList<[]>(
+    args.onObserverError,
+  );
+  const displayedRowSubscribersById = new Map<RowId, ObserverList<[]>>();
+  let disposed = false;
 
   function notifyDisplayedRowSequenceSubscribers(): void {
-    for (const fn of Array.from(displayedRowSequenceSubscribers)) fn();
+    displayedRowSequenceSubscribers.notify();
   }
 
   function notifyDisplayedRowSubscribers(rowId: RowId): void {
-    const set = displayedRowSubscribersById.get(rowId);
-    if (!set) return;
-    for (const fn of Array.from(set)) fn();
+    displayedRowSubscribersById.get(rowId)?.notify();
   }
 
   return {
@@ -68,9 +76,11 @@ export function createDisplayedRowsStore(
       return current.displayedRows.rowById.get(rowId);
     },
     invalidateDisplayedRows(_reason) {
+      if (disposed) return;
       const previous = current;
       const next = args.deriveDisplayedRowsState(args.readInput(), previous);
       current = next;
+      args.beforeNotify?.();
 
       if (previous.displayedRowSequence !== next.displayedRowSequence) {
         notifyDisplayedRowSequenceSubscribers();
@@ -86,27 +96,32 @@ export function createDisplayedRowsStore(
       }
     },
     subscribeDisplayedRowSequence(fn) {
-      displayedRowSequenceSubscribers.add(fn);
-      return () => {
-        displayedRowSequenceSubscribers.delete(fn);
-      };
+      if (disposed) return () => {};
+      return displayedRowSequenceSubscribers.subscribe(fn);
     },
     subscribeDisplayedRow(rowId, fn) {
-      let set = displayedRowSubscribersById.get(rowId);
-      if (!set) {
-        set = new Set();
-        displayedRowSubscribersById.set(rowId, set);
+      if (disposed) return () => {};
+      let observers = displayedRowSubscribersById.get(rowId);
+      if (!observers) {
+        observers = createObserverList(args.onObserverError);
+        displayedRowSubscribersById.set(rowId, observers);
       }
-      set.add(fn);
+      const unsubscribe = observers.subscribe(fn);
+      let unsubscribed = false;
       return () => {
-        const cur = displayedRowSubscribersById.get(rowId);
-        if (!cur) return;
-        cur.delete(fn);
-        if (cur.size === 0) displayedRowSubscribersById.delete(rowId);
+        if (unsubscribed) return;
+        unsubscribed = true;
+        unsubscribe();
+        if (observers.size() === 0) displayedRowSubscribersById.delete(rowId);
       };
     },
     dispose() {
+      if (disposed) return;
+      disposed = true;
       displayedRowSequenceSubscribers.clear();
+      for (const observers of displayedRowSubscribersById.values()) {
+        observers.clear();
+      }
       displayedRowSubscribersById.clear();
     },
   };

@@ -16,13 +16,24 @@ export function startLoadingValueLookupEntriesForGridRows(args: {
   const subscriptions = new Map<GridPath, () => void>();
   const lastNodesByPath = new Map<GridPath, unknown>();
 
-  function attachKnownPaths(): void {
+  function syncKnownLevels(): void {
     if (stopped) return;
 
-    for (const path of args.runtime.registeredPaths()) {
+    const levels = args.runtime.registeredLevels();
+    const registeredPaths = new Set(levels.map((level) => level.path));
+
+    for (const [path, unsubscribe] of subscriptions) {
+      if (registeredPaths.has(path)) continue;
+      unsubscribe();
+      subscriptions.delete(path);
+      lastNodesByPath.delete(path);
+    }
+
+    for (const level of levels) {
+      const { path } = level;
       if (subscriptions.has(path)) continue;
 
-      const source = args.runtime.sourceFor(path);
+      const source = level.data;
       const loadForPath = () => {
         if (stopped) return;
 
@@ -51,12 +62,12 @@ export function startLoadingValueLookupEntriesForGridRows(args: {
     }
   }
 
-  attachKnownPaths();
-  const unsubscribeRegistry = args.runtime.subscribeRegistry(attachKnownPaths);
+  syncKnownLevels();
+  const unsubscribeLevels = args.runtime.subscribeLevels(syncKnownLevels);
 
   return () => {
     stopped = true;
-    unsubscribeRegistry();
+    unsubscribeLevels();
     for (const unsubscribe of subscriptions.values()) unsubscribe();
     subscriptions.clear();
     lastNodesByPath.clear();

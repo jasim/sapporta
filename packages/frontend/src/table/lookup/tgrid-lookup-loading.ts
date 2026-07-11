@@ -8,13 +8,15 @@ import { lookupCapabilities, preset } from "@sapporta/grid/column-preset";
 export function startTGridLookupLoading<
   RowsByLevel extends TGridRowsByLevel,
   AppServices = unknown,
->(session: TGridSession<RowsByLevel, AppServices>): () => void {
+>(
+  session: Pick<TGridSession<RowsByLevel, AppServices>, "runtime">,
+): () => void {
   return startLoadingValueLookupEntriesForGridRows({
     runtime: session.runtime,
     lookupColumnsForGridPath: (path) => {
-      const level = session.runtime.schemaAt(path);
+      const level = session.runtime.level(path);
 
-      return level.columns.flatMap((gridColumn) => {
+      return level.schema.columns.flatMap((gridColumn) => {
         const columnPreset = preset(gridColumn);
         const valueLookup = columnPreset
           ? lookupCapabilities(columnPreset)?.valueLookup

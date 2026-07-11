@@ -69,25 +69,25 @@ import type { RowSelection } from "../types/row-selection";
 import { reduceController } from "./reducer";
 
 export interface GridControllerPublicVerbs {
-  startEdit: {
+  readonly startEdit: {
     (coord: Coord, trigger: "type", initial: string): void;
     (coord: Coord, trigger: NonTypedCellEditGesture): void;
   };
-  activateCell: (coord: Coord, trigger: CellActivationTrigger) => void;
-  handleCellPointer: (
+  readonly activateCell: (coord: Coord, trigger: CellActivationTrigger) => void;
+  readonly handleCellPointer: (
     coord: Coord,
     gesture: "click" | "doubleClick",
   ) => boolean;
-  cancelEdit: () => void;
+  readonly cancelEdit: () => void;
   // commitEdit closes the editor, performs the cell write, and (when
   // `commit !== "stay"`) fires a movement intent in the requested
   // direction so the user lands where Tab / Enter / Shift+Tab promised.
-  commitEdit: (value: unknown, commit?: CommitTarget) => void;
-  clearCellSelection: () => void;
-  clearRowSelection: () => void;
+  readonly commitEdit: (value: unknown, commit?: CommitTarget) => void;
+  readonly clearCellSelection: () => void;
+  readonly clearRowSelection: () => void;
   // host I/O — stable; bound once to DOM by Grid.tsx. Returns true if the
   // event was consumed (caller should preventDefault), false otherwise.
-  handleKey: (
+  readonly handleKey: (
     e: KeyboardEvent,
     presentation?: CellKeyboardPresentation,
   ) => boolean;
@@ -95,12 +95,15 @@ export interface GridControllerPublicVerbs {
   // placement: pointer clicks should be able to move focus without moving
   // visible content, while keyboard-style navigation can reveal its resolved
   // destination after choosing a target.
-  revealCell: (coord: Coord) => void;
-  revealRow: (rowId: RowId) => void;
-  flushEffects: () => void;
+  readonly revealCell: (coord: Coord) => void;
+  readonly revealRow: (rowId: RowId) => void;
+  readonly flushEffects: () => void;
   // Sibling channel for queued effects. EffectRunner subscribes to this and
   // calls flushEffects() after running them.
-  effects: StoreApi<GridEffect[]>;
+  readonly effects: Pick<
+    StoreApi<readonly GridEffect[]>,
+    "getState" | "getInitialState" | "subscribe"
+  >;
 }
 
 export interface GridControllerCursorPort {
@@ -120,8 +123,12 @@ type ReadonlyControllerStore = Pick<
 export type GridControllerPublic = ReadonlyControllerStore &
   GridControllerPublicVerbs;
 
+type MutableGridControllerPublicVerbs = {
+  -readonly [Key in keyof GridControllerPublicVerbs]: GridControllerPublicVerbs[Key];
+};
+
 export type GridControllerStore = StoreApi<ControllerState> &
-  GridControllerPublicVerbs &
+  MutableGridControllerPublicVerbs &
   GridControllerCursorPort & {
     dispatch: (action: GridAction) => void;
   };
@@ -133,7 +140,7 @@ export type CreateControllerArgs = {
   // them so changing the displayed/schema/capabilities does not invalidate
   // the store.
   getDisplayed: () => DisplayedRows;
-  getSchema: () => ColumnSchema[];
+  getSchema: () => readonly ColumnSchema[];
   capabilitiesFor: (kind: LevelRowKind) => RowCapabilities;
   onNavigateCell?: (intent: CellNavigationIntent) => void;
   onNavigateRow?: (intent: RowNavigationIntent) => void;

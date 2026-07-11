@@ -28,7 +28,6 @@ import type {
   PatchCellResponse,
   RestEndpointFactory,
   RowQueryState,
-  RowKey,
   SortDescriptor,
   TreeNode,
 } from "@sapporta/grid";
@@ -40,9 +39,7 @@ import {
   deleteTableRow,
   type FetchTableRowsParams,
 } from "../api/rows";
-import type { RowId } from "@sapporta/shared/row-id";
 import type { TGridColumnMapper } from "./tgrid-column-mapper";
-import { tableRowIdentity } from "./table-row-identity";
 import type {
   TableColumnName,
   TGridLevelId,
@@ -184,7 +181,7 @@ export function compileTGridRuntimeConfig<
       name: levelId,
       columns: columnBuild.columns,
       rowHeaderColumn: columnBuild.rowHeaderColumn,
-      options: tableRowIdentity(pkCol.name, table.immutable ?? false),
+      options: { allowPhantoms: !(table.immutable ?? false) },
       childLevels: [...config.childLevels],
     };
 
@@ -223,6 +220,7 @@ export function compileTGridRuntimeConfig<
     endpointFactoriesByLevel[levelId] = makeEndpointFactory({
       levelId,
       table,
+      rowKeyColumn: pkCol.name,
       parent: parent
         ? {
             parentLevelId: parent.parentLevelId,
@@ -366,6 +364,7 @@ function missingTGridSessionContext(): never {
 function makeEndpointFactory(args: {
   levelId: string;
   table: TableSchema;
+  rowKeyColumn: TableColumnName;
   parent?: {
     parentLevelId: string;
     foreignKey: TableColumnName;
@@ -383,10 +382,6 @@ function makeEndpointFactory(args: {
     | (() => TGridSessionContext<TGridRowsByLevel, unknown>)
     | undefined;
 }): RestEndpointFactory<TGridFilter> {
-  const validColIds: ReadonlySet<ColId> = new Set(
-    args.table.columns.map((c) => c.name as ColId),
-  );
-
   return (ctx) => {
     // Expanded child rows are always filtered to the parent row that opened them.
     const parentRowKey = args.parent
@@ -436,7 +431,7 @@ function makeEndpointFactory(args: {
         } satisfies FetchTableRowsParams);
         args.recordTotalCount?.(res.meta.total);
         return {
-          nodes: buildTableTreeNodes(res.data, args.levelId),
+          nodes: buildTableTreeNodes(res.data, args.levelId, args.rowKeyColumn),
           totalCount: res.meta.total,
         };
       },
@@ -449,21 +444,28 @@ function makeEndpointFactory(args: {
             );
           }
           const session = args.sessionContext();
+          const level = session.runtime.level(
+            pathForEndpoint(args.levelId, ctx.ancestors),
+          );
           const result = await saveCellValue({
             value: req.value,
             row: req.row,
             rowKey: req.rowKey,
             levelId: args.levelId,
-            path: pathForEndpoint(args.levelId, ctx.ancestors),
+            level,
             runtime: session.runtime,
             appServices: session.appServices,
           });
-          return patchCellResponseFromTGridResult(result, args.levelId);
+          return patchCellResponseFromTGridResult(
+            result,
+            args.levelId,
+            args.rowKeyColumn,
+          );
         }
 
         const result = await args.rowsClient.update(
           args.table.name,
-          String(req.rowKey) as RowId,
+          String(req.rowKey),
           { [req.colId]: req.value } as Row,
         );
         return { value: (result.data as Row)[req.colId] };
@@ -478,13 +480,10 @@ function makeEndpointFactory(args: {
           columns as Row,
         );
         const row = Array.isArray(result.data) ? result.data[0] : result.data;
-        return { levelName: args.levelId, columns: row };
+        return tableTreeNode(row, args.levelId, args.rowKeyColumn);
       },
       removeNode: async (req) => {
-        await args.rowsClient.remove(
-          args.table.name,
-          String(req.rowKey) as RowId,
-        );
+        await args.rowsClient.remove(args.table.name, String(req.rowKey));
       },
       canAppendRow: ({ request, visibleCount, totalCount }) => {
         // TGrid request pages are one-based because the table API and URL state
@@ -563,6 +562,7 @@ function buildTGridRowsRequest(args: {
 function patchCellResponseFromTGridResult(
   result: TGridRuntimeCellWriteResult,
   levelId: string,
+  rowKeyColumn: TableColumnName,
 ): PatchCellResponse {
   switch (result.kind) {
     case "value":
@@ -572,18 +572,42 @@ function patchCellResponseFromTGridResult(
     case "row":
       return {
         kind: "row",
-        node: { levelName: levelId, columns: result.row },
+        node: tableTreeNode(result.row, levelId, rowKeyColumn),
       };
     case "reload":
       return { kind: "reload" };
   }
 }
 
-function buildTableTreeNodes(rows: Row[], levelId: string): TreeNode[] {
-  return rows.map((row) => ({
+function buildTableTreeNodes(
+  rows: readonly Row[],
+  levelId: string,
+  rowKeyColumn: TableColumnName,
+): TreeNode[] {
+  return rows.map((row) => tableTreeNode(row, levelId, rowKeyColumn));
+}
+
+function tableTreeNode(
+  row: Readonly<Record<string, unknown>> | undefined,
+  levelId: string,
+  rowKeyColumn: TableColumnName,
+): TreeNode {
+  if (!row) {
+    throw new Error(
+      `TGrid row adapter: '${levelId}' returned no authoritative row`,
+    );
+  }
+  const primaryKey = row[rowKeyColumn];
+  if (primaryKey === null || primaryKey === undefined || primaryKey === "") {
+    throw new Error(
+      `TGrid row adapter: '${levelId}' row is missing primary key '${rowKeyColumn}'`,
+    );
+  }
+  return {
+    rowKey: String(primaryKey),
     levelName: levelId,
-    columns: row as Record<string, unknown>,
-  }));
+    columns: row,
+  };
 }
 
 function parentKeyFor(
@@ -616,5 +640,5 @@ function pathForEndpoint(
     path = childPath(path, previous.rowKey, ancestors[index].levelName);
   }
   const parent = ancestors[ancestors.length - 1];
-  return childPath(path, parent.rowKey as RowKey, levelId);
+  return childPath(path, parent.rowKey, levelId);
 }

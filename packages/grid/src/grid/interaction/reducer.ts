@@ -22,7 +22,7 @@ import type { GridEffect } from "../types/effects";
 
 export type ReducerContext = {
   displayed: DisplayedRows;
-  schema: ColumnSchema[];
+  schema: readonly ColumnSchema[];
   capabilitiesFor: (kind: LevelRowKind) => RowCapabilities;
 };
 

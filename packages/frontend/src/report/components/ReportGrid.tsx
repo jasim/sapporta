@@ -24,7 +24,7 @@ import {
   type GridLevelChrome,
   type GridRuntime,
   type InMemoryLevelOpts,
-  type TreeNode,
+  type LevelSchema,
 } from "@sapporta/grid";
 import {
   columnPreset,
@@ -108,9 +108,7 @@ function ReportGrid<TInput = unknown>({
 
   return (
     <GridRuntimeProvider runtime={runtime}>
-      <ReportGridBody
-        session={{ dataset, runtime, root: rootPath(dataset.rootLevel) }}
-      />
+      <ReportGridBody session={{ dataset, runtime, root: runtime.root.path }} />
     </GridRuntimeProvider>
   );
 }
@@ -173,7 +171,7 @@ function buildReportGridModel<TInput>(
   schema: GridSchema;
   dataSource: ReturnType<typeof inMemoryGridDataSource>;
 } {
-  const levels: GridSchema["levels"] = {};
+  const levels: Record<string, LevelSchema> = {};
   const sourceLevels: Record<string, InMemoryLevelOpts> = {};
   const linkCache: ReportCellLinkCache = new Map();
 
@@ -200,7 +198,6 @@ function buildReportGridModel<TInput>(
       columns,
       rowHeaderColumn: "none",
       options: {
-        rowKey: (node, localIdx) => node.rowKey ?? String(localIdx),
         defaultCollapsed: level.defaultCollapsed,
       },
       childLevels: [...level.childLevels],
@@ -224,7 +221,7 @@ function buildReportGridModel<TInput>(
     schema,
     dataSource: inMemoryGridDataSource({
       schema,
-      tree: dataset.nodes as TreeNode[],
+      tree: dataset.nodes,
       levels: sourceLevels,
     }),
   };
@@ -254,12 +251,13 @@ function expandNodesAtPath({
   nodes: GridDatasetNode[];
 }) {
   if (dataset.levels[levelName]?.defaultCollapsed === true) return;
+  const level = runtime.level(path);
 
   for (const node of nodes) {
     const childEntries = Object.entries(node.children ?? {});
     if (childEntries.length === 0) continue;
 
-    runtime.coordinator.expand(path, makeRowId(path, node.rowKey));
+    level.expand(makeRowId(level.path, node.rowKey));
     for (const [childLevelName, childNodes] of childEntries) {
       expandNodesAtPath({
         runtime,

@@ -1,5 +1,4 @@
 import { useCallback, useState, useSyncExternalStore } from "react";
-import type { GridPath } from "@sapporta/grid";
 import type { TGridRowsByLevel } from "../grid-adapter/tgrid-types";
 import type { TGridSession } from "../state/tgrid-session";
 import {
@@ -12,10 +11,8 @@ import {
 export {
   clearTableSelection,
   deleteSelectedTableRows,
-  planTableRowDeletion,
   selectedTableDeleteTargets,
   type TableDeleteTarget,
-  type TableRowDeletionPlan,
   type TableSelectionSession,
 } from "./table-row-deletion";
 
@@ -71,27 +68,39 @@ function subscribeSelectedDataRows(
   if (!session) return () => {};
 
   const runtime = session.runtime;
-  const unsubs: Array<() => void> = [];
-  const subscribedPaths = new Set<GridPath>();
+  type SelectionLevel = ReturnType<
+    TableSelectionSession["runtime"]["registeredLevels"]
+  >[number];
+  const subscriptions = new Map<SelectionLevel, () => void>();
 
-  function subscribeKnownPaths(): void {
-    for (const path of runtime.registeredPaths()) {
-      if (subscribedPaths.has(path)) continue;
-      subscribedPaths.add(path);
-      unsubs.push(runtime.subscribeRowInteractionSnapshot(path, notify));
-      unsubs.push(runtime.subscribeDisplayedRowSequence(path, notify));
+  function syncLevels(): void {
+    const registered = new Set(runtime.registeredLevels());
+    for (const [level, unsubscribe] of subscriptions) {
+      if (registered.has(level)) continue;
+      unsubscribe();
+      subscriptions.delete(level);
+    }
+    for (const level of registered) {
+      if (subscriptions.has(level)) continue;
+      const unsubscribeSelection =
+        level.subscribeRowInteractionSnapshot(notify);
+      const unsubscribeRows = level.subscribeDisplayedRowSequence(notify);
+      subscriptions.set(level, () => {
+        unsubscribeSelection();
+        unsubscribeRows();
+      });
     }
   }
 
-  subscribeKnownPaths();
-  unsubs.push(
-    runtime.subscribeRegistry(() => {
-      subscribeKnownPaths();
-      notify();
-    }),
-  );
+  syncLevels();
+  const unsubscribeLevels = runtime.subscribeLevels(() => {
+    syncLevels();
+    notify();
+  });
 
   return () => {
-    for (const unsub of unsubs) unsub();
+    unsubscribeLevels();
+    for (const unsubscribe of subscriptions.values()) unsubscribe();
+    subscriptions.clear();
   };
 }

@@ -116,9 +116,9 @@ function constructColumn<TMeta>(
     edit: runtime.edit,
     activation: runtime.activation,
     meta: options.meta,
+    ...(copy ? { copy } : {}),
+    [GRID_COLUMN_PRESET_RUNTIME]: runtime,
   };
-  if (copy) out.copy = copy;
-  out[GRID_COLUMN_PRESET_RUNTIME] = runtime;
   return out;
 }
 

@@ -5,7 +5,7 @@ import {
   nextFocusableRow,
 } from "./level-row-traversal";
 import { capabilitiesFor } from "./capabilities";
-import { rootPath, makeRowId } from "./identity";
+import { makeLevelRowId, makeRowId, rootPath } from "./identity";
 import type { DisplayedRows, LevelRow } from "./level-row";
 
 const path = rootPath("rows");
@@ -13,43 +13,45 @@ const path = rootPath("rows");
 function buildDisplayed(
   specs: Array<{ key: string; kind: LevelRow["kind"] }>,
 ): DisplayedRows {
-  const rows = specs.map((s) => {
-    const id = makeRowId(path, s.key);
+  const rows: LevelRow[] = specs.map((s): LevelRow => {
+    const id = makeLevelRowId(path, s.kind, s.key);
+    const rowSelectable = capabilitiesFor(s.kind).rowSelectable;
     if (s.kind === "data") {
       return {
         kind: "data",
         id,
-        rowSelectable: true,
+        rowSelectable,
         columns: {},
         hasChildren: false,
-        source: {} as never,
+        source: { rowKey: s.key, levelName: "rows", columns: {} },
       };
     }
     if (s.kind === "footer") {
       return {
         kind: "footer",
         id,
-        rowSelectable: false,
+        rowSelectable,
         columns: {},
-        source: {} as never,
+        source: { rowKey: s.key, columns: {} },
       };
     }
-    if (s.kind === "rollup")
+    if (s.kind === "phantom") {
       return {
-        kind: "rollup",
+        kind: "phantom",
         id,
-        rowSelectable: true,
+        rowSelectable,
         columns: {},
-        source: {} as never,
+        source: { rowKey: s.key, columns: {}, state: { kind: "editing" } },
       };
+    }
     return {
       kind: s.kind,
       id,
-      rowSelectable: true,
+      rowSelectable,
       columns: {},
-      source: {} as never,
+      source: { rowKey: s.key, levelName: "rows", columns: {} },
     };
-  }) as LevelRow[];
+  });
   const rowById = new Map(rows.map((r) => [r.id, r] as const));
   const rowIndexById = new Map(rows.map((r, i) => [r.id, i] as const));
   return { rows, rowById, rowIndexById };
@@ -153,7 +155,7 @@ describe("level-row-traversal", () => {
       { key: "d", kind: "data" },
     ]);
     expect(firstFocusableRow(d, capabilitiesFor)?.id).toBe(
-      makeRowId(path, "o"),
+      makeLevelRowId(path, "opening", "o"),
     );
     expect(lastFocusableRow(d, capabilitiesFor)?.id).toBe(makeRowId(path, "d"));
   });

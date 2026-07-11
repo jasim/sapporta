@@ -43,70 +43,75 @@ export type RowSelectionGesture = "replace" | "extend" | "toggle";
 // storage layer: the effective selected rows are computed from the active row,
 // and controller.rowSelection is ignored.
 export type SelectedRowsSync =
-  | { kind: "follows-active-row" }
-  | { kind: "independent" };
+  | { readonly kind: "follows-active-row" }
+  | { readonly kind: "independent" };
 
 export type SelectedRowsKeyboardConfig = {
-  space: "toggle-active-row" | "ignore";
+  readonly space: "toggle-active-row" | "ignore";
 };
 
 export type SelectedRowsConfig =
-  | { kind: "none" }
+  | { readonly kind: "none" }
   | {
-      kind: "enabled";
+      readonly kind: "enabled";
       // Controls which shapes may be stored after normalization. Even in
       // "multi", helper functions project the value through displayed-row
       // order, so callers never depend on Set insertion order.
-      mode: RowSelectionMode;
-      sync: SelectedRowsSync;
-      keyboard: SelectedRowsKeyboardConfig;
+      readonly mode: RowSelectionMode;
+      readonly sync: SelectedRowsSync;
+      readonly keyboard: SelectedRowsKeyboardConfig;
     };
 
-export type SelectedCellsConfig = { kind: "none" } | { kind: "range" };
+export type SelectedCellsConfig =
+  | { readonly kind: "none" }
+  | { readonly kind: "range" };
 
 export type CellArrowKeyBehavior = "grid" | "field-list";
 
 export type ActiveCellKeyboardConfig = {
-  arrows: {
-    tabular: CellArrowKeyBehavior;
-    cards: CellArrowKeyBehavior;
+  readonly arrows: {
+    readonly tabular: CellArrowKeyBehavior;
+    readonly cards: CellArrowKeyBehavior;
   };
 };
 
 export type CellGridActiveRowConfig =
-  | { kind: "none" }
+  | { readonly kind: "none" }
   // Active row is a derived view of the active cell's row. No row cursor is
   // created in cell-grid mode.
-  | { kind: "from-active-cell" };
+  | { readonly kind: "from-active-cell" };
 
 export type ActiveRowKeyboardConfig = {
-  arrows: "move-active-row";
-  shiftArrows: "extend-selected-rows" | "move-active-row";
-  expansion: "left-right-enter" | "none";
+  readonly arrows: "move-active-row";
+  readonly shiftArrows: "extend-selected-rows" | "move-active-row";
+  readonly expansion: "left-right-enter" | "none";
 };
 
 export type RowListActiveRowConfig = {
-  kind: "from-row-cursor";
+  readonly kind: "from-row-cursor";
   // Row-list keyboard policy belongs to the active row, because the row cursor
   // is the thing arrows move. Selection only participates when Shift+arrows
   // are explicitly configured to extend independent selected rows.
-  keyboard: ActiveRowKeyboardConfig;
+  readonly keyboard: ActiveRowKeyboardConfig;
 };
 
 export type CellGridInteractionConfig = {
-  mode: "cell-grid";
-  activeCell: { kind: "enabled"; keyboard: ActiveCellKeyboardConfig };
-  selectedCells: SelectedCellsConfig;
-  activeRow: CellGridActiveRowConfig;
-  selectedRows: SelectedRowsConfig;
+  readonly mode: "cell-grid";
+  readonly activeCell: {
+    readonly kind: "enabled";
+    readonly keyboard: ActiveCellKeyboardConfig;
+  };
+  readonly selectedCells: SelectedCellsConfig;
+  readonly activeRow: CellGridActiveRowConfig;
+  readonly selectedRows: SelectedRowsConfig;
 };
 
 export type RowListInteractionConfig = {
-  mode: "row-list";
-  activeCell: { kind: "none" };
-  selectedCells: { kind: "none" };
-  activeRow: RowListActiveRowConfig;
-  selectedRows: SelectedRowsConfig;
+  readonly mode: "row-list";
+  readonly activeCell: { readonly kind: "none" };
+  readonly selectedCells: { readonly kind: "none" };
+  readonly activeRow: RowListActiveRowConfig;
+  readonly selectedRows: SelectedRowsConfig;
 };
 
 export type GridInteractionConfig =

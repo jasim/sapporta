@@ -20,7 +20,7 @@ function pickNumeric(value: unknown): number | null {
   return null;
 }
 
-export function sumBy(nodes: TreeNode[], colId: ColId): number {
+export function sumBy(nodes: readonly TreeNode[], colId: ColId): number {
   let total = 0;
   for (const n of nodes) {
     const v = pickNumeric(n.columns[colId]);
@@ -29,7 +29,7 @@ export function sumBy(nodes: TreeNode[], colId: ColId): number {
   return total;
 }
 
-export function avgBy(nodes: TreeNode[], colId: ColId): number | null {
+export function avgBy(nodes: readonly TreeNode[], colId: ColId): number | null {
   let total = 0;
   let count = 0;
   for (const n of nodes) {

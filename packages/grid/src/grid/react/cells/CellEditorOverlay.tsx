@@ -5,6 +5,7 @@ import type { ControllerState } from "../../types/controller-state";
 import type { GridPath } from "../../types/identity";
 import { useGridRuntime } from "../GridRuntimeProvider";
 import { findGridCellElement } from "../internal/dom-targets";
+import { runtimeInternalsFor } from "../../runtime/create-grid-runtime";
 
 // Singleton per path. When `editing` is non-null, find the focused cell DOM
 // node, position absolutely on top, and render the column's editor. When null,
@@ -28,10 +29,11 @@ export function CellEditorOverlay({
 }: {
   containerRef: React.RefObject<HTMLDivElement | null>;
   path: GridPath;
-  schema: ColumnSchema[];
+  schema: readonly ColumnSchema[];
 }) {
   const runtime = useGridRuntime();
-  const controller = runtime.controllerFor(path);
+  const level = runtime.level(path);
+  const controller = runtimeInternalsFor(runtime).controllerFor(path);
   const editing = useStore(controller, (s: ControllerState) => s.editing);
   const [position, setPosition] = useState<{
     left: number;
@@ -100,7 +102,7 @@ export function CellEditorOverlay({
   if (!column) return null;
   const Editor = column.edit?.editor;
   if (!Editor) return null;
-  const row = runtime.displayedRowsFor(path).rowById.get(editing.coord.rowId);
+  const row = level.displayedRow(editing.coord.rowId);
   if (!row) return null;
   const value = row.columns[column.id];
 

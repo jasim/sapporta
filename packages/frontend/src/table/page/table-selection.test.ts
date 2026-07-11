@@ -3,262 +3,209 @@ import {
   childPath,
   makeRowId,
   rootPath,
-  rowKeyOfRowId,
   type GridPath,
-  type GridRuntime,
-  type LevelRow,
-  type RowId,
+  type RowRemovalResult,
 } from "@sapporta/grid";
 import {
+  clearTableSelection,
   deleteSelectedTableRows,
   selectedTableDeleteTargets,
+  type TableDeleteTarget,
+  type TableSelectionSession,
 } from "./table-selection";
 
 describe("table selection", () => {
-  it("collects persisted selected rows across registered paths child-first", () => {
+  it("uses the runtime's selected data-target projection without replanning it", () => {
     const root = rootPath("orders");
-    const lines = childPath(root, "10" as never, "orders.lines");
-    const orderRow = makeRowId(root, "10" as never);
-    const lineRow = makeRowId(lines, "501" as never);
-    const footerRow = makeRowId(lines, "total" as never);
+    const lines = childPath(root, "10", "orders.lines");
+    const targets = [dataTarget(root, "10"), dataTarget(lines, "501")];
+    const session = makeSession({ targets });
 
-    const session = makeSession({
-      paths: [root, lines],
-      selectedByPath: new Map([
-        [root, [orderRow]],
-        [lines, [footerRow, lineRow]],
-      ]),
-      dataRowIds: new Set([orderRow, lineRow]),
-    });
-
-    expect(selectedTableDeleteTargets(session)).toEqual([
-      { path: lines, rowKey: "501" },
-      { path: root, rowKey: "10" },
-    ]);
+    expect(selectedTableDeleteTargets(session)).toBe(targets);
+    expect(
+      session.runtime.rowOperations.selectedDataTargets,
+    ).toHaveBeenCalledTimes(1);
   });
 
-  it("does not expose cell-range operation targets as selected rows", () => {
-    const root = rootPath("orders");
-    const rowId = makeRowId(root, "10" as never);
-    const session = makeSession({
-      paths: [root],
-      selectedByPath: new Map(),
-      operationTargetIdsByPath: new Map([[root, [rowId]]]),
-      dataRowIds: new Set([rowId]),
-    });
+  it("does not expose a target when the runtime projection is empty", () => {
+    const session = makeSession({ targets: [] });
 
     expect(selectedTableDeleteTargets(session)).toEqual([]);
   });
 
-  it("removes selected rows through the grid runtime and clears selection after success", async () => {
-    const root = rootPath("orders");
-    const rowId = makeRowId(root, "10" as never);
-    const clearRowSelection = vi.fn();
-    const removeRow = vi.fn(async () => {});
-    const continuation = { kind: "grid" as const, path: root };
-    const planCursorContinuationForRowRemoval = vi.fn(() => continuation);
-    const applyCursorContinuation = vi.fn();
-    const refetch = vi.fn();
-    const session = makeSession({
-      paths: [root],
-      selectedByPath: new Map([[root, [rowId]]]),
-      dataRowIds: new Set([rowId]),
-      clearRowSelection,
-      removeRow,
-      planCursorContinuationForRowRemoval,
-      applyCursorContinuation,
-      refetchByPath: new Map([[root, refetch]]),
-    });
+  it("delegates the complete deletion workflow to rowOperations.remove", async () => {
+    const target = dataTarget(rootPath("orders"), "10");
+    const remove = vi.fn(async () => complete([target]));
+    const session = makeSession({ targets: [target], remove });
 
     await deleteSelectedTableRows(session);
 
-    expect(planCursorContinuationForRowRemoval).toHaveBeenCalledWith([
-      { path: root, rowId },
-    ]);
-    expect(applyCursorContinuation).toHaveBeenCalledWith(continuation);
-    expect(applyCursorContinuation.mock.invocationCallOrder[0]).toBeLessThan(
-      removeRow.mock.invocationCallOrder[0],
-    );
-    expect(removeRow).toHaveBeenCalledWith(root, "10");
-    expect(refetch).toHaveBeenCalledTimes(1);
-    expect(clearRowSelection).toHaveBeenCalledWith(root);
+    expect(remove).toHaveBeenCalledWith([target]);
+    expect(session.setErrorBanner).not.toHaveBeenCalled();
   });
 
-  it("does not complete the deletion workflow until affected paths settle", async () => {
+  it("settles only after the runtime removal result settles", async () => {
+    const target = dataTarget(rootPath("orders"), "10");
+    const pending = deferred<RowRemovalResult>();
+    const remove = vi.fn(() => pending.promise);
+    const session = makeSession({ targets: [target], remove });
+
+    let settled = false;
+    const deletion = deleteSelectedTableRows(session).then(() => {
+      settled = true;
+    });
+    await Promise.resolve();
+    expect(settled).toBe(false);
+
+    pending.resolve(complete([target]));
+    await deletion;
+    expect(settled).toBe(true);
+  });
+
+  it("presents a partial removal error and leaves retry state to the runtime", async () => {
     const root = rootPath("orders");
-    const rowId = makeRowId(root, "10" as never);
-    const clearRowSelection = vi.fn();
-    let resolveRefetch: (() => void) | undefined;
-    const refetch = vi.fn(
-      () =>
-        new Promise<void>((resolve) => {
-          resolveRefetch = resolve;
-        }),
+    const removed = dataTarget(root, "10");
+    const failed = dataTarget(root, "20");
+    const unattempted = dataTarget(root, "30");
+    const remove = vi.fn(
+      async (): Promise<RowRemovalResult> => ({
+        kind: "partial",
+        removed: [removed],
+        failed,
+        unattempted: [unattempted],
+        error: new Error("permission denied"),
+      }),
     );
     const session = makeSession({
-      paths: [root],
-      selectedByPath: new Map([[root, [rowId]]]),
-      dataRowIds: new Set([rowId]),
-      clearRowSelection,
-      refetchByPath: new Map([[root, refetch]]),
-    });
-
-    const deleting = deleteSelectedTableRows(session);
-    await vi.waitFor(() => expect(refetch).toHaveBeenCalledTimes(1));
-    expect(clearRowSelection).not.toHaveBeenCalled();
-
-    resolveRefetch?.();
-    await deleting;
-
-    expect(clearRowSelection).toHaveBeenCalledWith(root);
-  });
-
-  it("deletes selected child rows before parents and refetches every touched path", async () => {
-    const root = rootPath("orders");
-    const lines = childPath(root, "10" as never, "orders.lines");
-    const orderRow = makeRowId(root, "10" as never);
-    const lineRow = makeRowId(lines, "501" as never);
-    const removeRow = vi.fn(async () => {});
-    const refetchRoot = vi.fn();
-    const refetchLines = vi.fn();
-    const session = makeSession({
-      paths: [root, lines],
-      selectedByPath: new Map([
-        [root, [orderRow]],
-        [lines, [lineRow]],
-      ]),
-      dataRowIds: new Set([orderRow, lineRow]),
-      removeRow,
-      refetchByPath: new Map([
-        [root, refetchRoot],
-        [lines, refetchLines],
-      ]),
+      targets: [removed, failed, unattempted],
+      remove,
     });
 
     await deleteSelectedTableRows(session);
 
-    expect(removeRow.mock.calls).toEqual([
-      [lines, "501"],
-      [root, "10"],
-    ]);
-    expect(refetchLines).toHaveBeenCalledTimes(1);
-    expect(refetchRoot).toHaveBeenCalledTimes(1);
-  });
-
-  it("stops after a failure, reports it, and retains rows that remain for retry", async () => {
-    const root = rootPath("orders");
-    const firstRow = makeRowId(root, "10" as never);
-    const failingRow = makeRowId(root, "20" as never);
-    const unattemptedRow = makeRowId(root, "30" as never);
-    const dataRowIds = new Set([firstRow, failingRow, unattemptedRow]);
-    const clearRowSelection = vi.fn();
-    const setErrorBanner = vi.fn();
-    const refetch = vi.fn();
-    const removeRow = vi.fn(async (_path: GridPath, rowKey: string) => {
-      if (rowKey === "10") {
-        dataRowIds.delete(firstRow);
-        return;
-      }
-      throw new Error("permission denied");
-    });
-    const session = makeSession({
-      paths: [root],
-      selectedByPath: new Map([[root, [firstRow, failingRow, unattemptedRow]]]),
-      dataRowIds,
-      clearRowSelection,
-      removeRow,
-      setErrorBanner,
-      refetchByPath: new Map([[root, refetch]]),
-    });
-
-    await deleteSelectedTableRows(session);
-
-    expect(removeRow.mock.calls).toEqual([
-      [root, "10"],
-      [root, "20"],
-    ]);
-    expect(clearRowSelection).not.toHaveBeenCalled();
-    expect(refetch).toHaveBeenCalledTimes(1);
-    expect(setErrorBanner).toHaveBeenCalledWith(
+    expect(session.setErrorBanner).toHaveBeenCalledWith(
       "Failed to delete row: permission denied",
     );
-    expect(selectedTableDeleteTargets(session)).toEqual([
-      { path: root, rowKey: "20" },
-      { path: root, rowKey: "30" },
-    ]);
+  });
+
+  it("presents preflight and disposal errors rejected by the runtime", async () => {
+    const target = dataTarget(rootPath("orders"), "10");
+    const remove = vi.fn(async (): Promise<RowRemovalResult> => {
+      throw new Error("stale row target");
+    });
+    const session = makeSession({ targets: [target], remove });
+
+    await deleteSelectedTableRows(session);
+
+    expect(session.setErrorBanner).toHaveBeenCalledWith(
+      "Failed to delete row: stale row target",
+    );
+  });
+
+  it("presents disposal errors raised while projecting selected targets", async () => {
+    const session = makeSession({ targets: [] });
+    vi.mocked(
+      session.runtime.rowOperations.selectedDataTargets,
+    ).mockImplementation(() => {
+      throw new Error("GridRuntime has been disposed.");
+    });
+
+    await deleteSelectedTableRows(session);
+
+    expect(session.setErrorBanner).toHaveBeenCalledWith(
+      "Failed to delete row: GridRuntime has been disposed.",
+    );
+  });
+
+  it("clears explicit row selection through each registered level", () => {
+    const selected = selectionLevel([makeRowId(rootPath("orders"), "10")]);
+    const empty = selectionLevel([]);
+    const session = makeSession({
+      targets: [],
+      levels: [selected.level, empty.level],
+    });
+
+    clearTableSelection(session);
+
+    expect(selected.clear).toHaveBeenCalledTimes(1);
+    expect(empty.clear).not.toHaveBeenCalled();
   });
 });
 
+type RemoveRows = TableSelectionSession["runtime"]["rowOperations"]["remove"];
+type SelectionLevel = ReturnType<
+  TableSelectionSession["runtime"]["registeredLevels"]
+>[number];
+
 function makeSession(args: {
-  paths: GridPath[];
-  selectedByPath: Map<GridPath, RowId[]>;
-  operationTargetIdsByPath?: Map<GridPath, RowId[]>;
-  dataRowIds: Set<RowId>;
-  clearRowSelection?: (path: GridPath) => void;
-  removeRow?: GridRuntime["removeRow"];
-  planCursorContinuationForRowRemoval?: GridRuntime["planCursorContinuationForRowRemoval"];
-  applyCursorContinuation?: GridRuntime["applyCursorContinuation"];
-  setErrorBanner?: (message: string | null) => void;
-  refetchByPath?: Map<GridPath, ReturnType<typeof vi.fn>>;
-}): {
-  runtime: GridRuntime;
-  setErrorBanner: (message: string | null) => void;
-} {
-  const clearRowSelection = args.clearRowSelection ?? vi.fn();
-  const refetchByPath =
-    args.refetchByPath ??
-    new Map(args.paths.map((path) => [path, vi.fn()] as const));
+  targets: readonly TableDeleteTarget[];
+  remove?: RemoveRows;
+  levels?: readonly SelectionLevel[];
+}): TableSelectionSession {
+  const remove: RemoveRows =
+    args.remove ?? (async (targets) => complete(targets));
   return {
-    setErrorBanner: args.setErrorBanner ?? vi.fn(),
     runtime: {
-      registeredPaths: () => args.paths,
-      rowOperationTargetsFor: (path: GridPath) =>
-        (
-          args.operationTargetIdsByPath?.get(path) ??
-          args.selectedByPath.get(path) ??
-          []
-        ).map((rowId) => ({
-          path,
-          rowId,
-          rowKey: rowKeyOfRowId(rowId),
-          row: displayedRowFor(args.dataRowIds, rowId),
-        })),
-      rowInteractionSnapshotFor: (path: GridPath) => ({
-        activeRowId: null,
-        selectedRowIds: args.selectedByPath.get(path) ?? [],
-        statusByRowId: new Map(),
-      }),
-      displayedRowFor: (_path: GridPath, rowId: RowId) =>
-        displayedRowFor(args.dataRowIds, rowId),
-      rowInteraction: { clearRowSelection },
-      planCursorContinuationForRowRemoval:
-        args.planCursorContinuationForRowRemoval ??
-        vi.fn(() => ({ kind: "grid", path: args.paths[0] })),
-      applyCursorContinuation: args.applyCursorContinuation ?? vi.fn(() => {}),
-      removeRow: args.removeRow ?? vi.fn(async () => {}),
-      sourceFor: (path: GridPath) => ({
-        query: { refetch: refetchByPath.get(path) },
-      }),
-    } as unknown as GridRuntime,
+      rowOperations: {
+        selectedDataTargets: vi.fn(() => args.targets),
+        remove,
+      },
+      registeredLevels: () => args.levels ?? [],
+      subscribeLevels: () => () => {},
+    },
+    setErrorBanner: vi.fn(),
   };
 }
 
-function displayedRowFor(dataRowIds: Set<RowId>, rowId: RowId): LevelRow {
-  if (dataRowIds.has(rowId)) {
-    return {
+function dataTarget(path: GridPath, rowKey: string): TableDeleteTarget {
+  const rowId = makeRowId(path, rowKey);
+  const source = {
+    rowKey,
+    levelName: "rows",
+    columns: { id: rowKey },
+  };
+  return {
+    path,
+    rowId,
+    rowKey,
+    row: {
       kind: "data",
       id: rowId,
       rowSelectable: true,
-      columns: {},
+      columns: source.columns,
       hasChildren: false,
-      source: { levelName: "test", columns: {} },
-    };
-  }
-  return {
-    kind: "footer",
-    id: rowId,
-    rowSelectable: false,
-    columns: {},
-    source: { rowKey: rowKeyOfRowId(rowId), columns: {} },
+      source,
+    },
   };
+}
+
+function complete(removed: readonly TableDeleteTarget[]): RowRemovalResult {
+  return { kind: "complete", removed };
+}
+
+function selectionLevel(selectedIds: readonly ReturnType<typeof makeRowId>[]): {
+  level: SelectionLevel;
+  clear: ReturnType<typeof vi.fn>;
+} {
+  const clear = vi.fn();
+  return {
+    level: {
+      selectedRowIds: () => selectedIds,
+      clearRowSelection: clear,
+      subscribeRowInteractionSnapshot: () => () => {},
+      subscribeDisplayedRowSequence: () => () => {},
+    },
+    clear,
+  };
+}
+
+function deferred<T>(): {
+  promise: Promise<T>;
+  resolve(value: T): void;
+} {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((settle) => {
+    resolve = settle;
+  });
+  return { promise, resolve };
 }

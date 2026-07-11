@@ -20,89 +20,177 @@
 import type { ColId, GridPath, RowKey } from "../types/identity";
 import type { PhantomRow } from "../types/level-row";
 import type { PhantomChannel } from "./types";
+import {
+  createObserverList,
+  type ObserverErrorReporter,
+  type ObserverList,
+} from "../observer-notification";
 
 // Returned by `get` for any path with no phantoms. Module-scoped so the
 // reference is stable across calls and across channel instances; displayed-row
 // derivation identity preservation treats this as the "no phantoms" sentinel.
-const EMPTY: PhantomRow[] = [];
+const EMPTY: readonly PhantomRow[] = [];
+const internalsByChannel = new WeakMap<
+  PhantomChannel,
+  { disposePath(path: GridPath): void }
+>();
+
+export function disposePhantomPath(
+  channel: PhantomChannel,
+  path: GridPath,
+): void {
+  internalsByChannel.get(channel)?.disposePath(path);
+}
 
 export function createPhantomChannel(
-  initial?: Map<GridPath, PhantomRow[]>,
+  initial?: ReadonlyMap<GridPath, readonly PhantomRow[]>,
+  onObserverError?: ObserverErrorReporter,
 ): PhantomChannel {
-  const byPath = new Map<GridPath, PhantomRow[]>();
+  const byPath = new Map<GridPath, readonly PhantomRow[]>();
   if (initial) {
-    for (const [path, arr] of initial) {
-      if (arr.length > 0) byPath.set(path, arr);
+    for (const [path, rows] of initial) {
+      assertUniqueDraftKeys(path, rows);
+      if (rows.length > 0) byPath.set(path, rows);
     }
   }
 
-  const subs = new Map<GridPath, Set<() => void>>();
+  const subscribers = new Map<GridPath, ObserverList<[]>>();
+  let disposed = false;
 
   function notify(path: GridPath): void {
-    const set = subs.get(path);
-    if (!set) return;
-    for (const fn of set) fn();
+    subscribers.get(path)?.notify();
   }
 
-  return {
-    get(path) {
-      return byPath.get(path) ?? EMPTY;
-    },
-    add(path, phantom) {
-      const cur = byPath.get(path) ?? EMPTY;
-      const idx = cur.findIndex((p) => p.rowKey === phantom.rowKey);
-      const next = cur.slice();
-      // Match the prior runtime behavior: a colliding rowKey replaces the
-      // existing phantom rather than inserting a duplicate.
-      if (idx >= 0) next[idx] = phantom;
-      else next.push(phantom);
-      byPath.set(path, next);
-      notify(path);
-    },
-    remove(path, rowKey) {
-      const cur = byPath.get(path);
-      if (!cur) return;
-      const idx = cur.findIndex((p) => p.rowKey === rowKey);
-      if (idx < 0) return;
-      const next = cur.slice();
-      next.splice(idx, 1);
-      // Evict on last-remove so `get` falls back to the EMPTY sentinel.
-      if (next.length === 0) byPath.delete(path);
-      else byPath.set(path, next);
-      notify(path);
-    },
+  function get(path: GridPath): readonly PhantomRow[] {
+    if (disposed) return EMPTY;
+    return byPath.get(path) ?? EMPTY;
+  }
+
+  function add(path: GridPath, phantom: PhantomRow): void {
+    if (disposed) return;
+    const current = byPath.get(path) ?? EMPTY;
+    assertDraftKeyAvailable(path, phantom.rowKey, current);
+    byPath.set(path, [...current, phantom]);
+    notify(path);
+  }
+
+  function remove(path: GridPath, rowKey: RowKey): void {
+    if (disposed) return;
+    const current = byPath.get(path);
+    if (!current) return;
+    const index = current.findIndex((phantom) => phantom.rowKey === rowKey);
+    if (index < 0) return;
+    const next = current.slice();
+    next.splice(index, 1);
+    // Evict on last-remove so `get` falls back to the EMPTY sentinel.
+    if (next.length === 0) byPath.delete(path);
+    else byPath.set(path, next);
+    notify(path);
+  }
+
+  function update(
+    path: GridPath,
+    rowKey: RowKey,
+    apply: (row: PhantomRow) => PhantomRow,
+  ): void {
+    if (disposed) return;
+    const current = byPath.get(path);
+    if (!current) return;
+    const index = current.findIndex((phantom) => phantom.rowKey === rowKey);
+    if (index < 0) return;
+    const updated = apply(current[index]);
+    assertDraftKeyAvailable(path, updated.rowKey, current, index);
+    const next = current.slice();
+    next[index] = updated;
+    byPath.set(path, next);
+    notify(path);
+  }
+
+  function subscribe(path: GridPath, fn: () => void): () => void {
+    if (disposed) return () => {};
+    let observers = subscribers.get(path);
+    if (!observers) {
+      observers = createObserverList(onObserverError);
+      subscribers.set(path, observers);
+    }
+    const unsubscribe = observers.subscribe(fn);
+    let unsubscribed = false;
+    return () => {
+      if (unsubscribed) return;
+      unsubscribed = true;
+      unsubscribe();
+      if (observers.size() === 0) subscribers.delete(path);
+    };
+  }
+
+  const channel: PhantomChannel = {
+    get,
+    add,
+    remove,
     setCell(path, rowKey, colId, value) {
-      this.update(path, rowKey, (old) => ({
+      update(path, rowKey, (old) => ({
         ...old,
         columns: { ...old.columns, [colId]: value },
       }));
     },
     setState(path, rowKey, state) {
-      this.update(path, rowKey, (old) => ({ ...old, state }));
+      update(path, rowKey, (old) => ({ ...old, state }));
     },
-    update(path, rowKey, update) {
-      const cur = byPath.get(path);
-      if (!cur) return;
-      const idx = cur.findIndex((p) => p.rowKey === rowKey);
-      if (idx < 0) return;
-      const next = cur.slice();
-      next[idx] = update(cur[idx]);
-      byPath.set(path, next);
-      notify(path);
-    },
-    subscribe(path, fn) {
-      let set = subs.get(path);
-      if (!set) {
-        set = new Set();
-        subs.set(path, set);
-      }
-      set.add(fn);
-      return () => {
-        const s = subs.get(path);
-        if (!s) return;
-        s.delete(fn);
-        if (s.size === 0) subs.delete(path);
-      };
+    update,
+    subscribe,
+    dispose() {
+      if (disposed) return;
+      disposed = true;
+      byPath.clear();
+      for (const observers of subscribers.values()) observers.clear();
+      subscribers.clear();
     },
   };
+  internalsByChannel.set(channel, {
+    disposePath(path) {
+      byPath.delete(path);
+      subscribers.get(path)?.clear();
+      subscribers.delete(path);
+    },
+  });
+  return channel;
+}
+
+function assertUniqueDraftKeys(
+  path: GridPath,
+  rows: readonly PhantomRow[],
+): void {
+  const seen = new Set<RowKey>();
+  for (const row of rows) {
+    assertNonemptyDraftKey(path, row.rowKey);
+    if (seen.has(row.rowKey)) throw duplicateDraftKeyError(path, row.rowKey);
+    seen.add(row.rowKey);
+  }
+}
+
+function assertDraftKeyAvailable(
+  path: GridPath,
+  rowKey: RowKey,
+  rows: readonly PhantomRow[],
+  currentIndex = -1,
+): void {
+  assertNonemptyDraftKey(path, rowKey);
+  const duplicate = rows.some(
+    (row, index) => index !== currentIndex && row.rowKey === rowKey,
+  );
+  if (duplicate) throw duplicateDraftKeyError(path, rowKey);
+}
+
+function assertNonemptyDraftKey(path: GridPath, rowKey: RowKey): void {
+  if (rowKey.length === 0) {
+    throw new Error(
+      `PhantomChannel: draft rowKey must not be empty at path "${path}".`,
+    );
+  }
+}
+
+function duplicateDraftKeyError(path: GridPath, rowKey: RowKey): Error {
+  return new Error(
+    `PhantomChannel: duplicate draft rowKey "${rowKey}" at path "${path}".`,
+  );
 }

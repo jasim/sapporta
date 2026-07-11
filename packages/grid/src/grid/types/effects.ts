@@ -22,7 +22,7 @@ import type { Coord, RowId } from "./identity";
 export type CursorPlacement = "selectAll" | "atEnd";
 
 export type GridEffect =
-  | { type: "focusContainer" }
-  | { type: "focusCellEditor"; cursor: CursorPlacement }
-  | { type: "scrollFocusIntoView"; coord: Coord }
-  | { type: "scrollRowIntoView"; rowId: RowId };
+  | { readonly type: "focusContainer" }
+  | { readonly type: "focusCellEditor"; readonly cursor: CursorPlacement }
+  | { readonly type: "scrollFocusIntoView"; readonly coord: Coord }
+  | { readonly type: "scrollRowIntoView"; readonly rowId: RowId };

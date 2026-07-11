@@ -1,17 +1,17 @@
 import type { GridPath } from "../../types/identity";
-import { makeRowId } from "../../types/identity";
+import { makeLevelRowId } from "../../types/identity";
 import { capabilitiesFor } from "../../types/capabilities";
 import type { LevelRow } from "../../types/level-row";
 import type { ProtoRow } from "../types";
 
-// Resolve final RowIds. Identity is a function of (path, rowKey) — reordering
-// the array does not move RowIds, which is what lets selection / focus state
-// outlive a sort or a phantom insertion.
+// Resolve final RowIds. Identity is a tagged function of (path, kind, rowKey),
+// so reordering the array does not move RowIds and generated row kinds cannot
+// collide with application data keys.
 export function withRowIds(rows: ProtoRow[], path: GridPath): LevelRow[] {
   const out: LevelRow[] = new Array(rows.length);
   for (let i = 0; i < rows.length; i++) {
     const r = rows[i];
-    const id = makeRowId(path, r.rowKey);
+    const id = makeLevelRowId(path, r.kind, r.rowKey);
     const rowSelectable = capabilitiesFor(r.kind).rowSelectable;
     switch (r.kind) {
       case "data":

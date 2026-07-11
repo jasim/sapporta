@@ -6,13 +6,11 @@ import { createRoot, type Root } from "react-dom/client";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { TableSchema } from "@sapporta/shared/contracts";
-import { rootPath } from "@sapporta/grid";
 import { TGrid } from "../page/TGrid";
 import { TablePage } from "../page/TablePage";
 import { useSchemaStore } from "../../schema-catalog/state/schema-store";
 import { defineTGrid } from "./tgrid-runtime-config";
 import { useTGridSession } from "./tgrid-binding";
-import type { TGridSession } from "../state/tgrid-session";
 import type { TableRowsClient } from "./tgrid-level-config";
 
 (
@@ -93,10 +91,6 @@ function definitionWithCustomer(customer: string) {
   });
 }
 
-const OrdersTGrid = TGrid as (props: {
-  session: TGridSession<RowsByLevel, unknown>;
-}) => ReactElement;
-
 function CustomGridView() {
   const session = useTGridSession(definition, {
     routeQuerySeeds: {
@@ -108,9 +102,9 @@ function CustomGridView() {
 
   if (!session) return createElement("div", null, "loading");
 
-  session.runtime.sourceFor(rootPath("orders"));
+  session.runtime.root.data.state();
 
-  return createElement(OrdersTGrid, { session });
+  return createElement(TGrid<RowsByLevel>, { session });
 }
 
 function ReplaceableGridView({
@@ -122,9 +116,9 @@ function ReplaceableGridView({
 
   if (!session) return createElement("div", null, "loading");
 
-  session.runtime.sourceFor(rootPath("orders"));
+  session.runtime.root.data.state();
 
-  return createElement(OrdersTGrid, { session });
+  return createElement(TGrid<RowsByLevel>, { session });
 }
 
 async function renderStrict(element: ReactElement): Promise<{
@@ -222,9 +216,7 @@ describe("TGrid StrictMode lifecycle", () => {
       await waitForText(mounted.container, "Acme");
 
       expect(mounted.container.textContent).not.toContain("loading");
-      expect(consoleError).not.toHaveBeenCalledWith(
-        expect.stringContaining("GridRuntime.sourceFor"),
-      );
+      expect(hasDisposedRuntimeError(consoleError.mock.calls)).toBe(false);
     } finally {
       consoleError.mockRestore();
     }
@@ -247,9 +239,7 @@ describe("TGrid StrictMode lifecycle", () => {
 
       await waitForText(mounted.container, "Acme");
 
-      expect(consoleError).not.toHaveBeenCalledWith(
-        expect.stringContaining("GridRuntime.sourceFor"),
-      );
+      expect(hasDisposedRuntimeError(consoleError.mock.calls)).toBe(false);
     } finally {
       consoleError.mockRestore();
     }

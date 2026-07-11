@@ -11,8 +11,9 @@ import styles from "./sapporta-preset.module.css";
 
 export function PresetLevelStatusBand({ path }: { path: GridPath }) {
   const runtime = useGridRuntime();
+  const level = runtime.level(path);
   const state = useLevelSourceState(path);
-  const levelName = runtime.schemaAt(path).name;
+  const levelName = level.schema.name;
   const model = levelStatusBandModel(state, levelName);
   if (!model) return null;
   const depth = gridPathDepth(path);
@@ -48,7 +49,7 @@ export function PresetLevelStatusBand({ path }: { path: GridPath }) {
         type="button"
         data-grid-part="level-status-retry"
         onClick={() => {
-          void runtime.sourceFor(path).query?.refetch?.();
+          void level.data.query?.refetch?.();
         }}
       >
         Retry
@@ -59,10 +60,11 @@ export function PresetLevelStatusBand({ path }: { path: GridPath }) {
 
 export function PresetEmptyLevel({ path }: { path: GridPath }) {
   const runtime = useGridRuntime();
+  const level = runtime.level(path);
   const state = useLevelSourceState(path);
   const phantoms = usePhantoms(path);
   if (!shouldRenderEmpty(state, phantoms.length)) return null;
-  const levelName = runtime.schemaAt(path).name;
+  const levelName = level.schema.name;
 
   return (
     <div

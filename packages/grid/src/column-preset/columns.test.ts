@@ -7,7 +7,7 @@ import {
 import { describe, expect, it } from "vitest";
 import type { LevelRow } from "../grid/types/level-row";
 import type { CellEditorProps } from "../grid/types/schema";
-import { rootPath, childPath } from "../grid/types/identity";
+import { childPath, makeRowId, rootPath } from "../grid/types/identity";
 import { TextCell } from "./cells/TextCell";
 import {
   CachedValueLookup,
@@ -81,11 +81,11 @@ describe("columnPreset columns", () => {
       path: rootPath("books"),
       row: {
         kind: "data",
-        id: "books#1" as never,
+        id: makeRowId(rootPath("books"), "1"),
         rowSelectable: true,
         columns: { amount: 0 },
         hasChildren: false,
-        source: { levelName: "books", columns: { amount: 0 } },
+        source: { rowKey: "1", levelName: "books", columns: { amount: 0 } },
       },
       activation: null,
     });
@@ -192,11 +192,15 @@ describe("columnPreset columns", () => {
         path: rootPath("books"),
         row: {
           kind: "data",
-          id: "books#1" as never,
+          id: makeRowId(rootPath("books"), "1"),
           rowSelectable: true,
           columns: { quote: "line 1" },
           hasChildren: false,
-          source: { levelName: "books", columns: { quote: "line 1" } },
+          source: {
+            rowKey: "1",
+            levelName: "books",
+            columns: { quote: "line 1" },
+          },
         },
         activation: null,
       });
@@ -224,11 +228,15 @@ describe("columnPreset columns", () => {
       path: rootPath("books"),
       row: {
         kind: "data",
-        id: "books#1" as never,
+        id: makeRowId(rootPath("books"), "1"),
         rowSelectable: true,
         columns: { title: "A short title" },
         hasChildren: false,
-        source: { levelName: "books", columns: { title: "A short title" } },
+        source: {
+          rowKey: "1",
+          levelName: "books",
+          columns: { title: "A short title" },
+        },
       },
       activation: null,
     });
@@ -256,11 +264,11 @@ describe("columnPreset columns", () => {
       path: rootPath("books"),
       row: {
         kind: "data",
-        id: "books#1" as never,
+        id: makeRowId(rootPath("books"), "1"),
         rowSelectable: true,
         columns: { title: "" },
         hasChildren: false,
-        source: { levelName: "books", columns: { title: "" } },
+        source: { rowKey: "1", levelName: "books", columns: { title: "" } },
       },
       activation: null,
     });
@@ -281,11 +289,15 @@ describe("columnPreset columns", () => {
       path: rootPath("books"),
       row: {
         kind: "data",
-        id: "books#1" as never,
+        id: makeRowId(rootPath("books"), "1"),
         rowSelectable: true,
         columns: { id: "books#1" },
         hasChildren: false,
-        source: { levelName: "books", columns: { id: "books#1" } },
+        source: {
+          rowKey: "1",
+          levelName: "books",
+          columns: { id: "books#1" },
+        },
       },
       activation: null,
     });
@@ -460,11 +472,11 @@ function findElement(
 function levelRow(columns: Record<string, unknown>): LevelRow {
   return {
     kind: "data",
-    id: "books#1" as never,
+    id: makeRowId(rootPath("books"), "1"),
     rowSelectable: true,
     columns,
     hasChildren: false,
-    source: { levelName: "books", columns },
+    source: { rowKey: "1", levelName: "books", columns },
   };
 }
 

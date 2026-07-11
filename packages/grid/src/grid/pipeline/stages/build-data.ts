@@ -1,23 +1,17 @@
 import type { LevelOptions, TreeNode } from "../../types/level-row";
 import type { ProtoRow } from "../types";
 
-// Default rowKey: prefer a source-provided rowKey, then fall back to the local
-// index for small static fixtures and tests.
-export function defaultRowKey(node: TreeNode, localIdx: number): string {
-  return node.rowKey ?? String(localIdx);
-}
-
 // Foundation step: TreeNode[] → ProtoRow[] (data rows only, no rollups
 // or brackets). Subsequent stages decorate this list.
 export function buildDataRows(
   nodes: readonly TreeNode[],
   options: LevelOptions,
 ): ProtoRow[] {
-  const rowKey = options.rowKey ?? defaultRowKey;
+  void options;
   const out: ProtoRow[] = [];
   for (let i = 0; i < nodes.length; i++) {
     const node = nodes[i];
-    const key = rowKey(node, i);
+    const key = node.rowKey;
     const hasChildren =
       !!node.children && Object.keys(node.children).length > 0;
     if (

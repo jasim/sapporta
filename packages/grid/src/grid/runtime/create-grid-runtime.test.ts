@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
-import { createGridRuntime } from "./create-grid-runtime";
-import { collectRowOperationTargets } from "./row-operation-targets";
+import { createGridRuntime, runtimeInternalsFor } from "./create-grid-runtime";
 import { inMemoryGridDataSource } from "../data-sources/memory/in-memory-grid-source";
 import { inMemoryLevelSource } from "../data-sources/memory/in-memory-level-source";
+import { createPhantomChannel } from "../data-sources/phantom-channel";
 import type {
   GridDataSource,
   LevelDataSource,
@@ -14,7 +14,7 @@ import type {
 } from "../data-sources/types";
 import {
   childPath,
-  displayedPhantomRowKey,
+  makeLevelRowId,
   makeRowId,
   rootPath,
   type GridPath,
@@ -94,7 +94,6 @@ const tableSchema: GridSchema = {
       rowHeaderColumn: "none",
       columns: cols,
       options: {
-        rowKey: (n: TreeNode) => String(n.columns.id),
         allowPhantoms: true,
       },
       childLevels: [],
@@ -103,8 +102,16 @@ const tableSchema: GridSchema = {
 };
 
 const tableNodes = (): TreeNode[] => [
-  { levelName: "rows", columns: { id: "a", name: "Apple", qty: 1 } },
-  { levelName: "rows", columns: { id: "b", name: "Banana", qty: 2 } },
+  {
+    rowKey: "a",
+    levelName: "rows",
+    columns: { id: "a", name: "Apple", qty: 1 },
+  },
+  {
+    rowKey: "b",
+    levelName: "rows",
+    columns: { id: "b", name: "Banana", qty: 2 },
+  },
 ];
 
 const reportSchema: GridSchema = {
@@ -120,7 +127,7 @@ const reportSchema: GridSchema = {
           renderCell: ({ value }) => String(value ?? ""),
         },
       ],
-      options: { rowKey: (n: TreeNode) => String(n.columns.name) },
+      options: {},
       childLevels: ["items"],
     } as LevelSchema,
     items: {
@@ -133,7 +140,7 @@ const reportSchema: GridSchema = {
           renderCell: ({ value }) => String(value ?? ""),
         },
       ],
-      options: { rowKey: (n: TreeNode) => String(n.columns.name) },
+      options: {},
       childLevels: [],
     } as LevelSchema,
   },
@@ -141,12 +148,17 @@ const reportSchema: GridSchema = {
 
 const reportTree: TreeNode[] = [
   {
+    rowKey: "Fruit",
     levelName: "cat",
     columns: { name: "Fruit" },
     children: {
       items: [
-        { levelName: "items", columns: { name: "Apple" } },
-        { levelName: "items", columns: { name: "Banana" } },
+        { rowKey: "Apple", levelName: "items", columns: { name: "Apple" } },
+        {
+          rowKey: "Banana",
+          levelName: "items",
+          columns: { name: "Banana" },
+        },
       ],
     },
   },
@@ -160,7 +172,6 @@ const booksSchema: GridSchema = {
       rowHeaderColumn: "none",
       columns: [textColumn("title", "Title")],
       options: {
-        rowKey: (n: TreeNode) => String(n.columns.id),
         allowPhantoms: true,
       },
       childLevels: ["quotes"],
@@ -170,7 +181,6 @@ const booksSchema: GridSchema = {
       rowHeaderColumn: "none",
       columns: [textColumn("text", "Quote")],
       options: {
-        rowKey: (n: TreeNode) => String(n.columns.id),
         allowPhantoms: true,
       },
       childLevels: [],
@@ -396,23 +406,23 @@ describe("GridRuntime", () => {
     runtime.dispose();
   });
 
-  it("displayedRowsFor is identity-stable across no-op calls", () => {
+  it("root displayedRows is identity-stable across no-op calls", () => {
     const rt = createGridRuntime({
       schema: tableSchema,
       dataSource: tableDataSource(),
     });
-    const a = rt.displayedRowsFor(rowsRoot);
-    const b = rt.displayedRowsFor(rowsRoot);
+    const a = rt.root.displayedRows();
+    const b = rt.root.displayedRows();
     expect(a).toBe(b);
   });
 
-  it("displayedRowSequenceFor is identity-stable across no-op calls", () => {
+  it("root displayedRowSequence is identity-stable across no-op calls", () => {
     const rt = createGridRuntime({
       schema: tableSchema,
       dataSource: tableDataSource(),
     });
-    const a = rt.displayedRowSequenceFor(rowsRoot);
-    const b = rt.displayedRowSequenceFor(rowsRoot);
+    const a = rt.root.displayedRowSequence();
+    const b = rt.root.displayedRowSequence();
 
     expect(a).toBe(b);
     expect(a.rows).toEqual([
@@ -426,8 +436,9 @@ describe("GridRuntime", () => {
       schema: tableSchema,
       dataSource: tableDataSource(),
     });
-    const c1 = rt.controllerFor(rowsRoot);
-    const c2 = rt.controllerFor(rowsRoot);
+    const internals = runtimeInternalsFor(rt);
+    const c1 = internals.controllerFor(rowsRoot);
+    const c2 = internals.controllerFor(rowsRoot);
     expect(c1).toBe(c2);
   });
 
@@ -440,15 +451,15 @@ describe("GridRuntime", () => {
     rt.dispose();
     rt.dispose();
 
-    expect(() => rt.sourceFor(rowsRoot)).toThrow(
+    expect(() => rt.root.data.state()).toThrow(
       "GridRuntime has been disposed.",
     );
-    expect(() => rt.displayedRowsFor(rowsRoot)).toThrow(
+    expect(() => rt.root.displayedRows()).toThrow(
       "GridRuntime has been disposed.",
     );
   });
 
-  it("guards retained source views after disposal", () => {
+  it("guards retained source views after disposal", async () => {
     const rt = createGridRuntime({
       schema: tableSchema,
       dataSource: inMemoryGridDataSource({
@@ -463,7 +474,7 @@ describe("GridRuntime", () => {
         },
       }),
     });
-    const source = rt.sourceFor(rowsRoot);
+    const source = rt.root.data;
 
     rt.dispose();
 
@@ -473,9 +484,9 @@ describe("GridRuntime", () => {
     expect(() => source.subscribe(() => {})).toThrow(
       "GridRuntime has been disposed.",
     );
-    expect(() =>
+    await expect(
       source.query!.sort!.set([{ colId: "qty", direction: "asc" }]),
-    ).toThrow("GridRuntime has been disposed.");
+    ).rejects.toThrow("GridRuntime has been disposed.");
     expect(() => source.onReconcile(() => {})).toThrow(
       "GridRuntime has been disposed.",
     );
@@ -486,7 +497,7 @@ describe("GridRuntime", () => {
       schema: tableSchema,
       dataSource: tableDataSource(),
     });
-    const source = rt.sourceFor(rowsRoot);
+    const source = rt.root.data;
     const unsubscribe = source.subscribe(() => {});
 
     rt.dispose();
@@ -505,8 +516,8 @@ describe("GridRuntime", () => {
       "items",
     );
 
-    expect(() => rt.sourceFor(unresolvedChildPath)).toThrow(
-      'GridRuntime.sourceFor: no source has been resolved for path "cat.Fruit.items". Expand the parent row first.',
+    expect(() => rt.level(unresolvedChildPath)).toThrow(
+      "Grid level is no longer registered.",
     );
   });
 
@@ -518,8 +529,8 @@ describe("GridRuntime", () => {
       on: { mutationCommitted: mutation },
     });
     const coord = { rowId: makeRowId(rowsRoot, "a"), colId: "qty" };
-    rt.writeCell(rowsRoot, coord, 99);
-    const displayed = rt.displayedRowsFor(rowsRoot);
+    rt.root.writeCell(coord, 99);
+    const displayed = rt.root.displayedRows();
     const updated = displayed.rowById.get(makeRowId(rowsRoot, "a"));
     expect(updated?.columns.qty).toBe(99);
     expect(mutation).toHaveBeenCalledWith({
@@ -536,7 +547,7 @@ describe("GridRuntime", () => {
       schema: tableSchema,
       dataSource: tableDataSource(),
     });
-    const src = rt.sourceFor(rowsRoot);
+    const src = rt.root.data;
     expect(src.canWrite).toBe(true);
     expect("setCell" in src).toBe(false);
     expect("applyChanges" in src).toBe(false);
@@ -551,7 +562,7 @@ describe("GridRuntime", () => {
       schema: tableSchema,
       dataSource: tableDataSource(),
     });
-    const source = rt.sourceFor(rowsRoot);
+    const source = rt.root.data;
 
     expect(() => {
       source.state().snapshot;
@@ -565,7 +576,6 @@ describe("GridRuntime", () => {
       rootSource() {
         const writable = inMemoryLevelSource({
           initialNodes: tableNodes(),
-          options: tableSchema.levels.rows.options,
           columns: tableSchema.levels.rows.columns,
           sortMode: "none",
           filterMode: "none",
@@ -589,11 +599,7 @@ describe("GridRuntime", () => {
       dataSource: readonlyDataSource,
     });
     expect(() =>
-      rt.writeCell(
-        rowsRoot,
-        { rowId: makeRowId(rowsRoot, "a"), colId: "qty" },
-        7,
-      ),
+      rt.root.writeCell({ rowId: makeRowId(rowsRoot, "a"), colId: "qty" }, 7),
     ).toThrow(/readonly/);
   });
 
@@ -607,13 +613,13 @@ describe("GridRuntime", () => {
     };
     const rt = createGridRuntime({ schema: reportSchema, dataSource });
     const fruitRow = makeRowId(reportRoot, "Fruit");
-    rt.coordinator.toggleExpand(reportRoot, fruitRow);
-    rt.coordinator.toggleExpand(reportRoot, fruitRow); // collapse
-    rt.coordinator.toggleExpand(reportRoot, fruitRow); // re-expand
+    rt.root.toggleExpand(fruitRow);
+    rt.root.toggleExpand(fruitRow); // collapse
+    rt.root.toggleExpand(fruitRow); // re-expand
     expect(resolveChild).toHaveBeenCalledTimes(1);
     expect(resolveChild.mock.calls[0]).toEqual([reportRoot, "Fruit", "items"]);
     const itemsPath = childPath(reportRoot, "Fruit", "items");
-    const items = rt.displayedRowsFor(itemsPath);
+    const items = rt.level(itemsPath).displayedRows();
     expect(items.rows.map((r) => r.columns.name)).toEqual(["Apple", "Banana"]);
   });
 
@@ -628,44 +634,48 @@ describe("GridRuntime", () => {
     expect(rt.schemaAt(itemsPath).name).toBe("items");
   });
 
-  it("materializedChildren returns nothing until the child source is registered", () => {
+  it("registeredLevels omits a child until its source is registered", () => {
     const rt = createGridRuntime({
       schema: reportSchema,
       dataSource: reportDataSource(),
     });
     const fruitRow = makeRowId(reportRoot, "Fruit");
-    expect(rt.materializedChildren(reportRoot, fruitRow)).toEqual([]);
-    rt.coordinator.toggleExpand(reportRoot, fruitRow);
-    expect(rt.materializedChildren(reportRoot, fruitRow)).toEqual([
+    expect(rt.registeredLevels().map((level) => level.path)).toEqual([
+      reportRoot,
+    ]);
+    rt.root.toggleExpand(fruitRow);
+    expect(rt.registeredLevels().map((level) => level.path)).toEqual([
+      reportRoot,
       childPath(reportRoot, "Fruit", "items"),
     ]);
     // Source survives collapse — materialization is "registered", not
     // "currently expanded".
-    rt.coordinator.toggleExpand(reportRoot, fruitRow);
-    expect(rt.materializedChildren(reportRoot, fruitRow)).toEqual([
+    rt.root.toggleExpand(fruitRow);
+    expect(rt.registeredLevels().map((level) => level.path)).toEqual([
+      reportRoot,
       childPath(reportRoot, "Fruit", "items"),
     ]);
   });
 
-  it("registeredPaths includes root immediately and is stable until registry changes", () => {
+  it("registeredLevels includes root immediately and is stable until registry changes", () => {
     const rt = createGridRuntime({
       schema: reportSchema,
       dataSource: reportDataSource(),
     });
-    const first = rt.registeredPaths();
-    const second = rt.registeredPaths();
+    const first = rt.registeredLevels();
+    const second = rt.registeredLevels();
 
-    expect(first).toEqual([reportRoot]);
+    expect(first.map((level) => level.path)).toEqual([reportRoot]);
     expect(second).toBe(first);
 
-    rt.coordinator.toggleExpand(reportRoot, makeRowId(reportRoot, "Fruit"));
-    const afterExpand = rt.registeredPaths();
+    rt.root.toggleExpand(makeRowId(reportRoot, "Fruit"));
+    const afterExpand = rt.registeredLevels();
     expect(afterExpand).not.toBe(first);
-    expect(afterExpand).toEqual([
+    expect(afterExpand.map((level) => level.path)).toEqual([
       reportRoot,
       childPath(reportRoot, "Fruit", "items"),
     ]);
-    expect(rt.registeredPaths()).toBe(afterExpand);
+    expect(rt.registeredLevels()).toBe(afterExpand);
   });
 
   it("materializedChildren returns child paths in schema declaration order", () => {
@@ -676,27 +686,28 @@ describe("GridRuntime", () => {
           name: "cat",
           rowHeaderColumn: "none",
           columns: [textColumn("name", "C")],
-          options: { rowKey: (n: TreeNode) => String(n.columns.name) },
+          options: {},
           childLevels: ["a", "b"],
         } as LevelSchema,
         a: {
           name: "a",
           rowHeaderColumn: "none",
           columns: [textColumn("v", "V")],
-          options: { rowKey: (n: TreeNode) => String(n.columns.v) },
+          options: {},
           childLevels: [],
         } as LevelSchema,
         b: {
           name: "b",
           rowHeaderColumn: "none",
           columns: [textColumn("v", "V")],
-          options: { rowKey: (n: TreeNode) => String(n.columns.v) },
+          options: {},
           childLevels: [],
         } as LevelSchema,
       },
     };
     const tree: TreeNode[] = [
       {
+        rowKey: "X",
         levelName: "cat",
         columns: { name: "X" },
         children: { a: [], b: [] },
@@ -714,31 +725,32 @@ describe("GridRuntime", () => {
     const rt = createGridRuntime({ schema: multiChildSchema, dataSource: ds });
     const root = rootPath("cat");
     const xRow = makeRowId(root, "X");
-    rt.coordinator.toggleExpand(root, xRow);
-    expect(rt.materializedChildren(root, xRow)).toEqual([
+    rt.root.toggleExpand(xRow);
+    expect(rt.registeredLevels().map((level) => level.path)).toEqual([
+      root,
       childPath(root, "X", "a"),
       childPath(root, "X", "b"),
     ]);
   });
 
-  it("notifies subscribeRegistry listeners when a child source is resolved", () => {
+  it("notifies subscribeLevels listeners when a child source is resolved", () => {
     const rt = createGridRuntime({
       schema: reportSchema,
       dataSource: reportDataSource(),
     });
     let ticks = 0;
-    rt.subscribeRegistry(() => {
+    rt.subscribeLevels(() => {
       ticks += 1;
     });
-    rt.coordinator.toggleExpand(reportRoot, makeRowId(reportRoot, "Fruit"));
+    rt.root.toggleExpand(makeRowId(reportRoot, "Fruit"));
     expect(ticks).toBe(1);
-    expect(rt.registeredPaths()).toEqual([
+    expect(rt.registeredLevels().map((level) => level.path)).toEqual([
       reportRoot,
       childPath(reportRoot, "Fruit", "items"),
     ]);
     // Re-expanding does not re-resolve, so no extra tick.
-    rt.coordinator.toggleExpand(reportRoot, makeRowId(reportRoot, "Fruit"));
-    rt.coordinator.toggleExpand(reportRoot, makeRowId(reportRoot, "Fruit"));
+    rt.root.toggleExpand(makeRowId(reportRoot, "Fruit"));
+    rt.root.toggleExpand(makeRowId(reportRoot, "Fruit"));
     expect(ticks).toBe(1);
   });
 
@@ -858,12 +870,12 @@ describe("GridRuntime", () => {
       dispose() {},
     };
     const rt = createGridRuntime({ schema: tableSchema, dataSource });
-    const before = rt.displayedRowsFor(rowsRoot);
+    const before = rt.root.displayedRows();
 
     status = "ready";
     for (const fn of subs) fn();
 
-    expect(rt.displayedRowsFor(rowsRoot)).toBe(before);
+    expect(rt.root.displayedRows()).toBe(before);
   });
 
   it("dispose tears down sources, controllers, and the data-source", () => {
@@ -871,26 +883,28 @@ describe("GridRuntime", () => {
     const dataSourceDispose = vi.fn();
     const writable = inMemoryLevelSource({
       initialNodes: tableNodes(),
-      options: tableSchema.levels.rows.options,
       columns: tableSchema.levels.rows.columns,
       sortMode: "none",
       filterMode: "none",
       paginationMode: "none",
     });
     const original = writable.dispose;
-    writable.dispose = () => {
-      sourceDispose();
-      original();
+    const source = {
+      ...writable,
+      dispose: () => {
+        sourceDispose();
+        original();
+      },
     };
     const dataSource: GridDataSource = {
-      rootSource: () => writable,
+      rootSource: () => source,
       resolveChild() {
         throw new Error("not used");
       },
       dispose: dataSourceDispose,
     };
     const rt = createGridRuntime({ schema: tableSchema, dataSource });
-    rt.controllerFor(rowsRoot);
+    runtimeInternalsFor(rt).controllerFor(rowsRoot);
     rt.dispose();
     expect(sourceDispose).toHaveBeenCalledTimes(1);
     expect(dataSourceDispose).toHaveBeenCalledTimes(1);
@@ -903,9 +917,10 @@ describe("GridRuntime", () => {
       dataSource: tableDataSource(),
       on: { mutationCommitted: handler },
     });
-    const c = rt.controllerFor(rowsRoot);
+    const internals = runtimeInternalsFor(rt);
+    const c = internals.controllerFor(rowsRoot);
     const coord = { rowId: makeRowId(rowsRoot, "a"), colId: "qty" };
-    rt.cursorManager.setCellRange(rowsRoot, coord, coord);
+    internals.cursorManager.setCellRange(rowsRoot, coord, coord);
     c.startEdit(coord, "f2");
     c.commitEdit(42);
     expect(handler).toHaveBeenCalledWith(
@@ -926,19 +941,18 @@ describe("GridRuntime", () => {
       dataSource: tableDataSource(),
       on: { mutationCommitted: handler },
     });
-    const c = rt.controllerFor(rowsRoot);
+    const internals = runtimeInternalsFor(rt);
+    const c = internals.controllerFor(rowsRoot);
     const aQty = { rowId: makeRowId(rowsRoot, "a"), colId: "qty" };
     const bQty = { rowId: makeRowId(rowsRoot, "b"), colId: "qty" };
 
-    rt.cursorManager.setCellRange(rowsRoot, aQty, bQty);
+    internals.cursorManager.setCellRange(rowsRoot, aQty, bQty);
     c.startEdit(aQty, "f2");
     c.commitEdit(42);
 
-    expect(rt.displayedRowFor(rowsRoot, aQty.rowId)?.columns.qty).toBe(42);
-    expect(rt.displayedRowFor(rowsRoot, bQty.rowId)?.columns.qty).toBe(42);
-    expect(rt.displayedRowFor(rowsRoot, aQty.rowId)?.columns.name).toBe(
-      "Apple",
-    );
+    expect(rt.root.displayedRow(aQty.rowId)?.columns.qty).toBe(42);
+    expect(rt.root.displayedRow(bQty.rowId)?.columns.qty).toBe(42);
+    expect(rt.root.displayedRow(aQty.rowId)?.columns.name).toBe("Apple");
     expect(handler).toHaveBeenCalledWith({
       kind: "cells",
       path: rowsRoot,
@@ -964,17 +978,18 @@ describe("GridRuntime", () => {
       dataSource: tableDataSource(),
       on: { mutationCommitted: handler },
     });
-    const c = rt.controllerFor(rowsRoot);
+    const internals = runtimeInternalsFor(rt);
+    const c = internals.controllerFor(rowsRoot);
     const aName = { rowId: makeRowId(rowsRoot, "a"), colId: "name" };
     const aQty = { rowId: makeRowId(rowsRoot, "a"), colId: "qty" };
     const bQty = { rowId: makeRowId(rowsRoot, "b"), colId: "qty" };
 
-    rt.cursorManager.setCellRange(rowsRoot, aName, bQty);
+    internals.cursorManager.setCellRange(rowsRoot, aName, bQty);
     c.startEdit(aQty, "f2");
     c.commitEdit(42);
 
-    expect(rt.displayedRowFor(rowsRoot, aQty.rowId)?.columns.qty).toBe(42);
-    expect(rt.displayedRowFor(rowsRoot, bQty.rowId)?.columns.qty).toBe(2);
+    expect(rt.root.displayedRow(aQty.rowId)?.columns.qty).toBe(42);
+    expect(rt.root.displayedRow(bQty.rowId)?.columns.qty).toBe(2);
     expect(handler).toHaveBeenCalledWith({
       kind: "cell",
       path: rowsRoot,
@@ -991,16 +1006,14 @@ describe("GridRuntime", () => {
       dataSource: tableDataSource(),
       on: { mutationCommitted: handler },
     });
-    const c = rt.controllerFor(rowsRoot);
+    const c = runtimeInternalsFor(rt).controllerFor(rowsRoot);
     const coord = { rowId: makeRowId(rowsRoot, "a"), colId: "qty" };
 
     c.startEdit(coord, "f2");
     c.commitEdit(42);
 
-    expect(rt.displayedRowFor(rowsRoot, coord.rowId)?.columns.qty).toBe(42);
-    expect(
-      rt.displayedRowFor(rowsRoot, makeRowId(rowsRoot, "b"))?.columns.qty,
-    ).toBe(2);
+    expect(rt.root.displayedRow(coord.rowId)?.columns.qty).toBe(42);
+    expect(rt.root.displayedRow(makeRowId(rowsRoot, "b"))?.columns.qty).toBe(2);
     expect(handler).toHaveBeenCalledWith({
       kind: "cell",
       path: rowsRoot,
@@ -1013,31 +1026,33 @@ describe("GridRuntime", () => {
   it("controller commitEdit fans out to phantom cells without mutation events for those cells", () => {
     const handler = vi.fn();
     const phantomRowKey = "draft1";
-    const phantomRowId = makeRowId(
-      rowsRoot,
-      displayedPhantomRowKey(phantomRowKey),
-    );
+    const phantomRowId = makeLevelRowId(rowsRoot, "phantom", phantomRowKey);
     const rt = createGridRuntime({
       schema: tableSchema,
       dataSource: tableDataSource(),
-      initialPhantomsByPath: new Map([
-        [rowsRoot, [phantom(phantomRowKey, { id: "c", name: "", qty: null })]],
-      ]),
+      phantomRows: {},
+      phantoms: createPhantomChannel(
+        new Map([
+          [
+            rowsRoot,
+            [phantom(phantomRowKey, { id: "c", name: "", qty: null })],
+          ],
+        ]),
+      ),
       on: { mutationCommitted: handler },
     });
-    const c = rt.controllerFor(rowsRoot);
+    const internals = runtimeInternalsFor(rt);
+    const c = internals.controllerFor(rowsRoot);
     const bQty = { rowId: makeRowId(rowsRoot, "b"), colId: "qty" };
     const phantomQty = { rowId: phantomRowId, colId: "qty" };
 
-    rt.cursorManager.setCellRange(rowsRoot, bQty, phantomQty);
+    internals.cursorManager.setCellRange(rowsRoot, bQty, phantomQty);
     c.startEdit(bQty, "f2");
     c.commitEdit(42);
 
-    expect(
-      rt.displayedRowFor(rowsRoot, makeRowId(rowsRoot, "a"))?.columns.qty,
-    ).toBe(1);
-    expect(rt.displayedRowFor(rowsRoot, bQty.rowId)?.columns.qty).toBe(42);
-    expect(rt.displayedRowFor(rowsRoot, phantomRowId)?.columns.qty).toBe(42);
+    expect(rt.root.displayedRow(makeRowId(rowsRoot, "a"))?.columns.qty).toBe(1);
+    expect(rt.root.displayedRow(bQty.rowId)?.columns.qty).toBe(42);
+    expect(rt.root.displayedRow(phantomRowId)?.columns.qty).toBe(42);
     expect(handler).toHaveBeenCalledWith({
       kind: "cells",
       path: rowsRoot,
@@ -1057,22 +1072,23 @@ describe("GridRuntime", () => {
       dataSource: tableDataSource(),
     });
     const listener = vi.fn();
-    const before = rt.displayedRowSequenceFor(rowsRoot);
-    rt.subscribeDisplayedRowSequence(rowsRoot, listener);
+    const before = rt.root.displayedRowSequence();
+    rt.root.subscribeDisplayedRowSequence(listener);
 
-    await rt.createRow(rowsRoot, {
+    await rt.root.createRow({
+      rowKey: "c",
       levelName: "rows",
       columns: { id: "c", name: "Cherry", qty: 3 },
     });
 
     expect(listener).toHaveBeenCalledTimes(1);
-    const afterInsert = rt.displayedRowSequenceFor(rowsRoot);
+    const afterInsert = rt.root.displayedRowSequence();
     expect(afterInsert).not.toBe(before);
 
-    await rt.removeRow(rowsRoot, "c");
+    await rt.root.removeRow("c");
 
     expect(listener).toHaveBeenCalledTimes(2);
-    expect(rt.displayedRowSequenceFor(rowsRoot)).not.toBe(afterInsert);
+    expect(rt.root.displayedRowSequence()).not.toBe(afterInsert);
   });
 
   it("subscribeDisplayedRow wakes on a single-cell edit without waking the row sequence", () => {
@@ -1082,52 +1098,49 @@ describe("GridRuntime", () => {
     });
     const sequence = vi.fn();
     const row = vi.fn();
-    const before = rt.displayedRowSequenceFor(rowsRoot);
-    rt.subscribeDisplayedRowSequence(rowsRoot, sequence);
-    rt.subscribeDisplayedRow(rowsRoot, makeRowId(rowsRoot, "a"), row);
+    const before = rt.root.displayedRowSequence();
+    rt.root.subscribeDisplayedRowSequence(sequence);
+    rt.root.subscribeDisplayedRow(makeRowId(rowsRoot, "a"), row);
 
-    rt.writeCell(
-      rowsRoot,
-      { rowId: makeRowId(rowsRoot, "a"), colId: "qty" },
-      99,
-    );
+    rt.root.writeCell({ rowId: makeRowId(rowsRoot, "a"), colId: "qty" }, 99);
 
     expect(sequence).not.toHaveBeenCalled();
-    expect(rt.displayedRowSequenceFor(rowsRoot)).toBe(before);
+    expect(rt.root.displayedRowSequence()).toBe(before);
     expect(row).toHaveBeenCalledTimes(1);
-    expect(
-      rt.displayedRowFor(rowsRoot, makeRowId(rowsRoot, "a"))?.columns.qty,
-    ).toBe(99);
+    expect(rt.root.displayedRow(makeRowId(rowsRoot, "a"))?.columns.qty).toBe(
+      99,
+    );
   });
 
   it("phantom changes notify row sequence and phantom row subscribers precisely", () => {
     const rt = createGridRuntime({
       schema: tableSchema,
       dataSource: tableDataSource(),
+      phantomRows: {},
     });
     const sequence = vi.fn();
-    const before = rt.displayedRowSequenceFor(rowsRoot);
-    rt.subscribeDisplayedRowSequence(rowsRoot, sequence);
+    const before = rt.root.displayedRowSequence();
+    rt.root.subscribeDisplayedRowSequence(sequence);
 
-    rt.phantoms.add(rowsRoot, phantom("draft1", { name: "X" }));
+    rt.root.drafts.add("draft1", { name: "X" });
 
-    const phantomId = makeRowId(rowsRoot, displayedPhantomRowKey("draft1"));
-    const afterAdd = rt.displayedRowSequenceFor(rowsRoot);
+    const phantomId = makeLevelRowId(rowsRoot, "phantom", "draft1");
+    const afterAdd = rt.root.displayedRowSequence();
     expect(sequence).toHaveBeenCalledTimes(1);
     expect(afterAdd).not.toBe(before);
-    expect(rt.displayedRowFor(rowsRoot, phantomId)?.kind).toBe("phantom");
+    expect(rt.root.displayedRow(phantomId)?.kind).toBe("phantom");
 
     const phantomRow = vi.fn();
-    rt.subscribeDisplayedRow(rowsRoot, phantomId, phantomRow);
-    rt.phantoms.setCell(rowsRoot, "draft1", "name", "Y");
+    rt.root.subscribeDisplayedRow(phantomId, phantomRow);
+    rt.root.drafts.setCell("draft1", "name", "Y");
 
     expect(sequence).toHaveBeenCalledTimes(1);
-    expect(rt.displayedRowSequenceFor(rowsRoot)).toBe(afterAdd);
+    expect(rt.root.displayedRowSequence()).toBe(afterAdd);
     expect(phantomRow).toHaveBeenCalledTimes(1);
 
-    rt.phantoms.remove(rowsRoot, "draft1");
+    rt.root.drafts.remove("draft1");
     expect(sequence).toHaveBeenCalledTimes(2);
-    expect(rt.displayedRowSequenceFor(rowsRoot)).not.toBe(afterAdd);
+    expect(rt.root.displayedRowSequence()).not.toBe(afterAdd);
     expect(phantomRow).toHaveBeenCalledTimes(2);
   });
 
@@ -1136,14 +1149,15 @@ describe("GridRuntime", () => {
       schema: reportSchema,
       dataSource: reportDataSource(),
     });
-    rt.coordinator.toggleExpand(reportRoot, makeRowId(reportRoot, "Fruit"));
+    rt.root.toggleExpand(makeRowId(reportRoot, "Fruit"));
     const itemsPath = childPath(reportRoot, "Fruit", "items") as GridPath;
     const rootList = vi.fn();
     const childList = vi.fn();
-    rt.subscribeDisplayedRowSequence(reportRoot, rootList);
-    rt.subscribeDisplayedRowSequence(itemsPath, childList);
+    rt.root.subscribeDisplayedRowSequence(rootList);
+    rt.level(itemsPath).subscribeDisplayedRowSequence(childList);
 
-    await rt.createRow(itemsPath, {
+    await rt.level(itemsPath).createRow({
+      rowKey: "Cherry",
       levelName: "items",
       columns: { name: "Cherry" },
     });
@@ -1152,16 +1166,17 @@ describe("GridRuntime", () => {
     expect(childList).toHaveBeenCalledTimes(1);
   });
 
-  it("phantoms exposed via runtime.phantoms reach the displayed rows", () => {
+  it("drafts exposed through the root level reach the displayed rows", () => {
     const rt = createGridRuntime({
       schema: tableSchema,
       dataSource: tableDataSource(),
+      phantomRows: {},
     });
-    rt.phantoms.add(rowsRoot, phantom("draft1", { name: "X" }));
-    const displayed = rt.displayedRowsFor(rowsRoot);
+    rt.root.drafts.add("draft1", { name: "X" });
+    const displayed = rt.root.displayedRows();
     expect(displayed.rows.some((r) => r.kind === "phantom")).toBe(true);
-    rt.phantoms.remove(rowsRoot, "draft1");
-    const after = rt.displayedRowsFor(rowsRoot);
+    rt.root.drafts.remove("draft1");
+    const after = rt.root.displayedRows();
     expect(after.rows.every((r) => r.kind !== "phantom")).toBe(true);
   });
 
@@ -1181,8 +1196,8 @@ describe("GridRuntime", () => {
       }),
     });
 
-    expect(rt.phantoms.get(rowsRoot)).toHaveLength(0);
-    expect(rt.displayedRowsFor(rowsRoot).rows).toEqual([]);
+    expect(rt.root.drafts.get()).toHaveLength(0);
+    expect(rt.root.displayedRows().rows).toEqual([]);
   });
 
   it("empty ready writable phantom-enabled levels get one editable phantom row", () => {
@@ -1201,11 +1216,10 @@ describe("GridRuntime", () => {
       }),
       phantomRows: {},
     });
-
-    const phantoms = rt.phantoms.get(rowsRoot);
+    const phantoms = rt.root.drafts.get();
     expect(phantoms).toHaveLength(1);
     expect(phantoms[0].state).toEqual({ kind: "editing" });
-    expect(rt.displayedRowsFor(rowsRoot).rows.map((row) => row.kind)).toEqual([
+    expect(rt.root.displayedRows().rows.map((row) => row.kind)).toEqual([
       "phantom",
     ]);
   });
@@ -1245,11 +1259,10 @@ describe("GridRuntime", () => {
       on: { mutationCommitted },
     });
 
-    const phantomRow = rt.phantoms.get(rowsRoot)[0];
-    rt.writeCell(
-      rowsRoot,
+    const phantomRow = rt.root.drafts.get()[0];
+    rt.root.writeCell(
       {
-        rowId: makeRowId(rowsRoot, displayedPhantomRowKey(phantomRow.rowKey)),
+        rowId: makeLevelRowId(rowsRoot, "phantom", phantomRow.rowKey),
         colId: "name",
       },
       "New row",
@@ -1257,7 +1270,7 @@ describe("GridRuntime", () => {
 
     expect(setCell).not.toHaveBeenCalled();
     expect(mutationCommitted).not.toHaveBeenCalled();
-    expect(rt.phantoms.get(rowsRoot)[0].columns.name).toBe("New row");
+    expect(rt.root.drafts.get()[0].columns.name).toBe("New row");
   });
 
   it("ArrowDown at the last row creates or reuses one blank phantom", () => {
@@ -1266,34 +1279,33 @@ describe("GridRuntime", () => {
       dataSource: tableDataSource(),
       phantomRows: {},
     });
+    const internals = runtimeInternalsFor(rt);
     const lastDataCursor = {
       path: rowsRoot,
       rowId: makeRowId(rowsRoot, "b"),
       colId: "qty",
     };
-    rt.cursorManager.moveCellCursorTo(lastDataCursor);
+    internals.cursorManager.moveCellCursorTo(lastDataCursor);
 
-    rt.coordinator.navigateCell(rowsRoot, {
+    internals.coordinator.navigateCell(rowsRoot, {
       type: "moveRow",
       direction: "down",
       colPolicy: "preserve",
       extend: false,
     });
-    const firstTarget = rt.cursorManager.currentCellCursor();
+    const firstTarget = internals.cursorManager.currentCellCursor();
     expect(firstTarget).not.toBeNull();
-    expect(rt.displayedRowFor(rowsRoot, firstTarget!.rowId)?.kind).toBe(
-      "phantom",
-    );
-    expect(rt.phantoms.get(rowsRoot)).toHaveLength(1);
+    expect(rt.root.displayedRow(firstTarget!.rowId)?.kind).toBe("phantom");
+    expect(rt.root.drafts.get()).toHaveLength(1);
 
-    rt.coordinator.navigateCell(rowsRoot, {
+    internals.coordinator.navigateCell(rowsRoot, {
       type: "moveRow",
       direction: "down",
       colPolicy: "preserve",
       extend: false,
     });
-    expect(rt.phantoms.get(rowsRoot)).toHaveLength(1);
-    expect(rt.cursorManager.currentCellCursor()).toEqual(firstTarget);
+    expect(rt.root.drafts.get()).toHaveLength(1);
+    expect(internals.cursorManager.currentCellCursor()).toEqual(firstTarget);
   });
 
   it("ArrowDown at a non-final page boundary does not create a phantom", () => {
@@ -1308,29 +1320,36 @@ describe("GridRuntime", () => {
       dataSource: dataSourceWithRoot(source),
       phantomRows: {},
     });
+    const internals = runtimeInternalsFor(rt);
     const lastPageRowCursor = {
       path: rowsRoot,
       rowId: makeRowId(rowsRoot, "b"),
       colId: "qty",
     };
-    rt.cursorManager.moveCellCursorTo(lastPageRowCursor);
+    internals.cursorManager.moveCellCursorTo(lastPageRowCursor);
 
-    rt.coordinator.navigateCell(rowsRoot, {
+    internals.coordinator.navigateCell(rowsRoot, {
       type: "moveRow",
       direction: "down",
       colPolicy: "preserve",
       extend: false,
     });
 
-    expect(rt.phantoms.get(rowsRoot)).toHaveLength(0);
-    expect(rt.cursorManager.currentCellCursor()).toEqual(lastPageRowCursor);
+    expect(rt.root.drafts.get()).toHaveLength(0);
+    expect(internals.cursorManager.currentCellCursor()).toEqual(
+      lastPageRowCursor,
+    );
   });
 
   it("ArrowDown before a footer requests a loaded-row boundary instead of creating a phantom", () => {
     const source = writableSourceFromSnapshot(
       {
         nodes: [
-          { levelName: "rows", columns: { id: "b", name: "Banana", qty: 2 } },
+          {
+            rowKey: "b",
+            levelName: "rows",
+            columns: { id: "b", name: "Banana", qty: 2 },
+          },
         ],
         footerRows: [{ rowKey: "total", columns: { qty: 2 } }],
       },
@@ -1345,21 +1364,22 @@ describe("GridRuntime", () => {
       phantomRows: {},
       onLoadedRowsBoundary,
     });
+    const internals = runtimeInternalsFor(rt);
     const lastDataCursor = {
       path: rowsRoot,
       rowId: makeRowId(rowsRoot, "b"),
       colId: "qty",
     };
-    rt.cursorManager.moveCellCursorTo(lastDataCursor);
+    internals.cursorManager.moveCellCursorTo(lastDataCursor);
 
-    rt.coordinator.navigateCell(rowsRoot, {
+    internals.coordinator.navigateCell(rowsRoot, {
       type: "moveRow",
       direction: "down",
       colPolicy: "preserve",
       extend: false,
     });
 
-    expect(rt.phantoms.get(rowsRoot)).toHaveLength(0);
+    expect(rt.root.drafts.get()).toHaveLength(0);
     expect(onLoadedRowsBoundary).toHaveBeenCalledWith({
       kind: "cell",
       loadPath: rowsRoot,
@@ -1368,7 +1388,7 @@ describe("GridRuntime", () => {
       colPolicy: "preserve",
       extend: false,
     });
-    expect(rt.cursorManager.currentCellCursor()).toEqual(lastDataCursor);
+    expect(internals.cursorManager.currentCellCursor()).toEqual(lastDataCursor);
   });
 
   it("requestLoadedRowsBoundary returns false while the source snapshot is loading", () => {
@@ -1381,7 +1401,7 @@ describe("GridRuntime", () => {
       dataSource: dataSourceWithRoot(mutable.source),
     });
 
-    const accepted = rt.requestLoadedRowsBoundary({
+    const accepted = runtimeInternalsFor(rt).requestLoadedRowsBoundary({
       kind: "cell",
       loadPath: rowsRoot,
       direction: "after",
@@ -1408,7 +1428,7 @@ describe("GridRuntime", () => {
     });
 
     expect(
-      rt.requestLoadedRowsBoundary({
+      runtimeInternalsFor(rt).requestLoadedRowsBoundary({
         kind: "cell",
         loadPath: rowsRoot,
         direction: "after",
@@ -1424,17 +1444,27 @@ describe("GridRuntime", () => {
 
     mutable.publish({
       nodes: [
-        { levelName: "rows", columns: { id: "c", name: "Cherry", qty: 3 } },
+        {
+          rowKey: "c",
+          levelName: "rows",
+          columns: { id: "c", name: "Cherry", qty: 3 },
+        },
       ],
     });
 
-    expect(rt.cursorManager.currentCellCursor()).toBeNull();
+    expect(
+      runtimeInternalsFor(rt).cursorManager.currentCellCursor(),
+    ).toBeNull();
   });
 
   it("returns false when the host loaded-row boundary hook declines", () => {
     const mutable = mutableWritableSource({
       nodes: [
-        { levelName: "rows", columns: { id: "b", name: "Banana", qty: 2 } },
+        {
+          rowKey: "b",
+          levelName: "rows",
+          columns: { id: "b", name: "Banana", qty: 2 },
+        },
       ],
     });
     const onLoadedRowsBoundary = vi.fn(() => false as const);
@@ -1444,7 +1474,7 @@ describe("GridRuntime", () => {
       onLoadedRowsBoundary,
     });
 
-    const accepted = rt.requestLoadedRowsBoundary({
+    const accepted = runtimeInternalsFor(rt).requestLoadedRowsBoundary({
       kind: "cell",
       loadPath: rowsRoot,
       direction: "before",
@@ -1460,13 +1490,18 @@ describe("GridRuntime", () => {
   it("ready loaded-row boundary navigation records and resolves focus after host load", async () => {
     const mutable = mutableWritableSource({
       nodes: [
-        { levelName: "rows", columns: { id: "b", name: "Banana", qty: 2 } },
+        {
+          rowKey: "b",
+          levelName: "rows",
+          columns: { id: "b", name: "Banana", qty: 2 },
+        },
       ],
     });
     const onLoadedRowsBoundary = vi.fn(async () => {
       mutable.publish({
         nodes: [
           {
+            rowKey: "c",
             levelName: "rows",
             columns: { id: "c", name: "Cherry", qty: 3 },
           },
@@ -1483,7 +1518,7 @@ describe("GridRuntime", () => {
     });
 
     expect(
-      rt.requestLoadedRowsBoundary({
+      runtimeInternalsFor(rt).requestLoadedRowsBoundary({
         kind: "cell",
         loadPath: rowsRoot,
         direction: "after",
@@ -1498,7 +1533,7 @@ describe("GridRuntime", () => {
     ).toBe(true);
     await flushMicrotasks();
 
-    expect(rt.cursorManager.currentCellCursor()).toEqual({
+    expect(runtimeInternalsFor(rt).cursorManager.currentCellCursor()).toEqual({
       path: rowsRoot,
       rowId: makeRowId(rowsRoot, "c"),
       colId: "qty",
@@ -1508,7 +1543,11 @@ describe("GridRuntime", () => {
   it("ArrowDown at the final datasource row of a paginated source creates a phantom", () => {
     const source = writableSourceFromSnapshot({
       nodes: [
-        { levelName: "rows", columns: { id: "c", name: "Cherry", qty: 3 } },
+        {
+          rowKey: "c",
+          levelName: "rows",
+          columns: { id: "c", name: "Cherry", qty: 3 },
+        },
       ],
     });
     const rt = createGridRuntime({
@@ -1516,23 +1555,24 @@ describe("GridRuntime", () => {
       dataSource: dataSourceWithRoot(source),
       phantomRows: {},
     });
-    rt.cursorManager.moveCellCursorTo({
+    const internals = runtimeInternalsFor(rt);
+    internals.cursorManager.moveCellCursorTo({
       path: rowsRoot,
       rowId: makeRowId(rowsRoot, "c"),
       colId: "qty",
     });
 
-    rt.coordinator.navigateCell(rowsRoot, {
+    internals.coordinator.navigateCell(rowsRoot, {
       type: "moveRow",
       direction: "down",
       colPolicy: "preserve",
       extend: false,
     });
 
-    expect(rt.phantoms.get(rowsRoot)).toHaveLength(1);
-    const target = rt.cursorManager.currentCellCursor();
+    expect(rt.root.drafts.get()).toHaveLength(1);
+    const target = internals.cursorManager.currentCellCursor();
     expect(target).not.toBeNull();
-    expect(rt.displayedRowFor(rowsRoot, target!.rowId)?.kind).toBe("phantom");
+    expect(rt.root.displayedRow(target!.rowId)?.kind).toBe("phantom");
   });
 
   it("does not eagerly create an empty-path phantom for an empty non-final page", () => {
@@ -1543,8 +1583,8 @@ describe("GridRuntime", () => {
       phantomRows: {},
     });
 
-    expect(rt.phantoms.get(rowsRoot)).toHaveLength(0);
-    expect(rt.displayedRowsFor(rowsRoot).rows).toHaveLength(0);
+    expect(rt.root.drafts.get()).toHaveLength(0);
+    expect(rt.root.displayedRows().rows).toHaveLength(0);
   });
 
   it("creates an empty-path phantom on the first page when total count is unknown", () => {
@@ -1558,8 +1598,8 @@ describe("GridRuntime", () => {
       phantomRows: {},
     });
 
-    expect(rt.phantoms.get(rowsRoot)).toHaveLength(1);
-    expect(rt.displayedRowsFor(rowsRoot).rows.map((row) => row.kind)).toEqual([
+    expect(rt.root.drafts.get()).toHaveLength(1);
+    expect(rt.root.displayedRows().rows.map((row) => row.kind)).toEqual([
       "phantom",
     ]);
   });
@@ -1567,7 +1607,11 @@ describe("GridRuntime", () => {
   it("removes a blank append phantom when the source leaves the append boundary", () => {
     const source = mutableWritableSource({
       nodes: [
-        { levelName: "rows", columns: { id: "c", name: "Cherry", qty: 3 } },
+        {
+          rowKey: "c",
+          levelName: "rows",
+          columns: { id: "c", name: "Cherry", qty: 3 },
+        },
       ],
     });
     const rt = createGridRuntime({
@@ -1575,27 +1619,28 @@ describe("GridRuntime", () => {
       dataSource: dataSourceWithRoot(source.source),
       phantomRows: {},
     });
-    rt.cursorManager.moveCellCursorTo({
+    const internals = runtimeInternalsFor(rt);
+    internals.cursorManager.moveCellCursorTo({
       path: rowsRoot,
       rowId: makeRowId(rowsRoot, "c"),
       colId: "qty",
     });
-    rt.coordinator.navigateCell(rowsRoot, {
+    internals.coordinator.navigateCell(rowsRoot, {
       type: "moveRow",
       direction: "down",
       colPolicy: "preserve",
       extend: false,
     });
-    expect(rt.phantoms.get(rowsRoot)).toHaveLength(1);
+    expect(rt.root.drafts.get()).toHaveLength(1);
 
     source.setCanAppendRow(() => false);
     source.publish({
       nodes: tableNodes(),
     });
 
-    expect(rt.phantoms.get(rowsRoot)).toHaveLength(0);
+    expect(rt.root.drafts.get()).toHaveLength(0);
     expect(
-      rt.displayedRowsFor(rowsRoot).rows.some((row) => row.kind === "phantom"),
+      rt.root.displayedRows().rows.some((row) => row.kind === "phantom"),
     ).toBe(false);
   });
 
@@ -1621,21 +1666,23 @@ describe("GridRuntime", () => {
         phantomRowCommitted,
       },
     });
-    const phantomRow = rt.phantoms.get(rowsRoot)[0];
-    const rowId = makeRowId(
-      rowsRoot,
-      displayedPhantomRowKey(phantomRow.rowKey),
-    );
-    rt.cursorManager.moveCellCursorTo({ path: rowsRoot, rowId, colId: "name" });
-    rt.writeCell(rowsRoot, { rowId, colId: "id" }, "c");
-    rt.writeCell(rowsRoot, { rowId, colId: "name" }, "Cherry");
+    const internals = runtimeInternalsFor(rt);
+    const phantomRow = rt.root.drafts.get()[0];
+    const rowId = makeLevelRowId(rowsRoot, "phantom", phantomRow.rowKey);
+    internals.cursorManager.moveCellCursorTo({
+      path: rowsRoot,
+      rowId,
+      colId: "name",
+    });
+    rt.root.writeCell({ rowId, colId: "id" }, "c");
+    rt.root.writeCell({ rowId, colId: "name" }, "Cherry");
 
-    rt.cursorManager.clearCellCursor();
+    internals.cursorManager.clearCellCursor();
     await flushMicrotasks();
 
-    expect(rt.phantoms.get(rowsRoot)).toHaveLength(0);
+    expect(rt.root.drafts.get()).toHaveLength(0);
     expect(
-      rt.snapshotFor(rowsRoot).nodes.map((node) => node.columns.id),
+      rt.root.data.state().snapshot.nodes.map((node) => node.columns.id),
     ).toEqual(["c"]);
     expect(mutationCommitted).toHaveBeenCalledTimes(1);
     expect(phantomRowCommitted).toHaveBeenCalledTimes(1);
@@ -1647,6 +1694,7 @@ describe("GridRuntime", () => {
     const createQuoteNode = vi.fn<WriteCapability["createNode"]>(
       async (node, atIndex) => ({
         node: {
+          rowKey: "quote-3",
           levelName: "quotes",
           columns: { id: "quote-3", ...node.columns },
         },
@@ -1660,6 +1708,7 @@ describe("GridRuntime", () => {
         rootSource: () =>
           writableSourceWithCreate(vi.fn(), [
             {
+              rowKey: "book-1",
               levelName: "books",
               columns: { id: "book-1", title: "Dune" },
             },
@@ -1670,10 +1719,12 @@ describe("GridRuntime", () => {
           expect(childLevelName).toBe("quotes");
           return writableSourceWithCreate(createQuoteNode, [
             {
+              rowKey: "quote-1",
               levelName: "quotes",
               columns: { id: "quote-1", text: "Fear is the mind-killer." },
             },
             {
+              rowKey: "quote-2",
               levelName: "quotes",
               columns: { id: "quote-2", text: "The sleeper must awaken." },
             },
@@ -1684,58 +1735,62 @@ describe("GridRuntime", () => {
       phantomRows: {},
       on: { phantomRowCommitted },
     });
-    rt.coordinator.toggleExpand(booksRoot, makeRowId(booksRoot, "book-1"));
+    rt.root.toggleExpand(makeRowId(booksRoot, "book-1"));
+    const internals = runtimeInternalsFor(rt);
+    const quotes = rt.level(quotesPath);
 
-    rt.cursorManager.moveCellCursorTo({
+    internals.cursorManager.moveCellCursorTo({
       path: quotesPath,
       rowId: makeRowId(quotesPath, "quote-2"),
       colId: "text",
     });
-    rt.coordinator.navigateCell(quotesPath, {
+    internals.coordinator.navigateCell(quotesPath, {
       type: "moveRow",
       direction: "down",
       colPolicy: "preserve",
       extend: false,
     });
 
-    expect(rt.phantoms.get(booksRoot)).toHaveLength(0);
-    const quotePhantoms = rt.phantoms.get(quotesPath);
+    expect(rt.root.drafts.get()).toHaveLength(0);
+    const quotePhantoms = quotes.drafts.get();
     expect(quotePhantoms).toHaveLength(1);
     const phantomRow = quotePhantoms[0];
-    const phantomRowId = makeRowId(
+    const phantomRowId = makeLevelRowId(
       quotesPath,
-      displayedPhantomRowKey(phantomRow.rowKey),
+      "phantom",
+      phantomRow.rowKey,
     );
-    expect(rt.cursorManager.currentCellCursor()).toEqual({
+    expect(internals.cursorManager.currentCellCursor()).toEqual({
       path: quotesPath,
       rowId: phantomRowId,
       colId: "text",
     });
-    expect(rt.displayedRowFor(quotesPath, phantomRowId)?.kind).toBe("phantom");
+    expect(quotes.displayedRow(phantomRowId)?.kind).toBe("phantom");
 
-    rt.writeCell(
-      quotesPath,
+    quotes.writeCell(
       { rowId: phantomRowId, colId: "text" },
       "The mystery of life isn't a problem to solve.",
     );
     expect(createQuoteNode).not.toHaveBeenCalled();
 
-    rt.cursorManager.clearCellCursor();
+    internals.cursorManager.clearCellCursor();
     await flushMicrotasks();
 
     expect(createQuoteNode).toHaveBeenCalledTimes(1);
     expect(createQuoteNode).toHaveBeenCalledWith(
       {
+        rowKey: phantomRow.rowKey,
         levelName: "quotes",
         columns: { text: "The mystery of life isn't a problem to solve." },
       },
       undefined,
     );
-    expect(rt.phantoms.get(quotesPath)).toHaveLength(0);
+    expect(quotes.drafts.get()).toHaveLength(0);
     expect(phantomRowCommitted).toHaveBeenCalledWith({
       path: quotesPath,
       rowKey: phantomRow.rowKey,
       node: {
+        rowKey: "quote-3",
         levelName: "quotes",
         columns: {
           id: "quote-3",
@@ -1757,16 +1812,18 @@ describe("GridRuntime", () => {
     const rt = createGridRuntime({
       schema: tableSchema,
       dataSource: dataSourceWithRoot(writableSourceWithCreate(createNode)),
+      phantomRows: {},
     });
-    rt.phantoms.add(rowsRoot, phantom("draft1", { id: "c", name: "Cherry" }));
+    rt.root.drafts.add("draft1", { id: "c", name: "Cherry" });
 
-    const first = rt.commitPhantomRow(rowsRoot, "draft1");
-    const second = rt.commitPhantomRow(rowsRoot, "draft1");
+    const first = rt.root.drafts.commit("draft1");
+    const second = rt.root.drafts.commit("draft1");
 
     expect(second).toBe(first);
     expect(createNode).toHaveBeenCalledTimes(1);
 
     const serverNode: TreeNode = {
+      rowKey: "c",
       levelName: "rows",
       columns: { id: "c", name: "Cherry" },
     };
@@ -1787,24 +1844,26 @@ describe("GridRuntime", () => {
       dataSource: dataSourceWithRoot(writableSourceWithCreate(createNode)),
       phantomRows: {},
     });
-    const phantomRow = rt.phantoms.get(rowsRoot)[0];
-    const rowId = makeRowId(
-      rowsRoot,
-      displayedPhantomRowKey(phantomRow.rowKey),
-    );
-    rt.cursorManager.moveCellCursorTo({ path: rowsRoot, rowId, colId: "name" });
-    rt.writeCell(rowsRoot, { rowId, colId: "id" }, "c");
+    const internals = runtimeInternalsFor(rt);
+    const phantomRow = rt.root.drafts.get()[0];
+    const rowId = makeLevelRowId(rowsRoot, "phantom", phantomRow.rowKey);
+    internals.cursorManager.moveCellCursorTo({
+      path: rowsRoot,
+      rowId,
+      colId: "name",
+    });
+    rt.root.writeCell({ rowId, colId: "id" }, "c");
 
-    rt.cursorManager.clearCellCursor();
-    const direct = rt.commitPhantomRow(rowsRoot, phantomRow.rowKey);
+    internals.cursorManager.clearCellCursor();
+    const direct = rt.root.drafts.commit(phantomRow.rowKey);
 
     expect(createNode).toHaveBeenCalledTimes(1);
     created.resolve({
-      node: { levelName: "rows", columns: { id: "c" } },
+      node: { rowKey: "c", levelName: "rows", columns: { id: "c" } },
       atIndex: 0,
     });
     await expect(direct).resolves.toEqual({
-      node: { levelName: "rows", columns: { id: "c" } },
+      node: { rowKey: "c", levelName: "rows", columns: { id: "c" } },
       atIndex: 0,
     });
   });
@@ -1820,24 +1879,38 @@ describe("GridRuntime", () => {
     const rt = createGridRuntime({
       schema: tableSchema,
       dataSource: dataSourceWithRoot(writableSourceWithCreate(createNode)),
+      phantomRows: {},
     });
-    rt.phantoms.add(rowsRoot, phantom("draft1", { id: "c", name: "Cherry" }));
-    const rowId = makeRowId(rowsRoot, displayedPhantomRowKey("draft1"));
+    rt.root.drafts.add("draft1", { id: "c", name: "Cherry" });
+    const rowId = makeLevelRowId(rowsRoot, "phantom", "draft1");
 
-    const promise = rt.commitPhantomRow(rowsRoot, "draft1");
+    const promise = rt.root.drafts.commit("draft1");
 
     expect(() =>
-      rt.writeCell(rowsRoot, { rowId, colId: "name" }, "Changed"),
+      rt.root.writeCell({ rowId, colId: "name" }, "Changed"),
     ).toThrow(/is saving and cannot be edited/);
-    expect(rt.phantoms.get(rowsRoot)[0].columns.name).toBe("Cherry");
+    expect(
+      rt.root.drafts.get().find((draft) => draft.rowKey === "draft1")?.columns
+        .name,
+    ).toBe("Cherry");
     expect(createNode).toHaveBeenCalledWith(
-      { levelName: "rows", columns: { id: "c", name: "Cherry" } },
+      {
+        rowKey: "draft1",
+        levelName: "rows",
+        columns: { id: "c", name: "Cherry" },
+      },
       undefined,
     );
 
-    rt.phantoms.setCell(rowsRoot, "draft1", "name", "Direct channel edit");
+    expect(() =>
+      rt.root.drafts.setCell("draft1", "name", "Direct channel edit"),
+    ).toThrow(/is saving and cannot be edited/);
     created.resolve({
-      node: { levelName: "rows", columns: { id: "c", name: "Cherry" } },
+      node: {
+        rowKey: "c",
+        levelName: "rows",
+        columns: { id: "c", name: "Cherry" },
+      },
       atIndex: 0,
     });
     await promise;
@@ -1876,19 +1949,21 @@ describe("GridRuntime", () => {
       phantomRows: {},
       on: { phantomRowCreateFailed: createFailed },
     });
-    const phantomRow = rt.phantoms.get(rowsRoot)[0];
-    const rowId = makeRowId(
-      rowsRoot,
-      displayedPhantomRowKey(phantomRow.rowKey),
-    );
-    rt.cursorManager.moveCellCursorTo({ path: rowsRoot, rowId, colId: "name" });
-    rt.writeCell(rowsRoot, { rowId, colId: "name" }, "Cherry");
+    const internals = runtimeInternalsFor(rt);
+    const phantomRow = rt.root.drafts.get()[0];
+    const rowId = makeLevelRowId(rowsRoot, "phantom", phantomRow.rowKey);
+    internals.cursorManager.moveCellCursorTo({
+      path: rowsRoot,
+      rowId,
+      colId: "name",
+    });
+    rt.root.writeCell({ rowId, colId: "name" }, "Cherry");
 
-    rt.cursorManager.clearCellCursor();
+    internals.cursorManager.clearCellCursor();
     await flushMicrotasks();
 
-    expect(rt.phantoms.get(rowsRoot)).toHaveLength(1);
-    expect(rt.phantoms.get(rowsRoot)[0].state).toEqual({
+    expect(rt.root.drafts.get()).toHaveLength(1);
+    expect(rt.root.drafts.get()[0].state).toEqual({
       kind: "failed",
       reason: "validation failed",
     });
@@ -1898,9 +1973,9 @@ describe("GridRuntime", () => {
       reason: "validation failed",
     });
 
-    rt.writeCell(rowsRoot, { rowId, colId: "name" }, "Cherry retry");
-    expect(rt.phantoms.get(rowsRoot)[0].state).toEqual({ kind: "editing" });
-    expect(rt.phantoms.get(rowsRoot)[0].columns.name).toBe("Cherry retry");
+    rt.root.writeCell({ rowId, colId: "name" }, "Cherry retry");
+    expect(rt.root.drafts.get()[0].state).toEqual({ kind: "editing" });
+    expect(rt.root.drafts.get()[0].columns.name).toBe("Cherry retry");
   });
 
   it("setCell on a different path does not invalidate sibling pipelines", () => {
@@ -1908,15 +1983,14 @@ describe("GridRuntime", () => {
       schema: reportSchema,
       dataSource: reportDataSource(),
     });
-    rt.coordinator.toggleExpand(reportRoot, makeRowId(reportRoot, "Fruit"));
+    rt.root.toggleExpand(makeRowId(reportRoot, "Fruit"));
     const itemsPath = childPath(reportRoot, "Fruit", "items") as GridPath;
-    const beforeChild = rt.displayedRowsFor(itemsPath);
-    rt.writeCell(
-      reportRoot,
+    const beforeChild = rt.level(itemsPath).displayedRows();
+    rt.root.writeCell(
       { rowId: makeRowId(reportRoot, "Fruit"), colId: "name" },
       "Fruit!",
     );
-    expect(rt.displayedRowsFor(itemsPath)).toBe(beforeChild);
+    expect(rt.level(itemsPath).displayedRows()).toBe(beforeChild);
   });
 
   it("createRow and removeRow are runtime verbs and emit mutationCommitted", async () => {
@@ -1927,15 +2001,14 @@ describe("GridRuntime", () => {
       on: { mutationCommitted: mutation },
     });
     const node: TreeNode = {
+      rowKey: "c",
       levelName: "rows",
       columns: { id: "c", name: "Cherry", qty: 3 },
     };
-    await rt.createRow(rowsRoot, node);
-    expect(rt.snapshotFor(rowsRoot).nodes.map((n) => n.columns.id)).toEqual([
-      "a",
-      "b",
-      "c",
-    ]);
+    await rt.root.createRow(node);
+    expect(
+      rt.root.data.state().snapshot.nodes.map((n) => n.columns.id),
+    ).toEqual(["a", "b", "c"]);
     expect(mutation).toHaveBeenLastCalledWith({
       kind: "insert",
       path: rowsRoot,
@@ -1943,15 +2016,18 @@ describe("GridRuntime", () => {
       atIndex: 2,
     });
 
-    await rt.removeRow(rowsRoot, "b");
-    expect(rt.snapshotFor(rowsRoot).nodes.map((n) => n.columns.id)).toEqual([
-      "a",
-      "c",
-    ]);
+    await rt.root.removeRow("b");
+    expect(
+      rt.root.data.state().snapshot.nodes.map((n) => n.columns.id),
+    ).toEqual(["a", "c"]);
     expect(mutation).toHaveBeenLastCalledWith({
       kind: "remove",
       path: rowsRoot,
-      node: { levelName: "rows", columns: { id: "b", name: "Banana", qty: 2 } },
+      node: {
+        rowKey: "b",
+        levelName: "rows",
+        columns: { id: "b", name: "Banana", qty: 2 },
+      },
       atIndex: 1,
     });
   });
@@ -1964,18 +2040,20 @@ describe("GridRuntime", () => {
     });
     const b = makeRowId(rowsRoot, "b");
     const c = makeRowId(rowsRoot, "c");
-    await rt.createRow(rowsRoot, {
+    await rt.root.createRow({
+      rowKey: "c",
       levelName: "rows",
       columns: { id: "c", name: "Cherry", qty: 3 },
     });
-    rt.cursorManager.moveCellCursorTo({
+    const internals = runtimeInternalsFor(rt);
+    internals.cursorManager.moveCellCursorTo({
       path: rowsRoot,
       rowId: b,
       colId: "qty",
     });
-    rt.controllerFor(rowsRoot).flushEffects();
+    internals.controllerFor(rowsRoot).flushEffects();
 
-    const continuation = rt.planCursorContinuationForRowRemoval([
+    const continuation = internals.planCursorContinuationForRowRemoval([
       { path: rowsRoot, rowId: b },
     ]);
     expect(continuation).toEqual({
@@ -1983,22 +2061,22 @@ describe("GridRuntime", () => {
       target: { path: rowsRoot, rowId: c, colId: "qty" },
     });
 
-    rt.applyCursorContinuation(continuation);
+    internals.applyCursorContinuation(continuation);
 
-    expect(rt.cursorManager.currentCellCursor()).toEqual({
+    expect(internals.cursorManager.currentCellCursor()).toEqual({
       path: rowsRoot,
       rowId: c,
       colId: "qty",
     });
     expect(
-      rt
+      internals
         .controllerFor(rowsRoot)
         .effects.getState()
         .map((effect) => effect.type),
     ).toEqual(["focusContainer", "scrollFocusIntoView"]);
 
-    await rt.removeRow(rowsRoot, "b");
-    expect(rt.cursorManager.currentCellCursor()?.rowId).toBe(c);
+    await rt.root.removeRow("b");
+    expect(internals.cursorManager.currentCellCursor()?.rowId).toBe(c);
   });
 
   it("records the latest selection gesture lead and clears it with selection", () => {
@@ -2010,20 +2088,21 @@ describe("GridRuntime", () => {
     const a = makeRowId(rowsRoot, "a");
     const b = makeRowId(rowsRoot, "b");
 
-    rt.rowInteraction.selectRow(rowsRoot, a);
-    expect(rt.coordinator.getState().rowSelectionLead).toEqual({
+    const internals = runtimeInternalsFor(rt);
+    rt.root.selectRow(a);
+    expect(internals.coordinator.getState().rowSelectionLead).toEqual({
       path: rowsRoot,
       rowId: a,
     });
 
-    rt.rowInteraction.extendRowSelectionTo(rowsRoot, b);
-    expect(rt.coordinator.getState().rowSelectionLead).toEqual({
+    rt.root.extendRowSelectionTo(b);
+    expect(internals.coordinator.getState().rowSelectionLead).toEqual({
       path: rowsRoot,
       rowId: b,
     });
 
-    rt.rowInteraction.clearRowSelection(rowsRoot);
-    expect(rt.coordinator.getState().rowSelectionLead).toBe(null);
+    rt.root.clearRowSelection();
+    expect(internals.coordinator.getState().rowSelectionLead).toBe(null);
   });
 
   it("skips an expanded child subtree when its parent row is removed", () => {
@@ -2031,7 +2110,10 @@ describe("GridRuntime", () => {
       schema: reportSchema,
       dataSource: inMemoryGridDataSource({
         schema: reportSchema,
-        tree: [...reportTree, { levelName: "cat", columns: { name: "Veg" } }],
+        tree: [
+          ...reportTree,
+          { rowKey: "Veg", levelName: "cat", columns: { name: "Veg" } },
+        ],
         levels: {
           cat: { sortMode: "none", filterMode: "none", paginationMode: "none" },
           items: {
@@ -2045,15 +2127,16 @@ describe("GridRuntime", () => {
     });
     const fruit = makeRowId(reportRoot, "Fruit");
     const itemsPath = childPath(reportRoot, "Fruit", "items");
-    rt.coordinator.toggleExpand(reportRoot, fruit);
-    rt.cursorManager.moveCellCursorTo({
+    rt.root.toggleExpand(fruit);
+    const internals = runtimeInternalsFor(rt);
+    internals.cursorManager.moveCellCursorTo({
       path: itemsPath,
       rowId: makeRowId(itemsPath, "Apple"),
       colId: "name",
     });
 
     expect(
-      rt.planCursorContinuationForRowRemoval([
+      internals.planCursorContinuationForRowRemoval([
         { path: reportRoot, rowId: fruit },
       ]),
     ).toEqual({
@@ -2073,13 +2156,15 @@ describe("GridRuntime", () => {
       interaction: ROW_MULTISELECT_LIST,
     });
     expect(() =>
-      rowList.cursorManager.moveCellCursorTo({
+      runtimeInternalsFor(rowList).cursorManager.moveCellCursorTo({
         path: rowsRoot,
         rowId: makeRowId(rowsRoot, "a"),
         colId: "name",
       }),
     ).toThrow(/cell-grid interaction/);
-    expect(rowList.coordinator.getState().cellCursor).toBe(null);
+    expect(runtimeInternalsFor(rowList).coordinator.getState().cellCursor).toBe(
+      null,
+    );
 
     const cellGrid = createGridRuntime({
       schema: tableSchema,
@@ -2087,12 +2172,14 @@ describe("GridRuntime", () => {
       interaction: CELL_GRID_WITH_ACTIVE_ROW,
     });
     expect(() =>
-      cellGrid.cursorManager.extendRowSelectionToCursor({
+      runtimeInternalsFor(cellGrid).cursorManager.extendRowSelectionToCursor({
         path: rowsRoot,
         rowId: makeRowId(rowsRoot, "a"),
       }),
     ).toThrow(/row-list interaction/);
-    expect(cellGrid.coordinator.getState().rowCursor).toBe(null);
+    expect(runtimeInternalsFor(cellGrid).coordinator.getState().rowCursor).toBe(
+      null,
+    );
   });
 
   it("controller startEdit is a no-op in row-list mode", () => {
@@ -2102,12 +2189,13 @@ describe("GridRuntime", () => {
       interaction: ROW_MULTISELECT_LIST,
     });
 
-    rt.controllerFor(rowsRoot).startEdit(
+    const controller = runtimeInternalsFor(rt).controllerFor(rowsRoot);
+    controller.startEdit(
       { rowId: makeRowId(rowsRoot, "a"), colId: "name" },
       "f2",
     );
 
-    expect(rt.controllerFor(rowsRoot).getState().editing).toBe(null);
+    expect(controller.getState().editing).toBe(null);
   });
 
   it("row selection reconciliation preserves identity on no-op normalization", () => {
@@ -2123,11 +2211,14 @@ describe("GridRuntime", () => {
       rowId: makeRowId(rowsRoot, "a"),
     };
 
-    rt.rowInteraction.setRowSelection(rowsRoot, selection);
+    rt.root.setRowSelection(selection);
     rowSelectionChanged.mockClear();
-    rt.invalidateDisplayedRows(rowsRoot, { type: "view" });
+    const internals = runtimeInternalsFor(rt);
+    internals.invalidateDisplayedRows(rowsRoot, { type: "view" });
 
-    expect(rt.controllerFor(rowsRoot).getState().rowSelection).toBe(selection);
+    expect(internals.controllerFor(rowsRoot).getState().rowSelection).toBe(
+      selection,
+    );
     expect(rowSelectionChanged).not.toHaveBeenCalled();
   });
 
@@ -2138,22 +2229,22 @@ describe("GridRuntime", () => {
       interaction: CELL_PRIMARY_WITH_SIDE_PANEL_ROW,
     });
 
-    expect(rt.selectedRowIds(rowsRoot)).toBe(rt.selectedRowIds(rowsRoot));
-    expect(rt.rowInteractionSnapshotFor(rowsRoot)).toBe(
-      rt.rowInteractionSnapshotFor(rowsRoot),
+    expect(rt.root.selectedRowIds()).toBe(rt.root.selectedRowIds());
+    expect(rt.root.rowInteractionSnapshot()).toBe(
+      rt.root.rowInteractionSnapshot(),
     );
 
-    rt.cursorManager.moveCellCursorTo({
+    runtimeInternalsFor(rt).cursorManager.moveCellCursorTo({
       path: rowsRoot,
       rowId: makeRowId(rowsRoot, "a"),
       colId: "name",
     });
 
-    expect(rt.activeRowFor(rowsRoot)).toBe(rt.activeRowFor(rowsRoot));
-    expect(rt.selectedRowsFor(rowsRoot)).toBe(rt.selectedRowsFor(rowsRoot));
-    expect(rt.selectedRowIds(rowsRoot)).toBe(rt.selectedRowIds(rowsRoot));
-    expect(rt.rowInteractionSnapshotFor(rowsRoot)).toBe(
-      rt.rowInteractionSnapshotFor(rowsRoot),
+    expect(rt.root.activeRow()).toBe(rt.root.activeRow());
+    expect(rt.root.selectedRows()).toBe(rt.root.selectedRows());
+    expect(rt.root.selectedRowIds()).toBe(rt.root.selectedRowIds());
+    expect(rt.root.rowInteractionSnapshot()).toBe(
+      rt.root.rowInteractionSnapshot(),
     );
   });
 
@@ -2167,13 +2258,16 @@ describe("GridRuntime", () => {
     const b = makeRowId(rowsRoot, "b");
     const c = makeRowId(rowsRoot, "c");
 
-    rt.rowInteraction.setRowCursor({ path: rowsRoot, rowId: a });
-    rt.rowInteraction.setRowSelection(rowsRoot, {
+    runtimeInternalsFor(rt).rowInteraction.setRowCursor({
+      path: rowsRoot,
+      rowId: a,
+    });
+    rt.root.setRowSelection({
       kind: "set",
       rowIds: new Set([a, b]),
     });
 
-    const snapshot = rt.rowInteractionSnapshotFor(rowsRoot);
+    const snapshot = rt.root.rowInteractionSnapshot();
     expect(snapshot.activeRowId).toBe(a);
     expect(snapshot.selectedRowIds).toEqual([a, b]);
     expect(rowInteractionStatusFor(a, snapshot)).toBe("cursor-selected");
@@ -2190,14 +2284,14 @@ describe("GridRuntime", () => {
     const a = makeRowId(rowsRoot, "a");
     const b = makeRowId(rowsRoot, "b");
 
-    rt.cursorManager.setCellRange(
+    runtimeInternalsFor(rt).cursorManager.setCellRange(
       rowsRoot,
       { rowId: a, colId: "name" },
       { rowId: b, colId: "qty" },
     );
 
     expect(
-      rt.rowOperationTargetsFor(rowsRoot).map((target) => ({
+      rt.rowOperations.targets().map((target) => ({
         rowId: target.rowId,
         rowKey: target.rowKey,
       })),
@@ -2216,42 +2310,42 @@ describe("GridRuntime", () => {
     const a = makeRowId(rowsRoot, "a");
     const b = makeRowId(rowsRoot, "b");
 
-    rt.cursorManager.setCellRange(
+    runtimeInternalsFor(rt).cursorManager.setCellRange(
       rowsRoot,
       { rowId: a, colId: "name" },
       { rowId: a, colId: "qty" },
     );
-    rt.rowInteraction.setRowSelection(rowsRoot, {
+    rt.root.setRowSelection({
       kind: "single",
       rowId: b,
     });
 
     expect(
-      rt.rowOperationTargetsFor(rowsRoot).map((target) => ({
+      rt.rowOperations.targets().map((target) => ({
         rowId: target.rowId,
         rowKey: target.rowKey,
       })),
     ).toEqual([{ rowId: b, rowKey: "b" }]);
   });
 
-  it("collectRowOperationTargets reads all registered paths", () => {
+  it("rowOperations.targets reads all registered levels", () => {
     const rt = createGridRuntime({
       schema: reportSchema,
       dataSource: reportDataSource(),
       interaction: CELL_EDITING_GRID,
     });
     const fruit = makeRowId(reportRoot, "Fruit");
-    rt.coordinator.toggleExpand(reportRoot, fruit);
+    rt.root.toggleExpand(fruit);
     const itemsPath = childPath(reportRoot, "Fruit", "items") as GridPath;
 
-    rt.cursorManager.setCellRange(
+    runtimeInternalsFor(rt).cursorManager.setCellRange(
       itemsPath,
       { rowId: makeRowId(itemsPath, "Apple"), colId: "name" },
       { rowId: makeRowId(itemsPath, "Banana"), colId: "name" },
     );
 
     expect(
-      collectRowOperationTargets(rt).map((target) => ({
+      rt.rowOperations.targets().map((target) => ({
         path: target.path,
         rowKey: target.rowKey,
       })),
@@ -2261,7 +2355,7 @@ describe("GridRuntime", () => {
     ]);
   });
 
-  it("selectedRowsFor preserves selection shape when projected row ids match", () => {
+  it("selectedRows preserves selection shape when projected row ids match", () => {
     const rt = createGridRuntime({
       schema: tableSchema,
       dataSource: tableDataSource(),
@@ -2270,7 +2364,7 @@ describe("GridRuntime", () => {
     const a = makeRowId(rowsRoot, "a");
     const b = makeRowId(rowsRoot, "b");
 
-    rt.rowInteraction.setRowSelection(rowsRoot, {
+    rt.root.setRowSelection({
       kind: "range",
       anchor: a,
       head: b,
@@ -2279,20 +2373,20 @@ describe("GridRuntime", () => {
     const selectedRowsChanged = vi.fn();
     const selectedRowIdsChanged = vi.fn();
     const rowInteractionChanged = vi.fn();
-    rt.subscribeSelectedRows(rowsRoot, selectedRowsChanged);
-    rt.subscribeSelectedRowIds(rowsRoot, selectedRowIdsChanged);
-    rt.subscribeRowInteractionSnapshot(rowsRoot, rowInteractionChanged);
+    rt.root.subscribeSelectedRows(selectedRowsChanged);
+    rt.root.subscribeSelectedRowIds(selectedRowIdsChanged);
+    rt.root.subscribeRowInteractionSnapshot(rowInteractionChanged);
 
-    rt.rowInteraction.setRowSelection(rowsRoot, {
+    rt.root.setRowSelection({
       kind: "set",
       rowIds: new Set([a, b]),
     });
 
-    expect(rt.selectedRowsFor(rowsRoot)).toEqual({
+    expect(rt.root.selectedRows()).toEqual({
       kind: "set",
       rowIds: new Set([a, b]),
     });
-    expect(rt.selectedRowIds(rowsRoot)).toEqual([a, b]);
+    expect(rt.root.selectedRowIds()).toEqual([a, b]);
     expect(selectedRowsChanged).toHaveBeenCalledTimes(1);
     expect(selectedRowIdsChanged).not.toHaveBeenCalled();
     expect(rowInteractionChanged).not.toHaveBeenCalled();
@@ -2319,24 +2413,22 @@ describe("GridRuntime", () => {
     const selectedRowsChanged = vi.fn();
     const selectedRowIdsChanged = vi.fn();
 
-    rt.rowInteraction.setRowSelection(rowsRoot, {
+    rt.root.setRowSelection({
       kind: "set",
       rowIds: new Set([a, b]),
     });
-    expect(rt.selectedRowIds(rowsRoot)).toEqual([a, b]);
+    expect(rt.root.selectedRowIds()).toEqual([a, b]);
 
-    rt.subscribeSelectedRows(rowsRoot, selectedRowsChanged);
-    rt.subscribeSelectedRowIds(rowsRoot, selectedRowIdsChanged);
+    rt.root.subscribeSelectedRows(selectedRowsChanged);
+    rt.root.subscribeSelectedRowIds(selectedRowIdsChanged);
 
-    await rt
-      .sourceFor(rowsRoot)
-      .query!.sort!.set([{ colId: "qty", direction: "desc" }]);
+    await rt.root.data.query!.sort!.set([{ colId: "qty", direction: "desc" }]);
 
-    expect(rt.selectedRowsFor(rowsRoot)).toEqual({
+    expect(rt.root.selectedRows()).toEqual({
       kind: "set",
       rowIds: new Set([a, b]),
     });
-    expect(rt.selectedRowIds(rowsRoot)).toEqual([b, a]);
+    expect(rt.root.selectedRowIds()).toEqual([b, a]);
     expect(selectedRowsChanged).not.toHaveBeenCalled();
     expect(selectedRowIdsChanged).toHaveBeenCalledTimes(1);
   });
@@ -2347,14 +2439,15 @@ describe("GridRuntime", () => {
       dataSource: reportDataSource(),
       interaction: CELL_GRID_WITH_ACTIVE_ROW,
     });
-    rt.coordinator.toggleExpand(reportRoot, makeRowId(reportRoot, "Fruit"));
+    rt.root.toggleExpand(makeRowId(reportRoot, "Fruit"));
     const itemsPath = childPath(reportRoot, "Fruit", "items") as GridPath;
     const rootActive = vi.fn();
     const childActive = vi.fn();
-    rt.subscribeActiveRow(reportRoot, rootActive);
-    rt.subscribeActiveRow(itemsPath, childActive);
+    rt.root.subscribeActiveRow(rootActive);
+    rt.level(itemsPath).subscribeActiveRow(childActive);
 
-    rt.cursorManager.moveCellCursorTo({
+    const internals = runtimeInternalsFor(rt);
+    internals.cursorManager.moveCellCursorTo({
       path: reportRoot,
       rowId: makeRowId(reportRoot, "Fruit"),
       colId: "name",
@@ -2362,15 +2455,15 @@ describe("GridRuntime", () => {
     expect(rootActive).toHaveBeenCalledTimes(1);
     expect(childActive).not.toHaveBeenCalled();
 
-    rt.cursorManager.moveCellCursorTo({
+    internals.cursorManager.moveCellCursorTo({
       path: itemsPath,
       rowId: makeRowId(itemsPath, "Apple"),
       colId: "name",
     });
     expect(rootActive).toHaveBeenCalledTimes(2);
     expect(childActive).toHaveBeenCalledTimes(1);
-    expect(rt.activeRowFor(reportRoot)).toBe(null);
-    expect(rt.activeRowFor(itemsPath)).toEqual({
+    expect(rt.root.activeRow()).toBe(null);
+    expect(rt.level(itemsPath).activeRow()).toEqual({
       path: itemsPath,
       rowId: makeRowId(itemsPath, "Apple"),
     });

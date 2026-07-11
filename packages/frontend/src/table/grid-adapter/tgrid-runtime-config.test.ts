@@ -14,13 +14,19 @@ import type {
   FetchPageRequest,
   CellEditorProps,
   CellEditorStart,
+  GridSchema,
   GridRuntime,
   LevelRow,
   RestEndpointFactory,
   RowQueryState,
   SortDescriptor,
 } from "@sapporta/grid";
-import { ExpandableCellFrame } from "@sapporta/grid";
+import {
+  createGridRuntime,
+  CELL_GRID_WITH_INDEPENDENT_ROW_SELECTION,
+  ExpandableCellFrame,
+  inMemoryGridDataSource,
+} from "@sapporta/grid";
 import { makeRowId, rootPath } from "@sapporta/grid";
 import { preset } from "@sapporta/grid/column-preset";
 import {
@@ -128,6 +134,42 @@ function rowsRequest(
   return buildRowsRequest(endpoint.rowQuery.current());
 }
 
+function runtimeFor(schema: GridSchema): GridRuntime {
+  return createGridRuntime({
+    schema,
+    interaction: CELL_GRID_WITH_INDEPENDENT_ROW_SELECTION,
+    dataSource: inMemoryGridDataSource({
+      schema,
+      tree: [],
+      levels: Object.fromEntries(
+        Object.keys(schema.levels).map((levelName) => [
+          levelName,
+          {
+            sortMode: "none",
+            filterMode: "none",
+            paginationMode: "none",
+          },
+        ]),
+      ),
+    }),
+  });
+}
+
+function testRowsClient(
+  overrides: Partial<TableRowsClient> = {},
+): TableRowsClient {
+  return {
+    fetch: vi.fn(async () => ({
+      data: [],
+      meta: { total: 0, page: 1, limit: 50, pages: 0 },
+    })),
+    create: vi.fn(async (_table, data) => ({ data })),
+    update: vi.fn(async (_table, _id, data) => ({ data })),
+    remove: vi.fn(async (_table, id) => ({ data: { id } })),
+    ...overrides,
+  };
+}
+
 describe("compileTGridRuntimeConfig", () => {
   let mounted: { root: Root; container: HTMLElement } | null = null;
 
@@ -208,13 +250,7 @@ describe("compileTGridRuntimeConfig", () => {
       unknown,
       "orders.lines.allocations"
     >("orders.lines.allocations");
-    const client = {
-      fetch: vi.fn(),
-      create: vi.fn(),
-      update: vi.fn(),
-      remove: vi.fn(),
-      ...rowsClient,
-    } as TableRowsClient;
+    const client = testRowsClient(rowsClient);
 
     return compileTGridRuntimeConfig<RowsByLevel>({
       rootLevel: "orders",
@@ -353,15 +389,26 @@ describe("compileTGridRuntimeConfig", () => {
     ).toThrow(message);
   });
 
-  it("uses each table primary key as row identity", () => {
-    const config = build();
-    const rootKey = config.gridSchema.levels.orders.options.rowKey!;
-    const childKey = config.gridSchema.levels["orders.lines"].options.rowKey!;
+  it("writes each table primary key into fetched TreeNode identity", async () => {
+    const fetch = vi.fn<TableRowsClient["fetch"]>(async ({ tableName }) => ({
+      data: tableName === "orders" ? [{ id: 7 }] : [{ id: 42 }],
+      meta: { total: 1, page: 1, limit: 25, pages: 1 },
+    }));
+    const config = build({ fetch });
+    const rootEndpoint = config.endpointFactoriesByLevel.orders({
+      ancestors: [],
+    });
+    const childEndpoint = config.endpointFactoriesByLevel["orders.lines"]({
+      ancestors: [{ levelName: "orders", rowKey: "7" }],
+    });
 
-    expect(rootKey({ levelName: "orders", columns: { id: 7 } }, 0)).toBe("7");
-    expect(
-      childKey({ levelName: "orders.lines", columns: { id: 42 } }, 0),
-    ).toBe("42");
+    const rootResult = await rootEndpoint.fetchPage(rowsRequest(rootEndpoint));
+    const childResult = await childEndpoint.fetchPage(
+      rowsRequest(childEndpoint),
+    );
+
+    expect(rootResult.nodes[0]?.rowKey).toBe("7");
+    expect(childResult.nodes[0]?.rowKey).toBe("42");
   });
 
   it("uses level-scoped columns instead of synthesizing from table children", () => {
@@ -406,7 +453,7 @@ describe("compileTGridRuntimeConfig", () => {
     },
   );
 
-  it("uses the declared primary column that supplies rowKey", () => {
+  it("uses the declared primary column for fetched TreeNode identity", async () => {
     type KeyedRows = {
       orders: { order_no: string; customer: string };
     };
@@ -427,24 +474,37 @@ describe("compileTGridRuntimeConfig", () => {
       children: [],
     };
 
-    const level = compileTGridRuntimeConfig<KeyedRows>({
+    const rowsClient: TableRowsClient = {
+      fetch: vi.fn(async () => ({
+        data: [{ order_no: "ORD-17", customer: "Acme" }],
+        meta: { total: 1, page: 1, limit: 25, pages: 1 },
+      })),
+      create: vi.fn(async (_table, data) => ({ data })),
+      update: vi.fn(async (_table, _id, data) => ({ data })),
+      remove: vi.fn(async (_table, id) => ({ data: { id } })),
+    };
+    const config = compileTGridRuntimeConfig<KeyedRows>({
       rootLevel: "orders",
       levels: {
-        orders: { table: keyedTable, childLevels: [] },
+        orders: { table: keyedTable, childLevels: [], rowsClient },
       },
       columnMapper: createTGridColumnMapper({ lookups: emptyLookupStore() }),
-    }).gridSchema.levels.orders;
+      hostRowQueryState: () =>
+        makeHostRowQueryState({
+          page: 1,
+          pageSize: 25,
+          sort: [],
+          filters: [],
+          search: null,
+        }),
+    });
+    const endpoint = config.endpointFactoriesByLevel.orders({ ancestors: [] });
+    const fetched = await endpoint.fetchPage(rowsRequest(endpoint));
 
-    expect(level.rowHeaderColumn).toEqual({ column: "order_no" });
-    expect(
-      level.options.rowKey?.(
-        {
-          levelName: "orders",
-          columns: { order_no: "ORD-17", customer: "Acme" },
-        },
-        0,
-      ),
-    ).toBe("ORD-17");
+    expect(config.gridSchema.levels.orders.rowHeaderColumn).toEqual({
+      column: "order_no",
+    });
+    expect(fetched.nodes[0]?.rowKey).toBe("ORD-17");
   });
 
   it("uses an empty selectable cell when the row-key column is not left-most or visible", () => {
@@ -631,17 +691,7 @@ describe("compileTGridRuntimeConfig", () => {
       CopyServices,
       "orders"
     >("orders");
-    const runtime = {} as GridRuntime;
-    const session: TGridSessionContext<CopyRowsByLevel, CopyServices> = {
-      rootLevel: "orders",
-      runtime,
-      levels: {} as TGridSessionContext<
-        CopyRowsByLevel,
-        CopyServices
-      >["levels"],
-      appServices: { suffix: "!" },
-      lookups: emptyLookupStore(),
-    };
+    let session: TGridSessionContext<CopyRowsByLevel, CopyServices>;
     const config = compileTGridRuntimeConfig<CopyRowsByLevel, CopyServices>({
       rootLevel: "orders",
       levels: {
@@ -650,8 +700,9 @@ describe("compileTGridRuntimeConfig", () => {
           childLevels: [],
           columns: [
             orderColumns.table("customer", {
-              copy: ({ values, runtime: copyRuntime, appServices }) => {
+              copy: ({ level, values, runtime: copyRuntime, appServices }) => {
                 expect(copyRuntime).toBe(runtime);
+                expect(level).toBe(runtime.root);
                 return [
                   {
                     header: "customer_name",
@@ -677,6 +728,29 @@ describe("compileTGridRuntimeConfig", () => {
       columnMapper: createTGridColumnMapper({ lookups }),
       sessionContext: () => session,
     });
+    const runtime = runtimeFor(config.gridSchema);
+    const levelConfig: TGridLevelConfig<
+      CopyRowsByLevel,
+      CopyServices,
+      "orders"
+    > = {
+      table: orderSchema,
+      childLevels: [],
+    };
+    session = {
+      rootLevel: "orders",
+      runtime,
+      levels: {
+        orders: {
+          levelId: "orders",
+          table: orderSchema,
+          config: levelConfig,
+          csvExportUrl: () => "",
+        },
+      },
+      appServices: { suffix: "!" },
+      lookups: emptyLookupStore(),
+    };
     const row: LevelRow = {
       kind: "data",
       id: makeRowId(rootPath("orders"), "7"),
@@ -684,6 +758,7 @@ describe("compileTGridRuntimeConfig", () => {
       columns: { id: 7, customer: "Acme" },
       hasChildren: false,
       source: {
+        rowKey: "7",
         levelName: "orders",
         columns: { id: 7, customer: "Acme" },
       },
@@ -713,6 +788,7 @@ describe("compileTGridRuntimeConfig", () => {
       "badge",
     ]);
     expect(clientCopyColumns[0].valueAt(row, 0)).toBe("Acme:undefined:1");
+    runtime.dispose();
   });
 
   it("builds emitted columns through column-preset constructors", () => {
@@ -728,17 +804,18 @@ describe("compileTGridRuntimeConfig", () => {
   it("wraps the first visible column of expandable levels with ExpandableCellFrame", () => {
     const config = build();
     const col = config.gridSchema.levels.orders.columns[0];
+    const path = rootPath("orders");
     const rendered = col.renderCell?.({
       value: 1,
       column: col,
-      path: "orders" as never,
+      path,
       row: {
         kind: "data",
-        id: "orders#1" as never,
+        id: makeRowId(path, "1"),
         rowSelectable: true,
         columns: { id: 1 },
         hasChildren: false,
-        source: { levelName: "orders", columns: { id: 1 } },
+        source: { rowKey: "1", levelName: "orders", columns: { id: 1 } },
       },
       activation: null,
     });
@@ -756,12 +833,8 @@ describe("compileTGridRuntimeConfig", () => {
       meta: { total: 1, page: 1, limit: 10, pages: 1 },
     }));
     const config = build({ fetch });
-    const endpoint = (
-      config.endpointFactoriesByLevel[
-        "orders.lines"
-      ] as RestEndpointFactory<TGridFilter>
-    )({
-      ancestors: [{ levelName: "orders", rowKey: "7" as never }],
+    const endpoint = config.endpointFactoriesByLevel["orders.lines"]({
+      ancestors: [{ levelName: "orders", rowKey: "7" }],
     });
 
     await endpoint.fetchPage(rowsRequest(endpoint));
@@ -808,12 +881,7 @@ describe("compileTGridRuntimeConfig", () => {
           table: orderSchemaWithStatus,
           childLevels: [],
           query: { owner: "host", fixedFilters: [fixedFilter] },
-          rowsClient: {
-            fetch,
-            create: vi.fn(),
-            update: vi.fn(),
-            remove: vi.fn(),
-          } as TableRowsClient,
+          rowsClient: testRowsClient({ fetch }),
         },
         "orders.lines": {
           table: lineSchema,
@@ -864,7 +932,7 @@ describe("compileTGridRuntimeConfig", () => {
             parent: {
               level: "orders",
               foreignKey: "order_id",
-              defaultSort: [{ colId: "kind" as never, direction: "asc" }],
+              defaultSort: [{ colId: "kind", direction: "asc" }],
             },
             childLevels: ["orders.lines.allocations"],
             query: { owner: "source", pageSize: 10 },
@@ -902,12 +970,7 @@ describe("compileTGridRuntimeConfig", () => {
           parent: { level: "orders", foreignKey: "order_id" },
           childLevels: [],
           query: { owner: "source", pageSize: 10, initialPage: 3 },
-          rowsClient: {
-            fetch,
-            create: vi.fn(),
-            update: vi.fn(),
-            remove: vi.fn(),
-          } as TableRowsClient,
+          rowsClient: testRowsClient({ fetch }),
         },
         "orders.lines.allocations": {
           table: allocationSchema,
@@ -927,7 +990,7 @@ describe("compileTGridRuntimeConfig", () => {
     });
 
     const endpoint = config.endpointFactoriesByLevel["orders.lines"]({
-      ancestors: [{ levelName: "orders", rowKey: "7" as never }],
+      ancestors: [{ levelName: "orders", rowKey: "7" }],
     });
 
     await endpoint.fetchPage(rowsRequest(endpoint));
@@ -959,12 +1022,7 @@ describe("compileTGridRuntimeConfig", () => {
             pageSize: 10,
             initialFilters: [eqCondition("cost", "12")],
           },
-          rowsClient: {
-            fetch,
-            create: vi.fn(),
-            update: vi.fn(),
-            remove: vi.fn(),
-          } as TableRowsClient,
+          rowsClient: testRowsClient({ fetch }),
         },
         "orders.lines.allocations": {
           table: allocationSchema,
@@ -984,7 +1042,7 @@ describe("compileTGridRuntimeConfig", () => {
     });
 
     const endpoint = config.endpointFactoriesByLevel["orders.lines"]({
-      ancestors: [{ levelName: "orders", rowKey: "7" as never }],
+      ancestors: [{ levelName: "orders", rowKey: "7" }],
     });
 
     await endpoint.fetchPage(rowsRequest(endpoint));
@@ -1042,7 +1100,7 @@ describe("compileTGridRuntimeConfig", () => {
     });
 
     const endpoint = config.endpointFactoriesByLevel["orders.lines"]({
-      ancestors: [{ levelName: "orders", rowKey: "7" as never }],
+      ancestors: [{ levelName: "orders", rowKey: "7" }],
     });
 
     expect(rowsRequest(endpoint).sort).toEqual([
@@ -1056,11 +1114,15 @@ describe("compileTGridRuntimeConfig", () => {
     }));
     const config = build({ create });
     const endpoint = config.endpointFactoriesByLevel["orders.lines"]({
-      ancestors: [{ levelName: "orders", rowKey: "7" as never }],
+      ancestors: [{ levelName: "orders", rowKey: "7" }],
     });
 
     const inserted = await endpoint.insertNode!({
-      node: { levelName: "orders.lines", columns: { sku: "A" } },
+      node: {
+        rowKey: "draft-line",
+        levelName: "orders.lines",
+        columns: { sku: "A" },
+      },
     });
 
     expect(create).toHaveBeenCalledWith("lines", {
@@ -1068,6 +1130,7 @@ describe("compileTGridRuntimeConfig", () => {
       order_id: "7",
     });
     expect(inserted).toEqual({
+      rowKey: "99",
       levelName: "orders.lines",
       columns: { id: 99, sku: "A", order_id: "7" },
     });
@@ -1078,16 +1141,7 @@ describe("compileTGridRuntimeConfig", () => {
     const columns = createTGridColumnsBuilder<RowsByLevel, Services, "orders">(
       "orders",
     );
-    const session: TGridSessionContext<RowsByLevel, Services> = {
-      rootLevel: "orders",
-      runtime: {} as unknown as GridRuntime,
-      appServices: { suffix: "saved" },
-      lookups: emptyLookupStore(),
-      levels: {} as unknown as TGridSessionContext<
-        RowsByLevel,
-        Services
-      >["levels"],
-    };
+    let session: TGridSessionContext<RowsByLevel, Services>;
     const lookups = emptyLookupStore();
     const config = compileTGridRuntimeConfig<RowsByLevel, Services>({
       rootLevel: "orders",
@@ -1099,13 +1153,16 @@ describe("compileTGridRuntimeConfig", () => {
           columns: [
             columns.table("customer", {
               label: "Customer Name",
-              saveCellValue: async (ctx) => ({
-                kind: "row",
-                row: {
-                  ...ctx.row,
-                  customer: `${ctx.value}-${ctx.appServices.suffix}`,
-                },
-              }),
+              saveCellValue: async (ctx) => {
+                expect(ctx.level).toBe(runtime.root);
+                return {
+                  kind: "row",
+                  row: {
+                    ...ctx.row,
+                    customer: `${ctx.value}-${ctx.appServices.suffix}`,
+                  },
+                };
+              },
             }),
             columns.client("status", {
               label: "Status",
@@ -1136,6 +1193,41 @@ describe("compileTGridRuntimeConfig", () => {
           search: null,
         }),
     });
+    const runtime = runtimeFor(config.gridSchema);
+    session = {
+      rootLevel: "orders",
+      runtime,
+      appServices: { suffix: "saved" },
+      lookups: emptyLookupStore(),
+      levels: {
+        orders: {
+          levelId: "orders",
+          table: orderSchema,
+          config: { table: orderSchema, childLevels: [] },
+          csvExportUrl: () => "",
+        },
+        "orders.lines": {
+          levelId: "orders.lines",
+          table: lineSchema,
+          config: {
+            table: lineSchema,
+            parent: { level: "orders", foreignKey: "order_id" },
+            childLevels: [],
+          },
+          csvExportUrl: () => "",
+        },
+        "orders.lines.allocations": {
+          levelId: "orders.lines.allocations",
+          table: allocationSchema,
+          config: {
+            table: allocationSchema,
+            parent: { level: "orders.lines", foreignKey: "line_id" },
+            childLevels: [],
+          },
+          csvExportUrl: () => "",
+        },
+      },
+    };
 
     expect(config.gridSchema.levels.orders.columns.map((c) => c.id)).toEqual([
       "customer",
@@ -1147,8 +1239,8 @@ describe("compileTGridRuntimeConfig", () => {
 
     const endpoint = config.endpointFactoriesByLevel.orders({ ancestors: [] });
     const result = await endpoint.patchCell!({
-      rowKey: "1" as never,
-      colId: "customer" as never,
+      rowKey: "1",
+      colId: "customer",
       value: "ACME",
       row: { id: 1, customer: "Old" },
     });
@@ -1156,10 +1248,12 @@ describe("compileTGridRuntimeConfig", () => {
     expect(result).toEqual({
       kind: "row",
       node: {
+        rowKey: "1",
         levelName: "orders",
         columns: { id: 1, customer: "ACME-saved" },
       },
     });
+    runtime.dispose();
   });
 
   it("passes edit start metadata into typed custom editors", async () => {
@@ -1183,16 +1277,7 @@ describe("compileTGridRuntimeConfig", () => {
       return null;
     }
 
-    const session: TGridSessionContext<RowsByLevel, Services> = {
-      rootLevel: "orders",
-      runtime: {} as unknown as GridRuntime,
-      appServices: { suffix: "saved" },
-      lookups: emptyLookupStore(),
-      levels: {} as unknown as TGridSessionContext<
-        RowsByLevel,
-        Services
-      >["levels"],
-    };
+    let session: TGridSessionContext<RowsByLevel, Services>;
     const lookups = emptyLookupStore();
     const config = compileTGridRuntimeConfig<RowsByLevel, Services>({
       rootLevel: "orders",
@@ -1232,6 +1317,41 @@ describe("compileTGridRuntimeConfig", () => {
           search: null,
         }),
     });
+    const runtime = runtimeFor(config.gridSchema);
+    session = {
+      rootLevel: "orders",
+      runtime,
+      appServices: { suffix: "saved" },
+      lookups: emptyLookupStore(),
+      levels: {
+        orders: {
+          levelId: "orders",
+          table: orderSchema,
+          config: { table: orderSchema, childLevels: [] },
+          csvExportUrl: () => "",
+        },
+        "orders.lines": {
+          levelId: "orders.lines",
+          table: lineSchema,
+          config: {
+            table: lineSchema,
+            parent: { level: "orders", foreignKey: "order_id" },
+            childLevels: [],
+          },
+          csvExportUrl: () => "",
+        },
+        "orders.lines.allocations": {
+          levelId: "orders.lines.allocations",
+          table: allocationSchema,
+          config: {
+            table: allocationSchema,
+            parent: { level: "orders.lines", foreignKey: "line_id" },
+            childLevels: [],
+          },
+          csvExportUrl: () => "",
+        },
+      },
+    };
     const editor = config.gridSchema.levels.orders.columns[0].edit?.editor;
     expect(editor).toBeDefined();
     if (!editor) throw new Error("expected custom editor to be compiled");
@@ -1244,6 +1364,7 @@ describe("compileTGridRuntimeConfig", () => {
       columns: { id: 1, customer: "Existing" },
       hasChildren: false,
       source: {
+        rowKey: "1",
         levelName: "orders",
         columns: { id: 1, customer: "Existing" },
       },
@@ -1265,5 +1386,6 @@ describe("compileTGridRuntimeConfig", () => {
       editStart,
       value: "Existing",
     });
+    runtime.dispose();
   });
 });

@@ -3,6 +3,7 @@ import { rowSelectionGestureFromModifiers } from "../../interaction/key-handling
 import type { GridPath } from "../../types/identity";
 import type { LevelRow } from "../../types/level-row";
 import { useGridRuntime } from "../GridRuntimeProvider";
+import { runtimeInternalsFor } from "../../runtime/create-grid-runtime";
 
 export function EmptyRowHeaderCell({
   row,
@@ -14,6 +15,7 @@ export function EmptyRowHeaderCell({
   selected: boolean;
 }) {
   const runtime = useGridRuntime();
+  const coordinator = runtimeInternalsFor(runtime).coordinator;
   // `rowSelectable` is the displayed-row capability used by navigation,
   // operation targeting, and row-selection normalization. Synthetic totals and
   // footers therefore expose the same disabled state in every interaction path.
@@ -27,7 +29,7 @@ export function EmptyRowHeaderCell({
     event.preventDefault();
     event.stopPropagation();
     if (disabled) return;
-    runtime.coordinator.navigateCell(path, {
+    coordinator.navigateCell(path, {
       type: "rowPressed",
       target: row.id,
       origin: { kind: "row-control" },
@@ -44,7 +46,7 @@ export function EmptyRowHeaderCell({
       event.preventDefault();
       event.stopPropagation();
       if (!disabled) {
-        runtime.coordinator.navigateCell(path, {
+        coordinator.navigateCell(path, {
           type: "rowPressed",
           target: row.id,
           origin: { kind: "row-control" },
@@ -56,7 +58,7 @@ export function EmptyRowHeaderCell({
     if (event.key === "Escape") {
       event.preventDefault();
       event.stopPropagation();
-      runtime.coordinator.navigateCell(path, { type: "clearRowSelection" });
+      coordinator.navigateCell(path, { type: "clearRowSelection" });
     }
   }
 

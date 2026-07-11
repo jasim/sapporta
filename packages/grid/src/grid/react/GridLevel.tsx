@@ -18,6 +18,7 @@ import {
 } from "./GridRuntimeProvider";
 import { rowInteractionStatusFor } from "../types/row-selection";
 import type { LevelSourceState, SourceLoadResult } from "../data-sources";
+import { runtimeInternalsFor } from "../runtime/create-grid-runtime";
 
 export type GridLevelChrome = {
   renderHeader?: (ctx: GridChromeContext) => ReactNode;
@@ -44,12 +45,12 @@ export type GridEmptyContext = GridChromeContext & {
 // channel) so it can interleave each row's child level mounts directly
 // inside `<Grid>`'s body. Every input needed to interleave the DOM —
 // display order, expansion, schema-declared child levels, and which child
-// paths are materialized — is already on the runtime + coordinator, so
+// paths are materialized — is already in the renderer internals, so
 // no separate cached displayed-row derivation sits between them.
 //
-// `runtime.materializedChildren(path, rowId)` returns the child paths
-// whose source is registered for that parent row, in schema declaration
-// order. "Materialized" is *source registered*, not *currently expanded*:
+// The renderer's materialized-child lookup returns the child paths whose source
+// is registered for that parent row, in schema declaration order.
+// "Materialized" is *source registered*, not *currently expanded*:
 // expansion gating happens here, where it can read `coordinator.expansion`
 // directly.
 //
@@ -71,22 +72,25 @@ export function GridLevel({
   presentation?: GridPresentation;
 }) {
   const runtime = useGridRuntime();
-  const controller = runtime.controllerFor(path);
-  const level = runtime.schemaAt(path);
-  const schema = level.columns;
+  const level = runtime.level(path);
+  const internals = runtimeInternalsFor(runtime);
+  const controller = internals.controllerFor(path);
+  const schema = level.schema.columns;
   const rowHeaderColumn: RowHeaderColumn =
-    runtime.interaction.mode === "cell-grid" ? level.rowHeaderColumn : "none";
+    runtime.interaction.mode === "cell-grid"
+      ? level.schema.rowHeaderColumn
+      : "none";
   const state = useLevelSourceState(path);
   const phantoms = usePhantoms(path);
   const colOrder = useMemo(() => schema.map((c) => c.id), [schema]);
   const chromeContext: GridChromeContext = {
     path,
-    levelName: level.name,
+    levelName: level.schema.name,
     presentation,
     schema,
     rowHeaderColumn,
   };
-  const retry = runtime.sourceFor(path).query?.refetch;
+  const retry = level.data.query?.refetch;
   // Status chrome is sampled before the body so loading/error information stays
   // outside `displayed.rows`. Empty chrome is sampled after the body guard: the
   // level is empty only when the ready source has no nodes, no footers, and the
@@ -140,28 +144,29 @@ function DisplayedRowsBody({
   presentation,
 }: {
   path: GridPath;
-  schema: ColumnSchema[];
+  schema: readonly ColumnSchema[];
   rowHeaderColumn: RowHeaderColumn;
   colOrder: readonly ColId[];
   chrome?: GridLevelChrome;
   presentation: GridPresentation;
 }) {
   const runtime = useGridRuntime();
+  const internals = runtimeInternalsFor(runtime);
   // Body mapping subscribes to row refs, not `LevelRow` objects. A cell edit
   // should re-render only the owning `GridRow`, not this mapper.
   const sequence = useDisplayedRowSequence(path);
   const rowInteraction = useRowInteractionSnapshot(path);
   const expansion = useSyncExternalStore(
-    runtime.coordinator.subscribe,
-    () => runtime.coordinator.getState().expansion.get(path),
-    () => runtime.coordinator.getState().expansion.get(path),
+    internals.coordinator.subscribe,
+    () => internals.coordinator.getState().expansion.get(path),
+    () => internals.coordinator.getState().expansion.get(path),
   );
 
   return (
     <div data-grid-part="body" role="rowgroup">
       {sequence.rows.map((rowRef) => {
         const childPaths = expansion?.has(rowRef.id)
-          ? runtime.materializedChildren(path, rowRef.id)
+          ? internals.materializedChildren(path, rowRef.id)
           : null;
         return (
           <Fragment key={rowRef.id}>
@@ -214,18 +219,20 @@ function ChildLevelMount({
 }) {
   const state = useLevelSourceState(path);
   const runtime = useGridRuntime();
-  const level = runtime.schemaAt(path);
-  const schema = level.columns;
+  const level = runtime.level(path);
+  const schema = level.schema.columns;
   const rowHeaderColumn: RowHeaderColumn =
-    runtime.interaction.mode === "cell-grid" ? level.rowHeaderColumn : "none";
+    runtime.interaction.mode === "cell-grid"
+      ? level.schema.rowHeaderColumn
+      : "none";
   const chromeContext: GridChromeContext = {
     path,
-    levelName: level.name,
+    levelName: level.schema.name,
     presentation,
     schema,
     rowHeaderColumn,
   };
-  const retry = runtime.sourceFor(path).query?.refetch;
+  const retry = level.data.query?.refetch;
   return (
     <div data-grid-part="child-level">
       {state.status === "ready" ? (

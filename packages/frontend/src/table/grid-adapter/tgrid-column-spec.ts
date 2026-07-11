@@ -1,7 +1,7 @@
 import type {
   CellEditGesture,
   GridCopyColumn,
-  GridPath,
+  GridLevelRuntime,
   GridRuntime,
 } from "@sapporta/grid";
 import type { ComponentType } from "react";
@@ -30,7 +30,7 @@ export type TGridColumnCopyBehavior<
   TValue,
 > = (context: {
   levelId: LevelId;
-  path: GridPath;
+  level: GridLevelRuntime;
   column: TGridColumnContext<RowsByLevel[LevelId]>;
   rows: readonly Readonly<RowsByLevel[LevelId]>[];
   values: readonly TValue[];

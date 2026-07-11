@@ -16,6 +16,7 @@ import { GridCopyContextMenu } from "./GridCopyContextMenu";
 import { GridRuntimeProvider } from "./GridRuntimeProvider";
 import {
   createGridRuntime,
+  runtimeInternalsFor,
   type GridRuntime,
 } from "../runtime/create-grid-runtime";
 import { inMemoryGridDataSource } from "../data-sources/memory/in-memory-grid-source";
@@ -103,7 +104,7 @@ const schema: GridSchema = {
       name: "accounts",
       rowHeaderColumn: "none",
       columns: [column("account", "Account"), column("debit", "Debit")],
-      options: { rowKey: (node, localIdx) => node.rowKey ?? String(localIdx) },
+      options: {},
       childLevels: [],
     },
   },
@@ -156,7 +157,7 @@ describe("GridCopyContextMenu", () => {
   it("copies the selected range with headers", async () => {
     const writeText = installClipboardMock();
     const runtime = makeRuntime();
-    runtime.cursorManager.setCellRange(
+    runtimeInternalsFor(runtime).cursorManager.setCellRange(
       root,
       { rowId: cashId, colId: "account" },
       { rowId: revenueId, colId: "debit" },

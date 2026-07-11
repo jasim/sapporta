@@ -12,7 +12,11 @@ const readyState = (snapshot: LevelSnapshot = ready): LevelSourceState => ({
   snapshot,
 });
 
-const oneNode: TreeNode = { levelName: "rows", columns: { id: "a" } };
+const oneNode: TreeNode = {
+  rowKey: "a",
+  levelName: "rows",
+  columns: { id: "a" },
+};
 
 describe("shouldRenderEmpty", () => {
   it("renders when ready + no rows + no phantoms + no footers", () => {
@@ -45,7 +49,9 @@ describe("shouldRenderEmpty", () => {
   });
 
   it("does NOT render when nodes are present", () => {
-    expect(shouldRenderEmpty(readyState({ ...ready, nodes: [oneNode] }), 0)).toBe(false);
+    expect(
+      shouldRenderEmpty(readyState({ ...ready, nodes: [oneNode] }), 0),
+    ).toBe(false);
   });
 
   it("does NOT render when phantoms are present", () => {
@@ -65,6 +71,8 @@ describe("shouldRenderEmpty", () => {
   });
 
   it("renders when footerRows is an empty array (treated as none)", () => {
-    expect(shouldRenderEmpty(readyState({ ...ready, footerRows: [] }), 0)).toBe(true);
+    expect(shouldRenderEmpty(readyState({ ...ready, footerRows: [] }), 0)).toBe(
+      true,
+    );
   });
 });

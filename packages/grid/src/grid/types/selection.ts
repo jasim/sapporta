@@ -2,8 +2,8 @@ import type { ColId, Coord, RowId } from "./identity";
 import type { DisplayedRows } from "./level-row";
 
 export type CellSelectionState = {
-  anchor: Coord;
-  head: Coord;
+  readonly anchor: Coord;
+  readonly head: Coord;
 };
 
 export type CellSelectionStatus = "none" | "in-selection" | "focus" | "editing";
@@ -62,7 +62,7 @@ export function selectionIsSingleCell(s: CellSelectionState): boolean {
 export function rowsInSelection(
   s: CellSelectionState,
   displayed: DisplayedRows,
-): RowId[] {
+): readonly RowId[] {
   const ai = displayed.rowIndexById.get(s.anchor.rowId);
   const hi = displayed.rowIndexById.get(s.head.rowId);
   if (ai == null || hi == null) return [];

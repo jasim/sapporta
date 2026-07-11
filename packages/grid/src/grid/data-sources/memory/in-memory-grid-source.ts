@@ -8,35 +8,24 @@
 // tree walk, so nothing in a level's config varies per parent. Hosts that
 // genuinely need per-parent in-memory variation write a custom `GridDataSource`.
 //
-// Lifecycle: the runtime owns caching and double-resolve guarding (see
-// `GridDataSource` contract). Each call to `resolveChild` returns a fresh
-// source; `dispose()` chains to every source we handed out so the host can
-// tear the whole graph down without enumerating children itself.
+// Lifecycle: the runtime owns caching, each returned level source, and the
+// double-resolve guard (see `GridDataSource` contract). Grid-source disposal
+// releases only this factory's path index; it never disposes level sources.
 //
-// Path walking: `parentPath` is decoded as an alternation of (levelName,
-// rowKey, …, levelName) segments per `identity.ts`. At each step we scan the
-// current array for the node whose rowKey matches the segment, then descend
-// through its `children[childLevelName]`. The walk is rowKey-keyed end to
-// end — sort/filter/reorder/insert/delete on intermediate levels does not
-// invalidate paths. Linear scan per step is fine because the walk runs once
-// per `(parentPath, parentRowKey, childLevelName)` triple — i.e., once per
-// child-level expansion, then cached by the runtime's registry. A per-level
-// rowKey-index map would need maintenance across mutations and would cost
-// more than it saves.
-//
-// Re-walks on every call are fine — the runtime's registry guarantees one
-// call per `(parentPath, parentRowKey, childLevelName)` per runtime lifetime.
-// The input `tree` array is treated as read-only seed data; mutating the
-// returned root source (e.g. `setCell`) does NOT mutate the input `tree`.
+// Child resolution starts at the exact live source registered for
+// `parentPath`, not at the constructor's nested seed tree. Root and child
+// edits, inserts, removals, bulk replacements, and later restoration are
+// therefore all visible when a descendant is resolved. The input `tree`
+// remains seed data only.
 
-import { defaultRowKey } from "../../pipeline/stages/build-data";
-import { decomposePath } from "../../types/identity";
+import { childPath, decomposePath, rootPath } from "../../types/identity";
 import type { GridPath, RowKey } from "../../types/identity";
 import type { FooterRow, TreeNode } from "../../types/level-row";
 import type { GridSchema } from "../../types/schema";
 import {
   inMemoryLevelSource,
   inMemoryReadonlyLevelSource,
+  currentInMemorySourceNodes,
   type InMemoryLevelSourceOpts,
 } from "./in-memory-level-source";
 import type { GridDataSource, LevelDataSource } from "../types";
@@ -50,7 +39,7 @@ export type InMemoryLevelOpts<F = unknown> = Omit<
 
 export type InMemoryGridDataSourceOpts<F = unknown> = {
   schema: GridSchema;
-  tree: TreeNode[];
+  tree: readonly TreeNode[];
   levels: { [levelName: string]: InMemoryLevelOpts<F> };
 };
 
@@ -65,13 +54,15 @@ export function inMemoryGridDataSource<F = unknown>(
     );
   }
 
-  const handed: LevelDataSource[] = [];
+  const root = rootPath(schema.rootLevel);
+  const liveSources = new Map<GridPath, LevelDataSource>();
   let rootCached: LevelDataSource | null = null;
 
   function buildLevelSource(
+    path: GridPath,
     levelName: string,
-    initialNodes: TreeNode[],
-    footerRows?: FooterRow[],
+    initialNodes: readonly TreeNode[],
+    footerRows?: readonly FooterRow[],
   ): LevelDataSource {
     const levelSchema = schema.levels[levelName];
     if (!levelSchema) {
@@ -88,7 +79,6 @@ export function inMemoryGridDataSource<F = unknown>(
     const { readonly: readonlySource, ...sourceOpts } = levelOpts;
     const args = {
       initialNodes,
-      options: levelSchema.options,
       columns: levelSchema.columns,
       ...sourceOpts,
       footerRows: footerRows ?? sourceOpts.footerRows,
@@ -96,21 +86,38 @@ export function inMemoryGridDataSource<F = unknown>(
     const src = readonlySource
       ? inMemoryReadonlyLevelSource<F>(args)
       : inMemoryLevelSource<F>(args);
-    handed.push(src);
+    liveSources.set(path, src);
     return src;
   }
 
+  function rootSource(): LevelDataSource {
+    if (rootCached === null) {
+      rootCached = buildLevelSource(root, schema.rootLevel, tree);
+    }
+    return rootCached;
+  }
+
   return {
-    rootSource() {
-      if (rootCached === null) {
-        rootCached = buildLevelSource(schema.rootLevel, tree);
-      }
-      return rootCached;
-    },
+    rootSource,
 
     resolveChild(parentPath, parentRowKey, childLevelName) {
-      const { arr: parentLevelArr, levelName: parentLevelName } =
-        walkToParentLevel(tree, parentPath, schema);
+      const decomposition = decomposePath(parentPath);
+      if (decomposition.rootLevelName !== schema.rootLevel) {
+        throw new Error(
+          `inMemoryGridDataSource: parentPath '${parentPath}' root segment '${decomposition.rootLevelName}' does not match schema.rootLevel '${schema.rootLevel}'`,
+        );
+      }
+      const parentLevelName =
+        decomposition.edges.at(-1)?.levelName ?? decomposition.rootLevelName;
+      const parentSource =
+        liveSources.get(parentPath) ??
+        (parentPath === root ? rootSource() : undefined);
+      if (!parentSource) {
+        throw new Error(
+          `inMemoryGridDataSource: parent level source '${parentPath}' has not been resolved`,
+        );
+      }
+      const parentLevelArr = currentInMemorySourceNodes(parentSource);
       const parent = findByRowKey(
         parentLevelArr,
         parentRowKey,
@@ -119,53 +126,29 @@ export function inMemoryGridDataSource<F = unknown>(
       );
       const children = parent.children?.[childLevelName];
       const footerRows = parent.childFooterRows?.[childLevelName];
-      const initialNodes: TreeNode[] =
+      const initialNodes: readonly TreeNode[] =
         children === undefined
           ? []
           : Array.isArray(children)
             ? children
             : [children];
-      return buildLevelSource(childLevelName, initialNodes, footerRows);
+      return buildLevelSource(
+        childPath(parentPath, parentRowKey, childLevelName),
+        childLevelName,
+        initialNodes,
+        footerRows,
+      );
     },
 
     dispose() {
-      for (const src of handed) src.dispose();
-      handed.length = 0;
+      liveSources.clear();
       rootCached = null;
     },
   };
 }
 
-function walkToParentLevel(
-  tree: TreeNode[],
-  parentPath: GridPath,
-  schema: GridSchema,
-): { arr: TreeNode[]; levelName: string } {
-  const decomp = decomposePath(parentPath);
-  if (decomp.rootLevelName !== schema.rootLevel) {
-    throw new Error(
-      `inMemoryGridDataSource: parentPath '${parentPath}' root segment '${decomp.rootLevelName}' does not match schema.rootLevel '${schema.rootLevel}'`,
-    );
-  }
-  let arr: TreeNode[] = tree;
-  let levelName = decomp.rootLevelName;
-  for (let i = 0; i < decomp.edges.length; i++) {
-    const edge = decomp.edges[i];
-    const parent = findByRowKey(arr, edge.rowKey, levelName, schema);
-    const childSlice = parent.children?.[edge.levelName];
-    if (childSlice === undefined) {
-      throw new Error(
-        `inMemoryGridDataSource: parentPath '${parentPath}' references missing child key '${edge.levelName}' at edge ${i}`,
-      );
-    }
-    arr = Array.isArray(childSlice) ? childSlice : [childSlice];
-    levelName = edge.levelName;
-  }
-  return { arr, levelName };
-}
-
 function findByRowKey(
-  arr: TreeNode[],
+  arr: readonly TreeNode[],
   rowKey: RowKey,
   levelName: string,
   schema: GridSchema,
@@ -176,9 +159,8 @@ function findByRowKey(
       `inMemoryGridDataSource: schema.levels has no entry for level '${levelName}'`,
     );
   }
-  const rowKeyFn = levelSchema.options.rowKey ?? defaultRowKey;
-  for (let i = 0; i < arr.length; i++) {
-    if (rowKeyFn(arr[i], i) === rowKey) return arr[i];
+  for (const node of arr) {
+    if (node.rowKey === rowKey) return node;
   }
   throw new Error(
     `inMemoryGridDataSource: no node with rowKey '${rowKey}' in level '${levelName}'`,

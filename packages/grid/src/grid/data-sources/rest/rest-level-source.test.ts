@@ -40,9 +40,9 @@ async function flush(): Promise<void> {
 }
 
 const fixtureNodes = (): TreeNode[] => [
-  { levelName: "rows", columns: { id: "a", v: 1 } },
-  { levelName: "rows", columns: { id: "b", v: 2 } },
-  { levelName: "rows", columns: { id: "c", v: 3 } },
+  { rowKey: "a", levelName: "rows", columns: { id: "a", v: 1 } },
+  { rowKey: "b", levelName: "rows", columns: { id: "b", v: 2 } },
+  { rowKey: "c", levelName: "rows", columns: { id: "c", v: 3 } },
 ];
 
 type TestFilter = Record<string, (value: unknown) => boolean>;
@@ -52,7 +52,6 @@ const baseOpts = (
 ): RestLevelSourceOpts<TestFilter> => ({
   fetchPage: vi.fn(async () => ({ nodes: fixtureNodes() })),
   rowQuery: sourceOwnedRowQuery({ page: 0, pageSize: 10 }),
-  rowKey: (n) => String(n.columns.id),
   ...extra,
 });
 
@@ -89,6 +88,35 @@ describe("restLevelSource — read surface", () => {
     expect("pagination" in src.state().snapshot).toBe(false);
   });
 
+  it("owns immutable fetched row and footer snapshots", async () => {
+    const response = {
+      nodes: [
+        {
+          rowKey: "a",
+          levelName: "rows",
+          columns: { id: "a", v: 1 },
+        },
+      ],
+      footerRows: [{ rowKey: "total", columns: { v: 1 } }],
+    };
+    const src = restLevelSource(baseOpts({ fetchPage: async () => response }));
+    await flush();
+    const ready = src.state();
+
+    response.nodes[0].rowKey = "mutated";
+    response.nodes[0].columns.v = 99;
+    response.footerRows[0].columns.v = 99;
+
+    expect(src.state()).toBe(ready);
+    expect(ready.snapshot.nodes[0].rowKey).toBe("a");
+    expect(ready.snapshot.nodes[0].columns.v).toBe(1);
+    expect(ready.snapshot.footerRows?.[0].columns.v).toBe(1);
+    expect(Object.isFrozen(ready)).toBe(true);
+    expect(Object.isFrozen(ready.snapshot)).toBe(true);
+    expect(Object.isFrozen(ready.snapshot.nodes)).toBe(true);
+    expect(Object.isFrozen(ready.snapshot.nodes[0].columns)).toBe(true);
+  });
+
   it("propagates fetchPage rejection: status initialLoading → initialError, error.message verbatim", async () => {
     const fetched = deferred<FetchPageResponse>();
     const fetchPage = vi.fn(async () => fetched.promise);
@@ -105,6 +133,84 @@ describe("restLevelSource — read surface", () => {
     expect(state.error.message).toBe(
       "500 Internal Server Error — connection refused",
     );
+  });
+
+  it("publishes an initial error instead of an invalid identity snapshot", async () => {
+    const missingKey = {
+      levelName: "rows",
+      columns: { id: "missing", v: 1 },
+    } as unknown as TreeNode;
+    const src = restLevelSource(
+      baseOpts({ fetchPage: async () => ({ nodes: [missingKey] }) }),
+    );
+
+    await flush();
+    const state = src.state();
+    expect(state.status).toBe("initialError");
+    if (state.status !== "initialError") {
+      throw new Error("expected initialError");
+    }
+    expect(state.snapshot.nodes).toEqual([]);
+    expect(state.error.message).toContain("TreeNode.rowKey is required");
+  });
+
+  it("preserves the last valid rows when a refresh has duplicate row keys", async () => {
+    let fetchCount = 0;
+    const fetchPage = vi.fn(async () => {
+      fetchCount += 1;
+      return fetchCount === 1
+        ? { nodes: fixtureNodes() }
+        : {
+            nodes: [
+              { rowKey: "same", levelName: "rows", columns: { id: "one" } },
+              { rowKey: "same", levelName: "rows", columns: { id: "two" } },
+            ],
+          };
+    });
+    const src = restLevelSource(baseOpts({ fetchPage }));
+    await flush();
+    const beforeNodes = src.state().snapshot.nodes;
+
+    const result = await src.query!.refetch!();
+
+    expect(result.kind).toBe("error");
+    const state = src.state();
+    expect(state.status).toBe("refreshError");
+    expect(state.snapshot.nodes).toBe(beforeNodes);
+    if (state.status !== "refreshError") {
+      throw new Error("expected refreshError");
+    }
+    expect(state.error.message).toContain('duplicate TreeNode.rowKey "same"');
+  });
+
+  it("reports throwing subscribers, continues in order, and keeps duplicate registrations independent", async () => {
+    const fetched = deferred<FetchPageResponse>();
+    const observerError = new Error("observer failed");
+    const report = vi.fn();
+    const calls: string[] = [];
+    const duplicate = vi.fn(() => calls.push("duplicate"));
+    const src = restLevelSource(
+      baseOpts({
+        fetchPage: async () => fetched.promise,
+        onObserverError: report,
+      }),
+    );
+    const unsubscribeFirst = src.subscribe(duplicate);
+    src.subscribe(() => {
+      calls.push("throw");
+      throw observerError;
+    });
+    src.subscribe(duplicate);
+
+    fetched.resolve({ nodes: fixtureNodes() });
+    await fetched.promise;
+    await flush();
+
+    expect(calls).toEqual(["duplicate", "throw", "duplicate"]);
+    expect(report).toHaveBeenCalledWith(observerError);
+    unsubscribeFirst();
+    await src.query!.refetch!();
+    expect(duplicate).toHaveBeenCalledTimes(4);
   });
 
   it("setSort triggers exactly one refetch and cancels in-flight prior fetch", async () => {
@@ -126,7 +232,13 @@ describe("restLevelSource — read surface", () => {
 
     // Resolve the stale (first) fetch — it should NOT win.
     calls[0].deferred.resolve({
-      nodes: [{ levelName: "rows", columns: { id: "stale", v: 0 } }],
+      nodes: [
+        {
+          rowKey: "stale",
+          levelName: "rows",
+          columns: { id: "stale", v: 0 },
+        },
+      ],
       totalCount: 1,
     });
     await calls[0].deferred.promise;
@@ -161,7 +273,13 @@ describe("restLevelSource — read surface", () => {
     expect(fetchPage).toHaveBeenCalledTimes(2);
 
     calls[0].resolve({
-      nodes: [{ levelName: "rows", columns: { id: "stale-page-0", v: 0 } }],
+      nodes: [
+        {
+          rowKey: "stale-page-0",
+          levelName: "rows",
+          columns: { id: "stale-page-0", v: 0 },
+        },
+      ],
     });
     await calls[0].promise;
     await flush();
@@ -272,7 +390,6 @@ describe("restLevelSource — host-backed row query", () => {
         setFilterState: () => "unchanged",
         setPageState: () => "unchanged",
       }),
-      rowKey: (n) => String(n.columns.id),
     });
     await flush();
     await flush();
@@ -313,7 +430,6 @@ describe("restLevelSource — host-backed row query", () => {
         setFilterState: () => "unchanged",
         setPageState: () => "unchanged",
       }),
-      rowKey: (n) => String(n.columns.id),
     });
     await flush();
     await flush();
@@ -345,7 +461,6 @@ describe("restLevelSource — host-backed row query", () => {
         setFilterState: () => "unchanged",
         setPageState: () => "unchanged",
       }),
-      rowKey: (n) => String(n.columns.id),
     });
     await flush();
     await flush();
@@ -383,7 +498,6 @@ describe("restLevelSource — host-backed row query", () => {
           return "changed";
         },
       }),
-      rowKey: (n) => String(n.columns.id),
     });
     await flush();
     await flush();
@@ -420,7 +534,6 @@ describe("restLevelSource — host-backed row query", () => {
         setFilterState: () => "unchanged",
         setPageState: () => "unchanged",
       }),
-      rowKey: (n) => String(n.columns.id),
       patchCell,
       insertNode: async (req) => req.node,
       removeNode: async () => {},
@@ -637,6 +750,69 @@ describe("restLevelSource — setCell reconciliation", () => {
     const colIds = patchCell.mock.calls.map((c) => c[0].colId).sort();
     expect(colIds).toEqual(["id", "v"]);
   });
+
+  it("rejects a full-row response that changes identity without publishing it", async () => {
+    const patches: Array<ReturnType<typeof deferred<PatchCellResponse>>> = [];
+    const src = await readyWritable({
+      patchCell: async () => {
+        const patch = deferred<PatchCellResponse>();
+        patches.push(patch);
+        return patch.promise;
+      },
+    });
+    const events: ReconcileEvent[] = [];
+    src.write.onReconcile((event) => events.push(event));
+
+    src.write.setCell("a", "v", 9);
+    const optimistic = src.state().snapshot;
+    patches[0].resolve({
+      kind: "row",
+      node: {
+        rowKey: "changed-a",
+        levelName: "rows",
+        columns: { id: "a", v: 10 },
+      },
+    });
+    await patches[0].promise;
+    await flush();
+
+    expect(src.state().snapshot).toBe(optimistic);
+    expect(src.state().snapshot.nodes[0].rowKey).toBe("a");
+    expect(events).toEqual([
+      expect.objectContaining({
+        kind: "rejected",
+        rowKey: "a",
+        reason: expect.stringContaining("TreeNode.rowKey changed"),
+      }),
+    ]);
+  });
+
+  it("isolates reconcile observers and keeps duplicate callbacks independently registered", async () => {
+    const observerError = new Error("reconcile observer failed");
+    const report = vi.fn();
+    const calls: string[] = [];
+    const duplicate = vi.fn(() => calls.push("duplicate"));
+    const src = await readyWritable({
+      patchCell: async (request) => ({ value: request.value }),
+      onObserverError: report,
+    });
+    const unsubscribeFirst = src.write.onReconcile(duplicate);
+    src.write.onReconcile(() => {
+      calls.push("throw");
+      throw observerError;
+    });
+    src.write.onReconcile(duplicate);
+
+    src.write.setCell("a", "v", 11);
+    await flush();
+    expect(calls).toEqual(["duplicate", "throw", "duplicate"]);
+    expect(report).toHaveBeenCalledWith(observerError);
+
+    unsubscribeFirst();
+    src.write.setCell("a", "v", 12);
+    await flush();
+    expect(duplicate).toHaveBeenCalledTimes(3);
+  });
 });
 
 describe("restLevelSource — applyChanges atomicity", () => {
@@ -742,13 +918,15 @@ describe("restLevelSource — createNode", () => {
     const write = src.write;
 
     const draft: TreeNode = {
+      rowKey: "draft-d",
       levelName: "rows",
       columns: { v: 4 },
     };
     const promise = write.createNode(draft);
     expect(src.state().snapshot.nodes).toHaveLength(3);
 
-    const serverNode: TreeNode = {
+    const serverNode = {
+      rowKey: "d",
       levelName: "rows",
       columns: { id: "d", v: 40 },
     };
@@ -757,7 +935,12 @@ describe("restLevelSource — createNode", () => {
     await flush();
 
     expect(src.state().snapshot.nodes).toHaveLength(4);
-    expect(src.state().snapshot.nodes[3]).toBe(serverNode);
+    expect(src.state().snapshot.nodes[3]).toStrictEqual(serverNode);
+    expect(src.state().snapshot.nodes[3] === serverNode).toBe(false);
+    serverNode.rowKey = "mutated";
+    serverNode.columns.v = 99;
+    expect(src.state().snapshot.nodes[3].rowKey).toBe("d");
+    expect(src.state().snapshot.nodes[3].columns.v).toBe(40);
   });
 
   it("appends default creates at the index visible after each server response", async () => {
@@ -772,15 +955,18 @@ describe("restLevelSource — createNode", () => {
     const write = src.write;
 
     const first = write.createNode({
+      rowKey: "d",
       levelName: "rows",
       columns: { id: "d", v: 4 },
     });
     const second = write.createNode({
+      rowKey: "e",
       levelName: "rows",
       columns: { id: "e", v: 5 },
     });
 
     const secondServerNode: TreeNode = {
+      rowKey: "e",
       levelName: "rows",
       columns: { id: "e", v: 50 },
     };
@@ -791,6 +977,7 @@ describe("restLevelSource — createNode", () => {
     });
 
     const firstServerNode: TreeNode = {
+      rowKey: "d",
       levelName: "rows",
       columns: { id: "d", v: 40 },
     };
@@ -819,10 +1006,53 @@ describe("restLevelSource — createNode", () => {
     const before = src.state().snapshot.nodes;
 
     await expect(
-      write.createNode({ levelName: "rows", columns: { v: 4 } }),
+      write.createNode({
+        rowKey: "draft",
+        levelName: "rows",
+        columns: { v: 4 },
+      }),
     ).rejects.toThrow("nope");
 
     expect(src.state().snapshot.nodes).toBe(before);
+  });
+
+  it("validates the create input before calling the endpoint", async () => {
+    const insertNode = vi.fn(
+      async (request: { node: TreeNode }) => request.node,
+    );
+    const src = await readyWritable({ insertNode });
+    const before = src.state().snapshot;
+
+    await expect(
+      src.write.createNode({ rowKey: "", levelName: "rows", columns: {} }),
+    ).rejects.toThrow("TreeNode.rowKey must be non-empty");
+
+    expect(insertNode).not.toHaveBeenCalled();
+    expect(src.state().snapshot).toBe(before);
+  });
+
+  it("rejects a duplicate authoritative create before publication", async () => {
+    const src = await readyWritable({
+      insertNode: async () => ({
+        rowKey: "a",
+        levelName: "rows",
+        columns: { id: "server-a", v: 40 },
+      }),
+    });
+    const before = src.state().snapshot;
+    const subscriber = vi.fn();
+    src.subscribe(subscriber);
+
+    await expect(
+      src.write.createNode({
+        rowKey: "provisional",
+        levelName: "rows",
+        columns: { v: 4 },
+      }),
+    ).rejects.toThrow('duplicate TreeNode.rowKey "a"');
+
+    expect(src.state().snapshot).toBe(before);
+    expect(subscriber).not.toHaveBeenCalled();
   });
 });
 
@@ -844,15 +1074,91 @@ describe("restLevelSource — removeNode", () => {
     return src as WritableTestSource;
   }
 
-  it("surfaces backend delete failures to the caller", async () => {
+  it("keeps rows unchanged while delete is pending and when it rejects", async () => {
+    const deletion = deferred<void>();
     const src = await readyWritable({
-      removeNode: async () => {
-        throw new Error("delete denied");
-      },
+      removeNode: async () => deletion.promise,
     });
     const write = src.write;
+    const before = src.state().snapshot;
+    const subscriber = vi.fn();
+    src.subscribe(subscriber);
 
-    await expect(write.removeNode("b")).rejects.toThrow("delete denied");
+    const removal = write.removeNode("b");
+    expect(src.state().snapshot).toBe(before);
+    expect(subscriber).not.toHaveBeenCalled();
+
+    deletion.reject(new Error("delete denied"));
+    await expect(removal).rejects.toThrow("delete denied");
+    expect(src.state().snapshot).toBe(before);
+    expect(src.state().snapshot.nodes.map((node) => node.rowKey)).toEqual([
+      "a",
+      "b",
+      "c",
+    ]);
+    expect(subscriber).not.toHaveBeenCalled();
+  });
+
+  it("removes from the latest nodes after the endpoint succeeds", async () => {
+    const deletion = deferred<void>();
+    let fetchCount = 0;
+    const src = await readyWritable({
+      fetchPage: async () => {
+        fetchCount += 1;
+        return fetchCount === 1
+          ? { nodes: fixtureNodes() }
+          : {
+              nodes: [
+                ...fixtureNodes(),
+                { rowKey: "d", levelName: "rows", columns: { id: "d", v: 4 } },
+              ],
+            };
+      },
+      removeNode: async () => deletion.promise,
+    });
+
+    const removal = src.write.removeNode("b");
+    expect(src.state().snapshot.nodes.map((node) => node.rowKey)).toEqual([
+      "a",
+      "b",
+      "c",
+    ]);
+
+    await src.query!.refetch!();
+    deletion.resolve(undefined);
+    await removal;
+
+    expect(src.state().snapshot.nodes.map((node) => node.rowKey)).toEqual([
+      "a",
+      "c",
+      "d",
+    ]);
+  });
+
+  it("treats a successful delete as a no-op when a refresh already removed the row", async () => {
+    const deletion = deferred<void>();
+    let fetchCount = 0;
+    const src = await readyWritable({
+      fetchPage: async () => {
+        fetchCount += 1;
+        return fetchCount === 1
+          ? { nodes: fixtureNodes() }
+          : { nodes: fixtureNodes().filter((node) => node.rowKey !== "b") };
+      },
+      removeNode: async () => deletion.promise,
+    });
+
+    const removal = src.write.removeNode("b");
+    await src.query!.refetch!();
+    const refreshed = src.state().snapshot;
+    const subscriber = vi.fn();
+    src.subscribe(subscriber);
+
+    deletion.resolve(undefined);
+    await removal;
+
+    expect(src.state().snapshot).toBe(refreshed);
+    expect(subscriber).not.toHaveBeenCalled();
   });
 });
 

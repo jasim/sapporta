@@ -35,6 +35,7 @@ export type BenchCounters = {
   hostLevelStatusChangedEvents: number;
   hostPhantomRowCommittedEvents: number;
   hostPhantomRowCreateFailedEvents: number;
+  hostCellActivationErrorEvents: number;
 };
 
 export function createBenchCounters(): BenchCounters {
@@ -68,6 +69,7 @@ export function createBenchCounters(): BenchCounters {
     hostLevelStatusChangedEvents: 0,
     hostPhantomRowCommittedEvents: 0,
     hostPhantomRowCreateFailedEvents: 0,
+    hostCellActivationErrorEvents: 0,
   };
 }
 
@@ -118,6 +120,9 @@ export function eventCounters(counters: BenchCounters): {
     phantomRowCreateFailed: () => {
       counters.hostPhantomRowCreateFailedEvents++;
     },
+    cellActivationError: () => {
+      counters.hostCellActivationErrorEvents++;
+    },
   };
 }
 
@@ -126,35 +131,35 @@ export function attachRuntimeSubscribers(
   counters: BenchCounters,
 ): () => void {
   const unsubs: Array<() => void> = [];
-  for (const path of runtime.registeredPaths()) {
+  for (const level of runtime.registeredLevels()) {
     counters.runtimeDisplayedSequenceSubscribes++;
     unsubs.push(
-      runtime.subscribeDisplayedRowSequence(path, () => {
+      level.subscribeDisplayedRowSequence(() => {
         counters.runtimeDisplayedSequenceFires++;
       }),
     );
     counters.runtimeActiveRowSubscribes++;
     unsubs.push(
-      runtime.subscribeActiveRow(path, () => {
+      level.subscribeActiveRow(() => {
         counters.runtimeActiveRowFires++;
       }),
     );
     counters.runtimeSelectedRowSubscribes++;
     unsubs.push(
-      runtime.subscribeSelectedRowIds(path, () => {
+      level.subscribeSelectedRowIds(() => {
         counters.runtimeSelectedRowFires++;
       }),
     );
     counters.runtimeRowInteractionSubscribes++;
     unsubs.push(
-      runtime.subscribeRowInteractionSnapshot(path, () => {
+      level.subscribeRowInteractionSnapshot(() => {
         counters.runtimeRowInteractionFires++;
       }),
     );
-    for (const row of runtime.displayedRowSequenceFor(path).rows) {
+    for (const row of level.displayedRowSequence().rows) {
       counters.runtimeDisplayedRowSubscribes++;
       unsubs.push(
-        runtime.subscribeDisplayedRow(path, row.id, () => {
+        level.subscribeDisplayedRow(row.id, () => {
           counters.runtimeDisplayedRowFires++;
         }),
       );

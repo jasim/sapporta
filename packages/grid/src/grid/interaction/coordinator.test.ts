@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { createGridRuntime } from "../runtime/create-grid-runtime";
+import {
+  createGridRuntime,
+  runtimeInternalsFor,
+} from "../runtime/create-grid-runtime";
 import type {
-  GridRuntime,
+  GridRuntimeInternals,
   LoadedRowsBoundaryEvent,
 } from "../runtime/create-grid-runtime";
 import { inMemoryGridDataSource } from "../data-sources/memory/in-memory-grid-source";
@@ -43,14 +46,14 @@ const reportSchema: GridSchema = {
         withRowExpansionColumn(testColumn("name", "Name")),
         testColumn("qty", "Qty"),
       ],
-      options: { rowKey: (n: TreeNode) => String(n.columns.name) },
+      options: {},
       childLevels: ["items"],
     },
     items: {
       name: "items",
       rowHeaderColumn: "none",
       columns: [testColumn("name", "Name"), testColumn("qty", "Qty")],
-      options: { rowKey: (n: TreeNode) => String(n.columns.name) },
+      options: {},
       childLevels: [],
     },
   },
@@ -62,20 +65,28 @@ const vegItems = childPath(root, "Veg", "items");
 
 const tree: TreeNode[] = [
   {
+    rowKey: "Fruit",
     levelName: "cat",
     columns: { name: "Fruit" },
     children: {
       items: [
-        { levelName: "items", columns: { name: "Apple" } },
-        { levelName: "items", columns: { name: "Banana" } },
+        { rowKey: "Apple", levelName: "items", columns: { name: "Apple" } },
+        {
+          rowKey: "Banana",
+          levelName: "items",
+          columns: { name: "Banana" },
+        },
       ],
     },
   },
   {
+    rowKey: "Veg",
     levelName: "cat",
     columns: { name: "Veg" },
     children: {
-      items: [{ levelName: "items", columns: { name: "Carrot" } }],
+      items: [
+        { rowKey: "Carrot", levelName: "items", columns: { name: "Carrot" } },
+      ],
     },
   },
 ];
@@ -90,14 +101,14 @@ const booksSchema: GridSchema = {
         withRowExpansionColumn(testColumn("title", "Title")),
         testColumn("author", "Author"),
       ],
-      options: { rowKey: (n: TreeNode) => String(n.columns.id) },
+      options: {},
       childLevels: ["quotes"],
     },
     quotes: {
       name: "quotes",
       rowHeaderColumn: "none",
       columns: [testColumn("text", "Quote")],
-      options: { rowKey: (n: TreeNode) => String(n.columns.id) },
+      options: {},
       childLevels: [],
     },
   },
@@ -108,19 +119,23 @@ const duneQuotes = childPath(booksRoot, "book-2", "quotes");
 
 const booksTree: TreeNode[] = [
   {
+    rowKey: "book-1",
     levelName: "books",
     columns: { id: "book-1", title: "Kindred", author: "Octavia Butler" },
   },
   {
+    rowKey: "book-2",
     levelName: "books",
     columns: { id: "book-2", title: "Dune", author: "Frank Herbert" },
     children: {
       quotes: [
         {
+          rowKey: "quote-1",
           levelName: "quotes",
           columns: { id: "quote-1", text: "Fear is the mind-killer." },
         },
         {
+          rowKey: "quote-2",
           levelName: "quotes",
           columns: { id: "quote-2", text: "The sleeper must awaken." },
         },
@@ -128,6 +143,7 @@ const booksTree: TreeNode[] = [
     },
   },
   {
+    rowKey: "book-3",
     levelName: "books",
     columns: { id: "book-3", title: "Piranesi", author: "Susanna Clarke" },
   },
@@ -149,26 +165,38 @@ function setupCollapsed(interaction?: GridInteractionConfig) {
       items: { sortMode: "none", filterMode: "none", paginationMode: "none" },
     },
   });
-  return createGridRuntime({
-    schema: reportSchema,
-    dataSource: ds,
-    interaction,
-  });
+  return runtimeInternalsFor(
+    createGridRuntime({
+      schema: reportSchema,
+      dataSource: ds,
+      interaction,
+    }),
+  );
 }
 
 function setupRowList() {
-  return createGridRuntime({
-    schema: reportSchema,
-    dataSource: inMemoryGridDataSource({
+  return runtimeInternalsFor(
+    createGridRuntime({
       schema: reportSchema,
-      tree,
-      levels: {
-        cat: { sortMode: "none", filterMode: "none", paginationMode: "none" },
-        items: { sortMode: "none", filterMode: "none", paginationMode: "none" },
-      },
+      dataSource: inMemoryGridDataSource({
+        schema: reportSchema,
+        tree,
+        levels: {
+          cat: {
+            sortMode: "none",
+            filterMode: "none",
+            paginationMode: "none",
+          },
+          items: {
+            sortMode: "none",
+            filterMode: "none",
+            paginationMode: "none",
+          },
+        },
+      }),
+      interaction: ROW_MULTISELECT_LIST,
     }),
-    interaction: ROW_MULTISELECT_LIST,
-  });
+  );
 }
 
 function setupPagedBooks() {
@@ -196,37 +224,39 @@ function setupPagedBooks() {
     subscribe: () => () => {},
     dispose: () => {},
   };
-  const rt = createGridRuntime({
-    schema: booksSchema,
-    dataSource: {
-      rootSource: () => rootSource,
-      resolveChild: () => quotesSource,
-      dispose: () => {
-        rootSource.dispose();
-        quotesSource.dispose();
+  const rt = runtimeInternalsFor(
+    createGridRuntime({
+      schema: booksSchema,
+      dataSource: {
+        rootSource: () => rootSource,
+        resolveChild: () => quotesSource,
+        dispose: () => {
+          rootSource.dispose();
+          quotesSource.dispose();
+        },
       },
-    },
-    onLoadedRowsBoundary: (event) => {
-      if (event.loadPath !== booksRoot) {
-        return false;
-      }
-      const nextPage = event.direction === "after" ? page + 1 : page - 1;
-      if (nextPage < 0 || nextPage >= rootPages.length) {
-        return Promise.resolve({
-          kind: "unchanged" as const,
-          state: rootSource.state(),
-        });
-      }
-      page = nextPage;
-      rootSnapshot = { nodes: rootPages[page] };
-      for (const fn of rootSubs) fn();
-      const state = rootSource.state();
-      if (state.status !== "ready") {
-        return Promise.resolve({ kind: "unchanged" as const, state });
-      }
-      return Promise.resolve({ kind: "ready" as const, state });
-    },
-  });
+      onLoadedRowsBoundary: (event) => {
+        if (event.loadPath !== booksRoot) {
+          return false;
+        }
+        const nextPage = event.direction === "after" ? page + 1 : page - 1;
+        if (nextPage < 0 || nextPage >= rootPages.length) {
+          return Promise.resolve({
+            kind: "unchanged" as const,
+            state: rootSource.state(),
+          });
+        }
+        page = nextPage;
+        rootSnapshot = { nodes: rootPages[page] };
+        for (const fn of rootSubs) fn();
+        const state = rootSource.state();
+        if (state.status !== "ready") {
+          return Promise.resolve({ kind: "unchanged" as const, state });
+        }
+        return Promise.resolve({ kind: "ready" as const, state });
+      },
+    }),
+  );
   rt.coordinator.toggleExpand(booksRoot, makeRowId(booksRoot, "book-2"));
   return rt;
 }
@@ -243,11 +273,10 @@ function pagedRootDataSource(
 } {
   let page = initialPage;
   const snapshotForPage = (): LevelSnapshot => {
-    const next: LevelSnapshot = {
+    return {
       nodes: pages[page],
+      ...(footerRows ? { footerRows } : {}),
     };
-    if (footerRows) next.footerRows = footerRows;
-    return next;
   };
   let snapshot: LevelSnapshot = snapshotForPage();
   const subscribers = new Set<() => void>();
@@ -311,8 +340,8 @@ function pagedRuntime(
 ) {
   return pagedRuntimeWithPages(
     [
-      [{ levelName: "cat", columns: { name: "Fruit" } }],
-      [{ levelName: "cat", columns: { name: "Veg" } }],
+      [{ rowKey: "Fruit", levelName: "cat", columns: { name: "Fruit" } }],
+      [{ rowKey: "Veg", levelName: "cat", columns: { name: "Veg" } }],
     ],
     interaction,
     footerRows,
@@ -327,16 +356,18 @@ function pagedRuntimeWithPages(
   initialPage = 0,
 ) {
   const harness = pagedRootDataSource(pages, footerRows, initialPage);
-  return createGridRuntime({
-    schema: reportSchema,
-    dataSource: harness.dataSource,
-    onLoadedRowsBoundary: harness.onLoadedRowsBoundary,
-    interaction,
-  });
+  return runtimeInternalsFor(
+    createGridRuntime({
+      schema: reportSchema,
+      dataSource: harness.dataSource,
+      onLoadedRowsBoundary: harness.onLoadedRowsBoundary,
+      interaction,
+    }),
+  );
 }
 
 function focusCell(
-  rt: GridRuntime,
+  rt: GridRuntimeInternals,
   path: GridPath,
   coord: { rowId: RowId; colId: "name" | "qty" },
 ) {
@@ -665,10 +696,10 @@ describe("GridCoordinator", () => {
   it("PageDown first clamps to the last loaded cell, then turns to the next page", async () => {
     const rt = pagedRuntimeWithPages([
       [
-        { levelName: "cat", columns: { name: "Fruit" } },
-        { levelName: "cat", columns: { name: "Apple" } },
+        { rowKey: "Fruit", levelName: "cat", columns: { name: "Fruit" } },
+        { rowKey: "Apple", levelName: "cat", columns: { name: "Apple" } },
       ],
-      [{ levelName: "cat", columns: { name: "Veg" } }],
+      [{ rowKey: "Veg", levelName: "cat", columns: { name: "Veg" } }],
     ]);
     const first = {
       path: root,
@@ -711,10 +742,10 @@ describe("GridCoordinator", () => {
   it("PageUp first clamps to the first loaded cell, then turns to the previous page", async () => {
     const rt = pagedRuntimeWithPages(
       [
-        [{ levelName: "cat", columns: { name: "Fruit" } }],
+        [{ rowKey: "Fruit", levelName: "cat", columns: { name: "Fruit" } }],
         [
-          { levelName: "cat", columns: { name: "Apple" } },
-          { levelName: "cat", columns: { name: "Veg" } },
+          { rowKey: "Apple", levelName: "cat", columns: { name: "Apple" } },
+          { rowKey: "Veg", levelName: "cat", columns: { name: "Veg" } },
         ],
       ],
       undefined,
@@ -817,10 +848,10 @@ describe("GridCoordinator", () => {
     const rt = pagedRuntimeWithPages(
       [
         [
-          { levelName: "cat", columns: { name: "Fruit" } },
-          { levelName: "cat", columns: { name: "Apple" } },
+          { rowKey: "Fruit", levelName: "cat", columns: { name: "Fruit" } },
+          { rowKey: "Apple", levelName: "cat", columns: { name: "Apple" } },
         ],
-        [{ levelName: "cat", columns: { name: "Veg" } }],
+        [{ rowKey: "Veg", levelName: "cat", columns: { name: "Veg" } }],
       ],
       ROW_MULTISELECT_LIST,
     );
@@ -861,10 +892,10 @@ describe("GridCoordinator", () => {
   it("row-list PageUp first clamps to the first loaded row, then turns to the previous page", async () => {
     const rt = pagedRuntimeWithPages(
       [
-        [{ levelName: "cat", columns: { name: "Fruit" } }],
+        [{ rowKey: "Fruit", levelName: "cat", columns: { name: "Fruit" } }],
         [
-          { levelName: "cat", columns: { name: "Apple" } },
-          { levelName: "cat", columns: { name: "Veg" } },
+          { rowKey: "Apple", levelName: "cat", columns: { name: "Apple" } },
+          { rowKey: "Veg", levelName: "cat", columns: { name: "Veg" } },
         ],
       ],
       ROW_MULTISELECT_LIST,
@@ -1058,7 +1089,9 @@ describe("GridCoordinator", () => {
         items: { sortMode: "none", filterMode: "none", paginationMode: "none" },
       },
     });
-    const rt = createGridRuntime({ schema: reportSchema, dataSource: ds });
+    const rt = runtimeInternalsFor(
+      createGridRuntime({ schema: reportSchema, dataSource: ds }),
+    );
     const id = makeRowId(root, "Fruit");
     rt.coordinator.toggleExpand(root, id);
     expect(rt.coordinator.getState().expansion.get(root)?.has(id)).toBe(true);
@@ -1075,7 +1108,9 @@ describe("GridCoordinator", () => {
         items: { sortMode: "none", filterMode: "none", paginationMode: "none" },
       },
     });
-    const rt = createGridRuntime({ schema: reportSchema, dataSource: ds });
+    const rt = runtimeInternalsFor(
+      createGridRuntime({ schema: reportSchema, dataSource: ds }),
+    );
     const id = makeRowId(root, "Fruit");
 
     rt.coordinator.expand(root, id);

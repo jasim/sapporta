@@ -49,12 +49,11 @@ export function ExpandableCellFrame({
   children?: ReactNode;
 }) {
   const runtime = useGridRuntime();
+  const level = runtime.level(path);
   const isExpanded = useSyncExternalStore(
-    runtime.coordinator.subscribe,
-    () =>
-      runtime.coordinator.getState().expansion.get(path)?.has(rowId) ?? false,
-    () =>
-      runtime.coordinator.getState().expansion.get(path)?.has(rowId) ?? false,
+    level.subscribeExpansion,
+    () => level.isExpanded(rowId),
+    () => level.isExpanded(rowId),
   );
   const enabled = activation?.availability.kind === "enabled";
   const expansionControl = activation ? (

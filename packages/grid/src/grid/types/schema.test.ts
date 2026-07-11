@@ -4,6 +4,7 @@ import {
   editStartsOn,
   type ColumnSchema,
 } from "./schema";
+import { makeRowId, rootPath } from "./identity";
 
 describe("ColumnSchema helpers", () => {
   it("requires host rendering at compile time", () => {
@@ -32,6 +33,8 @@ describe("ColumnSchema helpers", () => {
   });
 
   it("normalizes string activation descriptions to enabled states", () => {
+    const path = rootPath("rows");
+    const rowId = makeRowId(path, "1");
     const column: ColumnSchema = {
       id: "name" as never,
       name: "Name",
@@ -49,15 +52,15 @@ describe("ColumnSchema helpers", () => {
         value: "Ada",
         row: {
           kind: "data",
-          id: "rows#1" as never,
+          id: rowId,
           rowSelectable: true,
           columns: { name: "Ada" },
           hasChildren: false,
-          source: {} as never,
+          source: { rowKey: "1", levelName: "rows", columns: { name: "Ada" } },
         },
         column: { id: column.id, name: column.name },
-        path: "rows" as never,
-        coord: { rowId: "rows#1" as never, colId: column.id },
+        path,
+        coord: { rowId, colId: column.id },
         actions: {
           rowExpansion: {
             canToggle: () => false,

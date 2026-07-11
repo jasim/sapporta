@@ -1,7 +1,11 @@
 import type { ReactNode } from "react";
-import type { GridSchema, ColumnSchema } from "../src/grid/types/schema";
+import type {
+  GridSchema,
+  ColumnSchema,
+  LevelSchema,
+} from "../src/grid/types/schema";
 import type { TreeNode } from "../src/grid/types/level-row";
-import type { ColId, RowKey } from "../src/grid/types/identity";
+import type { ColId } from "../src/grid/types/identity";
 import type { InMemoryGridDataSourceOpts } from "../src/grid/data-sources/memory/in-memory-grid-source";
 
 export type BenchDatasetName =
@@ -95,14 +99,13 @@ export function buildBenchDataset(config: BenchDatasetConfig): BenchDataset {
 }
 
 function buildSchema(config: BenchDatasetConfig): GridSchema {
-  const levels: GridSchema["levels"] = {};
+  const levels: Record<string, LevelSchema> = {};
   for (let levelIndex = 0; levelIndex < config.depth; levelIndex++) {
     levels[levelName(levelIndex)] = {
       name: levelName(levelIndex),
       columns: buildColumns(config.columns),
       rowHeaderColumn: "none",
       options: {
-        rowKey: (node) => node.columns.id as RowKey,
         allowPhantoms: true,
       },
       childLevels:
@@ -154,6 +157,7 @@ function buildLevelRows(
           }
         : undefined;
     return {
+      rowKey: key,
       levelName: levelName(levelIndex),
       columns,
       children,
@@ -174,8 +178,8 @@ function countNodes(nodes: readonly TreeNode[]): number {
     count++;
     if (!node.children) continue;
     for (const child of Object.values(node.children)) {
-      if (Array.isArray(child)) stack.push(...child);
-      else stack.push(child);
+      if ("rowKey" in child) stack.push(child);
+      else stack.push(...child);
     }
   }
   return count;

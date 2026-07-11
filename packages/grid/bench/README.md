@@ -1,8 +1,9 @@
 # Grid Benchmarks
 
-Benchmark-only harnesses for `@sapporta/grid`. These files live outside `src`,
-are not included by the package build, and are not part of the production grid
-runtime.
+The `bench` directory contains headless runtime benchmarks for
+`@sapporta/grid`. The package build reads production modules from `src`. The
+benchmark runner reads its datasets and instrumentation from this directory.
+Each generated `TreeNode` carries a stable path-derived `rowKey`.
 
 ## Runtime Benchmarks
 
@@ -44,9 +45,9 @@ Available benchmarks:
 
 ## What This Measures
 
-The runtime harness measures the non-React state graph:
+The runtime harness measures the headless state graph:
 
-- source registry size and source subscription fanout
+- registered level count and source subscription fanout
 - displayed-row sequence and per-row subscription fanout
 - row interaction subscription fanout
 - mutation/status/reconcile host event counts
@@ -62,7 +63,7 @@ Each result separates setup and action cost:
 - `timingsMs.touchDisplayed`: displayed-row/sequence derivation reads
 - `timingsMs.attachSubscribers`: benchmark subscriber fanout setup
 - `timingsMs.action`: the operation the benchmark is named after
-- `timingsMs.countDisplayed`: final path/row counting
+- `timingsMs.countDisplayed`: final registered-level and row counting
 - `timingsMs.detachSubscribers` and `timingsMs.runtimeDispose`: teardown work
 - `timingsMs.measuredWork`: setup, action, and counting phases summed without
   forced-GC checkpoint time
@@ -81,6 +82,6 @@ The JSON `memoryMb` object is a forced-GC heap profile in MB:
 - `afterDatasetRelease`: heap after the benchmark drops its dataset reference
 - `retainedDelta`: `afterDatasetRelease - baseline`, useful as a leak smoke test
 
-It deliberately does not import the grid React barrel or render DOM. Browser
-profiling should be added as a separate fixture so React fiber, DOM, layout,
-paint, and browser heap costs can be measured independently from runtime costs.
+The harness imports the runtime and advanced composition modules directly. A
+separate browser fixture can measure React fiber, DOM, layout, paint, and
+browser heap costs.

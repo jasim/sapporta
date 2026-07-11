@@ -2,7 +2,7 @@ import { useStore } from "zustand";
 import type { MouseEvent } from "react";
 import type { GridPath } from "../../types/identity";
 import type { ColumnSchema } from "../../types/schema";
-import type { LevelRow } from "../../types/level-row";
+import type { DisplayedRows, LevelRow } from "../../types/level-row";
 import type { CellSelectionStatus } from "../../types/selection";
 import { selectionContainsCoord } from "../../types/selection";
 import type { ControllerState } from "../../types/controller-state";
@@ -10,6 +10,7 @@ import type { ColId } from "../../types/identity";
 import { rowSelectionGestureFromModifiers } from "../../interaction/key-handling";
 import { CellShell } from "./CellShell";
 import { useGridRuntime } from "../GridRuntimeProvider";
+import { runtimeInternalsFor } from "../../runtime/create-grid-runtime";
 
 // Per-cell view. One narrow subscription on the transient channel:
 //
@@ -38,16 +39,12 @@ export function GridDataCell({
   rowHeader?: boolean;
 }) {
   const runtime = useGridRuntime();
-  const controller = runtime.controllerFor(path);
+  const level = runtime.level(path);
+  const internals = runtimeInternalsFor(runtime);
+  const controller = internals.controllerFor(path);
 
   const status = useStore(controller, (s: ControllerState) =>
-    selectCellStatus(
-      s,
-      row.id,
-      column.id,
-      runtime.displayedRowsFor(path),
-      colOrder,
-    ),
+    selectCellStatus(s, row.id, column.id, level.displayedRows(), colOrder),
   );
 
   // Pointer interaction has two ordered phases. Mouse down establishes the
@@ -62,7 +59,7 @@ export function GridDataCell({
     e.preventDefault();
     const coord = { rowId: row.id, colId: column.id };
     if (rowHeader) {
-      runtime.coordinator.navigateCell(path, {
+      internals.coordinator.navigateCell(path, {
         type: "rowPressed",
         target: row.id,
         origin: { kind: "cell", target: coord },
@@ -70,7 +67,7 @@ export function GridDataCell({
       });
       return;
     }
-    runtime.coordinator.navigateCell(path, {
+    internals.coordinator.navigateCell(path, {
       type: "cellPressed",
       target: coord,
       extend: e.shiftKey,
@@ -92,7 +89,7 @@ export function GridDataCell({
     // already identify the edited cell. Reapplying a plain cell press is
     // idempotent for the normal browser sequence and also preserves that
     // invariant for synthesized double-click events.
-    runtime.coordinator.navigateCell(path, {
+    internals.coordinator.navigateCell(path, {
       type: "cellPressed",
       target: coord,
       extend: false,
@@ -108,7 +105,7 @@ export function GridDataCell({
     column,
     path,
     rowHeader,
-    activation: runtime.cellActivationFor(path, coord),
+    activation: internals.cellActivationFor(path, coord),
   });
 
   return (
@@ -129,7 +126,7 @@ function selectCellStatus(
   s: ControllerState,
   rowId: LevelRow["id"],
   colId: ColumnSchema["id"],
-  displayed: ReturnType<ReturnType<typeof useGridRuntime>["displayedRowsFor"]>,
+  displayed: DisplayedRows,
   colOrder: readonly ColId[],
 ): CellSelectionStatus {
   // Editing wins, but only if this path is the cursor's path — `liveCellFocus`

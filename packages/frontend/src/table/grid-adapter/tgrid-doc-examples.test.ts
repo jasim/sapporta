@@ -251,7 +251,7 @@ describe("TGRID-USAGE examples", () => {
 
     const rowPrimarySession = createTGridSession(rowPrimaryDefinition);
     try {
-      expect(rowPrimarySession.runtime.interaction).toBe(
+      expect(rowPrimarySession.runtime.interaction).toStrictEqual(
         ROW_PRIMARY_MASTER_DETAIL,
       );
     } finally {
@@ -271,7 +271,7 @@ describe("TGRID-USAGE examples", () => {
 
     const defaultSession = createTGridSession(defaultDefinition);
     try {
-      expect(defaultSession.runtime.interaction).toBe(
+      expect(defaultSession.runtime.interaction).toStrictEqual(
         CELL_GRID_WITH_INDEPENDENT_ROW_SELECTION,
       );
     } finally {

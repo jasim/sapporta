@@ -1,27 +1,13 @@
-export { collectRowOperationTargets } from "./row-operation-targets";
-
 export {
   createGridRuntime,
   type GridRuntime,
   type LoadedRowsBoundaryEvent,
   type RuntimeArgs,
-  type RowInteractionCommands,
 } from "./create-grid-runtime";
+export type { GridLevelRuntime } from "./grid-level-runtime";
+export type { RowOperationTarget, RowRemovalResult } from "./row-operations";
 export type {
   RowInteractionSnapshot,
   RowInteractionStatus,
 } from "../types/row-selection";
-export type {
-  CursorContinuation,
-  RowRemovalRef,
-} from "../interaction/cursor-continuation";
-
-export type { GridEmitter, GridEvents } from "./emitter";
-
-export {
-  createTableController,
-  type TableController,
-  type ReadonlyTableController,
-  type WritableTableController,
-  type RootPhantomHelpers,
-} from "./table-controller";
+export type { GridEvents } from "./emitter";

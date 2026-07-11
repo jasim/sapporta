@@ -3,6 +3,7 @@ import type { TreeNode } from "../../types/level-row";
 import { avgBy, sumBy } from "./aggregator";
 
 const node = (cols: Record<string, unknown>): TreeNode => ({
+  rowKey: "row",
   levelName: "items",
   columns: cols,
 });

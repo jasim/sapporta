@@ -37,15 +37,15 @@ const schema: GridSchema = {
           name: "Other",
         }),
       ],
-      options: { rowKey: (node: TreeNode) => String(node.columns.id) },
+      options: {},
       childLevels: [],
     },
   },
 };
 
 const nodes = (): TreeNode[] => [
-  { levelName: "rows", columns: { id: "a", v: "Alpha" } },
-  { levelName: "rows", columns: { id: "b", v: "Beta" } },
+  { rowKey: "a", levelName: "rows", columns: { id: "a", v: "Alpha" } },
+  { rowKey: "b", levelName: "rows", columns: { id: "b", v: "Beta" } },
 ];
 
 async function flush(): Promise<void> {
@@ -99,7 +99,6 @@ describe("ColumnPresetHeader sorting", () => {
         setFilterState: () => "unchanged",
         setPageState: () => "unchanged",
       }),
-      rowKey: (node) => String(node.columns.id),
     });
     const dataSource: GridDataSource = {
       rootSource: () => source,
@@ -192,7 +191,6 @@ describe("ColumnPresetHeader sorting", () => {
         setFilterState: () => "unchanged",
         setPageState: () => "unchanged",
       }),
-      rowKey: (node) => String(node.columns.id),
     });
     const dataSource: GridDataSource = {
       rootSource: () => source,

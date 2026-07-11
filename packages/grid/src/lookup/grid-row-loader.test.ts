@@ -14,7 +14,10 @@ import type { ValueLookup } from "./cache/value-lookup";
 const root = rootPath("orders");
 
 function makeNode(columns: Record<string, unknown>): TreeNode {
-  return { levelName: "test", columns };
+  const rowKey = String(
+    columns.id ?? columns.customer_id ?? columns.product_id,
+  );
+  return { rowKey, levelName: "test", columns };
 }
 
 function makeLookup(): ValueLookup {
@@ -74,13 +77,13 @@ function makeRuntime(args: {
   let paths = args.paths;
   const registryListeners = new Set<() => void>();
   const runtime = {
-    registeredPaths: () => paths,
-    sourceFor: (path: GridPath) => {
-      const source = args.sources.get(path);
-      if (!source) throw new Error(`missing source ${path}`);
-      return source;
-    },
-    subscribeRegistry: (fn: () => void) => {
+    registeredLevels: () =>
+      paths.map((path) => {
+        const data = args.sources.get(path);
+        if (!data) throw new Error(`missing source ${path}`);
+        return { path, data };
+      }),
+    subscribeLevels: (fn: () => void) => {
       registryListeners.add(fn);
       return () => {
         registryListeners.delete(fn);
@@ -183,6 +186,38 @@ describe("startLoadingValueLookupEntriesForGridRows", () => {
 
     expect(lookup.loadMissingEntries).toHaveBeenCalledWith(["5"]);
     expect(lookup.loadMissingEntries).toHaveBeenCalledWith(["5", "6"]);
+    stop();
+  });
+
+  it("unsubscribes a removed descendant and reloads it when re-registered", () => {
+    const child = childPath(root, "42", "orders.lines");
+    const lookup = makeLookup();
+    const rootSource = makeSource([makeNode({ id: "42" })]);
+    const childSource = makeSource([makeNode({ product_id: "5" })]);
+    const runtime = makeRuntime({
+      paths: [root, child],
+      sources: new Map([
+        [root, rootSource.source],
+        [child, childSource.source],
+      ]),
+    });
+
+    const stop = startLoadingValueLookupEntriesForGridRows({
+      runtime: runtime.runtime,
+      lookupColumnsForGridPath: (path) =>
+        path === child ? [{ colId: "product_id", valueLookup: lookup }] : [],
+    });
+    expect(childSource.listenerCount()).toBe(1);
+    expect(lookup.loadMissingEntries).toHaveBeenCalledTimes(1);
+
+    runtime.setPaths([root]);
+    runtime.emitRegistry();
+    expect(childSource.listenerCount()).toBe(0);
+
+    runtime.setPaths([root, child]);
+    runtime.emitRegistry();
+    expect(childSource.listenerCount()).toBe(1);
+    expect(lookup.loadMissingEntries).toHaveBeenCalledTimes(2);
     stop();
   });
 

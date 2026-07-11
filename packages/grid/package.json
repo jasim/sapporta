@@ -43,6 +43,11 @@
       "sapporta:source": "./src/grid/index.ts",
       "default": "./dist/grid.js"
     },
+    "./advanced": {
+      "types": "./dist/advanced.d.ts",
+      "sapporta:source": "./src/advanced.ts",
+      "default": "./dist/advanced.js"
+    },
     "./column-preset": {
       "types": "./dist/column-preset/index.d.ts",
       "sapporta:source": "./src/column-preset/index.ts",

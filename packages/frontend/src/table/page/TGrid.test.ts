@@ -12,17 +12,11 @@ import {
 } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import {
-  CELL_GRID_WITH_ACTIVE_ROW,
-  createGridRuntime,
-  inMemoryGridDataSource,
-  type ColId,
-  type ColumnSchema,
-  type GridRuntime,
-  type GridSchema,
-  type TreeNode,
-} from "@sapporta/grid";
-import type { TGridSession } from "../state/tgrid-session";
+import { CELL_GRID_WITH_ACTIVE_ROW } from "@sapporta/grid";
+import type { TableSchema } from "@sapporta/shared/contracts";
+import type { TableRowsClient } from "../grid-adapter/tgrid-level-config";
+import { defineTGrid } from "../grid-adapter/tgrid-runtime-config";
+import { createTGridSession, type TGridSession } from "../state/tgrid-session";
 import { TGrid } from "./TGrid";
 
 (
@@ -59,29 +53,43 @@ type Rows = {
   accounts: { id: string; name: string };
 };
 
-const schema: GridSchema = {
-  rootLevel: "accounts",
-  levels: {
-    accounts: {
-      name: "accounts",
-      columns: [column("name", "Name")],
-      rowHeaderColumn: "none",
-      options: { rowKey: (node, localIdx) => node.rowKey ?? String(localIdx) },
-      childLevels: [],
-    },
-  },
+const accountsTable: TableSchema = {
+  name: "accounts",
+  label: "Accounts",
+  immutable: false,
+  rowLabelColumns: ["name"],
+  columns: [
+    { name: "id", label: "ID", kind: "text", primary: true },
+    { name: "name", label: "Name", kind: "text" },
+  ],
+  children: [],
 };
 
-const tree: TreeNode[] = [
-  {
-    rowKey: "cash",
-    levelName: "accounts",
-    columns: { id: "cash", name: "Cash" },
+const rowsClient: TableRowsClient = {
+  fetch: vi.fn(async () => ({
+    data: [{ id: "cash", name: "Cash" }],
+    meta: { total: 1, page: 1, limit: 50, pages: 1 },
+  })),
+  create: vi.fn(async (_table, data) => ({ data })),
+  update: vi.fn(async (_table, _id, data) => ({ data })),
+  remove: vi.fn(async (_table, id) => ({ data: { id } })),
+};
+
+const definition = defineTGrid<Rows>({
+  rootLevel: "accounts",
+  interaction: CELL_GRID_WITH_ACTIVE_ROW,
+  levels: {
+    accounts: {
+      table: accountsTable,
+      rowHeaderColumn: "none",
+      childLevels: [],
+      rowsClient,
+    },
   },
-];
+});
 
 let mounted: { root: Root; container: HTMLElement } | null = null;
-const runtimes: GridRuntime[] = [];
+const sessions: TGridSession<Rows>[] = [];
 
 afterEach(async () => {
   if (mounted) {
@@ -91,30 +99,22 @@ afterEach(async () => {
     mounted.container.remove();
     mounted = null;
   }
-  for (const runtime of runtimes.splice(0)) {
-    runtime.dispose();
+  for (const session of sessions.splice(0)) {
+    session.dispose();
   }
 });
 
 describe("TGrid", () => {
   it("wraps the grid level with the copy context menu scope", async () => {
-    const runtime = makeRuntime();
-    const session = {
-      rootLevel: "accounts",
-      runtime,
-      levels: {},
-      levelInfoById: {},
-      appServices: undefined,
-      lookups: {},
-      setLevelSort: vi.fn(),
-      setLevelFilter: vi.fn(),
-    } as unknown as TGridSession<Rows>;
+    const session = createTGridSession(definition);
+    sessions.push(session);
 
     const container = document.createElement("div");
     document.body.append(container);
     const rootClient = createRoot(container);
     await act(async () => {
       rootClient.render(createElement(TGrid<Rows>, { session }));
+      for (let index = 0; index < 10; index += 1) await Promise.resolve();
     });
     mounted = { root: rootClient, container };
 
@@ -127,31 +127,3 @@ describe("TGrid", () => {
     expect(container.textContent).toContain("Cash");
   });
 });
-
-function makeRuntime(): GridRuntime {
-  const runtime = createGridRuntime({
-    schema,
-    dataSource: inMemoryGridDataSource({
-      schema,
-      tree,
-      levels: {
-        accounts: {
-          sortMode: "none",
-          filterMode: "none",
-          paginationMode: "none",
-        },
-      },
-    }),
-    interaction: CELL_GRID_WITH_ACTIVE_ROW,
-  });
-  runtimes.push(runtime);
-  return runtime;
-}
-
-function column(id: ColId, name: string): ColumnSchema {
-  return {
-    id,
-    name,
-    renderCell: ({ value }) => String(value ?? ""),
-  };
-}

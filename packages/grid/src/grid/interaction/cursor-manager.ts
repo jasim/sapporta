@@ -30,22 +30,25 @@ import type { DisplayedRows } from "../types/level-row";
 // targets. A row-selector checkbox therefore calls `setRowSelection` without
 // moving the row cursor or changing keyboard routing.
 export interface CursorManager {
-  applyCellCursor: (target: CellCursor | null) => void;
-  moveCellCursorTo: (target: CellCursor) => void;
-  extendCellSelectionTo: (target: CellCursor) => void;
-  setCellRange: (path: GridPath, anchor: Coord, head: Coord) => void;
-  clearCellRange: (path: GridPath) => void;
-  clearCellCursor: () => void;
-  currentCellCursor: () => CellCursor | null;
+  readonly moveCellCursorTo: (target: CellCursor) => void;
+  readonly extendCellSelectionTo: (target: CellCursor) => void;
+  readonly setCellRange: (path: GridPath, anchor: Coord, head: Coord) => void;
+  readonly clearCellRange: (path: GridPath) => void;
+  readonly clearCellCursor: () => void;
+  readonly currentCellCursor: () => CellCursor | null;
 
-  applyRowCursor: (target: RowCursor | null) => void;
-  moveRowCursorTo: (target: RowCursor) => void;
-  extendRowSelectionToCursor: (target: RowCursor) => void;
-  setRowSelection: (path: GridPath, selection: RowSelection) => void;
-  clearRowSelection: (path: GridPath) => void;
-  clearRowCursor: () => void;
-  currentRowCursor: () => RowCursor | null;
+  readonly moveRowCursorTo: (target: RowCursor) => void;
+  readonly extendRowSelectionToCursor: (target: RowCursor) => void;
+  readonly setRowSelection: (path: GridPath, selection: RowSelection) => void;
+  readonly clearRowSelection: (path: GridPath) => void;
+  readonly clearRowCursor: () => void;
+  readonly currentRowCursor: () => RowCursor | null;
 }
+
+export type CursorManagerInternal = CursorManager & {
+  applyCellCursor: (target: CellCursor | null) => void;
+  applyRowCursor: (target: RowCursor | null) => void;
+};
 
 export type CursorManagerDeps = {
   interaction: GridInteractionConfig;
@@ -62,7 +65,9 @@ export type CursorManagerDeps = {
   ) => void;
 };
 
-export function createCursorManager(deps: CursorManagerDeps): CursorManager {
+export function createCursorManager(
+  deps: CursorManagerDeps,
+): CursorManagerInternal {
   function assertCellGrid(command: string): boolean {
     if (deps.interaction.mode === "cell-grid") return true;
     throw new Error(
@@ -169,7 +174,7 @@ export function createCursorManager(deps: CursorManagerDeps): CursorManager {
   function moveRowCursorTo(target: RowCursor): void {
     assertRowList("moveRowCursorTo");
     // Plain row movement does not write stored row selection. If selection
-    // follows the active row, runtime.selectedRowsFor derives that on read.
+    // follows the active row, the path-bound level derives that on read.
     applyRowCursor(target);
   }
 

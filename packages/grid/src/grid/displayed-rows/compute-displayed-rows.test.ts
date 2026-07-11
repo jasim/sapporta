@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { rootPath } from "../types/identity";
+import { makeRowId, rootPath } from "../types/identity";
 import type { LevelSchema } from "../types/schema";
 import type { LevelSnapshot } from "../data-sources/types";
 import type {
@@ -40,19 +40,29 @@ const cols = [
 ];
 
 const opts: LevelOptions = {
-  rowKey: (n: TreeNode) => String(n.columns.id),
   allowPhantoms: true,
 };
 
 const reportOpts: LevelOptions = {
-  rowKey: (n: TreeNode) => String(n.columns.id),
   allowPhantoms: false,
 };
 
 const nodes: TreeNode[] = [
-  { levelName: "root", columns: { id: "a", name: "Apple", qty: 3 } },
-  { levelName: "root", columns: { id: "b", name: "Banana", qty: 1 } },
-  { levelName: "root", columns: { id: "c", name: "Cherry", qty: 2 } },
+  {
+    rowKey: "a",
+    levelName: "root",
+    columns: { id: "a", name: "Apple", qty: 3 },
+  },
+  {
+    rowKey: "b",
+    levelName: "root",
+    columns: { id: "b", name: "Banana", qty: 1 },
+  },
+  {
+    rowKey: "c",
+    levelName: "root",
+    columns: { id: "c", name: "Cherry", qty: 2 },
+  },
 ];
 
 function makeSchema(options: LevelOptions = opts, columns = cols): LevelSchema {
@@ -71,11 +81,10 @@ function makeSnapshot(
     footerRows?: FooterRow[];
   } = {},
 ): LevelSnapshot {
-  const snapshot: LevelSnapshot = {
+  return {
     nodes: args.nodes ?? nodes,
+    ...(args.footerRows ? { footerRows: args.footerRows } : {}),
   };
-  if (args.footerRows) snapshot.footerRows = args.footerRows;
-  return snapshot;
 }
 
 function makeInput(
@@ -103,9 +112,19 @@ describe("buildDataRows", () => {
 
   it("treats TreeNode.kind opening/closing/subtotal as bracket rows", () => {
     const mixed: TreeNode[] = [
-      { levelName: "x", columns: { id: "open" }, kind: "opening" },
-      { levelName: "x", columns: { id: "d1" } },
-      { levelName: "x", columns: { id: "sub" }, kind: "subtotal" },
+      {
+        rowKey: "open",
+        levelName: "x",
+        columns: { id: "open" },
+        kind: "opening",
+      },
+      { rowKey: "d1", levelName: "x", columns: { id: "d1" } },
+      {
+        rowKey: "sub",
+        levelName: "x",
+        columns: { id: "sub" },
+        kind: "subtotal",
+      },
     ];
     const out = buildDataRows(mixed, opts);
     expect(out.map((r) => r.kind)).toEqual(["opening", "data", "subtotal"]);
@@ -116,16 +135,17 @@ describe("withRollup", () => {
   it("inserts a rollup row after each data row carrying sourceSnapshot.rollup", () => {
     const withRollupNodes: TreeNode[] = [
       {
+        rowKey: "a",
         levelName: "x",
         columns: { id: "a", qty: 1 },
         rollup: { id: "a-r", qty: 5 },
       },
-      { levelName: "x", columns: { id: "b", qty: 2 } },
+      { rowKey: "b", levelName: "x", columns: { id: "b", qty: 2 } },
     ];
     const protos = buildDataRows(withRollupNodes, opts);
     const rolled = withRollup(protos);
     expect(rolled.map((r) => r.kind)).toEqual(["data", "rollup", "data"]);
-    expect(rolled[1].rowKey).toBe("a:rollup");
+    expect(rolled[1].rowKey).toBe("a");
   });
 
   it("returns the same array reference when nothing rolls up", () => {
@@ -142,7 +162,7 @@ describe("withFooters", () => {
     ];
     const out = withFooters(protos, footers);
     expect(out[out.length - 1].kind).toBe("footer");
-    expect(out[out.length - 1].rowKey).toBe("footer:total");
+    expect(out[out.length - 1].rowKey).toBe("total");
   });
 
   it("returns the same array when no footers", () => {
@@ -263,18 +283,19 @@ describe("withSort", () => {
   it("keeps a row's rollup glued to the row when sorting", () => {
     const withRollupNodes: TreeNode[] = [
       {
+        rowKey: "a",
         levelName: "x",
         columns: { id: "a", qty: 3 },
         rollup: { id: "a-r", qty: 99 },
       },
-      { levelName: "x", columns: { id: "b", qty: 1 } },
+      { rowKey: "b", levelName: "x", columns: { id: "b", qty: 1 } },
     ];
     const a = buildDataRows(withRollupNodes, opts);
     const b = withRollup(a);
     const out = withSort(b, [{ colId: "qty", direction: "asc" }], cols);
     expect(out.map((r) => r.kind)).toEqual(["data", "data", "rollup"]);
     expect(out[1].rowKey).toBe("a");
-    expect(out[2].rowKey).toBe("a:rollup");
+    expect(out[2].rowKey).toBe("a");
   });
 });
 
@@ -291,11 +312,13 @@ describe("withFilter", () => {
   it("drops a rollup if its data row was filtered out", () => {
     const withRollupNodes: TreeNode[] = [
       {
+        rowKey: "a",
         levelName: "x",
         columns: { id: "a", qty: 3 },
         rollup: { id: "a-r", qty: 99 },
       },
       {
+        rowKey: "b",
         levelName: "x",
         columns: { id: "b", qty: 1 },
         rollup: { id: "b-r", qty: 99 },
@@ -314,10 +337,10 @@ describe("withRowIds + buildDisplayed", () => {
     const path = rootPath("root");
     const protos = buildDataRows(nodes, opts);
     const rows = withRowIds(protos, path);
-    expect(rows[0].id).toBe("root#a");
+    expect(rows[0].id).toBe(makeRowId(path, "a"));
     const displayed = buildDisplayed(rows);
-    expect(displayed.rowIndexById.get("root#b" as never)).toBe(1);
-    expect(displayed.rowById.get("root#c" as never)?.kind).toBe("data");
+    expect(displayed.rowIndexById.get(makeRowId(path, "b"))).toBe(1);
+    expect(displayed.rowById.get(makeRowId(path, "c"))?.kind).toBe("data");
   });
 });
 
@@ -389,7 +412,11 @@ describe("deriveDisplayedRowsState identity preservation", () => {
     const a = deriveDisplayedRowsState(base);
     const newNodes = [
       ...nodes,
-      { levelName: "root", columns: { id: "d", name: "Date", qty: 4 } },
+      {
+        rowKey: "d",
+        levelName: "root",
+        columns: { id: "d", name: "Date", qty: 4 },
+      },
     ];
     const b = deriveDisplayedRowsState(
       { ...base, sourceSnapshot: makeSnapshot({ nodes: newNodes }) },
@@ -420,7 +447,6 @@ describe("deriveDisplayedRowsState identity preservation", () => {
       first.displayedRows.rows.slice(0, 3),
     );
   });
-
 });
 
 describe("deriveDisplayedRowsState row sequence", () => {
@@ -428,7 +454,11 @@ describe("deriveDisplayedRowsState row sequence", () => {
     const base = makeInput();
     const first = deriveDisplayedRowsState(base);
     const nextNodes = [
-      { levelName: "root", columns: { id: "a", name: "Apricot", qty: 3 } },
+      {
+        rowKey: "a",
+        levelName: "root",
+        columns: { id: "a", name: "Apricot", qty: 3 },
+      },
       nodes[1],
       nodes[2],
     ];
@@ -439,8 +469,10 @@ describe("deriveDisplayedRowsState row sequence", () => {
     );
 
     expect(second.displayedRowSequence).toBe(first.displayedRowSequence);
-    expect(second.displayedRows.rowById.get("root#a" as never)).not.toBe(
-      first.displayedRows.rowById.get("root#a" as never),
+    expect(
+      second.displayedRows.rowById.get(makeRowId(rootPath("root"), "a")),
+    ).not.toBe(
+      first.displayedRows.rowById.get(makeRowId(rootPath("root"), "a")),
     );
   });
 
@@ -459,9 +491,9 @@ describe("deriveDisplayedRowsState row sequence", () => {
     );
     expect(sorted.displayedRowSequence).not.toBe(first.displayedRowSequence);
     expect(sorted.displayedRowSequence.rows.map((r) => r.id)).toEqual([
-      "root#b",
-      "root#c",
-      "root#a",
+      makeRowId(rootPath("root"), "b"),
+      makeRowId(rootPath("root"), "c"),
+      makeRowId(rootPath("root"), "a"),
     ]);
 
     const filtered = deriveDisplayedRowsState(
@@ -475,8 +507,8 @@ describe("deriveDisplayedRowsState row sequence", () => {
     );
     expect(filtered.displayedRowSequence).not.toBe(first.displayedRowSequence);
     expect(filtered.displayedRowSequence.rows.map((r) => r.id)).toEqual([
-      "root#a",
-      "root#c",
+      makeRowId(rootPath("root"), "a"),
+      makeRowId(rootPath("root"), "c"),
     ]);
   });
 

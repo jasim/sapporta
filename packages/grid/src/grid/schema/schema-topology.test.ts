@@ -33,12 +33,7 @@ function column(
   };
 }
 
-// rowKey on expandable levels is required by the GridPath encoding (see
-// PROPOSAL-rowkey-paths.md). Use the row's own primary-keyish column for
-// these test fixtures.
-const byPk: LevelOptions = {
-  rowKey: (n) => String(n.columns.id ?? n.columns.name ?? ""),
-};
+const byPk: LevelOptions = {};
 
 const reportSchema: GridSchema = {
   rootLevel: "orders",
@@ -139,17 +134,15 @@ describe("buildSchemaTopology", () => {
     expect(() => buildSchemaTopology(bad)).toThrow(/cycle detected/);
   });
 
-  it("throws when an expandable level lacks an explicit options.rowKey", () => {
-    const bad: GridSchema = {
+  it("allows an expandable level to omit options.rowKey", () => {
+    const ok: GridSchema = {
       rootLevel: "orders",
       levels: {
-        orders: level("orders", ["lines"]), // no rowKey, but expandable
+        orders: level("orders", ["lines"]),
         lines: level("lines"),
       },
     };
-    expect(() => buildSchemaTopology(bad)).toThrow(
-      /expandable level "orders" must declare options\.rowKey/,
-    );
+    expect(() => buildSchemaTopology(ok)).not.toThrow();
   });
 
   it("throws when a level has duplicate column ids", () => {

@@ -6,35 +6,35 @@ import type { FooterRow, PhantomRow, TreeNode } from "../types/level-row";
 // `withRowIds` is the seam that resolves `rowKey + path → RowId`.
 export type ProtoRow =
   | {
-      kind: "data";
-      rowKey: RowKey;
-      columns: Record<ColId, unknown>;
-      hasChildren: boolean;
-      source: TreeNode;
+      readonly kind: "data";
+      readonly rowKey: RowKey;
+      readonly columns: Readonly<Record<ColId, unknown>>;
+      readonly hasChildren: boolean;
+      readonly source: TreeNode;
     }
   | {
-      kind: "rollup";
-      rowKey: RowKey;
-      columns: Record<ColId, unknown>;
-      source: TreeNode;
+      readonly kind: "rollup";
+      readonly rowKey: RowKey;
+      readonly columns: Readonly<Record<ColId, unknown>>;
+      readonly source: TreeNode;
     }
   | {
-      kind: "opening" | "closing" | "subtotal";
-      rowKey: RowKey;
-      columns: Record<ColId, unknown>;
-      source: TreeNode;
+      readonly kind: "opening" | "closing" | "subtotal";
+      readonly rowKey: RowKey;
+      readonly columns: Readonly<Record<ColId, unknown>>;
+      readonly source: TreeNode;
     }
   | {
-      kind: "footer";
-      rowKey: RowKey;
-      columns: Record<ColId, unknown>;
-      source: FooterRow;
+      readonly kind: "footer";
+      readonly rowKey: RowKey;
+      readonly columns: Readonly<Record<ColId, unknown>>;
+      readonly source: FooterRow;
     }
   | {
-      kind: "phantom";
-      rowKey: RowKey;
-      columns: Record<ColId, unknown>;
-      source: PhantomRow;
+      readonly kind: "phantom";
+      readonly rowKey: RowKey;
+      readonly columns: Readonly<Record<ColId, unknown>>;
+      readonly source: PhantomRow;
     };
 
 // Sort is the only per-column concern the grid takes a position on: a
@@ -42,7 +42,10 @@ export type ProtoRow =
 // with collation, locale-aware comparators, null ordering rules) is the
 // host's domain — `withSort` calls `makeRowComparator` over the column
 // schema and the host can override per-column comparators there.
-export type SortDescriptor = { colId: ColId; direction: "asc" | "desc" };
+export type SortDescriptor = {
+  readonly colId: ColId;
+  readonly direction: "asc" | "desc";
+};
 
 // Filter is the OPPOSITE position: the grid takes no opinion at all. There
 // is no grid-level filter grammar — no operator names (`eq`/`like`/`gt`),
@@ -56,7 +59,9 @@ export type SortDescriptor = { colId: ColId; direction: "asc" | "desc" };
 // This is the trust boundary. The grid does not validate, introspect, or
 // recover from a malformed `RowPredicate` — if it throws, that's a host
 // bug, not a grid concern.
-export type RowPredicate = (columns: Record<ColId, unknown>) => boolean;
+export type RowPredicate = (
+  columns: Readonly<Record<ColId, unknown>>,
+) => boolean;
 
 // What a single stage looks like. Stages are pure, identity-preserving
 // when they would emit the same output.

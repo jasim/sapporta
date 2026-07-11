@@ -36,15 +36,19 @@
 // publishes already-windowed nodes. Displayed-row derivation cannot tell the
 // difference and must not try.
 //
-// The input `initialNodes` array is copied on construction so external
-// mutation of the input doesn't bleed into the source's snapshots.
+// Input rows are structurally snapshotted on ingress so external mutation of
+// nodes, columns, children, or footers cannot alter published source state.
 
 import type { ColId, RowKey } from "../../types/identity";
 import type { ColumnSchema } from "../../types/schema";
-import type { FooterRow, LevelOptions, TreeNode } from "../../types/level-row";
+import type { FooterRow, TreeNode } from "../../types/level-row";
 import type { RowPredicate, SortDescriptor } from "../../pipeline/types";
-import { defaultRowKey } from "../../pipeline/stages/build-data";
 import { assertBoundedInteger } from "@sapporta/shared/validation";
+import {
+  assertTreeNodeCanBeInserted,
+  assertUniqueTreeNodeRowKeys,
+} from "../../row-identity";
+import { createObserverList } from "../../observer-notification";
 import type {
   LevelDataSource,
   LevelQueryCapabilities,
@@ -59,6 +63,12 @@ import {
   sliceSourceNodes,
   sortSourceNodes,
 } from "../query-shaping";
+import {
+  createStructuralSnapshotCache,
+  snapshotFooterRows,
+  snapshotTreeNode,
+  snapshotTreeNodes,
+} from "../immutable-snapshot";
 
 type ClientMode = "client" | "none";
 
@@ -71,20 +81,20 @@ export type InMemoryAggregator = (
 };
 
 export type InMemoryLevelSourceOpts<F = unknown> = {
-  initialNodes: TreeNode[];
-  options: LevelOptions;
-  columns: ColumnSchema[];
+  initialNodes: readonly TreeNode[];
+  columns: readonly ColumnSchema[];
   sortMode: ClientMode;
   filterMode: ClientMode;
   paginationMode: ClientMode;
   // Honored only when the corresponding mode is `'client'`. With mode
   // `'none'` the verb is ignored and the snapshot omits the field.
-  initialSort?: SortDescriptor[];
+  initialSort?: readonly SortDescriptor[];
   initialFilter?: F;
   initialPage?: number;
   initialPageSize?: number;
-  footerRows?: FooterRow[];
+  footerRows?: readonly FooterRow[];
   aggregator?: InMemoryAggregator;
+  onObserverError?: (error: unknown) => void;
   // The host's grammar-to-predicate compiler — the trust boundary for
   // filtering. The host owns `F`, the host owns the compiler, the grid
   // calls the resulting `RowPredicate` without inspection. Required when
@@ -102,7 +112,8 @@ type Core<F> = {
   // Bulk replacement — primarily for hosts that hand the in-memory source
   // server-fetched rows. It is implementation-specific, so it stays off the
   // cross-source `LevelDataSource` contract.
-  replaceNodes: (nodes: TreeNode[]) => void;
+  replaceNodes: (nodes: readonly TreeNode[]) => void;
+  currentNodes: () => readonly TreeNode[];
 };
 
 // Returned shape for hosts that construct an in-memory source directly and want
@@ -111,8 +122,27 @@ type Core<F> = {
 // on the extra method.
 export type InMemoryLevelSource = LevelDataSource & {
   write: WriteCapability;
-  replaceNodes: (nodes: TreeNode[]) => void;
+  replaceNodes: (nodes: readonly TreeNode[]) => void;
 };
+
+const currentNodesBySource = new WeakMap<
+  LevelDataSource,
+  () => readonly TreeNode[]
+>();
+
+// Internal integration seam for the hierarchical in-memory grid source. It
+// keeps the cross-source LevelDataSource contract free of implementation-only
+// tree access while letting child resolution read the authoritative base rows
+// of the exact live parent level.
+export function currentInMemorySourceNodes(
+  source: LevelDataSource,
+): readonly TreeNode[] {
+  const currentNodes = currentNodesBySource.get(source);
+  if (!currentNodes) {
+    throw new Error("currentInMemorySourceNodes: source is not in-memory");
+  }
+  return currentNodes();
+}
 
 function buildCore<F>(opts: InMemoryLevelSourceOpts<F>): Core<F> {
   if (opts.filterMode === "client" && !opts.compileFilter) {
@@ -121,17 +151,27 @@ function buildCore<F>(opts: InMemoryLevelSourceOpts<F>): Core<F> {
     );
   }
 
-  const rowKeyFn = opts.options.rowKey ?? defaultRowKey;
+  assertUniqueTreeNodeRowKeys(
+    opts.initialNodes,
+    "inMemoryLevelSource initialNodes",
+  );
   const initialPage = opts.initialPage ?? 0;
   const initialPageSize = opts.initialPageSize ?? Number.POSITIVE_INFINITY;
   if (opts.paginationMode === "client") {
     assertPageWindow(initialPage, initialPageSize);
   }
 
-  // Copy on construction so external mutation of `initialNodes` doesn't
-  // bleed into our snapshots after-the-fact.
-  let baseNodes: TreeNode[] = opts.initialNodes.slice();
-  let sort: SortDescriptor[] | undefined =
+  // Snapshot on ingress so caller-owned nodes and column records cannot mutate
+  // a published source state without a source command and notification.
+  let structuralSnapshots = createStructuralSnapshotCache();
+  let baseNodes: readonly TreeNode[] = snapshotTreeNodes(
+    opts.initialNodes,
+    structuralSnapshots,
+  );
+  const configuredFooterRows = opts.footerRows
+    ? snapshotFooterRows(opts.footerRows, structuralSnapshots)
+    : undefined;
+  let sort: readonly SortDescriptor[] | undefined =
     opts.sortMode === "client" ? opts.initialSort : undefined;
   let filter: F | undefined =
     opts.filterMode === "client" ? opts.initialFilter : undefined;
@@ -141,8 +181,10 @@ function buildCore<F>(opts: InMemoryLevelSourceOpts<F>): Core<F> {
       ? initialPageSize
       : Number.POSITIVE_INFINITY;
 
-  const subs = new Set<() => void>();
-  const reconcileSubs = new Set<(e: ReconcileEvent) => void>();
+  const subscribers = createObserverList<[]>(opts.onObserverError);
+  const reconcileSubscribers = createObserverList<[ReconcileEvent]>(
+    opts.onObserverError,
+  );
   let disposed = false;
 
   // Cached published state. Invalidated on any mutation so the next
@@ -186,19 +228,18 @@ function buildCore<F>(opts: InMemoryLevelSourceOpts<F>): Core<F> {
     const baseIdxOf = new Map<TreeNode, number>();
     for (let i = 0; i < baseNodes.length; i++) baseIdxOf.set(baseNodes[i], i);
     for (let i = 0; i < pipelineNodes.length; i++) {
-      const key = rowKeyFn(pipelineNodes[i], i);
+      const key = pipelineNodes[i].rowKey;
       const baseIdx = baseIdxOf.get(pipelineNodes[i]);
       if (baseIdx !== undefined) rowKeyToBaseIdx.set(key, baseIdx);
     }
 
     let publishedNodes: readonly TreeNode[] = pipelineNodes;
-    let footerRows: FooterRow[] | undefined = opts.footerRows?.slice();
+    let footerRows: readonly FooterRow[] | undefined = configuredFooterRows;
     if (opts.aggregator) {
       const result = opts.aggregator(pipelineNodes, opts.columns);
       if (result.perRowRollup.size > 0) {
-        publishedNodes = pipelineNodes.map((n, idx) => {
-          const key = rowKeyFn(n, idx);
-          const rollup = result.perRowRollup.get(key);
+        publishedNodes = pipelineNodes.map((n) => {
+          const rollup = result.perRowRollup.get(n.rowKey);
           if (!rollup) return n;
           return { ...n, rollup: { ...(n.rollup ?? {}), ...rollup } };
         });
@@ -211,18 +252,26 @@ function buildCore<F>(opts: InMemoryLevelSourceOpts<F>): Core<F> {
     // Reuse prior `nodes` / `footerRows` references when the content is
     // structurally identical, letting displayed-row derivation reuse rows
     // across writes that didn't actually change the published view.
-    const finalNodes = nodesEqual(lastNodes, publishedNodes)
+    const immutableNodes = snapshotTreeNodes(
+      publishedNodes,
+      structuralSnapshots,
+    );
+    const immutableFooterRows = footerRows
+      ? snapshotFooterRows(footerRows, structuralSnapshots)
+      : undefined;
+    const finalNodes = nodesEqual(lastNodes, immutableNodes)
       ? lastNodes!
-      : publishedNodes;
-    const finalFooters = footerRowsEqual(lastFooterRows, footerRows)
+      : immutableNodes;
+    const finalFooters = footerRowsEqual(lastFooterRows, immutableFooterRows)
       ? lastFooterRows
-      : footerRows;
+      : immutableFooterRows;
 
-    const snapshot: LevelSnapshot = { nodes: finalNodes };
-    if (finalFooters) snapshot.footerRows = finalFooters;
+    const snapshot: LevelSnapshot = finalFooters
+      ? Object.freeze({ nodes: finalNodes, footerRows: finalFooters })
+      : Object.freeze({ nodes: finalNodes });
 
     cachedSnapshot = snapshot;
-    cachedState = { status: "ready", snapshot };
+    cachedState = Object.freeze({ status: "ready", snapshot });
     cachedRowKeyToBaseIdx = rowKeyToBaseIdx;
     lastNodes = finalNodes;
     lastFooterRows = finalFooters;
@@ -240,7 +289,7 @@ function buildCore<F>(opts: InMemoryLevelSourceOpts<F>): Core<F> {
 
   function notify(): void {
     if (disposed) return;
-    for (const fn of subs) fn();
+    subscribers.notify();
   }
 
   function lookupBaseIdx(rowKey: RowKey): number {
@@ -273,17 +322,22 @@ function buildCore<F>(opts: InMemoryLevelSourceOpts<F>): Core<F> {
   function applyOne(rowKey: RowKey, colId: ColId, value: unknown): void {
     const baseIdx = lookupBaseIdx(rowKey);
     const node = baseNodes[baseIdx];
-    baseNodes[baseIdx] = {
-      ...node,
-      columns: { ...node.columns, [colId]: value },
-    };
+    const next = baseNodes.slice();
+    next[baseIdx] = snapshotTreeNode(
+      {
+        ...node,
+        columns: { ...node.columns, [colId]: value },
+      },
+      structuralSnapshots,
+    );
+    baseNodes = Object.freeze(next);
   }
 
   function setSortQuery(
     nextSort: readonly SortDescriptor[] | undefined,
   ): Promise<SourceLoadResult> {
     if (sort === nextSort) return unchangedResult();
-    sort = nextSort ? [...nextSort] : undefined;
+    sort = nextSort ? Object.freeze([...nextSort]) : undefined;
     invalidate();
     notify();
     return readyResult();
@@ -299,7 +353,9 @@ function buildCore<F>(opts: InMemoryLevelSourceOpts<F>): Core<F> {
     return readyResult();
   }
 
-  const query: LevelQueryCapabilities = {};
+  const query: {
+    -readonly [Key in keyof LevelQueryCapabilities]: LevelQueryCapabilities[Key];
+  } = {};
   if (opts.sortMode === "client") {
     query.sort = {
       current: () => sort,
@@ -319,18 +375,16 @@ function buildCore<F>(opts: InMemoryLevelSourceOpts<F>): Core<F> {
       return cachedState!;
     },
     subscribe(fn) {
-      subs.add(fn);
-      return () => {
-        subs.delete(fn);
-      };
+      return subscribers.subscribe(fn);
     },
     dispose() {
+      if (disposed) return;
       disposed = true;
-      subs.clear();
-      reconcileSubs.clear();
+      subscribers.clear();
+      reconcileSubscribers.clear();
     },
+    ...(query.sort || query.filter || query.refetch ? { query } : {}),
   };
-  if (query.sort || query.filter || query.refetch) read.query = query;
 
   const setCell: WriteCapability["setCell"] = (rowKey, colId, value) => {
     applyOne(rowKey, colId, value);
@@ -348,24 +402,34 @@ function buildCore<F>(opts: InMemoryLevelSourceOpts<F>): Core<F> {
   };
 
   const createNode: WriteCapability["createNode"] = async (node, atIndex) => {
+    const createdNode = snapshotTreeNode(node, structuralSnapshots);
+    assertTreeNodeCanBeInserted(
+      baseNodes,
+      createdNode,
+      "inMemoryLevelSource.createNode",
+    );
     const idx = atIndex === undefined ? baseNodes.length : atIndex;
-    baseNodes = baseNodes.slice();
-    baseNodes.splice(idx, 0, node);
+    const next = baseNodes.slice();
+    next.splice(idx, 0, createdNode);
+    baseNodes = Object.freeze(next);
     invalidate();
     notify();
-    return { node, atIndex: idx };
+    return Object.freeze({ node: createdNode, atIndex: idx });
   };
 
   const removeNode: WriteCapability["removeNode"] = (rowKey) => {
     const baseIdx = lookupBaseIdx(rowKey);
-    baseNodes = baseNodes.slice();
-    baseNodes.splice(baseIdx, 1);
+    const next = baseNodes.slice();
+    next.splice(baseIdx, 1);
+    baseNodes = Object.freeze(next);
     invalidate();
     notify();
   };
 
   const replaceNodes: Core<F>["replaceNodes"] = (nodes) => {
-    baseNodes = nodes.slice();
+    assertUniqueTreeNodeRowKeys(nodes, "inMemoryLevelSource.replaceNodes");
+    structuralSnapshots = createStructuralSnapshotCache();
+    baseNodes = snapshotTreeNodes(nodes, structuralSnapshots);
     invalidate();
     notify();
   };
@@ -375,10 +439,7 @@ function buildCore<F>(opts: InMemoryLevelSourceOpts<F>): Core<F> {
     // (optimistic === authoritative). We accept the subscription so callers
     // can wire it uniformly across source kinds, but no event will ever
     // fire on it.
-    reconcileSubs.add(fn);
-    return () => {
-      reconcileSubs.delete(fn);
-    };
+    return reconcileSubscribers.subscribe(fn);
   };
 
   function canAppendRow(): boolean {
@@ -401,6 +462,7 @@ function buildCore<F>(opts: InMemoryLevelSourceOpts<F>): Core<F> {
       canAppendRow,
     },
     replaceNodes,
+    currentNodes: () => baseNodes,
   };
 }
 
@@ -410,7 +472,7 @@ export function inMemoryLevelSource<F = unknown>(
   const core = buildCore<F>(opts);
   // Reproduce the read surface so the writable source has its own, fresh
   // identity object rather than sharing one with the readonly variant.
-  return {
+  const source: InMemoryLevelSource = {
     state: core.read.state,
     subscribe: core.read.subscribe,
     ...(core.read.query ? { query: core.read.query } : {}),
@@ -418,18 +480,22 @@ export function inMemoryLevelSource<F = unknown>(
     write: core.write,
     replaceNodes: core.replaceNodes,
   };
+  currentNodesBySource.set(source, core.currentNodes);
+  return source;
 }
 
 export function inMemoryReadonlyLevelSource<F = unknown>(
   opts: InMemoryLevelSourceOpts<F>,
 ): LevelDataSource {
   const core = buildCore<F>(opts);
-  return {
+  const source: LevelDataSource = {
     state: core.read.state,
     subscribe: core.read.subscribe,
     ...(core.read.query ? { query: core.read.query } : {}),
     dispose: core.read.dispose,
   };
+  currentNodesBySource.set(source, core.currentNodes);
+  return source;
 }
 
 function assertPageWindow(page: number, pageSize: number): void {

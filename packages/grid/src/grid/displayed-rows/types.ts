@@ -24,11 +24,11 @@ export type DisplayedRowsViewState = Record<string, never>;
 // asks the store to re-read the whole recipe and derive a new `DisplayedRows`
 // snapshot from first principles.
 export type DisplayedRowsInput = {
-  path: GridPath;
-  schema: LevelSchema;
-  sourceSnapshot: LevelSnapshot;
-  phantomRows: PhantomRow[];
-  viewState: DisplayedRowsViewState;
+  readonly path: GridPath;
+  readonly schema: LevelSchema;
+  readonly sourceSnapshot: LevelSnapshot;
+  readonly phantomRows: readonly PhantomRow[];
+  readonly viewState: DisplayedRowsViewState;
 };
 
 // One path's cached data-plane snapshots. The full row model and the
@@ -36,8 +36,8 @@ export type DisplayedRowsInput = {
 // identities answer different questions: "did content change?" vs. "did the
 // body need to remap row shells?"
 export type DisplayedRowsState = {
-  displayedRows: DisplayedRows;
-  displayedRowSequence: DisplayedRowSequence;
+  readonly displayedRows: DisplayedRows;
+  readonly displayedRowSequence: DisplayedRowSequence;
 };
 
 // A reason is intentionally diagnostic, not semantic input. The store always

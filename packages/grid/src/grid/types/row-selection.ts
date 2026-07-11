@@ -18,8 +18,8 @@ import type { GridInteractionConfig, RowSelectionMode } from "./interaction";
 // table-wide row selection value in this type; callers that want a page-level
 // command target must aggregate across registered paths explicitly.
 export type RowCursor = {
-  path: GridPath;
-  rowId: RowId;
+  readonly path: GridPath;
+  readonly rowId: RowId;
 };
 
 export function rowCursorEqual(
@@ -33,14 +33,14 @@ export function rowCursorEqual(
 
 export type RowSelection =
   | null
-  | { kind: "single"; rowId: RowId }
+  | { readonly kind: "single"; readonly rowId: RowId }
   // Range is stored as anchor/head and interpreted against current displayed
   // row order. Sorting or filtering can therefore change which rows lie
   // between the endpoints, and normalization prunes invalid endpoints.
-  | { kind: "range"; anchor: RowId; head: RowId }
+  | { readonly kind: "range"; readonly anchor: RowId; readonly head: RowId }
   // The Set is an implementation detail for arbitrary membership. Public
   // projection always returns ids in displayed order, never insertion order.
-  | { kind: "set"; rowIds: ReadonlySet<RowId> };
+  | { readonly kind: "set"; readonly rowIds: ReadonlySet<RowId> };
 
 export type RowInteractionStatus =
   | "idle"
@@ -49,12 +49,12 @@ export type RowInteractionStatus =
   | "cursor-selected";
 
 export type RowInteractionSnapshot = {
-  activeRowId: RowId | null;
+  readonly activeRowId: RowId | null;
   // Selected row ids for this path only. This does not include rows covered by
   // a cell selection unless a command deliberately projects cells to row
   // operation targets outside this snapshot.
-  selectedRowIds: readonly RowId[];
-  statusByRowId: ReadonlyMap<RowId, RowInteractionStatus>;
+  readonly selectedRowIds: readonly RowId[];
+  readonly statusByRowId: ReadonlyMap<RowId, RowInteractionStatus>;
 };
 
 export function makeRowCursor(path: GridPath, rowId: RowId): RowCursor {
@@ -88,7 +88,7 @@ export function activeRowFor(
   if (config.mode === "cell-grid") {
     if (config.activeRow.kind === "none") return null;
     // Cell-grid active row is derived, not stored. A cell cursor may point at a
-    // row in another path; runtime.activeRowFor(path) filters that after this
+    // row in another path; the path-bound level read filters that after this
     // pure helper returns the canonical active-row value.
     return cellCursor
       ? { path: cellCursor.path, rowId: cellCursor.rowId }

@@ -13,12 +13,13 @@ import {
 } from "./internal/dom-targets";
 import styles from "./grid.module.css";
 import { cn } from "@sapporta/ui";
+import { runtimeInternalsFor } from "../runtime/create-grid-runtime";
 
 export type GridChromeContext = {
   path: GridPath;
   levelName: string;
   presentation: GridPresentation;
-  schema: ColumnSchema[];
+  schema: readonly ColumnSchema[];
   rowHeaderColumn: RowHeaderColumn;
 };
 
@@ -65,7 +66,7 @@ export function Grid({
   children,
 }: {
   path: GridPath;
-  schema: ColumnSchema[];
+  schema: readonly ColumnSchema[];
   rowHeaderColumn: RowHeaderColumn;
   controller: GridControllerPublic;
   presentation?: GridPresentation;
@@ -76,7 +77,8 @@ export function Grid({
 }) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const runtime = useGridRuntime();
-  const isActive = useStore(runtime.coordinator, (s) =>
+  const internals = runtimeInternalsFor(runtime);
+  const isActive = useStore(internals.coordinator, (s) =>
     runtime.interaction.mode === "cell-grid"
       ? s.cellCursor?.path === path
       : s.rowCursor?.path === path,

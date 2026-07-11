@@ -41,6 +41,7 @@ function RowSelectionCell({
   path,
 }: Parameters<ColumnSchema["renderCell"]>[0]) {
   const runtime = useGridRuntime();
+  const level = runtime.level(path);
   const rowInteractionStatus = useCurrentRowInteractionStatus();
   const checked =
     rowInteractionStatus === "selected" ||
@@ -55,9 +56,9 @@ function RowSelectionCell({
     // not move the cell cursor, row cursor, or live focus; keyboard routing
     // remains whatever `runtime.interaction.mode` said at construction time.
     if (event instanceof MouseEvent && event.shiftKey) {
-      runtime.rowInteraction.extendRowSelectionTo(path, row.id);
+      level.extendRowSelectionTo(row.id);
     } else {
-      runtime.rowInteraction.toggleRowSelection(path, row.id);
+      level.toggleRowSelection(row.id);
     }
   }
 

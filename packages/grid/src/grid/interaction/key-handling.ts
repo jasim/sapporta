@@ -106,7 +106,7 @@ export function keyEventToCellIntent(
   config: CellGridInteractionConfig,
   state: ControllerState,
   displayed: DisplayedRows,
-  schema: ColumnSchema[],
+  schema: readonly ColumnSchema[],
   capabilities: CapabilitiesFn,
   presentation: CellKeyboardPresentation = "tabular",
 ): CellNavigationIntent | null {

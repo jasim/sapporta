@@ -5,13 +5,13 @@ import type { RowCursor } from "../types/row-selection";
 // contains no pending/loading state: callers compute it from a pre-mutation
 // visible-row snapshot, then apply it before the mutation begins.
 export type CursorContinuation =
-  | { kind: "cell"; target: CellCursor }
-  | { kind: "row"; target: RowCursor }
-  | { kind: "grid"; path: GridPath };
+  | { readonly kind: "cell"; readonly target: CellCursor }
+  | { readonly kind: "row"; readonly target: RowCursor }
+  | { readonly kind: "grid"; readonly path: GridPath };
 
 export type RowRemovalRef = {
-  path: GridPath;
-  rowId: RowId;
+  readonly path: GridPath;
+  readonly rowId: RowId;
 };
 
 // Pure planner input. The runtime adapter owns the live-tree walk and marks
@@ -19,28 +19,28 @@ export type RowRemovalRef = {
 // structural work outside the planner makes every landing policy testable with
 // ordinary data.
 export type CursorContinuationRow = {
-  path: GridPath;
-  rowId: RowId;
-  survivesRemoval: boolean;
-  cellFocusable: boolean;
-  rowSelectable: boolean;
-  colIds: readonly ColId[];
+  readonly path: GridPath;
+  readonly rowId: RowId;
+  readonly survivesRemoval: boolean;
+  readonly cellFocusable: boolean;
+  readonly rowSelectable: boolean;
+  readonly colIds: readonly ColId[];
 };
 
 export type CursorContinuationInput =
   | {
-      mode: "cell-grid";
-      rows: readonly CursorContinuationRow[];
-      cellCursor: CellCursor | null;
-      rowSelectionLead: RowCursor | null;
-      fallbackPath: GridPath;
+      readonly mode: "cell-grid";
+      readonly rows: readonly CursorContinuationRow[];
+      readonly cellCursor: CellCursor | null;
+      readonly rowSelectionLead: RowCursor | null;
+      readonly fallbackPath: GridPath;
     }
   | {
-      mode: "row-list";
-      rows: readonly CursorContinuationRow[];
-      rowCursor: RowCursor | null;
-      rowSelectionLead: RowCursor | null;
-      fallbackPath: GridPath;
+      readonly mode: "row-list";
+      readonly rows: readonly CursorContinuationRow[];
+      readonly rowCursor: RowCursor | null;
+      readonly rowSelectionLead: RowCursor | null;
+      readonly fallbackPath: GridPath;
     };
 
 export function planCursorContinuation(

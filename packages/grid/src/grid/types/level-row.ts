@@ -24,48 +24,44 @@ import type { ColId, RowId, RowKey } from "./identity";
 export type FooterRow = {
   // Stable key inside its scope — a level snapshot's footerRows array, or a
   // parent node's childFooterRows for that child level.
-  rowKey: RowKey;
-  columns: Record<ColId, unknown>;
+  readonly rowKey: RowKey;
+  readonly columns: Readonly<Record<ColId, unknown>>;
 };
 
 export type PhantomRow = {
-  rowKey: RowKey;
-  columns: Record<ColId, unknown>;
-  state: PhantomRowState;
+  readonly rowKey: RowKey;
+  readonly columns: Readonly<Record<ColId, unknown>>;
+  readonly state: PhantomRowState;
 };
 
 export type PhantomRowState =
-  | { kind: "editing" }
-  | { kind: "saving" }
-  | { kind: "failed"; reason: string };
+  | { readonly kind: "editing" }
+  | { readonly kind: "saving" }
+  | { readonly kind: "failed"; readonly reason: string };
 
 export type PhantomRowsConfig =
   | false
   | {
-      isBlank?: (columns: Record<ColId, unknown>) => boolean;
-      makeRowKey?: (context: {
-        path: import("./identity").GridPath;
-        existing: readonly PhantomRow[];
+      readonly isBlank?: (columns: Readonly<Record<ColId, unknown>>) => boolean;
+      readonly makeRowKey?: (context: {
+        readonly path: import("./identity").GridPath;
+        readonly existing: readonly PhantomRow[];
       }) => RowKey;
     };
 
 export type LevelOptions = {
-  // Map a TreeNode + its local index (within siblings of the same level) to a stable RowKey.
-  // Default: `${localIdx}` — fine for tables with stable arrays, replaceable when the
-  // consumer has a real PK and wants identity to survive reorders.
-  rowKey?: (node: TreeNode, localIdx: number) => RowKey;
-  defaultCollapsed?: boolean;
-  allowPhantoms?: boolean;
+  readonly defaultCollapsed?: boolean;
+  readonly allowPhantoms?: boolean;
 };
 
 export type TreeNode = {
-  rowKey?: RowKey;
-  levelName: string;
-  columns: Record<ColId, unknown>;
-  rollup?: Record<ColId, unknown>;
-  children?: Record<string, TreeNode | TreeNode[]>;
-  childFooterRows?: Record<string, FooterRow[]>;
-  kind?: "opening" | "closing" | "subtotal";
+  readonly rowKey: RowKey;
+  readonly levelName: string;
+  readonly columns: Readonly<Record<ColId, unknown>>;
+  readonly rollup?: Readonly<Record<ColId, unknown>>;
+  readonly children?: Readonly<Record<string, TreeNode | readonly TreeNode[]>>;
+  readonly childFooterRows?: Readonly<Record<string, readonly FooterRow[]>>;
+  readonly kind?: "opening" | "closing" | "subtotal";
 };
 
 export type LevelRowKind =
@@ -81,40 +77,40 @@ export type LevelRowKind =
 // the interaction layer branches only via capabilitiesFor(kind).
 export type LevelRow =
   | {
-      kind: "data";
-      id: RowId;
-      rowSelectable: boolean;
-      columns: Record<ColId, unknown>;
-      hasChildren: boolean;
-      source: TreeNode;
+      readonly kind: "data";
+      readonly id: RowId;
+      readonly rowSelectable: boolean;
+      readonly columns: Readonly<Record<ColId, unknown>>;
+      readonly hasChildren: boolean;
+      readonly source: TreeNode;
     }
   | {
-      kind: "rollup";
-      id: RowId;
-      rowSelectable: boolean;
-      columns: Record<ColId, unknown>;
-      source: TreeNode;
+      readonly kind: "rollup";
+      readonly id: RowId;
+      readonly rowSelectable: boolean;
+      readonly columns: Readonly<Record<ColId, unknown>>;
+      readonly source: TreeNode;
     }
   | {
-      kind: "opening" | "closing" | "subtotal";
-      id: RowId;
-      rowSelectable: boolean;
-      columns: Record<ColId, unknown>;
-      source: TreeNode;
+      readonly kind: "opening" | "closing" | "subtotal";
+      readonly id: RowId;
+      readonly rowSelectable: boolean;
+      readonly columns: Readonly<Record<ColId, unknown>>;
+      readonly source: TreeNode;
     }
   | {
-      kind: "footer";
-      id: RowId;
-      rowSelectable: boolean;
-      columns: Record<ColId, unknown>;
-      source: FooterRow;
+      readonly kind: "footer";
+      readonly id: RowId;
+      readonly rowSelectable: boolean;
+      readonly columns: Readonly<Record<ColId, unknown>>;
+      readonly source: FooterRow;
     }
   | {
-      kind: "phantom";
-      id: RowId;
-      rowSelectable: boolean;
-      columns: Record<ColId, unknown>;
-      source: PhantomRow;
+      readonly kind: "phantom";
+      readonly id: RowId;
+      readonly rowSelectable: boolean;
+      readonly columns: Readonly<Record<ColId, unknown>>;
+      readonly source: PhantomRow;
     };
 
 export type TreeBackedLevelRow = Extract<
@@ -151,16 +147,16 @@ export function footerSourceForRow(row: LevelRow): FooterRow | null {
 }
 
 export type DisplayedRowRef = {
-  id: RowId;
-  kind: LevelRowKind;
+  readonly id: RowId;
+  readonly kind: LevelRowKind;
 };
 
 export type DisplayedRowSequence = {
-  rows: readonly DisplayedRowRef[];
+  readonly rows: readonly DisplayedRowRef[];
 };
 
 export type DisplayedRows = {
-  rows: LevelRow[];
-  rowById: Map<RowId, LevelRow>;
-  rowIndexById: Map<RowId, number>;
+  readonly rows: readonly LevelRow[];
+  readonly rowById: ReadonlyMap<RowId, LevelRow>;
+  readonly rowIndexById: ReadonlyMap<RowId, number>;
 };

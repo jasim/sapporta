@@ -82,6 +82,7 @@ import {
   cursorEqual,
   decomposePath,
   makeRowId,
+  pathOfRowId,
   phantomKeyFromDisplayedRowId,
   rootPath,
   rowKeyOfRowId,
@@ -132,7 +133,16 @@ import type {
   LevelSchema,
 } from "../types/schema";
 import { describeCellActivation } from "../types/schema";
-import { defaultRowKey } from "../pipeline/stages/build-data";
+import {
+  assertTreeNodeCanBeInserted,
+  assertUniqueTreeNodeRowKeys,
+  rowKeyOfTreeNode,
+} from "../row-identity";
+import {
+  createObserverList,
+  reportObserverError,
+  type ObserverList,
+} from "../observer-notification";
 import type {
   CellChange,
   CreateNodeResult,
@@ -143,6 +153,7 @@ import type {
   LevelSourceState,
   LevelStatus,
   RuntimeLevelDataSource,
+  ReconcileEvent,
   SourceLoadResult,
   WriteCapability,
 } from "../data-sources/types";
@@ -167,7 +178,7 @@ import {
 } from "../interaction/coordinator";
 import {
   createCursorManager,
-  type CursorManager,
+  type CursorManagerInternal,
 } from "../interaction/cursor-manager";
 import {
   planCursorContinuation,
@@ -176,10 +187,30 @@ import {
   type RowRemovalRef,
 } from "../interaction/cursor-continuation";
 import { visibleRows } from "../interaction/visible-order";
-import { createPhantomChannel } from "../data-sources/phantom-channel";
+import {
+  createPhantomChannel,
+  disposePhantomPath,
+} from "../data-sources/phantom-channel";
 import { createEmitter, type GridEmitter, type GridEvents } from "./emitter";
 import type { PhantomChannel } from "../data-sources/types";
+import {
+  createStructuralSnapshotCache,
+  snapshotLevelSnapshot,
+} from "../data-sources/immutable-snapshot";
 import { createPhantomRowLifecycle } from "./phantom-row-lifecycle";
+import {
+  createGridLevelRuntime,
+  disposeGridLevelRuntime,
+  type GridLevelRuntime,
+} from "./grid-level-runtime";
+import {
+  createRowOperations,
+  type GridRowOperations,
+  type RowOperationTarget,
+  type RowOperationsController,
+  type RowRemovalCursorToken,
+  type RowRemovalResult,
+} from "./row-operations";
 import { rowsInSelection } from "../types/selection";
 import {
   firstFocusableRow,
@@ -187,39 +218,52 @@ import {
 } from "../types/level-row-traversal";
 
 export type RuntimeArgs = {
-  schema: GridSchema;
-  dataSource: GridDataSource;
-  interaction?: GridInteractionConfig;
-  initialPhantomsByPath?: Map<GridPath, PhantomRow[]>;
-  phantomRows?: PhantomRowsConfig;
+  readonly schema: GridSchema;
+  readonly dataSource: GridDataSource;
+  readonly interaction?: GridInteractionConfig;
+  readonly phantoms?: PhantomChannel;
+  readonly phantomRows?: PhantomRowsConfig;
   // A host can own displayed-row edge policy for loaded windows. The runtime
   // emits a boundary event and waits for the host/source load promise. After a
   // ready result, it samples displayed rows and lands on the requested edge.
-  onLoadedRowsBoundary?: (
+  readonly onLoadedRowsBoundary?: (
     event: LoadedRowsBoundaryEvent,
   ) => Promise<SourceLoadResult> | false;
-  on?: { [E in keyof GridEvents]?: (payload: GridEvents[E]) => void };
-};
-
-type RowOperationTarget = {
-  path: GridPath;
-  rowId: RowId;
-  rowKey: RowKey;
-  row: LevelRow;
+  readonly on?: {
+    readonly [E in keyof GridEvents]?: (payload: GridEvents[E]) => void;
+  };
+  readonly onObserverError?: (error: unknown) => void;
 };
 
 export type GridRuntime = {
+  readonly schema: GridSchema;
+  readonly interaction: GridInteractionConfig;
+  readonly root: GridLevelRuntime;
+  level(path: GridPath): GridLevelRuntime;
+  registeredLevels(): readonly GridLevelRuntime[];
+  subscribeLevels(listener: () => void): () => void;
+  schemaAt(path: GridPath): LevelSchema;
+  readonly rowOperations: GridRowOperations;
+  on<E extends keyof GridEvents>(
+    event: E,
+    listener: (payload: GridEvents[E]) => void,
+  ): () => void;
+  dispose(): void;
+};
+
+/** Package-private runtime surface used by the renderer and advanced entry. */
+export type GridRuntimeInternals = {
   schema: GridSchema;
   schemaTopology: SchemaTopology;
   // Fires every time the child-source registry's key set changes — e.g.
   // when a row's first expansion installs a new child source. Status
   // flips do NOT trigger this; status is read lazily through
   // `snapshotFor` at the call site.
-  registeredPaths: () => GridPath[];
+  registeredPaths: () => readonly GridPath[];
   subscribeRegistry: (fn: () => void) => () => void;
 
   coordinator: GridCoordinatorPublic;
-  cursorManager: CursorManager;
+  cursorManager: CursorManagerInternal;
   phantoms: PhantomChannel;
   interaction: GridInteractionConfig;
 
@@ -281,7 +325,7 @@ export type GridRuntime = {
   writeCell: (path: GridPath, coord: Coord, value: unknown) => void;
   // Batched edit on one path. Emits one `mutationCommitted` event. The source
   // is responsible for atomicity — partial failures are not exposed to the host.
-  applyChanges: (path: GridPath, changes: CellChange[]) => void;
+  applyChanges: (path: GridPath, changes: readonly CellChange[]) => void;
   // Runtime-owned row insertion/removal. These are the host-facing row
   // mutation verbs; the concrete source verbs are private to the runtime.
   createRow: (
@@ -310,6 +354,9 @@ export type GridRuntime = {
   phantomBoundaryRowTarget: (path: GridPath) => RowCursor | null;
   requestLoadedRowsBoundary: (event: LoadedRowsBoundaryEvent) => boolean;
 
+  observe: <Args extends readonly unknown[]>(
+    listener: (...args: Args) => void,
+  ) => (...args: Args) => void;
   on: GridEmitter["on"];
   dispose: () => void;
 };
@@ -326,38 +373,72 @@ export type RowInteractionCommands = {
 };
 
 type PendingPhantomCreate = {
-  promise: Promise<CreateNodeResult>;
-  node: TreeNode;
-  atIndex?: number;
+  readonly promise: Promise<CreateNodeResult>;
 };
 
 export type LoadedRowsBoundaryEvent =
   | {
-      kind: "cell";
-      loadPath: GridPath;
-      direction: "before" | "after";
-      origin: CellCursor;
-      colPolicy: ColPolicy;
-      extend: boolean;
+      readonly kind: "cell";
+      readonly loadPath: GridPath;
+      readonly direction: "before" | "after";
+      readonly origin: CellCursor;
+      readonly colPolicy: ColPolicy;
+      readonly extend: boolean;
     }
   | {
-      kind: "row";
-      loadPath: GridPath;
-      direction: "before" | "after";
-      origin: RowCursor;
-      extend: boolean;
+      readonly kind: "row";
+      readonly loadPath: GridPath;
+      readonly direction: "before" | "after";
+      readonly origin: RowCursor;
+      readonly extend: boolean;
     };
 
-type PendingLoadedRowsBoundary = LoadedRowsBoundaryEvent;
+type PendingLoadedRowsBoundary = {
+  readonly event: LoadedRowsBoundaryEvent;
+  readonly token: number;
+};
+
+const internalsByRuntime = new WeakMap<GridRuntime, GridRuntimeInternals>();
+
+export function runtimeInternalsFor(
+  runtime: GridRuntime,
+): GridRuntimeInternals {
+  const internals = internalsByRuntime.get(runtime);
+  if (!internals) {
+    throw new Error("GridRuntime: value was not created by createGridRuntime.");
+  }
+  return internals;
+}
 
 export function createGridRuntime(args: RuntimeArgs): GridRuntime {
-  const { schema, dataSource } = args;
-  const interaction = normalizeInteraction(args.interaction);
-  const schemaTopology = buildSchemaTopology(schema);
-  assertRowHeaderInteractionCompatibility(schema, interaction);
+  let schema: GridSchema;
+  let interaction: GridInteractionConfig;
+  let schemaTopology: SchemaTopology;
+  try {
+    schema = snapshotGridSchema(args.schema);
+    interaction = snapshotGridInteraction(
+      normalizeInteraction(args.interaction),
+    );
+    schemaTopology = buildSchemaTopology(schema);
+    assertRowHeaderInteractionCompatibility(schema, interaction);
+  } catch (error) {
+    try {
+      args.phantoms?.dispose();
+    } catch (cleanupError) {
+      reportObserverError(cleanupError, args.onObserverError);
+    }
+    try {
+      args.dataSource.dispose();
+    } catch (cleanupError) {
+      reportObserverError(cleanupError, args.onObserverError);
+    }
+    throw error;
+  }
+  const { dataSource } = args;
 
-  const emitter = createEmitter();
-  const phantoms = createPhantomChannel(args.initialPhantomsByPath);
+  const emitter = createEmitter(args.onObserverError);
+  const phantoms =
+    args.phantoms ?? createPhantomChannel(undefined, args.onObserverError);
 
   // Wire initial subscriptions before any source can fire — the host
   // wants to observe the very first transitions.
@@ -375,15 +456,40 @@ export function createGridRuntime(args: RuntimeArgs): GridRuntime {
   // (parent, rowId)?" through `materializedChildren`; the registry is
   // the canonical answer.
   const sources = new Map<GridPath, LevelDataSource>();
+  const levelRegistrations = new Map<GridPath, object>();
   const sourceViews = new Map<GridPath, RuntimeLevelDataSource>();
+  const sourceStates = new Map<GridPath, LevelSourceState>();
+  const adaptedSourceSnapshots = new WeakMap<LevelSnapshot, LevelSnapshot>();
+  const adaptedStructuralSnapshots = createStructuralSnapshotCache();
+  const adaptedSnapshotsByNodes = new WeakMap<
+    readonly TreeNode[],
+    {
+      readonly footerRows: LevelSnapshot["footerRows"];
+      readonly snapshot: LevelSnapshot;
+    }
+  >();
+  const sourceViewListeners = new Map<GridPath, ObserverList<[]>>();
+  const sourceReconcileListeners = new Map<
+    GridPath,
+    ObserverList<[event: ReconcileEvent]>
+  >();
   const sourceUnsubs = new Map<GridPath, () => void>();
   const reconcileUnsubs = new Map<GridPath, () => void>();
   const lastStatusByPath = new Map<GridPath, LevelStatus>();
+  const membershipByPath = new Map<
+    GridPath,
+    Map<RowKey, { readonly generation: number; readonly present: boolean }>
+  >();
+  const pendingAuthoritativeRemovals = new Map<GridPath, Set<RowKey>>();
+  const identityErrorPaths = new Set<GridPath>();
+  const phantomLifecycleSources = new Map<GridPath, LevelDataSource>();
+  let membershipGeneration = 0;
   const pendingPhantomCreates = new Map<string, PendingPhantomCreate>();
   let pendingLoadedRowsBoundary: PendingLoadedRowsBoundary | null = null;
+  let loadedRowsBoundaryToken = 0;
   const phantomLifecycle = createPhantomRowLifecycle({
     config: args.phantomRows,
-    getSource: (path) => sources.get(path),
+    getSource: sourceForPhantomLifecycle,
     schemaAt: (path) => schemaForPath(path),
     getPhantoms: (path) => phantoms.get(path),
     addPhantom: (path, phantom) => phantoms.add(path, phantom),
@@ -397,12 +503,86 @@ export function createGridRuntime(args: RuntimeArgs): GridRuntime {
     },
   });
 
+  function sourceForPhantomLifecycle(
+    path: GridPath,
+  ): LevelDataSource | undefined {
+    const existing = phantomLifecycleSources.get(path);
+    if (existing) return existing;
+    const source = sources.get(path);
+    if (!source) return undefined;
+    const view: LevelDataSource = {
+      state: () => sourceStates.get(path) ?? source.state(),
+      subscribe: source.subscribe,
+      dispose: () => {},
+      ...(source.query ? { query: source.query } : {}),
+      ...(source.write ? { write: source.write } : {}),
+    };
+    phantomLifecycleSources.set(path, view);
+    return view;
+  }
+
   const root = rootPath(schemaTopology.rootLevelName);
   let disposed = false;
+  let runtimeFault: Error | null = null;
+  let dependenciesDisposed = false;
+  let activeOperations = 0;
 
   function assertLive(): void {
     if (disposed) {
       throw new Error("GridRuntime has been disposed.");
+    }
+    if (runtimeFault) {
+      throw new Error(`GridRuntime has faulted: ${runtimeFault.message}`);
+    }
+  }
+
+  function receiveSourceNotification(path: GridPath): void {
+    try {
+      onSourceSnapshotChanged(path);
+    } catch (error) {
+      faultRuntime(error);
+    }
+  }
+
+  function faultRuntime(error: unknown): void {
+    if (!runtimeFault) runtimeFault = errorOf(error);
+    emitter.clear();
+    reportObserverError(error, args.onObserverError);
+  }
+
+  function assertLevelLive(path: GridPath): void {
+    assertLive();
+    if (!sources.has(path)) {
+      throw new Error("Grid level is no longer registered.");
+    }
+  }
+
+  function assertLevelRegistrationLive(
+    path: GridPath,
+    registration: object,
+  ): void {
+    assertLive();
+    if (!sources.has(path) || levelRegistrations.get(path) !== registration) {
+      throw new Error("Grid level is no longer registered.");
+    }
+  }
+
+  function runOperation<T>(operation: () => Promise<T>): Promise<T> {
+    try {
+      assertLive();
+    } catch (error) {
+      return Promise.reject(error);
+    }
+    activeOperations += 1;
+    try {
+      return operation().finally(() => {
+        activeOperations -= 1;
+        if (disposed && activeOperations === 0) disposeDependencies();
+      });
+    } catch (error) {
+      activeOperations -= 1;
+      if (disposed && activeOperations === 0) disposeDependencies();
+      return Promise.reject(error);
     }
   }
 
@@ -419,7 +599,7 @@ export function createGridRuntime(args: RuntimeArgs): GridRuntime {
   // Lazy controllers. Identity-stable per path for the runtime's
   // lifetime; collapsing/re-expanding does not recreate them.
   const controllers = new Map<GridPath, GridControllerStore>();
-  const controllerUnsubs: Array<() => void> = [];
+  const controllerUnsubs = new Map<GridPath, () => void>();
   const activeRowSnapshots = new Map<GridPath, RowCursor | null>();
   const selectedRowsSnapshots = new Map<GridPath, RowSelection>();
   const selectedRowIdSnapshots = new Map<GridPath, readonly RowId[]>();
@@ -431,32 +611,43 @@ export function createGridRuntime(args: RuntimeArgs): GridRuntime {
   // of the path string, so the entry is stable for the runtime's
   // lifetime — no invalidation needed.
   const schemaCache = new Map<GridPath, LevelSchema>();
+  const levelsByPath = new Map<GridPath, GridLevelRuntime>();
+  let registeredLevelSnapshot: readonly GridLevelRuntime[] | null = null;
+  let rowOperationsController: RowOperationsController | null = null;
 
   // useSyncExternalStore-style subscribers fired on every registry-key
   // change. Consumers re-read the path-derived view they need, commonly
   // `materializedChildren`, on the next tick.
-  const registryListeners = new Set<() => void>();
-  let registeredPathSnapshot: GridPath[] | null = null;
+  const registryListeners = createObserverList<[]>(args.onObserverError);
+  let registeredPathSnapshot: readonly GridPath[] | null = null;
 
-  function registeredPaths(): GridPath[] {
+  function registeredPaths(): readonly GridPath[] {
     assertLive();
     if (!registeredPathSnapshot) {
-      registeredPathSnapshot = Array.from(sources.keys());
+      registeredPathSnapshot = Object.freeze(Array.from(sources.keys()));
     }
     return registeredPathSnapshot;
   }
 
+  function registeredLevels(): readonly GridLevelRuntime[] {
+    assertLive();
+    if (registeredLevelSnapshot) return registeredLevelSnapshot;
+    const next = Object.freeze(
+      Array.from(sources.keys(), (path) => levelRuntimeFor(path)),
+    );
+    registeredLevelSnapshot = next;
+    return next;
+  }
+
   function subscribeRegistry(fn: () => void): () => void {
     assertLive();
-    registryListeners.add(fn);
-    return () => {
-      registryListeners.delete(fn);
-    };
+    return registryListeners.subscribe(fn);
   }
 
   function notifyRegistryChanged(): void {
     registeredPathSnapshot = null;
-    for (const fn of registryListeners) fn();
+    registeredLevelSnapshot = null;
+    if (!disposed) registryListeners.notify();
   }
 
   function levelNameOf(path: GridPath): string {
@@ -466,22 +657,143 @@ export function createGridRuntime(args: RuntimeArgs): GridRuntime {
       : decomp.edges[decomp.edges.length - 1].levelName;
   }
 
+  function cacheSourceState(path: GridPath, state: LevelSourceState): void {
+    try {
+      const adapted = snapshotLevelSourceState(state, adaptSourceSnapshot);
+      assertUniqueNodeKeys(adapted.snapshot.nodes, path);
+      if ("previous" in adapted) {
+        assertUniqueNodeKeys(adapted.previous.nodes, path);
+      }
+      sourceStates.set(path, adapted);
+      identityErrorPaths.delete(path);
+      updateMembership(path, adapted.snapshot.nodes);
+    } catch (cause) {
+      const error = errorOf(cause);
+      const previous = sourceStates.get(path)?.snapshot ?? EMPTY_LEVEL_SNAPSHOT;
+      const identityError: LevelSourceState =
+        previous.nodes.length === 0
+          ? Object.freeze({
+              status: "initialError",
+              snapshot: previous,
+              error,
+            })
+          : Object.freeze({
+              status: "refreshError",
+              snapshot: previous,
+              previous,
+              error,
+            });
+      sourceStates.set(path, identityError);
+      identityErrorPaths.add(path);
+    }
+  }
+
+  function adaptSourceSnapshot(snapshot: LevelSnapshot): LevelSnapshot {
+    const existing = adaptedSourceSnapshots.get(snapshot);
+    if (existing) return existing;
+    const byNodes = adaptedSnapshotsByNodes.get(snapshot.nodes);
+    if (byNodes && byNodes.footerRows === snapshot.footerRows) {
+      adaptedSourceSnapshots.set(snapshot, byNodes.snapshot);
+      return byNodes.snapshot;
+    }
+    const adapted = snapshotLevelSnapshot(snapshot, adaptedStructuralSnapshots);
+    adaptedSourceSnapshots.set(snapshot, adapted);
+    adaptedSnapshotsByNodes.set(snapshot.nodes, {
+      footerRows: snapshot.footerRows,
+      snapshot: adapted,
+    });
+    return adapted;
+  }
+
+  function updateMembership(path: GridPath, nodes: readonly TreeNode[]): void {
+    const previous = membershipByPath.get(path) ?? new Map();
+    const present = new Set(nodes.map((node) => node.rowKey));
+    const next = new Map<
+      RowKey,
+      { readonly generation: number; readonly present: boolean }
+    >();
+    for (const [rowKey, membership] of previous) {
+      next.set(rowKey, {
+        generation: membership.generation,
+        present: present.has(rowKey),
+      });
+    }
+    for (const rowKey of present) {
+      const old = previous.get(rowKey);
+      next.set(rowKey, {
+        generation:
+          old?.present === true ? old.generation : ++membershipGeneration,
+        present: true,
+      });
+    }
+    membershipByPath.set(path, next);
+  }
+
+  function membershipGenerationFor(
+    path: GridPath,
+    rowKey: RowKey,
+  ): number | undefined {
+    const membership = membershipByPath.get(path)?.get(rowKey);
+    return membership?.present ? membership.generation : undefined;
+  }
+
   function onSourceSnapshotChanged(path: GridPath): void {
     const src = sources.get(path);
     if (!src) return;
-    const state = src.state();
+    cacheSourceState(path, src.state());
+    const state = sourceStates.get(path)!;
     const status = state.status;
     const prev = lastStatusByPath.get(path);
+    let statusPayload: GridEvents["levelStatusChanged"] | null = null;
     if (prev !== status) {
       lastStatusByPath.set(path, status);
       const error = "error" in state ? state.error : undefined;
-      emitter.emit(
-        "levelStatusChanged",
-        error ? { path, status, error } : { path, status },
-      );
+      statusPayload = error ? { path, status, error } : { path, status };
     }
+    applyAuthoritativeRemovalCleanup(path, state.snapshot.nodes);
+    if (disposed) return;
     phantomLifecycle.reconcileBlankAppendPhantoms(path);
     phantomLifecycle.ensureBlankForEmptyPath(path);
+    invalidateDisplayedRows(path, { type: "source" });
+    resolvePendingLoadedRowsBoundary(path);
+    if (statusPayload) emitter.emit("levelStatusChanged", statusPayload);
+    notifySourceView(path);
+  }
+
+  function notifySourceView(path: GridPath): void {
+    if (disposed) return;
+    const listeners = sourceViewListeners.get(path);
+    if (!listeners) return;
+    listeners.notify();
+  }
+
+  function notifySourceReconcile(path: GridPath, event: ReconcileEvent): void {
+    const listeners = sourceReconcileListeners.get(path);
+    if (!listeners) return;
+    listeners.notify(event);
+  }
+
+  function adaptedLoadResult(
+    path: GridPath,
+    result: SourceLoadResult,
+  ): SourceLoadResult {
+    if (result.kind === "superseded" || result.kind === "disposed") {
+      return result;
+    }
+    const state = sourceStates.get(path) ?? result.state;
+    if (state.status === "ready") return { kind: "ready", state };
+    if (state.status === "initialError" || state.status === "refreshError") {
+      return { kind: "error", state };
+    }
+    return { kind: "unchanged", state };
+  }
+
+  function cleanupSafely(cleanup: () => void): void {
+    try {
+      cleanup();
+    } catch (error) {
+      reportObserverError(error, args.onObserverError);
+    }
   }
 
   // Eagerly install the root so initial reads (snapshotFor,
@@ -489,31 +801,44 @@ export function createGridRuntime(args: RuntimeArgs): GridRuntime {
   // never come from `resolveChild`, so a separate code path here keeps
   // `ensureChildSources` focused on the child-path case.
   {
-    const src = dataSource.rootSource();
-    sources.set(root, src);
-    lastStatusByPath.set(root, src.state().status);
-    sourceUnsubs.set(
-      root,
-      src.subscribe(() => {
-        onSourceSnapshotChanged(root);
-        invalidateDisplayedRows(root, { type: "source" });
-        // After a host-owned boundary load, the cursor should land on rows
-        // from the window the app just loaded. Recompute displayed rows first
-        // so the landing target comes from current source state, not the
-        // previous window.
-        resolvePendingLoadedRowsBoundary(root);
-      }),
-    );
-    if (src.write) {
-      reconcileUnsubs.set(
+    let src: LevelDataSource | undefined;
+    try {
+      src = dataSource.rootSource();
+      sources.set(root, src);
+      levelRegistrations.set(root, Object.freeze({}));
+      cacheSourceState(root, src.state());
+      lastStatusByPath.set(root, sourceStates.get(root)!.status);
+      sourceUnsubs.set(
         root,
-        src.write.onReconcile((event) => {
-          emitter.emit("cellReconciled", { path: root, event });
+        src.subscribe(() => {
+          receiveSourceNotification(root);
         }),
       );
+      if (src.write) {
+        reconcileUnsubs.set(
+          root,
+          src.write.onReconcile((event) => {
+            if (!disposed) {
+              emitter.emit("cellReconciled", { path: root, event });
+              notifySourceReconcile(root, event);
+            }
+          }),
+        );
+      }
+      phantomLifecycle.ensureBlankForEmptyPath(root);
+      levelRuntimeFor(root);
+      notifyRegistryChanged();
+    } catch (error) {
+      const sourceUnsubscribe = sourceUnsubs.get(root);
+      if (sourceUnsubscribe) cleanupSafely(sourceUnsubscribe);
+      const reconcileUnsubscribe = reconcileUnsubs.get(root);
+      if (reconcileUnsubscribe) cleanupSafely(reconcileUnsubscribe);
+      if (src) cleanupSafely(() => src!.dispose());
+      cleanupSafely(() => phantoms.dispose());
+      cleanupSafely(() => dataSource.dispose());
+      emitter.clear();
+      throw error;
     }
-    phantomLifecycle.ensureBlankForEmptyPath(root);
-    notifyRegistryChanged();
   }
 
   function ensureChildSources(parentPath: GridPath, rowId: RowId): void {
@@ -522,37 +847,49 @@ export function createGridRuntime(args: RuntimeArgs): GridRuntime {
     if (childLevels.length === 0) return;
     const parentRowKey = rowKeyOfRowId(rowId);
     let bumped = false;
-    for (const childLevelName of childLevels) {
-      const childPath = makeChildPath(parentPath, parentRowKey, childLevelName);
-      if (sources.has(childPath)) continue;
-      const src = dataSource.resolveChild(
-        parentPath,
-        parentRowKey,
-        childLevelName,
-      );
-      sources.set(childPath, src);
-      lastStatusByPath.set(childPath, src.state().status);
-      sourceUnsubs.set(
-        childPath,
-        src.subscribe(() => {
-          onSourceSnapshotChanged(childPath);
-          invalidateDisplayedRows(childPath, { type: "source" });
-          // Expanded child tables load boundaries independently. A parent
-          // refresh should not finish a pending boundary load inside a child
-          // table, or vice versa.
-          resolvePendingLoadedRowsBoundary(childPath);
-        }),
-      );
-      if (src.write) {
-        reconcileUnsubs.set(
+    const addedPaths: GridPath[] = [];
+    try {
+      for (const childLevelName of childLevels) {
+        const childPath = makeChildPath(
+          parentPath,
+          parentRowKey,
+          childLevelName,
+        );
+        if (sources.has(childPath)) continue;
+        const src = dataSource.resolveChild(
+          parentPath,
+          parentRowKey,
+          childLevelName,
+        );
+        sources.set(childPath, src);
+        levelRegistrations.set(childPath, Object.freeze({}));
+        addedPaths.push(childPath);
+        cacheSourceState(childPath, src.state());
+        lastStatusByPath.set(childPath, sourceStates.get(childPath)!.status);
+        sourceUnsubs.set(
           childPath,
-          src.write.onReconcile((event) => {
-            emitter.emit("cellReconciled", { path: childPath, event });
+          src.subscribe(() => {
+            receiveSourceNotification(childPath);
           }),
         );
+        if (src.write) {
+          reconcileUnsubs.set(
+            childPath,
+            src.write.onReconcile((event) => {
+              if (!disposed) {
+                emitter.emit("cellReconciled", { path: childPath, event });
+                notifySourceReconcile(childPath, event);
+              }
+            }),
+          );
+        }
+        phantomLifecycle.ensureBlankForEmptyPath(childPath);
+        levelRuntimeFor(childPath);
+        bumped = true;
       }
-      phantomLifecycle.ensureBlankForEmptyPath(childPath);
-      bumped = true;
+    } catch (error) {
+      for (const path of addedPaths.reverse()) unregisterLevel(path);
+      throw error;
     }
     if (bumped) notifyRegistryChanged();
   }
@@ -562,21 +899,20 @@ export function createGridRuntime(args: RuntimeArgs): GridRuntime {
   }
 
   function sourceStateFor(path: GridPath): LevelSourceState {
-    assertLive();
-    const src = sources.get(path);
-    if (!src) {
+    assertLevelLive(path);
+    const state = sourceStates.get(path);
+    if (!state) {
       const root = rootPath(schemaTopology.rootLevelName);
       throw new Error(
         path === root
-          ? `GridRuntime.snapshotFor: root source for "${path}" is missing. The runtime was initialized inconsistently or has been disposed.`
-          : `GridRuntime.snapshotFor: no source has been resolved for path "${path}". Expand the parent row first or invoke runtime.sourceFor on a known path.`,
+          ? `GridRuntime: root source for "${path}" is missing. The runtime was initialized inconsistently or has been disposed.`
+          : `GridRuntime: no source has been resolved for path "${path}". Expand the parent row first.`,
       );
     }
-    return src.state();
+    return state;
   }
 
   function schemaForPath(path: GridPath): LevelSchema {
-    assertLive();
     let s = schemaCache.get(path);
     if (s) return s;
     s = schemaTopology.levelOf(levelNameOf(path));
@@ -624,12 +960,18 @@ export function createGridRuntime(args: RuntimeArgs): GridRuntime {
     store = createDisplayedRowsStore({
       readInput: () => displayedRowsInputFor(path),
       deriveDisplayedRowsState,
+      beforeNotify: () => reconcileRowSelection(path),
+      onObserverError: args.onObserverError,
     });
     displayedRowsStoresByPath.set(path, store);
     phantomSubscriptionUnsubs.set(
       path,
       phantoms.subscribe(path, () => {
-        invalidateDisplayedRows(path, { type: "phantoms" });
+        try {
+          invalidateDisplayedRows(path, { type: "phantoms" });
+        } catch (error) {
+          faultRuntime(error);
+        }
       }),
     );
     return store;
@@ -677,16 +1019,11 @@ export function createGridRuntime(args: RuntimeArgs): GridRuntime {
     path: GridPath,
     reason: DisplayedRowsInvalidationReason,
   ): void {
-    assertLive();
     const store = displayedRowsStoresByPath.get(path);
     if (!store) {
       return;
     }
     store.invalidateDisplayedRows(reason);
-    // Data/view changes may make a stored row selection invalid: a selected row
-    // can be filtered out, deleted, or become non-row-selectable. The reverse
-    // is not true — row selection changes must not invalidate displayed rows.
-    reconcileRowSelection(path);
   }
 
   function reconcileRowSelection(path: GridPath): void {
@@ -707,42 +1044,68 @@ export function createGridRuntime(args: RuntimeArgs): GridRuntime {
     if (next !== current) cursorManager.setRowSelection(path, next);
   }
 
-  function requestLoadedRowsBoundary(
-    event: PendingLoadedRowsBoundary,
-  ): boolean {
+  function requestLoadedRowsBoundary(event: LoadedRowsBoundaryEvent): boolean {
     assertLive();
+    const existing = pendingLoadedRowsBoundary;
+    if (existing && loadedBoundaryIntentEqual(existing.event, event)) {
+      return true;
+    }
     const src = sources.get(event.loadPath);
     if (!src) return false;
     // While rows are loading, repeated key presses should not skip ahead based
     // on stale counts. Wait until the latest rows are settled before accepting
     // another boundary turn.
-    const state = src.state();
+    const state = sourceStates.get(event.loadPath)!;
     if (state.status !== "ready") return false;
-    const hostLoad = args.onLoadedRowsBoundary?.(event);
-    if (!hostLoad) return false;
-    pendingLoadedRowsBoundary = event;
+    const pending = Object.freeze({
+      event,
+      token: ++loadedRowsBoundaryToken,
+    });
+    pendingLoadedRowsBoundary = pending;
+    let hostLoad: Promise<SourceLoadResult> | false | undefined;
+    try {
+      hostLoad = args.onLoadedRowsBoundary?.(event);
+    } catch (error) {
+      pendingLoadedRowsBoundary = null;
+      reportObserverError(error, args.onObserverError);
+      return false;
+    }
+    if (!hostLoad) {
+      if (pendingLoadedRowsBoundary?.token === pending.token) {
+        pendingLoadedRowsBoundary = null;
+      }
+      return false;
+    }
     // The host promise describes the source load, not React paint. Source
     // subscriptions may already have resolved the pending landing before the
     // promise callback runs. Keep both paths legal: a ready promise performs a
     // final sample if needed, and non-ready outcomes clear only the still-live
     // intent.
-    void hostLoad.then((result) => {
-      if (result.kind === "ready") {
-        resolvePendingLoadedRowsBoundary(event.loadPath);
-        return;
-      }
-      if (pendingLoadedRowsBoundary === event) {
+    void hostLoad.then(
+      (result) => {
+        if (pendingLoadedRowsBoundary?.token !== pending.token) return;
+        if (result.kind === "ready") {
+          resolvePendingLoadedRowsBoundary(event.loadPath);
+          return;
+        }
         pendingLoadedRowsBoundary = null;
-      }
-    });
+      },
+      (error: unknown) => {
+        if (pendingLoadedRowsBoundary?.token === pending.token) {
+          pendingLoadedRowsBoundary = null;
+        }
+        reportObserverError(error, args.onObserverError);
+      },
+    );
     return true;
   }
 
   function resolvePendingLoadedRowsBoundary(path: GridPath): void {
     const pending = pendingLoadedRowsBoundary;
-    if (!pending || pending.loadPath !== path) return;
+    if (!pending || pending.event.loadPath !== path) return;
+    const event = pending.event;
 
-    const state = sourceStateFor(path);
+    const state = sourceStates.get(path)!;
     // Keep the requested landing while the next page loads. If the load fails,
     // leave the cursor where the user started instead of moving it during a
     // later, unrelated refresh.
@@ -754,11 +1117,11 @@ export function createGridRuntime(args: RuntimeArgs): GridRuntime {
       return;
     }
 
-    if (pending.kind === "cell") {
-      const target = pendingLoadedRowsBoundaryCellTarget(pending);
+    if (event.kind === "cell") {
+      const target = pendingLoadedRowsBoundaryCellTarget(event);
       pendingLoadedRowsBoundary = null;
       if (!target) return;
-      if (pending.extend) {
+      if (event.extend) {
         cursorManager.extendCellSelectionTo(target);
       } else {
         cursorManager.moveCellCursorTo(target);
@@ -770,10 +1133,10 @@ export function createGridRuntime(args: RuntimeArgs): GridRuntime {
       return;
     }
 
-    const target = pendingLoadedRowsBoundaryRowTarget(pending);
+    const target = pendingLoadedRowsBoundaryRowTarget(event);
     pendingLoadedRowsBoundary = null;
     if (!target) return;
-    if (pending.extend) {
+    if (event.extend) {
       cursorManager.extendRowSelectionToCursor(target);
     } else {
       cursorManager.moveRowCursorTo(target);
@@ -782,7 +1145,7 @@ export function createGridRuntime(args: RuntimeArgs): GridRuntime {
   }
 
   function pendingLoadedRowsBoundaryCellTarget(
-    pending: Extract<PendingLoadedRowsBoundary, { kind: "cell" }>,
+    pending: Extract<LoadedRowsBoundaryEvent, { kind: "cell" }>,
   ): CellCursor | null {
     const displayed = displayedRowsFor(pending.loadPath);
     // After an "after" boundary load, continue at the first focusable row;
@@ -803,7 +1166,7 @@ export function createGridRuntime(args: RuntimeArgs): GridRuntime {
   }
 
   function pendingLoadedRowsBoundaryRowTarget(
-    pending: Extract<PendingLoadedRowsBoundary, { kind: "row" }>,
+    pending: Extract<LoadedRowsBoundaryEvent, { kind: "row" }>,
   ): RowCursor | null {
     const rows = displayedRowsFor(pending.loadPath).rows;
     // Row-list pages can include visible rows that are not operation targets.
@@ -835,14 +1198,18 @@ export function createGridRuntime(args: RuntimeArgs): GridRuntime {
   }
 
   function sourceFor(path: GridPath): RuntimeLevelDataSource {
-    assertLive();
+    assertLevelLive(path);
+    const registration = levelRegistrations.get(path);
+    if (!registration) {
+      throw new Error("Grid level is no longer registered.");
+    }
     const src = sources.get(path);
     if (!src) {
       const root = rootPath(schemaTopology.rootLevelName);
       throw new Error(
         path === root
-          ? `GridRuntime.sourceFor: root source for "${path}" is missing. The runtime was initialized inconsistently or has been disposed.`
-          : `GridRuntime.sourceFor: no source has been resolved for path "${path}". Expand the parent row first.`,
+          ? `GridRuntime: root source for "${path}" is missing. The runtime was initialized inconsistently or has been disposed.`
+          : `GridRuntime: no source has been resolved for path "${path}". Expand the parent row first.`,
       );
     }
     let view = sourceViews.get(path);
@@ -857,59 +1224,96 @@ export function createGridRuntime(args: RuntimeArgs): GridRuntime {
       ? {
           ...(sourceQuery.sort
             ? {
-                sort: {
+                sort: Object.freeze({
                   current: () => {
-                    assertLive();
+                    assertLevelRegistrationLive(path, registration);
                     return sourceQuery.sort!.current();
                   },
                   set: (sort) => {
-                    assertLive();
-                    return sourceQuery.sort!.set(sort);
+                    return runOperation(async () => {
+                      assertLevelRegistrationLive(path, registration);
+                      return adaptedLoadResult(
+                        path,
+                        await sourceQuery.sort!.set(sort),
+                      );
+                    });
                   },
-                },
+                }),
               }
             : {}),
           ...(sourceQuery.filter
             ? {
-                filter: {
+                filter: Object.freeze({
                   current: () => {
-                    assertLive();
+                    assertLevelRegistrationLive(path, registration);
                     return sourceQuery.filter!.current();
                   },
                   set: (filter) => {
-                    assertLive();
-                    return sourceQuery.filter!.set(filter);
+                    return runOperation(async () => {
+                      assertLevelRegistrationLive(path, registration);
+                      return adaptedLoadResult(
+                        path,
+                        await sourceQuery.filter!.set(filter),
+                      );
+                    });
                   },
-                },
+                }),
               }
             : {}),
           ...(sourceQuery.refetch
             ? {
                 refetch: () => {
-                  assertLive();
-                  return sourceQuery.refetch!();
+                  return runOperation(async () => {
+                    assertLevelRegistrationLive(path, registration);
+                    return adaptedLoadResult(
+                      path,
+                      await sourceQuery.refetch!(),
+                    );
+                  });
                 },
               }
             : {}),
         }
       : undefined;
-    view = {
-      canWrite: src.write !== undefined,
+    const stableQuery = query ? Object.freeze(query) : undefined;
+    view = Object.freeze({
+      get canWrite() {
+        assertLevelRegistrationLive(path, registration);
+        return src.write !== undefined;
+      },
       state: () => {
-        assertLive();
-        return src.state();
+        assertLevelRegistrationLive(path, registration);
+        return sourceStateFor(path);
       },
       subscribe: (fn) => {
-        assertLive();
-        return src.subscribe(fn);
+        assertLevelRegistrationLive(path, registration);
+        let listeners = sourceViewListeners.get(path);
+        if (!listeners) {
+          listeners = createObserverList(args.onObserverError);
+          sourceViewListeners.set(path, listeners);
+        }
+        const unsubscribe = listeners.subscribe(fn);
+        return () => {
+          unsubscribe();
+          if (listeners!.size() === 0) sourceViewListeners.delete(path);
+        };
       },
-      ...(query ? { query } : {}),
+      ...(stableQuery ? { query: stableQuery } : {}),
       onReconcile(fn) {
-        assertLive();
+        assertLevelRegistrationLive(path, registration);
         if (!src.write) return () => {};
-        return src.write.onReconcile(fn);
+        let listeners = sourceReconcileListeners.get(path);
+        if (!listeners) {
+          listeners = createObserverList(args.onObserverError);
+          sourceReconcileListeners.set(path, listeners);
+        }
+        const unsubscribe = listeners.subscribe(fn);
+        return () => {
+          unsubscribe();
+          if (listeners!.size() === 0) sourceReconcileListeners.delete(path);
+        };
       },
-    };
+    });
     sourceViews.set(path, view);
     return view;
   }
@@ -928,6 +1332,11 @@ export function createGridRuntime(args: RuntimeArgs): GridRuntime {
     if (!src.write) {
       throw new Error(
         `GridRuntime: source for path "${path}" is readonly — writeCell/applyChanges/createRow/removeRow are not available.`,
+      );
+    }
+    if (identityErrorPaths.has(path)) {
+      throw new Error(
+        `GridRuntime: source for path "${path}" has invalid row identity and cannot be mutated.`,
       );
     }
     // Capture the capability object once for this command. A source should not
@@ -961,8 +1370,7 @@ export function createGridRuntime(args: RuntimeArgs): GridRuntime {
     }
     const rowKey = rowKeyOfRowId(coord.rowId);
     const oldValue = readCellValue(
-      source.state().snapshot,
-      schemaForPath(path),
+      sourceStates.get(path)!.snapshot,
       rowKey,
       coord.colId,
     );
@@ -1042,65 +1450,71 @@ export function createGridRuntime(args: RuntimeArgs): GridRuntime {
     rowKey: RowKey,
     atIndex?: number,
   ): Promise<CreateNodeResult> {
+    if (disposed) {
+      return Promise.reject(new Error("GridRuntime has been disposed."));
+    }
+    if (!sources.has(path)) {
+      return Promise.reject(new Error("Grid level is no longer registered."));
+    }
     const pendingKey = phantomCreateKey(path, rowKey);
     const pending = pendingPhantomCreates.get(pendingKey);
     if (pending) return pending.promise;
 
-    const phantom = phantoms.get(path).find((p) => p.rowKey === rowKey);
-    if (!phantom) {
-      return Promise.reject(
-        new Error(
+    const promise = runOperation(async () => {
+      assertLevelRegisteredForOperation(path);
+      requireDraftEligibility(path);
+      const phantom = phantoms.get(path).find((p) => p.rowKey === rowKey);
+      if (!phantom) {
+        throw new Error(
           `GridRuntime.commitPhantomRow: no phantom with rowKey "${rowKey}" at path "${path}".`,
-        ),
-      );
-    }
-    if (phantom.state.kind === "saving") {
-      return Promise.reject(
-        new Error(
+        );
+      }
+      if (phantom.state.kind === "saving") {
+        throw new Error(
           `GridRuntime.commitPhantomRow: phantom with rowKey "${rowKey}" at path "${path}" is already saving.`,
-        ),
-      );
-    }
-    if (phantomLifecycle.isBlank(phantom.columns)) {
-      return Promise.reject(
-        new Error(
+        );
+      }
+      if (phantomLifecycle.isBlank(phantom.columns)) {
+        throw new Error(
           `GridRuntime.commitPhantomRow: phantom with rowKey "${rowKey}" at path "${path}" is blank.`,
-        ),
-      );
-    }
-    phantoms.setState(path, rowKey, { kind: "saving" });
-    const node: TreeNode = {
-      levelName: schemaForPath(path).name,
-      columns: { ...phantom.columns },
-    };
-    const promise = (async () => {
+        );
+      }
+      phantoms.setState(path, rowKey, { kind: "saving" });
+      const node: TreeNode = {
+        rowKey,
+        levelName: schemaForPath(path).name,
+        columns: { ...phantom.columns },
+      };
       try {
         const result = await createRow(path, node, atIndex);
         phantoms.remove(path, rowKey);
-        emitter.emit("phantomRowCommitted", { path, rowKey, ...result });
+        if (!disposed) {
+          emitter.emit("phantomRowCommitted", { path, rowKey, ...result });
+        }
         return result;
       } catch (err) {
         const reason = reasonOf(err);
         phantoms.setState(path, rowKey, { kind: "failed", reason });
-        emitter.emit("phantomRowCreateFailed", { path, rowKey, reason });
+        if (!disposed) {
+          emitter.emit("phantomRowCreateFailed", { path, rowKey, reason });
+        }
         throw err;
       } finally {
         pendingPhantomCreates.delete(pendingKey);
       }
-    })();
-    pendingPhantomCreates.set(pendingKey, { promise, node, atIndex });
+    });
+    pendingPhantomCreates.set(pendingKey, { promise });
     return promise;
   }
 
-  function applyChanges(path: GridPath, changes: CellChange[]): void {
+  function applyChanges(path: GridPath, changes: readonly CellChange[]): void {
     const { source, write } = requireWritable(path);
-    const levelSchema = schemaForPath(path);
-    const snapshot = source.state().snapshot;
+    const snapshot = sourceStates.get(path)!.snapshot;
     // Read prior values BEFORE the source applies the change. Once
     // applyChanges returns, the snapshot reflects the writes and the prior
     // values are unavailable for mutation events.
     const priors = changes.map((c) =>
-      readCellValue(snapshot, levelSchema, c.rowKey, c.colId),
+      readCellValue(snapshot, c.rowKey, c.colId),
     );
     write.applyChanges(changes);
     const edits = changes.map((c, i) => ({
@@ -1117,30 +1531,78 @@ export function createGridRuntime(args: RuntimeArgs): GridRuntime {
     atIndex?: number,
   ): Promise<CreateNodeResult> {
     const { write } = requireWritable(path);
+    const existingKeys = assertCreateNode(path, node);
     const result = await write.createNode(node, atIndex);
-    emitter.emit("mutationCommitted", {
-      kind: "insert",
-      path,
-      node: result.node,
-      atIndex: result.atIndex,
-    });
+    try {
+      assertAuthoritativeCreatedNode(path, result.node, existingKeys);
+    } catch (error) {
+      faultRuntime(error);
+      return result;
+    }
+    if (!disposed) {
+      emitter.emit("mutationCommitted", {
+        kind: "insert",
+        path,
+        node: result.node,
+        atIndex: result.atIndex,
+      });
+    }
     return result;
+  }
+
+  function assertCreateNode(
+    path: GridPath,
+    node: TreeNode,
+  ): ReadonlySet<RowKey> {
+    const schema = schemaForPath(path);
+    if (node.levelName !== schema.name) {
+      throw new Error(
+        `GridRuntime.createRow: node levelName "${node.levelName}" does not match level "${schema.name}".`,
+      );
+    }
+    rowKeyOfTreeNode(node, "GridRuntime.createRow");
+    const nodes = sourceStates.get(path)!.snapshot.nodes;
+    assertTreeNodeCanBeInserted(nodes, node, "GridRuntime.createRow");
+    return new Set(nodes.map((existing) => existing.rowKey));
+  }
+
+  function assertAuthoritativeCreatedNode(
+    path: GridPath,
+    node: TreeNode,
+    existingKeys: ReadonlySet<RowKey>,
+  ): void {
+    const schema = schemaForPath(path);
+    if (node.levelName !== schema.name) {
+      throw new Error(
+        `GridRuntime.createRow: source returned levelName "${node.levelName}" for level "${schema.name}".`,
+      );
+    }
+    const rowKey = rowKeyOfTreeNode(
+      node,
+      "GridRuntime.createRow authoritative result",
+    );
+    if (existingKeys.has(rowKey)) {
+      throw new Error(
+        `GridRuntime.createRow: source returned duplicate TreeNode.rowKey "${rowKey}".`,
+      );
+    }
   }
 
   async function removeRow(path: GridPath, rowKey: RowKey): Promise<void> {
     const { source, write } = requireWritable(path);
     const { node, index } = readNodeWithIndex(
-      source.state().snapshot,
-      schemaForPath(path),
+      sourceStates.get(path)!.snapshot,
       rowKey,
     );
     await write.removeNode(rowKey);
-    emitter.emit("mutationCommitted", {
-      kind: "remove",
-      path,
-      node,
-      atIndex: index,
-    });
+    if (!disposed) {
+      emitter.emit("mutationCommitted", {
+        kind: "remove",
+        path,
+        node,
+        atIndex: index,
+      });
+    }
   }
 
   // Coordinator reads runtime state through `getRuntime` — it never holds
@@ -1148,8 +1610,8 @@ export function createGridRuntime(args: RuntimeArgs): GridRuntime {
   // applied sort is reflected on the next call without explicit
   // invalidation. The reference is late-bound because the runtime
   // object is built below.
-  let runtimeRef: GridRuntime | null = null;
-  let cursorManagerRef: CursorManager | null = null;
+  let runtimeRef: GridRuntimeInternals | null = null;
+  let cursorManagerRef: CursorManagerInternal | null = null;
   const coordinator: GridCoordinatorStore = createGridCoordinator({
     getRuntime: () => {
       if (!runtimeRef) {
@@ -1180,6 +1642,15 @@ export function createGridRuntime(args: RuntimeArgs): GridRuntime {
     onRowCursorChanging: phantomLifecycle.onRowCursorChanging,
   });
   cursorManagerRef = cursorManager;
+  let cursorRevision = 0;
+  const unsubscribeCursorRevision = coordinator.subscribe((state, previous) => {
+    if (
+      state.cellCursor !== previous.cellCursor ||
+      state.rowCursor !== previous.rowCursor
+    ) {
+      cursorRevision += 1;
+    }
+  });
 
   function cursorContinuationRows(
     removalsByPath: ReadonlyMap<GridPath, ReadonlySet<RowId>>,
@@ -1336,7 +1807,7 @@ export function createGridRuntime(args: RuntimeArgs): GridRuntime {
         });
       }
     });
-    controllerUnsubs.push(unsub);
+    controllerUnsubs.set(path, unsub);
     return c;
   }
 
@@ -1734,36 +2205,640 @@ export function createGridRuntime(args: RuntimeArgs): GridRuntime {
     },
   };
 
+  function levelRuntimeFor(path: GridPath): GridLevelRuntime {
+    const existing = levelsByPath.get(path);
+    if (existing) return existing;
+    const registration = levelRegistrations.get(path);
+    if (!sources.has(path) || !registration) {
+      throw new Error("Grid level is no longer registered.");
+    }
+
+    const observe = (listener: () => void): (() => void) =>
+      isolateObserver(listener);
+    const level = createGridLevelRuntime({
+      path,
+      schema: schemaForPath(path),
+      data: sourceFor(path),
+      assertLive: () => assertLevelRegistrationLive(path, registration),
+      isLive: () =>
+        !disposed &&
+        !runtimeFault &&
+        sources.has(path) &&
+        levelRegistrations.get(path) === registration,
+      onObserverError: (error) =>
+        reportObserverError(error, args.onObserverError),
+      ports: {
+        displayedRows: () => {
+          assertLevelLive(path);
+          return displayedRowsFor(path);
+        },
+        displayedRowSequence: () => {
+          assertLevelLive(path);
+          return displayedRowSequenceFor(path);
+        },
+        displayedRow: (rowId) => {
+          assertLevelLive(path);
+          assertRowIdAtPath(path, rowId);
+          return displayedRowFor(path, rowId);
+        },
+        dataRowTarget: (rowId) => {
+          assertLevelLive(path);
+          const operations = requireRowOperationsController();
+          return operations.targetForKind(path, rowId, "data");
+        },
+        subscribeDisplayedRowSequence: (listener) => {
+          assertLevelLive(path);
+          return subscribeDisplayedRowSequence(path, observe(listener));
+        },
+        subscribeDisplayedRow: (rowId, listener) => {
+          assertLevelLive(path);
+          assertRowIdAtPath(path, rowId);
+          return subscribeDisplayedRow(path, rowId, observe(listener));
+        },
+        activeRow: () => {
+          assertLevelLive(path);
+          return activeRowForPath(path);
+        },
+        selectedRows: () => {
+          assertLevelLive(path);
+          return selectedRowsForPath(path);
+        },
+        selectedRowIds: () => {
+          assertLevelLive(path);
+          return selectedRowIds(path);
+        },
+        rowInteractionSnapshot: () => {
+          assertLevelLive(path);
+          return rowInteractionSnapshotForPath(path);
+        },
+        subscribeActiveRow: (listener) => {
+          assertLevelLive(path);
+          return subscribeActiveRow(path, observe(listener));
+        },
+        subscribeSelectedRows: (listener) => {
+          assertLevelLive(path);
+          return subscribeSelectedRows(path, observe(listener));
+        },
+        subscribeSelectedRowIds: (listener) => {
+          assertLevelLive(path);
+          return subscribeSelectedRowIds(path, observe(listener));
+        },
+        subscribeRowInteractionSnapshot: (listener) => {
+          assertLevelLive(path);
+          return subscribeRowInteractionSnapshot(path, observe(listener));
+        },
+        selectRow: (rowId) => {
+          assertLevelLive(path);
+          assertRowIdAtPath(path, rowId);
+          rowInteraction.selectRow(path, rowId);
+        },
+        setRowSelection: (selection) => {
+          assertLevelLive(path);
+          rowInteraction.setRowSelection(path, selection);
+        },
+        toggleRowSelection: (rowId) => {
+          assertLevelLive(path);
+          assertRowIdAtPath(path, rowId);
+          rowInteraction.toggleRowSelection(path, rowId);
+        },
+        extendRowSelectionTo: (rowId) => {
+          assertLevelLive(path);
+          assertRowIdAtPath(path, rowId);
+          rowInteraction.extendRowSelectionTo(path, rowId);
+        },
+        clearRowSelection: () => {
+          assertLevelLive(path);
+          rowInteraction.clearRowSelection(path);
+        },
+        isExpanded: (rowId) => {
+          assertLevelLive(path);
+          assertRowIdAtPath(path, rowId);
+          return (
+            coordinator.getState().expansion.get(path)?.has(rowId) ?? false
+          );
+        },
+        subscribeExpansion: (listener) => {
+          assertLevelLive(path);
+          let previous = coordinator.getState().expansion.get(path);
+          const notify = observe(listener);
+          return coordinator.subscribe((state) => {
+            const next = state.expansion.get(path);
+            if (next === previous) return;
+            previous = next;
+            notify();
+          });
+        },
+        expand: (rowId) => {
+          assertLevelLive(path);
+          assertRowIdAtPath(path, rowId);
+          coordinator.expand(path, rowId);
+        },
+        collapse: (rowId) => {
+          assertLevelLive(path);
+          assertRowIdAtPath(path, rowId);
+          coordinator.collapse(path, rowId);
+        },
+        toggleExpand: (rowId) => {
+          assertLevelLive(path);
+          assertRowIdAtPath(path, rowId);
+          coordinator.toggleExpand(path, rowId);
+        },
+        writeCell: (coord, value) => {
+          assertLevelLive(path);
+          assertRowIdAtPath(path, coord.rowId);
+          writeCell(path, coord, value);
+        },
+        applyChanges: (changes) => {
+          assertLevelLive(path);
+          applyChanges(path, changes);
+        },
+        createRow: (node, atIndex) =>
+          runOperation(async () => {
+            assertLevelRegisteredForOperation(path);
+            return createRow(path, node, atIndex);
+          }),
+        removeRow: (rowKey) => removeSingleRow(path, rowKey),
+        drafts: Object.freeze({
+          get: () => {
+            assertLevelLive(path);
+            return phantoms.get(path);
+          },
+          subscribe: (listener: () => void) => {
+            assertLevelLive(path);
+            return phantoms.subscribe(path, observe(listener));
+          },
+          add: (
+            rowKey: RowKey,
+            columns: Readonly<Record<ColId, unknown>> = {},
+          ) => {
+            assertLevelLive(path);
+            requireDraftEligibility(path);
+            phantoms.add(path, {
+              rowKey,
+              columns: Object.freeze({ ...columns }),
+              state: { kind: "editing" },
+            });
+          },
+          remove: (rowKey: RowKey) => {
+            assertLevelLive(path);
+            phantoms.remove(path, rowKey);
+          },
+          setCell: (rowKey: RowKey, colId: ColId, value: unknown) => {
+            assertLevelLive(path);
+            requireDraftEditingEligibility(path);
+            if (!phantoms.get(path).some((draft) => draft.rowKey === rowKey)) {
+              throw new Error(
+                `GridRuntime.drafts.setCell: no draft with rowKey "${rowKey}" at path "${path}".`,
+              );
+            }
+            phantomLifecycle.setPhantomCell(path, rowKey, colId, value);
+          },
+          commit: (rowKey: RowKey, atIndex?: number) =>
+            commitPhantomRow(path, rowKey, atIndex),
+        }),
+      },
+    });
+    levelsByPath.set(path, level);
+    return level;
+  }
+
+  function isolateObserver<Args extends readonly unknown[]>(
+    listener: (...args: Args) => void,
+  ): (...args: Args) => void {
+    return (...listenerArgs) => {
+      if (disposed || runtimeFault) return;
+      try {
+        listener(...listenerArgs);
+      } catch (error) {
+        reportObserverError(error, args.onObserverError);
+      }
+    };
+  }
+
+  function assertRowIdAtPath(path: GridPath, rowId: RowId): void {
+    if (pathOfRowId(rowId) === path) return;
+    throw new Error(
+      `GridRuntime: row "${rowId}" does not belong to path "${path}".`,
+    );
+  }
+
+  function assertLevelRegisteredForOperation(path: GridPath): void {
+    if (!sources.has(path)) {
+      throw new Error("Grid level is no longer registered.");
+    }
+  }
+
+  function requireDraftEligibility(path: GridPath): void {
+    assertLevelRegisteredForOperation(path);
+    if (args.phantomRows === undefined || args.phantomRows === false) {
+      throw new Error(
+        `GridRuntime: draft authoring is not enabled for path "${path}".`,
+      );
+    }
+    const source = sources.get(path)!;
+    const state = sourceStates.get(path)!;
+    if (
+      !source.write ||
+      state.status !== "ready" ||
+      source.write.canAppendRow?.() !== true ||
+      schemaForPath(path).options.allowPhantoms !== true
+    ) {
+      throw new Error(
+        `GridRuntime: path "${path}" is not currently eligible for draft authoring.`,
+      );
+    }
+  }
+
+  function requireDraftEditingEligibility(path: GridPath): void {
+    assertLevelRegisteredForOperation(path);
+    const source = sources.get(path)!;
+    const state = sourceStates.get(path)!;
+    if (
+      args.phantomRows === undefined ||
+      args.phantomRows === false ||
+      !source.write ||
+      state.status === "initialError" ||
+      state.status === "refreshError" ||
+      schemaForPath(path).options.allowPhantoms !== true
+    ) {
+      throw new Error(
+        `GridRuntime: draft authoring is not enabled for path "${path}".`,
+      );
+    }
+  }
+
+  function requireRowOperationsController(): RowOperationsController {
+    if (!rowOperationsController) {
+      throw new Error(
+        "GridRuntime: row operations were used before runtime construction completed.",
+      );
+    }
+    return rowOperationsController;
+  }
+
+  async function removeSingleRow(
+    path: GridPath,
+    rowKey: RowKey,
+  ): Promise<void> {
+    assertLevelLive(path);
+    const target = requireRowOperationsController().targetForKind(
+      path,
+      makeRowId(path, rowKey),
+      "data",
+    );
+    if (!target) {
+      throw new Error(
+        `GridRuntime.removeRow: no current data row with rowKey '${rowKey}'`,
+      );
+    }
+    const result = await requireRowOperationsController().public.remove([
+      target,
+    ]);
+    if (result.kind === "partial") throw result.error;
+  }
+
+  function cellSelectedRowIds(path: GridPath): readonly RowId[] {
+    const selection = controllerCursorPortFor(path).getState().cellSelection;
+    return selection
+      ? rowsInSelection(selection, displayedRowsFor(path))
+      : emptyRowIds;
+  }
+
+  async function removeRowOperationTarget(
+    target: RowOperationTarget<"data">,
+  ): Promise<void> {
+    const source = sources.get(target.path);
+    const write = source?.write;
+    if (!source || !write) {
+      throw new Error("Grid level is no longer registered.");
+    }
+    const { node, index } = readNodeWithIndex(
+      sourceStates.get(target.path)!.snapshot,
+      target.rowKey,
+    );
+    let pending = pendingAuthoritativeRemovals.get(target.path);
+    if (!pending) {
+      pending = new Set();
+      pendingAuthoritativeRemovals.set(target.path, pending);
+    }
+    pending.add(target.rowKey);
+
+    try {
+      await write.removeNode(target.rowKey);
+      // A conforming source publishes before the promise settles. Read once
+      // more for custom sources that settled synchronously without notifying.
+      if (
+        sourceStates
+          .get(target.path)!
+          .snapshot.nodes.some(
+            (candidate) => candidate.rowKey === target.rowKey,
+          )
+      ) {
+        receiveSourceNotification(target.path);
+      }
+      const stillPresent = sourceStates
+        .get(target.path)!
+        .snapshot.nodes.some((candidate) => candidate.rowKey === target.rowKey);
+      if (stillPresent) {
+        throw new Error(
+          `GridRuntime.removeRow: source settled without publishing removal of rowKey '${target.rowKey}'.`,
+        );
+      }
+      applyAuthoritativeRemovalCleanup(
+        target.path,
+        sourceStates.get(target.path)!.snapshot.nodes,
+      );
+      if (!disposed) {
+        emitter.emit("mutationCommitted", {
+          kind: "remove",
+          path: target.path,
+          node,
+          atIndex: index,
+        });
+      }
+    } catch (error) {
+      pending.delete(target.rowKey);
+      if (pending.size === 0) pendingAuthoritativeRemovals.delete(target.path);
+      throw error;
+    }
+  }
+
+  async function settleTouchedPaths(
+    paths: ReadonlySet<GridPath>,
+  ): Promise<void> {
+    if (disposed) return;
+    const refetches: Promise<unknown>[] = [];
+    for (const path of paths) {
+      const refetch = sources.get(path)?.query?.refetch;
+      if (refetch) refetches.push(Promise.resolve().then(() => refetch()));
+    }
+    await Promise.allSettled(refetches);
+  }
+
+  type RuntimeRemovalCursorToken = RowRemovalCursorToken & {
+    readonly revision: number;
+    readonly cellCursor: CellCursor | null;
+    readonly rowCursor: RowCursor | null;
+    readonly rowSelectionLead: RowCursor | null;
+  };
+
+  function beginRemovalCursorContinuation(
+    targets: readonly RowOperationTarget<"data">[],
+  ): RowRemovalCursorToken {
+    const origin = coordinator.getState();
+    const continuation = planCursorContinuationForRowRemoval(
+      targets.map(({ path, rowId }) => ({ path, rowId })),
+    );
+    applyCursorContinuation(continuation);
+    return Object.freeze({
+      revision: cursorRevision,
+      cellCursor: origin.cellCursor,
+      rowCursor: origin.rowCursor,
+      rowSelectionLead: origin.rowSelectionLead,
+    });
+  }
+
+  function finishRemovalCursorContinuation(
+    opaqueToken: RowRemovalCursorToken,
+    removed: readonly RowOperationTarget<"data">[],
+    complete: boolean,
+  ): void {
+    if (disposed) return;
+    const token = opaqueToken as RuntimeRemovalCursorToken;
+    if (cursorRevision !== token.revision && currentCursorIsValid()) return;
+    if (complete && currentCursorIsValid()) return;
+    const removalsByPath = new Map<GridPath, Set<RowId>>();
+    for (const { path, rowId } of removed) {
+      const rowIds = removalsByPath.get(path) ?? new Set<RowId>();
+      rowIds.add(rowId);
+      removalsByPath.set(path, rowIds);
+    }
+    const rows = cursorContinuationRows(removalsByPath);
+    const newerOrigin = cursorRevision !== token.revision;
+    const state = coordinator.getState();
+    const correction =
+      interaction.mode === "cell-grid"
+        ? planCursorContinuation({
+            mode: "cell-grid",
+            rows,
+            cellCursor: newerOrigin ? state.cellCursor : token.cellCursor,
+            rowSelectionLead: newerOrigin
+              ? state.rowSelectionLead
+              : token.rowSelectionLead,
+            fallbackPath: root,
+          })
+        : planCursorContinuation({
+            mode: "row-list",
+            rows,
+            rowCursor: newerOrigin ? state.rowCursor : token.rowCursor,
+            rowSelectionLead: newerOrigin
+              ? state.rowSelectionLead
+              : token.rowSelectionLead,
+            fallbackPath: root,
+          });
+    applyCursorContinuation(correction);
+  }
+
+  function currentCursorIsValid(): boolean {
+    if (interaction.mode === "cell-grid") {
+      const cursor = cursorManager.currentCellCursor();
+      if (!cursor || !sources.has(cursor.path)) return cursor === null;
+      const row = displayedRowFor(cursor.path, cursor.rowId);
+      return (
+        !!row &&
+        capabilitiesFor(row.kind).focusable &&
+        schemaForPath(cursor.path).columns.some(
+          (column) => column.id === cursor.colId,
+        )
+      );
+    }
+    const cursor = cursorManager.currentRowCursor();
+    if (!cursor || !sources.has(cursor.path)) return cursor === null;
+    return displayedRowFor(cursor.path, cursor.rowId)?.rowSelectable === true;
+  }
+
+  function applyAuthoritativeRemovalCleanup(
+    path: GridPath,
+    nodes: readonly TreeNode[],
+  ): void {
+    const pending = pendingAuthoritativeRemovals.get(path);
+    if (!pending) return;
+    const present = new Set(nodes.map((node) => node.rowKey));
+    let registryChanged = false;
+    for (const rowKey of Array.from(pending)) {
+      if (present.has(rowKey)) continue;
+      pending.delete(rowKey);
+      const rowId = makeRowId(path, rowKey);
+      if (coordinator.getState().expansion.get(path)?.has(rowId)) {
+        coordinator.collapse(path, rowId);
+      }
+      registryChanged =
+        unregisterDescendantsOfRow(path, rowKey) || registryChanged;
+    }
+    if (pending.size === 0) pendingAuthoritativeRemovals.delete(path);
+    if (registryChanged) notifyRegistryChanged();
+  }
+
+  function unregisterDescendantsOfRow(
+    parentPath: GridPath,
+    parentRowKey: RowKey,
+  ): boolean {
+    const descendants = Array.from(sources.keys())
+      .filter((path) => isBelowParentRow(path, parentPath, parentRowKey))
+      .sort(
+        (left, right) =>
+          decomposePath(right).edges.length - decomposePath(left).edges.length,
+      );
+    for (const path of descendants) unregisterLevel(path);
+    return descendants.length > 0;
+  }
+
+  function isBelowParentRow(
+    candidate: GridPath,
+    parentPath: GridPath,
+    parentRowKey: RowKey,
+  ): boolean {
+    let current = candidate;
+    let edge = trailingEdge(current);
+    while (edge) {
+      if (
+        edge.parentPath === parentPath &&
+        edge.parentRowKey === parentRowKey
+      ) {
+        return true;
+      }
+      current = edge.parentPath;
+      edge = trailingEdge(current);
+    }
+    return false;
+  }
+
+  function unregisterLevel(path: GridPath): void {
+    const level = levelsByPath.get(path);
+    if (level) cleanupSafely(() => disposeGridLevelRuntime(level));
+    const sourceUnsubscribe = sourceUnsubs.get(path);
+    if (sourceUnsubscribe) cleanupSafely(sourceUnsubscribe);
+    sourceUnsubs.delete(path);
+    const reconcileUnsubscribe = reconcileUnsubs.get(path);
+    if (reconcileUnsubscribe) cleanupSafely(reconcileUnsubscribe);
+    reconcileUnsubs.delete(path);
+    const controllerUnsubscribe = controllerUnsubs.get(path);
+    if (controllerUnsubscribe) cleanupSafely(controllerUnsubscribe);
+    controllerUnsubs.delete(path);
+    const phantomUnsubscribe = phantomSubscriptionUnsubs.get(path);
+    if (phantomUnsubscribe) cleanupSafely(phantomUnsubscribe);
+    phantomSubscriptionUnsubs.delete(path);
+    const displayedRowsStore = displayedRowsStoresByPath.get(path);
+    if (displayedRowsStore) cleanupSafely(() => displayedRowsStore.dispose());
+    displayedRowsStoresByPath.delete(path);
+    sourceViewListeners.get(path)?.clear();
+    sourceViewListeners.delete(path);
+    sourceReconcileListeners.get(path)?.clear();
+    sourceReconcileListeners.delete(path);
+    cleanupSafely(() => disposePhantomPath(phantoms, path));
+    const source = sources.get(path);
+    sources.delete(path);
+    levelRegistrations.delete(path);
+    if (source) cleanupSafely(() => source.dispose());
+    sourceStates.delete(path);
+    sourceViews.delete(path);
+    phantomLifecycleSources.delete(path);
+    membershipByPath.delete(path);
+    pendingAuthoritativeRemovals.delete(path);
+    identityErrorPaths.delete(path);
+    lastStatusByPath.delete(path);
+    controllers.delete(path);
+    activeRowSnapshots.delete(path);
+    selectedRowsSnapshots.delete(path);
+    selectedRowIdSnapshots.delete(path);
+    rowInteractionSnapshots.delete(path);
+    levelsByPath.delete(path);
+  }
+
+  rowOperationsController = createRowOperations({
+    registeredPaths: () => registeredPaths(),
+    isRegistered: (path) => sources.has(path),
+    displayedRows: (path) => displayedRowsStoreFor(path).getDisplayedRows(),
+    selectedRowIds,
+    cellSelectedRowIds,
+    membershipGeneration: membershipGenerationFor,
+    isWritable: (path) =>
+      sources.get(path)?.write !== undefined && !identityErrorPaths.has(path),
+    removeTarget: removeRowOperationTarget,
+    settleTouchedPaths,
+    beginCursorContinuation: beginRemovalCursorContinuation,
+    finishCursorContinuation: finishRemovalCursorContinuation,
+    runOperation,
+  });
+
   function dispose() {
     if (disposed) return;
     disposed = true;
-    for (const u of controllerUnsubs) u();
-    controllerUnsubs.length = 0;
-    for (const u of sourceUnsubs.values()) u();
+    for (const level of levelsByPath.values()) {
+      cleanupSafely(() => disposeGridLevelRuntime(level));
+    }
+    emitter.clear();
+    registryListeners.clear();
+    for (const listeners of sourceViewListeners.values()) listeners.clear();
+    sourceViewListeners.clear();
+    for (const listeners of sourceReconcileListeners.values()) {
+      listeners.clear();
+    }
+    sourceReconcileListeners.clear();
+    for (const store of displayedRowsStoresByPath.values()) {
+      cleanupSafely(() => store.dispose());
+    }
+    for (const unsubscribe of controllerUnsubs.values()) {
+      cleanupSafely(unsubscribe);
+    }
+    controllerUnsubs.clear();
+    cleanupSafely(unsubscribeCursorRevision);
+    pendingLoadedRowsBoundary = null;
+    if (activeOperations === 0) disposeDependencies();
+  }
+
+  function disposeDependencies(): void {
+    if (dependenciesDisposed) return;
+    dependenciesDisposed = true;
+    for (const unsubscribe of sourceUnsubs.values()) {
+      cleanupSafely(unsubscribe);
+    }
     sourceUnsubs.clear();
-    for (const u of reconcileUnsubs.values()) u();
+    for (const unsubscribe of reconcileUnsubs.values()) {
+      cleanupSafely(unsubscribe);
+    }
     reconcileUnsubs.clear();
-    for (const src of sources.values()) src.dispose();
+    for (const source of sources.values()) {
+      cleanupSafely(() => source.dispose());
+    }
     sources.clear();
+    levelRegistrations.clear();
+    sourceStates.clear();
     sourceViews.clear();
+    phantomLifecycleSources.clear();
+    levelsByPath.clear();
     registeredPathSnapshot = null;
-    for (const store of displayedRowsStoresByPath.values()) store.dispose();
+    registeredLevelSnapshot = null;
     displayedRowsStoresByPath.clear();
-    for (const unsub of phantomSubscriptionUnsubs.values()) unsub();
+    for (const unsubscribe of phantomSubscriptionUnsubs.values()) {
+      cleanupSafely(unsubscribe);
+    }
     phantomSubscriptionUnsubs.clear();
     controllers.clear();
     activeRowSnapshots.clear();
     selectedRowsSnapshots.clear();
     selectedRowIdSnapshots.clear();
     rowInteractionSnapshots.clear();
-    schemaCache.clear();
     lastStatusByPath.clear();
-    pendingLoadedRowsBoundary = null;
-    dataSource.dispose();
-    emitter.clear();
+    membershipByPath.clear();
+    pendingAuthoritativeRemovals.clear();
+    identityErrorPaths.clear();
+    pendingPhantomCreates.clear();
+    cleanupSafely(() => phantoms.dispose());
+    cleanupSafely(() => dataSource.dispose());
   }
 
-  const runtime: GridRuntime = {
+  const internals: GridRuntimeInternals = {
     schema,
     schemaTopology,
     registeredPaths,
@@ -1805,27 +2880,48 @@ export function createGridRuntime(args: RuntimeArgs): GridRuntime {
     phantomBoundaryCellTarget: phantomLifecycle.boundaryCellTarget,
     phantomBoundaryRowTarget: phantomLifecycle.boundaryRowTarget,
     requestLoadedRowsBoundary,
+    observe: isolateObserver,
     on: emitter.on,
     dispose,
   };
-  runtimeRef = runtime;
-  return runtime;
+  runtimeRef = internals;
+
+  const publicRuntime: GridRuntime = Object.freeze({
+    schema,
+    interaction,
+    root: levelRuntimeFor(root),
+    level(path: GridPath) {
+      assertLive();
+      const level = levelsByPath.get(path);
+      if (!level || !sources.has(path)) {
+        throw new Error("Grid level is no longer registered.");
+      }
+      return level;
+    },
+    registeredLevels,
+    subscribeLevels: subscribeRegistry,
+    schemaAt: schemaForPath,
+    rowOperations: requireRowOperationsController().public,
+    on<E extends keyof GridEvents>(
+      event: E,
+      listener: (payload: GridEvents[E]) => void,
+    ) {
+      assertLive();
+      return emitter.on(event, listener);
+    },
+    dispose,
+  });
+  internalsByRuntime.set(publicRuntime, internals);
+  return publicRuntime;
 }
 
-// Read a cell value from a snapshot using the level schema's rowKey function.
-// The runtime needs the prior value in `mutationCommitted` before the source
-// applies the write, and the only reliable row lookup is the same keying
-// function the source uses.
 function readCellValue(
   snapshot: LevelSnapshot,
-  schema: LevelSchema,
   rowKey: RowKey,
   colId: ColId,
 ): unknown {
-  const rowKeyFn = schema.options.rowKey ?? defaultRowKey;
-  for (let i = 0; i < snapshot.nodes.length; i++) {
-    const node = snapshot.nodes[i];
-    if (rowKeyFn(node, i) === rowKey) {
+  for (const node of snapshot.nodes) {
+    if (node.rowKey === rowKey) {
       return node.columns[colId];
     }
   }
@@ -1863,17 +2959,172 @@ function isPromiseLike(value: unknown): value is PromiseLike<unknown> {
 
 function readNodeWithIndex(
   snapshot: LevelSnapshot,
-  schema: LevelSchema,
   rowKey: RowKey,
 ): { node: TreeNode; index: number } {
-  const rowKeyFn = schema.options.rowKey ?? defaultRowKey;
   for (let i = 0; i < snapshot.nodes.length; i++) {
     const node = snapshot.nodes[i];
-    if (rowKeyFn(node, i) === rowKey) {
+    if (node.rowKey === rowKey) {
       return { node, index: i };
     }
   }
   throw new Error(`GridRuntime.removeRow: no node with rowKey '${rowKey}'`);
+}
+
+const EMPTY_LEVEL_SNAPSHOT: LevelSnapshot = Object.freeze({
+  nodes: Object.freeze([]),
+});
+
+function snapshotGridSchema(schema: GridSchema): GridSchema {
+  const levels: Record<string, LevelSchema> = {};
+  for (const [name, level] of Object.entries(schema.levels)) {
+    const columns = level.columns.map((column) =>
+      Object.freeze({
+        ...column,
+        ...(column.edit
+          ? {
+              edit: Object.freeze({
+                ...column.edit,
+                startsOn: Object.freeze([...column.edit.startsOn]),
+              }),
+            }
+          : {}),
+        ...(column.activation
+          ? {
+              activation: Object.freeze({
+                ...column.activation,
+                startsOn: Object.freeze([...column.activation.startsOn]),
+              }),
+            }
+          : {}),
+      }),
+    );
+    const rowHeaderColumn =
+      typeof level.rowHeaderColumn === "object"
+        ? Object.freeze({ ...level.rowHeaderColumn })
+        : level.rowHeaderColumn;
+    levels[name] = Object.freeze({
+      ...level,
+      columns: Object.freeze(columns),
+      rowHeaderColumn,
+      options: Object.freeze({ ...level.options }),
+      childLevels: Object.freeze([...level.childLevels]),
+    });
+  }
+  return Object.freeze({
+    rootLevel: schema.rootLevel,
+    levels: Object.freeze(levels),
+  });
+}
+
+function snapshotGridInteraction(
+  interaction: GridInteractionConfig,
+): GridInteractionConfig {
+  if (interaction.mode === "cell-grid") {
+    return Object.freeze({
+      ...interaction,
+      activeCell: Object.freeze({
+        ...interaction.activeCell,
+        keyboard: Object.freeze({
+          arrows: Object.freeze({
+            ...interaction.activeCell.keyboard.arrows,
+          }),
+        }),
+      }),
+      selectedCells: Object.freeze({ ...interaction.selectedCells }),
+      activeRow: Object.freeze({ ...interaction.activeRow }),
+      selectedRows: snapshotSelectedRows(interaction.selectedRows),
+    });
+  }
+  return Object.freeze({
+    ...interaction,
+    activeCell: Object.freeze({ ...interaction.activeCell }),
+    selectedCells: Object.freeze({ ...interaction.selectedCells }),
+    activeRow: Object.freeze({
+      ...interaction.activeRow,
+      keyboard: Object.freeze({ ...interaction.activeRow.keyboard }),
+    }),
+    selectedRows: snapshotSelectedRows(interaction.selectedRows),
+  });
+}
+
+function snapshotSelectedRows(
+  selectedRows: GridInteractionConfig["selectedRows"],
+): GridInteractionConfig["selectedRows"] {
+  if (selectedRows.kind === "none") {
+    return Object.freeze({ kind: "none" });
+  }
+  return Object.freeze({
+    ...selectedRows,
+    sync: Object.freeze({ ...selectedRows.sync }),
+    keyboard: Object.freeze({ ...selectedRows.keyboard }),
+  });
+}
+
+function snapshotLevelSourceState(
+  state: LevelSourceState,
+  snapshotFor: (snapshot: LevelSnapshot) => LevelSnapshot,
+): LevelSourceState {
+  const snapshot = snapshotFor(state.snapshot);
+  switch (state.status) {
+    case "initialLoading":
+      return Object.freeze({ status: state.status, snapshot });
+    case "ready":
+      return Object.freeze({ status: state.status, snapshot });
+    case "refreshing":
+      return Object.freeze({
+        status: state.status,
+        snapshot,
+        previous: snapshotFor(state.previous),
+      });
+    case "initialError":
+      return Object.freeze({
+        status: state.status,
+        snapshot,
+        error: state.error,
+      });
+    case "refreshError":
+      return Object.freeze({
+        status: state.status,
+        snapshot,
+        previous: snapshotFor(state.previous),
+        error: state.error,
+      });
+  }
+}
+
+function assertUniqueNodeKeys(
+  nodes: readonly TreeNode[],
+  path: GridPath,
+): void {
+  assertUniqueTreeNodeRowKeys(nodes, `GridRuntime source "${path}"`);
+}
+
+function errorOf(error: unknown): Error {
+  return error instanceof Error ? error : new Error(String(error));
+}
+
+function loadedBoundaryIntentEqual(
+  left: LoadedRowsBoundaryEvent,
+  right: LoadedRowsBoundaryEvent,
+): boolean {
+  if (
+    left.kind !== right.kind ||
+    left.loadPath !== right.loadPath ||
+    left.direction !== right.direction ||
+    left.extend !== right.extend
+  ) {
+    return false;
+  }
+  if (left.kind === "cell" && right.kind === "cell") {
+    return (
+      left.colPolicy === right.colPolicy &&
+      cursorEqual(left.origin, right.origin)
+    );
+  }
+  if (left.kind === "row" && right.kind === "row") {
+    return rowCursorEqual(left.origin, right.origin);
+  }
+  return false;
 }
 
 function reasonOf(err: unknown): string {

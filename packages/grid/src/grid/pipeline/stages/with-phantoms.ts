@@ -1,5 +1,4 @@
 import type { LevelOptions, PhantomRow } from "../../types/level-row";
-import { displayedPhantomRowKey } from "../../types/identity";
 import type { ProtoRow } from "../types";
 
 // Append phantom rows after footers (well, technically after data — see runner
@@ -21,7 +20,7 @@ export function withPhantoms(
   for (const p of phantoms) {
     out.push({
       kind: "phantom",
-      rowKey: displayedPhantomRowKey(p.rowKey),
+      rowKey: p.rowKey,
       columns: p.columns,
       source: p,
     });

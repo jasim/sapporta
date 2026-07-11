@@ -174,10 +174,10 @@
 //
 // Active row and selected rows are canonical runtime reads:
 //
-//   - `runtime.activeRowFor(path)` derives from the cell cursor in cell-grid
+//   - `runtime.level(path).activeRow()` derives from the cell cursor in cell-grid
 //     mode when configured, or from live row focus in row-list mode.
 //
-//   - `runtime.selectedRowsFor(path)` is disabled, derived from active row, or
+//   - `runtime.level(path).selectedRows()` is disabled, derived from active row, or
 //     read from stored independent row selection depending on
 //     `interaction.selectedRows`.
 //
@@ -215,7 +215,8 @@
 //                 "orders.ord-1.lines", "orders.ord-1.lines.ln-2.notes".
 //                 (types/identity.ts)
 //
-//   RowId       — logical row identity: `${GridPath}#${RowKey}`.
+//   RowId       — logical row identity: a tagged, escaped
+//                 `${GridPath}#${LevelRowKind}#${RowKey}` tuple.
 //                 Stores key on RowId; array indices are render-time
 //                 scratch. Reordering rows does not move identity.
 //                 (types/identity.ts)
@@ -308,10 +309,10 @@
 //
 // `GridRuntime` (runtime/create-grid-runtime.ts) is a plain TypeScript value, not a
 // React thing. It owns the schema/path topologies, the per-path displayed-row
-// stores, the controller instances, and the seams through which all data writes
-// flow (`writeCell`, `applyChanges`, `commitPhantomRow`) — each resolves the
-// path's `LevelDataSource` and forwards. Components reach it via
-// `useGridRuntime()`.
+// stores, the controller instances, and the path-bound levels through which
+// data writes flow (`writeCell`, `applyChanges`, and draft commits). Components
+// reach it via `useGridRuntime()` and resolve a registered path with
+// `runtime.level(path)`.
 //
 // Because the runtime exposes displayed rows through identity-stable external
 // stores, components never need to compute derived data in render bodies. This
@@ -371,22 +372,15 @@
 // runtime/, data-sources/, pipeline/, interaction/, schema/, and react/.
 
 export {
-  collectRowOperationTargets,
   createGridRuntime,
-  createTableController,
+  type GridLevelRuntime,
   type GridRuntime,
-  type CursorContinuation,
-  type RowRemovalRef,
+  type RowOperationTarget,
+  type RowRemovalResult,
   type LoadedRowsBoundaryEvent,
   type RuntimeArgs,
-  type RowInteractionCommands,
   type RowInteractionSnapshot,
   type RowInteractionStatus,
-  type TableController,
-  type ReadonlyTableController,
-  type WritableTableController,
-  type RootPhantomHelpers,
-  type GridEmitter,
   type GridEvents,
 } from "./runtime";
 
@@ -437,18 +431,6 @@ export {
   sortSourceNodes,
   sliceSourceNodes,
 } from "./data-sources";
-export {
-  createDisplayedRowsStore,
-  buildDisplayedRowSequence,
-  deriveDisplayedRowsState,
-  reuseDisplayedRowSequenceIfUnchanged,
-  type DisplayedRowsInput,
-  type DisplayedRowsInvalidationReason,
-  type DisplayedRowsState,
-  type DisplayedRowsStore,
-  type CreateDisplayedRowsStoreArgs,
-  type DisplayedRowsViewState,
-} from "./displayed-rows";
 export type {
   GridDataSource,
   LevelStatus,
@@ -559,7 +541,6 @@ export {
   trailingEdge,
   parseChildPath,
   makeRowId,
-  displayedPhantomRowKey,
   phantomKeyFromDisplayedRowId,
   isDisplayedPhantomRowId,
   pathOfRowId,

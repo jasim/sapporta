@@ -28,7 +28,7 @@ function props(editStart: CellEditorStart, value: unknown): CellEditorProps {
     rowSelectable: true,
     columns: { a: value },
     hasChildren: false,
-    source: {} as never,
+    source: { rowKey: "r0", levelName: "rows", columns: { a: value } },
   };
   return {
     editStart,

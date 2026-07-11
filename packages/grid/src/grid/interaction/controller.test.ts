@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { createGridController } from "./controller";
 import { capabilitiesFor } from "../types/capabilities";
 import { CELL_EDITING_GRID } from "../types/interaction";
-import { rootPath, makeRowId } from "../types/identity";
+import { makeLevelRowId, makeRowId, rootPath } from "../types/identity";
 import type { CellNavigationIntent } from "../types/action";
 import type { Coord, GridPath } from "../types/identity";
 import type { ColumnSchema } from "../types/schema";
@@ -35,22 +35,45 @@ const cols: ColumnSchema[] = [
 function makeRows(
   specs: Array<{ key: string; kind: LevelRow["kind"] }>,
 ): DisplayedRows {
-  const rows = specs.map((s) => {
-    const id = makeRowId(path, s.key);
+  const rows: LevelRow[] = specs.map((s): LevelRow => {
+    const id = makeLevelRowId(path, s.kind, s.key);
+    const rowSelectable = capabilitiesFor(s.kind).rowSelectable;
     if (s.kind === "data") {
       return {
         kind: "data",
         id,
-        rowSelectable: true,
+        rowSelectable,
         columns: {},
         hasChildren: false,
-        source: {} as never,
+        source: { rowKey: s.key, levelName: "rows", columns: {} },
       };
     }
-    if (s.kind === "footer")
-      return { kind: "footer", id, columns: {}, source: {} as never };
-    return { kind: s.kind, id, columns: {}, source: {} as never };
-  }) as LevelRow[];
+    if (s.kind === "footer") {
+      return {
+        kind: "footer",
+        id,
+        rowSelectable,
+        columns: {},
+        source: { rowKey: s.key, columns: {} },
+      };
+    }
+    if (s.kind === "phantom") {
+      return {
+        kind: "phantom",
+        id,
+        rowSelectable,
+        columns: {},
+        source: { rowKey: s.key, columns: {}, state: { kind: "editing" } },
+      };
+    }
+    return {
+      kind: s.kind,
+      id,
+      rowSelectable,
+      columns: {},
+      source: { rowKey: s.key, levelName: "rows", columns: {} },
+    };
+  });
   return buildDisplayed(rows);
 }
 
@@ -83,7 +106,7 @@ describe("GridController — verbs", () => {
     const c = makeController();
     c.startEdit({ rowId: makeRowId(path, "r0"), colId: "a" }, "f2");
     expect(c.getState().editing).toEqual({
-      coord: { rowId: "rows#r0", colId: "a" },
+      coord: { rowId: makeRowId(path, "r0"), colId: "a" },
       editStart: { trigger: "f2" },
     });
     expect(c.getState().cellSelection).toBe(null);
@@ -98,7 +121,7 @@ describe("GridController — verbs", () => {
     c.commitEdit("after");
     expect(c.getState().editing).toBe(null);
     expect(writeValue).toHaveBeenCalledWith(
-      { rowId: "rows#r0", colId: "a" },
+      { rowId: makeRowId(path, "r0"), colId: "a" },
       "after",
     );
   });
@@ -184,7 +207,7 @@ describe("GridController — verbs", () => {
 
     c.startEdit({ rowId: makeRowId(path, "r0"), colId: "a" }, "enter");
     expect(c.getState().editing).toEqual({
-      coord: { rowId: "rows#r0", colId: "a" },
+      coord: { rowId: makeRowId(path, "r0"), colId: "a" },
       editStart: { trigger: "enter" },
     });
   });

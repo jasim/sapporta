@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { buildDisplayed } from "../pipeline/stages/build-displayed";
-import { makeRowId, rootPath } from "./identity";
+import { makeRowId, rootPath, rowKeyOfRowId } from "./identity";
 import type { DisplayedRows, LevelRow } from "./level-row";
 import {
   makeRowRangeSelection,
@@ -26,7 +26,7 @@ function row(id: typeof r0, rowSelectable: boolean): LevelRow {
     rowSelectable,
     columns: {},
     hasChildren: false,
-    source: {} as never,
+    source: { rowKey: rowKeyOfRowId(id), levelName: "rows", columns: {} },
   };
 }
 

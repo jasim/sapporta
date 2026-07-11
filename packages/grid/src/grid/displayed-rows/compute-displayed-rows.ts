@@ -13,6 +13,10 @@ import type {
   LevelRow,
 } from "../types/level-row";
 import type { DisplayedRowsInput, DisplayedRowsState } from "./types";
+import {
+  assertUniqueDisplayedRowIds,
+  assertUniqueTreeNodeRowKeys,
+} from "../row-identity";
 
 const EMPTY_FOOTERS: FooterRow[] = [];
 
@@ -58,6 +62,10 @@ export function deriveDisplayedRowsState(
 function deriveIdentifiedRows(input: DisplayedRowsInput): LevelRow[] {
   const { path, schema, sourceSnapshot, phantomRows } = input;
   const footerRows = sourceSnapshot.footerRows ?? EMPTY_FOOTERS;
+  assertUniqueTreeNodeRowKeys(
+    sourceSnapshot.nodes,
+    `Displayed rows at path "${path}"`,
+  );
   const dataRows = buildDataRows(sourceSnapshot.nodes, schema.options);
   const rollupRows = withRollup(dataRows);
   const bracketedRows = withOpeningClosing(rollupRows);
@@ -67,7 +75,9 @@ function deriveIdentifiedRows(input: DisplayedRowsInput): LevelRow[] {
     phantomRows,
     schema.options,
   );
-  return withRowIds(rowsWithPhantoms, path);
+  const identified = withRowIds(rowsWithPhantoms, path);
+  assertUniqueDisplayedRowIds(identified, `Displayed rows at path "${path}"`);
+  return identified;
 }
 
 export function buildDisplayedRowSequence(
@@ -101,9 +111,9 @@ export function reuseDisplayedRowSequenceIfUnchanged(
 // Purpose: swap unchanged rows back to their previous object identities.
 // Value: row subscribers wake only when that row's visible facts change.
 function reuseUnchangedDisplayedRowObjects(
-  rows: LevelRow[],
+  rows: readonly LevelRow[],
   previous?: DisplayedRows,
-): LevelRow[] {
+): readonly LevelRow[] {
   if (!previous || previous.rowById.size === 0) return rows;
 
   let changed = previous.rows.length !== rows.length;
@@ -147,8 +157,8 @@ function canReuseDisplayedRowObject(
 }
 
 function columnValuesEqual(
-  a: Record<ColId, unknown>,
-  b: Record<ColId, unknown>,
+  a: Readonly<Record<ColId, unknown>>,
+  b: Readonly<Record<ColId, unknown>>,
 ): boolean {
   const aKeys = Object.keys(a) as ColId[];
   const bKeys = Object.keys(b) as ColId[];
@@ -164,7 +174,7 @@ function columnValuesEqual(
 // Purpose: reuse the wrapper when the ordered row object list is unchanged.
 // Value: no-op invalidations keep stable maps and avoid waking broad readers.
 function reuseDisplayedRowsSnapshotIfRowObjectsUnchanged(
-  rows: LevelRow[],
+  rows: readonly LevelRow[],
   previous?: DisplayedRows,
 ): DisplayedRows {
   if (!previous || previous.rows.length !== rows.length) {

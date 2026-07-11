@@ -8,7 +8,6 @@ import { inMemoryGridDataSource } from "../data-sources";
 import type { GridDataSource } from "../data-sources/types";
 import { createGridRuntime, type RuntimeArgs } from "../runtime";
 import { CELL_GRID_WITH_ACTIVE_ROW } from "../types/interaction";
-import type { TreeNode } from "../types/level-row";
 import type { GridSchema } from "../types/schema";
 import { useGridRuntimeEffect } from "./GridRuntimeEffect";
 import { GridRuntimeProvider, useGridRuntime } from "./GridRuntimeProvider";
@@ -71,7 +70,7 @@ describe("useGridRuntimeEffect", () => {
               renderCell: ({ value }) => String(value ?? ""),
             },
           ],
-          options: { rowKey: (node: TreeNode) => node.rowKey ?? "row" },
+          options: {},
           childLevels: [],
         },
       },
@@ -206,13 +205,7 @@ describe("useGridRuntimeEffect", () => {
     const disposes: Array<ReturnType<typeof vi.fn>> = [];
     let createCount = 0;
 
-    function Probe({
-      rootLevel,
-      label,
-    }: {
-      rootLevel: string;
-      label: string;
-    }) {
+    function Probe({ rootLevel, label }: { rootLevel: string; label: string }) {
       const runtime = useGridRuntimeEffect(() => {
         createCount += 1;
         const { args, dispose } = makeArgs(rootLevel);
@@ -256,10 +249,10 @@ describe("useGridRuntimeEffect", () => {
 
       if (!runtime) return createElement("span", null, "loading");
 
-      return createElement(
-        GridRuntimeProvider,
-        { runtime, children: createElement(Consumer) },
-      );
+      return createElement(GridRuntimeProvider, {
+        runtime,
+        children: createElement(Consumer),
+      });
     }
 
     const { container } = await renderClient(createElement(Probe));

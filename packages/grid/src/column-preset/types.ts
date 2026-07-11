@@ -69,7 +69,7 @@ export type GridLevelCommands<TFilter = unknown> = {
 export type HeaderLevelState<TFilter = unknown> = {
   path: GridPath;
   levelName: string;
-  schema: ColumnSchema[];
+  schema: readonly ColumnSchema[];
   snapshot: LevelSnapshot;
   sort: readonly SortDescriptor[] | undefined;
   filter: TFilter | undefined;

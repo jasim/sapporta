@@ -36,12 +36,13 @@ import type { RowSelection } from "./row-selection";
 //     Meaningful only when
 //     `interaction.selectedRows.sync.kind === "independent"`. When selected
 //     rows follow the active row, callers must read the effective value through
-//     `runtime.selectedRowsFor(path)` instead of reading this field directly.
+//     `runtime.level(path).selectedRows()` instead of reading this field
+//     directly.
 //     This is not a global table/page selection store.
 export type ControllerState = {
-  liveCellFocus: Coord | null;
-  cellSelection: CellSelectionState | null;
-  editing: EditingState | null;
-  liveRowFocus: RowId | null;
-  rowSelection: RowSelection;
+  readonly liveCellFocus: Coord | null;
+  readonly cellSelection: CellSelectionState | null;
+  readonly editing: EditingState | null;
+  readonly liveRowFocus: RowId | null;
+  readonly rowSelection: RowSelection;
 };

@@ -5,7 +5,6 @@ import {
   GridCopyContextMenu,
   GridLevel,
   GridRuntimeProvider,
-  rootPath,
   type GridChromeContext,
   type GridLevelChrome,
   type GridPresentation,
@@ -79,7 +78,7 @@ export function TGrid<
 }) {
   const runtime = session.runtime;
   const sessionContext = session as TGridRenderableSessionContext;
-  const root = rootPath(runtime.schema.rootLevel);
+  const root = runtime.root.path;
   const chrome = useMemo(() => {
     const presetChrome = columnPreset.chrome<TGridTableColumnMeta, TGridFilter>(
       {
@@ -89,7 +88,7 @@ export function TGrid<
         },
         renderColumnHeaderMenu: renderTGridHeaderMenu,
         commandOverrides: (level) => {
-          const levelId = runtime.schemaAt(level.path).name;
+          const levelId = runtime.level(level.path).schema.name;
           const queryStore = sessionContext.levels[levelId]?.queryStore as
             | { getState(): TGridLevelQueryState }
             | undefined;

@@ -1,3 +1,5 @@
+// @vitest-environment happy-dom
+
 import { describe, expect, it, vi } from "vitest";
 import type { TableSchema } from "@sapporta/shared/contracts";
 import {
@@ -6,9 +8,21 @@ import {
   type FilterCondition,
 } from "@sapporta/shared/filter";
 import { makeRowId, rootPath } from "@sapporta/grid";
+import { controllerFor, cursorManagerFor } from "@sapporta/grid/advanced";
 import { createTGridSession } from "./tgrid-session";
 import { defineTGrid } from "../grid-adapter/tgrid-runtime-config";
 import type { TableRowsClient } from "../grid-adapter/tgrid-level-config";
+
+vi.mock("../api/rows", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../api/rows")>();
+  return {
+    ...actual,
+    fetchTableRows: vi.fn(async () => ({
+      data: [],
+      meta: { total: 0, page: 1, limit: 50, pages: 0 },
+    })),
+  };
+});
 
 type OrderRow = {
   id: number;
@@ -38,7 +52,11 @@ function typedFilters(filters: readonly FilterCondition[]) {
 }
 
 async function flush(): Promise<void> {
-  for (let i = 0; i < 5; i += 1) await Promise.resolve();
+  for (let i = 0; i < 20; i += 1) await Promise.resolve();
+}
+
+function keyEvent(key: string): KeyboardEvent {
+  return new KeyboardEvent("keydown", { key });
 }
 
 function deferred<T>(): {
@@ -301,19 +319,15 @@ describe("TGridSession", () => {
     try {
       await flush();
       const path = rootPath("orders");
-      session.runtime.cursorManager.moveCellCursorTo({
+      const cursors = cursorManagerFor(session.runtime);
+      const controller = controllerFor(session.runtime, path);
+      cursors.moveCellCursorTo({
         path,
         rowId: makeRowId(path, "1"),
         colId: "customer",
       });
 
-      session.runtime.controllerFor(path).handleKey({
-        key: "ArrowDown",
-        ctrlKey: false,
-        metaKey: false,
-        shiftKey: false,
-        altKey: false,
-      } as KeyboardEvent);
+      controller.handleKey(keyEvent("ArrowDown"));
       await flush();
 
       expect(session.getQueryState().page).toBe(2);
@@ -324,7 +338,7 @@ describe("TGridSession", () => {
         filters: [],
         search: null,
       });
-      expect(session.runtime.coordinator.getState().cellCursor).toEqual({
+      expect(cursors.currentCellCursor()).toEqual({
         path,
         rowId: makeRowId(path, "2"),
         colId: "customer",
@@ -373,25 +387,21 @@ describe("TGridSession", () => {
     try {
       await flush();
       const path = rootPath("orders");
-      session.runtime.cursorManager.moveCellCursorTo({
+      const cursors = cursorManagerFor(session.runtime);
+      const controller = controllerFor(session.runtime, path);
+      cursors.moveCellCursorTo({
         path,
         rowId: makeRowId(path, "1"),
         colId: "customer",
       });
 
-      session.runtime.controllerFor(path).handleKey({
-        key: "ArrowUp",
-        ctrlKey: false,
-        metaKey: false,
-        shiftKey: false,
-        altKey: false,
-      } as KeyboardEvent);
+      controller.handleKey(keyEvent("ArrowUp"));
       await flush();
 
       expect(fetch.mock.calls.map(([req]) => req.page)).toEqual([1]);
       expect(session.getQueryState().page).toBe(1);
       expect(onQueryUrlChange).not.toHaveBeenCalled();
-      expect(session.runtime.coordinator.getState().cellCursor).toEqual({
+      expect(cursors.currentCellCursor()).toEqual({
         path,
         rowId: makeRowId(path, "1"),
         colId: "customer",
@@ -436,36 +446,26 @@ describe("TGridSession", () => {
     try {
       await flush();
       const path = rootPath("orders");
-      session.runtime.cursorManager.moveCellCursorTo({
+      const cursors = cursorManagerFor(session.runtime);
+      const controller = controllerFor(session.runtime, path);
+      cursors.moveCellCursorTo({
         path,
         rowId: makeRowId(path, "1"),
         colId: "customer",
       });
 
-      session.runtime.controllerFor(path).handleKey({
-        key: "PageDown",
-        ctrlKey: false,
-        metaKey: false,
-        shiftKey: false,
-        altKey: false,
-      } as KeyboardEvent);
+      controller.handleKey(keyEvent("PageDown"));
       await flush();
 
       expect(session.getQueryState().page).toBe(1);
       expect(onQueryUrlChange).not.toHaveBeenCalled();
-      expect(session.runtime.coordinator.getState().cellCursor).toEqual({
+      expect(cursors.currentCellCursor()).toEqual({
         path,
         rowId: makeRowId(path, "2"),
         colId: "customer",
       });
 
-      session.runtime.controllerFor(path).handleKey({
-        key: "PageDown",
-        ctrlKey: false,
-        metaKey: false,
-        shiftKey: false,
-        altKey: false,
-      } as KeyboardEvent);
+      controller.handleKey(keyEvent("PageDown"));
       await flush();
 
       expect(session.getQueryState().page).toBe(2);
@@ -476,7 +476,7 @@ describe("TGridSession", () => {
         filters: [],
         search: null,
       });
-      expect(session.runtime.coordinator.getState().cellCursor).toEqual({
+      expect(cursors.currentCellCursor()).toEqual({
         path,
         rowId: makeRowId(path, "3"),
         colId: "customer",
@@ -527,31 +527,21 @@ describe("TGridSession", () => {
     try {
       await flush();
       const path = rootPath("orders");
-      session.runtime.cursorManager.moveCellCursorTo({
+      const cursors = cursorManagerFor(session.runtime);
+      const controller = controllerFor(session.runtime, path);
+      cursors.moveCellCursorTo({
         path,
         rowId: makeRowId(path, "1"),
         colId: "customer",
       });
 
-      session.runtime.controllerFor(path).handleKey({
-        key: "ArrowDown",
-        ctrlKey: false,
-        metaKey: false,
-        shiftKey: false,
-        altKey: false,
-      } as KeyboardEvent);
+      controller.handleKey(keyEvent("ArrowDown"));
       await flush();
 
       expect(session.getQueryState().page).toBe(2);
       expect(rowsClient.fetch).toHaveBeenCalledTimes(2);
 
-      session.runtime.controllerFor(path).handleKey({
-        key: "ArrowDown",
-        ctrlKey: false,
-        metaKey: false,
-        shiftKey: false,
-        altKey: false,
-      } as KeyboardEvent);
+      controller.handleKey(keyEvent("ArrowDown"));
       await flush();
 
       expect(session.getQueryState().page).toBe(2);
@@ -572,19 +562,13 @@ describe("TGridSession", () => {
         search: null,
       });
 
-      expect(session.runtime.coordinator.getState().cellCursor).toEqual({
+      expect(cursors.currentCellCursor()).toEqual({
         path,
         rowId: makeRowId(path, "2"),
         colId: "customer",
       });
 
-      session.runtime.controllerFor(path).handleKey({
-        key: "ArrowDown",
-        ctrlKey: false,
-        metaKey: false,
-        shiftKey: false,
-        altKey: false,
-      } as KeyboardEvent);
+      controller.handleKey(keyEvent("ArrowDown"));
       await flush();
 
       expect(session.getQueryState().page).toBe(3);

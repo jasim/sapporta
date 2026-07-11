@@ -28,20 +28,34 @@ export type CommitTarget = NavigationDirection | "stay";
 // manager (see `interaction/cursor-manager.ts`); the reducer only handles edit
 // lifecycle.
 export type StartEditAction =
-  | { type: "START_EDIT"; coord: Coord; trigger: "type"; initial: string }
   | {
-      type: "START_EDIT";
-      coord: Coord;
-      trigger: NonTypedCellEditGesture;
-      initial?: never;
+      readonly type: "START_EDIT";
+      readonly coord: Coord;
+      readonly trigger: "type";
+      readonly initial: string;
+    }
+  | {
+      readonly type: "START_EDIT";
+      readonly coord: Coord;
+      readonly trigger: NonTypedCellEditGesture;
+      readonly initial?: never;
     };
 
 export type GridAction =
   | StartEditAction
-  | { type: "CANCEL_EDIT" }
-  | { type: "COMMIT_EDIT"; value: unknown; commit: CommitTarget };
+  | { readonly type: "CANCEL_EDIT" }
+  | {
+      readonly type: "COMMIT_EDIT";
+      readonly value: unknown;
+      readonly commit: CommitTarget;
+    };
 
-export type RowDirection = "up" | "down" | "first" | "last" | { delta: number };
+export type RowDirection =
+  | "up"
+  | "down"
+  | "first"
+  | "last"
+  | { readonly delta: number };
 
 // "preserve" — prefer the source colId on the target if present;
 // otherwise fall back to the target's first focusable column.
@@ -56,67 +70,94 @@ export type ColPolicy = "preserve" | "first" | "last";
 // canonical cursors and path-local selection state.
 export type CellNavigationIntent =
   | {
-      type: "commitMove";
-      target: Exclude<CommitTarget, "stay">;
+      readonly type: "commitMove";
+      readonly target: Exclude<CommitTarget, "stay">;
     }
   | {
-      type: "moveColumn";
-      direction: "left" | "right" | "rowStart" | "rowEnd";
-      extend: boolean;
+      readonly type: "moveColumn";
+      readonly direction: "left" | "right" | "rowStart" | "rowEnd";
+      readonly extend: boolean;
     }
   | {
-      type: "moveRow";
-      direction: "up" | "down";
-      colPolicy: ColPolicy;
-      extend: boolean;
+      readonly type: "moveRow";
+      readonly direction: "up" | "down";
+      readonly colPolicy: ColPolicy;
+      readonly extend: boolean;
     }
   | {
-      type: "moveRowDelta";
-      delta: number;
-      colPolicy: "preserve";
-      extend: boolean;
+      readonly type: "moveRowDelta";
+      readonly delta: number;
+      readonly colPolicy: "preserve";
+      readonly extend: boolean;
     }
   | {
-      type: "moveGridEdge";
-      edge: "first" | "last";
-      colPolicy: "preserve";
-      extend: boolean;
+      readonly type: "moveGridEdge";
+      readonly edge: "first" | "last";
+      readonly colPolicy: "preserve";
+      readonly extend: boolean;
     }
-  | { type: "startEdit"; coord: Coord; trigger: "type"; initial: string }
   | {
-      type: "startEdit";
-      coord: Coord;
-      trigger: NonTypedCellEditGesture;
-      initial?: never;
+      readonly type: "startEdit";
+      readonly coord: Coord;
+      readonly trigger: "type";
+      readonly initial: string;
     }
-  | { type: "activateCell"; coord: Coord; trigger: CellActivationTrigger }
+  | {
+      readonly type: "startEdit";
+      readonly coord: Coord;
+      readonly trigger: NonTypedCellEditGesture;
+      readonly initial?: never;
+    }
+  | {
+      readonly type: "activateCell";
+      readonly coord: Coord;
+      readonly trigger: CellActivationTrigger;
+    }
   // Pointer selection enters through the same coordinator as keyboard
   // navigation. The coordinator can therefore apply one cross-path selection
   // rule before the cursor manager updates path-local focus and ranges.
-  | { type: "cellPressed"; target: Coord; extend: boolean }
   | {
-      type: "rowPressed";
-      target: RowId;
+      readonly type: "cellPressed";
+      readonly target: Coord;
+      readonly extend: boolean;
+    }
+  | {
+      readonly type: "rowPressed";
+      readonly target: RowId;
       // A data-backed row header remains the active cell and therefore supplies
       // a cell coordinate. A structural row control owns DOM focus and has no
       // cell coordinate, so the coordinator clears the logical cell cursor.
-      origin: { kind: "cell"; target: Coord } | { kind: "row-control" };
-      gesture: RowSelectionGesture;
+      readonly origin:
+        | { readonly kind: "cell"; readonly target: Coord }
+        | { readonly kind: "row-control" };
+      readonly gesture: RowSelectionGesture;
     }
-  | { type: "clearCellSelection" }
-  | { type: "clearRowSelection" }
-  | { type: "focusFirstCell" }
-  | { type: "toggleActiveRowSelection" };
+  | { readonly type: "clearCellSelection" }
+  | { readonly type: "clearRowSelection" }
+  | { readonly type: "focusFirstCell" }
+  | { readonly type: "toggleActiveRowSelection" };
 
 export type CellEditorStartTrigger = CellEditGesture;
 
 export type RowNavigationIntent =
-  | { type: "moveActiveRow"; direction: "up" | "down"; extend: boolean }
-  | { type: "moveActiveRowDelta"; delta: number; extend: boolean }
-  | { type: "moveActiveRowEdge"; edge: "first" | "last"; extend: boolean }
-  | { type: "focusFirstRow" }
-  | { type: "toggleActiveRowSelection" }
-  | { type: "clearRowSelection" }
-  | { type: "expandActiveRow" }
-  | { type: "collapseActiveRow" }
-  | { type: "toggleActiveRowExpansion" };
+  | {
+      readonly type: "moveActiveRow";
+      readonly direction: "up" | "down";
+      readonly extend: boolean;
+    }
+  | {
+      readonly type: "moveActiveRowDelta";
+      readonly delta: number;
+      readonly extend: boolean;
+    }
+  | {
+      readonly type: "moveActiveRowEdge";
+      readonly edge: "first" | "last";
+      readonly extend: boolean;
+    }
+  | { readonly type: "focusFirstRow" }
+  | { readonly type: "toggleActiveRowSelection" }
+  | { readonly type: "clearRowSelection" }
+  | { readonly type: "expandActiveRow" }
+  | { readonly type: "collapseActiveRow" }
+  | { readonly type: "toggleActiveRowExpansion" };

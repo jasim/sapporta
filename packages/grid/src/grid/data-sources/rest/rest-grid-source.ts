@@ -24,11 +24,11 @@
 // itself so we are invoked at most once per `(parentPath, parentRowKey,
 // childLevelName)`.
 //
-// Lifecycle. The grid source tracks every level source it produces and
-// chains `dispose` to all of them. The runtime owns per-source caching;
-// `resolveChild` is a pure factory — it returns a fresh source on each
-// call and never caches. The runtime's registry ensures `resolveChild`
-// is invoked at most once per child key.
+// Lifecycle. The runtime owns every returned level source. Grid-source
+// disposal releases only factory-level state and never disposes those sources.
+// `resolveChild` is a pure factory — it returns a fresh source on each call and
+// never caches. The runtime's registry ensures it is invoked at most once per
+// child key.
 
 import { decomposePath } from "../../types/identity";
 import type { GridPath, RowKey } from "../../types/identity";
@@ -57,7 +57,6 @@ export function restGridDataSource<F = unknown>(
     );
   }
 
-  const handed: LevelDataSource[] = [];
   let rootCached: LevelDataSource | null = null;
 
   function buildLevel(
@@ -76,17 +75,7 @@ export function restGridDataSource<F = unknown>(
         `restGridDataSource: schema.levels has no entry for level '${levelName}'`,
       );
     }
-    const baseOpts = factory({ ancestors });
-    // Inject the schema's rowKey resolver so cell-level operations use
-    // the same identity function the runtime does — host endpoint
-    // factories should not need to repeat it.
-    const merged: RestLevelSourceOpts<F> = {
-      ...baseOpts,
-      rowKey: baseOpts.rowKey ?? levelSchema.options.rowKey,
-    };
-    const src = restLevelSource<F>(merged);
-    handed.push(src);
-    return src;
+    return restLevelSource<F>(factory({ ancestors }));
   }
 
   return {
@@ -103,8 +92,6 @@ export function restGridDataSource<F = unknown>(
     },
 
     dispose() {
-      for (const src of handed) src.dispose();
-      handed.length = 0;
       rootCached = null;
     },
   };

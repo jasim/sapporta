@@ -62,8 +62,8 @@ import type {
   RowNavigationIntent,
   RowDirection,
 } from "../types/action";
-import type { GridRuntime } from "../runtime/create-grid-runtime";
-import type { CursorManager } from "./cursor-manager";
+import type { GridRuntimeInternals } from "../runtime/create-grid-runtime";
+import type { CursorManager, CursorManagerInternal } from "./cursor-manager";
 import {
   resolveRowSelectableNavigation,
   resolveVisibleRowNavigation,
@@ -108,13 +108,13 @@ export type CreateCoordinatorArgs = {
   // Live runtime reference. The coordinator does not hold any derived
   // view; it queries the runtime each call so a freshly resolved child
   // source or a freshly applied sort is reflected immediately.
-  getRuntime: () => GridRuntime;
+  getRuntime: () => GridRuntimeInternals;
   // Cursor manager reference, bound after construction (the cursor manager
   // depends on the coordinator and the controllerFor lookup). The coordinator
   // never writes cursors itself — it asks the cursor manager to apply targets,
   // and the cursor manager reaches back to `setCellCursor` / `setRowCursor` to
   // write the global half of the denormalisation.
-  getCursorManager: () => CursorManager;
+  getCursorManager: () => CursorManagerInternal;
   capabilitiesFor: (kind: LevelRowKind) => RowCapabilities;
   // Invoked just before the coordinator commits a toggleExpand that
   // adds `rowId` to `path`'s expansion set. The runtime hooks this to
@@ -125,7 +125,7 @@ export type CreateCoordinatorArgs = {
 };
 
 type LoadedRowsBoundaryEvent = Parameters<
-  GridRuntime["requestLoadedRowsBoundary"]
+  GridRuntimeInternals["requestLoadedRowsBoundary"]
 >[0];
 type LoadedRowsBoundaryRequest =
   | Omit<Extract<LoadedRowsBoundaryEvent, { kind: "cell" }>, "loadPath">
@@ -285,7 +285,7 @@ export function createGridCoordinator(
   }
 
   function nextColForDirection(
-    schema: { id: ColId }[],
+    schema: readonly { id: ColId }[],
     fromColId: ColId,
     direction: "left" | "right" | "rowStart" | "rowEnd",
   ): ColId | null {
@@ -325,7 +325,7 @@ export function createGridCoordinator(
   }
 
   function requestLoadedRowsBoundary(
-    runtime: GridRuntime,
+    runtime: GridRuntimeInternals,
     navigation: LoadedRowsBoundaryRequest,
   ): boolean {
     // Ask nearest-to-farthest so nested tables keep their own loading policy.
@@ -345,7 +345,7 @@ export function createGridCoordinator(
   function intentForCommit(
     target: Exclude<CommitTarget, "stay">,
     current: CellCursor,
-    runtime: GridRuntime,
+    runtime: GridRuntimeInternals,
   ): CellNavigationIntent {
     switch (target) {
       case "up":
@@ -414,7 +414,7 @@ export function createGridCoordinator(
     intent: CellNavigationIntent,
     fromPath: GridPath,
     cursor: CellCursor | null,
-    runtime: GridRuntime,
+    runtime: GridRuntimeInternals,
   ): CellCursor | null {
     if (intent.type === "focusFirstCell") {
       const first = firstFocusableRow(
@@ -485,7 +485,7 @@ export function createGridCoordinator(
   }
 
   function clearCellRangesAcrossGrid(
-    runtime: GridRuntime,
+    runtime: GridRuntimeInternals,
     cursorManager: CursorManager,
   ): void {
     if (runtime.interaction.mode !== "cell-grid") return;
@@ -500,7 +500,7 @@ export function createGridCoordinator(
   }
 
   function clearRowSelectionAcrossGrid(
-    runtime: GridRuntime,
+    runtime: GridRuntimeInternals,
     exceptPath?: GridPath,
   ): void {
     // Row selection is stored per path and outlives DOM presence. Replace and
@@ -514,7 +514,7 @@ export function createGridCoordinator(
   }
 
   function applyRowPress(
-    runtime: GridRuntime,
+    runtime: GridRuntimeInternals,
     cursorManager: CursorManager,
     fromPath: GridPath,
     intent: Extract<CellNavigationIntent, { type: "rowPressed" }>,
@@ -614,7 +614,7 @@ export function createGridCoordinator(
     intent: RowNavigationIntent,
     fromPath: GridPath,
     rowCursor: RowCursor | null,
-    runtime: GridRuntime,
+    runtime: GridRuntimeInternals,
   ): RowCursor | null {
     if (intent.type === "focusFirstRow") {
       // Row-list focus starts on the first row that can be an operation target.

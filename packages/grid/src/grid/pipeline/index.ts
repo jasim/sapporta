@@ -1,5 +1,5 @@
 export type { ProtoRow, SortDescriptor, RowPredicate, Stage } from "./types";
-export { buildDataRows, defaultRowKey } from "./stages/build-data";
+export { buildDataRows } from "./stages/build-data";
 export { withRollup } from "./stages/with-rollup";
 export { withOpeningClosing } from "./stages/with-opening-closing";
 export { withFooters } from "./stages/with-footers";

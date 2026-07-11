@@ -32,56 +32,85 @@ import type { TreeNode } from "../types/level-row";
 import type { CellSelectionState } from "../types/selection";
 import type { RowSelection } from "../types/row-selection";
 import type { CellActivationTrigger } from "../types/schema";
+import {
+  createObserverList,
+  type ObserverErrorReporter,
+  type ObserverList,
+} from "../observer-notification";
 
 export type MutationCommittedEvent =
   | {
-      kind: "cell";
-      path: GridPath;
-      coord: Coord;
-      oldValue: unknown;
-      newValue: unknown;
+      readonly kind: "cell";
+      readonly path: GridPath;
+      readonly coord: Coord;
+      readonly oldValue: unknown;
+      readonly newValue: unknown;
     }
   | {
-      kind: "cells";
-      path: GridPath;
-      edits: ReadonlyArray<{
-        coord: Coord;
-        oldValue: unknown;
-        newValue: unknown;
+      readonly kind: "cells";
+      readonly path: GridPath;
+      readonly edits: ReadonlyArray<{
+        readonly coord: Coord;
+        readonly oldValue: unknown;
+        readonly newValue: unknown;
       }>;
     }
-  | { kind: "insert"; path: GridPath; node: TreeNode; atIndex: number }
-  | { kind: "remove"; path: GridPath; node: TreeNode; atIndex: number };
+  | {
+      readonly kind: "insert";
+      readonly path: GridPath;
+      readonly node: TreeNode;
+      readonly atIndex: number;
+    }
+  | {
+      readonly kind: "remove";
+      readonly path: GridPath;
+      readonly node: TreeNode;
+      readonly atIndex: number;
+    };
 
 // Events emitted by the runtime to host code.
 export type GridEvents = {
   mutationCommitted: MutationCommittedEvent;
   cellSelectionChanged: {
-    path: GridPath;
-    selection: CellSelectionState | null;
+    readonly path: GridPath;
+    readonly selection: CellSelectionState | null;
   };
-  rowSelectionChanged: { path: GridPath; selection: RowSelection };
+  rowSelectionChanged: {
+    readonly path: GridPath;
+    readonly selection: RowSelection;
+  };
   // Reconciliation result for an optimistic edit. The path identifies the
   // source that emitted the event; the inner `event` is the source's own
   // ReconcileEvent (`agreed` | `diverged` | `rejected`). Wrapped rather
   // than spread to keep `path` from colliding with future ReconcileEvent
   // fields.
-  cellReconciled: { path: GridPath; event: ReconcileEvent };
+  cellReconciled: {
+    readonly path: GridPath;
+    readonly event: ReconcileEvent;
+  };
   // Source status transitions — fires on every transition observed by the
   // runtime's source subscription.
-  levelStatusChanged: { path: GridPath; status: LevelStatus; error?: Error };
-  phantomRowCommitted: {
-    path: GridPath;
-    rowKey: RowKey;
-    node: TreeNode;
-    atIndex: number;
+  levelStatusChanged: {
+    readonly path: GridPath;
+    readonly status: LevelStatus;
+    readonly error?: Error;
   };
-  phantomRowCreateFailed: { path: GridPath; rowKey: RowKey; reason: string };
+  phantomRowCommitted: {
+    readonly path: GridPath;
+    readonly rowKey: RowKey;
+    readonly node: TreeNode;
+    readonly atIndex: number;
+  };
+  phantomRowCreateFailed: {
+    readonly path: GridPath;
+    readonly rowKey: RowKey;
+    readonly reason: string;
+  };
   cellActivationError: {
-    path: GridPath;
-    coord: Coord;
-    trigger: CellActivationTrigger;
-    error: unknown;
+    readonly path: GridPath;
+    readonly coord: Coord;
+    readonly trigger: CellActivationTrigger;
+    readonly error: unknown;
   };
 };
 
@@ -95,31 +124,29 @@ export type GridEmitter = {
 };
 
 type AnyHandler = (payload: GridEvents[EventName]) => void;
+type EventObserverList = ObserverList<[payload: GridEvents[EventName]]>;
 
-export function createEmitter(): GridEmitter {
+export function createEmitter(
+  onObserverError?: ObserverErrorReporter,
+): GridEmitter {
   // Storage is keyed loosely; the public `on`/`emit` methods preserve
   // event-name typing through their generic parameter, and the per-event
-  // handler set holds homogeneous payloads.
-  const handlers = new Map<EventName, Set<AnyHandler>>();
+  // observer list holds homogeneous payloads.
+  const handlers = new Map<EventName, EventObserverList>();
   return {
     on<E extends EventName>(event: E, handler: Handler<E>): () => void {
-      let set = handlers.get(event);
-      if (!set) {
-        set = new Set();
-        handlers.set(event, set);
+      let observers = handlers.get(event);
+      if (!observers) {
+        observers = createObserverList(onObserverError);
+        handlers.set(event, observers);
       }
-      const h = handler as AnyHandler;
-      set.add(h);
-      return () => {
-        set!.delete(h);
-      };
+      return observers.subscribe(handler as AnyHandler);
     },
     emit<E extends EventName>(event: E, payload: GridEvents[E]): void {
-      const set = handlers.get(event);
-      if (!set) return;
-      for (const h of set) (h as Handler<E>)(payload);
+      handlers.get(event)?.notify(payload);
     },
     clear() {
+      for (const observers of handlers.values()) observers.clear();
       handlers.clear();
     },
   };

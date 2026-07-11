@@ -6,10 +6,18 @@ import {
   visibleRows,
 } from "./visible-order";
 import { capabilitiesFor } from "../types/capabilities";
-import { createGridRuntime } from "../runtime/create-grid-runtime";
-import type { GridRuntime } from "../runtime/create-grid-runtime";
+import {
+  createGridRuntime,
+  runtimeInternalsFor,
+  type GridRuntimeInternals,
+} from "../runtime/create-grid-runtime";
 import { inMemoryGridDataSource } from "../data-sources/memory/in-memory-grid-source";
-import { childPath, makeRowId, rootPath } from "../types/identity";
+import {
+  childPath,
+  makeLevelRowId,
+  makeRowId,
+  rootPath,
+} from "../types/identity";
 import type { CellCursor, GridPath, RowId } from "../types/identity";
 import type { TreeNode } from "../types/level-row";
 import type { LevelRow } from "../types/level-row";
@@ -30,14 +38,14 @@ const reportSchema: GridSchema = {
       name: "cat",
       rowHeaderColumn: "none",
       columns: [testColumn("name", "Name"), testColumn("qty", "Qty")],
-      options: { rowKey: (n: TreeNode) => String(n.columns.name) },
+      options: {},
       childLevels: ["items"],
     },
     items: {
       name: "items",
       rowHeaderColumn: "none",
       columns: [testColumn("name", "Name"), testColumn("weight", "Weight")],
-      options: { rowKey: (n: TreeNode) => String(n.columns.name) },
+      options: {},
       childLevels: [],
     },
   },
@@ -49,20 +57,36 @@ const vegItems = childPath(root, "Veg", "items");
 
 const tree: TreeNode[] = [
   {
+    rowKey: "Fruit",
     levelName: "cat",
     columns: { name: "Fruit", qty: 2 },
     children: {
       items: [
-        { levelName: "items", columns: { name: "Apple", weight: 1 } },
-        { levelName: "items", columns: { name: "Banana", weight: 2 } },
+        {
+          rowKey: "Apple",
+          levelName: "items",
+          columns: { name: "Apple", weight: 1 },
+        },
+        {
+          rowKey: "Banana",
+          levelName: "items",
+          columns: { name: "Banana", weight: 2 },
+        },
       ],
     },
   },
   {
+    rowKey: "Veg",
     levelName: "cat",
     columns: { name: "Veg", qty: 1 },
     children: {
-      items: [{ levelName: "items", columns: { name: "Carrot", weight: 3 } }],
+      items: [
+        {
+          rowKey: "Carrot",
+          levelName: "items",
+          columns: { name: "Carrot", weight: 3 },
+        },
+      ],
     },
   },
 ];
@@ -76,7 +100,8 @@ function setup({ expand = [] as string[] } = {}) {
       items: { sortMode: "none", filterMode: "none", paginationMode: "none" },
     },
   });
-  const rt = createGridRuntime({ schema: reportSchema, dataSource: ds });
+  const runtime = createGridRuntime({ schema: reportSchema, dataSource: ds });
+  const rt = runtimeInternalsFor(runtime);
   for (const name of expand) {
     rt.coordinator.toggleExpand(root, makeRowId(root, name));
   }
@@ -86,8 +111,8 @@ function setup({ expand = [] as string[] } = {}) {
 const deps = { capabilitiesFor };
 
 function cellTarget(
-  runtime: GridRuntime,
-  coordinator: GridRuntime["coordinator"],
+  runtime: GridRuntimeInternals,
+  coordinator: GridRuntimeInternals["coordinator"],
   from: CellCursor,
   dir: RowDirection,
   colPolicy: ColPolicy,
@@ -103,7 +128,7 @@ function cellTarget(
   ).target;
 }
 
-function fakeRuntimeWithRows(rows: LevelRow[]): GridRuntime {
+function fakeRuntimeWithRows(rows: LevelRow[]): GridRuntimeInternals {
   const rowById = new Map<RowId, LevelRow>();
   const rowIndexById = new Map<RowId, number>();
   rows.forEach((row, index) => {
@@ -145,7 +170,7 @@ function fakeRuntimeWithRows(rows: LevelRow[]): GridRuntime {
     }),
     schemaAt: () => reportSchema.levels.cat,
   };
-  return runtime as unknown as GridRuntime;
+  return runtime as unknown as GridRuntimeInternals;
 }
 
 function dataRow(rowKey: string): LevelRow {
@@ -155,14 +180,14 @@ function dataRow(rowKey: string): LevelRow {
     rowSelectable: true,
     columns: { name: rowKey },
     hasChildren: false,
-    source: { levelName: "cat", columns: { name: rowKey } },
+    source: { rowKey, levelName: "cat", columns: { name: rowKey } },
   };
 }
 
 function footerRow(rowKey: string): LevelRow {
   return {
     kind: "footer",
-    id: makeRowId(root, rowKey),
+    id: makeLevelRowId(root, "footer", rowKey),
     rowSelectable: false,
     columns: { name: rowKey },
     source: { rowKey, columns: { name: rowKey } },
@@ -224,14 +249,7 @@ describe("resolveVisibleRowNavigation", () => {
       rowId: makeRowId(root, "Fruit"),
       colId: "name",
     };
-    const next = cellTarget(
-      rt,
-      rt.coordinator,
-      from,
-      "down",
-      "preserve",
-      deps,
-    );
+    const next = cellTarget(rt, rt.coordinator, from, "down", "preserve", deps);
     expect(next).toEqual({
       path: fruitItems,
       rowId: makeRowId(fruitItems, "Apple"),
@@ -246,14 +264,7 @@ describe("resolveVisibleRowNavigation", () => {
       rowId: makeRowId(fruitItems, "Banana"),
       colId: "name",
     };
-    const next = cellTarget(
-      rt,
-      rt.coordinator,
-      from,
-      "down",
-      "preserve",
-      deps,
-    );
+    const next = cellTarget(rt, rt.coordinator, from, "down", "preserve", deps);
     expect(next).toEqual({
       path: root,
       rowId: makeRowId(root, "Veg"),
@@ -268,14 +279,7 @@ describe("resolveVisibleRowNavigation", () => {
       rowId: makeRowId(root, "Veg"),
       colId: "name",
     };
-    const next = cellTarget(
-      rt,
-      rt.coordinator,
-      from,
-      "up",
-      "preserve",
-      deps,
-    );
+    const next = cellTarget(rt, rt.coordinator, from, "up", "preserve", deps);
     expect(next).toEqual({
       path: fruitItems,
       rowId: makeRowId(fruitItems, "Banana"),
@@ -312,14 +316,7 @@ describe("resolveVisibleRowNavigation", () => {
       rowId: makeRowId(root, "Fruit"),
       colId: "name",
     };
-    const next = cellTarget(
-      rt,
-      rt.coordinator,
-      from,
-      "last",
-      "preserve",
-      deps,
-    );
+    const next = cellTarget(rt, rt.coordinator, from, "last", "preserve", deps);
     expect(next).toEqual({
       path: vegItems,
       rowId: makeRowId(vegItems, "Carrot"),
@@ -334,14 +331,7 @@ describe("resolveVisibleRowNavigation", () => {
       rowId: makeRowId(root, "Fruit"),
       colId: "name", // both root and items declare 'name'
     };
-    const next = cellTarget(
-      rt,
-      rt.coordinator,
-      from,
-      "down",
-      "preserve",
-      deps,
-    );
+    const next = cellTarget(rt, rt.coordinator, from, "down", "preserve", deps);
     expect(next?.colId).toBe("name");
   });
 
@@ -352,14 +342,7 @@ describe("resolveVisibleRowNavigation", () => {
       rowId: makeRowId(root, "Fruit"),
       colId: "qty", // items has no 'qty' column
     };
-    const next = cellTarget(
-      rt,
-      rt.coordinator,
-      from,
-      "down",
-      "preserve",
-      deps,
-    );
+    const next = cellTarget(rt, rt.coordinator, from, "down", "preserve", deps);
     expect(next?.colId).toBe("name");
   });
 
@@ -370,14 +353,7 @@ describe("resolveVisibleRowNavigation", () => {
       rowId: makeRowId(root, "Fruit"),
       colId: "qty", // schema differs but 'first' policy applies regardless
     };
-    const next = cellTarget(
-      rt,
-      rt.coordinator,
-      from,
-      "down",
-      "first",
-      deps,
-    );
+    const next = cellTarget(rt, rt.coordinator, from, "down", "first", deps);
     expect(next?.colId).toBe("name");
 
     // Even when the source colId IS valid on the target, "first" overrides.
@@ -386,14 +362,7 @@ describe("resolveVisibleRowNavigation", () => {
       rowId: makeRowId(root, "Fruit"),
       colId: "name",
     };
-    const next2 = cellTarget(
-      rt,
-      rt.coordinator,
-      from2,
-      "down",
-      "first",
-      deps,
-    );
+    const next2 = cellTarget(rt, rt.coordinator, from2, "down", "first", deps);
     expect(next2?.colId).toBe("name"); // happens to match because items.first === 'name'
   });
 
@@ -433,10 +402,7 @@ describe("resolveVisibleRowNavigation", () => {
   });
 
   it("ArrowDown overflows next when a footer follows the last focusable row", () => {
-    const rt = fakeRuntimeWithRows([
-      dataRow("Fruit"),
-      footerRow("total"),
-    ]);
+    const rt = fakeRuntimeWithRows([dataRow("Fruit"), footerRow("total")]);
 
     const result = resolveVisibleRowNavigation(
       rt,
@@ -545,10 +511,7 @@ describe("resolveVisibleRowNavigation", () => {
   });
 
   it("PageDown overflows next from the last focusable row before a footer", () => {
-    const rt = fakeRuntimeWithRows([
-      dataRow("Fruit"),
-      footerRow("total"),
-    ]);
+    const rt = fakeRuntimeWithRows([dataRow("Fruit"), footerRow("total")]);
 
     const result = resolveVisibleRowNavigation(
       rt,
@@ -583,10 +546,7 @@ describe("resolveVisibleRowNavigation", () => {
 
 describe("resolveRowSelectableNavigation", () => {
   it("ArrowDown overflows next when a non-row-selectable row follows the last selectable row", () => {
-    const rt = fakeRuntimeWithRows([
-      dataRow("Fruit"),
-      footerRow("total"),
-    ]);
+    const rt = fakeRuntimeWithRows([dataRow("Fruit"), footerRow("total")]);
 
     const result = resolveRowSelectableNavigation(
       rt,
@@ -627,10 +587,7 @@ describe("resolveRowSelectableNavigation", () => {
       dataRow("Apple"),
       dataRow("Banana"),
     ]);
-    const after = fakeRuntimeWithRows([
-      dataRow("Fruit"),
-      footerRow("total"),
-    ]);
+    const after = fakeRuntimeWithRows([dataRow("Fruit"), footerRow("total")]);
     const before = fakeRuntimeWithRows([
       footerRow("opening-total"),
       dataRow("Fruit"),

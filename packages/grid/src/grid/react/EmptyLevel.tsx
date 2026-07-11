@@ -28,10 +28,11 @@ export function shouldRenderEmpty(
 
 export function EmptyLevel({ path }: { path: GridPath }) {
   const runtime = useGridRuntime();
+  const level = runtime.level(path);
   const state = useLevelSourceState(path);
   const phantoms = usePhantoms(path);
   if (!shouldRenderEmpty(state, phantoms.length)) return null;
-  const levelName = runtime.schemaAt(path).name;
+  const levelName = level.schema.name;
   return (
     <div data-grid-part="level-empty" role="status" data-grid-path={path}>
       No {levelName}.

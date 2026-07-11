@@ -10,7 +10,7 @@ import {
   ROW_MULTISELECT_LIST,
   ROW_PRIMARY_MASTER_DETAIL,
 } from "../types/interaction";
-import { rootPath, makeRowId } from "../types/identity";
+import { makeLevelRowId, makeRowId, rootPath } from "../types/identity";
 import type { ControllerState } from "../types/controller-state";
 import type { ColumnSchema } from "../types/schema";
 import type { DisplayedRows, LevelRow } from "../types/level-row";
@@ -36,25 +36,45 @@ const cols: ColumnSchema[] = [
 function makeRows(
   specs: Array<{ key: string; kind: LevelRow["kind"] }>,
 ): DisplayedRows {
-  const rows = specs.map((s) => {
-    const id = makeRowId(path, s.key);
+  const rows: LevelRow[] = specs.map((s): LevelRow => {
+    const id = makeLevelRowId(path, s.kind, s.key);
+    const rowSelectable = capabilitiesFor(s.kind).rowSelectable;
     if (s.kind === "data") {
       return {
         kind: "data",
         id,
-        rowSelectable: true,
+        rowSelectable,
         columns: {},
         hasChildren: false,
-        source: {} as never,
+        source: { rowKey: s.key, levelName: "rows", columns: {} },
       };
     }
     if (s.kind === "footer") {
-      return { kind: "footer", id, columns: {}, source: {} as never };
+      return {
+        kind: "footer",
+        id,
+        rowSelectable,
+        columns: {},
+        source: { rowKey: s.key, columns: {} },
+      };
     }
-    if (s.kind === "rollup")
-      return { kind: "rollup", id, columns: {}, source: {} as never };
-    return { kind: s.kind, id, columns: {}, source: {} as never };
-  }) as LevelRow[];
+    if (s.kind === "phantom") {
+      return {
+        kind: "phantom",
+        id,
+        rowSelectable,
+        columns: {},
+        source: { rowKey: s.key, columns: {}, state: { kind: "editing" } },
+      };
+    }
+    return {
+      kind: s.kind,
+      id,
+      rowSelectable,
+      columns: {},
+      source: { rowKey: s.key, levelName: "rows", columns: {} },
+    };
+  });
   return buildDisplayed(rows);
 }
 
@@ -226,11 +246,13 @@ describe("keyEventToCellIntent", () => {
   });
 
   it("Escape clears row selection when no cell range exists", () => {
-    const state = focusAt("r0", "a");
-    state.cellSelection = null;
-    state.rowSelection = {
-      kind: "single",
-      rowId: makeRowId(path, "r0"),
+    const state = {
+      ...focusAt("r0", "a"),
+      cellSelection: null,
+      rowSelection: {
+        kind: "single" as const,
+        rowId: makeRowId(path, "r0"),
+      },
     };
 
     expect(
@@ -358,7 +380,7 @@ describe("keyEventToCellIntent", () => {
       ),
     ).toEqual({
       type: "startEdit",
-      coord: { rowId: "rows#r0", colId: "a" },
+      coord: { rowId: makeRowId(path, "r0"), colId: "a" },
       trigger: "f2",
     });
   });
@@ -374,7 +396,7 @@ describe("keyEventToCellIntent", () => {
       ),
     ).toEqual({
       type: "startEdit",
-      coord: { rowId: "rows#r0", colId: "a" },
+      coord: { rowId: makeRowId(path, "r0"), colId: "a" },
       trigger: "enter",
     });
   });
@@ -406,7 +428,7 @@ describe("keyEventToCellIntent", () => {
       ),
     ).toEqual({
       type: "activateCell",
-      coord: { rowId: "rows#r0", colId: "a" },
+      coord: { rowId: makeRowId(path, "r0"), colId: "a" },
       trigger: { kind: "keyboard", gesture: "enter" },
     });
     expect(
@@ -419,7 +441,7 @@ describe("keyEventToCellIntent", () => {
       ),
     ).toEqual({
       type: "activateCell",
-      coord: { rowId: "rows#r0", colId: "a" },
+      coord: { rowId: makeRowId(path, "r0"), colId: "a" },
       trigger: { kind: "keyboard", gesture: "space" },
     });
   });
@@ -447,7 +469,7 @@ describe("keyEventToCellIntent", () => {
       ),
     ).toEqual({
       type: "startEdit",
-      coord: { rowId: "rows#r0", colId: "b" },
+      coord: { rowId: makeRowId(path, "r0"), colId: "b" },
       trigger: "enter",
     });
   });
@@ -463,7 +485,7 @@ describe("keyEventToCellIntent", () => {
       ),
     ).toEqual({
       type: "startEdit",
-      coord: { rowId: "rows#r0", colId: "a" },
+      coord: { rowId: makeRowId(path, "r0"), colId: "a" },
       trigger: "type",
       initial: "z",
     });
@@ -509,7 +531,7 @@ describe("keyEventToCellIntent", () => {
       ),
     ).toEqual({
       type: "startEdit",
-      coord: { rowId: "rows#r0", colId: "a" },
+      coord: { rowId: makeRowId(path, "r0"), colId: "a" },
       trigger: "f2",
     });
   });

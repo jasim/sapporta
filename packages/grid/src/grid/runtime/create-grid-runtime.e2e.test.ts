@@ -10,13 +10,14 @@
 // call deterministically without racing microtasks.
 
 import { describe, expect, it } from "vitest";
-import { createGridRuntime } from "./create-grid-runtime";
+import { createGridRuntime, runtimeInternalsFor } from "./create-grid-runtime";
 import type {
   FetchPageRequest,
   FetchPageResponse,
   PatchCellRequest,
   PatchCellResponse,
   ReconcileEvent,
+  RemoveNodeRequest,
 } from "../data-sources/types";
 import { inMemoryGridDataSource } from "../data-sources/memory/in-memory-grid-source";
 import { restGridDataSource } from "../data-sources/rest/rest-grid-source";
@@ -30,6 +31,7 @@ import {
 } from "../types/identity";
 import type { TreeNode } from "../types/level-row";
 import type { GridSchema } from "../types/schema";
+import { ROW_MULTISELECT_LIST } from "../types/interaction";
 
 // ---------------------------------------------------------------------
 // Fixture: orders → lines → notes.
@@ -68,21 +70,21 @@ const schema: GridSchema = {
       name: "orders",
       rowHeaderColumn: "none",
       columns: ordersColumns,
-      options: { rowKey: (n) => String(n.columns.id) },
+      options: {},
       childLevels: ["lines"],
     },
     lines: {
       name: "lines",
       rowHeaderColumn: "none",
       columns: linesColumns,
-      options: { rowKey: (n) => String(n.columns.id) },
+      options: {},
       childLevels: ["notes"],
     },
     notes: {
       name: "notes",
       rowHeaderColumn: "none",
       columns: notesColumns,
-      options: { rowKey: (n) => String(n.columns.id) },
+      options: {},
       childLevels: [],
     },
   },
@@ -125,16 +127,23 @@ type Transport = {
     req: PatchCellRequest;
     deferred: Deferred<PatchCellResponse>;
   }>;
+  removeCalls: Array<{
+    req: RemoveNodeRequest;
+    deferred: Deferred<void>;
+  }>;
   fetchPage: (req: FetchPageRequest) => Promise<FetchPageResponse>;
   patchCell: (req: PatchCellRequest) => Promise<PatchCellResponse>;
+  removeNode: (req: RemoveNodeRequest) => Promise<void>;
 };
 
 function makeTransport(): Transport {
   const fetchCalls: Transport["fetchCalls"] = [];
   const patchCalls: Transport["patchCalls"] = [];
+  const removeCalls: Transport["removeCalls"] = [];
   return {
     fetchCalls,
     patchCalls,
+    removeCalls,
     fetchPage: async (req) => {
       const d = deferred<FetchPageResponse>();
       fetchCalls.push({ req, deferred: d });
@@ -143,6 +152,11 @@ function makeTransport(): Transport {
     patchCell: async (req) => {
       const d = deferred<PatchCellResponse>();
       patchCalls.push({ req, deferred: d });
+      return d.promise;
+    },
+    removeNode: async (req) => {
+      const d = deferred<void>();
+      removeCalls.push({ req, deferred: d });
       return d.promise;
     },
   };
@@ -154,19 +168,35 @@ function endpointFor(t: Transport): RestEndpointFactory {
     fetchPage: t.fetchPage,
     patchCell: t.patchCell,
     insertNode: async (req) => req.node,
-    removeNode: async () => {},
+    removeNode: t.removeNode,
     rowQuery: sourceOwnedRowQuery({ page: 0, pageSize: 50 }),
   });
 }
 
 const ordersFixture = (): TreeNode[] => [
-  { levelName: "orders", columns: { id: "O1", customer: "Acme", amount: 100 } },
-  { levelName: "orders", columns: { id: "O2", customer: "Beta", amount: 200 } },
+  {
+    rowKey: "O1",
+    levelName: "orders",
+    columns: { id: "O1", customer: "Acme", amount: 100 },
+  },
+  {
+    rowKey: "O2",
+    levelName: "orders",
+    columns: { id: "O2", customer: "Beta", amount: 200 },
+  },
 ];
 
 const linesFixture = (): TreeNode[] => [
-  { levelName: "lines", columns: { id: "L1", sku: "SKU-1", qty: 1 } },
-  { levelName: "lines", columns: { id: "L2", sku: "SKU-2", qty: 5 } },
+  {
+    rowKey: "L1",
+    levelName: "lines",
+    columns: { id: "L1", sku: "SKU-1", qty: 1 },
+  },
+  {
+    rowKey: "L2",
+    levelName: "lines",
+    columns: { id: "L2", sku: "SKU-2", qty: 5 },
+  },
 ];
 
 // ---------------------------------------------------------------------
@@ -176,7 +206,7 @@ const linesFixture = (): TreeNode[] => [
 describe("GridRuntime over restGridDataSource — full lifecycle", () => {
   const ordersRoot = rootPath("orders");
 
-  function buildRig() {
+  function buildRig(interaction = false) {
     const orders = makeTransport();
     const lines = makeTransport();
     const notes = makeTransport();
@@ -193,6 +223,7 @@ describe("GridRuntime over restGridDataSource — full lifecycle", () => {
     const runtime = createGridRuntime({
       schema,
       dataSource,
+      ...(interaction ? { interaction: ROW_MULTISELECT_LIST } : {}),
       on: {
         cellReconciled: (p) =>
           events.push({ kind: "cellReconciled", payload: p }),
@@ -207,7 +238,7 @@ describe("GridRuntime over restGridDataSource — full lifecycle", () => {
     const { runtime, orders } = buildRig();
 
     expect(orders.fetchCalls).toHaveLength(1);
-    expect(runtime.sourceStateFor(ordersRoot).status).toBe("initialLoading");
+    expect(runtime.root.data.state().status).toBe("initialLoading");
 
     orders.fetchCalls[0].deferred.resolve({
       nodes: ordersFixture(),
@@ -215,7 +246,7 @@ describe("GridRuntime over restGridDataSource — full lifecycle", () => {
     });
     await flush();
 
-    const snap = runtime.snapshotFor(ordersRoot);
+    const snap = runtime.root.data.state().snapshot;
     expect(snap.nodes.map((n) => n.columns.id)).toEqual(["O1", "O2"]);
     expect("pagination" in snap).toBe(false);
   });
@@ -228,9 +259,7 @@ describe("GridRuntime over restGridDataSource — full lifecycle", () => {
     });
     await flush();
 
-    runtime
-      .sourceFor(ordersRoot)
-      .query!.sort!.set([{ colId: "amount", direction: "asc" }]);
+    runtime.root.data.query!.sort!.set([{ colId: "amount", direction: "asc" }]);
     expect(orders.fetchCalls).toHaveLength(2);
     expect(orders.fetchCalls[1].req.sort).toEqual([
       { colId: "amount", direction: "asc" },
@@ -245,11 +274,11 @@ describe("GridRuntime over restGridDataSource — full lifecycle", () => {
     });
     await flush();
 
-    runtime.coordinator.toggleExpand(ordersRoot, makeRowId(ordersRoot, "O1"));
+    runtime.root.toggleExpand(makeRowId(ordersRoot, "O1"));
     const linesPath = childPath(ordersRoot, "O1", "lines");
 
     expect(lines.fetchCalls).toHaveLength(1);
-    expect(runtime.sourceStateFor(linesPath).status).toBe("initialLoading");
+    expect(runtime.level(linesPath).data.state().status).toBe("initialLoading");
 
     lines.fetchCalls[0].deferred.resolve({
       nodes: linesFixture(),
@@ -257,9 +286,12 @@ describe("GridRuntime over restGridDataSource — full lifecycle", () => {
     });
     await flush();
 
-    expect(runtime.sourceStateFor(linesPath).status).toBe("ready");
+    expect(runtime.level(linesPath).data.state().status).toBe("ready");
     expect(
-      runtime.snapshotFor(linesPath).nodes.map((n) => n.columns.id),
+      runtime
+        .level(linesPath)
+        .data.state()
+        .snapshot.nodes.map((n) => n.columns.id),
     ).toEqual(["L1", "L2"]);
   });
 
@@ -272,7 +304,7 @@ describe("GridRuntime over restGridDataSource — full lifecycle", () => {
     await flush();
 
     const coord = { rowId: makeRowId(ordersRoot, "O1"), colId: "amount" };
-    runtime.writeCell(ordersRoot, coord, 150);
+    runtime.root.writeCell(coord, 150);
     expect(orders.patchCalls).toHaveLength(1);
 
     orders.patchCalls[0].deferred.resolve({ value: 150 });
@@ -298,13 +330,13 @@ describe("GridRuntime over restGridDataSource — full lifecycle", () => {
     await flush();
 
     const coord = { rowId: makeRowId(ordersRoot, "O1"), colId: "amount" };
-    runtime.writeCell(ordersRoot, coord, 150);
+    runtime.root.writeCell(coord, 150);
     orders.patchCalls[0].deferred.resolve({ value: 175 });
     await flush();
 
-    const updated = runtime
-      .snapshotFor(ordersRoot)
-      .nodes.find((n) => n.columns.id === "O1");
+    const updated = runtime.root.data
+      .state()
+      .snapshot.nodes.find((n) => n.columns.id === "O1");
     expect(updated?.columns.amount).toBe(175);
 
     const reconcile = events
@@ -333,10 +365,9 @@ describe("GridRuntime over restGridDataSource — full lifecycle", () => {
     });
     await flush();
 
-    runtime.sourceFor(ordersRoot).onReconcile((event) => {
+    runtime.root.data.onReconcile((event) => {
       if (event.kind === "rejected") {
-        runtime.writeCell(
-          ordersRoot,
+        runtime.root.writeCell(
           { rowId: makeRowId(ordersRoot, event.rowKey), colId: event.colId },
           event.priorValue,
         );
@@ -344,13 +375,13 @@ describe("GridRuntime over restGridDataSource — full lifecycle", () => {
     });
 
     const coord = { rowId: makeRowId(ordersRoot, "O1"), colId: "amount" };
-    runtime.writeCell(ordersRoot, coord, 150);
+    runtime.root.writeCell(coord, 150);
     orders.patchCalls[0].deferred.reject(
       new Error("403 Forbidden — column read-only"),
     );
     await flush();
 
-    const snap = runtime.snapshotFor(ordersRoot);
+    const snap = runtime.root.data.state().snapshot;
     expect(snap.nodes.find((n) => n.columns.id === "O1")?.columns.amount).toBe(
       100,
     );
@@ -371,8 +402,9 @@ describe("GridRuntime over restGridDataSource — full lifecycle", () => {
       priorValue: 100,
     });
     expect(
-      runtime.snapshotFor(ordersRoot).nodes.find((n) => n.columns.id === "O1")
-        ?.columns.amount,
+      runtime.root.data
+        .state()
+        .snapshot.nodes.find((n) => n.columns.id === "O1")?.columns.amount,
     ).toBe(100);
     expect(orders.patchCalls).toHaveLength(2);
     expect(orders.patchCalls[1].req).toEqual({
@@ -387,6 +419,55 @@ describe("GridRuntime over restGridDataSource — full lifecycle", () => {
     });
   });
 
+  it("rejected REST removal preserves the row, selection, and cursor", async () => {
+    const { runtime, orders } = buildRig(true);
+    orders.fetchCalls[0].deferred.resolve({
+      nodes: ordersFixture(),
+      totalCount: 2,
+    });
+    await flush();
+
+    const orderOne = makeRowId(ordersRoot, "O1");
+    runtime.root.setRowSelection({ kind: "single", rowId: orderOne });
+    runtimeInternalsFor(runtime).cursorManager.moveRowCursorTo({
+      path: ordersRoot,
+      rowId: orderOne,
+    });
+    const target = runtime.rowOperations.selectedDataTargets()[0]!;
+    const removal = runtime.rowOperations.remove([target]);
+
+    expect(orders.removeCalls).toHaveLength(1);
+    expect(orders.removeCalls[0].req).toEqual({ rowKey: "O1" });
+    expect(
+      runtime.root.data.state().snapshot.nodes.map(({ rowKey }) => rowKey),
+    ).toEqual(["O1", "O2"]);
+
+    const failure = new Error("delete denied");
+    orders.removeCalls[0].deferred.reject(failure);
+    await flush();
+    expect(orders.fetchCalls).toHaveLength(2);
+    orders.fetchCalls[1].deferred.resolve({
+      nodes: ordersFixture(),
+      totalCount: 2,
+    });
+    const result = await removal;
+
+    expect(result).toMatchObject({
+      kind: "partial",
+      removed: [],
+      failed: { rowKey: "O1" },
+      unattempted: [],
+      error: failure,
+    });
+    expect(
+      runtime.root.data.state().snapshot.nodes.map(({ rowKey }) => rowKey),
+    ).toEqual(["O1", "O2"]);
+    expect(runtime.root.selectedRowIds()).toEqual([orderOne]);
+    expect(
+      runtimeInternalsFor(runtime).cursorManager.currentRowCursor(),
+    ).toEqual({ path: ordersRoot, rowId: orderOne });
+  });
+
   it("refetch issues a new fetchPage; status flips ready → refreshing → ready", async () => {
     const { runtime, orders, events } = buildRig();
     orders.fetchCalls[0].deferred.resolve({
@@ -394,18 +475,18 @@ describe("GridRuntime over restGridDataSource — full lifecycle", () => {
       totalCount: 2,
     });
     await flush();
-    expect(runtime.sourceStateFor(ordersRoot).status).toBe("ready");
+    expect(runtime.root.data.state().status).toBe("ready");
 
-    runtime.sourceFor(ordersRoot).query!.refetch!();
+    runtime.root.data.query!.refetch!();
     expect(orders.fetchCalls).toHaveLength(2);
-    expect(runtime.sourceStateFor(ordersRoot).status).toBe("refreshing");
+    expect(runtime.root.data.state().status).toBe("refreshing");
 
     orders.fetchCalls[1].deferred.resolve({
       nodes: ordersFixture(),
       totalCount: 2,
     });
     await flush();
-    expect(runtime.sourceStateFor(ordersRoot).status).toBe("ready");
+    expect(runtime.root.data.state().status).toBe("ready");
 
     const statuses = events
       .filter((e) => e.kind === "levelStatusChanged")
@@ -430,7 +511,7 @@ describe("Success metric: REST source rows are already shaped for display", () =
         name: "orders",
         rowHeaderColumn: "none",
         columns: ordersColumns,
-        options: { rowKey: (n) => String(n.columns.id) },
+        options: {},
         childLevels: [],
       },
     },
@@ -451,14 +532,17 @@ describe("Success metric: REST source rows are already shaped for display", () =
     orders.fetchCalls[0].deferred.resolve({
       nodes: [
         {
+          rowKey: "O1",
           levelName: "orders",
           columns: { id: "O1", customer: "Acme", amount: 300 },
         },
         {
+          rowKey: "O2",
           levelName: "orders",
           columns: { id: "O2", customer: "Beta", amount: 100 },
         },
         {
+          rowKey: "O3",
           levelName: "orders",
           columns: { id: "O3", customer: "Gamma", amount: 200 },
         },
@@ -467,28 +551,29 @@ describe("Success metric: REST source rows are already shaped for display", () =
     });
     await flush();
 
-    const before = runtime
-      .displayedRowsFor(ordersRoot)
+    const before = runtime.root
+      .displayedRows()
       .rows.map((r) => r.columns.amount);
     expect(before).toEqual([300, 100, 200]);
 
     // Apply a sort descriptor. The REST source refetches; we resolve it with
     // the SAME unsorted nodes.
     // If the pipeline ran withSort, the displayed order would be [100,200,300].
-    runtime
-      .sourceFor(ordersRoot)
-      .query!.sort!.set([{ colId: "amount", direction: "asc" }]);
+    runtime.root.data.query!.sort!.set([{ colId: "amount", direction: "asc" }]);
     orders.fetchCalls[1].deferred.resolve({
       nodes: [
         {
+          rowKey: "O1",
           levelName: "orders",
           columns: { id: "O1", customer: "Acme", amount: 300 },
         },
         {
+          rowKey: "O2",
           levelName: "orders",
           columns: { id: "O2", customer: "Beta", amount: 100 },
         },
         {
+          rowKey: "O3",
           levelName: "orders",
           columns: { id: "O3", customer: "Gamma", amount: 200 },
         },
@@ -497,8 +582,8 @@ describe("Success metric: REST source rows are already shaped for display", () =
     });
     await flush();
 
-    const after = runtime
-      .displayedRowsFor(ordersRoot)
+    const after = runtime.root
+      .displayedRows()
       .rows.map((r) => r.columns.amount);
     expect(after).toEqual([300, 100, 200]);
   });
@@ -513,10 +598,12 @@ describe("Success metric: REST source rows are already shaped for display", () =
     orders.fetchCalls[0].deferred.resolve({
       nodes: [
         {
+          rowKey: "O1",
           levelName: "orders",
           columns: { id: "O1", customer: "Acme", amount: 300 },
         },
         {
+          rowKey: "O2",
           levelName: "orders",
           columns: { id: "O2", customer: "Beta", amount: 100 },
         },
@@ -526,16 +613,18 @@ describe("Success metric: REST source rows are already shaped for display", () =
     await flush();
 
     // Apply a filter that, if run client-side, would exclude both rows.
-    runtime.sourceFor(ordersRoot).query!.filter!.set({ amount: () => false });
+    runtime.root.data.query!.filter!.set({ amount: () => false });
     // The REST source refetches; resolve with both rows still present
     // (endpoint's prerogative).
     orders.fetchCalls[1].deferred.resolve({
       nodes: [
         {
+          rowKey: "O1",
           levelName: "orders",
           columns: { id: "O1", customer: "Acme", amount: 300 },
         },
         {
+          rowKey: "O2",
           levelName: "orders",
           columns: { id: "O2", customer: "Beta", amount: 100 },
         },
@@ -544,9 +633,7 @@ describe("Success metric: REST source rows are already shaped for display", () =
     });
     await flush();
 
-    const ids = runtime
-      .displayedRowsFor(ordersRoot)
-      .rows.map((r) => r.columns.id);
+    const ids = runtime.root.displayedRows().rows.map((r) => r.columns.id);
     expect(ids).toEqual(["O1", "O2"]);
   });
 });
@@ -560,7 +647,7 @@ describe("Success metric: switching source kinds requires no schema or component
         name: "orders",
         rowHeaderColumn: "none",
         columns: ordersColumns,
-        options: { rowKey: (n) => String(n.columns.id) },
+        options: {},
         childLevels: [],
       },
     },
@@ -585,8 +672,8 @@ describe("Success metric: switching source kinds requires no schema or component
       },
     });
     const rt1 = createGridRuntime({ schema: flatSchema, dataSource: ds1 });
-    expect(rt1.sourceStateFor(ordersRoot).status).toBe("ready");
-    const memRows = rt1.displayedRowsFor(ordersRoot).rows.map((r) => ({
+    expect(rt1.root.data.state().status).toBe("ready");
+    const memRows = rt1.root.displayedRows().rows.map((r) => ({
       id: r.columns.id,
       amount: r.columns.amount,
     }));
@@ -605,7 +692,7 @@ describe("Success metric: switching source kinds requires no schema or component
     });
     await flush();
 
-    const restRows = rt2.displayedRowsFor(ordersRoot).rows.map((r) => ({
+    const restRows = rt2.root.displayedRows().rows.map((r) => ({
       id: r.columns.id,
       amount: r.columns.amount,
     }));

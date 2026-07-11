@@ -49,7 +49,6 @@ const schema: GridSchema = {
       rowHeaderColumn: "none",
       columns: cols,
       options: {
-        rowKey: (n: TreeNode) => String(n.columns.id),
         allowPhantoms: true,
       },
       childLevels: [],
@@ -59,6 +58,7 @@ const schema: GridSchema = {
 
 function makeRows(): TreeNode[] {
   return Array.from({ length: 25 }, (_, i) => ({
+    rowKey: `r${i}`,
     levelName: "rows",
     columns: { id: `r${i}`, qty: i },
   }));
@@ -68,6 +68,7 @@ function buildRuntime(opts?: {
   sortMode?: "client" | "none";
   filterMode?: "client" | "none";
   paginationMode?: "client" | "none";
+  drafts?: boolean;
 }) {
   const dataSource = inMemoryGridDataSource<TestFilter>({
     schema,
@@ -81,13 +82,16 @@ function buildRuntime(opts?: {
       },
     },
   });
-  return createGridRuntime({ schema, dataSource });
+  return createGridRuntime({
+    schema,
+    dataSource,
+    ...(opts?.drafts ? { phantomRows: {} } : {}),
+  });
 }
 
 function buildReadonlyRuntime() {
   const readonlyRoot = inMemoryReadonlyLevelSource<TestFilter>({
     initialNodes: makeRows(),
-    options: schema.levels.rows.options,
     columns: cols,
     sortMode: "client",
     filterMode: "client",
@@ -113,9 +117,7 @@ describe("TableController — writable construction", () => {
     if (!tc.writable) throw new Error("expected writable");
     const sourceRef = tc.rootSource;
     const controllerRef = tc.rootController;
-    await tc.rootSource.query!.sort!.set([
-      { colId: "qty", direction: "desc" },
-    ]);
+    await tc.rootSource.query!.sort!.set([{ colId: "qty", direction: "desc" }]);
     expect(tc.rootSource).toBe(sourceRef);
     expect(tc.rootController).toBe(controllerRef);
   });
@@ -136,10 +138,8 @@ describe("TableController — passthroughs", () => {
   it("rootSource.query.sort applies a SortDescriptor", async () => {
     const rt = buildRuntime();
     const tc = createTableController({ runtime: rt });
-    await tc.rootSource.query!.sort!.set([
-      { colId: "qty", direction: "desc" },
-    ]);
-    const displayed = rt.displayedRowsFor(rootPath("rows"));
+    await tc.rootSource.query!.sort!.set([{ colId: "qty", direction: "desc" }]);
+    const displayed = rt.root.displayedRows();
     expect(displayed.rows[0].columns.qty).toBe(24);
     expect(displayed.rows[displayed.rows.length - 1].columns.qty).toBe(0);
   });
@@ -150,7 +150,7 @@ describe("TableController — passthroughs", () => {
     await tc.rootSource.query!.filter!.set({
       qty: (v: unknown) => Number(v) >= 20,
     } satisfies TestFilter);
-    const displayed = rt.displayedRowsFor(rootPath("rows"));
+    const displayed = rt.root.displayedRows();
     expect(displayed.rows.length).toBe(5);
     expect(displayed.rows.every((r) => Number(r.columns.qty) >= 20)).toBe(true);
   });
@@ -158,17 +158,17 @@ describe("TableController — passthroughs", () => {
 
 describe("TableController — phantoms", () => {
   it("phantoms.add shows the row in displayed output", () => {
-    const rt = buildRuntime();
+    const rt = buildRuntime({ drafts: true });
     const tc = createTableController({ runtime: rt });
     if (!tc.writable) throw new Error("expected writable");
     tc.phantoms.add(phantom("draft1", { id: "draft1", qty: 999 }));
-    const displayed = rt.displayedRowsFor(rootPath("rows"));
+    const displayed = rt.root.displayedRows();
     expect(displayed.rows.some((r) => r.kind === "phantom")).toBe(true);
     expect(tc.phantoms.get()).toHaveLength(1);
   });
 
   it("commitPhantomRow creates a real node, removes the phantom, emits phantomRowCommitted exactly once", async () => {
-    const rt = buildRuntime();
+    const rt = buildRuntime({ drafts: true });
     const tc = createTableController({ runtime: rt });
     if (!tc.writable) throw new Error("expected writable");
     let committed = 0;
@@ -185,10 +185,10 @@ describe("TableController — phantoms", () => {
     tc.phantoms.add(phantom("draft1", { id: "r25", qty: 25 }));
     await tc.commitPhantomRow("draft1");
 
-    const displayed = rt.displayedRowsFor(rootPath("rows"));
+    const displayed = rt.root.displayedRows();
     expect(displayed.rows.some((r) => r.kind === "phantom")).toBe(false);
     expect(displayed.rows[displayed.rows.length - 1].id).toBe(
-      makeRowId(rootPath("rows"), "r25"),
+      makeRowId(rootPath("rows"), "draft1"),
     );
     expect(tc.phantoms.get()).toHaveLength(0);
     expect(committed).toBe(1);
@@ -196,35 +196,44 @@ describe("TableController — phantoms", () => {
     expect(lastMutation).toEqual({
       kind: "insert",
       path: "rows",
-      node: { levelName: "rows", columns: { id: "r25", qty: 25 } },
+      node: {
+        rowKey: "draft1",
+        levelName: "rows",
+        columns: { id: "r25", qty: 25 },
+      },
       atIndex: 25,
     });
   });
 
   it("commitPhantomRow with a missing rowKey rejects and does not mutate state", async () => {
-    const rt = buildRuntime();
+    const rt = buildRuntime({ drafts: true });
     const tc = createTableController({ runtime: rt });
     if (!tc.writable) throw new Error("expected writable");
     let committed = 0;
     rt.on("phantomRowCommitted", () => {
       committed += 1;
     });
-    const before = rt.snapshotFor(rootPath("rows")).nodes;
+    const beforeState = rt.root.data.state();
+    if (beforeState.status !== "ready")
+      throw new Error("expected ready source");
+    const before = beforeState.snapshot.nodes;
     await expect(tc.commitPhantomRow("ghost")).rejects.toThrow(
       /no phantom with rowKey "ghost"/,
     );
-    expect(rt.snapshotFor(rootPath("rows")).nodes).toBe(before);
+    const afterState = rt.root.data.state();
+    if (afterState.status !== "ready") throw new Error("expected ready source");
+    expect(afterState.snapshot.nodes).toBe(before);
     expect(committed).toBe(0);
   });
 
   it("commitPhantomRow forwards atIndex to createNode", async () => {
-    const rt = buildRuntime();
+    const rt = buildRuntime({ drafts: true });
     const tc = createTableController({ runtime: rt });
     if (!tc.writable) throw new Error("expected writable");
     tc.phantoms.add(phantom("draft1", { id: "r99", qty: 99 }));
     await tc.commitPhantomRow("draft1", 0);
-    const displayed = rt.displayedRowsFor(rootPath("rows"));
-    expect(displayed.rows[0].id).toBe(makeRowId(rootPath("rows"), "r99"));
+    const displayed = rt.root.displayedRows();
+    expect(displayed.rows[0].id).toBe(makeRowId(rootPath("rows"), "draft1"));
   });
 });
 

@@ -3,13 +3,11 @@ import {
   createGridRuntime,
   makeRowId,
   restGridDataSource,
-  rootPath,
   type GridPath,
   type GridRuntime,
   type LoadedRowsBoundaryEvent,
   type RuntimeLevelDataSource,
   type RowQueryState,
-  type RowKey,
   type SortDescriptor,
   type SourceLoadResult,
 } from "@sapporta/grid";
@@ -261,8 +259,8 @@ class DefaultTGridSession<
       },
     });
 
-    this.rootGridPath = rootPath(runtimeConfig.gridSchema.rootLevel);
-    this.rootSource = this.runtime.sourceFor(this.rootGridPath);
+    this.rootGridPath = this.runtime.root.path;
+    this.rootSource = this.runtime.root.data;
     this.levelInfoById = runtimeConfig.levelInfoById as Record<
       TGridLevelId<RowsByLevel>,
       TGridLevelInfo
@@ -283,7 +281,8 @@ class DefaultTGridSession<
   ): readonly Readonly<RowsByLevel[LevelId]>[] {
     void levelId;
     return this.runtime
-      .displayedRowsFor(path)
+      .level(path)
+      .displayedRows()
       .rows.filter((row) => row.kind === "data")
       .map((row) => row.columns as RowsByLevel[LevelId]);
   }
@@ -294,10 +293,8 @@ class DefaultTGridSession<
     path: GridPath = this.rootGridPath,
   ): Readonly<RowsByLevel[LevelId]> | undefined {
     void levelId;
-    const row = this.runtime.displayedRowFor(
-      path,
-      makeRowId(path, rowKey as RowKey),
-    );
+    const level = this.runtime.level(path);
+    const row = level.displayedRow(makeRowId(level.path, rowKey));
     if (!row || row.kind !== "data") return undefined;
     return row.columns as RowsByLevel[LevelId];
   }
@@ -323,8 +320,9 @@ class DefaultTGridSession<
     path: GridPath,
     sort: SortDescriptor[],
   ): Promise<SourceLoadResult> {
+    const level = this.runtime.level(path);
     const result =
-      (await this.runtime.sourceFor(path).query?.sort?.set(sort)) ??
+      (await level.data.query?.sort?.set(sort)) ??
       this.unchangedSourceResult(path);
     this.pushUrlAfterReady(levelId, result);
     return result;
@@ -335,8 +333,9 @@ class DefaultTGridSession<
     path: GridPath,
     filter: TGridFilter | undefined,
   ): Promise<SourceLoadResult> {
+    const level = this.runtime.level(path);
     const result =
-      (await this.runtime.sourceFor(path).query?.filter?.set(filter)) ??
+      (await level.data.query?.filter?.set(filter)) ??
       this.unchangedSourceResult(path);
     this.pushUrlAfterReady(levelId, result);
     return result;
@@ -469,8 +468,8 @@ class DefaultTGridSession<
     // numbers, page-size policy, route state, and total-count checks. Returning
     // false tells the runtime to try an ancestor path or normal append-row
     // fallback.
-    const levelId = this.runtime.schemaAt(event.loadPath)
-      .name as TGridLevelId<RowsByLevel>;
+    const level = this.runtime.level(event.loadPath);
+    const levelId = level.schema.name as TGridLevelId<RowsByLevel>;
     const store = this.queryStoresByLevel.get(levelId);
     if (!store) return false;
     const query = store.getState();
@@ -480,7 +479,7 @@ class DefaultTGridSession<
       event.direction === "after" ? query.page + 1 : query.page - 1;
     if (nextPage < 1) return false;
 
-    const sourceState = this.runtime.sourceStateFor(event.loadPath);
+    const sourceState = level.data.state();
     if (sourceState.status !== "ready") return false;
     if (
       event.direction === "after" &&
@@ -501,8 +500,9 @@ class DefaultTGridSession<
   }
 
   private refetchSource(path: GridPath): Promise<SourceLoadResult> {
+    const level = this.runtime.level(path);
     return (
-      this.runtime.sourceFor(path).query?.refetch?.() ??
+      level.data.query?.refetch?.() ??
       Promise.resolve(this.unchangedSourceResult(path))
     );
   }
@@ -510,7 +510,7 @@ class DefaultTGridSession<
   private unchangedSourceResult(path: GridPath): SourceLoadResult {
     return {
       kind: "unchanged",
-      state: this.runtime.sourceStateFor(path),
+      state: this.runtime.level(path).data.state(),
     };
   }
 
@@ -738,7 +738,7 @@ class DefaultTGridSession<
   private errorStoreForPath(
     path: GridPath,
   ): StoreApi<TGridLevelQueryState<TGridTableRow>> | undefined {
-    const levelId = this.runtime.schemaAt(path)
+    const levelId = this.runtime.level(path).schema
       .name as TGridLevelId<RowsByLevel>;
     return (
       this.queryStoresByLevel.get(levelId) ??

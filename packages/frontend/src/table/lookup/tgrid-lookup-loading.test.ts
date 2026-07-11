@@ -2,18 +2,17 @@ import { describe, expect, it, vi } from "vitest";
 import type { ColumnSchema as TableColumnSchema } from "@sapporta/shared/contracts";
 import {
   childPath,
+  createGridRuntime,
+  inMemoryGridDataSource,
+  makeRowId,
   rootPath,
   type ColumnSchema,
-  type GridPath,
-  type GridRuntime,
+  type GridSchema,
   type LevelSchema,
-  type RuntimeLevelDataSource,
-  type SourceLoadResult,
   type TreeNode,
 } from "@sapporta/grid";
 import { columnPreset } from "@sapporta/grid/column-preset";
 import type { ValueLookup } from "@sapporta/grid/lookup";
-import type { TGridSession } from "../state/tgrid-session";
 import { startTGridLookupLoading } from "./tgrid-lookup-loading";
 import type { TGridTableColumnMeta } from "../grid-adapter/tgrid-column-mapper";
 
@@ -69,8 +68,9 @@ function makeGridColumn(args: {
 function makeLevel(args: {
   name: string;
   table: string;
-  columns: TableColumnSchema[];
-  valueLookupByColumn?: Record<string, ValueLookup>;
+  columns: readonly TableColumnSchema[];
+  childLevels?: readonly string[];
+  valueLookupByColumn?: Readonly<Record<string, ValueLookup>>;
 }): LevelSchema {
   return {
     name: args.name,
@@ -83,98 +83,102 @@ function makeLevel(args: {
     ),
     rowHeaderColumn: "none",
     options: {},
-    childLevels: [],
+    childLevels: args.childLevels ?? [],
   };
 }
 
-function makeNode(columns: Record<string, unknown>): TreeNode {
-  return { levelName: "test", columns };
-}
-
-function makeSource(nodes: TreeNode[]) {
-  const unsubscribe = vi.fn();
-  const source: RuntimeLevelDataSource = {
-    canWrite: false,
-    state: () => ({
-      status: "ready",
-      snapshot: {
-        nodes,
-      },
-    }),
-    subscribe: vi.fn(() => unsubscribe),
-    query: {
-      refetch: () => unchangedResult(source.state()),
-    },
-    onReconcile: () => () => {},
-  };
-  return { source, unsubscribe };
-}
-
-function unchangedResult(
-  state: ReturnType<RuntimeLevelDataSource["state"]>,
-): Promise<SourceLoadResult> {
-  return Promise.resolve({ kind: "unchanged", state });
-}
-
-function makeValueLookup(args: {
-  loadMissingEntries: (values: readonly unknown[]) => Promise<void>;
-}): ValueLookup {
+function makeValueLookup(
+  loadMissingEntries: (values: readonly unknown[]) => Promise<void>,
+): ValueLookup {
   return {
     entryForValue: vi.fn(),
-    loadMissingEntries: args.loadMissingEntries,
+    loadMissingEntries,
     subscribeToLookupChanges: vi.fn(() => () => {}),
   };
 }
 
 describe("startTGridLookupLoading", () => {
-  it("loads FK labels for every registered table path", () => {
-    const orderSource = makeSource([
-      makeNode({ id: 42, customer_id: "2" }),
-      makeNode({ id: 43, customer_id: "3" }),
-    ]);
-    const linesSource = makeSource([
-      makeNode({ id: 1, product_id: "5" }),
-      makeNode({ id: 2, product_id: "6" }),
-    ]);
+  it("loads FK labels through every registered path-bound level", () => {
     const customerLoad = vi.fn(async () => {});
     const productLoad = vi.fn(async () => {});
-    const customerLookup = makeValueLookup({
-      loadMissingEntries: customerLoad,
-    });
-    const productLookup = makeValueLookup({
-      loadMissingEntries: productLoad,
-    });
     const ordersLevel = makeLevel({
       name: "orders",
       table: "orders",
       columns: [idColumn, customerColumn],
-      valueLookupByColumn: { customer_id: customerLookup },
+      childLevels: ["orders.lines"],
+      valueLookupByColumn: {
+        customer_id: makeValueLookup(customerLoad),
+      },
     });
     const linesLevel = makeLevel({
       name: "orders.lines",
       table: "lines",
       columns: [idColumn, productColumn],
-      valueLookupByColumn: { product_id: productLookup },
+      valueLookupByColumn: {
+        product_id: makeValueLookup(productLoad),
+      },
     });
-    const runtime = {
-      registeredPaths: () => [ordersPath, linesPath],
-      sourceFor: (path: GridPath) =>
-        path === ordersPath ? orderSource.source : linesSource.source,
-      schemaAt: (path: GridPath) =>
-        path === ordersPath ? ordersLevel : linesLevel,
-      subscribeRegistry: () => () => {},
-    } as unknown as GridRuntime;
-    const session = {
-      runtime,
-    } as unknown as TGridSession;
+    const schema = {
+      rootLevel: "orders",
+      levels: {
+        orders: ordersLevel,
+        "orders.lines": linesLevel,
+      },
+    } satisfies GridSchema;
+    const lineNodes: TreeNode[] = [
+      {
+        rowKey: "1",
+        levelName: "orders.lines",
+        columns: { id: 1, product_id: "5" },
+      },
+      {
+        rowKey: "2",
+        levelName: "orders.lines",
+        columns: { id: 2, product_id: "6" },
+      },
+    ];
+    const runtime = createGridRuntime({
+      schema,
+      dataSource: inMemoryGridDataSource({
+        schema,
+        tree: [
+          {
+            rowKey: "42",
+            levelName: "orders",
+            columns: { id: 42, customer_id: "2" },
+            children: { "orders.lines": lineNodes },
+          },
+          {
+            rowKey: "43",
+            levelName: "orders",
+            columns: { id: 43, customer_id: "3" },
+          },
+        ],
+        levels: {
+          orders: {
+            sortMode: "none",
+            filterMode: "none",
+            paginationMode: "none",
+            readonly: true,
+          },
+          "orders.lines": {
+            sortMode: "none",
+            filterMode: "none",
+            paginationMode: "none",
+            readonly: true,
+          },
+        },
+      }),
+    });
+    runtime.root.expand(makeRowId(ordersPath, "42"));
+    expect(runtime.level(linesPath).path).toBe(linesPath);
 
-    const stop = startTGridLookupLoading(session);
+    const stop = startTGridLookupLoading({ runtime });
 
     expect(customerLoad).toHaveBeenCalledWith(["2", "3"]);
     expect(productLoad).toHaveBeenCalledWith(["5", "6"]);
 
     stop();
-    expect(orderSource.unsubscribe).toHaveBeenCalledOnce();
-    expect(linesSource.unsubscribe).toHaveBeenCalledOnce();
+    runtime.dispose();
   });
 });

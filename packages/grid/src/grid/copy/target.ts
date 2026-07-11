@@ -5,6 +5,7 @@ import { makeSelection, selectionContainsCoord } from "../types/selection";
 import type { DisplayedRows } from "../types/level-row";
 import type { ColumnSchema } from "../types/schema";
 import { cellCursorFromEventTarget } from "../react/internal/dom-targets";
+import { runtimeInternalsFor } from "../runtime/create-grid-runtime";
 
 export type GridCopyTarget = {
   path: CellCursor["path"];
@@ -24,7 +25,7 @@ function resolveGridCopyTargetFromActiveCell(
 ): GridCopyTarget | null {
   if (runtime.interaction.mode !== "cell-grid") return null;
 
-  const cursor = runtime.cursorManager.currentCellCursor();
+  const cursor = runtimeInternalsFor(runtime).cursorManager.currentCellCursor();
   if (!cursor) return null;
 
   const context = validCursorContext(runtime, cursor);
@@ -48,7 +49,7 @@ export function prepareGridCopyTarget(
   const existingSelection = selectionTargetForCursor(runtime, context);
   if (existingSelection) return existingSelection;
 
-  runtime.cursorManager.moveCellCursorTo(cursor);
+  runtimeInternalsFor(runtime).cursorManager.moveCellCursorTo(cursor);
   return singleCellTarget(cursor);
 }
 
@@ -95,7 +96,7 @@ function safeDisplayedRowsFor(
   path: CellCursor["path"],
 ): DisplayedRows | null {
   try {
-    return runtime.displayedRowsFor(path);
+    return runtime.level(path).displayedRows();
   } catch {
     return null;
   }
@@ -106,7 +107,7 @@ function safeColumnsFor(
   path: CellCursor["path"],
 ): readonly ColumnSchema[] | null {
   try {
-    return runtime.schemaAt(path).columns;
+    return runtime.level(path).schema.columns;
   } catch {
     return null;
   }
@@ -117,7 +118,8 @@ function safeControllerSelection(
   path: CellCursor["path"],
 ): CellSelectionState | null {
   try {
-    return runtime.controllerFor(path).getState().cellSelection;
+    return runtimeInternalsFor(runtime).controllerFor(path).getState()
+      .cellSelection;
   } catch {
     return null;
   }

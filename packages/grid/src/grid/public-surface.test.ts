@@ -1,4 +1,50 @@
 import { describe, expect, it } from "vitest";
+import * as advanced from "./advanced";
+import {
+  createGridRuntime,
+  inMemoryGridDataSource,
+  makeRowId,
+  rootPath,
+  ROW_MULTISELECT_LIST,
+  type GridSchema,
+} from "./index";
+
+const runtimeSchema: GridSchema = {
+  rootLevel: "rows",
+  levels: {
+    rows: {
+      name: "rows",
+      rowHeaderColumn: "none",
+      columns: [
+        {
+          id: "name",
+          name: "Name",
+          renderCell: ({ value }) => String(value ?? ""),
+        },
+      ],
+      options: {},
+      childLevels: [],
+    },
+  },
+};
+
+function publicRuntime() {
+  return createGridRuntime({
+    schema: runtimeSchema,
+    interaction: ROW_MULTISELECT_LIST,
+    dataSource: inMemoryGridDataSource({
+      schema: runtimeSchema,
+      tree: [{ rowKey: "a", levelName: "rows", columns: { name: "Alpha" } }],
+      levels: {
+        rows: {
+          sortMode: "none",
+          filterMode: "none",
+          paginationMode: "none",
+        },
+      },
+    }),
+  });
+}
 
 describe("grid public surface", () => {
   it("does not export removed internal grid APIs", async () => {
@@ -29,5 +75,72 @@ describe("grid public surface", () => {
     expect(mod).not.toHaveProperty("useGridRuntimeResource");
     expect(mod).not.toHaveProperty("inMemoryLevelSource");
     expect(mod).not.toHaveProperty("restLevelSource");
+  });
+
+  it("publishes exactly the proposed GridRuntime keys", () => {
+    const runtime = publicRuntime();
+
+    expect(Object.keys(runtime).sort()).toEqual([
+      "dispose",
+      "interaction",
+      "level",
+      "on",
+      "registeredLevels",
+      "root",
+      "rowOperations",
+      "schema",
+      "schemaAt",
+      "subscribeLevels",
+    ]);
+    expect(runtime).not.toHaveProperty("controllerFor");
+    expect(runtime).not.toHaveProperty("cursorManager");
+    expect(runtime).not.toHaveProperty("invalidateDisplayedRows");
+    expect(runtime).not.toHaveProperty("requestLoadedRowsBoundary");
+    expect(runtime).not.toHaveProperty("sourceFor");
+  });
+
+  it("exposes supported advanced composition without private runtime ports", () => {
+    expect(Object.keys(advanced).sort()).toEqual([
+      "applyCursorContinuation",
+      "cellActivationFor",
+      "controllerFor",
+      "createPhantomChannel",
+      "createPhantomRowLifecycle",
+      "cursorManagerFor",
+      "materializedChildren",
+      "planCursorContinuationForRowRemoval",
+    ]);
+    expect(advanced).not.toHaveProperty("runtimeInternalsFor");
+    expect(advanced).not.toHaveProperty("createGridCoordinator");
+    expect(advanced).not.toHaveProperty("invalidateDisplayedRows");
+    expect(advanced).not.toHaveProperty("requestLoadedRowsBoundary");
+
+    const runtime = publicRuntime();
+    const path = rootPath("rows");
+    const rowId = makeRowId(path, "a");
+    const cursors = advanced.cursorManagerFor(runtime);
+    cursors.moveRowCursorTo({ path, rowId });
+
+    expect(cursors.currentRowCursor()).toEqual({ path, rowId });
+    expect(advanced.cursorManagerFor(runtime)).toBe(cursors);
+    expect(advanced.controllerFor(runtime, path)).toBe(
+      advanced.controllerFor(runtime, path),
+    );
+  });
+
+  it("returns frozen schema and interaction snapshots", () => {
+    const runtime = publicRuntime();
+    const level = runtime.schema.levels.rows;
+
+    expect(Object.isFrozen(runtime.schema)).toBe(true);
+    expect(Object.isFrozen(runtime.schema.levels)).toBe(true);
+    expect(Object.isFrozen(level)).toBe(true);
+    expect(Object.isFrozen(level.columns)).toBe(true);
+    expect(Object.isFrozen(level.columns[0])).toBe(true);
+    expect(Object.isFrozen(level.options)).toBe(true);
+    expect(Object.isFrozen(level.childLevels)).toBe(true);
+    expect(Object.isFrozen(runtime.interaction)).toBe(true);
+    expect(Object.isFrozen(runtime.interaction.activeRow)).toBe(true);
+    expect(Object.isFrozen(runtime.interaction.selectedRows)).toBe(true);
   });
 });

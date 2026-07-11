@@ -3,6 +3,7 @@
 import { afterEach, describe, expect, it } from "vitest";
 import {
   createGridRuntime,
+  runtimeInternalsFor,
   type GridRuntime,
 } from "../runtime/create-grid-runtime";
 import { inMemoryGridDataSource } from "../data-sources/memory/in-memory-grid-source";
@@ -48,7 +49,7 @@ const schema: GridSchema = {
       name: "accounts",
       columns,
       rowHeaderColumn: "none",
-      options: { rowKey: (node, localIdx) => node.rowKey ?? String(localIdx) },
+      options: {},
       childLevels: ["entries"],
     },
     entries: {
@@ -58,7 +59,7 @@ const schema: GridSchema = {
         column("description", "Description"),
         column("amount", "Amount"),
       ],
-      options: { rowKey: (node, localIdx) => node.rowKey ?? String(localIdx) },
+      options: {},
       childLevels: [],
     },
   },
@@ -287,9 +288,7 @@ describe("serializeGridCopyTargetToCsv", () => {
                 ],
               },
             ],
-            options: {
-              rowKey: (node, localIdx) => node.rowKey ?? String(localIdx),
-            },
+            options: {},
             childLevels: [],
           },
         },
@@ -349,9 +348,7 @@ describe("serializeGridCopyTargetToCsv", () => {
                 },
               },
             ],
-            options: {
-              rowKey: (node, localIdx) => node.rowKey ?? String(localIdx),
-            },
+            options: {},
             childLevels: [],
           },
         },
@@ -407,9 +404,7 @@ describe("serializeGridCopyTargetToCsv", () => {
                 ],
               },
             ],
-            options: {
-              rowKey: (node, localIdx) => node.rowKey ?? String(localIdx),
-            },
+            options: {},
             childLevels: [],
           },
         },
@@ -442,12 +437,13 @@ describe("serializeGridCopyTargetToCsv", () => {
 describe("prepareGridCopyTarget", () => {
   it("preserves the selected range when right-clicking inside it", () => {
     const runtime = makeRuntime();
-    runtime.cursorManager.setCellRange(
+    const internals = runtimeInternalsFor(runtime);
+    internals.cursorManager.setCellRange(
       root,
       { rowId: cashId, colId: "account" },
       { rowId: revenueId, colId: "debit" },
     );
-    const before = runtime.cursorManager.currentCellCursor();
+    const before = internals.cursorManager.currentCellCursor();
 
     const target = prepareGridCopyTarget(
       runtime,
@@ -461,12 +457,13 @@ describe("prepareGridCopyTarget", () => {
         head: { rowId: revenueId, colId: "debit" },
       },
     });
-    expect(runtime.cursorManager.currentCellCursor()).toEqual(before);
+    expect(internals.cursorManager.currentCellCursor()).toEqual(before);
   });
 
   it("replaces the target with a single cell when right-clicking outside the selected range", () => {
     const runtime = makeRuntime();
-    runtime.cursorManager.setCellRange(
+    const internals = runtimeInternalsFor(runtime);
+    internals.cursorManager.setCellRange(
       root,
       { rowId: cashId, colId: "account" },
       { rowId: revenueId, colId: "debit" },
@@ -481,17 +478,17 @@ describe("prepareGridCopyTarget", () => {
       path: root,
       selection: makeSelection({ rowId: revenueId, colId: "note" }),
     });
-    expect(runtime.cursorManager.currentCellCursor()).toEqual({
+    expect(internals.cursorManager.currentCellCursor()).toEqual({
       path: root,
       rowId: revenueId,
       colId: "note",
     });
-    expect(runtime.controllerFor(root).getState().cellSelection).toBeNull();
+    expect(internals.controllerFor(root).getState().cellSelection).toBeNull();
   });
 
   it("uses the active cell when the context menu opens outside a cell", () => {
     const runtime = makeRuntime();
-    runtime.cursorManager.moveCellCursorTo({
+    runtimeInternalsFor(runtime).cursorManager.moveCellCursorTo({
       path: root,
       rowId: cashId,
       colId: "account",
@@ -515,15 +512,16 @@ describe("prepareGridCopyTarget", () => {
 
   it("keeps selections scoped to the clicked child path", async () => {
     const runtime = makeRuntime();
-    runtime.coordinator.expand(root, cashId);
+    const internals = runtimeInternalsFor(runtime);
+    runtime.root.expand(cashId);
     const entriesPath = childPath(root, "cash", "entries");
     const entryId = makeRowId(entriesPath, "entry-1");
-    runtime.cursorManager.setCellRange(
+    internals.cursorManager.setCellRange(
       root,
       { rowId: cashId, colId: "account" },
       { rowId: revenueId, colId: "debit" },
     );
-    runtime.cursorManager.setCellRange(
+    internals.cursorManager.setCellRange(
       entriesPath,
       { rowId: entryId, colId: "description" },
       { rowId: entryId, colId: "amount" },

@@ -23,32 +23,32 @@ export type LevelSnapshot = {
   // Already filtered, sorted, and windowed for display by the source or host.
   // Consumers render these nodes as-is. If an application needs a different
   // query policy, it belongs in the source that publishes this array.
-  nodes: readonly TreeNode[];
+  readonly nodes: readonly TreeNode[];
   // Server-supplied or source-computed aggregates for this level.
-  footerRows?: readonly FooterRow[];
+  readonly footerRows?: readonly FooterRow[];
 };
 
 export type LevelSourceState =
   | {
-      status: "initialLoading";
-      snapshot: LevelSnapshot;
+      readonly status: "initialLoading";
+      readonly snapshot: LevelSnapshot;
     }
-  | { status: "ready"; snapshot: LevelSnapshot }
+  | { readonly status: "ready"; readonly snapshot: LevelSnapshot }
   | {
-      status: "refreshing";
-      snapshot: LevelSnapshot;
-      previous: LevelSnapshot;
-    }
-  | {
-      status: "initialError";
-      snapshot: LevelSnapshot;
-      error: Error;
+      readonly status: "refreshing";
+      readonly snapshot: LevelSnapshot;
+      readonly previous: LevelSnapshot;
     }
   | {
-      status: "refreshError";
-      snapshot: LevelSnapshot;
-      previous: LevelSnapshot;
-      error: Error;
+      readonly status: "initialError";
+      readonly snapshot: LevelSnapshot;
+      readonly error: Error;
+    }
+  | {
+      readonly status: "refreshError";
+      readonly snapshot: LevelSnapshot;
+      readonly previous: LevelSnapshot;
+      readonly error: Error;
     };
 
 export type SourceLoadResult =
@@ -58,25 +58,29 @@ export type SourceLoadResult =
   // DOM focus, scroll position, URL state, or any host workflow that may run
   // after the load settles.
   | {
-      kind: "ready";
-      state: Extract<LevelSourceState, { status: "ready" }>;
+      readonly kind: "ready";
+      readonly state: Extract<LevelSourceState, { status: "ready" }>;
     }
   | {
-      kind: "error";
-      state: Extract<
+      readonly kind: "error";
+      readonly state: Extract<
         LevelSourceState,
         { status: "initialError" | "refreshError" }
       >;
     }
-  | { kind: "unchanged"; state: LevelSourceState }
-  | { kind: "superseded" }
-  | { kind: "disposed" };
+  | { readonly kind: "unchanged"; readonly state: LevelSourceState }
+  | { readonly kind: "superseded" }
+  | { readonly kind: "disposed" };
 
-export type CellChange = { rowKey: RowKey; colId: ColId; value: unknown };
+export type CellChange = {
+  readonly rowKey: RowKey;
+  readonly colId: ColId;
+  readonly value: unknown;
+};
 
 export type CreateNodeResult = {
-  node: TreeNode;
-  atIndex: number;
+  readonly node: TreeNode;
+  readonly atIndex: number;
 };
 
 // The named outcome of an optimistic edit, surfaced after the server
@@ -84,101 +88,106 @@ export type CreateNodeResult = {
 // UX, or revert decisions.
 export type ReconcileEvent =
   | {
-      kind: "agreed";
-      rowKey: RowKey;
-      colId: ColId;
+      readonly kind: "agreed";
+      readonly rowKey: RowKey;
+      readonly colId: ColId;
       // The value the server confirmed — equal to the optimistic value
       // the caller passed to `setCell`.
-      value: unknown;
+      readonly value: unknown;
     }
   | {
-      kind: "diverged";
-      rowKey: RowKey;
-      colId: ColId;
+      readonly kind: "diverged";
+      readonly rowKey: RowKey;
+      readonly colId: ColId;
       // The value the caller submitted.
-      optimisticValue: unknown;
+      readonly optimisticValue: unknown;
       // The value the server actually stored. The source has ALREADY
       // updated `nodes` to this value before emitting, so by the time
       // the host sees this event the grid is showing truth.
-      authoritativeValue: unknown;
+      readonly authoritativeValue: unknown;
       // Value visible immediately before the optimistic edit.
-      priorValue: unknown;
+      readonly priorValue: unknown;
     }
   | {
-      kind: "rejected";
-      rowKey: RowKey;
-      colId: ColId;
+      readonly kind: "rejected";
+      readonly rowKey: RowKey;
+      readonly colId: ColId;
       // The optimistic value still standing in `nodes` — the source
       // does NOT auto-revert.
-      optimisticValue: unknown;
+      readonly optimisticValue: unknown;
       // Backend error text, surfaced verbatim per project policy.
-      reason: string;
+      readonly reason: string;
       // Value visible immediately before the optimistic edit.
-      priorValue: unknown;
+      readonly priorValue: unknown;
     };
 
 export type SortQueryCapability = {
-  current(): readonly SortDescriptor[] | undefined;
-  set(sort: readonly SortDescriptor[] | undefined): Promise<SourceLoadResult>;
+  readonly current: () => readonly SortDescriptor[] | undefined;
+  readonly set: (
+    sort: readonly SortDescriptor[] | undefined,
+  ) => Promise<SourceLoadResult>;
 };
 
 export type FilterQueryCapability<TFilter = unknown> = {
-  current(): TFilter | undefined;
-  set(filter: TFilter | undefined): Promise<SourceLoadResult>;
+  readonly current: () => TFilter | undefined;
+  readonly set: (filter: TFilter | undefined) => Promise<SourceLoadResult>;
 };
 
 export type LevelQueryCapabilities = {
-  sort?: SortQueryCapability;
-  filter?: FilterQueryCapability<unknown>;
-  refetch?: () => Promise<SourceLoadResult>;
+  readonly sort?: SortQueryCapability;
+  readonly filter?: FilterQueryCapability<unknown>;
+  readonly refetch?: () => Promise<SourceLoadResult>;
 };
 
 export type WriteCapability = {
-  setCell(rowKey: RowKey, colId: ColId, value: unknown): void;
-  applyChanges(changes: readonly CellChange[]): void;
-  createNode(node: TreeNode, atIndex?: number): Promise<CreateNodeResult>;
-  removeNode(rowKey: RowKey): void | Promise<void>;
-  onReconcile(fn: (event: ReconcileEvent) => void): () => void;
-  canAppendRow?: () => boolean;
+  readonly setCell: (rowKey: RowKey, colId: ColId, value: unknown) => void;
+  readonly applyChanges: (changes: readonly CellChange[]) => void;
+  readonly createNode: (
+    node: TreeNode,
+    atIndex?: number,
+  ) => Promise<CreateNodeResult>;
+  readonly removeNode: (rowKey: RowKey) => void | Promise<void>;
+  readonly onReconcile: (fn: (event: ReconcileEvent) => void) => () => void;
+  readonly canAppendRow?: () => boolean;
 };
 
 export type LevelDataSource = {
-  state(): LevelSourceState;
+  readonly state: () => LevelSourceState;
   // Subscribe to source state transitions. The callback receives no payload;
   // consumers re-read `state()` after it fires. A callback must run only after
   // the source has made the new state visible through `state()`.
-  subscribe(fn: () => void): () => void;
-  dispose(): void;
+  readonly subscribe: (fn: () => void) => () => void;
+  readonly dispose: () => void;
 
-  query?: LevelQueryCapabilities;
-  write?: WriteCapability;
+  readonly query?: LevelQueryCapabilities;
+  readonly write?: WriteCapability;
 };
 
 // Host-facing source view returned by `GridRuntime.sourceFor`. It preserves
 // read/query/reconcile access while hiding write verbs, so all mutations flow
 // through runtime methods.
 export type RuntimeLevelDataSource = {
-  state(): LevelSourceState;
-  subscribe(fn: () => void): () => void;
-  query?: LevelQueryCapabilities;
-  canWrite: boolean;
-  onReconcile(fn: (e: ReconcileEvent) => void): () => void;
+  readonly state: () => LevelSourceState;
+  readonly subscribe: (fn: () => void) => () => void;
+  readonly query?: LevelQueryCapabilities;
+  readonly canWrite: boolean;
+  readonly onReconcile: (fn: (event: ReconcileEvent) => void) => () => void;
 };
 
 // The hierarchical seam — produces a fresh `LevelDataSource` for each
 // expanded child. The runtime owns lifecycle and caching; the source
 // must NOT maintain its own child registry.
 export type GridDataSource = {
-  rootSource: () => LevelDataSource;
+  readonly rootSource: () => LevelDataSource;
   // Pure factory. Returns a fresh `LevelDataSource` for a child level
   // rooted at (parentPath, parentRowKey, childLevelName). The runtime's
   // registry guards against double-resolve.
-  resolveChild: (
+  readonly resolveChild: (
     parentPath: GridPath,
     parentRowKey: RowKey,
     childLevelName: string,
   ) => LevelDataSource;
-  dispose: () => void;
+  readonly dispose: () => void;
 };
 
 // Phantoms — author-state, kept on a separate per-path channel and layered
@@ -187,22 +196,27 @@ export type GridDataSource = {
 export type PhantomChannel = {
   // Identity-stable — same path with the same phantom set returns the
   // same array reference.
-  get: (path: GridPath) => PhantomRow[];
-  add: (path: GridPath, phantom: PhantomRow) => void;
-  remove: (path: GridPath, rowKey: RowKey) => void;
-  setCell: (
+  readonly get: (path: GridPath) => readonly PhantomRow[];
+  readonly add: (path: GridPath, phantom: PhantomRow) => void;
+  readonly remove: (path: GridPath, rowKey: RowKey) => void;
+  readonly setCell: (
     path: GridPath,
     rowKey: RowKey,
     colId: ColId,
     value: unknown,
   ) => void;
-  setState: (path: GridPath, rowKey: RowKey, state: PhantomRowState) => void;
-  update: (
+  readonly setState: (
+    path: GridPath,
+    rowKey: RowKey,
+    state: PhantomRowState,
+  ) => void;
+  readonly update: (
     path: GridPath,
     rowKey: RowKey,
     update: (row: PhantomRow) => PhantomRow,
   ) => void;
-  subscribe: (path: GridPath, fn: () => void) => () => void;
+  readonly subscribe: (path: GridPath, fn: () => void) => () => void;
+  readonly dispose: () => void;
 };
 
 // REST request / response shapes consumed by `restLevelSource`. Declared
@@ -216,41 +230,44 @@ export type PhantomChannel = {
 // parameterization — they are unaffected by the host's filter grammar.
 
 export type FetchPageRequest<F = unknown> = {
-  sort?: readonly SortDescriptor[];
-  filter?: F;
-  page: number;
-  pageSize: number;
+  readonly sort?: readonly SortDescriptor[];
+  readonly filter?: F;
+  readonly page: number;
+  readonly pageSize: number;
 };
 
 export type FetchPageResponse = {
   // Already shaped by the endpoint for display.
-  nodes: readonly TreeNode[];
-  totalCount?: number;
-  footerRows?: readonly FooterRow[];
+  readonly nodes: readonly TreeNode[];
+  readonly totalCount?: number;
+  readonly footerRows?: readonly FooterRow[];
 };
 
 export type PatchCellRequest = {
-  rowKey: RowKey;
-  colId: ColId;
-  value: unknown;
-  row: Record<ColId, unknown>;
+  readonly rowKey: RowKey;
+  readonly colId: ColId;
+  readonly value: unknown;
+  readonly row: Readonly<Record<ColId, unknown>>;
 };
 
 // `patchCell` can return the authoritative cell value, a row patch, a full
 // row replacement, or request a reload. The simple `{ value }` shape is the
 // source-level contract for direct cell updates.
 export type PatchCellResponse =
-  | { value: unknown }
-  | { kind: "value"; value: unknown }
-  | { kind: "patch"; patch: Record<ColId, unknown> }
-  | { kind: "row"; node: TreeNode }
-  | { kind: "reload" };
+  | { readonly value: unknown }
+  | { readonly kind: "value"; readonly value: unknown }
+  | {
+      readonly kind: "patch";
+      readonly patch: Readonly<Record<ColId, unknown>>;
+    }
+  | { readonly kind: "row"; readonly node: TreeNode }
+  | { readonly kind: "reload" };
 
 export type InsertNodeRequest = {
-  node: TreeNode;
-  atIndex?: number;
+  readonly node: TreeNode;
+  readonly atIndex?: number;
 };
 
 export type RemoveNodeRequest = {
-  rowKey: RowKey;
+  readonly rowKey: RowKey;
 };
