@@ -2,7 +2,7 @@ import { performance } from "node:perf_hooks";
 import {
   createGridRuntime,
   type GridRuntime,
-} from "../src/grid/runtime/create-grid-runtime";
+} from "../src/grid/runtime/runtime";
 import type { GridLevelRuntime } from "../src/grid/runtime/grid-level-runtime";
 import { controllerFor, cursorManagerFor } from "../src/advanced";
 import { inMemoryGridDataSource } from "../src/grid/data-sources/memory/in-memory-grid-source";

@@ -374,9 +374,6 @@ export type RuntimeKernel = {
   dispose: () => void;
 };
 
-/** @deprecated Package-private compatibility name for interaction tests. */
-export type GridRuntimeInternals = RuntimeKernel;
-
 export type RowInteractionCommands = {
   setRowCursor: (target: RowCursor) => void;
   clearRowCursor: () => void;
@@ -392,7 +389,7 @@ const kernels = new WeakMap<GridRuntime, RuntimeKernel>();
 
 export function runtimeInternalsFor(
   runtime: GridRuntime,
-): GridRuntimeInternals {
+): RuntimeKernel {
   const internals = kernels.get(runtime);
   if (!internals) {
     throw new Error("GridRuntime: value was not created by createGridRuntime.");
@@ -485,13 +482,13 @@ export function createGridRuntime(args: RuntimeArgs): GridRuntime {
   }
 
   const root = rootPath(schemaTopology.rootLevelName);
-  let disposed = false;
+  let shutdownRequested = false;
   let runtimeFault: Error | null = null;
-  let dependenciesDisposed = false;
-  let activeOperations = 0;
+  let retainedResourcesReleased = false;
+  let inFlightOperations = 0;
 
   function assertLive(): void {
-    if (disposed) {
+    if (shutdownRequested) {
       throw new Error("GridRuntime has been disposed.");
     }
     if (runtimeFault) {
@@ -535,15 +532,17 @@ export function createGridRuntime(args: RuntimeArgs): GridRuntime {
     } catch (error) {
       return Promise.reject(error);
     }
-    activeOperations += 1;
+    inFlightOperations += 1;
     try {
       return operation().finally(() => {
-        activeOperations -= 1;
-        if (disposed && activeOperations === 0) disposeDependencies();
+        inFlightOperations -= 1;
+        if (shutdownRequested && inFlightOperations === 0)
+          releaseRetainedResources();
       });
     } catch (error) {
-      activeOperations -= 1;
-      if (disposed && activeOperations === 0) disposeDependencies();
+      inFlightOperations -= 1;
+      if (shutdownRequested && inFlightOperations === 0)
+        releaseRetainedResources();
       return Promise.reject(error);
     }
   }
@@ -560,7 +559,7 @@ export function createGridRuntime(args: RuntimeArgs): GridRuntime {
       }
     },
     onReconcile: (handle, event) => {
-      if (!disposed)
+      if (!shutdownRequested)
         emitter.emit("cellReconciled", { path: handle.path, event });
     },
     onObserverError: args.onObserverError,
@@ -592,7 +591,7 @@ export function createGridRuntime(args: RuntimeArgs): GridRuntime {
       phantomLifecycle.setPhantomCell(path, rowKey, colId, value),
     emit: emitter.emit,
     fault: faultRuntime,
-    isDisposed: () => disposed,
+    isDisposed: () => shutdownRequested,
   });
   const drafts = createDraftRuntime({
     phantoms,
@@ -607,7 +606,7 @@ export function createGridRuntime(args: RuntimeArgs): GridRuntime {
       phantomLifecycle.setPhantomCell(path, rowKey, colId, value),
     isBlank: phantomLifecycle.isBlank,
     emit: emitter.emit,
-    isDisposed: () => disposed,
+    isDisposed: () => shutdownRequested,
   });
 
   // Lazy controllers. Identity-stable per path for the runtime's
@@ -655,7 +654,7 @@ export function createGridRuntime(args: RuntimeArgs): GridRuntime {
   function notifyRegistryChanged(): void {
     registeredPathSnapshot = null;
     registeredLevelSnapshot = null;
-    if (!disposed) registryListeners.notify();
+    if (!shutdownRequested) registryListeners.notify();
   }
 
   function levelNameOf(path: GridPath): string {
@@ -669,7 +668,7 @@ export function createGridRuntime(args: RuntimeArgs): GridRuntime {
     const { handle, state, statusChanged } = refresh;
     const path = handle.path;
     applyAuthoritativeRemovalCleanup(path, state.snapshot.nodes);
-    if (disposed) return;
+    if (shutdownRequested) return;
     phantomLifecycle.reconcileBlankAppendPhantoms(path);
     phantomLifecycle.ensureBlankForEmptyPath(path);
     invalidateDisplayedRows(path, { type: "source" });
@@ -917,7 +916,7 @@ export function createGridRuntime(args: RuntimeArgs): GridRuntime {
   // applied sort is reflected on the next call without explicit
   // invalidation. The reference is late-bound because the runtime
   // object is built below.
-  let runtimeRef: GridRuntimeInternals | null = null;
+  let runtimeRef: RuntimeKernel | null = null;
   let cursorManagerRef: CursorManagerInternal | null = null;
   const coordinator: GridCoordinatorStore = createGridCoordinator({
     getRuntime: () => {
@@ -1519,7 +1518,7 @@ export function createGridRuntime(args: RuntimeArgs): GridRuntime {
       data: sourceFor(path),
       assertLive: () => assertLevelRegistrationLive(path, registration),
       isLive: () =>
-        !disposed &&
+        !shutdownRequested &&
         !runtimeFault &&
         sourceRegistry.entryForHandle(registration) !== undefined,
       onObserverError: (error) =>
@@ -1695,7 +1694,7 @@ export function createGridRuntime(args: RuntimeArgs): GridRuntime {
     listener: (...args: Args) => void,
   ): (...args: Args) => void {
     return (...listenerArgs) => {
-      if (disposed || runtimeFault) return;
+      if (shutdownRequested || runtimeFault) return;
       try {
         listener(...listenerArgs);
       } catch (error) {
@@ -1795,7 +1794,7 @@ export function createGridRuntime(args: RuntimeArgs): GridRuntime {
         target.path,
         sourceRegistry.state(target.path).snapshot.nodes,
       );
-      if (!disposed) {
+      if (!shutdownRequested) {
         emitter.emit("mutationCommitted", {
           kind: "remove",
           path: target.path,
@@ -1812,7 +1811,7 @@ export function createGridRuntime(args: RuntimeArgs): GridRuntime {
   async function settleTouchedPaths(
     paths: ReadonlySet<GridPath>,
   ): Promise<void> {
-    if (disposed) return;
+    if (shutdownRequested) return;
     const refetches: Promise<unknown>[] = [];
     for (const path of paths) {
       const refetch = sourceRegistry.source(path)?.query?.refetch;
@@ -1849,7 +1848,7 @@ export function createGridRuntime(args: RuntimeArgs): GridRuntime {
     removed: readonly RowOperationTarget<"data">[],
     complete: boolean,
   ): void {
-    if (disposed) return;
+    if (shutdownRequested) return;
     const token = opaqueToken as RuntimeRemovalCursorToken;
     if (cursorRevision !== token.revision && currentCursorIsValid()) return;
     if (complete && currentCursorIsValid()) return;
@@ -1988,8 +1987,8 @@ export function createGridRuntime(args: RuntimeArgs): GridRuntime {
   });
 
   function dispose() {
-    if (disposed) return;
-    disposed = true;
+    if (shutdownRequested) return;
+    shutdownRequested = true;
     for (const level of levelsByPath.values()) {
       cleanupSafely(() => disposeGridLevelRuntime(level));
     }
@@ -1999,12 +1998,12 @@ export function createGridRuntime(args: RuntimeArgs): GridRuntime {
     interactionRuntime.dispose();
     cleanupSafely(unsubscribeCursorRevision);
     loadedBoundaryRuntime?.dispose();
-    if (activeOperations === 0) disposeDependencies();
+    if (inFlightOperations === 0) releaseRetainedResources();
   }
 
-  function disposeDependencies(): void {
-    if (dependenciesDisposed) return;
-    dependenciesDisposed = true;
+  function releaseRetainedResources(): void {
+    if (retainedResourcesReleased) return;
+    retainedResourcesReleased = true;
     sourceRegistry.dispose();
     phantomLifecycleSources.clear();
     levelsByPath.clear();
@@ -2015,7 +2014,7 @@ export function createGridRuntime(args: RuntimeArgs): GridRuntime {
     cleanupSafely(() => dataSource.dispose());
   }
 
-  const internals: GridRuntimeInternals = {
+  const internals: RuntimeKernel = {
     schema,
     schemaTopology,
     registeredPaths,

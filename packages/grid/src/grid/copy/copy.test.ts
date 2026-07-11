@@ -5,7 +5,7 @@ import {
   createGridRuntime,
   runtimeInternalsFor,
   type GridRuntime,
-} from "../runtime/create-grid-runtime";
+} from "../runtime/runtime";
 import { inMemoryGridDataSource } from "../data-sources/memory/in-memory-grid-source";
 import {
   childPath,

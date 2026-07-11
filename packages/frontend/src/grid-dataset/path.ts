@@ -1,20 +1,11 @@
 import {
   decomposePath,
-  treeNodeForRow,
   type GridPath,
-  type LevelRow,
 } from "@sapporta/grid";
 import type {
   GridDataset,
   GridDatasetNode,
 } from "@sapporta/shared/grid-dataset";
-
-export function gridDatasetNodeForRow(row: LevelRow): GridDatasetNode | null {
-  const node = treeNodeForRow(row);
-  return node && typeof node.rowKey === "string"
-    ? (node as GridDatasetNode)
-    : null;
-}
 
 export function gridDatasetAncestorsForPath(
   dataset: GridDataset,

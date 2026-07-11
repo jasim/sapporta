@@ -5,6 +5,5 @@ export { withOpeningClosing } from "./stages/with-opening-closing";
 export { withFooters } from "./stages/with-footers";
 export { withPhantoms } from "./stages/with-phantoms";
 export { withSort } from "./stages/with-sort";
-export { withFilter } from "./stages/with-filter";
 export { withRowIds } from "./stages/with-row-ids";
 export { buildDisplayed, EMPTY_DISPLAYED } from "./stages/build-displayed";

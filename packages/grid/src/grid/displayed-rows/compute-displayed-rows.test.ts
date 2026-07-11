@@ -13,7 +13,6 @@ import { withRollup } from "../pipeline/stages/with-rollup";
 import { withFooters } from "../pipeline/stages/with-footers";
 import { withPhantoms } from "../pipeline/stages/with-phantoms";
 import { withSort } from "../pipeline/stages/with-sort";
-import { withFilter } from "../pipeline/stages/with-filter";
 import { withRowIds } from "../pipeline/stages/with-row-ids";
 import { buildDisplayed } from "../pipeline/stages/build-displayed";
 import { deriveDisplayedRowsState } from ".";
@@ -296,39 +295,6 @@ describe("withSort", () => {
     expect(out.map((r) => r.kind)).toEqual(["data", "data", "rollup"]);
     expect(out[1].rowKey).toBe("a");
     expect(out[2].rowKey).toBe("a");
-  });
-});
-
-describe("withFilter", () => {
-  it("drops data rows that fail the predicate", () => {
-    const protos = buildDataRows(nodes, opts);
-    const out = withFilter(protos, (cols) => Number(cols.qty) >= 2);
-    expect(out.map((r) => (r.kind === "data" ? r.columns.id : null))).toEqual([
-      "a",
-      "c",
-    ]);
-  });
-
-  it("drops a rollup if its data row was filtered out", () => {
-    const withRollupNodes: TreeNode[] = [
-      {
-        rowKey: "a",
-        levelName: "x",
-        columns: { id: "a", qty: 3 },
-        rollup: { id: "a-r", qty: 99 },
-      },
-      {
-        rowKey: "b",
-        levelName: "x",
-        columns: { id: "b", qty: 1 },
-        rollup: { id: "b-r", qty: 99 },
-      },
-    ];
-    const a = buildDataRows(withRollupNodes, opts);
-    const b = withRollup(a);
-    const out = withFilter(b, (cols) => Number(cols.qty) >= 2);
-    expect(out.map((r) => r.kind)).toEqual(["data", "rollup"]);
-    expect(out[0].rowKey).toBe("a");
   });
 });
 

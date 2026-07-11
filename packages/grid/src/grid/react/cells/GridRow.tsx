@@ -8,7 +8,7 @@ import type { GridPresentation } from "../Grid";
 import { gridRowIdentityAttrs } from "../internal/dom-targets";
 import { GridDataCell } from "./GridDataCell";
 import { EmptyRowHeaderCell } from "./RowHeaderCell";
-import { runtimeInternalsFor } from "../../runtime/create-grid-runtime";
+import { runtimeInternalsFor } from "../../runtime/runtime";
 
 export type RowChromeState = {
   active: boolean;

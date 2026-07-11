@@ -1,11 +1,11 @@
-import type { GridRuntime } from "../runtime/create-grid-runtime";
+import type { GridRuntime } from "../runtime/runtime";
 import type { CellCursor, ColId, Coord } from "../types/identity";
 import type { CellSelectionState } from "../types/selection";
 import { makeSelection, selectionContainsCoord } from "../types/selection";
 import type { DisplayedRows } from "../types/level-row";
 import type { ColumnSchema } from "../types/schema";
 import { cellCursorFromEventTarget } from "../react/internal/dom-targets";
-import { runtimeInternalsFor } from "../runtime/create-grid-runtime";
+import { runtimeInternalsFor } from "../runtime/runtime";
 
 export type GridCopyTarget = {
   path: CellCursor["path"];

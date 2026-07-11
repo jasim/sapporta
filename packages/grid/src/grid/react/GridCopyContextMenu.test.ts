@@ -18,7 +18,7 @@ import {
   createGridRuntime,
   runtimeInternalsFor,
   type GridRuntime,
-} from "../runtime/create-grid-runtime";
+} from "../runtime/runtime";
 import { inMemoryGridDataSource } from "../data-sources/memory/in-memory-grid-source";
 import { rootPath } from "../types/identity";
 import { makeRowId, type ColId, type RowId } from "../types/identity";

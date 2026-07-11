@@ -2,11 +2,11 @@ import { describe, expect, it } from "vitest";
 import {
   createGridRuntime,
   runtimeInternalsFor,
-} from "../runtime/create-grid-runtime";
+} from "../runtime/runtime";
 import type {
-  GridRuntimeInternals,
+  RuntimeKernel,
   LoadedRowsBoundaryEvent,
-} from "../runtime/create-grid-runtime";
+} from "../runtime/runtime";
 import { inMemoryGridDataSource } from "../data-sources/memory/in-memory-grid-source";
 import type {
   GridDataSource,
@@ -367,7 +367,7 @@ function pagedRuntimeWithPages(
 }
 
 function focusCell(
-  rt: GridRuntimeInternals,
+  rt: RuntimeKernel,
   path: GridPath,
   coord: { rowId: RowId; colId: "name" | "qty" },
 ) {

@@ -13,7 +13,7 @@ import {
 } from "./internal/dom-targets";
 import styles from "./grid.module.css";
 import { cn } from "@sapporta/ui";
-import { runtimeInternalsFor } from "../runtime/create-grid-runtime";
+import { runtimeInternalsFor } from "../runtime/runtime";
 
 export type GridChromeContext = {
   path: GridPath;

@@ -8,7 +8,7 @@ import { useStore } from "zustand";
 import {
   runtimeInternalsFor,
   type GridRuntime,
-} from "../runtime/create-grid-runtime";
+} from "../runtime/runtime";
 import type { LevelSnapshot, LevelSourceState } from "../data-sources/types";
 import type { CellCursor, Coord, GridPath, RowId } from "../types/identity";
 import type { CellSelectionState } from "../types/selection";

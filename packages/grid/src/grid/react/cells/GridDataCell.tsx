@@ -10,7 +10,7 @@ import type { ColId } from "../../types/identity";
 import { rowSelectionGestureFromModifiers } from "../../interaction/key-handling";
 import { CellShell } from "./CellShell";
 import { useGridRuntime } from "../GridRuntimeProvider";
-import { runtimeInternalsFor } from "../../runtime/create-grid-runtime";
+import { runtimeInternalsFor } from "../../runtime/runtime";
 
 // Per-cell view. One narrow subscription on the transient channel:
 //

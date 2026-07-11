@@ -16,7 +16,7 @@ import type {
 import {
   runtimeInternalsFor,
   type GridRuntime,
-} from "./runtime/create-grid-runtime";
+} from "./runtime/runtime";
 import type { CellCursor, Coord, GridPath, RowId } from "./types/identity";
 import type { RowCursor, RowSelection } from "./types/row-selection";
 import type {

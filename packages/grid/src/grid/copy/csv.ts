@@ -1,5 +1,5 @@
 import { csvRow } from "@sapporta/shared/csv";
-import type { GridRuntime } from "../runtime/create-grid-runtime";
+import type { GridRuntime } from "../runtime/runtime";
 import type { GridPath } from "../types/identity";
 import type { LevelRow } from "../types/level-row";
 import type { ColumnSchema, GridCopyColumn } from "../types/schema";

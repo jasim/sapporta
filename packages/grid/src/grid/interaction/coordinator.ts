@@ -62,7 +62,7 @@ import type {
   RowNavigationIntent,
   RowDirection,
 } from "../types/action";
-import type { GridRuntimeInternals } from "../runtime/create-grid-runtime";
+import type { RuntimeKernel } from "../runtime/runtime";
 import type { CursorManager, CursorManagerInternal } from "./cursor-manager";
 import {
   resolveRowSelectableNavigation,
@@ -108,7 +108,7 @@ export type CreateCoordinatorArgs = {
   // Live runtime reference. The coordinator does not hold any derived
   // view; it queries the runtime each call so a freshly resolved child
   // source or a freshly applied sort is reflected immediately.
-  getRuntime: () => GridRuntimeInternals;
+  getRuntime: () => RuntimeKernel;
   // Cursor manager reference, bound after construction (the cursor manager
   // depends on the coordinator and the controllerFor lookup). The coordinator
   // never writes cursors itself — it asks the cursor manager to apply targets,
@@ -125,7 +125,7 @@ export type CreateCoordinatorArgs = {
 };
 
 type LoadedRowsBoundaryEvent = Parameters<
-  GridRuntimeInternals["requestLoadedRowsBoundary"]
+  RuntimeKernel["requestLoadedRowsBoundary"]
 >[0];
 type LoadedRowsBoundaryRequest =
   | Omit<Extract<LoadedRowsBoundaryEvent, { kind: "cell" }>, "loadPath">
@@ -325,7 +325,7 @@ export function createGridCoordinator(
   }
 
   function requestLoadedRowsBoundary(
-    runtime: GridRuntimeInternals,
+    runtime: RuntimeKernel,
     navigation: LoadedRowsBoundaryRequest,
   ): boolean {
     // Ask nearest-to-farthest so nested tables keep their own loading policy.
@@ -345,7 +345,7 @@ export function createGridCoordinator(
   function intentForCommit(
     target: Exclude<CommitTarget, "stay">,
     current: CellCursor,
-    runtime: GridRuntimeInternals,
+    runtime: RuntimeKernel,
   ): CellNavigationIntent {
     switch (target) {
       case "up":
@@ -414,7 +414,7 @@ export function createGridCoordinator(
     intent: CellNavigationIntent,
     fromPath: GridPath,
     cursor: CellCursor | null,
-    runtime: GridRuntimeInternals,
+    runtime: RuntimeKernel,
   ): CellCursor | null {
     if (intent.type === "focusFirstCell") {
       const first = firstFocusableRow(
@@ -485,7 +485,7 @@ export function createGridCoordinator(
   }
 
   function clearCellRangesAcrossGrid(
-    runtime: GridRuntimeInternals,
+    runtime: RuntimeKernel,
     cursorManager: CursorManager,
   ): void {
     if (runtime.interaction.mode !== "cell-grid") return;
@@ -500,7 +500,7 @@ export function createGridCoordinator(
   }
 
   function clearRowSelectionAcrossGrid(
-    runtime: GridRuntimeInternals,
+    runtime: RuntimeKernel,
     exceptPath?: GridPath,
   ): void {
     // Row selection is stored per path and outlives DOM presence. Replace and
@@ -514,7 +514,7 @@ export function createGridCoordinator(
   }
 
   function applyRowPress(
-    runtime: GridRuntimeInternals,
+    runtime: RuntimeKernel,
     cursorManager: CursorManager,
     fromPath: GridPath,
     intent: Extract<CellNavigationIntent, { type: "rowPressed" }>,
@@ -614,7 +614,7 @@ export function createGridCoordinator(
     intent: RowNavigationIntent,
     fromPath: GridPath,
     rowCursor: RowCursor | null,
-    runtime: GridRuntimeInternals,
+    runtime: RuntimeKernel,
   ): RowCursor | null {
     if (intent.type === "focusFirstRow") {
       // Row-list focus starts on the first row that can be an operation target.

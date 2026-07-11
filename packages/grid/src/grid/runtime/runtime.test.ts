@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { createGridRuntime, runtimeInternalsFor } from "./create-grid-runtime";
+import { createGridRuntime, runtimeInternalsFor } from "./runtime";
 import { inMemoryGridDataSource } from "../data-sources/memory/in-memory-grid-source";
 import { inMemoryLevelSource } from "../data-sources/memory/in-memory-level-source";
 import { createPhantomChannel } from "../data-sources/phantom-channel";

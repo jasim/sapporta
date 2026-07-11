@@ -572,66 +572,44 @@ export function restLevelSource<F = unknown>(
       return;
     }
 
-    if ("kind" in res) {
-      switch (res.kind) {
-        case "value":
-          applyAuthoritativeValue({
-            rowKey,
-            colId,
-            optimisticValue,
-            authoritativeValue: res.value,
-            priorValue,
-          });
-          return;
-        case "patch":
-          applyAuthoritativePatch({
-            rowKey,
-            colId,
-            optimisticValue,
-            patch: res.patch,
-            priorValue,
-          });
-          return;
-        case "row":
-          applyAuthoritativeRow({
-            rowKey,
-            colId,
-            optimisticValue,
-            node: res.node,
-            priorValue,
-          });
-          return;
-        case "reload":
-          void refetch();
-          emitReconcile({
-            kind: "agreed",
-            rowKey,
-            colId,
-            value: optimisticValue,
-          });
-          return;
-      }
+    switch (res.kind) {
+      case "value":
+        applyAuthoritativeValue({
+          rowKey,
+          colId,
+          optimisticValue,
+          authoritativeValue: res.value,
+          priorValue,
+        });
+        return;
+      case "patch":
+        applyAuthoritativePatch({
+          rowKey,
+          colId,
+          optimisticValue,
+          patch: res.patch,
+          priorValue,
+        });
+        return;
+      case "row":
+        applyAuthoritativeRow({
+          rowKey,
+          colId,
+          optimisticValue,
+          node: res.node,
+          priorValue,
+        });
+        return;
+      case "reload":
+        void refetch();
+        emitReconcile({
+          kind: "agreed",
+          rowKey,
+          colId,
+          value: optimisticValue,
+        });
+        return;
     }
-
-    if (!("value" in res)) {
-      emitReconcile({
-        kind: "rejected",
-        rowKey,
-        colId,
-        optimisticValue,
-        reason: "patchCell response missing 'value' field",
-        priorValue,
-      });
-      return;
-    }
-
-    applyAuthoritativeValue({
-      rowKey,
-      colId,
-      optimisticValue,
-      authoritativeValue: res.value,
-      priorValue,
-    });
   }
 
   function applyAuthoritativeValue(args: {

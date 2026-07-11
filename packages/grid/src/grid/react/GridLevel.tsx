@@ -18,7 +18,7 @@ import {
 } from "./GridRuntimeProvider";
 import { rowInteractionStatusFor } from "../types/row-selection";
 import type { LevelSourceState, SourceLoadResult } from "../data-sources";
-import { runtimeInternalsFor } from "../runtime/create-grid-runtime";
+import { runtimeInternalsFor } from "../runtime/runtime";
 
 export type GridLevelChrome = {
   renderHeader?: (ctx: GridChromeContext) => ReactNode;

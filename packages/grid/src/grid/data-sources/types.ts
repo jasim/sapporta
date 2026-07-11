@@ -251,10 +251,8 @@ export type PatchCellRequest = {
 };
 
 // `patchCell` can return the authoritative cell value, a row patch, a full
-// row replacement, or request a reload. The simple `{ value }` shape is the
-// source-level contract for direct cell updates.
+// row replacement, or request a reload.
 export type PatchCellResponse =
-  | { readonly value: unknown }
   | { readonly kind: "value"; readonly value: unknown }
   | {
       readonly kind: "patch";

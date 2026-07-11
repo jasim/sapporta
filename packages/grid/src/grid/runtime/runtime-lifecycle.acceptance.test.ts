@@ -27,7 +27,7 @@ import {
   createGridRuntime,
   runtimeInternalsFor,
   type LoadedRowsBoundaryEvent,
-} from "./create-grid-runtime";
+} from "./runtime";
 
 const textColumn = {
   id: "name",
@@ -272,7 +272,7 @@ function selectedHierarchyTargets(
   return { childPath: itemsPath, fruit, apple, banana };
 }
 
-describe("runtime refactor acceptance", () => {
+describe("runtime lifecycle acceptance", () => {
   it("reuses unchanged adapted rows when a new source array changes only one raw node", () => {
     const initial = flatNodes();
     const source = mutableSource(initial);

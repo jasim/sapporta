@@ -8,7 +8,7 @@ import { inMemoryGridDataSource } from "../../data-sources/memory/in-memory-grid
 import {
   createGridRuntime,
   runtimeInternalsFor,
-} from "../../runtime/create-grid-runtime";
+} from "../../runtime/runtime";
 import {
   CELL_GRID_WITH_INDEPENDENT_ROW_SELECTION,
   ROW_MULTISELECT_LIST,

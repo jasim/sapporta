@@ -11,6 +11,7 @@ import {
   makeRowId,
   rootPath,
   rowExpansionActivation,
+  treeNodeForRow,
   useGridRuntimeEffect,
   withRowExpansionColumn,
   type CellActivation,
@@ -25,6 +26,7 @@ import {
   type GridRuntime,
   type InMemoryLevelOpts,
   type LevelSchema,
+  type TreeNode,
 } from "@sapporta/grid";
 import {
   columnPreset,
@@ -36,10 +38,7 @@ import type {
   GridDatasetNode,
 } from "@sapporta/shared/grid-dataset";
 import { cn } from "@sapporta/ui/cn";
-import {
-  gridDatasetAncestorsForPath,
-  gridDatasetNodeForRow,
-} from "../../grid-dataset/path";
+import { gridDatasetAncestorsForPath } from "../../grid-dataset/path";
 import "./ReportGrid.css";
 
 export type ReportCellLink = {
@@ -52,7 +51,7 @@ export type ReportCellLink = {
 
 export type ReportCellLinkContext<TInput = unknown> = {
   dataset: GridDataset;
-  node: GridDatasetNode;
+  node: TreeNode;
   levelName: string;
   input: TInput | undefined;
   ancestors: GridDatasetNode[];
@@ -418,7 +417,7 @@ function resolvePrimaryReportCellLink<TInput>({
   row: CellRenderProps["row"];
   value: unknown;
 }): ReportCellLink | null {
-  const node = gridDatasetNodeForRow(row);
+  const node = treeNodeForRow(row);
   if (!node) return null;
 
   const ancestors = gridDatasetAncestorsForPath(dataset, path);

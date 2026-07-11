@@ -3,7 +3,7 @@ import { rowSelectionGestureFromModifiers } from "../../interaction/key-handling
 import type { GridPath } from "../../types/identity";
 import type { LevelRow } from "../../types/level-row";
 import { useGridRuntime } from "../GridRuntimeProvider";
-import { runtimeInternalsFor } from "../../runtime/create-grid-runtime";
+import { runtimeInternalsFor } from "../../runtime/runtime";
 
 export function EmptyRowHeaderCell({
   row,

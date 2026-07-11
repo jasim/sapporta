@@ -1,7 +1,4 @@
-// End-to-end runtime test — the merge gate for the grid rewrite.
-//
-// Phases 01–11 each shipped a focused unit-tested slice. This file glues
-// them together: a runtime over `restGridDataSource` for orders → lines →
+// End-to-end runtime coverage over `restGridDataSource` for orders → lines →
 // notes, exercised through load → sort → expand → optimistic
 // edit → reconcile (agreed/diverged/rejected) → host-policy revert → refetch.
 //
@@ -10,7 +7,7 @@
 // call deterministically without racing microtasks.
 
 import { describe, expect, it } from "vitest";
-import { createGridRuntime, runtimeInternalsFor } from "./create-grid-runtime";
+import { createGridRuntime, runtimeInternalsFor } from "./runtime";
 import type {
   FetchPageRequest,
   FetchPageResponse,
@@ -307,7 +304,7 @@ describe("GridRuntime over restGridDataSource — full lifecycle", () => {
     runtime.root.writeCell(coord, 150);
     expect(orders.patchCalls).toHaveLength(1);
 
-    orders.patchCalls[0].deferred.resolve({ value: 150 });
+    orders.patchCalls[0].deferred.resolve({ kind: "value", value: 150 });
     await flush();
 
     const reconcile = events
@@ -331,7 +328,7 @@ describe("GridRuntime over restGridDataSource — full lifecycle", () => {
 
     const coord = { rowId: makeRowId(ordersRoot, "O1"), colId: "amount" };
     runtime.root.writeCell(coord, 150);
-    orders.patchCalls[0].deferred.resolve({ value: 175 });
+    orders.patchCalls[0].deferred.resolve({ kind: "value", value: 175 });
     await flush();
 
     const updated = runtime.root.data

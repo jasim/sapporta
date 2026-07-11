@@ -3,7 +3,7 @@ export {
   type GridRuntime,
   type LoadedRowsBoundaryEvent,
   type RuntimeArgs,
-} from "./create-grid-runtime";
+} from "./runtime";
 export type { GridLevelRuntime } from "./grid-level-runtime";
 export type { RowOperationTarget, RowRemovalResult } from "./row-operations";
 export type {

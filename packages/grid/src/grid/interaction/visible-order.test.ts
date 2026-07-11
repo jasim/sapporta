@@ -9,8 +9,8 @@ import { capabilitiesFor } from "../types/capabilities";
 import {
   createGridRuntime,
   runtimeInternalsFor,
-  type GridRuntimeInternals,
-} from "../runtime/create-grid-runtime";
+  type RuntimeKernel,
+} from "../runtime/runtime";
 import { inMemoryGridDataSource } from "../data-sources/memory/in-memory-grid-source";
 import {
   childPath,
@@ -111,8 +111,8 @@ function setup({ expand = [] as string[] } = {}) {
 const deps = { capabilitiesFor };
 
 function cellTarget(
-  runtime: GridRuntimeInternals,
-  coordinator: GridRuntimeInternals["coordinator"],
+  runtime: RuntimeKernel,
+  coordinator: RuntimeKernel["coordinator"],
   from: CellCursor,
   dir: RowDirection,
   colPolicy: ColPolicy,
@@ -128,7 +128,7 @@ function cellTarget(
   ).target;
 }
 
-function fakeRuntimeWithRows(rows: LevelRow[]): GridRuntimeInternals {
+function fakeRuntimeWithRows(rows: LevelRow[]): RuntimeKernel {
   const rowById = new Map<RowId, LevelRow>();
   const rowIndexById = new Map<RowId, number>();
   rows.forEach((row, index) => {
@@ -170,7 +170,7 @@ function fakeRuntimeWithRows(rows: LevelRow[]): GridRuntimeInternals {
     }),
     schemaAt: () => reportSchema.levels.cat,
   };
-  return runtime as unknown as GridRuntimeInternals;
+  return runtime as unknown as RuntimeKernel;
 }
 
 function dataRow(rowKey: string): LevelRow {

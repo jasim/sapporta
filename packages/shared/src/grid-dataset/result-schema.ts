@@ -69,32 +69,12 @@ export const gridDatasetLevelSchema = z.object({
 });
 export type GridDatasetLevel = z.output<typeof gridDatasetLevelSchema>;
 
-export const gridDatasetStatSchema = z.object({
-  label: z.string(),
-  value: z.string(),
-  tone: z.enum(["fg", "positive", "negative", "brand", "muted"]).optional(),
-  strong: z.boolean().optional(),
-});
-export type GridDatasetStat = z.output<typeof gridDatasetStatSchema>;
-
-export const gridDatasetPageSchema = z.object({
-  nodes: z.array(gridDatasetNodeSchema),
-  totalCount: z.number().int().nonnegative().optional(),
-  footerRows: z.array(gridDatasetFooterRowSchema).optional(),
-});
-export type GridDatasetPage = z.output<typeof gridDatasetPageSchema>;
-
 export const gridDatasetSchema = z.object({
   name: z.string(),
   label: z.string(),
   rootLevel: z.string(),
   levels: z.record(z.string(), gridDatasetLevelSchema),
   nodes: z.array(gridDatasetNodeSchema),
-  totalCount: z.number().int().nonnegative().optional(),
   footerRows: z.array(gridDatasetFooterRowSchema).optional(),
-  errors: z
-    .array(z.object({ path: z.string(), message: z.string() }))
-    .optional(),
-  stats: z.array(gridDatasetStatSchema).optional(),
 });
 export type GridDataset = z.output<typeof gridDatasetSchema>;

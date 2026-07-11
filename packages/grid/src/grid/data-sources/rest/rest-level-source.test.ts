@@ -548,7 +548,7 @@ describe("restLevelSource — host-backed row query", () => {
     write.setCell("a", "v", 42);
     expect(src.state().snapshot.nodes[0].columns.v).toBe(42);
 
-    patches[0].resolve({ value: 42 });
+    patches[0].resolve({ kind: "value", value: 42 });
     await patches[0].promise;
     await flush();
 
@@ -569,7 +569,7 @@ describe("restLevelSource — read-only / writable discrimination", () => {
     expect(() =>
       restLevelSource(
         baseOpts({
-          patchCell: async () => ({ value: 0 }),
+          patchCell: async () => ({ kind: "value", value: 0 }),
         }),
       ),
     ).toThrow(/all of \{patchCell, insertNode, removeNode\} must be wired/);
@@ -578,7 +578,7 @@ describe("restLevelSource — read-only / writable discrimination", () => {
   it("with all three edit endpoints, exposes a write capability", () => {
     const src = restLevelSource(
       baseOpts({
-        patchCell: async () => ({ value: 0 }),
+        patchCell: async () => ({ kind: "value", value: 0 }),
         insertNode: async (req) => req.node,
         removeNode: async () => {},
       }),
@@ -592,7 +592,7 @@ describe("restLevelSource — setCell reconciliation", () => {
     extra: Partial<RestLevelSourceOpts<TestFilter>> = {},
   ): RestLevelSourceOpts<TestFilter> {
     return baseOpts({
-      patchCell: async () => ({ value: 0 }),
+      patchCell: async () => ({ kind: "value", value: 0 }),
       insertNode: async (req) => req.node,
       removeNode: async () => {},
       ...extra,
@@ -626,7 +626,7 @@ describe("restLevelSource — setCell reconciliation", () => {
     write.setCell("a", "v", 99);
     expect(src.state().snapshot.nodes[0].columns.v).toBe(99);
 
-    patches[0].resolve({ value: 99 });
+    patches[0].resolve({ kind: "value", value: 99 });
     await patches[0].promise;
     await flush();
 
@@ -654,7 +654,7 @@ describe("restLevelSource — setCell reconciliation", () => {
     });
 
     write.setCell("a", "v", 99);
-    patches[0].resolve({ value: 100 }); // server normalized
+    patches[0].resolve({ kind: "value", value: 100 }); // server normalized
     await patches[0].promise;
     await flush();
 
@@ -723,12 +723,12 @@ describe("restLevelSource — setCell reconciliation", () => {
     expect(patches).toHaveLength(2);
 
     // Resolve the FIRST (superseded) one — it should NOT emit reconcile.
-    patches[0].deferred.resolve({ value: 99 });
+    patches[0].deferred.resolve({ kind: "value", value: 99 });
     await patches[0].deferred.promise;
     await flush();
     expect(events).toEqual([]);
 
-    patches[1].deferred.resolve({ value: 100 });
+    patches[1].deferred.resolve({ kind: "value", value: 100 });
     await patches[1].deferred.promise;
     await flush();
     expect(events).toEqual([
@@ -738,9 +738,12 @@ describe("restLevelSource — setCell reconciliation", () => {
   });
 
   it("two setCell on different cells of the same row: both PATCHes issue independently", async () => {
-    const patchCell = vi.fn(async (_req: PatchCellRequest) => ({
-      value: _req.value,
-    }));
+    const patchCell = vi.fn(
+      async (_req: PatchCellRequest): Promise<PatchCellResponse> => ({
+        kind: "value",
+        value: _req.value,
+      }),
+    );
     const src = await readyWritable({ patchCell });
     const write = src.write;
 
@@ -793,7 +796,7 @@ describe("restLevelSource — setCell reconciliation", () => {
     const calls: string[] = [];
     const duplicate = vi.fn(() => calls.push("duplicate"));
     const src = await readyWritable({
-      patchCell: async (request) => ({ value: request.value }),
+      patchCell: async (request) => ({ kind: "value", value: request.value }),
       onObserverError: report,
     });
     const unsubscribeFirst = src.write.onReconcile(duplicate);
@@ -820,7 +823,7 @@ describe("restLevelSource — applyChanges atomicity", () => {
     extra: Partial<RestLevelSourceOpts<TestFilter>> = {},
   ): RestLevelSourceOpts<TestFilter> {
     return baseOpts({
-      patchCell: async (req) => ({ value: req.value }),
+      patchCell: async (req) => ({ kind: "value", value: req.value }),
       insertNode: async (req) => req.node,
       removeNode: async () => {},
       ...extra,
@@ -857,10 +860,12 @@ describe("restLevelSource — applyChanges atomicity", () => {
   });
 
   it("any PATCH rejects: every change reverts to prior, rejected events fire per cell", async () => {
-    const patchCell = vi.fn(async (req: PatchCellRequest) => {
-      if (req.rowKey === "b") throw new Error("conflict");
-      return { value: req.value };
-    });
+    const patchCell = vi.fn(
+      async (req: PatchCellRequest): Promise<PatchCellResponse> => {
+        if (req.rowKey === "b") throw new Error("conflict");
+        return { kind: "value", value: req.value };
+      },
+    );
     const src = await readyWritable({ patchCell });
     const write = src.write;
 
@@ -894,7 +899,7 @@ describe("restLevelSource — createNode", () => {
   ): Promise<WritableTestSource> {
     const src = restLevelSource(
       baseOpts({
-        patchCell: async () => ({ value: 0 }),
+        patchCell: async () => ({ kind: "value", value: 0 }),
         insertNode: async (req) => req.node,
         removeNode: async () => {},
         ...extra,
@@ -1062,7 +1067,7 @@ describe("restLevelSource — removeNode", () => {
   ): Promise<WritableTestSource> {
     const src = restLevelSource(
       baseOpts({
-        patchCell: async () => ({ value: 0 }),
+        patchCell: async () => ({ kind: "value", value: 0 }),
         insertNode: async (req) => req.node,
         removeNode: async () => {},
         ...extra,

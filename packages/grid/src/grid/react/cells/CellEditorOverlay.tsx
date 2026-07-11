@@ -5,7 +5,7 @@ import type { ControllerState } from "../../types/controller-state";
 import type { GridPath } from "../../types/identity";
 import { useGridRuntime } from "../GridRuntimeProvider";
 import { findGridCellElement } from "../internal/dom-targets";
-import { runtimeInternalsFor } from "../../runtime/create-grid-runtime";
+import { runtimeInternalsFor } from "../../runtime/runtime";
 
 // Singleton per path. When `editing` is non-null, find the focused cell DOM
 // node, position absolutely on top, and render the column's editor. When null,
