@@ -86,10 +86,12 @@ function decodePathSegment(segment: string): string {
   return out;
 }
 
+/** Encodes a row key for use as one unambiguous path or row-id segment. */
 export function encodeRowKeySegment(rowKey: RowKey): string {
   return encodePathSegment(rowKey);
 }
 
+/** Decodes a row-key segment produced by `encodeRowKeySegment`. */
 export function decodeRowKeySegment(segment: string): RowKey {
   return decodePathSegment(segment);
 }
@@ -102,10 +104,15 @@ function decodeLevelNameSegment(segment: string): string {
   return decodePathSegment(segment);
 }
 
+/** Creates the only path registered during runtime construction. */
 export function rootPath(rootLevelName: string): GridPath {
   return encodeLevelNameSegment(rootLevelName) as GridPath;
 }
 
+/**
+ * Appends one parent-row and child-level edge to a path.
+ * Use this helper instead of concatenating path strings.
+ */
 export function childPath(
   parent: GridPath,
   parentRowKey: RowKey,
@@ -201,6 +208,7 @@ export function parseChildPath(
   return { rowKey, childKey };
 }
 
+/** Creates an identity for any displayed row kind within one path. */
 export function makeLevelRowId(
   path: GridPath,
   kind: LevelRowKind,
@@ -212,27 +220,33 @@ export function makeLevelRowId(
   return `${path}#${kind}#${encodeRowKeySegment(rowKey)}` as RowId;
 }
 
+/** Creates the source-backed data-row identity for a path and row key. */
 export function makeRowId(path: GridPath, rowKey: RowKey): RowId {
   return makeLevelRowId(path, "data", rowKey);
 }
 
+/** Returns a draft row's local key, or `null` for every other row kind. */
 export function phantomKeyFromDisplayedRowId(rowId: RowId): RowKey | null {
   const parsed = parseRowId(rowId);
   return parsed.kind === "phantom" ? parsed.rowKey : null;
 }
 
+/** Reports whether a displayed row id belongs to a draft row. */
 export function isDisplayedPhantomRowId(rowId: RowId): boolean {
   return phantomKeyFromDisplayedRowId(rowId) !== null;
 }
 
+/** Returns the exact grid path encoded in a row identity. */
 export function pathOfRowId(id: RowId): GridPath {
   return parseRowId(id).path;
 }
 
+/** Returns the path-local row key encoded in a row identity. */
 export function rowKeyOfRowId(id: RowId): RowKey {
   return parseRowId(id).rowKey;
 }
 
+/** Returns the displayed row kind encoded in a row identity. */
 export function kindOfRowId(id: RowId): LevelRowKind {
   return parseRowId(id).kind;
 }
@@ -273,6 +287,7 @@ function isLevelRowKind(value: string): value is LevelRowKind {
   }
 }
 
+/** Compares two cell coordinates by row and column identity. */
 export function coordsEqual(a: Coord, b: Coord): boolean {
   return a.rowId === b.rowId && a.colId === b.colId;
 }
@@ -286,6 +301,7 @@ export type CellCursor = {
   readonly colId: ColId;
 };
 
+/** Compares nullable global cell cursors by path, row, and column identity. */
 export function cursorEqual(
   a: CellCursor | null,
   b: CellCursor | null,

@@ -8,6 +8,7 @@ import type { CursorManager } from "./interaction/cursor-manager";
 import type { GridControllerPublic } from "./interaction/controller";
 import type { CellKeyboardPresentation } from "./interaction/key-handling";
 import { createPhantomRowLifecycle } from "./runtime/phantom-row-lifecycle";
+import { trackGridLevelSubscription } from "./runtime/grid-level-runtime";
 import type {
   PhantomRowLifecycle,
   PhantomRowLifecycleDeps,
@@ -41,6 +42,13 @@ const controllerWrappers = new WeakMap<
   >
 >();
 
+/**
+ * Returns advanced cursor commands for a runtime.
+ *
+ * The wrapper checks the runtime or target level before every command. It does
+ * not let an old cursor manager keep operating after disposal or after a path
+ * registration ends.
+ */
 export function cursorManagerFor(runtime: GridRuntime): CursorManager {
   runtime.registeredLevels();
   const existing = cursorWrappers.get(runtime);
@@ -106,6 +114,14 @@ export function cursorManagerFor(runtime: GridRuntime): CursorManager {
   return wrapper;
 }
 
+/**
+ * Returns the path-local controller for one current level registration.
+ *
+ * Use this surface for editing, raw controller state, keyboard dispatch, and
+ * queued effects. Its state and effects subscriptions are different: state
+ * describes interaction, while effects describe imperative work waiting for a
+ * mounted renderer. Both subscriptions stop when the level unregisters.
+ */
 export function controllerFor(
   runtime: GridRuntime,
   path: GridPath,
@@ -152,10 +168,13 @@ export function controllerFor(
       listener: (state: ControllerState, previous: ControllerState) => void,
     ) {
       assertLevel();
-      return raw.subscribe(
-        internals.observe((state, previous) => {
-          if (isCurrentLevel()) listener(state, previous);
-        }),
+      return trackGridLevelSubscription(
+        level,
+        raw.subscribe(
+          internals.observe((state, previous) => {
+            if (isCurrentLevel()) listener(state, previous);
+          }),
+        ),
       );
     },
     startEdit,
@@ -215,10 +234,13 @@ export function controllerFor(
         ) => void,
       ) {
         assertLevel();
-        return raw.effects.subscribe(
-          internals.observe((state, previous) => {
-            if (isCurrentLevel()) listener(state, previous);
-          }),
+        return trackGridLevelSubscription(
+          level,
+          raw.effects.subscribe(
+            internals.observe((state, previous) => {
+              if (isCurrentLevel()) listener(state, previous);
+            }),
+          ),
         );
       },
     }),
@@ -227,6 +249,10 @@ export function controllerFor(
   return wrapper;
 }
 
+/**
+ * Describes and runs the configured activation for one displayed cell.
+ * Returns `null` when the column or row does not provide an activation.
+ */
 export function cellActivationFor(
   runtime: GridRuntime,
   path: GridPath,
@@ -237,6 +263,11 @@ export function cellActivationFor(
   return runtimeInternalsFor(runtime).cellActivationFor(path, coord, trigger);
 }
 
+/**
+ * Returns registered child paths for one parent row in schema declaration
+ * order. The result includes collapsed children because collapse retains their
+ * registrations.
+ */
 export function materializedChildren(
   runtime: GridRuntime,
   parentPath: GridPath,
@@ -248,6 +279,10 @@ export function materializedChildren(
   ]);
 }
 
+/**
+ * Chooses a valid focus landing from the current visible tree before the
+ * listed rows are removed.
+ */
 export function planCursorContinuationForRowRemoval(
   runtime: GridRuntime,
   removals: readonly RowRemovalRef[],
@@ -258,6 +293,7 @@ export function planCursorContinuationForRowRemoval(
   );
 }
 
+/** Applies a previously computed cursor landing and queues reveal work. */
 export function applyCursorContinuation(
   runtime: GridRuntime,
   continuation: CursorContinuation,

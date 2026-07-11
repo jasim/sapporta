@@ -57,12 +57,13 @@
 //
 // Reading order:
 //   1. index.ts — public API and architecture signpost.
-//   2. runtime/create-grid-runtime.ts — runtime construction, source
+//   2. runtime/README.md — live lifecycle, subscription roles, and ordering.
+//   3. runtime/runtime.ts — runtime construction, source
 //      registry, write boundary, and per-path controller wiring.
-//   3. data-sources/types.ts — data-source contract and snapshot shape.
-//   4. displayed-rows/ — pure `DisplayedRowsInput` → row read models.
-//   5. react/GridLevel.tsx — recursive render bridge.
-//   6. interaction/controller.ts — cell selection, row selection, focus,
+//   4. data-sources/types.ts — data-source contract and snapshot shape.
+//   5. displayed-rows/ — pure `DisplayedRowsInput` → row read models.
+//   6. react/GridLevel.tsx — recursive render bridge.
+//   7. interaction/controller.ts — cell selection, row selection, focus,
 //      editing, and keyboard dispatch.
 //
 // =====================================================================
@@ -307,7 +308,7 @@
 // Orchestration
 // =====================================================================
 //
-// `GridRuntime` (runtime/create-grid-runtime.ts) is a plain TypeScript value, not a
+// `GridRuntime` (runtime/runtime.ts) is a plain TypeScript value, not a
 // React thing. It owns the schema/path topologies, the per-path displayed-row
 // stores, the controller instances, and the path-bound levels through which
 // data writes flow (`writeCell`, `applyChanges`, and draft commits). Components

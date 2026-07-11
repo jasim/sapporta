@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { controllerFor } from "../advanced";
 import type {
   GridDataSource,
+  CreateNodeResult,
   LevelDataSource,
   LevelSourceState,
   PhantomChannel,
@@ -1100,5 +1101,75 @@ describe("runtime refactor acceptance", () => {
     ]);
     expect(items.dispose).toHaveBeenCalledOnce();
     expect(report).toHaveBeenCalledWith(cleanupFailure);
+  });
+
+  it("installs a source entry before a synchronous subscription notification", () => {
+    const root = mutableSource(flatNodes());
+    const source: WritableLevelSource = {
+      ...root.source,
+      subscribe(listener) {
+        const unsubscribe = root.source.subscribe(listener);
+        listener();
+        return unsubscribe;
+      },
+    };
+
+    const runtime = createGridRuntime({
+      schema: flatSchema,
+      dataSource: {
+        rootSource: () => source,
+        resolveChild: () => {
+          throw new Error("No child source was configured.");
+        },
+        dispose: () => {},
+      },
+    });
+
+    expect(runtime.root.displayedRows().rows).toHaveLength(3);
+    runtime.dispose();
+  });
+
+  it("defers dependency disposal until every concurrent command settles", async () => {
+    const first = deferred<CreateNodeResult>();
+    const second = deferred<CreateNodeResult>();
+    const pending = [first, second];
+    const root = mutableSource(flatNodes(), {
+      createNode: (node, atIndex) => {
+        const operation = pending.shift();
+        if (!operation) throw new Error("Unexpected create command.");
+        return operation.promise.then(() => ({
+          node,
+          atIndex: atIndex ?? flatNodes().length,
+        }));
+      },
+    });
+    const dataSourceDispose = vi.fn();
+    const runtime = createGridRuntime({
+      schema: flatSchema,
+      dataSource: dataSourceWithRoot(root, dataSourceDispose),
+    });
+    runtime.root.drafts.add("draft-1", { name: "One" });
+    runtime.root.drafts.add("draft-2", { name: "Two" });
+    const firstCommit = runtime.root.drafts.commit("draft-1");
+    const secondCommit = runtime.root.drafts.commit("draft-2");
+
+    runtime.dispose();
+    expect(root.dispose).not.toHaveBeenCalled();
+    expect(dataSourceDispose).not.toHaveBeenCalled();
+
+    first.resolve({
+      node: { rowKey: "ignored-1", levelName: "rows", columns: {} },
+      atIndex: 0,
+    });
+    await firstCommit;
+    expect(root.dispose).not.toHaveBeenCalled();
+
+    second.resolve({
+      node: { rowKey: "ignored-2", levelName: "rows", columns: {} },
+      atIndex: 0,
+    });
+    await secondCommit;
+    expect(root.dispose).toHaveBeenCalledOnce();
+    expect(dataSourceDispose).toHaveBeenCalledOnce();
   });
 });

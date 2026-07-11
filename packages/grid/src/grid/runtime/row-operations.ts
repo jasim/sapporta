@@ -40,8 +40,14 @@ export type RowRemovalResult =
     };
 
 export type GridRowOperations = {
+  /**
+   * Returns operation targets across registered paths. Explicit row selection
+   * wins per path; cell-selected rows are the fallback.
+   */
   targets(): readonly RowOperationTarget[];
+  /** Returns source-backed targets from explicit row selection only. */
   selectedDataTargets(): readonly RowOperationTarget<"data">[];
+  /** Validates, orders, and removes targets until complete or one fails. */
   remove(
     targets: readonly RowOperationTarget<"data">[],
   ): Promise<RowRemovalResult>;
@@ -181,6 +187,8 @@ export function createRowOperations(
       }
 
       const execution = childFirst(targets);
+      // Move the cursor before source writes begin. The visible tree still
+      // contains every target, so continuation planning has full context.
       const continuation = ports.beginCursorContinuation(execution);
       const removed: RowOperationTarget<"data">[] = [];
       const touched = new Set<GridPath>();
@@ -193,6 +201,8 @@ export function createRowOperations(
           await ports.removeTarget(target);
           removed.push(target);
         } catch (error) {
+          // Touched sources may refresh asynchronously after removal. Wait for
+          // them before deciding whether and where cursor correction is needed.
           await ports.settleTouchedPaths(touched);
           ports.finishCursorContinuation(continuation, removed, false);
           return {
@@ -262,6 +272,8 @@ export function createRowOperations(
   function childFirst(
     targets: readonly RowOperationTarget<"data">[],
   ): RowOperationTarget<"data">[] {
+    // Descendants run before ancestors so removing a parent cannot dispose a
+    // child source before its requested child rows have been removed.
     const registeredOrder = new Map(
       ports.registeredPaths().map((path, index) => [path, index] as const),
     );
@@ -298,3 +310,9 @@ function assertRowIdPath(path: GridPath, rowId: RowId): void {
     `GridRuntime: row "${rowId}" does not belong to path "${path}".`,
   );
 }
+// Row-operation capabilities and ordered removal.
+//
+// A RowOperationTarget is more than a row id. It is a capability issued for a
+// particular row membership generation in a particular runtime. Commands can
+// retain the object across an async confirmation step, while removal still
+// rejects it if the row disappeared and another row reused its key.
