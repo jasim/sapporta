@@ -19,12 +19,14 @@ describe("ReportGridDataset", () => {
   let mounted: { root: Root; container: HTMLElement } | null = null;
 
   afterEach(async () => {
-    if (!mounted) return;
-    await act(async () => {
-      mounted?.root.unmount();
-    });
-    mounted.container.remove();
-    mounted = null;
+    if (mounted) {
+      await act(async () => {
+        mounted?.root.unmount();
+      });
+      mounted.container.remove();
+      mounted = null;
+    }
+    window.localStorage.clear();
   });
 
   async function renderClient(
@@ -223,6 +225,96 @@ describe("ReportGridDataset", () => {
       );
     });
   }
+
+  function dispatchPointer(
+    target: Element,
+    type: string,
+    init: { clientX: number; pointerId: number },
+  ): void {
+    const event = new Event(type, { bubbles: true, cancelable: true });
+    Object.defineProperties(event, {
+      button: { value: 0 },
+      clientX: { value: init.clientX },
+      pointerId: { value: init.pointerId },
+    });
+    target.dispatchEvent(event);
+  }
+
+  it("resizes and persists columns independently for nested report levels", async () => {
+    const dataset = accountLedgerDataset();
+    const storageKey = "sapporta:report-grid-columns:account-ledger:entry";
+    window.localStorage.clear();
+
+    const container = await renderClient(
+      createElement(ReportGridDataset, { dataset }),
+    );
+
+    await waitForText(container, "Opening balance");
+    const rootGrid = container.querySelector('[data-grid-path="account"]');
+    const childGrid = container.querySelector(
+      '[data-grid-path="account.acct-1.entry"]',
+    );
+    if (!(rootGrid instanceof HTMLElement)) {
+      throw new Error("expected report root grid");
+    }
+    if (!(childGrid instanceof HTMLElement)) {
+      throw new Error("expected nested report grid");
+    }
+
+    const resizeHandlesFor = (grid: HTMLElement) =>
+      [
+        ...grid.querySelectorAll('[data-grid-part="column-resize-handle"]'),
+      ].filter((handle) => handle.closest("[data-grid-path]") === grid);
+
+    expect(resizeHandlesFor(rootGrid)).toHaveLength(2);
+    expect(resizeHandlesFor(childGrid)).toHaveLength(2);
+
+    const header = childGrid.querySelector(
+      '[data-grid-part="header-cell"][data-col-id="description"]',
+    );
+    const handle = header?.querySelector(
+      '[data-grid-part="column-resize-handle"]',
+    );
+    if (!(header instanceof HTMLElement)) {
+      throw new Error("expected Description header");
+    }
+    if (!(handle instanceof HTMLElement)) {
+      throw new Error("expected Description resize handle");
+    }
+    Object.defineProperty(header, "getBoundingClientRect", {
+      configurable: true,
+      value: () =>
+        ({
+          width: 120,
+          height: 32,
+          top: 0,
+          right: 120,
+          bottom: 32,
+          left: 0,
+          x: 0,
+          y: 0,
+          toJSON: () => ({}),
+        }) satisfies DOMRect,
+    });
+
+    await act(async () => {
+      dispatchPointer(handle, "pointerdown", { clientX: 120, pointerId: 1 });
+      dispatchPointer(handle, "pointermove", { clientX: 165, pointerId: 1 });
+      dispatchPointer(handle, "pointerup", { clientX: 165, pointerId: 1 });
+    });
+
+    expect(
+      childGrid.style.getPropertyValue("--grid-template-columns"),
+    ).toContain("165px");
+    expect(JSON.parse(window.localStorage.getItem(storageKey) ?? "{}")).toEqual(
+      { description: 165 },
+    );
+    expect(
+      window.localStorage.getItem(
+        "sapporta:report-grid-columns:account-ledger:account",
+      ),
+    ).toBeNull();
+  });
 
   it("renders nested rows with app-owned cell links", async () => {
     const dataset = {

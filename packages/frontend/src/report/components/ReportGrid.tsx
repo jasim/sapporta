@@ -113,7 +113,7 @@ function ReportGrid<TInput = unknown>({
 }
 
 function ReportGridBody({ session }: { session: ReportGridBinding }) {
-  const chrome = useReportGridChrome();
+  const chrome = useReportGridChrome(session.dataset.name);
 
   useLayoutEffect(() => {
     expandDefaultReportRows(session.runtime, session.dataset);
@@ -128,9 +128,14 @@ function ReportGridBody({ session }: { session: ReportGridBinding }) {
   );
 }
 
-function useReportGridChrome(): GridLevelChrome {
+function useReportGridChrome(reportName: string): GridLevelChrome {
   return useMemo<GridLevelChrome>(() => {
-    const base = columnPreset.chrome();
+    const base = columnPreset.chrome({
+      columnSizing: {
+        storageKey: ({ levelName }) =>
+          `sapporta:report-grid-columns:${reportName}:${levelName}`,
+      },
+    });
     return {
       ...base,
       levelContainerClassName: (context) =>
@@ -143,7 +148,7 @@ function useReportGridChrome(): GridLevelChrome {
       renderStatus: base.renderStatus,
       renderEmpty: base.renderEmpty,
     };
-  }, []);
+  }, [reportName]);
 }
 
 export interface ReportGridDatasetProps<TInput = unknown> {
