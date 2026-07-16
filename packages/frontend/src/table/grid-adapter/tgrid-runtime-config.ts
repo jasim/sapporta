@@ -466,18 +466,18 @@ function makeEndpointFactory(args: {
         const result = await args.rowsClient.update(
           args.table.name,
           String(req.rowKey),
-          { [req.colId]: req.value } as Row,
+          { [req.colId]: req.value },
         );
-        return { value: (result.data as Row)[req.colId] };
+        return { kind: "value", value: result.data[req.colId] };
       },
       insertNode: async (req) => {
         // Creating a child row should attach it to the expanded parent row.
         const columns = args.parent
           ? { ...req.node.columns, [args.parent.foreignKey]: parentRowKey }
-          : req.node.columns;
+          : { ...req.node.columns };
         const result = await args.rowsClient.create(
           args.table.name,
-          columns as Row,
+          columns,
         );
         const row = Array.isArray(result.data) ? result.data[0] : result.data;
         return tableTreeNode(row, args.levelId, args.rowKeyColumn);
