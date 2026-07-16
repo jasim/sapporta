@@ -1,13 +1,7 @@
 import { join, resolve } from "node:path";
-import { pathToFileURL } from "node:url";
 
 type SapportaSourcePackage =
-  | "core"
-  | "frontend"
-  | "grid"
-  | "honest"
-  | "shared"
-  | "ui";
+  "core" | "frontend" | "grid" | "honest" | "shared" | "ui";
 
 const SAPPORTA_SOURCE_PACKAGES_DIR = "packages";
 
@@ -76,7 +70,7 @@ export function devMode_sapportaSourcePackageLinkSpec(
   sourceRoot: string,
   packageName: SapportaSourcePackage,
 ): string {
-  return pathToFileURL(
+  return `link:${resolve(
     devMode_sapportaSourcePackageDir(sourceRoot, packageName),
-  ).href.replace(/^file:/, "link:");
+  )}`;
 }

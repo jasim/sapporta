@@ -285,7 +285,7 @@ describe("renderScaffoldFiles", () => {
     const byDest = new Map(files.map((file) => [file.dest, file.content]));
 
     expect(byDest.get("packages/shared/package.json")).toContain(
-      `"@sapporta/shared": "link://${process.cwd()}/packages/shared"`,
+      `"@sapporta/shared": "link:${process.cwd()}/packages/shared"`,
     );
   });
 });
