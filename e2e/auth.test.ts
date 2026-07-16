@@ -46,9 +46,7 @@ type RowsBody = {
 };
 
 type AuthBootstrapBody = {
-  userCount: number;
-  workspaceCount: number;
-  isEmpty: boolean;
+  shouldShowSignUp?: true;
 };
 
 type ProjectInfoBody = {
@@ -221,9 +219,7 @@ describe.sequential("sapporta init auth template - end-to-end", () => {
       { expectedStatus: 200 },
     );
     expect(bootstrap.body).toEqual({
-      userCount: 0,
-      workspaceCount: 0,
-      isEmpty: true,
+      shouldShowSignUp: true,
     });
 
     const info = await requestJson<ProjectInfoBody>(
@@ -276,11 +272,7 @@ describe.sequential("sapporta init auth template - end-to-end", () => {
       `${baseUrl}/api/auth-bootstrap`,
       { expectedStatus: 200 },
     );
-    expect(bootstrap.body).toEqual({
-      userCount: 1,
-      workspaceCount: 0,
-      isEmpty: false,
-    });
+    expect(bootstrap.body).toEqual({});
 
     const sessionJar = makeCookieJar(project!, "session-owner");
     await signInEmailUser(project!, baseUrl, {

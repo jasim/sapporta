@@ -52,7 +52,10 @@ type RowBody<T> = {
 };
 
 type LookupBody = {
-  data: Record<string, string>;
+  entries: Array<{
+    value: string | number;
+    label: string;
+  }>;
 };
 
 type CountBody = {
@@ -590,9 +593,9 @@ describe("generated table authz and row security - end-to-end", () => {
           serverOutput: server!.output,
         },
       )
-    ).body.data;
-    expect(Object.keys(taskLookup).sort()).toEqual([
-      String(input.visibleTaskIds[0]),
+    ).body.entries;
+    expect(taskLookup).toEqual([
+      { value: input.visibleTaskIds[0], label: "A owner alpha" },
     ]);
 
     const taskCount = (
@@ -635,10 +638,10 @@ describe("generated table authz and row security - end-to-end", () => {
           serverOutput: server!.output,
         },
       )
-    ).body.data;
-    expect(noteLookup).toEqual({
-      [String(input.visibleNoteId)]: "A owner private",
-    });
+    ).body.entries;
+    expect(noteLookup).toEqual([
+      { value: input.visibleNoteId, label: "A owner private" },
+    ]);
 
     const noteCount = (
       await requestJson<CountBody>(
