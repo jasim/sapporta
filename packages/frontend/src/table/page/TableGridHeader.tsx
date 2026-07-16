@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useRef, useState, type ComponentType } from "react";
 import {
   Download,
   ListFilter,
@@ -42,6 +42,7 @@ import {
 } from "./TableHeaderControls";
 import type { TablePageMode } from "./table-page-mode";
 import type { TableViewPreference } from "./table-view-pref";
+import type { TableGridActionsProps } from "./TableGridView";
 import { useTableLevelQuery, type TableLevelQuery } from "./table-level-query";
 import { useTableSelection } from "./table-selection";
 import { useTGridSourceStatus } from "./tgrid-source-status";
@@ -67,6 +68,7 @@ export function TableGridHeader<
   viewPreference,
   onViewPreferenceChange,
   onNewRecord,
+  actions: Actions,
 }: {
   mode: TablePageMode;
   session: TGridSession<RowsByLevel, AppServices>;
@@ -75,6 +77,7 @@ export function TableGridHeader<
   viewPreference: TableViewPreference;
   onViewPreferenceChange: (view: TableViewPreference) => void;
   onNewRecord?: () => void;
+  actions?: ComponentType<TableGridActionsProps<RowsByLevel, AppServices>>;
 }) {
   const query = useTableLevelQuery(session, level);
   const selection = useTableSelection(session);
@@ -107,6 +110,9 @@ export function TableGridHeader<
         exportUrl={session.csvExportUrl(level)}
         deleteControl={deleteControl}
         onNewRecord={onNewRecord}
+        actions={Actions}
+        session={session}
+        level={level}
       />
     ) : (
       <WideTableHeader
@@ -118,6 +124,9 @@ export function TableGridHeader<
         onViewPreferenceChange={onViewPreferenceChange}
         deleteControl={deleteControl}
         onNewRecord={onNewRecord}
+        actions={Actions}
+        session={session}
+        level={level}
       />
     );
 
@@ -134,7 +143,10 @@ export function TableGridHeader<
   );
 }
 
-function WideTableHeader({
+function WideTableHeader<
+  RowsByLevel extends TGridRowsByLevel,
+  AppServices = unknown,
+>({
   table,
   totalCount,
   query,
@@ -143,6 +155,9 @@ function WideTableHeader({
   onViewPreferenceChange,
   deleteControl,
   onNewRecord,
+  actions: Actions,
+  session,
+  level,
 }: {
   table: TableSchema;
   totalCount: number;
@@ -152,6 +167,9 @@ function WideTableHeader({
   onViewPreferenceChange: (view: TableViewPreference) => void;
   deleteControl?: TableDeleteControl;
   onNewRecord?: () => void;
+  actions?: ComponentType<TableGridActionsProps<RowsByLevel, AppServices>>;
+  session: TGridSession<RowsByLevel, AppServices>;
+  level: TGridLevelId<RowsByLevel>;
 }) {
   const tableLabel = table.label ?? table.name;
 
@@ -167,6 +185,9 @@ function WideTableHeader({
               value={viewPreference}
               onChange={onViewPreferenceChange}
             />
+            {Actions && (
+              <Actions session={session} level={level} surface="toolbar" />
+            )}
             {query.searchable && (
               <SearchInput value={query.search} onChange={query.setSearch} />
             )}
@@ -222,13 +243,19 @@ function WideTableHeader({
   );
 }
 
-function NarrowCardTableHeader({
+function NarrowCardTableHeader<
+  RowsByLevel extends TGridRowsByLevel,
+  AppServices = unknown,
+>({
   table,
   totalCount,
   query,
   exportUrl,
   deleteControl,
   onNewRecord,
+  actions: Actions,
+  session,
+  level,
 }: {
   table: TableSchema;
   totalCount: number;
@@ -236,6 +263,9 @@ function NarrowCardTableHeader({
   exportUrl: string;
   deleteControl?: TableDeleteControl;
   onNewRecord?: () => void;
+  actions?: ComponentType<TableGridActionsProps<RowsByLevel, AppServices>>;
+  session: TGridSession<RowsByLevel, AppServices>;
+  level: TGridLevelId<RowsByLevel>;
 }) {
   const [actionsOpen, setActionsOpen] = useState(false);
   const [filtersOpen, setFiltersOpen] = useState(false);
@@ -341,6 +371,14 @@ function NarrowCardTableHeader({
             </SheetDescription>
           </SheetHeader>
           <div className="mt-4 grid gap-2">
+            {Actions && (
+              <Actions
+                session={session}
+                level={level}
+                surface="action-sheet"
+                close={() => setActionsOpen(false)}
+              />
+            )}
             {query.hasSort && (
               <CompactHeaderButton
                 icon={<X className="h-4 w-4 shrink-0" />}

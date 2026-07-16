@@ -1,6 +1,11 @@
 // @vitest-environment happy-dom
 
-import { act, createElement, type ReactElement } from "react";
+import {
+  act,
+  createElement,
+  type ComponentType,
+  type ReactElement,
+} from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
@@ -10,10 +15,18 @@ import {
 import type { TableSchema } from "@sapporta/shared/contracts";
 import type { TGridDefinition } from "../grid-adapter/tgrid-runtime-config";
 import type { SchemaTableRowsByLevel } from "../grid-adapter/schema-tgrid";
-import type { TableGridViewProps } from "./TableGridView";
+import {
+  SchemaTableGridView as PublicSchemaTableGridView,
+  type TableGridActionsProps as PublicTableGridActionsProps,
+  type TableGridOptionsByTable,
+  type TablePageGridOptions,
+} from "../../index";
+import type { TableGridActionsProps as TablePublicActionsProps } from "../index";
+import type { TableGridBinding, TableGridViewProps } from "./TableGridView";
 import {
   SchemaTableGridView,
   type SchemaTableGridViewProps,
+  useSchemaTableGrid,
 } from "./SchemaTableGridView";
 
 (
@@ -23,15 +36,28 @@ import {
 type CapturedTableGridViewProps = TableGridViewProps<SchemaTableRowsByLevel>;
 
 const { tableGridViewSpy } = vi.hoisted(() => ({
-  tableGridViewSpy: vi.fn(
-    (_props: CapturedTableGridViewProps): ReactElement =>
-      createElement("div", null, "table grid view"),
+  tableGridViewSpy: vi.fn((_props: CapturedTableGridViewProps): ReactElement =>
+    createElement("div", null, "table grid view"),
   ),
 }));
 
-vi.mock("./TableGridView", () => ({
-  TableGridView: (props: CapturedTableGridViewProps) => tableGridViewSpy(props),
-}));
+vi.mock("./TableGridView", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("./TableGridView")>();
+  return {
+    ...actual,
+    TableGridView: (props: CapturedTableGridViewProps) =>
+      tableGridViewSpy(props),
+  };
+});
+
+vi.mock("../grid-adapter/tgrid-binding", async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import("../grid-adapter/tgrid-binding")>();
+  return {
+    ...actual,
+    useTGridSession: () => null,
+  };
+});
 
 const ordersTable: TableSchema = {
   name: "orders",
@@ -145,8 +171,7 @@ describe("SchemaTableGridView", () => {
     expect(props?.route.navigate).toBe(navigate);
 
     const definition = props?.definition as
-      | TGridDefinition<SchemaTableRowsByLevel>
-      | undefined;
+      TGridDefinition<SchemaTableRowsByLevel> | undefined;
     expect(definition?.rootLevel).toBe("orders");
     expect(definition?.levels.orders.query).toMatchObject({
       owner: "host",
@@ -271,5 +296,65 @@ describe("SchemaTableGridView", () => {
     expect(props.loadLookups).toBe(false);
     expect(props.className).toBe("table-page");
     expect(props.gridClassName).toBe("table-grid");
+  });
+
+  it("forwards actions without adding them to the TGrid definition", async () => {
+    const Actions = (
+      _props: PublicTableGridActionsProps<SchemaTableRowsByLevel>,
+    ) => createElement("button", null, "Archive orders");
+    const props = await renderSchemaTableGridView({ actions: Actions });
+
+    expect(props.actions).toBe(Actions);
+    expect(props.definition).not.toHaveProperty("actions");
+    expect(props.definition.levels.orders).not.toHaveProperty("actions");
+  });
+
+  it("preserves actions through useSchemaTableGrid and useTableGrid on the binding", async () => {
+    const Actions = (
+      _props: PublicTableGridActionsProps<SchemaTableRowsByLevel>,
+    ) => null;
+    let binding: TableGridBinding<SchemaTableRowsByLevel> | undefined;
+    const source = {
+      table: ordersTable,
+      tablesByName: { orders: ordersTable, order_lines: orderLinesTable },
+    };
+    const route = {
+      path: "/orders-workbench",
+      searchParams: new URLSearchParams(),
+      navigate: vi.fn(),
+    };
+
+    function BindingProbe(): ReactElement | null {
+      binding = useSchemaTableGrid({
+        source,
+        route,
+        registerAs: "orders",
+        loadLookups: false,
+        actions: Actions,
+      });
+      return null;
+    }
+
+    mounted = await render(createElement(BindingProbe));
+
+    expect(binding?.actions).toBe(Actions);
+    expect(binding?.level).toBe("orders");
+  });
+
+  it("exposes the component slot through the table and root public surfaces", () => {
+    const Actions = (
+      _props: PublicTableGridActionsProps<SchemaTableRowsByLevel>,
+    ) => null;
+    const TableSurfaceActions: ComponentType<
+      TablePublicActionsProps<SchemaTableRowsByLevel>
+    > = Actions;
+    const pageOptions = { actions: Actions } satisfies TablePageGridOptions;
+    const routeOptions = {
+      orders: pageOptions,
+    } satisfies TableGridOptionsByTable;
+
+    expect(PublicSchemaTableGridView).toBe(SchemaTableGridView);
+    expect(TableSurfaceActions).toBe(Actions);
+    expect(routeOptions.orders.actions).toBe(Actions);
   });
 });

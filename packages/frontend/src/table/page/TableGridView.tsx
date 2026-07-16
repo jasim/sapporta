@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, type ComponentType } from "react";
 import { useStore } from "zustand";
 import type { TableSchema } from "@sapporta/shared/contracts";
 import { useTGridSession } from "../grid-adapter/tgrid-binding";
@@ -33,6 +33,22 @@ import {
 //
 // The route stays outside this component so custom pages can live anywhere in
 // the app while table controls update that page's URL.
+export type TableGridActionsProps<
+  RowsByLevel extends TGridRowsByLevel,
+  AppServices = unknown,
+> = {
+  session: TGridSession<RowsByLevel, AppServices>;
+  level: TGridLevelId<RowsByLevel>;
+} & (
+  | {
+      surface: "toolbar";
+    }
+  | {
+      surface: "action-sheet";
+      close: () => void;
+    }
+);
+
 export type TableGridViewProps<
   RowsByLevel extends TGridRowsByLevel,
   AppServices = unknown,
@@ -44,6 +60,7 @@ export type TableGridViewProps<
   registerAs?: string;
   loadLookups?: boolean;
   onNewRecord?: () => void;
+  actions?: ComponentType<TableGridActionsProps<RowsByLevel, AppServices>>;
   viewRelatedRows?: ViewRelatedRowsOption;
   className?: string;
   gridClassName?: string;
@@ -63,6 +80,7 @@ export type TableGridBinding<
   level: TGridLevelId<RowsByLevel>;
   routePath: string;
   onNewRecord?: () => void;
+  actions?: ComponentType<TableGridActionsProps<RowsByLevel, AppServices>>;
   viewRelatedRows?: ViewRelatedRowsOption;
   className?: string;
   gridClassName?: string;
@@ -79,6 +97,7 @@ export function useTableGrid<
   registerAs,
   loadLookups,
   onNewRecord,
+  actions,
   viewRelatedRows,
   className,
   gridClassName,
@@ -116,6 +135,7 @@ export function useTableGrid<
     level: urlState.level,
     routePath: urlState.routePath,
     onNewRecord,
+    actions,
     viewRelatedRows,
     className,
     gridClassName,
@@ -136,6 +156,7 @@ export function TableGridView<
   registerAs,
   loadLookups,
   onNewRecord,
+  actions,
   viewRelatedRows,
   className,
   gridClassName,
@@ -148,6 +169,7 @@ export function TableGridView<
     registerAs,
     loadLookups,
     onNewRecord,
+    actions,
     viewRelatedRows,
     className,
     gridClassName,
@@ -168,6 +190,7 @@ export function TableGridView<
       level={tableGrid.level}
       routePath={tableGrid.routePath}
       onNewRecord={tableGrid.onNewRecord}
+      actions={tableGrid.actions}
       viewRelatedRows={tableGrid.viewRelatedRows}
       className={tableGrid.className}
       gridClassName={tableGrid.gridClassName}
@@ -186,6 +209,7 @@ function TableGridViewWithSession<
   level,
   routePath,
   onNewRecord,
+  actions,
   viewRelatedRows,
   className,
   gridClassName,
@@ -195,6 +219,7 @@ function TableGridViewWithSession<
   level: TGridLevelId<RowsByLevel>;
   routePath: string;
   onNewRecord?: () => void;
+  actions?: ComponentType<TableGridActionsProps<RowsByLevel, AppServices>>;
   viewRelatedRows?: ViewRelatedRowsOption;
   className?: string;
   gridClassName?: string;
@@ -236,6 +261,7 @@ function TableGridViewWithSession<
           viewPreference={tableView.preference}
           onViewPreferenceChange={tableView.setPreference}
           onNewRecord={onNewRecord}
+          actions={actions}
         />
       }
       footer={

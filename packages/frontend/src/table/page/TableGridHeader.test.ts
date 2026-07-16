@@ -1,9 +1,15 @@
 // @vitest-environment happy-dom
 
-import { act, createElement, type ReactElement } from "react";
+import {
+  act,
+  createElement,
+  type ComponentType,
+  type ReactElement,
+} from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { TableSchema } from "@sapporta/shared/contracts";
+import type { TableGridActionsProps } from "../../index";
 import type { TGridSession } from "../state/tgrid-session";
 import { TableGridHeader } from "./TableGridHeader";
 import type { TableLevelQuery } from "./table-level-query";
@@ -60,9 +66,33 @@ const query: TableLevelQuery = {
   clearSort: vi.fn(),
 };
 
+const getVisibleRows = vi.fn(() => [{ id: "order-1" }]);
+const reloadRows = vi.fn(async () => undefined);
 const session = {
   csvExportUrl: () => "/api/tables/orders/export",
+  getVisibleRows,
+  reloadRows,
 } as unknown as TGridSession<TestRows>;
+
+const actionPropsSpy =
+  vi.fn<(props: TableGridActionsProps<TestRows>) => void>();
+
+function TestActions(props: TableGridActionsProps<TestRows>): ReactElement {
+  actionPropsSpy(props);
+  const visibleRowCount = props.session.getVisibleRows(props.level).length;
+  return createElement(
+    "button",
+    {
+      type: "button",
+      onClick: () => {
+        void props.session.reloadRows(props.level).then(() => {
+          if (props.surface === "action-sheet") props.close();
+        });
+      },
+    },
+    `Reload ${visibleRowCount} visible row${visibleRowCount === 1 ? "" : "s"}`,
+  );
+}
 
 let mounted: { root: Root; container: HTMLDivElement } | null = null;
 
@@ -74,6 +104,9 @@ beforeEach(() => {
     error: undefined,
     totalCount: 3,
   });
+  actionPropsSpy.mockClear();
+  getVisibleRows.mockClear();
+  reloadRows.mockClear();
 });
 
 afterEach(async () => {
@@ -238,6 +271,60 @@ describe("TableGridHeader", () => {
       expect(document.body.querySelector('[role="alertdialog"]')).toBeNull();
     });
   });
+
+  it("renders application actions in the wide toolbar with the live session and level", async () => {
+    mounted = await renderHeader("wide", ordersTable, TestActions);
+
+    expect(buttonWithText("Reload 1 visible row")).toBeInstanceOf(
+      HTMLButtonElement,
+    );
+    expect(getVisibleRows).toHaveBeenCalledWith("orders");
+    expect(actionPropsSpy).toHaveBeenCalledTimes(1);
+    expect(actionPropsSpy.mock.calls[0]?.[0]).toMatchObject({
+      session,
+      level: "orders",
+      surface: "toolbar",
+    });
+    expect("close" in (actionPropsSpy.mock.calls[0]?.[0] ?? {})).toBe(false);
+  });
+
+  it("renders application actions in the narrow action sheet and lets them close it", async () => {
+    mounted = await renderHeader("narrowCards", ordersTable, TestActions);
+
+    expect(findButtonWithText("Reload 1 visible row")).toBeUndefined();
+
+    await act(async () => {
+      const openActions = document.body.querySelector(
+        'button[aria-label="Open table actions"]',
+      );
+      if (!(openActions instanceof HTMLButtonElement)) {
+        throw new Error("expected the table actions trigger");
+      }
+      openActions.click();
+    });
+
+    expect(document.body.textContent).toContain("Table actions");
+    const actionButton = buttonWithText("Reload 1 visible row");
+    const props = actionPropsSpy.mock.calls.at(-1)?.[0];
+    expect(props).toMatchObject({
+      session,
+      level: "orders",
+      surface: "action-sheet",
+    });
+    expect(props?.surface === "action-sheet" && props.close).toEqual(
+      expect.any(Function),
+    );
+
+    await act(async () => {
+      actionButton.click();
+      await Promise.resolve();
+    });
+
+    expect(reloadRows).toHaveBeenCalledWith("orders");
+    await vi.waitFor(() => {
+      expect(findButtonWithText("Reload 1 visible row")).toBeUndefined();
+    });
+  });
 });
 
 function rowsSelection(
@@ -255,12 +342,13 @@ function rowsSelection(
 async function renderHeader(
   mode: "wide" | "narrowCards",
   table: TableSchema = ordersTable,
+  actions?: ComponentType<TableGridActionsProps<TestRows>>,
 ): Promise<{ root: Root; container: HTMLDivElement }> {
   const container = document.createElement("div");
   document.body.append(container);
   const root = createRoot(container);
   await act(async () => {
-    root.render(headerElement(mode, table));
+    root.render(headerElement(mode, table, actions));
   });
   return { root, container };
 }
@@ -278,6 +366,7 @@ async function rerenderHeader(
 function headerElement(
   mode: "wide" | "narrowCards",
   table: TableSchema,
+  actions?: ComponentType<TableGridActionsProps<TestRows>>,
 ): ReactElement {
   return createElement(TableGridHeader<TestRows>, {
     mode,
@@ -287,6 +376,7 @@ function headerElement(
     viewPreference: "auto",
     onViewPreferenceChange: vi.fn(),
     onNewRecord: vi.fn(),
+    actions,
   });
 }
 

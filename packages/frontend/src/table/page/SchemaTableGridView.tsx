@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, type ComponentType } from "react";
 import type { GridInteractionConfig } from "@sapporta/grid";
 import type { TableSchema } from "@sapporta/shared/contracts";
 import {
@@ -13,6 +13,7 @@ import type { TableGridRoute } from "./table-grid-url-state";
 import {
   TableGridView,
   useTableGrid,
+  type TableGridActionsProps,
   type TableGridBinding,
 } from "./TableGridView";
 import type { ViewRelatedRowsOption } from "./TGrid";
@@ -31,6 +32,8 @@ export type SchemaTableGridViewProps = {
   registerAs?: string;
   /** Provide this when the page should show a New record action. */
   onNewRecord?: () => void;
+  /** Render application-defined actions in the table toolbar and action sheet. */
+  actions?: ComponentType<TableGridActionsProps<SchemaTableRowsByLevel>>;
   /** Tune row expansion, row loading, interaction, controls, and styling. */
   viewRelatedRows?: ViewRelatedRowsOption;
   rootRows?: SchemaTableRootRowsOptions;
@@ -167,6 +170,7 @@ export function SchemaTableGridView({
   route,
   registerAs,
   onNewRecord,
+  actions,
   viewRelatedRows,
   rootRows,
   relatedRows,
@@ -190,6 +194,7 @@ export function SchemaTableGridView({
       registerAs={registerAs}
       loadLookups={loadLookups}
       onNewRecord={onNewRecord}
+      actions={actions}
       viewRelatedRows={viewRelatedRows}
       className={className}
       gridClassName={gridClassName}
@@ -202,6 +207,7 @@ export function useSchemaTableGrid({
   route,
   registerAs,
   onNewRecord,
+  actions,
   viewRelatedRows,
   rootRows,
   relatedRows,
@@ -224,6 +230,7 @@ export function useSchemaTableGrid({
     registerAs,
     loadLookups,
     onNewRecord,
+    actions,
     viewRelatedRows,
     className,
     gridClassName,

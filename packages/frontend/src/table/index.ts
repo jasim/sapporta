@@ -65,6 +65,7 @@ export {
 export {
   TableGridView,
   useTableGrid,
+  type TableGridActionsProps,
   type TableGridBinding,
   type TableGridViewProps,
   type UseTableGridArgs,
