@@ -6,6 +6,8 @@ import {
 } from "@sapporta/frontend/auth/runtime";
 import { getApiBase } from "@sapporta/frontend/platform";
 import { useSchemaStore } from "@sapporta/frontend/schema";
+import { Button, buttonVariants } from "@sapporta/ui/button";
+import { cn } from "@sapporta/ui/cn";
 import {
   AlertTriangle,
   Check,
@@ -17,69 +19,63 @@ import {
 
 const sapportaDocsUrl = "https://github.com/jasim/sapporta/tree/main/docs";
 
-const projectReferences = `Before changing the app, review:
-- [README.md](README.md)
-- [AGENTS.md](AGENTS.md)
-- [Sapporta coding-agent skill](https://github.com/jasim/sapporta-skills/tree/main/skills/sapporta)`;
+const projectReferences = `Read README.md and AGENTS.md first. Follow the Sapporta skill and the getting-started guide: https://sapporta.com/docs/getting-started`;
 
 const appIdeas = [
   {
     id: "tasks",
     label: "Task Management",
-    eyebrow: "Productivity",
+    category: "Productivity",
     description:
       "Plan projects, assign work, track due dates, and review progress.",
-    prompt: `Build a simple task management application.
-Use Sapporta, the database framework for TypeScript, and ensure the Sapporta skill is installed. Follow the setup instructions at https://sapporta.com/docs/getting-started
+    prompt: `Build a focused task management app with Sapporta.
 
-Keep the first version focused and easy to understand: include the core workflows that make the app useful, and avoid exhaustive features or deep customization.
+Model people, projects, tasks, labels, and comments.
 
-Use workspaceGlobal tables with this exact contract: people(id, name, email), projects(id, name, description, status), tasks(id, title, description, status, priority, due_date, assignee_id, project_id), labels(id, name, color), task_labels(id, task_id, label_id), comments(id, task_id, author_id, body). Use status values open, in_progress, blocked, done; priorities low, normal, high; and project statuses active, paused, complete. Do not expose workspace_id, workspaceId, scoped_to_user_id, or scopedToUserId in clients, CLI commands, or agent prompts.
+Include:
+- task creation and assignment
+- status, priority, due dates, labels, and comments
+- views for open tasks, overdue tasks, assignees, and projects
 
-Include workflows for creating a task, assigning it, changing its status, and adding a comment. Include reports for open tasks, overdue tasks, tasks by assignee, and tasks by project. Populate the application with realistic sample projects, people, tasks, labels, and comments so the first run shows an active todo app.`,
+Add realistic sample data. Keep the first version small and follow the existing project structure.`,
   },
   {
     id: "invoices",
     label: "Invoicing",
-    eyebrow: "Business",
+    category: "Business",
     description:
       "Create quotes and invoices, record payments, and monitor unpaid balances.",
-    prompt: `Build an invoicing application.
-Use Sapporta, the database framework for TypeScript, and ensure the Sapporta skill is installed. Follow the setup instructions at https://sapporta.com/docs/getting-started
+    prompt: `Build a focused invoicing app with Sapporta.
 
-Keep the first version focused and easy to understand: include the core workflows that make the app useful, and avoid exhaustive features or deep customization.
+Model customers, catalog items, quotes, invoices, line items, and payments.
 
-The application should manage customers, contacts, products or services, quotes, quote line items, invoices, invoice line items, payments, and payment allocations. Invoice totals should come from line items, and invoice status should move from draft to sent to paid.
+Include:
+- invoice entry with line items and calculated totals
+- draft, sent, overdue, and paid states
+- views for revenue, unpaid invoices, payment history, and item sales
 
-Include a workflow where a user can enter an invoice and its line items together. Include reports for monthly revenue, unpaid invoices, overdue receivables, customer payment history, and product or service sales. Populate the application with realistic sample customers, products or services, invoices, payments, and receivables activity so the first run feels complete.`,
+Add realistic sample data. Keep the first version small and follow the existing project structure.`,
   },
   {
     id: "meals",
     label: "Meal Tracking",
-    eyebrow: "Personal Database",
+    category: "Personal",
     description:
       "Log meals, track nutrition targets, and review daily and weekly totals.",
-    prompt: `Build a meal and nutrition tracking application.
-Use Sapporta, the database framework for TypeScript, and ensure the Sapporta skill is installed. Follow the setup instructions at https://sapporta.com/docs/getting-started
+    prompt: `Build a focused meal tracking app with Sapporta.
 
-Keep the first version focused and easy to understand: include the core workflows that make the app useful, and avoid exhaustive features or deep customization.
+Model foods, serving units, meals, meal items, daily targets, and measurements.
 
-The application should manage foods, serving units, meals, meal items, daily targets, body measurements, and nutrition goals. Track calories, protein, carbs, fat, fiber, and serving sizes. Users should be able to move from a day to its meals and from a food to its usage history.
+Include:
+- meal logging with several foods
+- copying a previous meal into today
+- views for daily totals, weekly averages, macro balance, and food history
 
-Include workflows for logging a meal with multiple foods and copying a previous meal into today. Include reports for daily nutrition totals, weekly averages, macro balance, calorie trend, and foods eaten most often. Populate the application with realistic sample foods, meals, targets, and nutrition logs so the first run shows meaningful daily and weekly totals.`,
+Add realistic sample data. Keep the first version small and follow the existing project structure.`,
   },
 ] as const;
 
 type AppIdea = (typeof appIdeas)[number];
-
-const navButtonClass =
-  "inline-flex h-9 items-center justify-center gap-2 rounded-[2px] bg-transparent px-3 text-sap-data font-semibold text-sap-soft hover:bg-sap-row-hover hover:text-sap-fg disabled:opacity-70";
-
-const primaryButtonClass =
-  "inline-flex h-9 items-center justify-center gap-2 rounded-[2px] bg-sap-fg px-3 text-sap-data font-semibold text-sap-bg hover:opacity-90";
-
-const eyebrowClass =
-  "text-sap-label font-bold uppercase tracking-sap-section text-sap-link";
 
 // Replace this screen with the first dashboard, workflow, or form your app
 // needs after the app has its own primary surface.
@@ -137,41 +133,43 @@ ${projectReferences}`;
 
   return (
     <div className="flex-1 overflow-y-auto bg-sap-bg text-sap-fg">
-      <div className="mx-auto max-w-[96rem] px-5 py-6 sm:px-10 lg:px-16">
+      <div className="mx-auto max-w-[68rem] px-5 py-5 sm:px-8 sm:py-7 lg:px-10">
         {viewMode === "diagnostics" ? (
           <>
             <PageNav>
-              <button
-                className={navButtonClass}
-                type="button"
+              <Button
+                variant="ghost"
+                size="sm"
                 onClick={() => setViewMode("onboarding")}
               >
                 Welcome
-              </button>
-              <button
-                className={navButtonClass}
-                type="button"
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
                 onClick={runDiagnostics}
                 disabled={diagnosticsRunning}
               >
-                <SearchCheck className="h-3.5 w-3.5" strokeWidth={1.8} />
+                <SearchCheck data-icon="inline-start" strokeWidth={1.8} />
                 {diagnosticsRunning ? "Running" : "Run again"}
-              </button>
+              </Button>
             </PageNav>
 
-            <header className="max-w-[58rem] pb-8 pt-10 sm:pt-14">
-              <div className={eyebrowClass}>Project diagnostics</div>
-              <h1 className="mt-4 text-[42px] font-[830] leading-[0.96] text-sap-fg sm:text-[64px]">
-                Check the frontend, API, schema, and auth connection.
+            <header className="max-w-[44rem] pb-7 pt-10 sm:pt-12">
+              <div className="text-sap-label font-bold uppercase tracking-sap-section text-sap-muted">
+                Project diagnostics
+              </div>
+              <h1 className="mt-3 text-2xl font-[720] leading-tight text-sap-soft sm:text-[30px]">
+                Check the project connections
               </h1>
-              <p className="mt-6 max-w-[42rem] text-[17px] leading-7 text-sap-soft">
-                Use these checks when the page renders but metadata, custom API
-                routes, or the workspace context need attention.
+              <p className="mt-3 max-w-[38rem] text-[15px] leading-6 text-sap-muted">
+                Run these checks when schema metadata, API routes, or the
+                workspace session do not load as expected.
               </p>
             </header>
 
-            <section className="border-t border-sap-border py-8">
-              <div className="grid max-w-[58rem] gap-2">
+            <section className="border-t border-sap-border-soft py-7">
+              <div className="grid max-w-[50rem] gap-3">
                 {diagnostics.map((result) => (
                   <DiagnosticRow key={result.id} result={result} />
                 ))}
@@ -182,55 +180,83 @@ ${projectReferences}`;
           <>
             <PageNav>
               <a
-                className={navButtonClass}
+                className={cn(
+                  buttonVariants({ variant: "ghost", size: "sm" }),
+                  "no-underline",
+                )}
                 href={sapportaDocsUrl}
                 rel="noreferrer"
                 target="_blank"
               >
                 Docs
-                <ExternalLink className="h-3.5 w-3.5" strokeWidth={1.8} />
+                <ExternalLink data-icon="inline-end" strokeWidth={1.8} />
               </a>
-              <button
-                className={navButtonClass}
-                type="button"
-                onClick={openDiagnostics}
-              >
-                <Stethoscope className="h-3.5 w-3.5" strokeWidth={1.8} />
+              <Button variant="ghost" size="sm" onClick={openDiagnostics}>
+                <Stethoscope data-icon="inline-start" strokeWidth={1.8} />
                 Diagnostics
-              </button>
+              </Button>
             </PageNav>
 
-            <header className="max-w-[44rem] pb-8 pt-10 sm:pt-14">
-              <h1 className="text-[21px] font-[830] leading-[0.96] text-sap-fg sm:text-[32px]">
-                Build your database app with Sapporta
+            <header className="max-w-[44rem] pt-12 sm:pt-16">
+              <h1 className="text-[24px] font-[680] leading-tight text-sap-soft sm:text-[28px]">
+                Welcome to your new Sapporta project
               </h1>
-              <p className="mt-4 text-[17px] leading-7 text-sap-soft">
-                Choose a starter prompt, and copy it into your coding agent.
+              <p className="mt-4 text-[15px] leading-6 text-sap-muted">
+                Start building your application by prompting a coding agent.
+                Here are a few sample prompts to get started.
               </p>
             </header>
 
-            <main className="max-w-[58rem] py-6">
-              <section>
-                <div className="grid gap-2 sm:grid-cols-3">
+            <main className="max-w-[58rem] py-9 sm:py-11">
+              <section aria-labelledby="starter-heading">
+                <h2
+                  className="mb-3 text-[16px] font-[680] text-sap-soft"
+                  id="starter-heading"
+                >
+                  Sample prompts
+                </h2>
+                <div
+                  aria-label="Starter app choices"
+                  className="grid gap-2 sm:grid-cols-3"
+                  role="group"
+                >
                   {appIdeas.map((idea) => (
                     <button
-                      className={[
-                        "rounded-[4px] px-4 py-4 text-left ring-1 transition-colors",
+                      aria-pressed={selectedIdea.id === idea.id}
+                      className={cn(
+                        "min-h-[108px] cursor-pointer rounded-lg bg-sap-sidebar px-4 py-4 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-sap-bg",
                         selectedIdea.id === idea.id
-                          ? "bg-sap-active-nav text-sap-fg ring-sap-border-strong"
-                          : "bg-sap-sidebar text-sap-soft ring-sap-border-soft hover:bg-sap-row-hover hover:text-sap-fg",
-                      ].join(" ")}
+                          ? "bg-sap-brand-soft text-sap-fg"
+                          : "text-sap-soft hover:bg-sap-row-hover hover:text-sap-fg",
+                      )}
                       key={idea.id}
                       type="button"
                       onClick={() => setSelectedIdeaId(idea.id)}
                     >
-                      <div className="text-sap-micro font-bold uppercase tracking-sap-label text-sap-muted">
-                        {idea.eyebrow}
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex flex-col gap-1">
+                          <div className="text-sap-micro font-bold uppercase tracking-sap-label text-sap-muted">
+                            {idea.category}
+                          </div>
+                          <div className="text-[14px] font-[650] leading-5">
+                            {idea.label}
+                          </div>
+                        </div>
+                        <span
+                          aria-hidden="true"
+                          className={cn(
+                            "flex size-4 shrink-0 items-center justify-center rounded-full border",
+                            selectedIdea.id === idea.id
+                              ? "border-sap-brand bg-sap-surface"
+                              : "border-sap-border-strong bg-sap-surface",
+                          )}
+                        >
+                          {selectedIdea.id === idea.id ? (
+                            <span className="size-2 rounded-full bg-sap-brand" />
+                          ) : null}
+                        </span>
                       </div>
-                      <div className="mt-1 text-[15px] font-[720] leading-5">
-                        {idea.label}
-                      </div>
-                      <div className="mt-1 text-sap-body leading-5 text-sap-muted">
+                      <div className="mt-2 text-sap-body leading-5 text-sap-muted">
                         {idea.description}
                       </div>
                     </button>
@@ -238,37 +264,41 @@ ${projectReferences}`;
                 </div>
               </section>
 
-              <section className="mt-8 min-w-0">
-                <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+              <section
+                aria-labelledby="prompt-heading"
+                className="mt-10 min-w-0"
+              >
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
                   <div>
-                    <div className={eyebrowClass}>Prompt</div>
-                    <h2 className="mt-2 text-[26px] font-[760] leading-tight text-sap-fg">
-                      {selectedIdea.label}
+                    <h2
+                      className="text-[16px] font-[680] text-sap-soft"
+                      id="prompt-heading"
+                    >
+                      {selectedIdea.label} prompt
                     </h2>
+                    <p className="mt-1 text-sap-body text-sap-muted">
+                      Paste this into your coding agent from the project root.
+                    </p>
                   </div>
-                  <button
-                    className={primaryButtonClass}
-                    type="button"
-                    onClick={copyAgentPrompt}
-                  >
+                  <Button size="sm" onClick={copyAgentPrompt}>
                     {copyStatus === "copied" ? (
-                      <Check className="h-4 w-4" strokeWidth={2} />
+                      <Check data-icon="inline-start" strokeWidth={2} />
                     ) : (
-                      <Copy className="h-4 w-4" strokeWidth={1.9} />
+                      <Copy data-icon="inline-start" strokeWidth={1.9} />
                     )}
-                    {copyStatus === "copied"
-                      ? "Copied"
-                      : copyStatus === "error"
-                        ? "Copy failed"
-                        : "Copy Prompt"}
-                  </button>
+                    <span aria-live="polite">
+                      {copyStatus === "copied"
+                        ? "Copied"
+                        : copyStatus === "error"
+                          ? "Copy failed"
+                          : "Copy prompt"}
+                    </span>
+                  </Button>
                 </div>
 
-                <div className="overflow-hidden rounded-[4px] bg-sap-sidebar">
-                  <pre className="mono max-h-[560px] overflow-auto whitespace-pre-wrap p-5 text-[13px] leading-6 text-sap-fg">
-                    {activePrompt}
-                  </pre>
-                </div>
+                <pre className="mono mt-4 max-h-[420px] overflow-auto whitespace-pre-wrap break-words rounded-lg bg-sap-sidebar p-5 text-[13px] leading-6 text-sap-soft sm:p-6">
+                  {activePrompt}
+                </pre>
               </section>
             </main>
           </>
@@ -280,9 +310,13 @@ ${projectReferences}`;
 
 function PageNav({ children }: { children: ReactNode }) {
   return (
-    <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-      <div className="text-sap-label font-[780] uppercase leading-none text-sap-subtle">
-        Sapporta
+    <div className="flex items-center justify-between gap-4">
+      <div className="flex items-center gap-2.5">
+        <span
+          aria-hidden="true"
+          className="size-4 rounded-[5px] bg-[linear-gradient(135deg,var(--sap-fg)_0_58%,var(--sap-brand)_58%_100%)]"
+        />
+        <div className="text-sap-data font-[680] text-sap-soft">Sapporta</div>
       </div>
       <nav className="flex flex-wrap gap-2" aria-label="Welcome actions">
         {children}
@@ -314,26 +348,29 @@ function DiagnosticRow({ result }: { result: DiagnosticResult }) {
         : "text-sap-negative";
 
   return (
-    <div className="grid gap-3 rounded-[2px] border border-sap-border bg-sap-surface px-4 py-3 sm:grid-cols-[120px_minmax(0,1fr)]">
+    <div className="grid gap-3 rounded-lg border border-sap-border-soft bg-sap-surface px-4 py-4 shadow-sm sm:grid-cols-[104px_minmax(0,1fr)] sm:px-5">
       <div
-        className={`flex items-center gap-2 text-sap-data font-semibold ${statusClass}`}
+        className={cn(
+          "flex items-center gap-2 text-sap-data font-semibold",
+          statusClass,
+        )}
       >
         {result.status === "pass" ? (
-          <Check className="h-4 w-4" strokeWidth={2} />
+          <Check className="size-4" strokeWidth={2} />
         ) : (
-          <AlertTriangle className="h-4 w-4" strokeWidth={1.9} />
+          <AlertTriangle className="size-4" strokeWidth={1.9} />
         )}
         {statusLabel(result.status)}
       </div>
       <div className="min-w-0">
-        <div className="text-sap-body font-semibold text-sap-fg">
+        <div className="text-sap-body font-semibold text-sap-soft">
           {result.label}
         </div>
         <p className="mt-1 text-sap-data leading-5 text-sap-soft">
           {result.message}
         </p>
         {result.detail ? (
-          <pre className="mono mt-2 whitespace-pre-wrap break-words rounded-md border border-sap-border bg-sap-sidebar p-3 text-sap-micro leading-5 text-sap-fg">
+          <pre className="mono mt-3 whitespace-pre-wrap break-words rounded-md border border-sap-border-soft bg-sap-nested p-3 text-sap-micro leading-5 text-sap-soft">
             {result.detail}
           </pre>
         ) : null}

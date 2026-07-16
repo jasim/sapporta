@@ -1,10 +1,8 @@
 import { ReactNode } from "react";
 
 /**
- * Framing primitive for the app sidebar. Fixed 220px width, hairline border
- * on the right, sits on `sidebar` background. Provides a header slot (brand
- * row) and a scrollable body, plus an optional footer slot (typically the
- * command-menu kbd strip).
+ * Framing primitive for the app sidebar. Provides a project header, scrollable
+ * navigation, and an optional account footer on the sidebar surface.
  */
 export function SidebarShell({
   header,
@@ -16,13 +14,15 @@ export function SidebarShell({
   children?: ReactNode;
 }) {
   return (
-    <aside className="w-[220px] shrink-0 border-r border-sap-border-soft bg-sap-sidebar text-sap-fg flex flex-col h-full px-3 py-[18px]">
-      <div className="h-[28px] mb-6 px-[2px] flex items-center gap-[10px]">
+    <aside className="flex h-full w-[240px] shrink-0 flex-col border-r border-sap-border-soft bg-sap-sidebar px-3 py-3 text-sap-fg">
+      <div className="mb-3 flex min-h-14 items-center gap-3 rounded-lg px-2">
         {header}
       </div>
-      <nav className="flex-1 overflow-y-auto">{children}</nav>
+      <nav aria-label="Primary" className="flex-1 overflow-y-auto px-0.5 pb-2">
+        {children}
+      </nav>
       {footer && (
-        <div className="border-t border-sap-border-soft mt-4 pt-3 px-[2px]">
+        <div className="mt-3 border-t border-sap-border-soft px-0.5 pt-3">
           {footer}
         </div>
       )}

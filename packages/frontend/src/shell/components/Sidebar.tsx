@@ -1,5 +1,6 @@
 import { type ReactNode, useMemo, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
+import { cn } from "@sapporta/ui/cn";
 import { ListFilter } from "lucide-react";
 import { useSchemaStore } from "../../schema-catalog/state/schema-store";
 import { AuthAccountMenu } from "./AuthAccountMenu";
@@ -19,7 +20,7 @@ export function SapportaMark({ size = 17 }: { size?: number }) {
   return (
     <span
       aria-hidden="true"
-      className="inline-block rounded-[5px]"
+      className="inline-block rounded-[6px] shadow-sm"
       style={{
         width: size,
         height: size,
@@ -35,9 +36,14 @@ function SidebarHeader() {
   const name = useSchemaStore((s) => s.name);
   return (
     <>
-      <SapportaMark size={18} />
-      <span className="text-sap-body font-bold tracking-sap-display truncate">
-        {name ?? ""}
+      <SapportaMark size={24} />
+      <span className="flex min-w-0 flex-col gap-0.5">
+        <span className="truncate text-sap-body font-[680] tracking-sap-display text-sap-soft">
+          {name ?? "Your app"}
+        </span>
+        <span className="text-sap-micro font-semibold uppercase tracking-sap-label text-sap-subtle">
+          Sapporta
+        </span>
       </span>
     </>
   );
@@ -51,11 +57,11 @@ export function NavSection({
   children: ReactNode;
 }) {
   return (
-    <section>
-      <div className="mt-[18px] mb-[6px] px-[2px] flex items-center justify-between text-sap-label font-bold uppercase tracking-sap-section text-sap-subtle">
+    <section className="flex flex-col gap-1 pt-4 first:pt-0">
+      <div className="flex items-center justify-between px-2 text-sap-label font-bold uppercase tracking-sap-section text-sap-subtle">
         <span>{label}</span>
       </div>
-      <div>{children}</div>
+      <div className="flex flex-col gap-0.5">{children}</div>
     </section>
   );
 }
@@ -76,34 +82,32 @@ export function NavItem({
       to={item.to}
       title={compact ? item.label : undefined}
       aria-label={compact ? item.label : undefined}
-      className={cx(
-        "flex items-center rounded-[6px] text-sap-body no-underline",
-        compact ? "h-10 w-10 justify-center" : "gap-2 h-[28px] px-2",
+      aria-current={active ? "page" : undefined}
+      className={cn(
+        "group flex items-center rounded-lg text-sap-body text-sap-soft no-underline transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-sap-sidebar",
+        compact ? "size-10 justify-center" : "h-9 gap-2.5 px-2.5",
         active
-          ? "bg-sap-active-nav text-sap-fg font-[650]"
-          : "text-sap-soft hover:bg-sap-row-hover",
+          ? "bg-sap-active-nav"
+          : "hover:bg-sap-row-hover hover:text-sap-fg",
       )}
     >
       <span
-        className={cx(
-          "inline-flex items-center justify-center shrink-0",
-          compact ? "h-5 w-5" : "w-[14px] h-[14px]",
-          active ? "text-sap-brand mono text-sap-data" : "text-sap-subtle",
+        className={cn(
+          "inline-flex shrink-0 items-center justify-center text-sap-subtle transition-colors group-hover:text-sap-muted",
+          compact ? "size-5" : "size-4",
         )}
       >
-        {active && !compact ? (
-          "▸"
-        ) : Icon ? (
+        {Icon ? (
           <Icon
-            className={compact ? "h-[17px] w-[17px]" : "h-[12px] w-[12px]"}
-            strokeWidth={1.5}
+            className={compact ? "size-[17px]" : "size-[15px]"}
+            strokeWidth={1.7}
           />
         ) : (
-          <span className="h-[6px] w-[6px] rounded-full bg-current" />
+          <span className="size-1.5 rounded-full bg-current" />
         )}
       </span>
       {!compact && (
-        <span className="flex-1 min-w-0 truncate">{item.label}</span>
+        <span className="min-w-0 flex-1 truncate">{item.label}</span>
       )}
     </Link>
   );
@@ -140,9 +144,9 @@ export function NavigationRail({ navigation }: NavigationShellProps) {
     : allItems.slice(0, 8);
 
   return (
-    <aside className="hidden md:flex lg:hidden w-[64px] shrink-0 border-r border-sap-border-soft bg-sap-sidebar text-sap-fg flex-col items-center h-full py-4">
-      <SapportaMark size={20} />
-      <nav className="mt-6 flex flex-col gap-1">
+    <aside className="hidden h-full w-[68px] shrink-0 flex-col items-center border-r border-sap-border-soft bg-sap-sidebar py-4 text-sap-fg md:flex lg:hidden">
+      <SapportaMark size={22} />
+      <nav aria-label="Primary" className="mt-6 flex flex-col gap-1.5">
         {items.map((item) => (
           <NavItem
             key={item.to}
@@ -166,7 +170,10 @@ export function MobileBottomNav({
   const stableItems = navigationItems(navigation).slice(0, 3);
 
   return (
-    <nav className="md:hidden fixed inset-x-0 bottom-0 z-[var(--sap-z-shell-sticky)] h-[56px] border-t border-sap-border bg-sap-sidebar px-2 flex items-center justify-around">
+    <nav
+      aria-label="Primary"
+      className="fixed inset-x-0 bottom-0 z-[var(--sap-z-shell-sticky)] flex h-[56px] items-center justify-around border-t border-sap-border-soft bg-sap-sidebar/95 px-2 shadow-[0_-4px_18px_color-mix(in_oklab,var(--sap-fg)_7%,transparent)] md:hidden"
+    >
       {stableItems.map((item) => {
         const active = isNavigationItemActive(item, location);
         const Icon = item.icon;
@@ -174,17 +181,18 @@ export function MobileBottomNav({
           <Link
             key={item.to}
             to={item.to}
-            className={cx(
-              "min-w-[56px] h-12 px-2 rounded-[6px] flex flex-col items-center justify-center gap-1 text-sap-label no-underline",
+            aria-current={active ? "page" : undefined}
+            className={cn(
+              "flex h-12 min-w-[60px] flex-col items-center justify-center gap-1 rounded-lg px-2 text-sap-label text-sap-muted no-underline transition-colors",
               active
-                ? "text-sap-fg bg-sap-active-nav font-[650]"
-                : "text-sap-soft",
+                ? "bg-sap-active-nav"
+                : "hover:bg-sap-row-hover hover:text-sap-fg",
             )}
           >
             {Icon ? (
-              <Icon className="h-[16px] w-[16px]" strokeWidth={1.5} />
+              <Icon className="size-4" strokeWidth={1.7} />
             ) : (
-              <span className="h-[6px] w-[6px] rounded-full bg-current" />
+              <span className="size-1.5 rounded-full bg-current" />
             )}
             <span className="max-w-[72px] truncate">{item.label}</span>
           </Link>
@@ -211,10 +219,12 @@ export function NavigationPicker({
     isNavigationItemActive(item, location),
   );
 
-  const buttonClass =
+  const buttonClass = cn(
+    "transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
     trigger === "rail"
-      ? "h-10 w-10 rounded-[6px] inline-flex items-center justify-center text-sap-soft hover:bg-sap-row-hover"
-      : "min-w-[56px] h-12 px-2 rounded-[6px] flex flex-col items-center justify-center gap-1 text-sap-label text-sap-soft";
+      ? "inline-flex size-10 items-center justify-center rounded-lg text-sap-muted hover:bg-sap-row-hover hover:text-sap-fg"
+      : "flex h-12 min-w-[60px] flex-col items-center justify-center gap-1 rounded-lg px-2 text-sap-label text-sap-muted hover:bg-sap-row-hover hover:text-sap-fg",
+  );
   const panelClass =
     trigger === "rail"
       ? "absolute bottom-0 left-full ml-3 w-[min(360px,calc(100vw-24px))]"
@@ -230,7 +240,7 @@ export function NavigationPicker({
         aria-expanded={open}
         onClick={() => setOpen((current) => !current)}
       >
-        <ListFilter className="h-[17px] w-[17px]" strokeWidth={1.5} />
+        <ListFilter className="size-[17px]" strokeWidth={1.7} />
         {trigger === "mobile" && <span>Browse</span>}
       </button>
       {open && (
@@ -243,19 +253,19 @@ export function NavigationPicker({
       )}
       {open && (
         <div
-          className={cx(
+          className={cn(
             panelClass,
-            "z-[var(--sap-z-popover)] max-h-[320px] overflow-y-auto rounded-md border border-sap-border bg-popover p-1 text-sap-body text-popover-foreground shadow-md",
+            "z-[var(--sap-z-popover)] max-h-[360px] overflow-y-auto rounded-lg border border-sap-border bg-popover p-1.5 text-sap-body text-popover-foreground shadow-lg",
           )}
         >
           {options.map((option) => (
             <button
               key={option.id}
               type="button"
-              className={cx(
-                "flex w-full items-center rounded-[4px] px-2 py-[7px] text-left text-sap-data hover:bg-sap-row-hover hover:text-sap-fg",
+              className={cn(
+                "flex w-full items-center rounded-md px-2.5 py-2 text-left text-sap-data transition-colors hover:bg-sap-row-hover hover:text-sap-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
                 activeItem?.to === option.id
-                  ? "bg-sap-active-nav font-[650] text-sap-fg"
+                  ? "bg-sap-active-nav text-sap-soft"
                   : "text-sap-soft",
               )}
               onClick={() => {
@@ -270,10 +280,6 @@ export function NavigationPicker({
       )}
     </div>
   );
-}
-
-function cx(...classes: Array<string | false | null | undefined>): string {
-  return classes.filter(Boolean).join(" ");
 }
 
 function includeActiveRailItem(
