@@ -19,6 +19,7 @@ export {
 } from "./table/actions/record-actions";
 
 export { AccountProfilePage } from "./auth/components/AccountProfilePage";
+export { ChangePasswordPage } from "./auth/components/ChangePasswordPage";
 export {
   AuthGate,
   ForgotPasswordPage,
@@ -27,6 +28,7 @@ export {
   ResetPasswordPage,
   SignupPage,
   VerifyEmailPage,
+  changePassword,
   fetchAuthBootstrapStatus,
   fetchAuthContext,
   signOut,
@@ -34,6 +36,7 @@ export {
   useAuthStore,
   type AuthState,
   type AuthSession,
+  type ChangePasswordInput,
 } from "./auth";
 export { BootLoader } from "./app/boot/BootLoader";
 export { HomeRedirect } from "./app/boot/HomeRedirect";

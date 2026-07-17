@@ -10,6 +10,7 @@ import {
   UserRound,
 } from "lucide-react";
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
+import { Link } from "react-router-dom";
 import { Button } from "@sapporta/ui/button";
 import {
   Dialog,
@@ -106,9 +107,32 @@ export function AccountProfilePage() {
           />
         </section>
 
+        <AccountSecurity />
         <AgentAccessTokens />
       </div>
     </div>
+  );
+}
+
+function AccountSecurity() {
+  return (
+    <section className="mt-8">
+      <header className="mb-3 flex items-center gap-2">
+        <KeyRound className="size-4 text-sap-subtle" strokeWidth={1.7} />
+        <h2 className="text-[17px] font-[680] text-sap-fg">Security</h2>
+      </header>
+      <div className="flex min-h-[70px] flex-wrap items-center justify-between gap-4 border-y border-sap-border-soft py-3">
+        <div className="min-w-0">
+          <div className="text-sap-body font-medium text-sap-fg">Password</div>
+          <p className="mt-1 text-sap-data text-sap-muted">
+            Use your current password to choose a new one.
+          </p>
+        </div>
+        <Button variant="outline" render={<Link to="/account/password" />}>
+          Change password
+        </Button>
+      </div>
+    </section>
   );
 }
 

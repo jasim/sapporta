@@ -46,18 +46,17 @@ export function errorMessage(
   fallback = "Request failed",
 ): string {
   if (err instanceof ApiError) {
-    const body = err.body;
-    if (isErrorBody(body)) return body.error;
+    const message = apiErrorMessage(err.body);
+    if (message) return message;
   }
   if (err instanceof Error) return err.message;
   return fallback;
 }
 
-function isErrorBody(body: unknown): body is { error: string } {
-  return (
-    body !== null &&
-    typeof body === "object" &&
-    "error" in body &&
-    typeof (body as { error: unknown }).error === "string"
-  );
+function apiErrorMessage(body: unknown): string | undefined {
+  if (body === null || typeof body !== "object") return undefined;
+  const error = "error" in body ? body.error : undefined;
+  if (typeof error === "string") return error;
+  const message = "message" in body ? body.message : undefined;
+  return typeof message === "string" ? message : undefined;
 }

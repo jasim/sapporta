@@ -17,6 +17,7 @@ import { useSchemaStore } from "../../schema-catalog/state/schema-store";
 import { AuthAccountMenu } from "../../shell/components/AuthAccountMenu";
 import { useAuthStore, type AuthState } from "../state/auth-store";
 import { AuthGate, PublicOnlyGate } from "./AuthGate";
+import { AccountProfilePage } from "./AccountProfilePage";
 import {
   ForgotPasswordPage,
   LoginPage,
@@ -24,6 +25,7 @@ import {
   SignupPage,
   VerifyEmailPage,
 } from "./AuthPages";
+import { ChangePasswordPage } from "./ChangePasswordPage";
 
 const AUTH_CONTEXT = {
   user: {
@@ -444,6 +446,132 @@ describe("auth pages", () => {
     await clickButton("Log out");
 
     await waitForText("login page");
+  });
+});
+
+describe("authenticated account pages", () => {
+  it("links the account profile to password settings inside the shell", async () => {
+    installFetch((request) => {
+      if (request.path === "/api/auth-tokens") {
+        return jsonResponse({ tokens: [] });
+      }
+      return jsonResponse({ error: "Unexpected request" }, 500);
+    });
+    useAuthStoreSetState({
+      session: { kind: "authenticated", context: AUTH_CONTEXT },
+    });
+
+    await renderRoutes(
+      "/account/profile",
+      createElement(Route, {
+        path: "/account/profile",
+        element: createElement(AccountProfilePage),
+      }),
+      createElement(Route, {
+        path: "/account/password",
+        element: createElement(ChangePasswordPage),
+      }),
+    );
+
+    await waitForText("Security");
+    const link = host.querySelector<HTMLAnchorElement>(
+      'a[href="/account/password"]',
+    );
+    expect(link).not.toBeNull();
+    await act(async () => {
+      link!.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    });
+    await waitForText("Enter your current password, then choose a new one.");
+  });
+
+  it("changes the signed-in user's password", async () => {
+    const calls = installFetch((request) => {
+      if (
+        request.path === "/api/auth/change-password" &&
+        request.method === "POST"
+      ) {
+        return jsonResponse({ token: null, user: AUTH_CONTEXT.user });
+      }
+      return jsonResponse({ error: "Unexpected request" }, 500);
+    });
+    useAuthStoreSetState({
+      session: { kind: "authenticated", context: AUTH_CONTEXT },
+    });
+    await renderRoutes(
+      "/account/password",
+      createElement(Route, {
+        path: "/account/password",
+        element: createElement(ChangePasswordPage),
+      }),
+    );
+
+    await fillInput("Current password", "correct-horse-battery-staple");
+    await fillInput("New password", "new-correct-horse-battery-staple");
+    await fillInput("Confirm new password", "new-correct-horse-battery-staple");
+    await submitForm();
+
+    await waitForText("Password changed.");
+    expect(calls).toContainEqual({
+      path: "/api/auth/change-password",
+      method: "POST",
+      body: {
+        currentPassword: "correct-horse-battery-staple",
+        newPassword: "new-correct-horse-battery-staple",
+      },
+    });
+  });
+
+  it("rejects mismatched new passwords before sending a request", async () => {
+    const calls = installFetch(() =>
+      jsonResponse({ error: "Unexpected request" }, 500),
+    );
+    useAuthStoreSetState({
+      session: { kind: "authenticated", context: AUTH_CONTEXT },
+    });
+    await renderRoutes(
+      "/account/password",
+      createElement(Route, {
+        path: "/account/password",
+        element: createElement(ChangePasswordPage),
+      }),
+    );
+
+    await fillInput("Current password", "correct-horse-battery-staple");
+    await fillInput("New password", "first-new-password");
+    await fillInput("Confirm new password", "different-new-password");
+    await submitForm();
+
+    await waitForText("New passwords do not match.");
+    expect(calls).toEqual([]);
+  });
+
+  it("shows Better Auth password errors", async () => {
+    installFetch((request) => {
+      if (request.path === "/api/auth/change-password") {
+        return jsonResponse(
+          { code: "INVALID_PASSWORD", message: "Invalid password" },
+          400,
+        );
+      }
+      return jsonResponse({ error: "Unexpected request" }, 500);
+    });
+    useAuthStoreSetState({
+      session: { kind: "authenticated", context: AUTH_CONTEXT },
+    });
+    await renderRoutes(
+      "/account/password",
+      createElement(Route, {
+        path: "/account/password",
+        element: createElement(ChangePasswordPage),
+      }),
+    );
+
+    await fillInput("Current password", "wrong-password");
+    await fillInput("New password", "new-correct-horse-battery-staple");
+    await fillInput("Confirm new password", "new-correct-horse-battery-staple");
+    await submitForm();
+
+    await waitForText("Invalid password");
   });
 });
 

@@ -46,6 +46,20 @@ export async function revokeAuthToken(id: string): Promise<void> {
   });
 }
 
+export interface ChangePasswordInput {
+  currentPassword: string;
+  newPassword: string;
+  revokeOtherSessions?: boolean;
+}
+
+export async function changePassword(body: ChangePasswordInput): Promise<void> {
+  await fetchApi("/auth/change-password", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+}
+
 export async function signOut(): Promise<void> {
   await fetchApi("/auth/sign-out", {
     method: "POST",

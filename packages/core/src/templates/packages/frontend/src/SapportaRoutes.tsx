@@ -34,6 +34,11 @@ const AccountProfilePage = lazy(() =>
     default: m.AccountProfilePage,
   })),
 );
+const ChangePasswordPage = lazy(() =>
+  import("@sapporta/frontend/auth/profile").then((m) => ({
+    default: m.ChangePasswordPage,
+  })),
+);
 const TableRoute = lazy(() =>
   import("@sapporta/frontend/routes/table").then((m) => ({
     default: m.TableRoute,
@@ -107,6 +112,14 @@ export const sapportaProtectedRoutes = (
       element={
         <Suspense fallback={<RouteFallback />}>
           <AccountProfilePage />
+        </Suspense>
+      }
+    />
+    <Route
+      path="account/password"
+      element={
+        <Suspense fallback={<RouteFallback />}>
+          <ChangePasswordPage />
         </Suspense>
       }
     />
