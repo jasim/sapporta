@@ -8,6 +8,7 @@ import {
   createProjectAuthEmailAndPasswordOptions,
   createProjectAuthPlugins,
   projectAuthBasePath,
+  projectAuthCookiePrefix,
   projectAuthDrizzleAdapterConfig,
 } from "./options.js";
 import * as authSchema from "./schema.js";
@@ -43,6 +44,9 @@ export function createBetterAuth({
     baseURL: env.publicAppUrl,
     secret: env.betterAuthSecret,
     trustedOrigins: env.trustedOrigins,
+    advanced: {
+      cookiePrefix: projectAuthCookiePrefix,
+    },
     database: drizzleAdapter(conn.db, {
       schema: authSchema,
       ...projectAuthDrizzleAdapterConfig,

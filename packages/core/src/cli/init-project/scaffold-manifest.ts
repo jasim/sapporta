@@ -78,7 +78,7 @@ export const SCAFFOLD_MANIFEST: ScaffoldManifest = [
   scaffoldFileAt(
     "project-auth/options.ts",
     "packages/api/project-auth/options.ts",
-    "framework",
+    "workspace",
   ),
   scaffoldFileAt(
     "project-auth/context.ts",

@@ -29,11 +29,13 @@ const VITE_SOURCE_LINK_RESOLUTION_MARKER =
 export function buildTemplateVariables(opts: {
   project: ProjectLayout;
   packages: ScaffoldPackages;
+  authCookiePrefix: string;
   betterAuthDevSecret: string;
 }): TemplateVariables {
   const variables: TemplateVariables = {
     "%%SAPPORTA:SLUG%%": opts.project.slug,
     "%%SAPPORTA:NAME%%": opts.project.name,
+    "%%SAPPORTA:AUTH_COOKIE_PREFIX%%": opts.authCookiePrefix,
     "%%SAPPORTA:BETTER_AUTH_DEV_SECRET%%": opts.betterAuthDevSecret,
     // The template treats the executable and preload as one token so every
     // source-linked API uses the same scoped resolver. Registry output receives

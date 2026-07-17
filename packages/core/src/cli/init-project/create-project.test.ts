@@ -165,6 +165,12 @@ describe("createProject", () => {
     expect(readFileSync(join(target, "sapporta.json"), "utf-8")).toBe(
       '{\n  "name": "Acme App"\n}\n',
     );
+    expect(
+      readFileSync(
+        join(target, "packages/api/project-auth/options.ts"),
+        "utf-8",
+      ),
+    ).toMatch(/projectAuthCookiePrefix = "sapporta-acme-app-[a-f0-9]{16}"/);
     expect(existsSync(join(target, "data"))).toBe(true);
     expect(existsSync(join(target, "packages/api/package.json"))).toBe(true);
     expect(commands).toContain("pnpm --version");
@@ -210,6 +216,28 @@ function noopSqliteVerifier(): void {
 }
 
 describe("renderScaffoldFiles", () => {
+  it("keeps same-slug projects distinct with their generated cookie ids", () => {
+    const project = layoutForRoot(
+      projectIdentityFromOptions({
+        dir: "/tmp/acme-app",
+        name: "Acme App",
+      }),
+    );
+    const authOptions = (files: ReturnType<typeof renderScaffoldFiles>) =>
+      files.find((file) => file.dest === "packages/api/project-auth/options.ts")
+        ?.content;
+    const first = authOptions(renderScaffoldFiles(project, undefined));
+    const second = authOptions(renderScaffoldFiles(project, undefined));
+
+    expect(first).toMatch(
+      /projectAuthCookiePrefix = "sapporta-acme-app-[a-f0-9]{16}"/,
+    );
+    expect(second).toMatch(
+      /projectAuthCookiePrefix = "sapporta-acme-app-[a-f0-9]{16}"/,
+    );
+    expect(first).not.toBe(second);
+  });
+
   it("replaces scaffold placeholders in generated project files", () => {
     const project = layoutForRoot(
       projectIdentityFromOptions({
@@ -234,6 +262,12 @@ describe("renderScaffoldFiles", () => {
       /"@sapporta\/shared": "\^?\d+\.\d+\.\d+"/,
     );
     expect(byDest.get("package.json")).toContain('"name": "Acme App"');
+    expect(byDest.get("packages/api/project-auth/options.ts")).toMatch(
+      /projectAuthCookiePrefix = "sapporta-acme-app-[a-f0-9]{16}"/,
+    );
+    expect(byDest.get("packages/api/project-auth/better-auth.ts")).toContain(
+      "cookiePrefix: projectAuthCookiePrefix",
+    );
     expect(byDest.get(".env.development")).toMatch(
       /BETTER_AUTH_SECRET=[A-Za-z0-9_-]{43}/,
     );
@@ -424,6 +458,7 @@ describe("scaffold template inventory", () => {
     const handledTokens = new Set([
       "%%SAPPORTA:SLUG%%",
       "%%SAPPORTA:NAME%%",
+      "%%SAPPORTA:AUTH_COOKIE_PREFIX%%",
       "%%SAPPORTA:BETTER_AUTH_DEV_SECRET%%",
       "%%SAPPORTA:NODE_COMMAND%%",
       "%%SAPPORTA:VITE_SOURCE_LINK_RESOLUTION%%",

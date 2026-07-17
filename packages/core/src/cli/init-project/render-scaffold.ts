@@ -22,6 +22,7 @@ export function renderScaffoldFiles(
   const variables = buildTemplateVariables({
     project,
     packages,
+    authCookiePrefix: createProjectAuthCookiePrefix(project.slug),
     betterAuthDevSecret,
   });
   const files = renderScaffoldTemplates({
@@ -41,4 +42,8 @@ export function renderScaffoldFiles(
     );
   }
   return files;
+}
+
+function createProjectAuthCookiePrefix(projectSlug: string): string {
+  return `sapporta-${projectSlug}-${randomBytes(8).toString("hex")}`;
 }

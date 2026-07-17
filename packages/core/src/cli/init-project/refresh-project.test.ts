@@ -185,6 +185,32 @@ describe("refreshScaffoldProject", () => {
       false,
     );
   });
+
+  it("preserves the app-owned auth cookie prefix during refresh", () => {
+    const target = createTargetProject();
+    const authOptionsPath = join(
+      target,
+      "packages/api/project-auth/options.ts",
+    );
+    writeFileSync(
+      authOptionsPath,
+      'export const projectAuthCookiePrefix = "custom-cookie-prefix";\n',
+    );
+
+    const summary = refreshScaffoldProject({
+      projectDir: target,
+      mode: "write",
+      devModePackageRoot: process.cwd(),
+    });
+
+    expect(summary.skipped).toContain(
+      "packages/api/project-auth/options.ts (workspace)",
+    );
+    expect(readFileSync(authOptionsPath, "utf-8")).toBe(
+      'export const projectAuthCookiePrefix = "custom-cookie-prefix";\n',
+    );
+    expect(readFileSync(join(target, "sapporta.json"), "utf-8")).toBe("{}\n");
+  });
 });
 
 describe("planRefreshFile", () => {
@@ -268,9 +294,14 @@ describe("planRefreshFile", () => {
 function createTargetProject(): string {
   const target = makeTempDir();
   mkdirSync(join(target, "packages/api/schema"), { recursive: true });
+  mkdirSync(join(target, "packages/api/project-auth"), { recursive: true });
   mkdirSync(join(target, "packages/frontend/src"), { recursive: true });
   mkdirSync(join(target, "packages/shared"), { recursive: true });
   writeFileSync(join(target, "sapporta.json"), "{}\n");
+  writeFileSync(
+    join(target, "packages/api/project-auth/options.ts"),
+    'export const projectAuthCookiePrefix = "sapporta-custom-root-test";\n',
+  );
   writeJson(join(target, "package.json"), {
     name: "custom-root",
     scripts: { dev: "custom root dev" },
