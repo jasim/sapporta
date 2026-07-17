@@ -2,7 +2,7 @@
 import { act, createElement } from "react";
 import type { ReactNode } from "react";
 import { createRoot, type Root } from "react-dom/client";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, Route, Routes } from "react-router-dom";
 import {
   afterEach,
   beforeAll,
@@ -16,6 +16,7 @@ import type { AuthContextResponse } from "@sapporta/shared/contracts";
 import { AuthGate } from "../../auth/components/AuthGate";
 import { useAuthStore } from "../../auth/state/auth-store";
 import { AuthAccountMenu } from "../../shell/components/AuthAccountMenu";
+import { AppShell } from "../../shell/components/AppShell";
 import { useSchemaStore } from "../../schema-catalog/state/schema-store";
 import { BootLoader } from "./BootLoader";
 
@@ -119,7 +120,7 @@ describe("BootLoader", () => {
   });
 
   it("settles anonymous visitors as guests and renders public shell content", async () => {
-    installBootFetch((request) => {
+    const calls = installBootFetch((request) => {
       if (request.path === "/api/auth-context") {
         return jsonResponse(
           { error: "Authentication required", code: "unauthenticated" },
@@ -129,14 +130,28 @@ describe("BootLoader", () => {
       return null;
     });
 
-    await renderBootLoader(createElement(Screen, { label: "public content" }));
+    await renderBootLoader(
+      createElement(
+        Routes,
+        null,
+        createElement(
+          Route,
+          { element: createElement(AppShell) },
+          createElement(Route, {
+            index: true,
+            element: createElement(Screen, { label: "public content" }),
+          }),
+        ),
+      ),
+    );
 
     await waitForText("public content");
     expect(useAuthStore.getState().session).toEqual({ kind: "guest" });
+    expect(calls.map((call) => call.path)).toEqual(["/api/auth-context"]);
   });
 
   it("renders public shell content when auth restoration fails", async () => {
-    installBootFetch((request) => {
+    const calls = installBootFetch((request) => {
       if (request.path === "/api/auth-context") {
         return jsonResponse({ error: "Server unavailable" }, 500);
       }
@@ -150,6 +165,7 @@ describe("BootLoader", () => {
       kind: "failed",
       error: "API error 500",
     });
+    expect(calls.map((call) => call.path)).toEqual(["/api/auth-context"]);
   });
 
   it("lets protected routes show the session error after auth restoration fails", async () => {

@@ -15,10 +15,10 @@ export function BootLoader({ children }: { children: ReactNode }) {
   const restoreSession = useAuthStore((s) => s.restoreSession);
 
   useEffect(() => {
-    if (!loaded && !error) {
+    if (session.kind === "authenticated" && !loaded && !error) {
       loadAdminMetadata();
     }
-  }, [loaded, error]);
+  }, [loaded, error, session.kind]);
 
   useEffect(() => {
     if (session.kind === "unknown") {
@@ -26,7 +26,7 @@ export function BootLoader({ children }: { children: ReactNode }) {
     }
   }, [restoreSession, session.kind]);
 
-  if (error) {
+  if (session.kind === "authenticated" && error) {
     return (
       <div className="flex items-center justify-center h-screen bg-sap-bg">
         <div className="max-w-lg text-center space-y-4">
@@ -56,7 +56,11 @@ export function BootLoader({ children }: { children: ReactNode }) {
     );
   }
 
-  if (!loaded || session.kind === "unknown" || session.kind === "loading") {
+  if (
+    session.kind === "unknown" ||
+    session.kind === "loading" ||
+    (session.kind === "authenticated" && !loaded)
+  ) {
     return (
       <div className="flex items-center justify-center h-screen bg-sap-bg">
         <div className="text-center space-y-3">
