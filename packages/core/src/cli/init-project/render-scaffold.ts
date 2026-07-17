@@ -27,6 +27,10 @@ export function renderScaffoldFiles(
   const files = renderScaffoldTemplates({
     templates: readScaffoldTemplates(initPaths),
     variables,
+    // Keep one mode bit from package resolution through template rendering.
+    // Generated files receive only the selected settings, never this internal
+    // framework-development explanation.
+    sourceLinkMode: packages.sourceLinkMode,
     pnpmOverrides: packages.pnpmOverrides,
   });
   const unresolved = findUnresolvedTokens(files);

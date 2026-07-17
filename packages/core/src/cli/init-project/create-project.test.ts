@@ -4,7 +4,10 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { ErrorCode, OperationError } from "../../introspect/types.js";
 import { createProject } from "./create-project.js";
-import { DEPENDENCY_CATALOG } from "./dependency-catalog.js";
+import {
+  DEPENDENCY_CATALOG,
+  sharedRuntimeDefinitions,
+} from "./dependency-catalog.js";
 import type { InitCommandRunner } from "./init-shell.js";
 import { resolveOwningPackage } from "./package-metadata.js";
 import { initProjectPackagePaths } from "./paths.js";
@@ -268,13 +271,29 @@ describe("renderScaffoldFiles", () => {
     expect(byDest.get("packages/api/authz/ability.ts")).toContain(
       'can("read", "public_api_sample")',
     );
+    const viteConfig = byDest.get("packages/frontend/vite.config.ts");
+    expect(viteConfig).not.toContain("preserveSymlinks");
+    expect(viteConfig).not.toContain("dedupe:");
+    // The scaffolder may explain its maintainer-only source-link policy, but
+    // registry-generated application code must not expose that terminology.
+    expect(viteConfig).not.toContain("VITE_SOURCE_LINK_RESOLUTION");
+    expect(viteConfig).not.toContain("source-link");
+    const apiPackage = JSON.parse(
+      byDest.get("packages/api/package.json") ?? "{}",
+    ) as { scripts?: Record<string, string> };
+    expect(apiPackage.scripts?.dev).toContain(
+      "node --env-file=../../.env.development --watch dist/boot.js",
+    );
+    expect(apiPackage.scripts?.start).toBe("node dist/boot.js");
+    expect(apiPackage.scripts?.dev).not.toContain("--preserve-symlinks");
+    expect(apiPackage.scripts?.start).not.toContain("--preserve-symlinks");
 
     for (const file of files) {
       expect(file.content, file.dest).not.toMatch(unresolvedToken);
     }
   });
 
-  it("renders shared library dependency for dev-root scaffolds", () => {
+  it("renders source-link dependencies, overrides, and resolver settings", () => {
     const project = layoutForRoot(
       projectIdentityFromOptions({
         dir: "/tmp/acme-app",
@@ -287,6 +306,95 @@ describe("renderScaffoldFiles", () => {
     expect(byDest.get("packages/shared/package.json")).toContain(
       `"@sapporta/shared": "link:${process.cwd()}/packages/shared"`,
     );
+    const viteConfig = byDest.get("packages/frontend/vite.config.ts");
+    expect(viteConfig).not.toContain("preserveSymlinks");
+    expect(viteConfig).toContain("dedupe:");
+    for (const definition of sharedRuntimeDefinitions("browser")) {
+      expect(viteConfig).toContain(JSON.stringify(definition.packageName));
+    }
+    // Source-linked output receives the concrete resolver setting only. The
+    // framework-development rationale belongs in the renderer, not the app.
+    expect(viteConfig).not.toContain("VITE_SOURCE_LINK_RESOLUTION");
+    expect(viteConfig).not.toContain("source-link");
+
+    const apiPackage = JSON.parse(
+      byDest.get("packages/api/package.json") ?? "{}",
+    ) as { scripts?: Record<string, string> };
+    expect(apiPackage.scripts?.dev).toContain(
+      "node --import @sapporta/server/source-link-runtime --env-file=../../.env.development --watch dist/boot.js",
+    );
+    expect(apiPackage.scripts?.start).toBe(
+      "node --import @sapporta/server/source-link-runtime dist/boot.js",
+    );
+
+    const rootPackage = JSON.parse(byDest.get("package.json") ?? "{}") as {
+      pnpm?: { overrides?: Record<string, string> };
+    };
+    const overrides = rootPackage.pnpm?.overrides ?? {};
+    expect(Object.keys(overrides)).toEqual([
+      "@sapporta/honest",
+      "@sapporta/shared",
+      "@sapporta/ui",
+      "@sapporta/grid",
+      "better-sqlite3",
+      "drizzle-orm",
+      "hono",
+      "@sapporta/rest-core",
+      "@js-temporal/polyfill",
+      "zod",
+      "react",
+      "react-dom",
+      "react-router-dom",
+      "zustand",
+    ]);
+    for (const packageName of [
+      "better-sqlite3",
+      "drizzle-orm",
+      "hono",
+      "@sapporta/rest-core",
+      "@js-temporal/polyfill",
+      "zod",
+      "react",
+      "react-dom",
+      "react-router-dom",
+      "zustand",
+    ]) {
+      expect(overrides[packageName], packageName).toMatch(/^\d+\.\d+\.\d+/);
+    }
+  });
+});
+
+describe("shared runtime dependency catalog", () => {
+  it("selects complete definitions in catalog order for each scope", () => {
+    expect(
+      sharedRuntimeDefinitions("browser").map(
+        (definition) => definition.packageName,
+      ),
+    ).toEqual([
+      "@sapporta/rest-core",
+      "@js-temporal/polyfill",
+      "zod",
+      "react",
+      "react-dom",
+      "react-router-dom",
+      "zustand",
+    ]);
+    expect(
+      sharedRuntimeDefinitions("server").map(
+        (definition) => definition.packageName,
+      ),
+    ).toEqual([
+      "better-sqlite3",
+      "drizzle-orm",
+      "hono",
+      "@sapporta/rest-core",
+      "@js-temporal/polyfill",
+      "zod",
+    ]);
+    for (const definition of DEPENDENCY_CATALOG.definitions) {
+      expect(typeof definition.sharedRuntime.browser).toBe("boolean");
+      expect(typeof definition.sharedRuntime.server).toBe("boolean");
+    }
   });
 });
 
@@ -313,10 +421,12 @@ describe("scaffold template inventory", () => {
 
   it("supplies every Sapporta template token used by scaffolded templates", () => {
     const initPaths = initProjectPackagePaths();
-    const suppliedTokens = new Set([
+    const handledTokens = new Set([
       "%%SAPPORTA:SLUG%%",
       "%%SAPPORTA:NAME%%",
       "%%SAPPORTA:BETTER_AUTH_DEV_SECRET%%",
+      "%%SAPPORTA:NODE_COMMAND%%",
+      "%%SAPPORTA:VITE_SOURCE_LINK_RESOLUTION%%",
       ...DEPENDENCY_CATALOG.tokenByKey.values(),
     ]);
     const usedTokens = new Set(
@@ -330,7 +440,7 @@ describe("scaffold template inventory", () => {
     );
 
     expect(
-      [...usedTokens].filter((token) => !suppliedTokens.has(token)),
+      [...usedTokens].filter((token) => !handledTokens.has(token)),
     ).toEqual([]);
   });
 });

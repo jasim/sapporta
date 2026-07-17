@@ -62,6 +62,11 @@
       "sapporta:source": "./src/cli/init-project/create-project.ts",
       "default": "./dist/cli/init-project/create-project.js"
     },
+    "./source-link-runtime": {
+      "types": "./dist/source-link-runtime.d.ts",
+      "sapporta:source": "./src/source-link-runtime.ts",
+      "default": "./dist/source-link-runtime.js"
+    },
     "./cli": {
       "types": "./dist/cli/index.d.ts",
       "sapporta:source": "./src/cli/index.ts",

@@ -25,6 +25,7 @@ const apiPort = parseIntegerEnv("SAPPORTA_API_PORT", 3000);
 export default defineConfig({
   plugins: [react(), tailwindcss()],
   resolve: {
+    // %%SAPPORTA:VITE_SOURCE_LINK_RESOLUTION%%
     alias: {
       "%%SAPPORTA:SLUG%%-shared": path.resolve(
         __dirname,

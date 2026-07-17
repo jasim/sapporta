@@ -4,10 +4,10 @@
   "type": "module",
   "scripts": {
     "predev": "pnpm --filter %%SAPPORTA:SLUG%%-shared build",
-    "dev": "tsc-watch --onFirstSuccess \"node --env-file=../../.env.development --watch dist/boot.js\"",
+    "dev": "tsc-watch --onFirstSuccess \"%%SAPPORTA:NODE_COMMAND%% --env-file=../../.env.development --watch dist/boot.js\"",
     "prebuild": "pnpm --filter %%SAPPORTA:SLUG%%-shared build",
     "build": "tsc",
-    "start": "node dist/boot.js",
+    "start": "%%SAPPORTA:NODE_COMMAND%% dist/boot.js",
     "db:generate": "drizzle-kit generate",
     "db:generate:custom": "drizzle-kit generate --custom",
     "db:migrate": "drizzle-kit migrate",

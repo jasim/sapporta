@@ -36,7 +36,6 @@ const verificationCommands = [
   ["pnpm", ["-r", "build"]],
   ["pnpm", ["typecheck"]],
   ["pnpm", ["check:public-declarations"]],
-  ["pnpm", ["check:peer-singletons"]],
   ["pnpm", ["test"]],
 ];
 

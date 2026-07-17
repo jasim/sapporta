@@ -1400,8 +1400,7 @@ export function signInEmailUser(
 export async function signInEmailUser(
   projectOrBaseUrl: E2eProject | string,
   baseUrlOrCredentials:
-    | string
-    | Pick<EmailUserCredentials, "email" | "password" | "cookieFile">,
+    string | Pick<EmailUserCredentials, "email" | "password" | "cookieFile">,
   maybeCredentials?: Pick<
     EmailUserCredentials,
     "email" | "password" | "cookieFile"
@@ -1907,8 +1906,11 @@ export async function startBuiltServer(
   const output: string[] = [];
 
   const serverProcess = await step("boot scaffolded server", async () => {
-    const child = spawn("node", ["packages/api/dist/boot.js"], {
-      cwd: project.projectDir,
+    const nodeArgs = project.env.SAPPORTA_DEV_MODE_PACKAGE_ROOT
+      ? ["--import", "@sapporta/server/source-link-runtime", "dist/boot.js"]
+      : ["dist/boot.js"];
+    const child = spawn("node", nodeArgs, {
+      cwd: join(project.projectDir, "packages", "api"),
       env: {
         ...project.env,
         ...envOverrides,

@@ -15,7 +15,7 @@ export function AppShell({
   navigation = [],
   showFrameworkNavigation = true,
 }: AppShellProps) {
-  const { loaded, error, tables } = useSchemaStore();
+  const { error, tables } = useSchemaStore();
   const shellNavigation = useMemo(() => {
     const frameworkNavigation = showFrameworkNavigation
       ? frameworkNavigationSections({ tables })
@@ -36,12 +36,7 @@ export function AppShell({
               Could not load the app schema: {error}
             </div>
           )}
-          {!loaded && !error && (
-            <div className="flex items-center justify-center h-full text-sap-muted">
-              Loading…
-            </div>
-          )}
-          {loaded && <Outlet />}
+          {!error && <Outlet />}
         </main>
         <MobileBottomNav
           navigation={navigation}
