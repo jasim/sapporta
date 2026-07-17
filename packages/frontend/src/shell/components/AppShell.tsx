@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { Outlet } from "react-router-dom";
 import { DesktopSidebar, MobileBottomNav, NavigationRail } from "./Sidebar";
+import { Toaster } from "sonner";
 import { useSchemaStore } from "../../schema-catalog/state/schema-store";
 import type { TableSchema } from "@sapporta/shared/contracts";
 import { Database } from "lucide-react";
@@ -25,6 +26,16 @@ export function AppShell({
 
   return (
     <div className="flex flex-col h-screen overflow-hidden">
+      <Toaster
+        position="top-center"
+        richColors
+        toastOptions={{
+          classNames: {
+            toast: "text-[17px]",
+            title: "font-semibold",
+          },
+        }}
+      />
       <div className="flex flex-1 min-h-0">
         <div className="hidden lg:block h-full">
           <DesktopSidebar navigation={shellNavigation} />

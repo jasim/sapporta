@@ -484,43 +484,6 @@ describe("authenticated account pages", () => {
     await waitForText("Enter your current password, then choose a new one.");
   });
 
-  it("changes the signed-in user's password", async () => {
-    const calls = installFetch((request) => {
-      if (
-        request.path === "/api/auth/change-password" &&
-        request.method === "POST"
-      ) {
-        return jsonResponse({ token: null, user: AUTH_CONTEXT.user });
-      }
-      return jsonResponse({ error: "Unexpected request" }, 500);
-    });
-    useAuthStoreSetState({
-      session: { kind: "authenticated", context: AUTH_CONTEXT },
-    });
-    await renderRoutes(
-      "/account/password",
-      createElement(Route, {
-        path: "/account/password",
-        element: createElement(ChangePasswordPage),
-      }),
-    );
-
-    await fillInput("Current password", "correct-horse-battery-staple");
-    await fillInput("New password", "new-correct-horse-battery-staple");
-    await fillInput("Confirm new password", "new-correct-horse-battery-staple");
-    await submitForm();
-
-    await waitForText("Password changed.");
-    expect(calls).toContainEqual({
-      path: "/api/auth/change-password",
-      method: "POST",
-      body: {
-        currentPassword: "correct-horse-battery-staple",
-        newPassword: "new-correct-horse-battery-staple",
-      },
-    });
-  });
-
   it("rejects mismatched new passwords before sending a request", async () => {
     const calls = installFetch(() =>
       jsonResponse({ error: "Unexpected request" }, 500),

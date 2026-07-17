@@ -1,6 +1,7 @@
 import { ArrowLeft, KeyRound } from "lucide-react";
 import { useId, useState, type FormEvent } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
+import { toast } from "sonner";
 import { Button } from "@sapporta/ui/button";
 import { Input } from "@sapporta/ui/input";
 import { Label } from "@sapporta/ui/label";
@@ -9,11 +10,11 @@ import { changePassword } from "../api/auth-context";
 import { useAuthStore } from "../state/auth-store";
 
 export function ChangePasswordPage() {
+  const navigate = useNavigate();
   const session = useAuthStore((state) => state.session);
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -35,7 +36,6 @@ export function ChangePasswordPage() {
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setMessage(null);
     setError(null);
 
     if (newPassword !== confirmPassword) {
@@ -46,10 +46,8 @@ export function ChangePasswordPage() {
     setSubmitting(true);
     try {
       await changePassword({ currentPassword, newPassword });
-      setCurrentPassword("");
-      setNewPassword("");
-      setConfirmPassword("");
-      setMessage("Password changed.");
+      toast.success("Password changed successfully.");
+      navigate("/account/profile", { replace: true });
     } catch (err) {
       setError(errorMessage(err, "Could not change password."));
     } finally {
@@ -104,11 +102,6 @@ export function ChangePasswordPage() {
             onChange={setConfirmPassword}
           />
 
-          {message ? (
-            <p className="text-sap-body text-sap-positive" role="status">
-              {message}
-            </p>
-          ) : null}
           {error ? (
             <p className="text-sap-body text-sap-negative" role="alert">
               {error}
