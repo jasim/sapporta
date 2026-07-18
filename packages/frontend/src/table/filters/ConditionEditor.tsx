@@ -5,7 +5,7 @@
  * dropdown, and value input are all derived from the column-type catalog.
  */
 
-import { useMemo, useState } from "react";
+import { useId, useMemo, useState } from "react";
 import { Check, ChevronDown } from "lucide-react";
 import type {
   FilterDraftValue,
@@ -383,12 +383,21 @@ function Field({
   label: string;
   children: React.ReactNode;
 }) {
+  const labelId = useId();
+
   return (
-    <label className="flex flex-col gap-[4px]">
-      <span className="text-sap-label uppercase tracking-sap-head font-medium text-sap-subtle">
+    <div
+      role="group"
+      aria-labelledby={labelId}
+      className="flex flex-col gap-[4px]"
+    >
+      <span
+        id={labelId}
+        className="text-sap-label uppercase tracking-sap-head font-medium text-sap-subtle"
+      >
         {label}
       </span>
       {children}
-    </label>
+    </div>
   );
 }

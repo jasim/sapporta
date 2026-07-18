@@ -22,6 +22,50 @@ afterEach(async () => {
 });
 
 describe("ConditionEditor enum interaction", () => {
+  it("selects an enum option when clicked", async () => {
+    const onApply = vi.fn();
+    const status: ColumnSchema = {
+      name: "status",
+      label: "Status",
+      kind: "text",
+      select: { options: ["draft", "done"] },
+    };
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+    mounted = { root, container };
+    await act(async () => {
+      root.render(
+        createElement(ConditionEditor, {
+          columns: [status],
+          lockedColumn: status,
+          onApply,
+          onCancel: vi.fn(),
+        }),
+      );
+    });
+
+    const option = container.querySelector('[role="option"]');
+    if (!option) throw new Error("Expected an enum option.");
+    expect(option.closest("label")).toBeNull();
+    await click(option);
+
+    expect(option.getAttribute("aria-selected")).toBe("true");
+    const apply = Array.from(container.querySelectorAll("button")).find(
+      (button) => button.textContent === "Apply",
+    );
+    if (!apply) throw new Error("Expected the Apply button.");
+    expect(apply.disabled).toBe(false);
+    await click(apply);
+    expect(onApply).toHaveBeenCalledWith(
+      expect.objectContaining({
+        column: "status",
+        op: "in",
+        values: ["draft"],
+      }),
+    );
+  });
+
   it("lets Enter select a highlighted enum option before Apply", async () => {
     const onApply = vi.fn();
     const status: ColumnSchema = {
