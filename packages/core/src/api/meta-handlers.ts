@@ -6,7 +6,7 @@
 
 import type Database from "better-sqlite3";
 import type { BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
-import { getTableConfig, type SQLiteColumn } from "drizzle-orm/sqlite-core";
+import { getTableConfig } from "drizzle-orm/sqlite-core";
 import type { Context } from "hono";
 import type { TableCatalog } from "../schema/catalog.js";
 import { extractSchemas, extractSchema } from "../schema/extract.js";
@@ -19,10 +19,17 @@ import {
   type OperationResult,
 } from "../introspect/types.js";
 import { parseOptionalBoundedInteger } from "@sapporta/shared/validation";
-import { columnPropertyName } from "../auth/row-scope.js";
-import { RowScopePolicyError, type SapportaAuthContext } from "../auth/index.js";
+import {
+  RowScopePolicyError,
+  type SapportaAuthContext,
+} from "../auth/index.js";
 import { QueryParseError } from "../db/errors.js";
 import { scopedRows } from "../data/scoped-rows.js";
+import {
+  resolveRowFields,
+  type ResolvedRowFields,
+  UnknownRowFieldsError,
+} from "../data/row-fields.js";
 import type { SapportaAuthGuard, SapportaEnv } from "./server.js";
 import type { TableDef } from "../schema/table.js";
 import {
@@ -122,12 +129,12 @@ export function makeMetaHandlers<E extends SapportaEnv>(
 
         const limit = parseSampleLimit(request.query?.limit) ?? 5;
         const fields = parseSampleFields(request.query?.fields);
-        const projection = resolveSampleProjection(def, fields);
+        const rowFields = resolveSampleRowFields(def, fields);
         const result = await scopedRows(db, auth, def).list({
           limit: String(limit),
         });
 
-        return c.json(projectSampleRows(result.data, projection));
+        return c.json(result.data.map((row) => rowFields.pick(row)));
       } catch (err) {
         if (err instanceof OperationError) {
           return operationErrorResponse(c, err);
@@ -196,57 +203,22 @@ function parseSampleLimit(raw: string | undefined): number | undefined {
   });
 }
 
-interface SampleFieldProjection {
-  responseName: string;
-  rowName: string;
-}
-
-function resolveSampleProjection(
+function resolveSampleRowFields(
   table: TableDef,
   fields: readonly string[] | undefined,
-): SampleFieldProjection[] {
-  const columnsByName = new Map<string, SQLiteColumn>();
-  for (const column of getTableConfig(table.drizzle).columns) {
-    columnsByName.set(column.name, column);
-  }
-
-  const requestedFields =
-    fields ?? getTableConfig(table.drizzle).columns.map((column) => column.name);
-  const projection: SampleFieldProjection[] = [];
-  const unknownFields: string[] = [];
-  for (const field of requestedFields) {
-    const column = columnsByName.get(field);
-    if (!column) {
-      unknownFields.push(field);
-      continue;
-    }
-    projection.push({
-      responseName: field,
-      rowName: columnPropertyName(table, column) ?? field,
-    });
-  }
-
-  if (unknownFields.length > 0) {
-    throw new OperationError(
-      `Unknown column(s) in '${table.sqlName}': ${unknownFields.join(", ")}`,
-      ErrorCode.INVALID_COLUMN_NAME,
+): ResolvedRowFields {
+  try {
+    return resolveRowFields(
+      table,
+      fields ??
+        getTableConfig(table.drizzle).columns.map((column) => column.name),
     );
-  }
-
-  return projection;
-}
-
-function projectSampleRows(
-  rows: readonly Record<string, unknown>[],
-  projection: readonly SampleFieldProjection[],
-): Record<string, unknown>[] {
-  return rows.map((row) => {
-    const projected: Record<string, unknown> = {};
-    for (const field of projection) {
-      projected[field.responseName] = row[field.rowName];
+  } catch (error) {
+    if (error instanceof UnknownRowFieldsError) {
+      throw new OperationError(error.message, ErrorCode.INVALID_COLUMN_NAME);
     }
-    return projected;
-  });
+    throw error;
+  }
 }
 
 function parseSampleFields(raw: string | undefined): string[] | undefined {
