@@ -100,7 +100,7 @@ export function FormField({ field, value, onChange }: FormFieldProps) {
           type="number"
           step="0.01"
           value={value != null ? String(value) : ""}
-          onChange={(e) => onChange(e.target.value || null)}
+          onChange={(e) => onChange(parseRecordNumberInput(e.target.value))}
         />
       )}
 
@@ -109,9 +109,7 @@ export function FormField({ field, value, onChange }: FormFieldProps) {
           id={id}
           type="number"
           value={value != null ? String(value) : ""}
-          onChange={(e) =>
-            onChange(e.target.value ? Number(e.target.value) : null)
-          }
+          onChange={(e) => onChange(parseRecordNumberInput(e.target.value))}
         />
       )}
 
@@ -131,7 +129,7 @@ export function FormField({ field, value, onChange }: FormFieldProps) {
           <textarea
             id={id}
             value={value != null ? String(value) : ""}
-            onChange={(e) => onChange(e.target.value || null)}
+            onChange={(e) => onChange(e.target.value)}
             className="flex min-h-24 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
           />
         ) : (
@@ -139,9 +137,15 @@ export function FormField({ field, value, onChange }: FormFieldProps) {
             id={id}
             type="text"
             value={value != null ? String(value) : ""}
-            onChange={(e) => onChange(e.target.value || null)}
+            onChange={(e) => onChange(e.target.value)}
           />
         ))}
     </div>
   );
+}
+
+export function parseRecordNumberInput(value: string): number | null {
+  if (value === "") return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
 }
