@@ -12,10 +12,7 @@
 import { isValidElement, useState } from "react";
 import { ArrowDown, ArrowUp, SlidersHorizontal, X } from "lucide-react";
 import type { TypedFilterCondition } from "@sapporta/shared/filter";
-import {
-  encodeTypedValue,
-  materializeTypedFilterCondition,
-} from "@sapporta/shared/filter";
+import { materializeTypedFilterCondition } from "@sapporta/shared/filter";
 import type { ColumnSchema } from "@sapporta/shared/contracts";
 import type { SortDescriptor } from "@sapporta/grid";
 import { isLookupValue, type LookupValue } from "@sapporta/grid/lookup";
@@ -188,7 +185,7 @@ export function HeaderFilterMenuContent({
               quickEntry.inputKind === "static" &&
               resolved && (
                 <quickEntry.Input
-                  values={quickValues.map(encodeTypedValue)}
+                  values={quickValues.filter(isString)}
                   onChange={applyQuick}
                   column={column}
                   options={resolved.options}
@@ -277,4 +274,8 @@ function MenuRow({
 
 function Divider() {
   return <div className="my-1 border-t border-sap-border-soft" />;
+}
+
+function isString(value: unknown): value is string {
+  return typeof value === "string";
 }

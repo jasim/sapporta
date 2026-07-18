@@ -1,15 +1,10 @@
 import { Checkbox } from "@sapporta/ui/checkbox";
+import { Combobox, comboboxClassNames } from "@sapporta/ui/combobox";
+import { cn } from "@sapporta/ui/cn";
 import { Input } from "@sapporta/ui/input";
 import { Label } from "@sapporta/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@sapporta/ui/select";
 import { isLookupValue } from "@sapporta/grid/lookup";
+import { Check, ChevronDown, X } from "lucide-react";
 import { LookupPicker } from "../../lookup";
 import type { RecordFormFieldModel } from "./record-form-fields";
 
@@ -51,27 +46,61 @@ export function FormField({ field, value, issue, onChange }: FormFieldProps) {
       )}
 
       {field.kind === "select" && (
-        <Select
-          items={field.options.map((option) => ({
-            label: option,
-            value: option,
-          }))}
-          value={value != null ? String(value) : ""}
-          onValueChange={(v) => onChange(v)}
+        <Combobox.Root<string>
+          items={field.options}
+          value={typeof value === "string" ? value : null}
+          onValueChange={(nextValue) => onChange(nextValue ?? null)}
         >
-          <SelectTrigger id={id} {...accessibilityProps}>
-            <SelectValue placeholder={`Select ${column.name}`} />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectGroup>
-              {field.options.map((opt) => (
-                <SelectItem key={opt} value={opt}>
-                  {opt}
-                </SelectItem>
-              ))}
-            </SelectGroup>
-          </SelectContent>
-        </Select>
+          <Combobox.InputGroup className={comboboxClassNames.inputGroup}>
+            <Combobox.Input
+              id={id}
+              {...accessibilityProps}
+              placeholder={`Select ${column.name}`}
+              className={comboboxClassNames.input}
+            />
+            <Combobox.Clear
+              aria-label="Clear selection"
+              className={comboboxClassNames.action}
+            >
+              <X aria-hidden />
+            </Combobox.Clear>
+            <Combobox.Trigger
+              aria-label="Open popup"
+              className={cn(comboboxClassNames.action, "me-1")}
+            >
+              <ChevronDown aria-hidden />
+            </Combobox.Trigger>
+          </Combobox.InputGroup>
+          <Combobox.Portal>
+            <Combobox.Positioner
+              align="start"
+              sideOffset={4}
+              className={comboboxClassNames.positioner}
+            >
+              <Combobox.Popup className={comboboxClassNames.popup}>
+                <Combobox.Empty className={comboboxClassNames.empty}>
+                  No results.
+                </Combobox.Empty>
+                <Combobox.List className={comboboxClassNames.list}>
+                  {(option: string) => (
+                    <Combobox.Item
+                      key={option}
+                      value={option}
+                      className={comboboxClassNames.item}
+                    >
+                      {option}
+                      <Combobox.ItemIndicator
+                        className={comboboxClassNames.itemIndicator}
+                      >
+                        <Check aria-hidden />
+                      </Combobox.ItemIndicator>
+                    </Combobox.Item>
+                  )}
+                </Combobox.List>
+              </Combobox.Popup>
+            </Combobox.Positioner>
+          </Combobox.Portal>
+        </Combobox.Root>
       )}
 
       {field.kind === "date" && (

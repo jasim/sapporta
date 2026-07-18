@@ -123,6 +123,23 @@ describe("TGridColumnMapper.columnFor", () => {
     expect(p.text.display).toBe("markdown");
   });
 
+  it("maps enum metadata to string-valued select options", () => {
+    const column = mapColumn({
+      name: "status",
+      label: "Status",
+      kind: "text",
+      select: { options: ["draft", "done"] },
+    });
+    const p = preset(column);
+
+    expect(p?.kind).toBe("select");
+    if (!p || !("select" in p)) throw new Error("expected select preset");
+    expect(p.select.options).toEqual([
+      { value: "draft", label: "draft" },
+      { value: "done", label: "done" },
+    ]);
+  });
+
   it("maps numeric display metadata into the numeric preset display", () => {
     const column = mapColumn({
       name: "balance",

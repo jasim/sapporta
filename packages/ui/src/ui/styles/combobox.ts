@@ -15,4 +15,9 @@ export const comboboxClassNames = {
   list: "max-h-[300px] overflow-x-hidden overflow-y-auto p-1",
   item: "relative flex w-full cursor-default select-none items-center gap-2 rounded-sm px-2 py-1.5 pr-8 text-sm outline-none data-highlighted:bg-accent data-highlighted:text-accent-foreground data-disabled:pointer-events-none data-disabled:opacity-50",
   itemIndicator: "absolute right-2 text-sap-muted [&_svg]:size-3.5",
+  chips:
+    "flex min-h-9 w-full flex-wrap items-center gap-1 rounded-md border border-input bg-transparent px-2 py-1 text-sm shadow-sm transition-colors focus-within:ring-1 focus-within:ring-ring data-disabled:cursor-not-allowed data-disabled:opacity-50",
+  chip: "inline-flex h-6 max-w-full items-center gap-1 rounded-sm bg-muted px-2 text-sm text-foreground",
+  chipRemove:
+    "inline-flex size-4 shrink-0 items-center justify-center rounded-sm text-muted-foreground outline-none hover:bg-accent hover:text-accent-foreground focus-visible:ring-1 focus-visible:ring-ring [&_svg]:size-3",
 } as const;

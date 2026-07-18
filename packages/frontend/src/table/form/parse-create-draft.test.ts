@@ -33,6 +33,26 @@ const TABLE: TableSchema = {
   ],
 };
 
+const ENUM_TABLE: TableSchema = {
+  ...TABLE,
+  columns: [
+    ...TABLE.columns,
+    {
+      name: "status",
+      label: "Status",
+      kind: "text",
+      select: { options: ["draft", "paid"] },
+    },
+    {
+      name: "priority",
+      label: "Priority",
+      kind: "text",
+      notNull: true,
+      select: { options: ["normal", "urgent"] },
+    },
+  ],
+};
+
 describe("parseCreateDraft", () => {
   it("turns a finite currency draft into the numeric request value", () => {
     expect(
@@ -111,6 +131,50 @@ describe("parseCreateDraft", () => {
     ).toEqual({
       ok: false,
       issues: [{ field: "issued_on", message: "Enter a valid date." }],
+    });
+  });
+
+  it("passes selected enum strings through unchanged", () => {
+    expect(
+      parseCreateDraft(ENUM_TABLE, {
+        number: "INV-1",
+        total: "5",
+        status: "paid",
+        priority: "urgent",
+      }),
+    ).toEqual({
+      ok: true,
+      value: {
+        number: "INV-1",
+        total: 5,
+        status: "paid",
+        priority: "urgent",
+      },
+    });
+  });
+
+  it("omits a cleared optional enum and reports a cleared required enum", () => {
+    expect(
+      parseCreateDraft(ENUM_TABLE, {
+        number: "INV-1",
+        total: "5",
+        status: null,
+        priority: "normal",
+      }),
+    ).toEqual({
+      ok: true,
+      value: { number: "INV-1", total: 5, priority: "normal" },
+    });
+
+    expect(
+      parseCreateDraft(ENUM_TABLE, {
+        number: "INV-1",
+        total: "5",
+        priority: null,
+      }),
+    ).toEqual({
+      ok: false,
+      issues: [{ field: "priority", message: "Priority is required." }],
     });
   });
 });

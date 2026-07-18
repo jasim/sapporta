@@ -27,19 +27,14 @@ import type {
 } from "./inputs/types";
 import { TextInput, NumberInput, DateInput } from "./inputs/ScalarInput";
 import { TagInput } from "./inputs/TagInput";
-import { CheckboxList } from "./inputs/CheckboxList";
+import { EnumCombobox } from "./inputs/EnumCombobox";
 import { LookupCheckboxList } from "./inputs/LookupCheckboxList";
 import type { ListOp, Polarity, ScalarOp } from "@sapporta/shared/filter";
 import { inferDisplayType } from "../model/column-types";
 
 /** Filter-side column types — coarser than the render-side DisplayType. */
 export type FilterColumnType =
-  | "text"
-  | "number"
-  | "date"
-  | "boolean"
-  | "enum"
-  | "fk";
+  "text" | "number" | "date" | "boolean" | "enum" | "fk";
 
 export type OpEntry =
   | {
@@ -235,8 +230,8 @@ const boolean: ColumnTypeEntry = {
 const enumType: ColumnTypeEntry = {
   defaultKey: "in",
   ops: [
-    staticList("in", "is one of", "in", CheckboxList),
-    staticList("nin", "is not one of", "nin", CheckboxList),
+    staticList("in", "is one of", "in", EnumCombobox),
+    staticList("nin", "is not one of", "nin", EnumCombobox),
     isEmpty,
     isNotEmpty,
   ],

@@ -269,7 +269,7 @@ behavior, use `zodForColumnValue(table, column)`; use
 - **Migrations**: native Drizzle Kit `generate` and `migrate`; Sapporta only checks readiness at boot
 - **Meta API**: `mount-meta.ts` mounts schema introspection, DB introspection, and the SQL proxy
 - **Tables API**: `tables-api.ts` — parametric `/:tableName` table-operation routing with runtime table registration
-- **Selects**: declare allowed values once with `select("status", ["draft", "paid"] as const)`, or use Drizzle `text("status", { enum: [...] })` directly. The same column values drive validation, OpenAPI, and dropdown metadata.
+- **Selects**: declare allowed values once with `select("status", ["draft", "paid"] as const)`, or use Drizzle `text("status", { enum: [...] })` directly. The same column values drive validation, OpenAPI, and choice/combobox metadata.
 - **Imports**: `@sapporta/server/table`, `@sapporta/server/runtime`, `@sapporta/server/view`, etc. (via package.json exports)
 
 ## Custom Views — Backend

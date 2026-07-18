@@ -331,7 +331,7 @@ export function ConditionEditor({
           )}
           {entry.inputKind === "static" && resolved && (
             <entry.Input
-              values={draft.listValues.map(String)}
+              values={draft.listValues.filter(isString)}
               onChange={(next) => setDraft({ ...draft, listValues: next })}
               column={draft.column}
               options={resolved.options}
@@ -370,6 +370,10 @@ export function ConditionEditor({
       </div>
     </div>
   );
+}
+
+function isString(value: unknown): value is string {
+  return typeof value === "string";
 }
 
 function Field({

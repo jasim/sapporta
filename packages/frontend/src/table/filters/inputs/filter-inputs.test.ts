@@ -7,6 +7,7 @@ import { createRoot, type Root } from "react-dom/client";
 import { StaticSearchLookup, StaticValueLookup } from "@sapporta/grid/lookup";
 import type { ColumnSchema } from "@sapporta/shared/contracts";
 import { NumberInput } from "./ScalarInput";
+import { EnumCombobox } from "./EnumCombobox";
 import { LookupCheckboxList } from "./LookupCheckboxList";
 
 (
@@ -35,6 +36,12 @@ describe("filter input drafts", () => {
     label: "Customer",
     kind: "number",
     foreignKey: { table: "customers", column: "id" },
+  };
+  const statusColumn: ColumnSchema = {
+    name: "status",
+    label: "Status",
+    kind: "text",
+    select: { options: ["draft", "done"] },
   };
 
   it("edits scalar number input as a string draft", async () => {
@@ -85,6 +92,53 @@ describe("filter input drafts", () => {
 
     expect(onChange).toHaveBeenCalledWith([7]);
   });
+
+  it("selects multiple enum strings without committing search text", async () => {
+    const onChange = vi.fn();
+    const container = await render(
+      createElement(EnumCombobox, {
+        values: [],
+        onChange,
+        column: statusColumn,
+        options: ["draft", "done"],
+        labels: { draft: "In progress", done: "Complete" },
+      }),
+    );
+    const input = requiredComboboxInput(container);
+
+    await changeInput(input, "progress");
+    expect(onChange).not.toHaveBeenCalled();
+    expect(optionTexts(container)).toEqual(["In progress"]);
+
+    const option = container.querySelector('[role="option"]');
+    if (!option) throw new Error("Expected a filtered enum option.");
+    await click(option);
+
+    expect(onChange).toHaveBeenCalledWith(["draft"]);
+  });
+
+  it("renders and removes selected enum values retired from the option list", async () => {
+    const onChange = vi.fn();
+    const container = await render(
+      createElement(EnumCombobox, {
+        values: ["retired", "draft"],
+        onChange,
+        column: statusColumn,
+        options: ["draft", "done"],
+        labels: { draft: "In progress" },
+      }),
+    );
+
+    expect(container.textContent).toContain("retired");
+    expect(optionTexts(container)).not.toContain("retired");
+    const remove = container.querySelector(
+      'button[aria-label="Remove retired"]',
+    );
+    if (!remove) throw new Error("Expected the retired value remove button.");
+    await click(remove);
+
+    expect(onChange).toHaveBeenCalledWith(["draft"]);
+  });
 });
 
 async function render(element: ReactElement): Promise<HTMLElement> {
@@ -104,4 +158,39 @@ function setInputValue(input: HTMLInputElement, value: string): void {
     "value",
   )?.set;
   setter?.call(input, value);
+}
+
+async function changeInput(input: HTMLInputElement, value: string) {
+  await act(async () => {
+    setInputValue(input, value);
+    input.dispatchEvent(
+      new InputEvent("input", {
+        bubbles: true,
+        data: value.at(-1) ?? null,
+        inputType: "insertText",
+      }),
+    );
+  });
+}
+
+function requiredComboboxInput(container: ParentNode): HTMLInputElement {
+  const input = container.querySelector('input[role="combobox"]');
+  if (!(input instanceof HTMLInputElement)) {
+    throw new Error("Expected a combobox input.");
+  }
+  return input;
+}
+
+function optionTexts(container: ParentNode): string[] {
+  return Array.from(container.querySelectorAll('[role="option"]')).map(
+    (option) => option.textContent ?? "",
+  );
+}
+
+async function click(element: Element): Promise<void> {
+  await act(async () => {
+    element.dispatchEvent(
+      new MouseEvent("click", { bubbles: true, cancelable: true }),
+    );
+  });
 }
