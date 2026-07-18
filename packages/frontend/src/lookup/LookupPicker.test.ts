@@ -9,8 +9,13 @@ import {
   StaticSearchLookup,
   StaticValueLookup,
   type LookupCapabilities,
+  type LookupValue,
 } from "@sapporta/grid/lookup";
-import { LookupPicker } from "./LookupPicker";
+import {
+  LookupPicker,
+  type LookupPickerItemDisplay,
+  type LookupPickerItemProps,
+} from "./LookupPicker";
 
 (
   globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
@@ -18,11 +23,12 @@ import { LookupPicker } from "./LookupPicker";
 
 let mounted: { root: Root; container: HTMLElement } | null = null;
 
-async function renderLookupPicker(
-  lookup: LookupCapabilities,
+async function renderLookupPicker<TValue extends LookupValue, TMeta = unknown>(
+  lookup: LookupCapabilities<TValue, TMeta>,
   args: {
-    value: string | number | null;
-    onChange?: (value: string | number | null) => void;
+    value: TValue | null;
+    onChange?: (value: TValue | null) => void;
+    itemDisplay?: LookupPickerItemDisplay<TValue, TMeta>;
     disabled?: boolean;
     allowClear?: boolean;
     id?: string;
@@ -32,13 +38,16 @@ async function renderLookupPicker(
   document.body.append(container);
   const root = createRoot(container);
   mounted = { root, container };
+  const onChange: (value: TValue | null) => void =
+    args.onChange ?? (() => undefined);
 
   await act(async () => {
     root.render(
-      createElement(LookupPicker, {
+      createElement(LookupPicker<TValue, TMeta>, {
         lookup,
         value: args.value,
-        onChange: args.onChange ?? vi.fn(),
+        onChange,
+        itemDisplay: args.itemDisplay,
         placeholder: "Select person",
         disabled: args.disabled,
         allowClear: args.allowClear,
@@ -190,6 +199,77 @@ describe("LookupPicker", () => {
     expect(input.value).toBe("zz");
     expect(searchedFor).toContain("z");
     expect(searchedFor).toContain("zz");
+  });
+
+  it("renders metadata fields in the configured order", async () => {
+    type Customer = {
+      name: string;
+      email: string;
+      status: string;
+    };
+    const entry = {
+      value: 7,
+      label: "Alice Adams",
+      meta: {
+        name: "Alice Adams",
+        email: "alice@example.com",
+        status: "active",
+      },
+    };
+    const lookup: LookupCapabilities<number, Customer> = {
+      valueLookup: new StaticValueLookup([entry]),
+      searchLookup: new StaticSearchLookup([entry]),
+    };
+
+    await renderLookupPicker(lookup, {
+      value: 7,
+      itemDisplay: { fields: ["name", "email", "status"] },
+    });
+    await pressKey(comboboxInput(), "ArrowDown");
+
+    const option = comboboxOptionByText("alice@example.com");
+    expect(option.textContent).toContain(
+      "Alice Adams|alice@example.com|active",
+    );
+    expect(comboboxInput().value).toBe("Alice Adams");
+  });
+
+  it("passes a complete asynchronously loaded entry to a custom item component", async () => {
+    type Customer = { name: string; email: string };
+
+    function CustomerItem({ entry }: LookupPickerItemProps<number, Customer>) {
+      return createElement(
+        "span",
+        { "data-customer-email": entry.meta.email },
+        `${entry.meta.name} (${entry.meta.email})`,
+      );
+    }
+
+    const lookup: LookupCapabilities<number, Customer> = {
+      valueLookup: new CachedValueLookup({
+        loadEntriesForValues: async (values) =>
+          values.map((value) => ({
+            value,
+            label: String(value),
+            meta: { name: "Alice Adams", email: "alice@example.com" },
+          })),
+      }),
+      searchLookup: new StaticSearchLookup([]),
+    };
+
+    await renderLookupPicker(lookup, {
+      value: 7,
+      itemDisplay: { fields: ["name", "email"], component: CustomerItem },
+    });
+    await pressKey(comboboxInput(), "ArrowDown");
+
+    await waitFor(() => {
+      expect(
+        document.querySelector('[data-customer-email="alice@example.com"]')
+          ?.textContent,
+      ).toBe("Alice Adams (alice@example.com)");
+    });
+    expect(comboboxInput().value).toBe("7");
   });
 
   it("clears to null", async () => {
