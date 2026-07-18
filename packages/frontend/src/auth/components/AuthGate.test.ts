@@ -478,10 +478,16 @@ describe("authenticated account pages", () => {
       'a[href="/account/password"]',
     );
     expect(link).not.toBeNull();
+    expect(link!.getAttribute("role")).toBeNull();
     await act(async () => {
       link!.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     });
     await waitForText("Enter your current password, then choose a new one.");
+    expect(
+      host
+        .querySelector<HTMLAnchorElement>('a[href="/account/profile"]')
+        ?.getAttribute("role"),
+    ).toBeNull();
   });
 
   it("rejects mismatched new passwords before sending a request", async () => {

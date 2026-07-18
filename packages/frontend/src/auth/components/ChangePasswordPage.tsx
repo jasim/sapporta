@@ -2,7 +2,7 @@ import { ArrowLeft, KeyRound } from "lucide-react";
 import { useId, useState, type FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
-import { Button } from "@sapporta/ui/button";
+import { Button, buttonVariants } from "@sapporta/ui/button";
 import { Input } from "@sapporta/ui/input";
 import { Label } from "@sapporta/ui/label";
 import { errorMessage } from "../../platform/http";
@@ -58,14 +58,16 @@ export function ChangePasswordPage() {
   return (
     <div className="min-h-full bg-sap-surface">
       <div className="mx-auto w-full max-w-[760px] px-6 py-8">
-        <Button
-          variant="ghost"
-          className="-ml-3 mb-4"
-          render={<Link to="/account/profile" />}
+        <Link
+          className={buttonVariants({
+            variant: "ghost",
+            className: "-ml-3 mb-4",
+          })}
+          to="/account/profile"
         >
           <ArrowLeft data-icon="inline-start" />
           Back to profile
-        </Button>
+        </Link>
 
         <header className="mb-7 flex items-start gap-3">
           <span className="inline-flex size-12 shrink-0 items-center justify-center rounded-[7px] bg-sap-active-nav text-sap-brand">

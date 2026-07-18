@@ -11,7 +11,7 @@ import {
 } from "lucide-react";
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { Link } from "react-router-dom";
-import { Button } from "@sapporta/ui/button";
+import { Button, buttonVariants } from "@sapporta/ui/button";
 import {
   Dialog,
   DialogClose,
@@ -128,9 +128,12 @@ function AccountSecurity() {
             Use your current password to choose a new one.
           </p>
         </div>
-        <Button variant="outline" render={<Link to="/account/password" />}>
+        <Link
+          className={buttonVariants({ variant: "outline" })}
+          to="/account/password"
+        >
           Change password
-        </Button>
+        </Link>
       </div>
     </section>
   );
