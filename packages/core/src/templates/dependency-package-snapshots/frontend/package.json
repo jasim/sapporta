@@ -121,7 +121,8 @@
     "@sapporta/shared": "workspace:*",
     "@sapporta/ui": "workspace:*",
     "immer": "^11.1.8",
-    "lucide-react": "^1.21.0"
+    "lucide-react": "^1.21.0",
+    "sonner": "^2.0.7"
   },
   "peerDependencies": {
     "@sapporta/rest-core": "3.52.2",
