@@ -1,5 +1,14 @@
 # @sapporta/server
 
+## 0.2.7
+
+### Patch Changes
+
+- Internal testing release
+- Updated dependencies
+  - @sapporta/honest@0.3.6
+  - @sapporta/shared@0.1.7
+
 ## 0.2.6
 
 ### Patch Changes

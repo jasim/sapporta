@@ -1,5 +1,15 @@
 # @sapporta/frontend
 
+## 0.2.7
+
+### Patch Changes
+
+- Internal testing release
+- Updated dependencies
+  - @sapporta/grid@0.2.7
+  - @sapporta/shared@0.1.7
+  - @sapporta/ui@0.2.7
+
 ## 0.2.6
 
 ### Patch Changes

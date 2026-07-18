@@ -1,6 +1,6 @@
 {
   "name": "@sapporta/shared",
-  "version": "0.1.6",
+  "version": "0.1.7",
   "type": "module",
   "description": "Types and pure helpers shared between @sapporta/server and @sapporta/ui. Leaf package — must not depend on either.",
   "keywords": [

@@ -1,5 +1,11 @@
 # @sapporta/ui
 
+## 0.2.7
+
+### Patch Changes
+
+- Internal testing release
+
 ## 0.2.6
 
 ### Patch Changes

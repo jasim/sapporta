@@ -1,5 +1,11 @@
 # @sapporta/honest
 
+## 0.3.6
+
+### Patch Changes
+
+- Internal testing release
+
 ## 0.3.5
 
 ### Patch Changes

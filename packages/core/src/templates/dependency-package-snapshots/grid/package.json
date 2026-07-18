@@ -1,6 +1,6 @@
 {
   "name": "@sapporta/grid",
-  "version": "0.2.6",
+  "version": "0.2.7",
   "type": "module",
   "description": "Sapporta grid runtime, React grid components, column presets, and lookup primitives.",
   "keywords": [

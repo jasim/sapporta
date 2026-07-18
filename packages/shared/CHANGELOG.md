@@ -1,5 +1,11 @@
 # @sapporta/shared
 
+## 0.1.7
+
+### Patch Changes
+
+- Internal testing release
+
 ## 0.1.6
 
 ### Patch Changes
