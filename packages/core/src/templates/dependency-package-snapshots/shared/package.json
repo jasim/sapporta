@@ -73,6 +73,11 @@
       "sapporta:source": "./src/row-id.ts",
       "default": "./dist/row-id.js"
     },
+    "./row-scope": {
+      "types": "./dist/row-scope.d.ts",
+      "sapporta:source": "./src/row-scope.ts",
+      "default": "./dist/row-scope.js"
+    },
     "./error": {
       "types": "./dist/error.d.ts",
       "sapporta:source": "./src/error.ts",

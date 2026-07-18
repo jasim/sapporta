@@ -13,7 +13,11 @@ import type {
   ColumnMeta as FactoryColumnMeta,
   ValueKind,
 } from "@sapporta/shared/value-kind";
-import type { ReferenceRule, RowScope } from "../auth/row-scope.js";
+import {
+  isSystemManagedScopeFieldName,
+  type ReferenceRule,
+  type RowScope,
+} from "../auth/row-scope.js";
 
 /**
  * Column factories live in `./columns.ts` — importing them here so users
@@ -223,10 +227,15 @@ function normalizeSapportaMeta(
   const columns: Record<string, ColumnMeta> = {};
 
   for (const name of columnNames) {
+    const systemManagedScopeField = isSystemManagedScopeFieldName(name);
     columns[name] = {
       ...(isAutoManagedTimestampColumn(name) ? { visuallyHidden: true } : {}),
       ...factoryColumns.get(name),
       ...userColumns[name],
+      // Ownership fields are implementation details of row scoping. Unlike
+      // timestamp defaults, applications cannot opt them back into ordinary
+      // table presentation.
+      ...(systemManagedScopeField ? { visuallyHidden: true } : {}),
     };
   }
 

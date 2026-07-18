@@ -1,5 +1,21 @@
 import { getTableConfig, type SQLiteColumn } from "drizzle-orm/sqlite-core";
+import {
+  SCOPED_TO_USER_ID_SQL_COLUMN,
+  SCOPED_TO_USER_ID_TS_COLUMN,
+  WORKSPACE_ID_SQL_COLUMN,
+  WORKSPACE_ID_TS_COLUMN,
+} from "@sapporta/shared/row-scope";
 import type { TableDef } from "../schema/table.js";
+
+export {
+  isSystemManagedScopeFieldName,
+  SCOPED_TO_USER_ID_SQL_COLUMN,
+  SCOPED_TO_USER_ID_TS_COLUMN,
+  scopeColumnNames,
+  systemManagedScopeFieldNames,
+  WORKSPACE_ID_SQL_COLUMN,
+  WORKSPACE_ID_TS_COLUMN,
+} from "@sapporta/shared/row-scope";
 
 export const rowScopes = [
   "workspaceUserScoped",
@@ -8,23 +24,6 @@ export const rowScopes = [
 ] as const;
 
 export type RowScope = (typeof rowScopes)[number];
-
-export const scopeColumnNames = {
-  typescript: {
-    workspaceId: "workspaceId",
-    scopedToUserId: "scopedToUserId",
-  },
-  sql: {
-    workspaceId: "workspace_id",
-    scopedToUserId: "scoped_to_user_id",
-  },
-} as const;
-
-export const WORKSPACE_ID_TS_COLUMN = scopeColumnNames.typescript.workspaceId;
-export const SCOPED_TO_USER_ID_TS_COLUMN =
-  scopeColumnNames.typescript.scopedToUserId;
-export const WORKSPACE_ID_SQL_COLUMN = scopeColumnNames.sql.workspaceId;
-export const SCOPED_TO_USER_ID_SQL_COLUMN = scopeColumnNames.sql.scopedToUserId;
 
 export interface ReferenceRule {
   /** Registered Sapporta target table SQL name. */
@@ -113,13 +112,4 @@ export function scopedToUserScopeColumn(
     SCOPED_TO_USER_ID_SQL_COLUMN,
     SCOPED_TO_USER_ID_TS_COLUMN,
   );
-}
-
-export function systemManagedScopeFieldNames(): readonly string[] {
-  return [
-    WORKSPACE_ID_SQL_COLUMN,
-    WORKSPACE_ID_TS_COLUMN,
-    SCOPED_TO_USER_ID_SQL_COLUMN,
-    SCOPED_TO_USER_ID_TS_COLUMN,
-  ];
 }

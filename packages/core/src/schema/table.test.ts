@@ -33,4 +33,27 @@ describe("table metadata", () => {
       'Table "accounts" rowLabelColumns includes unknown column "display_name".',
     );
   });
+
+  it("marks ownership columns as hidden presentation fields", () => {
+    const recordsTable = sqliteTable("records", {
+      id: integer("id").primaryKey({ autoIncrement: true }),
+      workspaceId: text("workspace_id").notNull(),
+      scopedToUserId: text("scoped_to_user_id").notNull(),
+      name: text("name").notNull(),
+    });
+
+    const records = sapportaTable({
+      drizzle: recordsTable,
+      meta: {
+        rowLabelColumns: ["name"],
+        columns: {
+          workspace_id: { visuallyHidden: false },
+          scoped_to_user_id: { visuallyHidden: false },
+        },
+      },
+    });
+
+    expect(records.meta.columns.workspace_id?.visuallyHidden).toBe(true);
+    expect(records.meta.columns.scoped_to_user_id?.visuallyHidden).toBe(true);
+  });
 });

@@ -38,6 +38,7 @@ export {
   columnBySqlName,
   columnPropertyName,
   isRowScope,
+  isSystemManagedScopeFieldName,
   rowScopes,
   scopeColumnFact,
   scopeColumnNames,
