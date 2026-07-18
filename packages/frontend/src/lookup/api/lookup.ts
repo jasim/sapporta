@@ -1,5 +1,5 @@
 import { uiClient } from "../../platform/client";
-import type { LookupResponse } from "@sapporta/shared/contracts";
+import type { LookupResponse, Row } from "@sapporta/shared/contracts";
 import type { LookupEntry, LookupValue } from "@sapporta/grid/lookup";
 import type { LookupSearchPage } from "@sapporta/grid/lookup";
 
@@ -8,6 +8,21 @@ export function buildLookupValueQuery(values: readonly LookupValue[]): {
 } {
   const ids = values.map((value) => String(value)).join(",");
   return ids ? { ids } : {};
+}
+
+export function buildLookupSearchQuery(
+  searchText: string,
+  limit?: number,
+  fields?: readonly string[],
+): { q: string; limit?: string; fields?: string } {
+  const displayedFields = Array.from(new Set(fields ?? []));
+  return {
+    q: searchText,
+    ...(limit === undefined ? {} : { limit: String(limit) }),
+    ...(displayedFields.length === 0
+      ? {}
+      : { fields: displayedFields.join(",") }),
+  };
 }
 
 export async function fetchLookup(
@@ -25,26 +40,24 @@ export async function fetchLookupSearch(
   tableName: string,
   searchText: string,
   limit?: number,
+  fields?: readonly string[],
 ): Promise<LookupResponse> {
   return uiClient.lookup({
     params: { tableName },
-    query: {
-      q: searchText,
-      ...(limit === undefined ? {} : { limit: String(limit) }),
-    },
+    query: buildLookupSearchQuery(searchText, limit, fields),
   });
 }
 
 export function lookupEntriesFromResponse(
   response: LookupResponse,
-): LookupEntry[] {
+): LookupEntry<LookupValue, Row>[] {
   return response.entries;
 }
 
 export async function fetchLookupEntriesForValues(
   tableName: string,
   values: readonly LookupValue[],
-): Promise<LookupEntry[]> {
+): Promise<LookupEntry<LookupValue, Row>[]> {
   if (values.length === 0) return [];
   const response = await fetchLookup(tableName, values);
   return lookupEntriesFromResponse(response);
@@ -54,11 +67,13 @@ export async function fetchLookupEntriesForSearch(args: {
   tableName: string;
   searchText: string;
   limit: number;
-}): Promise<LookupSearchPage> {
+  fields?: readonly string[];
+}): Promise<LookupSearchPage<LookupValue, Row>> {
   const response = await fetchLookupSearch(
     args.tableName,
     args.searchText,
     args.limit,
+    args.fields,
   );
   return {
     entries: lookupEntriesFromResponse(response),

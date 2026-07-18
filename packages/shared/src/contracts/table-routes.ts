@@ -116,6 +116,7 @@ export const lookupRoute = c.query({
   query: lookupQuerySchema,
   responses: {
     200: lookupResponseSchema,
+    400: errorBodySchema,
     404: errorBodySchema,
   },
 });

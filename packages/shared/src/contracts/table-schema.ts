@@ -36,10 +36,11 @@ export type SingleRow = z.output<typeof singleRowSchema>;
 
 const lookupValueSchema = z.union([z.string(), z.number()]);
 
-/** FK display-value lookup entries. */
+/** FK display-value lookup entries with the source row available to renderers. */
 export const lookupEntrySchema = z.object({
   value: lookupValueSchema,
   label: z.string(),
+  meta: rowSchema,
 });
 export type LookupEntry = z.output<typeof lookupEntrySchema>;
 
@@ -71,6 +72,7 @@ export const lookupQuerySchema = z.object({
   ids: z.string().optional(),
   q: z.string().optional(),
   limit: z.string().optional(),
+  fields: z.string().optional(),
 });
 export type LookupQuery = z.output<typeof lookupQuerySchema>;
 

@@ -89,6 +89,7 @@ describe("lookup hooks", () => {
       await seen!.searchLookup!.loadSearchResults({
         searchText: "cus",
         limit: 10,
+        fields: ["name", "email"],
       });
     });
 
@@ -96,11 +97,13 @@ describe("lookup hooks", () => {
       tableName: "customers",
       searchText: "cus",
       limit: 10,
+      fields: ["email", "name"],
     });
     expect(
       (
         seen!.searchLookup!.cachedSearchResults({
           searchText: "cus",
+          fields: ["name", "email"],
         }) as readonly {
           value: LookupValue;
           label: string;

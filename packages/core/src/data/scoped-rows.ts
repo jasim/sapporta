@@ -28,7 +28,7 @@
  * applies row visibility, performs persistence, and returns plain row objects.
  */
 
-import { asc, eq, inArray, sql, type SQL } from "drizzle-orm";
+import { asc, eq, inArray, or, sql, type SQL } from "drizzle-orm";
 import type { BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
 import { getTableConfig, type SQLiteColumn } from "drizzle-orm/sqlite-core";
 import type { RowId } from "@sapporta/shared/row-id";
@@ -41,6 +41,7 @@ import type { TableDef } from "../schema/table.js";
 import { savePipeline } from "./save-pipeline.js";
 import { parseQuery, type ParsedQuery } from "./query-parser.js";
 import { rowLabeller } from "./row-label.js";
+import { resolveRowFields, UnknownRowFieldsError } from "./row-fields.js";
 import type { LookupEntry } from "@sapporta/shared/contracts";
 
 export interface ListRowsInput {
@@ -211,20 +212,38 @@ export function scopedRows(
 
     async lookup(input = {}) {
       // Lookup backs foreign-key pickers and autocomplete. Optional ids preserve
-      // selected labels; optional q searches visible row-label columns.
+      // selected entries. Search follows the fields displayed by the picker;
+      // returned metadata contains only ordinary visible table fields.
       const { pkName, labelColumns, label } = rowLabeller(table);
       const idsParam = input.ids;
       const searchText = input.q?.trim().toLocaleLowerCase() ?? "";
       const limit = parseLookupLimit(input.limit);
+      const displayedFields = resolveLookupDisplayedFields(table, input.fields);
+      const visibleFields = getTableConfig(table.drizzle)
+        .columns.map((column) => column.name)
+        .filter(
+          (columnName) =>
+            table.meta.columns[columnName]?.visuallyHidden !== true,
+        );
+      const responseFields = resolveRowFields(table, visibleFields);
+      const queryFields = resolveRowFields(
+        table,
+        uniqueNames([pkName, ...labelColumns, ...visibleFields]),
+      );
 
       let rows: Record<string, unknown>[];
       if (idsParam === undefined) {
         const searchWhere =
           searchText === ""
             ? undefined
-            : lookupLabelSearchCondition(table, labelColumns, searchText);
+            : lookupDisplayedFieldsSearchCondition(
+                table,
+                labelColumns,
+                displayedFields,
+                searchText,
+              );
         const query = db
-          .select()
+          .select(queryFields.databaseSelection)
           .from(table.drizzle)
           .where(access.ownedRows(searchWhere))
           .orderBy(asc(pk.drizzlePk));
@@ -235,7 +254,7 @@ export function scopedRows(
         const ids = parseLookupIds(idsParam, table, pk.pkCol.name);
         if (ids.length === 0) return [];
         rows = (await db
-          .select()
+          .select(queryFields.databaseSelection)
           .from(table.drizzle)
           .where(access.ownedRows(inArray(pk.drizzlePk, ids)))) as Record<
           string,
@@ -244,23 +263,15 @@ export function scopedRows(
       }
 
       const entries: LookupEntry[] = [];
-      let count = 0;
       for (const row of rows) {
         const rowLabel = label(row);
-        if (
-          idsParam === undefined &&
-          searchText !== "" &&
-          !rowLabel.toLocaleLowerCase().includes(searchText)
-        ) {
-          continue;
-        }
         const value = row[pkName];
         if (typeof value === "string" || typeof value === "number") {
-          entries.push({ value, label: rowLabel });
-        }
-        count += 1;
-        if (idsParam === undefined && limit !== undefined) {
-          if (count >= limit) break;
+          entries.push({
+            value,
+            label: rowLabel,
+            meta: responseFields.pick(row),
+          });
         }
       }
       return entries;
@@ -282,7 +293,7 @@ export function scopedRows(
         );
       }
 
-      const ids = parseIds(idsParam);
+      const ids = parseCommaSeparatedValues(idsParam);
       if (ids.length === 0) return {};
 
       const drizzleColumn = (
@@ -362,8 +373,8 @@ function withoutUndefinedValues(input: ListRowsInput): Record<string, string> {
   return params;
 }
 
-function parseIds(idsParam: string): string[] {
-  return idsParam
+function parseCommaSeparatedValues(value: string): string[] {
+  return value
     .split(",")
     .map((value) => value.trim())
     .filter(Boolean);
@@ -374,7 +385,7 @@ function parseLookupIds(
   table: TableDef,
   primaryKeyColumn: string,
 ): Array<string | number> {
-  const ids = parseIds(idsParam);
+  const ids = parseCommaSeparatedValues(idsParam);
   const kind = resolveColumnKind(table, primaryKeyColumn);
   switch (kind) {
     case "text":
@@ -414,27 +425,73 @@ function parseLookupLimit(limitParam: string | undefined): number | undefined {
   });
 }
 
-function lookupLabelSearchCondition(
+function resolveLookupDisplayedFields(
   table: TableDef,
-  labelColumns: readonly string[],
+  fieldsParam: string | undefined,
+): readonly string[] {
+  if (fieldsParam === undefined) return [];
+  const fields = uniqueNames(parseCommaSeparatedValues(fieldsParam));
+
+  try {
+    resolveRowFields(table, fields);
+  } catch (error) {
+    if (error instanceof UnknownRowFieldsError) {
+      throw new QueryParseError("unknown_column", error.message);
+    }
+    throw error;
+  }
+
+  const hiddenFields = fields.filter(
+    (field) => table.meta.columns[field]?.visuallyHidden === true,
+  );
+  if (hiddenFields.length > 0) {
+    throw new QueryParseError(
+      "unknown_column",
+      `Lookup field(s) are not visible on table "${table.sqlName}": ${hiddenFields.join(", ")}`,
+    );
+  }
+
+  return fields;
+}
+
+function lookupDisplayedFieldsSearchCondition(
+  table: TableDef,
+  labelFields: readonly string[],
+  displayedFields: readonly string[],
   searchText: string,
 ): SQL | undefined {
-  const drizzleColumns = table.drizzle as unknown as Record<
-    string,
-    SQLiteColumn | undefined
-  >;
-  const pattern = `%${searchText}%`;
-  const labelExpression = labelColumns
-    .map((columnName) => drizzleColumns[columnName])
-    .filter((column): column is SQLiteColumn => column !== undefined)
-    .reduce<SQL | null>((expression, column) => {
+  const labelColumns = Object.values(
+    resolveRowFields(table, labelFields).databaseSelection,
+  );
+  const labelExpression = labelColumns.reduce<SQL | null>(
+    (expression, column) => {
       const value = sql`coalesce(cast(${column} as text), '')`;
       return expression === null
         ? value
         : sql`${expression} || ' ' || ${value}`;
-    }, null);
+    },
+    null,
+  );
   if (labelExpression === null) return undefined;
-  return sql`lower(${labelExpression}) like ${pattern}`;
+
+  const pattern = `%${searchText}%`;
+  const conditions: SQL[] = [sql`lower(${labelExpression}) like ${pattern}`];
+  const labelFieldSet = new Set(labelFields);
+  for (const column of Object.values(
+    resolveRowFields(
+      table,
+      displayedFields.filter((field) => !labelFieldSet.has(field)),
+    ).databaseSelection,
+  )) {
+    conditions.push(
+      sql`lower(coalesce(cast(${column} as text), '')) like ${pattern}`,
+    );
+  }
+  return conditions.length === 1 ? conditions[0] : or(...conditions);
+}
+
+function uniqueNames(names: readonly string[]): string[] {
+  return Array.from(new Set(names));
 }
 
 function isPersistenceNotFoundError(err: unknown): boolean {

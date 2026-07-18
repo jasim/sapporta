@@ -231,14 +231,60 @@ describe("/api/tables table operations", () => {
       const body = await res.json();
       expect(Array.isArray(body.entries)).toBe(true);
 
-      const entries = body.entries as Array<{ value: unknown; label: unknown }>;
+      const entries = body.entries as Array<{
+        value: unknown;
+        label: unknown;
+        meta: unknown;
+      }>;
       expect(entries.length).toBeGreaterThan(0);
       for (const entry of entries) {
         expect(
           typeof entry.value === "string" || typeof entry.value === "number",
         ).toBe(true);
         expect(typeof entry.label).toBe("string");
+        expect(entry.meta).toEqual(expect.any(Object));
+        expect(entry.meta).not.toHaveProperty("workspace_id");
+        expect(entry.meta).not.toHaveProperty("scoped_to_user_id");
+        expect(entry.meta).not.toHaveProperty("created_at");
+        expect(entry.meta).not.toHaveProperty("updated_at");
       }
+    });
+
+    it("searches the label and only extra fields displayed by the picker", async () => {
+      const created = await postJson("/api/tables/accounts", {
+        name: "Lookup Boundary Probe",
+        type: "expense",
+        balance: 987654,
+      });
+      expect(created.status).toBe(201);
+
+      const labelSearch = await request(
+        "/api/tables/accounts/_lookup?q=boundary",
+      );
+      expect(labelSearch.status).toBe(200);
+      expect((await labelSearch.json()).entries).toHaveLength(1);
+
+      const undisplayedFieldSearch = await request(
+        "/api/tables/accounts/_lookup?q=987654",
+      );
+      expect(undisplayedFieldSearch.status).toBe(200);
+      expect((await undisplayedFieldSearch.json()).entries).toEqual([]);
+
+      const displayedFieldSearch = await request(
+        "/api/tables/accounts/_lookup?q=987654&fields=balance",
+      );
+      expect(displayedFieldSearch.status).toBe(200);
+      expect((await displayedFieldSearch.json()).entries).toMatchObject([
+        { label: "Lookup Boundary Probe", meta: { balance: 987654 } },
+      ]);
+    });
+
+    it("rejects hidden fields as picker search fields", async () => {
+      const res = await request(
+        "/api/tables/accounts/_lookup?q=workspace-1&fields=workspace_id",
+      );
+      expect(res.status).toBe(400);
+      expect(await res.json()).toMatchObject({ code: "unknown_column" });
     });
   });
 
@@ -366,8 +412,22 @@ describe("/api/tables table operations", () => {
       expect(res.status).toBe(200);
       const body = await res.json();
       expect(body.entries).toEqual([
-        { value: uuid1, label: "Alpha Renamed" },
-        { value: uuid2, label: "Bravo" },
+        {
+          value: uuid1,
+          label: "Alpha Renamed",
+          meta: {
+            id: uuid1,
+            name: "Alpha Renamed",
+          },
+        },
+        {
+          value: uuid2,
+          label: "Bravo",
+          meta: {
+            id: uuid2,
+            name: "Bravo",
+          },
+        },
       ]);
     });
 

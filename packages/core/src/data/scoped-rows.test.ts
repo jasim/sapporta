@@ -179,25 +179,71 @@ describe("scopedRows", () => {
 
   it("looks up row labels inside row scope", async () => {
     const { rows } = setupAccounts();
-    await rows.create({ name: "Cash", type: "asset" });
-    await rows.create({ name: "Revenue", type: "revenue" });
-    await rows.create({ name: "Rent", type: "expense" });
+    await rows.create({ name: "Cash", type: "asset", balance: 100 });
+    await rows.create({ name: "Revenue", type: "revenue", balance: 250 });
+    await rows.create({ name: "Rent", type: "expense", balance: 300 });
 
     await expect(rows.lookup({ ids: "1,2" })).resolves.toEqual([
-      { value: 1, label: "Cash" },
-      { value: 2, label: "Revenue" },
+      {
+        value: 1,
+        label: "Cash",
+        meta: { id: 1, name: "Cash", type: "asset", balance: 100 },
+      },
+      {
+        value: 2,
+        label: "Revenue",
+        meta: { id: 2, name: "Revenue", type: "revenue", balance: 250 },
+      },
     ]);
     await expect(rows.lookup({ q: "re" })).resolves.toEqual([
-      { value: 2, label: "Revenue" },
-      { value: 3, label: "Rent" },
+      {
+        value: 2,
+        label: "Revenue",
+        meta: { id: 2, name: "Revenue", type: "revenue", balance: 250 },
+      },
+      {
+        value: 3,
+        label: "Rent",
+        meta: { id: 3, name: "Rent", type: "expense", balance: 300 },
+      },
     ]);
     await expect(rows.lookup({ q: "re", limit: "1" })).resolves.toEqual([
-      { value: 2, label: "Revenue" },
+      {
+        value: 2,
+        label: "Revenue",
+        meta: { id: 2, name: "Revenue", type: "revenue", balance: 250 },
+      },
     ]);
     await expect(rows.lookup({ limit: "2" })).resolves.toEqual([
-      { value: 1, label: "Cash" },
-      { value: 2, label: "Revenue" },
+      {
+        value: 1,
+        label: "Cash",
+        meta: { id: 1, name: "Cash", type: "asset", balance: 100 },
+      },
+      {
+        value: 2,
+        label: "Revenue",
+        meta: { id: 2, name: "Revenue", type: "revenue", balance: 250 },
+      },
     ]);
+    await expect(rows.lookup({ q: "asset" })).resolves.toEqual([]);
+    await expect(rows.lookup({ q: "asset", fields: "type" })).resolves.toEqual([
+      {
+        value: 1,
+        label: "Cash",
+        meta: { id: 1, name: "Cash", type: "asset", balance: 100 },
+      },
+    ]);
+    await expect(rows.lookup({ q: "250" })).resolves.toEqual([]);
+    await expect(rows.lookup({ q: "250", fields: "balance" })).resolves.toEqual(
+      [
+        {
+          value: 2,
+          label: "Revenue",
+          meta: { id: 2, name: "Revenue", type: "revenue", balance: 250 },
+        },
+      ],
+    );
   });
 
   it("rejects non-numeric lookup ids for numeric primary keys", async () => {
@@ -206,6 +252,49 @@ describe("scopedRows", () => {
     await expect(rows.lookup({ ids: "not-a-number" })).rejects.toBeInstanceOf(
       QueryParseError,
     );
+  });
+
+  it("returns public field names and excludes hidden fields", async () => {
+    const contactsTable = sqliteTable("contacts", {
+      id: integer("id").primaryKey({ autoIncrement: true }),
+      displayName: text("display_name").notNull(),
+      secretCode: text("secret_code").notNull(),
+    });
+    const contacts = sapportaTable({
+      drizzle: contactsTable,
+      meta: {
+        rowScope: "systemGlobal",
+        rowLabelColumns: ["display_name"],
+        columns: { secret_code: { visuallyHidden: true } },
+      },
+    });
+    const { db, sqlite } = createTestDb();
+    sqlite.exec(`
+      CREATE TABLE contacts (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        display_name TEXT NOT NULL,
+        secret_code TEXT NOT NULL
+      );
+      INSERT INTO contacts (display_name, secret_code)
+      VALUES ('Alice Adams', 'internal-7305');
+    `);
+    const rows = scopedRows(
+      db,
+      createTestAuthContext({ tables: [contacts] }),
+      contacts,
+    );
+
+    await expect(rows.lookup({ ids: "1" })).resolves.toEqual([
+      {
+        value: 1,
+        label: "Alice Adams",
+        meta: { id: 1, display_name: "Alice Adams" },
+      },
+    ]);
+    await expect(rows.lookup({ q: "internal-7305" })).resolves.toEqual([]);
+    await expect(
+      rows.lookup({ q: "internal-7305", fields: "secret_code" }),
+    ).rejects.toMatchObject({ code: "unknown_column" });
   });
 
   it("keeps lookup ids as strings for text primary keys", async () => {
@@ -236,7 +325,11 @@ describe("scopedRows", () => {
     );
 
     await expect(rows.lookup({ ids: "001" })).resolves.toEqual([
-      { value: "001", label: "Agent One" },
+      {
+        value: "001",
+        label: "Agent One",
+        meta: { id: "001", name: "Agent One" },
+      },
     ]);
   });
 

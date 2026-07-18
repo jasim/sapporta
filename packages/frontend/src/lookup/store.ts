@@ -1,25 +1,25 @@
-import type { LookupCapabilities } from "@sapporta/grid/lookup";
-import type { ColumnSchema } from "@sapporta/shared/contracts";
-import { createTableLookupSource } from "./source";
+import type { LookupCapabilities, LookupValue } from "@sapporta/grid/lookup";
+import type { ColumnSchema, Row } from "@sapporta/shared/contracts";
+import { createTableLookupSource, type TableLookupSource } from "./source";
 
-export type LookupForColumn = (
+export type LookupForColumn<TMeta = unknown> = (
   column: ColumnSchema,
-) => LookupCapabilities | undefined;
+) => LookupCapabilities<LookupValue, TMeta> | undefined;
 
-export type LookupStore = {
-  table(tableName: string): LookupCapabilities;
-  foreignKey: LookupForColumn;
+export type LookupStore<TMeta = unknown> = {
+  table(tableName: string): LookupCapabilities<LookupValue, TMeta>;
+  foreignKey: LookupForColumn<TMeta>;
   requireForeignKey(args: {
     tableName: string;
     column: ColumnSchema;
-  }): LookupCapabilities;
+  }): LookupCapabilities<LookupValue, TMeta>;
   clear(): void;
 };
 
-export function createLookupStore(): LookupStore {
-  const byTable = new Map<string, LookupCapabilities>();
+export function createLookupStore(): LookupStore<Row> {
+  const byTable = new Map<string, TableLookupSource>();
 
-  function table(tableName: string): LookupCapabilities {
+  function table(tableName: string): TableLookupSource {
     const existing = byTable.get(tableName);
     if (existing) return existing;
 
@@ -28,7 +28,7 @@ export function createLookupStore(): LookupStore {
     return lookup;
   }
 
-  function foreignKey(column: ColumnSchema): LookupCapabilities | undefined {
+  function foreignKey(column: ColumnSchema): TableLookupSource | undefined {
     return column.foreignKey ? table(column.foreignKey.table) : undefined;
   }
 
@@ -38,7 +38,7 @@ export function createLookupStore(): LookupStore {
   }: {
     tableName: string;
     column: ColumnSchema;
-  }): LookupCapabilities {
+  }): TableLookupSource {
     const lookup = foreignKey(column);
     if (lookup) return lookup;
 
