@@ -8,37 +8,44 @@ export type LookupSearchRequest = {
   searchText?: string;
   limit?: number;
   cursor?: string;
+  /** Entry metadata fields displayed by the requesting picker. */
+  fields?: readonly string[];
 };
 
-export type LookupSearchPage<TValue extends LookupValue = LookupValue> = {
-  entries: readonly LookupEntry<TValue>[];
+export type LookupSearchPage<
+  TValue extends LookupValue = LookupValue,
+  TMeta = unknown,
+> = {
+  entries: readonly LookupEntry<TValue, TMeta>[];
   nextCursor?: string;
 };
 
-export type SearchLookup<TValue extends LookupValue = LookupValue> =
-  LookupSubscription & {
-    /**
-     * React external-store invariant: callers use this as a
-     * `useSyncExternalStore` snapshot reader. For the same normalized search
-     * text, repeated reads must return the same array reference until the
-     * lookup store actually changes; allocating a fresh `[]` or filtered array
-     * on each read makes React treat the snapshot as changing during render.
-     */
-    cachedSearchResults(
-      request?: Pick<LookupSearchRequest, "searchText">,
-    ): readonly LookupEntry<TValue>[];
-    loadSearchResults(
-      request?: LookupSearchRequest,
-    ): Promise<LookupSearchPage<TValue>>;
-  };
+export type SearchLookup<
+  TValue extends LookupValue = LookupValue,
+  TMeta = unknown,
+> = LookupSubscription & {
+  /**
+   * React external-store invariant: callers use this as a
+   * `useSyncExternalStore` snapshot reader. For the same normalized search
+   * text, repeated reads must return the same array reference until the
+   * lookup store actually changes; allocating a fresh `[]` or filtered array
+   * on each read makes React treat the snapshot as changing during render.
+   */
+  cachedSearchResults(
+    request?: Pick<LookupSearchRequest, "searchText" | "fields">,
+  ): readonly LookupEntry<TValue, TMeta>[];
+  loadSearchResults(
+    request?: LookupSearchRequest,
+  ): Promise<LookupSearchPage<TValue, TMeta>>;
+};
 
-type LoadEntriesForSearch<TValue extends LookupValue> = (
+type LoadEntriesForSearch<TValue extends LookupValue, TMeta> = (
   request: Required<Pick<LookupSearchRequest, "searchText" | "limit">> &
-    Pick<LookupSearchRequest, "cursor">,
-) => Promise<LookupSearchPage<TValue>>;
+    Pick<LookupSearchRequest, "cursor" | "fields">,
+) => Promise<LookupSearchPage<TValue, TMeta>>;
 
-type CachedSearchPage<TValue extends LookupValue> = {
-  page: LookupSearchPage<TValue>;
+type CachedSearchPage<TValue extends LookupValue, TMeta> = {
+  page: LookupSearchPage<TValue, TMeta>;
   requestKey: string;
 };
 
@@ -58,32 +65,75 @@ function normalizeLimit(
   return Math.max(0, Math.floor(limit));
 }
 
+function normalizeFields(fields: readonly string[] | undefined): string[] {
+  return Array.from(new Set(fields ?? [])).sort();
+}
+
+function searchScopeKey(
+  request: Pick<LookupSearchRequest, "searchText" | "fields">,
+): string {
+  return JSON.stringify({
+    searchText: normalizeSearchText(request.searchText),
+    fields: normalizeFields(request.fields),
+  });
+}
+
 function searchRequestKey(request: LookupSearchRequest): string {
   return JSON.stringify({
     searchText: normalizeSearchText(request.searchText),
+    fields: normalizeFields(request.fields),
     limit: request.limit,
     cursor: request.cursor,
   });
 }
 
 function entryMatchesSearchText(
-  entry: LookupEntry<LookupValue>,
+  entry: LookupEntry<LookupValue, unknown>,
   searchText: string,
+  fields: readonly string[],
 ): boolean {
   if (searchText === "") return true;
 
   const lowerSearchText = searchText.toLocaleLowerCase();
+  return lookupEntrySearchValues(entry, fields).some((value) =>
+    value.toLocaleLowerCase().includes(lowerSearchText),
+  );
+}
+
+function lookupEntrySearchValues(
+  entry: LookupEntry<LookupValue, unknown>,
+  fields: readonly string[],
+): string[] {
+  const values = [entry.label];
+  if (isRecord(entry.meta)) {
+    for (const field of fields) {
+      const value = entry.meta[field];
+      if (isSearchableScalar(value)) values.push(String(value));
+    }
+  }
+  return values;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function isSearchableScalar(
+  value: unknown,
+): value is string | number | boolean | bigint {
   return (
-    entry.label.toLocaleLowerCase().includes(lowerSearchText) ||
-    (entry.description?.toLocaleLowerCase().includes(lowerSearchText) ?? false)
+    typeof value === "string" ||
+    typeof value === "number" ||
+    typeof value === "boolean" ||
+    typeof value === "bigint"
   );
 }
 
 // Lookup caches are ordinary memoized objects; see value-lookup.ts for the
 // lifetime rationale. Stale search responses are rejected by request key, not
 // by disposal — a late response for a superseded search is dropped because its
-// request key no longer matches the latest request for that search text.
-class SearchLookupStore<TValue extends LookupValue> {
+// request key no longer matches the latest request for that text + field scope.
+class SearchLookupStore {
   protected readonly listeners = new Set<() => void>();
 
   subscribeToLookupChanges(listener: () => void): () => void {
@@ -100,73 +150,81 @@ class SearchLookupStore<TValue extends LookupValue> {
   }
 }
 
-export class StaticSearchLookup<TValue extends LookupValue = LookupValue>
-  extends SearchLookupStore<TValue>
-  implements SearchLookup<TValue>
+export class StaticSearchLookup<
+  TValue extends LookupValue = LookupValue,
+  TMeta = unknown,
+>
+  extends SearchLookupStore
+  implements SearchLookup<TValue, TMeta>
 {
-  private readonly entries: readonly LookupEntry<TValue>[];
-  private readonly entriesBySearchText = new Map<
+  private readonly entries: readonly LookupEntry<TValue, TMeta>[];
+  private readonly entriesBySearchScope = new Map<
     string,
-    readonly LookupEntry<TValue>[]
+    readonly LookupEntry<TValue, TMeta>[]
   >();
 
-  constructor(entries: readonly LookupEntry<TValue>[]) {
+  constructor(entries: readonly LookupEntry<TValue, TMeta>[]) {
     super();
     this.entries = entries;
   }
 
   cachedSearchResults(
-    request?: Pick<LookupSearchRequest, "searchText">,
-  ): readonly LookupEntry<TValue>[] {
-    return this.entriesForSearchText(normalizeSearchText(request?.searchText));
+    request?: Pick<LookupSearchRequest, "searchText" | "fields">,
+  ): readonly LookupEntry<TValue, TMeta>[] {
+    return this.entriesForRequest(request ?? {});
   }
 
   async loadSearchResults(
     request: LookupSearchRequest = {},
-  ): Promise<LookupSearchPage<TValue>> {
-    const searchText = normalizeSearchText(request.searchText);
+  ): Promise<LookupSearchPage<TValue, TMeta>> {
     const limit = normalizeLimit(request.limit, this.entries.length);
-    const entries = this.entriesForSearchText(searchText);
+    const entries = this.entriesForRequest(request);
     return {
       entries: entries.length <= limit ? entries : entries.slice(0, limit),
     };
   }
 
-  private entriesForSearchText(
-    searchText: string,
-  ): readonly LookupEntry<TValue>[] {
+  private entriesForRequest(
+    request: Pick<LookupSearchRequest, "searchText" | "fields">,
+  ): readonly LookupEntry<TValue, TMeta>[] {
+    const searchText = normalizeSearchText(request.searchText);
     if (searchText === "") return this.entries;
 
-    const cached = this.entriesBySearchText.get(searchText);
+    const fields = normalizeFields(request.fields);
+    const scopeKey = searchScopeKey({ searchText, fields });
+    const cached = this.entriesBySearchScope.get(scopeKey);
     if (cached) return cached;
 
     const entries = this.entries.filter((entry) =>
-      entryMatchesSearchText(entry, searchText),
+      entryMatchesSearchText(entry, searchText, fields),
     );
-    this.entriesBySearchText.set(searchText, entries);
+    this.entriesBySearchScope.set(scopeKey, entries);
     return entries;
   }
 }
 
-export class CachedSearchLookup<TValue extends LookupValue = LookupValue>
-  extends SearchLookupStore<TValue>
-  implements SearchLookup<TValue>
+export class CachedSearchLookup<
+  TValue extends LookupValue = LookupValue,
+  TMeta = unknown,
+>
+  extends SearchLookupStore
+  implements SearchLookup<TValue, TMeta>
 {
-  private readonly loadEntriesForSearch: LoadEntriesForSearch<TValue>;
+  private readonly loadEntriesForSearch: LoadEntriesForSearch<TValue, TMeta>;
   private readonly defaultSearchLimit: number;
   private readonly maxCachedSearches: number;
-  private readonly searchPagesByText = new Map<
+  private readonly searchPagesByScope = new Map<
     string,
-    CachedSearchPage<TValue>
+    CachedSearchPage<TValue, TMeta>
   >();
   private readonly loadingSearchesByRequest = new Map<
     string,
-    Promise<LookupSearchPage<TValue>>
+    Promise<LookupSearchPage<TValue, TMeta>>
   >();
-  private readonly latestRequestBySearchText = new Map<string, string>();
+  private readonly latestRequestBySearchScope = new Map<string, string>();
 
   constructor(args: {
-    loadEntriesForSearch: LoadEntriesForSearch<TValue>;
+    loadEntriesForSearch: LoadEntriesForSearch<TValue, TMeta>;
     defaultSearchLimit?: number;
     maxCachedSearches?: number;
   }) {
@@ -183,31 +241,33 @@ export class CachedSearchLookup<TValue extends LookupValue = LookupValue>
   }
 
   cachedSearchResults(
-    request?: Pick<LookupSearchRequest, "searchText">,
-  ): readonly LookupEntry<TValue>[] {
-    const searchText = normalizeSearchText(request?.searchText);
+    request?: Pick<LookupSearchRequest, "searchText" | "fields">,
+  ): readonly LookupEntry<TValue, TMeta>[] {
+    const scopeKey = searchScopeKey(request ?? {});
     return (
-      this.searchPagesByText.get(searchText)?.page.entries ??
+      this.searchPagesByScope.get(scopeKey)?.page.entries ??
       EMPTY_SEARCH_RESULTS
     );
   }
 
   async loadSearchResults(
     request: LookupSearchRequest = {},
-  ): Promise<LookupSearchPage<TValue>> {
+  ): Promise<LookupSearchPage<TValue, TMeta>> {
     const normalizedRequest = this.normalizeRequest(request);
     const requestKey = searchRequestKey(normalizedRequest);
-    const cachedPage = this.searchPagesByText.get(normalizedRequest.searchText);
+    const scopeKey = searchScopeKey(normalizedRequest);
+    const cachedPage = this.searchPagesByScope.get(scopeKey);
     if (cachedPage?.requestKey === requestKey) return cachedPage.page;
 
     const pending = this.loadingSearchesByRequest.get(requestKey);
     if (pending) return pending;
 
-    this.latestRequestBySearchText.set(
-      normalizedRequest.searchText,
+    this.latestRequestBySearchScope.set(scopeKey, requestKey);
+    const load = this.loadAndStoreSearchPage(
+      normalizedRequest,
+      scopeKey,
       requestKey,
     );
-    const load = this.loadAndStoreSearchPage(normalizedRequest, requestKey);
     this.loadingSearchesByRequest.set(requestKey, load);
     return load;
   }
@@ -215,25 +275,26 @@ export class CachedSearchLookup<TValue extends LookupValue = LookupValue>
   private normalizeRequest(
     request: LookupSearchRequest,
   ): Required<Pick<LookupSearchRequest, "searchText" | "limit">> &
-    Pick<LookupSearchRequest, "cursor"> {
+    Pick<LookupSearchRequest, "cursor" | "fields"> {
+    const fields = normalizeFields(request.fields);
     return {
       searchText: normalizeSearchText(request.searchText),
       limit: normalizeLimit(request.limit, this.defaultSearchLimit),
+      ...(fields.length === 0 ? {} : { fields }),
       ...(request.cursor === undefined ? {} : { cursor: request.cursor }),
     };
   }
 
   private async loadAndStoreSearchPage(
     request: Required<Pick<LookupSearchRequest, "searchText" | "limit">> &
-      Pick<LookupSearchRequest, "cursor">,
+      Pick<LookupSearchRequest, "cursor" | "fields">,
+    scopeKey: string,
     requestKey: string,
-  ): Promise<LookupSearchPage<TValue>> {
+  ): Promise<LookupSearchPage<TValue, TMeta>> {
     try {
       const page = await this.loadEntriesForSearch(request);
-      if (
-        this.latestRequestBySearchText.get(request.searchText) === requestKey
-      ) {
-        this.searchPagesByText.set(request.searchText, { page, requestKey });
+      if (this.latestRequestBySearchScope.get(scopeKey) === requestKey) {
+        this.searchPagesByScope.set(scopeKey, { page, requestKey });
         this.evictOldSearches();
         this.notifyLookupChanged();
       }
@@ -244,10 +305,10 @@ export class CachedSearchLookup<TValue extends LookupValue = LookupValue>
   }
 
   private evictOldSearches(): void {
-    while (this.searchPagesByText.size > this.maxCachedSearches) {
-      const oldestSearchText = this.searchPagesByText.keys().next().value;
-      if (oldestSearchText === undefined) return;
-      this.searchPagesByText.delete(oldestSearchText);
+    while (this.searchPagesByScope.size > this.maxCachedSearches) {
+      const oldestScope = this.searchPagesByScope.keys().next().value;
+      if (oldestScope === undefined) return;
+      this.searchPagesByScope.delete(oldestScope);
     }
   }
 }

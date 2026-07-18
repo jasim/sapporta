@@ -30,6 +30,44 @@ describe("StaticSearchLookup", () => {
     ]);
   });
 
+  it("searches only metadata fields displayed by the picker", async () => {
+    const lookup = new StaticSearchLookup([
+      {
+        value: 1,
+        label: "Alice Adams",
+        meta: { email: "alice@example.com", accountNumber: 4102 },
+      },
+      {
+        value: 2,
+        label: "Bob Brown",
+        meta: { email: "bob@example.com", accountNumber: 7305 },
+      },
+    ]);
+
+    await lookup.loadSearchResults({
+      searchText: "7305",
+      limit: 50,
+      fields: ["accountNumber"],
+    });
+
+    expect(
+      lookup.cachedSearchResults({
+        searchText: "7305",
+        fields: ["accountNumber"],
+      }),
+    ).toEqual([
+      {
+        value: 2,
+        label: "Bob Brown",
+        meta: { email: "bob@example.com", accountNumber: 7305 },
+      },
+    ]);
+    expect(lookup.cachedSearchResults({ searchText: "7305" })).toEqual([]);
+    expect(
+      lookup.cachedSearchResults({ searchText: "7305", fields: ["email"] }),
+    ).toEqual([]);
+  });
+
   it("returns identity-stable cached results for React snapshot readers", () => {
     const lookup = new StaticSearchLookup([
       { value: "draft", label: "Draft invoice" },
@@ -129,6 +167,41 @@ describe("CachedSearchLookup", () => {
     await lookup.loadSearchResults({ searchText: "ac", limit: 50 });
 
     expect(loadEntriesForSearch).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps searches with different displayed fields in separate cache entries", async () => {
+    const loadEntriesForSearch = vi.fn(async ({ fields }) => ({
+      entries: [
+        {
+          value: fields?.join(",") ?? "label",
+          label: fields?.join(",") ?? "label",
+        },
+      ],
+    }));
+    const lookup = new CachedSearchLookup({ loadEntriesForSearch });
+
+    await lookup.loadSearchResults({
+      searchText: "same words",
+      fields: ["email"],
+    });
+    await lookup.loadSearchResults({
+      searchText: "same words",
+      fields: ["accountNumber"],
+    });
+
+    expect(loadEntriesForSearch).toHaveBeenCalledTimes(2);
+    expect(
+      lookup.cachedSearchResults({
+        searchText: "same words",
+        fields: ["email"],
+      }),
+    ).toEqual([{ value: "email", label: "email" }]);
+    expect(
+      lookup.cachedSearchResults({
+        searchText: "same words",
+        fields: ["accountNumber"],
+      }),
+    ).toEqual([{ value: "accountNumber", label: "accountNumber" }]);
   });
 
   it("loads again when the same words ask for a different page size", async () => {

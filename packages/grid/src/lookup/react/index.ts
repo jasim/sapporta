@@ -11,29 +11,36 @@ const EMPTY_LOOKUP_ENTRIES: readonly LookupEntry[] = [];
 
 export function useLookupSearchResults<
   TValue extends LookupValue = LookupValue,
+  TMeta = unknown,
 >(
-  searchLookup: SearchLookup<TValue> | undefined,
+  searchLookup: SearchLookup<TValue, TMeta> | undefined,
   searchText: string,
   limit: number,
-): readonly LookupEntry<TValue>[] {
+  fields?: readonly string[],
+): readonly LookupEntry<TValue, TMeta>[] {
+  const fieldsKey = lookupFieldsKey(fields);
+
   useEffect(() => {
     if (!searchLookup) return;
-    void searchLookup.loadSearchResults({ searchText, limit });
-  }, [searchLookup, searchText, limit]);
+    void searchLookup.loadSearchResults({ searchText, limit, fields });
+  }, [searchLookup, searchText, limit, fieldsKey]);
 
   return useSyncExternalStore(
     (listener) =>
       searchLookup?.subscribeToLookupChanges(listener) ?? subscribeNoop,
     () =>
-      searchLookup?.cachedSearchResults({ searchText }) ??
-      (EMPTY_LOOKUP_ENTRIES as readonly LookupEntry<TValue>[]),
+      searchLookup?.cachedSearchResults({ searchText, fields }) ??
+      (EMPTY_LOOKUP_ENTRIES as readonly LookupEntry<TValue, TMeta>[]),
   );
 }
 
-export function useLookupValueLabels(
-  valueLookup: ValueLookup | undefined,
-  values: readonly LookupValue[],
-): { labelFor(value: LookupValue): string | null } {
+export function useLookupValueEntries<
+  TValue extends LookupValue = LookupValue,
+  TMeta = unknown,
+>(
+  valueLookup: ValueLookup<TValue, TMeta> | undefined,
+  values: readonly TValue[],
+): readonly (LookupEntry<TValue, TMeta> | undefined)[] {
   const valueKey = lookupValuesKey(values);
 
   useEffect(() => {
@@ -41,66 +48,95 @@ export function useLookupValueLabels(
     void valueLookup.loadMissingEntries(values);
   }, [valueLookup, valueKey]);
 
-  const snapshot = useSyncExternalStore(
+  const getSnapshot = useMemo(() => {
+    let previous: readonly (LookupEntry<TValue, TMeta> | undefined)[] = [];
+    return () => {
+      const next = values.map((value) => valueLookup?.entryForValue(value));
+      if (
+        next.length === previous.length &&
+        next.every((entry, index) => entry === previous[index])
+      ) {
+        return previous;
+      }
+      previous = next;
+      return next;
+    };
+  }, [valueKey, valueLookup]);
+
+  return useSyncExternalStore(
     (listener) =>
       valueLookup?.subscribeToLookupChanges(listener) ?? subscribeNoop,
-    () =>
-      values
-        .map(
-          (value) =>
-            `${lookupValueKey(value)}\u0000${
-              valueLookup?.entryForValue(value)?.label ?? ""
-            }`,
-        )
-        .join("\u0001"),
+    getSnapshot,
   );
+}
+
+export function useLookupValueLabels<
+  TValue extends LookupValue = LookupValue,
+  TMeta = unknown,
+>(
+  valueLookup: ValueLookup<TValue, TMeta> | undefined,
+  values: readonly TValue[],
+): { labelFor(value: TValue): string | null } {
+  const entries = useLookupValueEntries(valueLookup, values);
+  const valueKey = lookupValuesKey(values);
 
   return useMemo(() => {
-    void snapshot;
+    void entries;
     return {
-      labelFor(value: LookupValue): string | null {
+      labelFor(value: TValue): string | null {
         return valueLookup?.entryForValue(value)?.label ?? null;
       },
     };
-  }, [snapshot, valueKey, valueLookup]);
+  }, [entries, valueKey, valueLookup]);
 }
 
-export function useLookupOptions(args: {
-  valueLookup: ValueLookup | undefined;
-  searchLookup: SearchLookup | undefined;
-  selectedValues: readonly LookupValue[];
+export function useLookupOptions<
+  TValue extends LookupValue = LookupValue,
+  TMeta = unknown,
+>(args: {
+  valueLookup: ValueLookup<TValue, TMeta> | undefined;
+  searchLookup: SearchLookup<TValue, TMeta> | undefined;
+  selectedValues: readonly TValue[];
   searchText: string;
   limit: number;
-}): readonly LookupEntry[] {
+  fields?: readonly string[];
+}): readonly LookupEntry<TValue, TMeta>[] {
   const searchEntries = useLookupSearchResults(
     args.searchLookup,
     args.searchText,
     args.limit,
+    args.fields,
   );
-  const selectedLabels = useLookupValueLabels(
+  const selectedEntries = useLookupValueEntries(
     args.valueLookup,
     args.selectedValues,
   );
   const selectedKey = lookupValuesKey(args.selectedValues);
 
   return useMemo(() => {
-    const byValue = new Map<string, LookupEntry>();
-    for (const value of args.selectedValues) {
+    const byValue = new Map<string, LookupEntry<TValue, TMeta>>();
+    for (const [index, value] of args.selectedValues.entries()) {
       const key = lookupValueKey(value);
-      byValue.set(key, {
-        value,
-        label: selectedLabels.labelFor(value) ?? String(value),
-      });
+      byValue.set(
+        key,
+        selectedEntries[index] ?? { value, label: String(value) },
+      );
     }
     for (const entry of searchEntries) {
       byValue.set(lookupValueKey(entry.value), entry);
     }
     return Array.from(byValue.values());
-  }, [args.selectedValues, searchEntries, selectedKey, selectedLabels]);
+  }, [args.selectedValues, searchEntries, selectedEntries, selectedKey]);
 }
 
 function lookupValuesKey(values: readonly LookupValue[]): string {
   return values.map(lookupValueKey).join("\u0000");
+}
+
+function lookupFieldsKey(fields: readonly string[] | undefined): string {
+  return Array.from(new Set(fields ?? []))
+    .sort()
+    .join("\u0000");
 }
 
 function subscribeNoop(): void {}

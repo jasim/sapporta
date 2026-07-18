@@ -12,27 +12,33 @@ export function lookupValueEquals(a: LookupValue, b: LookupValue): boolean {
   return lookupValueKey(a) === lookupValueKey(b);
 }
 
-export type LookupEntry<TValue extends LookupValue = LookupValue> = {
+export type LookupEntry<
+  TValue extends LookupValue = LookupValue,
+  TMeta = unknown,
+> = {
   value: TValue;
   label: string;
   description?: string;
   disabled?: boolean;
-  meta?: unknown;
+  /** Source data available to custom lookup item renderers. */
+  meta?: TMeta;
 };
 
 export type LookupSubscription = {
   subscribeToLookupChanges(listener: () => void): () => void;
 };
 
-export type ValueLookup<TValue extends LookupValue = LookupValue> =
-  LookupSubscription & {
-    entryForValue(value: unknown): LookupEntry<TValue> | undefined;
-    loadMissingEntries(values: readonly unknown[]): Promise<void>;
-  };
+export type ValueLookup<
+  TValue extends LookupValue = LookupValue,
+  TMeta = unknown,
+> = LookupSubscription & {
+  entryForValue(value: unknown): LookupEntry<TValue, TMeta> | undefined;
+  loadMissingEntries(values: readonly unknown[]): Promise<void>;
+};
 
-type LoadEntriesForValues<TValue extends LookupValue> = (
+type LoadEntriesForValues<TValue extends LookupValue, TMeta> = (
   values: readonly TValue[],
-) => Promise<readonly LookupEntry<TValue>[]>;
+) => Promise<readonly LookupEntry<TValue, TMeta>[]>;
 
 type ValueRequest<TValue extends LookupValue> = {
   key: string;
@@ -74,11 +80,14 @@ function uniqueSortedValueRequests<TValue extends LookupValue>(
 // subscriptions. An in-flight request that resolves after every listener has
 // unsubscribed simply stores its entries and notifies an empty listener set —
 // a no-op. The cache remains usable if a new subscriber attaches later.
-class ValueLookupStore<TValue extends LookupValue> {
-  protected readonly entriesByValue = new Map<string, LookupEntry<TValue>>();
+class ValueLookupStore<TValue extends LookupValue, TMeta> {
+  protected readonly entriesByValue = new Map<
+    string,
+    LookupEntry<TValue, TMeta>
+  >();
   private readonly listeners = new Set<() => void>();
 
-  entryForValue(value: unknown): LookupEntry<TValue> | undefined {
+  entryForValue(value: unknown): LookupEntry<TValue, TMeta> | undefined {
     const key = valueKey(value);
     return key === undefined ? undefined : this.entriesByValue.get(key);
   }
@@ -90,7 +99,9 @@ class ValueLookupStore<TValue extends LookupValue> {
     };
   }
 
-  protected setEntries(entries: readonly LookupEntry<TValue>[]): boolean {
+  protected setEntries(
+    entries: readonly LookupEntry<TValue, TMeta>[],
+  ): boolean {
     let changed = false;
     for (const entry of entries) {
       const key = valueKey(entry.value);
@@ -108,11 +119,14 @@ class ValueLookupStore<TValue extends LookupValue> {
   }
 }
 
-export class StaticValueLookup<TValue extends LookupValue = LookupValue>
-  extends ValueLookupStore<TValue>
-  implements ValueLookup<TValue>
+export class StaticValueLookup<
+  TValue extends LookupValue = LookupValue,
+  TMeta = unknown,
+>
+  extends ValueLookupStore<TValue, TMeta>
+  implements ValueLookup<TValue, TMeta>
 {
-  constructor(entries: readonly LookupEntry<TValue>[]) {
+  constructor(entries: readonly LookupEntry<TValue, TMeta>[]) {
     super();
     this.setEntries(entries);
   }
@@ -123,8 +137,8 @@ export class StaticValueLookup<TValue extends LookupValue = LookupValue>
 }
 
 export class RecordValueLookup
-  extends StaticValueLookup<string>
-  implements ValueLookup<string>
+  extends StaticValueLookup<string, unknown>
+  implements ValueLookup<string, unknown>
 {
   constructor(labelsByValue: Record<string, string>) {
     super(
@@ -133,14 +147,19 @@ export class RecordValueLookup
   }
 }
 
-export class CachedValueLookup<TValue extends LookupValue = LookupValue>
-  extends ValueLookupStore<TValue>
-  implements ValueLookup<TValue>
+export class CachedValueLookup<
+  TValue extends LookupValue = LookupValue,
+  TMeta = unknown,
+>
+  extends ValueLookupStore<TValue, TMeta>
+  implements ValueLookup<TValue, TMeta>
 {
-  private readonly loadEntriesForValues: LoadEntriesForValues<TValue>;
+  private readonly loadEntriesForValues: LoadEntriesForValues<TValue, TMeta>;
   private readonly loadingEntriesByValueKey = new Map<string, Promise<void>>();
 
-  constructor(args: { loadEntriesForValues: LoadEntriesForValues<TValue> }) {
+  constructor(args: {
+    loadEntriesForValues: LoadEntriesForValues<TValue, TMeta>;
+  }) {
     super();
     this.loadEntriesForValues = args.loadEntriesForValues;
   }

@@ -1,7 +1,10 @@
 import type { SearchLookup } from "./cache/search-lookup";
-import type { ValueLookup } from "./cache/value-lookup";
+import type { LookupValue, ValueLookup } from "./cache/value-lookup";
 
-export type LookupCapabilities = {
-  valueLookup: ValueLookup;
-  searchLookup?: SearchLookup;
+export type LookupCapabilities<
+  TValue extends LookupValue = LookupValue,
+  TMeta = unknown,
+> = {
+  valueLookup: ValueLookup<TValue, TMeta>;
+  searchLookup?: SearchLookup<TValue, TMeta>;
 };
