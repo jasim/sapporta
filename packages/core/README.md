@@ -227,6 +227,41 @@ Each namespace has a distinct prefix — route ordering no longer matters.
 - **Lookup**: `GET /api/tables/{table}/_lookup`
 - **Route-based reports**: app-owned contracts such as `GET /api/reports/trial-balance`
 
+### Table Zod Boundaries
+
+Use `tableApiZod` when composing a contract for generated table API values:
+
+```ts
+import { tableApiZod } from "@sapporta/server";
+
+const insert = tableApiZod.forInsert(invoices, tables);
+const patch = tableApiZod.forPatch(invoices, tables);
+const response = z.object({ data: tableApiZod.forRow(invoices) });
+```
+
+`forInsert()` describes one caller-supplied row, not an array or a create
+envelope. Generated routes compose arrays and master-detail bodies separately.
+Columns with `apiWritable: false`, references with `apiSettable: false`,
+generated primary keys, and auth-owned scope fields are excluded.
+
+Use `tableWriteZod` for trusted values at the save boundary:
+
+```ts
+import { tableWriteZod } from "@sapporta/server";
+
+const writeZod =
+  operation === "insert"
+    ? tableWriteZod.forInsert(invoices)
+    : tableWriteZod.forPatch(invoices);
+const result = writeZod.safeParse(record);
+```
+
+These schemas include server-authored structural columns. `parseTableWrite()`
+adds application validation after structural parsing and returns the parsed,
+canonical value that is passed to Drizzle. For one column's canonical value
+behavior, use `zodForColumnValue(table, column)`; use
+`getColumnEnumValues(column)` to read the column's Drizzle enum declaration.
+
 ## Core Modules
 
 - **Table definition**: `sapportaTable()` in `src/schema/table.ts` wraps Drizzle `sqliteTable` with Sapporta metadata
@@ -234,7 +269,7 @@ Each namespace has a distinct prefix — route ordering no longer matters.
 - **Migrations**: native Drizzle Kit `generate` and `migrate`; Sapporta only checks readiness at boot
 - **Meta API**: `mount-meta.ts` mounts schema introspection, DB introspection, and the SQL proxy
 - **Tables API**: `tables-api.ts` — parametric `/:tableName` table-operation routing with runtime table registration
-- **Enums**: SQLite has no native enum type. Use `text()` columns with `meta.selects` for dropdown/validation support.
+- **Selects**: declare allowed values once with `select("status", ["draft", "paid"] as const)`, or use Drizzle `text("status", { enum: [...] })` directly. The same column values drive validation, OpenAPI, and dropdown metadata.
 - **Imports**: `@sapporta/server/table`, `@sapporta/server/runtime`, `@sapporta/server/view`, etc. (via package.json exports)
 
 ## Custom Views — Backend

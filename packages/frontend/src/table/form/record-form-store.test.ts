@@ -1,7 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { TableSchema } from "@sapporta/shared/contracts";
 import {
-  compactRecordFormValues,
   createRecordFormStore,
   initialRecordFormValues,
 } from "./record-form-store";
@@ -13,13 +12,29 @@ const PRODUCTS_SCHEMA: TableSchema = {
   rowLabelColumns: ["name"],
   children: [],
   columns: [
-    { name: "id", label: "ID", primary: true, hasDefault: true },
-    { name: "sku", label: "SKU", notNull: true },
-    { name: "name", label: "Name", notNull: true },
-    { name: "is_active", label: "Is active" },
-    { name: "workspace_id", label: "Workspace", notNull: true },
-    { name: "scoped_to_user_id", label: "Scoped to user", notNull: true },
-    { name: "server_owned_id", label: "Server owned", clientEditable: false },
+    {
+      name: "id",
+      label: "ID",
+      kind: "number",
+      primary: true,
+      hasDefault: true,
+    },
+    { name: "sku", label: "SKU", kind: "text", notNull: true },
+    { name: "name", label: "Name", kind: "text", notNull: true },
+    { name: "is_active", label: "Is active", kind: "boolean" },
+    { name: "workspace_id", label: "Workspace", kind: "text", notNull: true },
+    {
+      name: "scoped_to_user_id",
+      label: "Scoped to user",
+      kind: "text",
+      notNull: true,
+    },
+    {
+      name: "server_owned_id",
+      label: "Server owned",
+      kind: "text",
+      apiWritable: false,
+    },
   ],
 };
 
@@ -30,8 +45,14 @@ const CATEGORIES_SCHEMA: TableSchema = {
   rowLabelColumns: ["name"],
   children: [],
   columns: [
-    { name: "id", label: "ID", primary: true, hasDefault: true },
-    { name: "name", label: "Name", notNull: true },
+    {
+      name: "id",
+      label: "ID",
+      kind: "number",
+      primary: true,
+      hasDefault: true,
+    },
+    { name: "name", label: "Name", kind: "text", notNull: true },
   ],
 };
 
@@ -66,21 +87,15 @@ describe("record form store", () => {
     expect(store.getState().values).toEqual({ name: null });
   });
 
-  it("compacts only nullish values before submit", () => {
-    expect(
-      compactRecordFormValues({
-        sku: "A-1",
-        name: "",
-        is_active: false,
-        reorder_point: 0,
-        notes: null,
-        lead_time_days: undefined,
-      }),
-    ).toEqual({
-      sku: "A-1",
-      name: "",
-      is_active: false,
-      reorder_point: 0,
-    });
+  it("clears a field issue without losing other issues when its draft changes", () => {
+    const store = createRecordFormStore(PRODUCTS_SCHEMA);
+    store.getState().setIssues([
+      { field: "sku", message: "SKU is required." },
+      { field: "name", message: "Name is required." },
+    ]);
+
+    store.getState().setValue("sku", "A-1");
+
+    expect(store.getState().issues).toEqual({ name: "Name is required." });
   });
 });

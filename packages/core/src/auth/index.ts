@@ -53,15 +53,15 @@ export {
 } from "./row-scope.js";
 
 export {
-  AuthPayloadPolicyError,
+  ApiWritePolicyError,
   AuthSchemaValidationError,
   assertAuthSchemaDefinitions,
   checkAuthSchemaDefinitions,
-  clientPayloadPolicyIssues,
+  apiWritePolicyIssues,
   requireResolvedTableReferences,
   resolveTableReferences,
   trustedInsertValuesForDataAuthority,
-  validateClientPayloadPolicy,
+  validateApiWriteInput,
   type AuthSchemaIssue,
   type AuthSchemaIssueCode,
   type ReferenceResolutionResult,

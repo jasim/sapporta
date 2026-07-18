@@ -8,18 +8,29 @@ export { NewRecordPage } from "./form/NewRecordPage";
 export { RecordFormField } from "./form/RecordFormField";
 export {
   RecordFormProvider,
+  useRecordFieldIssue,
   useRecordFieldValue,
   useRecordFormSetValue,
   useRecordFormStore,
 } from "./form/RecordFormProvider";
 export {
-  compactRecordFormValues,
   createRecordFormStore,
   initialRecordFormValues,
   type RecordFormState,
   type RecordFormStore,
   type RecordFormValues,
 } from "./form/record-form-store";
+export {
+  parseCreateDraft,
+  type CreateDraftIssue,
+  type ParseCreateDraftResult,
+} from "./form/parse-create-draft";
+export {
+  decodeTableValueDraft,
+  parseTablePatchValueDraft,
+  type TablePatchValueDraftParseResult,
+  type TableValueDraftDecodeResult,
+} from "./model/table-value-draft";
 export {
   buildRecordFormFields,
   type RecordFormFieldModel,

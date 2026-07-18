@@ -5,7 +5,7 @@ import { createTableCatalog } from "../schema/catalog.js";
 import { sapportaTable } from "../schema/table.js";
 import { createTestDb } from "../testing/test-utils.js";
 import {
-  AuthPayloadPolicyError,
+  ApiWritePolicyError,
   createAuthContext,
   createRowSecurity,
   lookupRowAccessPredicate,
@@ -304,7 +304,7 @@ describe("foreign-key auth validation", () => {
         { customer_id: "customer-2" },
         [customers, orders],
       ),
-    ).rejects.toThrow(AuthPayloadPolicyError);
+    ).rejects.toThrow(ApiWritePolicyError);
   });
 
   it("rejects current-user-invisible FK values", async () => {
@@ -331,7 +331,7 @@ describe("foreign-key auth validation", () => {
         { doc_id: "doc-2" },
         [privateDocs, orders],
       ),
-    ).rejects.toThrow(AuthPayloadPolicyError);
+    ).rejects.toThrow(ApiWritePolicyError);
   });
 
   it("passes valid workspace and system-global FK values", async () => {
@@ -365,7 +365,7 @@ describe("foreign-key auth validation", () => {
     ).resolves.toBeUndefined();
   });
 
-  it("rejects clientCanSet false before validating target rows", async () => {
+  it("rejects apiSettable false before validating target rows", async () => {
     const orders = sapportaTable({
       drizzle: sqliteTable("orders", {
         id: integer("id").primaryKey({ autoIncrement: true }),
@@ -376,7 +376,7 @@ describe("foreign-key auth validation", () => {
       meta: {
         rowScope: "workspaceUserScoped",
         rowLabelColumns: ["id"],
-        references: { country_id: { table: "countries", clientCanSet: false } },
+        references: { country_id: { table: "countries", apiSettable: false } },
       },
     });
     const { db } = dbWithReferenceRows();
@@ -478,7 +478,7 @@ describe("row-security guards", () => {
     });
     expect(() =>
       guard.ensureOwnership({ label: "Bad", workspace_id: "workspace-2" }),
-    ).toThrow(AuthPayloadPolicyError);
+    ).toThrow(ApiWritePolicyError);
   });
 
   it("prepares insert values by rejecting client ownership and stamping trusted ownership", async () => {
@@ -489,7 +489,7 @@ describe("row-security guards", () => {
 
     await expect(
       guard.insertValues(db, { label: "Bad", workspace_id: "workspace-2" }),
-    ).rejects.toThrow(AuthPayloadPolicyError);
+    ).rejects.toThrow(ApiWritePolicyError);
 
     await expect(guard.insertValues(db, { label: "New" })).resolves.toEqual({
       label: "New",
@@ -506,7 +506,7 @@ describe("row-security guards", () => {
 
     await expect(
       guard.patchValues(db, { label: "Bad", scoped_to_user_id: "user-2" }),
-    ).rejects.toThrow(AuthPayloadPolicyError);
+    ).rejects.toThrow(ApiWritePolicyError);
     await expect(guard.patchValues(db, { label: "Updated" })).resolves.toEqual({
       label: "Updated",
     });
@@ -542,7 +542,7 @@ describe("row-security guards", () => {
     expect(rows.map((row) => row.label)).toEqual(["mine"]);
   });
 
-  it("rejects client-submitted non-client-settable references", async () => {
+  it("rejects API-submitted non-API-settable references", async () => {
     const orders = sapportaTable({
       drizzle: sqliteTable("orders", {
         id: integer("id").primaryKey({ autoIncrement: true }),
@@ -553,7 +553,7 @@ describe("row-security guards", () => {
       meta: {
         rowScope: "workspaceUserScoped",
         rowLabelColumns: ["id"],
-        references: { country_id: { table: "countries", clientCanSet: false } },
+        references: { country_id: { table: "countries", apiSettable: false } },
       },
     });
     const { db } = dbWithReferenceRows();
@@ -579,7 +579,7 @@ describe("row-security guards", () => {
       meta: {
         rowScope: "workspaceUserScoped",
         rowLabelColumns: ["id"],
-        references: { invoice_id: { table: "invoices", clientCanSet: false } },
+        references: { invoice_id: { table: "invoices", apiSettable: false } },
       },
     });
     const { db } = dbWithReferenceRows();

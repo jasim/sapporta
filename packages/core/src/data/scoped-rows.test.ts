@@ -13,7 +13,9 @@ import {
 const accountsTable = sqliteTable("accounts", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   name: text("name").notNull(),
-  type: text("type").notNull(),
+  type: text("type", {
+    enum: ["asset", "liability", "equity", "revenue", "expense"],
+  }).notNull(),
   balance: integer("balance"),
 });
 
@@ -22,13 +24,6 @@ const accounts = sapportaTable({
   meta: {
     rowScope: "systemGlobal",
     rowLabelColumns: ["name"],
-    selects: [
-      {
-        type: "select",
-        column: "type",
-        options: ["asset", "liability", "equity", "revenue", "expense"],
-      },
-    ],
   },
 });
 
@@ -61,6 +56,42 @@ describe("scopedRows", () => {
       id: 1,
       name: "Cash",
       type: "asset",
+    });
+  });
+
+  it("enforces apiWritable as server write policy", async () => {
+    const privateAccounts = sapportaTable({
+      drizzle: accountsTable,
+      meta: {
+        rowScope: "systemGlobal",
+        rowLabelColumns: ["name"],
+        columns: { balance: { apiWritable: false } },
+      },
+    });
+    const { db, sqlite } = createTestDb();
+    sqlite.exec(`
+      CREATE TABLE accounts (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        type TEXT NOT NULL,
+        balance INTEGER
+      )
+    `);
+    const rows = scopedRows(
+      db,
+      createTestAuthContext({ tables: [privateAccounts] }),
+      privateAccounts,
+    );
+
+    await expect(
+      rows.create({ name: "Cash", type: "asset", balance: 100 }),
+    ).rejects.toMatchObject({
+      errors: [
+        {
+          field: "balance",
+          message: "This field is not writable through the table API.",
+        },
+      ],
     });
   });
 

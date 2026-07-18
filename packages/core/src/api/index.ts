@@ -31,7 +31,7 @@ export type {
 } from "@sapporta/rest-core";
 
 export * from "@sapporta/honest";
-export * from "./table-contracts.js";
+export * from "./table-api-contracts.js";
 export * from "./mount-tables.js";
 export * from "./table-handlers.js";
 export * from "./mount-meta.js";

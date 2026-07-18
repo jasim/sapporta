@@ -1,6 +1,7 @@
 import type { TableDef } from "./table.js";
 import { normalizeDataType } from "./normalize-datatype.js";
 import type { ValueKind } from "@sapporta/shared/value-kind";
+import { getTableConfig } from "drizzle-orm/sqlite-core";
 
 /**
  * Resolve a column's declared `ValueKind`.
@@ -8,6 +9,11 @@ import type { ValueKind } from "@sapporta/shared/value-kind";
  * Factory-declared columns carry `kind` in `meta.columns[col].kind`.
  * Hand-declared Drizzle columns derive `ValueKind` from the dialect-normalized
  * data type, keeping raw Drizzle schemas a supported declaration style.
+ *
+ * This function is the semantic kind authority for server validation, query
+ * behavior, and emitted frontend metadata. `normalizeDataType()` is used only
+ * as the fallback implementation for raw Drizzle columns; consumers do not
+ * maintain independent storage-type-to-kind mappings.
  *
  * Returns `undefined` only when the column name is not on the table.
  */
@@ -18,12 +24,10 @@ export function resolveColumnKind(
   const declared = schema.meta.columns[column]?.kind;
   if (declared) return declared;
 
-  const cols = schema.drizzle as unknown as Record<
-    string,
-    { columnType?: string; dataType?: string } | undefined
-  >;
-  const col = cols[column];
-  if (!col || !col.columnType || !col.dataType) return undefined;
+  const col = getTableConfig(schema.drizzle).columns.find(
+    (candidate) => candidate.name === column,
+  );
+  if (!col) return undefined;
 
   const dt = normalizeDataType({
     columnType: col.columnType,

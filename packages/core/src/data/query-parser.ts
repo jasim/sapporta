@@ -19,6 +19,7 @@ import {
   type AnyColumn,
 } from "drizzle-orm";
 import type { TableDef } from "../schema/table.js";
+import { columnBySqlName } from "../auth/row-scope.js";
 import { resolveColumnKind } from "../schema/resolve-kind.js";
 import { QueryParseError } from "../db/errors.js";
 import { parseBoundedInteger } from "@sapporta/shared/validation";
@@ -268,6 +269,5 @@ function likeWithEscape(col: AnyColumn, pattern: string): SQL {
 }
 
 function findColumn(schema: TableDef, name: string): AnyColumn | null {
-  const cols = schema.drizzle as unknown as Record<string, AnyColumn>;
-  return cols[name] ?? null;
+  return columnBySqlName(schema, name);
 }

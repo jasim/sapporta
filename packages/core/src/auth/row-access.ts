@@ -4,9 +4,9 @@ import type { TableDef } from "../schema/table.js";
 import type { RequestDataAuthority } from "./request-data-authority.js";
 import { RowScopePolicyError } from "./row-scope-policy-error.js";
 import {
-  AuthPayloadPolicyError,
+  ApiWritePolicyError,
   AuthSchemaValidationError,
-  clientPayloadPolicyIssues,
+  apiWritePolicyIssues,
   requireResolvedTableReferences,
 } from "./schema-validation.js";
 import {
@@ -103,10 +103,10 @@ export interface ForeignKeyValidationOptions {
    */
   partial?: boolean;
   /**
-   * Skips client payload policy checks when the caller has already separated
-   * client-submitted fields from trusted server-authored values.
+   * Skips API write policy checks when the caller has already separated
+   * API-submitted fields from trusted server-authored values.
    */
-  skipPayloadPolicy?: boolean;
+  skipApiWritePolicy?: boolean;
 }
 
 /**
@@ -142,7 +142,7 @@ export function validateForeignKeyReferencesSync(
   options: ForeignKeyValidationOptions = {},
 ): void {
   if (!isRecord(payload)) {
-    throw new AuthPayloadPolicyError([
+    throw new ApiWritePolicyError([
       { field: "$", message: "Expected an object payload." },
     ]);
   }
@@ -151,14 +151,10 @@ export function validateForeignKeyReferencesSync(
     sourceTable,
     registeredTables,
   );
-  if (options.skipPayloadPolicy !== true) {
-    const policyIssues = clientPayloadPolicyIssues(
-      sourceTable,
-      payload,
-      references,
-    );
+  if (options.skipApiWritePolicy !== true) {
+    const policyIssues = apiWritePolicyIssues(sourceTable, payload, references);
     if (policyIssues.length > 0) {
-      throw new AuthPayloadPolicyError(policyIssues);
+      throw new ApiWritePolicyError(policyIssues);
     }
   }
 
@@ -196,7 +192,7 @@ export function validateForeignKeyReferencesSync(
   }
 
   if (validationErrors.length > 0) {
-    throw new AuthPayloadPolicyError(validationErrors);
+    throw new ApiWritePolicyError(validationErrors);
   }
 }
 

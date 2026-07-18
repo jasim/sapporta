@@ -1,119 +1,125 @@
-import { describe, it, expect } from "vitest";
-import { sqliteTable, text, integer } from "drizzle-orm/sqlite-core";
-import { z } from "zod";
-import { sapportaTable, timestamp } from "../schema/table.js";
-import { validate, buildZodSchema } from "./validate.js";
-import { Temporal } from "@sapporta/shared/temporal";
+import { describe, expect, expectTypeOf, it, vi } from "vitest";
+import { integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
+import { money, sapportaTable, select, timestamp } from "../schema/table.js";
+import { parseTableWrite } from "./validate.js";
 
-describe("buildZodSchema()", () => {
-  it("infers string fields as required", () => {
-    const schema = sapportaTable({
-      drizzle: sqliteTable("test_strings", {
+const statuses = ["draft", "posted"] as const;
+
+describe("parseTableWrite", () => {
+  it("applies required, defaulted, nullable, select, and finite-number structure", () => {
+    const table = sapportaTable({
+      drizzle: sqliteTable("invoices", {
         id: integer("id").primaryKey({ autoIncrement: true }),
-        name: text("name").notNull(),
-      }),
-      meta: { rowLabelColumns: ["name"] },
-    });
-
-    const zodSchema = buildZodSchema(schema);
-    expect(zodSchema.safeParse({ name: "hello" }).success).toBe(true);
-    expect(zodSchema.safeParse({}).success).toBe(false);
-    expect(zodSchema.safeParse({ name: 123 }).success).toBe(false);
-  });
-
-  it("makes nullable columns nullable", () => {
-    const schema = sapportaTable({
-      drizzle: sqliteTable("test_nullable", {
-        id: integer("id").primaryKey({ autoIncrement: true }),
+        number: text("number").notNull(),
+        status: select("status", statuses).notNull(),
+        total: money("total").notNull(),
         notes: text("notes"),
       }),
-      meta: { rowLabelColumns: ["notes"] },
+      meta: { rowLabelColumns: ["number"], rowScope: "systemGlobal" },
     });
 
-    const zodSchema = buildZodSchema(schema);
-    expect(zodSchema.safeParse({ notes: null }).success).toBe(true);
-    expect(zodSchema.safeParse({ notes: "hello" }).success).toBe(true);
-  });
-
-  it("makes columns with defaults optional", () => {
-    const schema = sapportaTable({
-      drizzle: sqliteTable("test_defaults", {
-        id: integer("id").primaryKey({ autoIncrement: true }),
-        created_at: timestamp("created_at")
-          .notNull()
-          .$defaultFn(() => Temporal.Now.instant()),
-      }),
-      meta: { rowLabelColumns: ["id"] },
+    expect(
+      parseTableWrite(
+        table,
+        { number: "INV-1", status: "draft", total: 12.5, notes: null },
+        "insert",
+      ),
+    ).toMatchObject({ success: true });
+    expect(parseTableWrite(table, {}, "insert")).toMatchObject({
+      success: false,
     });
-
-    const zodSchema = buildZodSchema(schema);
-    // created_at has a default, so it should be optional
-    expect(zodSchema.safeParse({}).success).toBe(true);
+    expect(
+      parseTableWrite(
+        table,
+        { number: "INV-1", status: "unknown", total: 12.5 },
+        "insert",
+      ),
+    ).toMatchObject({ success: false });
+    expect(
+      parseTableWrite(
+        table,
+        { number: "INV-1", status: "draft", total: Number.POSITIVE_INFINITY },
+        "insert",
+      ),
+    ).toMatchObject({ success: false });
   });
 
-  it("validates select options", () => {
-    const schema = sapportaTable({
-      drizzle: sqliteTable("test_selects", {
+  it("uses patch semantics and reports the operation to application validation", () => {
+    const operations: string[] = [];
+    const table = sapportaTable({
+      drizzle: sqliteTable("patch_invoices", {
         id: integer("id").primaryKey({ autoIncrement: true }),
-        status: text("status").notNull(),
+        number: text("number").notNull(),
+        totalAmount: money("total_amount").notNull(),
       }),
-      meta: {
-        rowLabelColumns: ["status"],
-        selects: [
-          { type: "select", column: "status", options: ["active", "inactive"] },
-        ],
+      meta: { rowLabelColumns: ["number"], rowScope: "systemGlobal" },
+      validate(value, context) {
+        expectTypeOf(value.total_amount).toEqualTypeOf<number | undefined>();
+        operations.push(context.operation);
       },
     });
 
-    const zodSchema = buildZodSchema(schema);
-    expect(zodSchema.safeParse({ status: "active" }).success).toBe(true);
-    expect(zodSchema.safeParse({ status: "invalid" }).success).toBe(false);
+    expect(parseTableWrite(table, { total_amount: 20 }, "patch")).toEqual({
+      success: true,
+      data: { total_amount: 20 },
+    });
+    expect(
+      parseTableWrite(table, { total_amount: "20" }, "patch"),
+    ).toMatchObject({ success: false });
+    expect(operations).toEqual(["patch"]);
   });
 
-  it("uses user-provided validation schema", () => {
-    const customSchema = z.object({
-      name: z.string().min(3),
-    });
-
-    const schema = sapportaTable({
-      drizzle: sqliteTable("test_custom", {
+  it("composes application issues after structure and cannot weaken other fields", () => {
+    const validateCall = vi.fn();
+    const table = sapportaTable({
+      drizzle: sqliteTable("validated_invoices", {
         id: integer("id").primaryKey({ autoIncrement: true }),
         name: text("name").notNull(),
+        total: money("total").notNull(),
       }),
-      meta: { rowLabelColumns: ["name"], validation: customSchema },
+      meta: { rowLabelColumns: ["name"], rowScope: "systemGlobal" },
+      validate(value, context) {
+        validateCall();
+        if (context.operation === "insert" && value.total === 0) {
+          context.addIssue("total", "Total must be greater than zero.");
+        }
+      },
     });
 
-    const zodSchema = buildZodSchema(schema);
-    expect(zodSchema.safeParse({ name: "ab" }).success).toBe(false);
-    expect(zodSchema.safeParse({ name: "abc" }).success).toBe(true);
-  });
-});
-
-describe("validate()", () => {
-  it("returns empty array for valid records", () => {
-    const schema = sapportaTable({
-      drizzle: sqliteTable("test_valid", {
-        id: integer("id").primaryKey({ autoIncrement: true }),
-        name: text("name").notNull(),
-      }),
-      meta: { rowLabelColumns: ["name"] },
+    expect(
+      parseTableWrite(table, { name: "INV-1", total: 0 }, "insert"),
+    ).toEqual({
+      success: false,
+      issues: [{ field: "total", message: "Total must be greater than zero." }],
     });
-
-    expect(validate(schema, { name: "hello" })).toEqual([]);
+    expect(
+      parseTableWrite(table, { name: 123, total: 1 }, "insert"),
+    ).toMatchObject({ success: false });
+    expect(validateCall).toHaveBeenCalledTimes(1);
   });
 
-  it("returns field errors for invalid records", () => {
-    const schema = sapportaTable({
-      drizzle: sqliteTable("test_invalid", {
+  it("returns canonical Temporal transform output", () => {
+    const table = sapportaTable({
+      drizzle: sqliteTable("events", {
         id: integer("id").primaryKey({ autoIncrement: true }),
         name: text("name").notNull(),
-        count: integer("count").notNull(),
+        starts_at: timestamp("starts_at").notNull(),
       }),
-      meta: { rowLabelColumns: ["name"] },
+      meta: { rowLabelColumns: ["name"], rowScope: "systemGlobal" },
+      validate(value) {
+        expectTypeOf(value.starts_at).toEqualTypeOf<string | undefined>();
+      },
     });
 
-    const errors = validate(schema, {});
-    expect(errors.length).toBeGreaterThan(0);
-    expect(errors.some((e) => e.field === "name")).toBe(true);
+    expect(
+      parseTableWrite(
+        table,
+        { name: "Launch", starts_at: "2026-07-18T10:30:45.999+05:30" },
+        "insert",
+      ),
+    ).toEqual({
+      success: true,
+      data: { name: "Launch", starts_at: "2026-07-18T05:00:45Z" },
+    });
   });
 });

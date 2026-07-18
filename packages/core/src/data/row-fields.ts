@@ -20,15 +20,27 @@ type RowField = {
   column: SQLiteColumn;
 };
 
-/** A validated set of public row fields and their database columns. */
+/**
+ * A validated translation between Sapporta's public SQL names and Drizzle's
+ * TypeScript property names for a selected set of fields.
+ */
 export type ResolvedRowFields = {
   databaseSelection: Record<string, SQLiteColumn>;
   pick(row: Readonly<Record<string, unknown>>): Record<string, unknown>;
+  toDatabaseValues(
+    row: Readonly<Record<string, unknown>>,
+  ): Record<string, unknown>;
 };
 
 /**
- * Resolves public field names once so database selections and returned rows use
- * the same names even when the table uses different TypeScript property names.
+ * Resolves public field names once so queries, writes, and returned rows agree.
+ *
+ * Application payloads, generated API schemas, metadata, validation issues,
+ * filters, and row objects use SQL column names such as `workspace_id`.
+ * Drizzle may expose that column through a property such as `workspaceId`.
+ * This helper is the translation seam. Unknown public names fail explicitly,
+ * selections are aliased to public names, write objects use Drizzle properties,
+ * and returned rows are projected back to SQL names.
  */
 export function resolveRowFields(
   table: TableDef,
@@ -72,6 +84,13 @@ export function resolveRowFields(
             ? row[field.publicName]
             : row[field.rowKey],
         ]),
+      );
+    },
+    toDatabaseValues(row) {
+      return Object.fromEntries(
+        fields
+          .filter((field) => Object.hasOwn(row, field.publicName))
+          .map((field) => [field.rowKey, row[field.publicName]]),
       );
     },
   };

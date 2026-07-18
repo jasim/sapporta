@@ -26,13 +26,6 @@ export const accounts = sapportaTable({
   meta: {
     label: "Accounts",
     rowLabelColumns: ["name"],
-    selects: [
-      {
-        type: "select",
-        column: "account_type",
-        options: [...accountTypeOptions],
-      },
-    ],
   },
 });
 

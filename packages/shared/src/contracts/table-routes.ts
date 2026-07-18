@@ -64,7 +64,7 @@ export const createRowRoute = c.mutation({
   method: "POST",
   path: "/tables/:tableName",
   summary: "Create a row (or rows) in any table",
-  metadata: { tags: ["tables"], skipBodyValidation: true },
+  metadata: { tags: ["tables"] },
   pathParams: tableNameParam,
   body: z.union([rowSchema, z.array(rowSchema)]),
   responses: {
@@ -80,7 +80,7 @@ export const updateRowRoute = c.mutation({
   method: "PUT",
   path: "/tables/:tableName/:id",
   summary: "Update a row by id",
-  metadata: { tags: ["tables"], skipBodyValidation: true },
+  metadata: { tags: ["tables"] },
   pathParams: tableRowParam,
   body: rowSchema,
   responses: {

@@ -496,7 +496,7 @@ describe("/api/tables table operations", () => {
       );
     });
 
-    it("rejects client-submitted ownership fields", async () => {
+    it("rejects API-submitted ownership fields", async () => {
       const res = await postJson("/api/tables/articles", {
         title: "Tamper",
         body: "Client attempted to set ownership",

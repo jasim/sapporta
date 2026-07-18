@@ -101,6 +101,18 @@ export function number(name: string) {
   return real(name);
 }
 
+/**
+ * A text column whose allowed values are declared once on the Drizzle column.
+ * Sapporta reads the same enum values for runtime validation and metadata.
+ */
+export function select<const TOptions extends readonly [string, ...string[]]>(
+  name: string,
+  options: TOptions,
+) {
+  register(name, { kind: "text" });
+  return drizzleText(name, { enum: options });
+}
+
 // ── Boolean kind ──────────────────────────────────────────────────────
 
 export function bool(name: string) {
@@ -113,9 +125,9 @@ export function bool(name: string) {
 // The factory is the only place that knows the storage dialect's string
 // form. `toDriver` serializes `Temporal.*` (or a pre-canonicalized string)
 // to the fixed-width TEXT SQLite wants; `fromDriver` reverses the string
-// back into a Temporal object. Everything between the boundary parse and
-// the driver carries Temporal objects — the dialect-isolation claim from
-// docs/DATA-TYPE-PRINCIPLES.md §4 has one concrete enforcement point here.
+// back into a Temporal object. API and write validation use canonical JSON
+// strings; direct Drizzle application code may use Temporal objects. The driver
+// accepts both inputs and enforces the same storage representation.
 
 const plainDateColumn = customType<{
   data: Temporal.PlainDate;
@@ -123,9 +135,9 @@ const plainDateColumn = customType<{
 }>({
   dataType: () => "text",
   toDriver: (value) => {
-    // Runtime tolerance: accept a pre-canonicalized ISO string (e.g. from
-    // user-submitted JSON, before the boundary parse has turned it into a
-    // Temporal). Parsing + re-serializing guarantees storage invariants.
+    // Save-boundary parsing produces canonical strings, while direct Drizzle
+    // callers use the declared Temporal type. Parsing and re-serializing string
+    // input preserves the storage invariant for both paths.
     if (typeof value === "string")
       return formatPlainDate(parsePlainDate(value));
     return formatPlainDate(value);
@@ -149,9 +161,9 @@ const instantColumn = customType<{
 /**
  * `TEXT` (ISO `YYYY-MM-DD`) + kind `"date"`. Lex order equals calendar
  * order under ISO, so `ORDER BY` needs no special casing. The Drizzle
- * `customType` wrapper handles `Temporal.PlainDate` ↔ canonical TEXT in
- * one direction each — the pipeline above this factory never sees the
- * string form.
+ * `customType` wrapper accepts canonical strings from Sapporta's save pipeline
+ * and `Temporal.PlainDate` values from direct Drizzle callers. Database reads
+ * return `Temporal.PlainDate`.
  */
 export function date(name: string) {
   register(name, { kind: "date" });

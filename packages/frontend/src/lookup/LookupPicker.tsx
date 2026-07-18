@@ -44,6 +44,8 @@ export type LookupPickerProps<
   searchLimit?: number;
   id?: string;
   className?: string;
+  ariaInvalid?: boolean;
+  ariaDescribedBy?: string;
 };
 
 export function LookupPicker<
@@ -60,6 +62,8 @@ export function LookupPicker<
   searchLimit = DEFAULT_SEARCH_LIMIT,
   id,
   className,
+  ariaInvalid,
+  ariaDescribedBy,
 }: LookupPickerProps<TValue, TMeta>) {
   const [searchText, setSearchText] = useState("");
   const selectedValues = useMemo(() => (value == null ? [] : [value]), [value]);
@@ -103,6 +107,8 @@ export function LookupPicker<
       >
         <Combobox.Input
           id={id}
+          aria-invalid={ariaInvalid || undefined}
+          aria-describedby={ariaDescribedBy}
           placeholder={placeholder}
           className={comboboxClassNames.input}
         />

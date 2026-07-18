@@ -34,6 +34,7 @@ export {
   columnPresetWidthForSizing,
   type CharacterColumnSizing,
 } from "./sizing";
+export { parseNumericInput, type NumericInputParseResult } from "./parse";
 export {
   DEFAULT_COLUMN_RESIZE_MIN_PX,
   clampColumnPixelWidth,

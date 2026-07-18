@@ -22,7 +22,7 @@ import {
   getRoute,
   listRoute,
   updateRoute,
-} from "./table-contracts.js";
+} from "./table-api-contracts.js";
 import { jsonErrorResponse } from "./error-response.js";
 
 export interface TablesDocContext {
@@ -154,7 +154,7 @@ export function mountTables<
     opName: "update",
     method: "put",
     genericPath: "/tables/:tableName/:id",
-    routeFor: (d) => updateRoute(d),
+    routeFor: (d, all) => updateRoute(d, all),
     handler: handlers.update,
   });
   registerTableFamily(api, catalog, {

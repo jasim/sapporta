@@ -10,7 +10,9 @@ export const articlesTable = sqliteTable("articles", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   title: text("title").notNull(),
   body: text("body").notNull(),
-  status: text("status").notNull(),
+  status: text("status", {
+    enum: ["draft", "published", "archived"],
+  }).notNull(),
   workspace_id: text("workspace_id").notNull(),
   scoped_to_user_id: text("scoped_to_user_id").notNull(),
   created_at: timestamp("created_at"),
@@ -23,13 +25,6 @@ export const articles = sapportaTable({
     label: "Articles",
     rowScope: "workspaceUserScoped",
     rowLabelColumns: ["title"],
-    selects: [
-      {
-        type: "select",
-        column: "status",
-        options: ["draft", "published", "archived"],
-      },
-    ],
     search: { columns: ["title", "body"] },
   },
 });

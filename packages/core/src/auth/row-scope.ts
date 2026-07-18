@@ -30,8 +30,8 @@ export interface ReferenceRule {
   table: string;
   /** Target column SQL name. Defaults to the target table primary key. */
   column?: string;
-  /** When false, clients may not submit this FK column on create/update. */
-  clientCanSet?: boolean;
+  /** When false, table API callers may not submit this FK on create/update. */
+  apiSettable?: boolean;
 }
 
 export type ReferenceSource = "drizzle" | "meta" | "drizzle+meta";
@@ -43,7 +43,7 @@ export interface ResolvedReferenceFact {
   targetTable: TableDef;
   targetColumn: string;
   targetColumnRef: SQLiteColumn;
-  clientCanSet: boolean;
+  apiSettable: boolean;
   source: ReferenceSource;
 }
 
@@ -74,7 +74,7 @@ export function columnPropertyName(
   column: SQLiteColumn,
 ): string | null {
   for (const [key, value] of Object.entries(
-    table.drizzle as Record<string, unknown>,
+    table.drizzle as unknown as Record<string, unknown>,
   )) {
     if (value === column) return key;
   }

@@ -2,6 +2,7 @@ import { memo, useCallback } from "react";
 import { FormField } from "./FormField";
 import {
   useRecordFieldValue,
+  useRecordFieldIssue,
   useRecordFormSetValue,
 } from "./RecordFormProvider";
 import type { RecordFormFieldModel } from "./record-form-fields";
@@ -13,13 +14,16 @@ interface RecordFormFieldProps {
 function RecordFormFieldComponent({ field }: RecordFormFieldProps) {
   const { column } = field;
   const value = useRecordFieldValue(column.name);
+  const issue = useRecordFieldIssue(column.name);
   const setValue = useRecordFormSetValue();
   const onChange = useCallback(
     (nextValue: unknown) => setValue(column.name, nextValue),
     [column.name, setValue],
   );
 
-  return <FormField field={field} value={value} onChange={onChange} />;
+  return (
+    <FormField field={field} value={value} issue={issue} onChange={onChange} />
+  );
 }
 
 export const RecordFormField = memo(

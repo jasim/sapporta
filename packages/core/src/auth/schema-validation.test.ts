@@ -8,7 +8,7 @@ import {
 import { sapportaTable } from "../schema/table.js";
 import {
   checkAuthSchemaDefinitions,
-  clientPayloadPolicyIssues,
+  apiWritePolicyIssues,
   requestDataAuthority,
   resolveTableReferences,
   systemGlobalOnlyAuthority,
@@ -106,7 +106,7 @@ describe("auth schema validation", () => {
     ]);
   });
 
-  it("rejects client-editable system-managed scope columns", () => {
+  it("rejects API-writable system-managed scope columns", () => {
     const orders = sapportaTable({
       drizzle: sqliteTable("orders", {
         id: integer("id").primaryKey({ autoIncrement: true }),
@@ -115,14 +115,14 @@ describe("auth schema validation", () => {
       meta: {
         rowScope: "workspaceUserScoped",
         rowLabelColumns: ["id"],
-        columns: { workspace_id: { clientEditable: true } },
+        columns: { workspace_id: { apiWritable: true } },
       },
     });
 
     const issues = checkAuthSchemaDefinitions([orders]);
 
     expect(issues.map((issue) => issue.code)).toContain(
-      "system_managed_column_client_editable",
+      "system_managed_column_api_writable",
     );
   });
 
@@ -181,7 +181,7 @@ describe("auth schema validation", () => {
       targetColumn: "id",
       targetTable: accounts,
       source: "drizzle",
-      clientCanSet: true,
+      apiSettable: true,
     });
   });
 
@@ -203,7 +203,7 @@ describe("auth schema validation", () => {
         rowScope: "workspaceGlobal",
         rowLabelColumns: ["id"],
         references: {
-          account_id: { table: "accounts", column: "id", clientCanSet: false },
+          account_id: { table: "accounts", column: "id", apiSettable: false },
         },
       },
     });
@@ -216,7 +216,7 @@ describe("auth schema validation", () => {
       targetColumn: "id",
       targetTable: accounts,
       source: "meta",
-      clientCanSet: false,
+      apiSettable: false,
     });
   });
 
@@ -350,7 +350,7 @@ describe("auth schema validation", () => {
     );
   });
 
-  it("rejects clientCanSet false and system-managed client fields", () => {
+  it("rejects apiSettable false and system-managed API fields", () => {
     const accounts = sapportaTable({
       drizzle: sqliteTable("accounts", {
         id: integer("id").primaryKey({ autoIncrement: true }),
@@ -367,7 +367,7 @@ describe("auth schema validation", () => {
       meta: {
         rowScope: "workspaceGlobal",
         rowLabelColumns: ["id"],
-        references: { account_id: { table: "accounts", clientCanSet: false } },
+        references: { account_id: { table: "accounts", apiSettable: false } },
       },
     });
     const references = resolveTableReferences(invoices, [
@@ -375,7 +375,7 @@ describe("auth schema validation", () => {
       invoices,
     ]).references;
 
-    const issues = clientPayloadPolicyIssues(
+    const issues = apiWritePolicyIssues(
       invoices,
       {
         workspace_id: "workspace-1",
@@ -390,6 +390,29 @@ describe("auth schema validation", () => {
       "workspaceId",
       "account_id",
     ]);
+  });
+
+  it("enforces generated-primary-key and apiWritable policy on the server", () => {
+    const invoices = sapportaTable({
+      drizzle: sqliteTable("policy_invoices", {
+        id: integer("id").primaryKey({ autoIncrement: true }),
+        number: text("number").notNull(),
+        internal_note: text("internal_note"),
+      }),
+      meta: {
+        rowScope: "systemGlobal",
+        rowLabelColumns: ["number"],
+        columns: { internal_note: { apiWritable: false } },
+      },
+    });
+
+    expect(
+      apiWritePolicyIssues(invoices, {
+        id: 10,
+        number: "INV-1",
+        internal_note: "server only",
+      }).map((issue) => issue.field),
+    ).toEqual(["id", "internal_note"]);
   });
 
   it("computes trusted insert values for data authority in sql and typescript key forms", () => {

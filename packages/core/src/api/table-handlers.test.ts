@@ -11,7 +11,7 @@ import {
 import { createTableCatalog } from "../schema/catalog.js";
 import { sapportaTable } from "../schema/table.js";
 import { createTestDb } from "../testing/test-utils.js";
-import { createRoute } from "./table-contracts.js";
+import { createRoute } from "./table-api-contracts.js";
 import { makeAuthorizedTableHandlers } from "./table-handlers.js";
 import type { SapportaEnv } from "./server.js";
 
@@ -96,9 +96,10 @@ describe("makeAuthorizedTableHandlers", () => {
       });
       const app = new Hono<SapportaEnv>();
       app.post("/orders", async (c) => {
+        const body: unknown = await c.req.json();
         const result = await createOrders({
           c,
-          request: {} as Parameters<typeof createOrders>[0]["request"],
+          request: { body } as Parameters<typeof createOrders>[0]["request"],
           files: {},
         });
         if (result instanceof Response) return result;

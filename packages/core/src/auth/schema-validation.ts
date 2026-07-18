@@ -1,3 +1,15 @@
+/**
+ * Schema checks and field-ownership policy for row-scoped table APIs.
+ *
+ * Auth policy answers whether a caller may supply a field and whether a
+ * referenced row is visible. Zod write parsing answers whether the resulting
+ * value has the right type and presence. Generated writes apply auth policy
+ * first, merge trusted server values, and then reach authoritative structural
+ * parsing through the save pipeline. Keeping these questions separate allows
+ * required auth-owned fields to be absent from client payloads and present in
+ * prepared inserts.
+ */
+
 import { getTableConfig } from "drizzle-orm/sqlite-core";
 import type { TableDef } from "../schema/table.js";
 import { findPkColumn } from "../schema/pk.js";
@@ -21,7 +33,7 @@ export type AuthSchemaIssueCode =
   | "invalid_row_scope"
   | "missing_workspace_scope_column"
   | "missing_user_scope_column"
-  | "system_managed_column_client_editable"
+  | "system_managed_column_api_writable"
   | "unknown_reference_source_column"
   | "unregistered_reference_table"
   | "unsupported_reference_target_column"
@@ -53,14 +65,14 @@ export class AuthSchemaValidationError extends Error {
   }
 }
 
-export class AuthPayloadPolicyError extends Error {
+export class ApiWritePolicyError extends Error {
   public readonly errors: readonly ValidationErrorDetail[];
 
   constructor(errors: readonly ValidationErrorDetail[]) {
     super(
-      `Auth payload policy failed: ${errors.map((error) => `${error.field}: ${error.message}`).join(", ")}`,
+      `API write policy failed: ${errors.map((error) => `${error.field}: ${error.message}`).join(", ")}`,
     );
-    this.name = "AuthPayloadPolicyError";
+    this.name = "ApiWritePolicyError";
     this.errors = errors;
   }
 }
@@ -81,7 +93,7 @@ interface DrizzleReferenceFact {
 /**
  * Validates the auth-specific schema contract for every registered table.
  *
- * This checks required ownership columns, client-editable scope fields, and
+ * This checks required ownership columns, API-writable scope fields, and
  * reference metadata. It returns structured issues instead of throwing so boot
  * code can aggregate every schema problem in one pass.
  */
@@ -126,7 +138,7 @@ export function assertAuthSchemaDefinitions(tables: readonly TableDef[]): void {
  * Resolves all FK facts Sapporta auth can enforce for one source table.
  *
  * Drizzle FK metadata proves the physical relationship; `meta.references`
- * can add or refine the auth policy, including `clientCanSet: false`.
+ * can add or refine the auth policy, including `apiSettable: false`.
  * Conflicts are reported as schema issues because an ambiguous reference
  * cannot be validated safely at request time.
  */
@@ -209,12 +221,12 @@ export function requireResolvedTableReferences(
 }
 
 /**
- * Returns payload policy violations caused by fields clients are not trusted
- * to submit: auth ownership columns and references marked `clientCanSet:
- * false`. This only checks the client payload trust boundary; FK row
+ * Returns policy violations caused by fields table API callers may not submit:
+ * auth ownership columns and references marked `apiSettable: false`. This only
+ * checks the public API write boundary; FK row
  * visibility is validated separately after trusted server values are merged.
  */
-export function clientPayloadPolicyIssues(
+export function apiWritePolicyIssues(
   table: TableDef,
   payload: unknown,
   references: readonly ResolvedReferenceFact[] = [],
@@ -224,23 +236,40 @@ export function clientPayloadPolicyIssues(
   }
 
   const errors: ValidationErrorDetail[] = [];
+  const columns = getTableConfig(table.drizzle).columns;
+  for (const column of columns) {
+    if (!Object.prototype.hasOwnProperty.call(payload, column.name)) continue;
+    if (column.primary && column.hasDefault) {
+      errors.push({
+        field: column.name,
+        message:
+          "This primary key is generated and cannot be submitted through the table API.",
+      });
+    }
+    if (table.meta.columns[column.name]?.apiWritable === false) {
+      errors.push({
+        field: column.name,
+        message: "This field is not writable through the table API.",
+      });
+    }
+  }
   for (const field of systemManagedScopeFieldNames()) {
     if (Object.prototype.hasOwnProperty.call(payload, field)) {
       errors.push({
         field,
         message:
-          "This field is managed by Sapporta auth and cannot be submitted by clients.",
+          "This field is managed by Sapporta auth and cannot be submitted through the table API.",
       });
     }
   }
 
   for (const reference of references) {
-    if (reference.clientCanSet) continue;
+    if (reference.apiSettable) continue;
     if (Object.prototype.hasOwnProperty.call(payload, reference.sourceColumn)) {
       errors.push({
         field: reference.sourceColumn,
         message:
-          "This reference is managed by the server and cannot be submitted by clients.",
+          "This reference is managed by the server and cannot be submitted through the table API.",
       });
     }
   }
@@ -249,18 +278,40 @@ export function clientPayloadPolicyIssues(
 }
 
 /**
- * Enforces client payload policy and returns a shallow copy of the accepted
+ * Projects the API field-ownership rule for one column.
+ *
+ * `tableApiZod` uses this function to omit prohibited fields from generated
+ * client types and OpenAPI. Request-time row security uses the corresponding
+ * issue collector above to reject callers that submit those fields anyway.
+ * Frontend editability is only a presentation of this server-owned rule.
+ */
+export function isApiWritableColumn(
+  table: TableDef,
+  column: { name: string; primary: boolean; hasDefault: boolean },
+  references: readonly ResolvedReferenceFact[],
+): boolean {
+  if (systemManagedScopeFieldNames().includes(column.name)) return false;
+  if (column.primary && column.hasDefault) return false;
+  if (table.meta.columns[column.name]?.apiWritable === false) return false;
+  return !references.some(
+    (reference) =>
+      reference.sourceColumn === column.name && !reference.apiSettable,
+  );
+}
+
+/**
+ * Enforces API write policy and returns a shallow copy of the accepted
  * object. Prefer row-security helpers for request handlers; this primitive is
  * useful when composing lower-level auth workflows.
  */
-export function validateClientPayloadPolicy(
+export function validateApiWriteInput(
   table: TableDef,
   payload: unknown,
   references: readonly ResolvedReferenceFact[] = [],
 ): Record<string, unknown> {
-  const errors = clientPayloadPolicyIssues(table, payload, references);
+  const errors = apiWritePolicyIssues(table, payload, references);
   if (errors.length > 0) {
-    throw new AuthPayloadPolicyError(errors);
+    throw new ApiWritePolicyError(errors);
   }
   return { ...(payload as Record<string, unknown>) };
 }
@@ -275,7 +326,7 @@ export interface TrustedInsertValuesForDataAuthority {
 /**
  * Computes trusted ownership fields for inserting a row using request data
  * authority. Values come only from `RequestDataAuthority`, never from
- * client input.
+ * API input.
  *
  * The same fail-closed row-scope matrix applies to stamping as to reads:
  * system tables need system-global authority, workspace tables require
@@ -382,13 +433,13 @@ function checkScopeColumns(
   }
 
   for (const field of systemManagedScopeFieldNames()) {
-    if (table.meta.columns[field]?.clientEditable === true) {
+    if (table.meta.columns[field]?.apiWritable === true) {
       issues.push({
         table: table.sqlName,
         column: field,
-        code: "system_managed_column_client_editable",
+        code: "system_managed_column_api_writable",
         message:
-          "Auth scope columns are system-managed and cannot be client-editable.",
+          "Auth scope columns are system-managed and cannot be API-writable.",
       });
     }
   }
@@ -525,7 +576,7 @@ function resolveReferenceFact(args: {
       targetTable,
       targetColumn,
       targetColumnRef,
-      clientCanSet: args.explicitRule?.clientCanSet ?? true,
+      apiSettable: args.explicitRule?.apiSettable ?? true,
       source: args.source,
     },
   };

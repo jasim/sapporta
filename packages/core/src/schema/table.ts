@@ -1,13 +1,14 @@
 import type { SQL } from "drizzle-orm";
 import {
+  type AnySQLiteTable,
   index,
   integer,
   sqliteTable,
-  type SQLiteTableWithColumns,
   getTableConfig,
   uniqueIndex,
 } from "drizzle-orm/sqlite-core";
-import type { z } from "zod";
+import type { InferInsertModel } from "drizzle-orm";
+import type { Temporal } from "@sapporta/shared/temporal";
 import { drainPendingColumnMeta } from "./columns.js";
 import type {
   ColumnMeta as FactoryColumnMeta,
@@ -28,19 +29,13 @@ export {
   money,
   percentage,
   number,
+  select,
   bool,
   date,
   timestamp,
   text,
 } from "./columns.js";
 export { sqliteTable, integer, index, uniqueIndex };
-
-/** Metadata for a select/enum column */
-export interface SelectMeta {
-  type: "select";
-  column: string;
-  options: string[];
-}
 
 /** Declares a has-many child relationship for grid display */
 export interface ChildMeta {
@@ -98,8 +93,8 @@ export interface ColumnMeta {
   strong?: boolean;
   /** Freeform notes describing the column's meaning, conventions, or formula */
   notes?: string;
-  /** Whether clients may edit this column through generated table APIs. */
-  clientEditable?: boolean;
+  /** Whether callers may write this column through generated table APIs. */
+  apiWritable?: boolean;
 }
 
 /** Normalized Sapporta metadata attached to a TableDef.
@@ -114,12 +109,8 @@ export interface SapportaMeta {
    *  dropdowns, lookup responses, and anywhere a row is referenced rather
    *  than displayed in full. Multiple columns are concatenated with a space. */
   rowLabelColumns: readonly [string, ...string[]];
-  /** Select/enum columns */
-  selects: SelectMeta[];
   /** Whether records are immutable (no update/delete) */
   immutable: boolean;
-  /** User-provided Zod validation schema (overrides auto-inferred) */
-  validation?: z.ZodObject;
   /**
    * Declares the row isolation boundary used by built-in table operations and
    * reference validation helpers.
@@ -128,7 +119,7 @@ export interface SapportaMeta {
   /**
    * Explicit reference rules keyed by source SQL column name. Use this for
    * logical FKs that do not have Drizzle .references() metadata, or to mark
-   * proven FK columns as server-managed with clientCanSet: false.
+   * proven FK columns as server-managed with apiSettable: false.
    */
   references: Record<string, ReferenceRule>;
   /** Default sort order applied when no explicit sort is requested.
@@ -145,13 +136,7 @@ export interface SapportaMeta {
 }
 
 type SapportaMetaDefaultedField =
-  | "label"
-  | "selects"
-  | "immutable"
-  | "rowScope"
-  | "references"
-  | "children"
-  | "columns";
+  "label" | "immutable" | "rowScope" | "references" | "children" | "columns";
 
 /** Sparse public metadata accepted by `sapportaTable()`.
  *
@@ -162,7 +147,6 @@ export type SapportaTableInputMeta = Omit<
   SapportaMetaDefaultedField
 > & {
   label?: string;
-  selects?: SelectMeta[];
   immutable?: boolean;
   references?: Record<string, ReferenceRule>;
   children?: ChildMeta[];
@@ -175,22 +159,98 @@ export type SapportaTableInputMeta = Omit<
   rowScope?: RowScope;
 };
 
-/** A Sapporta table definition — wraps a Drizzle SQLite table with metadata */
-export interface TableDef {
+// Validation callbacks serve inserts and patches, so their inferred value is a
+// partial insert model. Temporal values use the canonical JSON string form that
+// structural parsing supplies to application validation.
+type CanonicalWriteValue<TValue> = TValue extends
+  Temporal.PlainDate | Temporal.Instant
+  ? string
+  : TValue;
+
+type CanonicalInsertValue<TTable extends AnySQLiteTable> = {
+  [
+    TField in keyof InferInsertModel<TTable, { dbColumnNames: true }>
+  ]: CanonicalWriteValue<
+    InferInsertModel<TTable, { dbColumnNames: true }>[TField]
+  >;
+};
+
+export type TableValidationValue<TTable extends AnySQLiteTable> = Readonly<
+  Partial<CanonicalInsertValue<TTable>>
+>;
+
+export type TableValidationField<TTable extends AnySQLiteTable> =
+  (keyof InferInsertModel<TTable, { dbColumnNames: true }> & string) | "$";
+
+export interface TableValidationContext<TTable extends AnySQLiteTable> {
+  /** Inserts contain the prepared row; patches contain only submitted fields. */
+  operation: "insert" | "patch";
+  /** Attach an issue to a public SQL column name, or to `$` for the row. */
+  addIssue(field: TableValidationField<TTable>, message: string): void;
+}
+
+/**
+ * Application validation that runs after Sapporta's structural write parser.
+ *
+ * The callback receives canonical values, including ISO strings for date and
+ * timestamp columns. It can add cross-field or domain issues. It cannot replace
+ * the structural schema or transform the values that Drizzle receives. This
+ * composition keeps application rules from weakening unrelated column checks.
+ */
+export type TableValidation<TTable extends AnySQLiteTable> = (
+  value: TableValidationValue<TTable>,
+  context: TableValidationContext<TTable>,
+) => void;
+
+/**
+ * The complete table description consumed by Sapporta.
+ *
+ * Application code authors two complementary pieces. The Drizzle table owns
+ * storage facts such as SQL names, nullability, defaults, primary keys, foreign
+ * keys, and SQLite types. Sapporta metadata owns application semantics and
+ * presentation such as value kinds, row labels, write policy, and grid hints.
+ * `sapportaTable()` joins those pieces into a `TableDef`. Schema extraction,
+ * generated APIs, auth, runtime validation, and table UI projections all start
+ * from that same joined description.
+ *
+ * Values at Sapporta's public boundaries use SQL column names. Drizzle property
+ * names remain an implementation detail of database access and are translated
+ * by `resolveRowFields()` immediately around Drizzle calls.
+ */
+export interface TableDef<TTable extends AnySQLiteTable = AnySQLiteTable> {
   /** The Drizzle SQLite table object */
-  drizzle: SQLiteTableWithColumns<any>;
+  drizzle: TTable;
   /** SQL table name extracted from the Drizzle table */
   sqlName: string;
   /** Sapporta metadata */
   meta: SapportaMeta;
+  /** Runtime form of the application validation declared in `TableOptions`. */
+  validate?(
+    value: Readonly<Record<string, unknown>>,
+    context: {
+      operation: "insert" | "patch";
+      addIssue(field: string, message: string): void;
+    },
+  ): void;
 }
 
 /** Options for the sapportaTable() function */
-export interface TableOptions {
+export interface TableOptions<TTable extends AnySQLiteTable> {
   /** The Drizzle sqliteTable definition */
-  drizzle: SQLiteTableWithColumns<any>;
+  drizzle: TTable;
   /** Sapporta metadata */
   meta: SapportaTableInputMeta;
+  /**
+   * Adds operation-aware application issues after structural parsing.
+   *
+   * For an insert, auth and other trusted server code have already added their
+   * required fields. For a patch, `value` contains only the submitted fields.
+   * Field keys are inferred public SQL column names.
+   */
+  validate?(
+    value: TableValidationValue<TTable>,
+    context: TableValidationContext<TTable>,
+  ): void;
 }
 
 const AUTO_MANAGED_TIMESTAMP_COLUMN_NAMES = new Set([
@@ -247,7 +307,6 @@ function normalizeSapportaMeta(
   return {
     ...input,
     label: input.label ?? sqlName,
-    selects: input.selects ?? [],
     immutable: input.immutable ?? false,
     rowScope: input.rowScope ?? "workspaceUserScoped",
     references: input.references ?? {},
@@ -257,17 +316,34 @@ function normalizeSapportaMeta(
 }
 
 /**
- * Define a Sapporta table. Wraps a Drizzle sqliteTable with metadata.
+ * Define the joined table description used throughout Sapporta.
  *
  * Usage:
  * ```ts
- * const accounts = sapportaTable({
- *   drizzle: sqliteTable("accounts", { ... }),
- *   meta: { label: "Accounts", rowLabelColumns: ["name"] }
+ * const invoiceTable = sqliteTable("invoices", {
+ *   id: integer("id").primaryKey({ autoIncrement: true }),
+ *   status: select("status", ["draft", "issued", "paid"]),
+ *   total: money("total").notNull(),
+ * });
+ *
+ * const invoices = sapportaTable({
+ *   drizzle: invoiceTable,
+ *   meta: { label: "Invoices", rowLabelColumns: ["id"] },
+ *   validate(value, context) {
+ *     if (context.operation === "insert" && value.total === 0) {
+ *       context.addIssue("total", "Total must be greater than zero.");
+ *     }
+ *   },
  * });
  * ```
+ *
+ * The select options above drive Drizzle typing, server Zod validation, and
+ * frontend select metadata from one column declaration. The validation
+ * callback adds an application rule after structural parsing.
  */
-export function sapportaTable(options: TableOptions): TableDef {
+export function sapportaTable<TTable extends AnySQLiteTable>(
+  options: TableOptions<TTable>,
+): TableDef<TTable> {
   const config = getTableConfig(options.drizzle);
   // This is the join point for the public API: it combines the user's separate
   // Drizzle definition with their Sapporta metadata. It also drains factory
@@ -284,5 +360,12 @@ export function sapportaTable(options: TableOptions): TableDef {
       options.meta,
       drained,
     ),
+    validate: options.validate
+      ? (value, context) =>
+          options.validate!(
+            value as TableValidationValue<TTable>,
+            context as TableValidationContext<TTable>,
+          )
+      : undefined,
   };
 }

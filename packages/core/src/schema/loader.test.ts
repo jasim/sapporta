@@ -1,6 +1,8 @@
 import { describe, it, expect } from "vitest";
 import { resolve } from "node:path";
 import { loadSchemas } from "./loader.js";
+import { getTableConfig } from "drizzle-orm/sqlite-core";
+import { getColumnEnumValues } from "./table-value-zod.js";
 
 describe("loadSchemas()", () => {
   // Compiled fixtures — see tsconfig.fixtures.json and the root pretest script.
@@ -14,7 +16,16 @@ describe("loadSchemas()", () => {
     const accounts = tables.find((t) => t.sqlName === "accounts");
     expect(accounts).toBeDefined();
     expect(accounts!.meta.label).toBe("Accounts");
-    expect(accounts!.meta.selects).toHaveLength(1);
+    const accountType = getTableConfig(accounts!.drizzle).columns.find(
+      (column) => column.name === "account_type",
+    );
+    expect(accountType && getColumnEnumValues(accountType)).toEqual([
+      "Asset",
+      "Liability",
+      "Equity",
+      "Revenue",
+      "Expense",
+    ]);
   });
 
   it("silently skips non-TableDef exports", async () => {

@@ -7,10 +7,8 @@ import { TopBar, TopBarButton } from "../../shell/components/TopBar";
 import { Button } from "@sapporta/ui/button";
 import { RecordFormField } from "./RecordFormField";
 import { RecordFormProvider } from "./RecordFormProvider";
-import {
-  compactRecordFormValues,
-  createRecordFormStore,
-} from "./record-form-store";
+import { createRecordFormStore } from "./record-form-store";
+import { parseCreateDraft } from "./parse-create-draft";
 import { buildRecordFormFields } from "./record-form-fields";
 import { createRecord } from "../actions/record-actions";
 import { useLookupStore } from "../../lookup";
@@ -37,14 +35,17 @@ export function NewRecordPage({ tableSchema }: { tableSchema: TableSchema }) {
 
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    setSaving(true);
     setError(null);
+    const parsed = parseCreateDraft(tableSchema, formStore.getState().values);
+    if (!parsed.ok) {
+      formStore.getState().setIssues(parsed.issues);
+      return;
+    }
+    formStore.getState().setIssues([]);
+    setSaving(true);
 
     try {
-      await createRecord(
-        tableSchema.name,
-        compactRecordFormValues(formStore.getState().values),
-      );
+      await createRecord(tableSchema.name, parsed.value);
     } catch (err: unknown) {
       setError(createErrorMessage(err));
     } finally {
@@ -72,9 +73,9 @@ export function NewRecordPage({ tableSchema }: { tableSchema: TableSchema }) {
         <RecordFormProvider store={formStore}>
           <form
             onSubmit={handleSubmit}
-            className="w-full max-w-[560px] space-y-5"
+            className="flex w-full max-w-[560px] flex-col gap-5"
           >
-            <div className="space-y-4">
+            <div className="flex flex-col gap-4">
               {formFields.map((field) => (
                 <RecordFormField key={field.column.name} field={field} />
               ))}
@@ -88,7 +89,9 @@ export function NewRecordPage({ tableSchema }: { tableSchema: TableSchema }) {
 
             <div className="flex gap-2 border-t border-sap-border-soft pt-5">
               <Button type="submit" disabled={saving}>
-                {saving && <Loader2 className="h-4 w-4 animate-spin" />}
+                {saving && (
+                  <Loader2 data-icon="inline-start" className="animate-spin" />
+                )}
                 Create
               </Button>
               <Button

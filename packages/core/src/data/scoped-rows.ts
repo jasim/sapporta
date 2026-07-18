@@ -8,18 +8,20 @@
  * row-security policy, then exposes CRUD, lookup, count, and export operations
  * that never let callers choose or bypass ownership columns.
  *
- * The important rule is that primary keys and client payloads are not security
+ * The important rule is that primary keys and API payloads are not security
  * boundaries. Reads and destructive writes add the table's workspace/user
- * visibility predicate in SQL. Creates and updates first reject client-supplied
+ * visibility predicate in SQL. Creates and updates first reject API-supplied
  * ownership fields, then stamp trusted scope values from request data
- * authority.
+ * authority. Prepared creates and patches then pass through `savePipeline()`;
+ * callers of `scopedRows()` receive the same structural parsing and application
+ * validation as generated HTTP routes and master-detail writes.
  *
  * The row-security module builds that request-bound policy with
  * `createRowSecurity()`, exposed on `SapportaAuthContext` as `RowSecurity`.
  * `RowSecurity.forTable(table)` returns the per-table helpers used here:
  * `ownedRows()` produces the SQL condition that limits reads, updates, and
  * deletes to rows visible to the current request; `insertValues()` and
- * `patchValues()` prepare safe write objects by preserving client-owned fields,
+ * `patchValues()` prepare safe write objects by preserving API-writable fields,
  * rejecting forbidden ownership fields, and adding server-trusted workspace/user
  * values where the table scope requires them.
  *
@@ -106,6 +108,10 @@ export function scopedRows(
   // the same table metadata, workspace, user, and row-scope interpretation.
   const access = auth.rowSecurity.forTable(table);
   const pk = resolvePk(table);
+  const publicRow = resolveRowFields(
+    table,
+    getTableConfig(table.drizzle).columns.map((column) => column.name),
+  );
 
   return {
     async list(input = {}) {
@@ -124,7 +130,7 @@ export function scopedRows(
         .offset(query.offset)) as Record<string, unknown>[];
 
       return {
-        data: rows,
+        data: rows.map((row) => publicRow.pick(row)),
         meta: {
           total,
           page: Math.floor(query.offset / query.limit) + 1,
@@ -142,11 +148,11 @@ export function scopedRows(
         .where(access.ownedRows(eq(pk.drizzlePk, id)))
         .limit(1)) as Record<string, unknown>[];
       if (rows.length === 0) throw new RowNotFoundError();
-      return rows[0]!;
+      return publicRow.pick(rows[0]!);
     },
 
     async create(input) {
-      // Accept either a single client payload or a batch, but prepare each row
+      // Accept either a single API payload or a batch, but prepare each row
       // independently so row-security can stamp trusted scope fields.
       const records = Array.isArray(input) ? input : [input];
       if (records.length === 0) {
@@ -194,7 +200,7 @@ export function scopedRows(
         .where(access.ownedRows(eq(pk.drizzlePk, id)))
         .returning()) as Record<string, unknown>[];
       if (deleted.length === 0) throw new RowNotFoundError();
-      return deleted[0]!;
+      return publicRow.pick(deleted[0]!);
     },
 
     async exportRows(input = {}) {
@@ -202,12 +208,13 @@ export function scopedRows(
       // and row ownership identical to list.
       const query = parseRowsQuery(input, table);
       const where = access.ownedRows(query.where);
-      return (await applyOrderBy(
+      const rows = (await applyOrderBy(
         db.select().from(table.drizzle).where(where),
         query,
         table,
         pk.drizzlePk,
       )) as unknown as Record<string, unknown>[];
+      return rows.map((row) => publicRow.pick(row));
     },
 
     async lookup(input = {}) {
@@ -331,8 +338,7 @@ export function scopedRows(
 // rows use database column names. Keep both primary-key forms together.
 function resolvePk(table: TableDef) {
   const pkCol = findPkColumn(table);
-  const columns = table.drizzle as unknown as Record<string, SQLiteColumn>;
-  return { pkCol, drizzlePk: columns[pkCol.name]! };
+  return { pkCol, drizzlePk: pkCol };
 }
 
 async function countRows(

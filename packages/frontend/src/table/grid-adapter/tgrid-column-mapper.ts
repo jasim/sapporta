@@ -1,3 +1,13 @@
+/**
+ * Adapts server-emitted table metadata to generic TGrid column presets.
+ *
+ * The grid package supplies editors and generic commit codecs. This adapter has
+ * the `ColumnSchema` required to add table patch semantics, lookups, display
+ * kinds, editability, and sizing. It is therefore the natural place to compose
+ * `parseTablePatchValueDraft()` into a grid column without moving table or API
+ * knowledge into the generic grid package.
+ */
+
 import type { ColumnSchema as TableColumnSchema } from "@sapporta/shared/contracts";
 import type { ColId, ColumnSchema as GridColumnSchema } from "@sapporta/grid";
 import {
@@ -6,6 +16,7 @@ import {
   type ColumnWidth,
 } from "@sapporta/grid/column-preset";
 import { inferDisplayType, type DisplayType } from "../model/column-types";
+import { parseTablePatchValueDraft } from "../model/table-value-draft";
 import type { LookupStore } from "../../lookup";
 
 export type TGridTableColumnMeta = {
@@ -58,6 +69,13 @@ function columnFor(
     id: column.name as ColId,
     name: column.label,
     edit: editable ? ("default" as const) : ("none" as const),
+    parse: (draft: string) => {
+      const parsed = parseTablePatchValueDraft(column, draft);
+      // TGrid's codec returns a value rather than a local field-issue result.
+      // Preserve invalid text so the generated patch reaches authoritative
+      // server validation and the editor does not silently clear the draft.
+      return parsed.ok ? parsed.value : draft;
+    },
     width: tableColumnPresetWidth(column),
     meta: {
       table: tableName,

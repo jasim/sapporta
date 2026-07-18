@@ -4,7 +4,9 @@ import { sqliteTable, text, integer } from "drizzle-orm/sqlite-core";
 export const accountsTable = sqliteTable("accounts", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   name: text("name").notNull(),
-  type: text("type").notNull(),
+  type: text("type", {
+    enum: ["asset", "liability", "equity", "revenue", "expense"],
+  }).notNull(),
   balance: integer("balance").notNull().default(0),
   workspace_id: text("workspace_id").notNull(),
   created_at: timestamp("created_at"),
@@ -17,13 +19,6 @@ export const accounts = sapportaTable({
     label: "Accounts",
     rowScope: "workspaceGlobal",
     rowLabelColumns: ["name"],
-    selects: [
-      {
-        type: "select",
-        column: "type",
-        options: ["asset", "liability", "equity", "revenue", "expense"],
-      },
-    ],
   },
 });
 

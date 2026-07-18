@@ -38,3 +38,7 @@ export function useRecordFieldValue(name: string): unknown {
 export function useRecordFormSetValue(): RecordFormState["setValue"] {
   return useRecordFormStore((state) => state.setValue);
 }
+
+export function useRecordFieldIssue(name: string): string | undefined {
+  return useRecordFormStore((state) => state.issues[name]);
+}

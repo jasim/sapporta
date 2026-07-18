@@ -6,6 +6,7 @@ import { findPkColumn } from "./pk.js";
 import { isAutoManagedTimestampColumn, type TableDef } from "./table.js";
 import { logger } from "../db/logger.js";
 import { findRowLabelColumns } from "../data/row-label.js";
+import { getColumnEnumValues } from "./table-value-zod.js";
 import { defaultColumnLabel } from "@sapporta/shared";
 import type {
   ChildSchema,
@@ -17,9 +18,19 @@ import type {
 const log = logger.child({ module: "schema" });
 
 /**
- * Extract schema metadata from loaded TableDefs.
+ * Projects loaded `TableDef` values into browser-safe table metadata.
  *
- * Used by GET /api/_schema and available for direct use in tests.
+ * The metadata endpoint is the frontend's table model. It contains public SQL
+ * names, presence facts, references, select options, semantic `kind`, and
+ * presentation hints. It does not contain Drizzle objects, server validators,
+ * auth authority, or database access.
+ *
+ * Every emitted column has a resolved `kind`. Column factories provide an
+ * explicit kind and raw Drizzle columns use `resolveColumnKind()` as a supported
+ * fallback. The shared wire schema requires this field, and the frontend parses
+ * the response before metadata-driven controls decode drafts.
+ *
+ * Used by the `/meta/tables` API and available for direct use in tests.
  */
 export function extractSchemas(defs: readonly TableDef[]): TableSchema[] {
   // Build a lookup by sqlName for resolving children
@@ -45,16 +56,15 @@ export function extractSchemas(defs: readonly TableDef[]): TableSchema[] {
       }
     }
 
-    // Build select lookup
-    const selectMap = new Map<string, string[]>();
-    if (schema.meta.selects) {
-      for (const s of schema.meta.selects) {
-        selectMap.set(s.column, s.options);
-      }
-    }
-
     const columns: ColumnSchema[] = config.columns.map((col) => {
       const columnMeta = schema.meta.columns[col.name];
+      const kind = resolveColumnKind(schema, col.name);
+      if (!kind) {
+        throw new Error(
+          `Schema extraction could not resolve kind for ${schema.sqlName}.${col.name}.`,
+        );
+      }
+      const selectOptions = getColumnEnumValues(col);
       const colSchema: ColumnSchema = {
         name: col.name,
         // Drizzle's internal dataType differs between dialects (e.g. Pg string-mode
@@ -66,14 +76,12 @@ export function extractSchemas(defs: readonly TableDef[]): TableSchema[] {
         primary: col.primary,
         isUnique: col.isUnique,
         foreignKey: fkMap.get(col.name) ?? null,
-        select: selectMap.has(col.name)
-          ? { options: selectMap.get(col.name)! }
-          : null,
+        select: selectOptions ? { options: [...selectOptions] } : null,
         // Factories stamp `kind` in `meta.columns`; hand-declared Drizzle
         // columns derive it from the normalized dataType. This guarantees
         // every extracted column has a `kind`, so downstream consumers
         // (UI display, operator applicability, parse) read a single field.
-        kind: resolveColumnKind(schema, col.name),
+        kind,
         displayFormat: columnMeta?.displayFormat,
         textDisplay: columnMeta?.textDisplay,
         label: columnMeta?.label ?? defaultColumnLabel(col.name),
@@ -84,7 +92,7 @@ export function extractSchemas(defs: readonly TableDef[]): TableSchema[] {
         zeroDisplay: columnMeta?.zeroDisplay,
         strong: columnMeta?.strong,
         notes: columnMeta?.notes,
-        clientEditable: columnMeta?.clientEditable,
+        apiWritable: columnMeta?.apiWritable,
         visuallyHidden: columnMeta?.visuallyHidden,
       };
 

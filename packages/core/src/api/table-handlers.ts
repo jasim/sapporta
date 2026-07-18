@@ -43,7 +43,7 @@ import {
 import type { TableHandlers } from "./mount-tables.js";
 import type { SapportaEnv } from "./server.js";
 import {
-  AuthPayloadPolicyError,
+  ApiWritePolicyError,
   forbidUnless,
   RowScopePolicyError,
   type SapportaAuthContext,
@@ -98,9 +98,12 @@ export function makeAuthorizedTableHandlers<E extends SapportaEnv>(
       },
     create:
       ({ def }) =>
-      async ({ c }) => {
+      async ({ c, request }) => {
         const auth = authorizeTableAction(c, guard(c), "create", def);
-        const body = await c.req.json();
+        // The adapter has already decoded the JSON into `request.body`. The
+        // route's skip flag bypasses Zod validation, not body extraction, so the
+        // handler must preserve this exact payload for auth and save parsing.
+        const body: unknown = request.body;
         try {
           if (isRecord(body) && isMasterDetailBody(body)) {
             return await handleMasterDetailCreate(
@@ -123,10 +126,9 @@ export function makeAuthorizedTableHandlers<E extends SapportaEnv>(
       async ({ c, request }) => {
         const auth = authorizeTableAction(c, guard(c), "update", def);
         const rows = scopedRows(db, auth, def);
-        const body = await c.req.json();
         try {
           return c.json(
-            { data: await rows.update(request.params.id, body) },
+            { data: await rows.update(request.params.id, request.body) },
             200,
           );
         } catch (err) {
@@ -320,8 +322,8 @@ function tableWriteErrorResponse<E extends Env>(
       status: 403,
     });
   }
-  if (err instanceof AuthPayloadPolicyError) {
-    log.warn("Auth payload policy failed", {
+  if (err instanceof ApiWritePolicyError) {
+    log.warn("API write policy failed", {
       table: table.sqlName,
       errors: err.errors,
     });

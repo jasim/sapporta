@@ -1,149 +1,94 @@
-import { z } from "zod";
-import { getTableConfig } from "drizzle-orm/sqlite-core";
+/**
+ * Authoritative parsing and application validation for table writes.
+ *
+ * Browser draft parsing and generated API schemas provide early feedback and
+ * describe caller-visible payloads. This module decides whether a prepared row
+ * can reach Drizzle. Generated routes, direct scoped-row operations, and
+ * master-detail writes all converge here through `savePipeline()`.
+ */
+
 import type { TableDef } from "../schema/table.js";
-import { resolveColumnKind } from "../schema/resolve-kind.js";
-import type { ValueKind } from "@sapporta/shared/value-kind";
-import {
-  Temporal,
-  parsePlainDate,
-  parseCanonicalInstant,
-  formatPlainDate,
-  formatCanonicalInstant,
-} from "@sapporta/shared/temporal";
-
-/**
- * Build a Zod schema from a Drizzle table definition.
- *
- * Keys on `ColumnMeta.kind` when present; raw Drizzle columns derive their
- * kind from Drizzle's dataType. Date and timestamp fields are validated by
- * strict Temporal parsing plus canonical re-serialization — regex shape
- * alone would accept `2024-02-30` and `25:00:00`, values that are
- * shape-valid but not real points in time.
- *
- * User-provided `meta.validation` overrides everything.
- */
-export function buildZodSchema(
-  schema: TableDef,
-): z.ZodObject<Record<string, z.ZodTypeAny>> {
-  if (schema.meta.validation) {
-    return schema.meta.validation;
-  }
-
-  const config = getTableConfig(schema.drizzle);
-  const shape: Record<string, z.ZodTypeAny> = {};
-
-  for (const col of config.columns) {
-    if (col.primary && col.hasDefault) continue;
-    const hasDefault = col.hasDefault;
-
-    const kind = resolveColumnKind(schema, col.name);
-    if (!kind) {
-      throw new Error(
-        `buildZodSchema: column "${col.name}" exists in Drizzle config but ` +
-          `is unknown to meta.columns — meta/Drizzle column sets have drifted.`,
-      );
-    }
-    let fieldSchema: z.ZodTypeAny = zodForKind(kind);
-
-    const selectMeta = schema.meta.selects.find((s) => s.column === col.name);
-    if (selectMeta) {
-      fieldSchema = z.enum(selectMeta.options as [string, ...string[]]);
-    }
-
-    // Make nullable + optional if column allows null
-    if (!col.notNull) {
-      fieldSchema = fieldSchema.nullable().optional();
-    }
-
-    // Make optional if column has a default
-    if (hasDefault && col.notNull) {
-      fieldSchema = fieldSchema.optional();
-    }
-
-    shape[col.name] = fieldSchema;
-  }
-
-  return z.object(shape).strict();
-}
-
-/**
- * Zod schema for a single `ValueKind`. Numbers reject `NaN` and
- * `Infinity`; booleans are strict; dates and timestamps accept either a
- * Temporal object (already parsed) or a canonical string, and transform
- * the result into the canonical string form — SQLite TEXT is what
- * Drizzle eventually binds, and pre-canonicalizing here keeps lex order
- * equal to chronological order.
- */
-function zodForKind(kind: ValueKind): z.ZodTypeAny {
-  switch (kind) {
-    case "number":
-      return z.number().finite();
-    case "boolean":
-      return z.boolean();
-    case "text":
-      return z.string();
-    case "date":
-      // The factory's customType accepts either Temporal.PlainDate
-      // (post-boundary-parse) or an ISO string (pre-parse, e.g. a user's
-      // raw JSON submission). Validation mirrors that shape — rejecting
-      // either form of malformed input so callers get a 400 before the
-      // value ever reaches Drizzle.
-      return z.union([
-        z.instanceof(Temporal.PlainDate),
-        z.string().transform((s, ctx) => {
-          try {
-            return formatPlainDate(parsePlainDate(s));
-          } catch (err) {
-            ctx.addIssue({
-              code: "custom",
-              message: `invalid ISO date: ${(err as Error).message}`,
-            });
-            return z.NEVER;
-          }
-        }),
-      ]);
-    case "timestamp":
-      return z.union([
-        z.instanceof(Temporal.Instant),
-        z.string().transform((s, ctx) => {
-          try {
-            return formatCanonicalInstant(parseCanonicalInstant(s));
-          } catch (err) {
-            ctx.addIssue({
-              code: "custom",
-              message: `invalid ISO timestamp: ${(err as Error).message}`,
-            });
-            return z.NEVER;
-          }
-        }),
-      ]);
-  }
-}
+import { tableWriteZod } from "./table-write-zod.js";
+import { rejectControlChars } from "./sanitize.js";
 
 export interface ValidationErrorDetail {
   field: string;
   message: string;
 }
 
+export type TableWriteParseResult =
+  | { success: true; data: Record<string, unknown> }
+  | { success: false; issues: ValidationErrorDetail[] };
+
 /**
- * Validate a record against a table schema.
- * Returns an array of errors (empty if valid).
+ * Parses one insert or update patch at the authoritative save boundary.
+ *
+ * Control characters are rejected first. `tableWriteZod` then enforces table
+ * structure and canonicalizes values such as dates and timestamps. Application
+ * validation sees that parsed result and may add operation-aware issues. A
+ * successful result contains the same parsed data that the save pipeline will
+ * persist; the pre-parse input is never substituted back in.
  */
-export function validate(
-  schema: TableDef,
+export function parseTableWrite(
+  table: TableDef,
   record: Record<string, unknown>,
-  opts?: { partial?: boolean },
-): ValidationErrorDetail[] {
-  let zodSchema = buildZodSchema(schema);
-  if (opts?.partial) {
-    zodSchema = zodSchema.partial();
+  operation: "insert" | "patch",
+): TableWriteParseResult {
+  const controlCharacterIssues: ValidationErrorDetail[] = [];
+  for (const [field, value] of Object.entries(record)) {
+    if (typeof value !== "string") continue;
+    try {
+      rejectControlChars(value);
+    } catch {
+      controlCharacterIssues.push({
+        field,
+        message: "Value contains control characters",
+      });
+    }
   }
-  const result = zodSchema.safeParse(record);
+  if (controlCharacterIssues.length > 0) {
+    return { success: false, issues: controlCharacterIssues };
+  }
 
-  if (result.success) return [];
+  const writeZod =
+    operation === "insert"
+      ? tableWriteZod.forInsert(table)
+      : tableWriteZod.forPatch(table);
+  const result = writeZod.safeParse(record);
+  if (!result.success) {
+    return {
+      success: false,
+      issues: result.error.issues.map((issue) => ({
+        field: issue.path.join("."),
+        message: issue.message,
+      })),
+    };
+  }
 
-  return result.error.issues.map((issue) => ({
-    field: issue.path.join("."),
-    message: issue.message,
-  }));
+  const applicationIssues: ValidationErrorDetail[] = [];
+  runApplicationValidation(
+    table,
+    result.data as Record<string, unknown>,
+    operation,
+    applicationIssues,
+  );
+  return applicationIssues.length > 0
+    ? { success: false, issues: applicationIssues }
+    : { success: true, data: result.data as Record<string, unknown> };
+}
+
+function runApplicationValidation(
+  table: TableDef,
+  value: Record<string, unknown>,
+  operation: "insert" | "patch",
+  issues: ValidationErrorDetail[],
+): void {
+  if (!table.validate) return;
+  const context = {
+    operation,
+    addIssue(field: string, message: string) {
+      issues.push({ field, message });
+    },
+  };
+  table.validate(value, context);
 }

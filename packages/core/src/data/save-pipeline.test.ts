@@ -1,5 +1,10 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { sqliteTable, text, integer } from "drizzle-orm/sqlite-core";
+import {
+  customType,
+  sqliteTable,
+  text,
+  integer,
+} from "drizzle-orm/sqlite-core";
 import { sapportaTable } from "../schema/table.js";
 import { savePipeline, insertRow, updateRow } from "./save-pipeline.js";
 import { ValidationError } from "../db/errors.js";
@@ -8,7 +13,9 @@ import { createTestDb } from "../testing/test-utils.js";
 const accountsTable = sqliteTable("accounts", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   name: text("name").notNull(),
-  type: text("type").notNull(),
+  type: text("type", {
+    enum: ["asset", "liability", "equity", "revenue", "expense"],
+  }).notNull(),
   balance: integer("balance"),
 });
 
@@ -16,18 +23,11 @@ const accounts = sapportaTable({
   drizzle: accountsTable,
   meta: {
     rowLabelColumns: ["name"],
-    selects: [
-      {
-        type: "select",
-        column: "type",
-        options: ["asset", "liability", "equity", "revenue", "expense"],
-      },
-    ],
   },
 });
 
 describe("save-pipeline (integration)", () => {
-  let db: any;
+  let db: ReturnType<typeof createTestDb>["db"];
 
   beforeEach(async () => {
     const testDb = createTestDb();
@@ -84,10 +84,11 @@ describe("save-pipeline (integration)", () => {
 
     try {
       await savePipeline(accounts, db, { name: "Cash\x07", type: "asset" });
-    } catch (e: any) {
+    } catch (e: unknown) {
       expect(e).toBeInstanceOf(ValidationError);
-      expect(e.errors[0].field).toBe("name");
-      expect(e.errors[0].message).toContain("control characters");
+      if (!(e instanceof ValidationError)) throw e;
+      expect(e.errors[0]!.field).toBe("name");
+      expect(e.errors[0]!.message).toContain("control characters");
     }
   });
 
@@ -129,5 +130,53 @@ describe("save-pipeline (integration)", () => {
       name: "Sales Revenue",
     });
     expect(updated.name).toBe("Sales Revenue");
+  });
+
+  it("passes parsed transform output to Drizzle and returns SQL field names", async () => {
+    let receivedByDrizzle: unknown;
+    const capturedTimestamp = customType<{
+      data: string;
+      driverData: string;
+    }>({
+      dataType: () => "text",
+      toDriver(value) {
+        receivedByDrizzle = value;
+        return value;
+      },
+      fromDriver: (value) => value,
+    });
+    const eventsTable = sqliteTable("events", {
+      id: integer("id").primaryKey({ autoIncrement: true }),
+      eventName: text("event_name").notNull(),
+      startsAt: capturedTimestamp("starts_at").notNull(),
+    });
+    const events = sapportaTable({
+      drizzle: eventsTable,
+      meta: {
+        rowLabelColumns: ["event_name"],
+        rowScope: "systemGlobal",
+        columns: { starts_at: { kind: "timestamp" } },
+      },
+    });
+    const testDb = createTestDb();
+    testDb.sqlite.exec(`
+      CREATE TABLE events (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        event_name TEXT NOT NULL,
+        starts_at TEXT NOT NULL
+      )
+    `);
+
+    const row = await savePipeline(events, testDb.db, {
+      event_name: "Launch",
+      starts_at: "2026-07-18T10:30:45.999+05:30",
+    });
+
+    expect(receivedByDrizzle).toBe("2026-07-18T05:00:45Z");
+    expect(row).toEqual({
+      id: 1,
+      event_name: "Launch",
+      starts_at: "2026-07-18T05:00:45Z",
+    });
   });
 });

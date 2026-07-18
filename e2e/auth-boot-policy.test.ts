@@ -369,7 +369,7 @@ function writeInvalidAuthSchema(projectDir: string): void {
       '    label: "Unknown Protected Ref",',
       '    rowScope: "workspaceGlobal",',
       '    rowLabelColumns: ["id"],',
-      '    references: { protected_account_id: { table: "boot_reference_target", clientCanSet: false } },',
+      '    references: { protected_account_id: { table: "boot_reference_target", apiSettable: false } },',
       "  },",
       "});",
       "",

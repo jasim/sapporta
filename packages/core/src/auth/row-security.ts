@@ -4,8 +4,8 @@ import type { TableCatalog } from "../schema/catalog.js";
 import type { TableDef } from "../schema/table.js";
 import type { RequestDataAuthority } from "./request-data-authority.js";
 import {
-  AuthPayloadPolicyError,
-  clientPayloadPolicyIssues,
+  ApiWritePolicyError,
+  apiWritePolicyIssues,
   requireResolvedTableReferences,
   trustedInsertValuesForDataAuthority,
 } from "./schema-validation.js";
@@ -30,7 +30,7 @@ import {
 export interface TableRowSecurity {
   /**
    * Low-level helper that stamps trusted ownership fields on an already-safe
-   * object. Prefer `insertValues()` for normal client create bodies because it
+   * object. Prefer `insertValues()` for normal API create bodies because it
    * also rejects server-managed references and validates FK visibility.
    */
   addOwnershipFields<T extends Record<string, unknown>>(
@@ -38,7 +38,7 @@ export interface TableRowSecurity {
   ): T & Record<string, unknown>;
 
   /**
-   * Rejects client-submitted ownership fields such as `workspace_id` and
+   * Rejects API-submitted ownership fields such as `workspace_id` and
    * `scoped_to_user_id`. This does not check server-managed references; use
    * `insertValues()` or `patchValues()` for normal write paths.
    */
@@ -46,10 +46,10 @@ export interface TableRowSecurity {
   ensureOwnership(input: unknown): Record<string, unknown>;
 
   /**
-   * Prepares one client create payload for Drizzle `insert().values(...)`.
+   * Prepares one API create payload for Drizzle `insert().values(...)`.
    *
-   * The helper rejects client ownership tampering, rejects client-submitted
-   * `clientCanSet: false` references, merges trusted `serverValues`, validates
+   * The helper rejects API ownership tampering, rejects API-submitted
+   * `apiSettable: false` references, merges trusted `serverValues`, validates
    * final FK visibility inside request data authority, and stamps
    * trusted ownership fields from auth.
    */
@@ -79,7 +79,7 @@ export interface TableRowSecurity {
   ): Record<string, unknown>;
 
   /**
-   * Prepares multiple client create payloads with the same guarantees as
+   * Prepares multiple API create payloads with the same guarantees as
    * `insertValues()`. Empty batches are rejected so callers do not accidentally
    * pass ambiguous SQL input to Drizzle.
    */
@@ -97,10 +97,10 @@ export interface TableRowSecurity {
   ownedRows(predicate?: SQL): SQL;
 
   /**
-   * Prepares one client update patch for Drizzle `update().set(...)`.
+   * Prepares one API update patch for Drizzle `update().set(...)`.
    *
-   * The helper rejects ownership tampering and client-submitted
-   * `clientCanSet: false` references, then validates submitted FK values. It
+   * The helper rejects ownership tampering and API-submitted
+   * `apiSettable: false` references, then validates submitted FK values. It
    * never stamps ownership fields; updates must not silently rewrite ownership.
    */
   patchValues<T extends Record<string, unknown>>(
@@ -113,8 +113,8 @@ export interface TableRowSecurity {
   ): Promise<Record<string, unknown>>;
 
   /**
-   * Low-level FK visibility check for trusted payloads. Normal client writes
-   * should call `insertValues()` or `patchValues()` so client-vs-server fields
+   * Low-level FK visibility check for trusted payloads. Normal API writes
+   * should call `insertValues()` or `patchValues()` so API-vs-server fields
    * are handled before reference validation.
    */
   validateReferences(
@@ -144,9 +144,9 @@ export interface InsertValuesOptions<
   T extends Record<string, unknown> = Record<string, unknown>,
 > {
   /**
-   * Trusted values authored by server code after client policy checks, such as
+   * Trusted values authored by server code after API policy checks, such as
    * a parent row id in a master-detail insert. These values may include
-   * references marked `clientCanSet: false`; final FK visibility is still
+   * references marked `apiSettable: false`; final FK visibility is still
    * validated after they are merged.
    */
   serverValues?:
@@ -181,21 +181,21 @@ export function createRowSecurity(
       function ensureOwnership<T extends Record<string, unknown>>(input: T): T;
       function ensureOwnership(input: unknown): Record<string, unknown>;
       function ensureOwnership(input: unknown): Record<string, unknown> {
-        const errors = clientPayloadPolicyIssues(tableDef, input, []);
+        const errors = apiWritePolicyIssues(tableDef, input, []);
         if (errors.length > 0) {
-          throw new AuthPayloadPolicyError(errors);
+          throw new ApiWritePolicyError(errors);
         }
         return input as Record<string, unknown>;
       }
 
-      function ensureClientPayload(input: unknown): Record<string, unknown> {
-        const errors = clientPayloadPolicyIssues(
+      function ensureApiWriteInput(input: unknown): Record<string, unknown> {
+        const errors = apiWritePolicyIssues(
           tableDef,
           input,
           referencesFor(tableDef),
         );
         if (errors.length > 0) {
-          throw new AuthPayloadPolicyError(errors);
+          throw new ApiWritePolicyError(errors);
         }
         return input as Record<string, unknown>;
       }
@@ -215,9 +215,9 @@ export function createRowSecurity(
         index: number,
         insertOptions: InsertValuesOptions<T> = {},
       ): T & Record<string, unknown> {
-        // Keep the trust boundary explicit: validate the client shape first,
+        // Keep the trust boundary explicit: validate the API shape first,
         // merge server-authored fields second, then validate the final graph.
-        const safe = ensureClientPayload(input) as T;
+        const safe = ensureApiWriteInput(input) as T;
         const trustedValues = resolveServerValues(insertOptions, safe, index);
         const merged = { ...safe, ...trustedValues };
         validateReferencesSync(db, merged);
@@ -239,7 +239,7 @@ export function createRowSecurity(
           options.catalog.tables,
           {
             ...options,
-            skipPayloadPolicy: true,
+            skipApiWritePolicy: true,
           },
         );
       }
@@ -256,7 +256,7 @@ export function createRowSecurity(
           options.catalog.tables,
           {
             ...options,
-            skipPayloadPolicy: true,
+            skipApiWritePolicy: true,
           },
         );
       }
@@ -289,7 +289,7 @@ export function createRowSecurity(
 
         async insertManyValues(db, inputs, insertOptions) {
           if (inputs.length === 0) {
-            throw new AuthPayloadPolicyError([
+            throw new ApiWritePolicyError([
               { field: "$", message: "Expected at least one row to insert." },
             ]);
           }
@@ -314,7 +314,7 @@ export function createRowSecurity(
         },
 
         async patchValues(db: BetterSQLite3Database, patch: unknown) {
-          const safe = ensureClientPayload(patch);
+          const safe = ensureApiWriteInput(patch);
           await validateReferences(db, safe);
           return safe;
         },

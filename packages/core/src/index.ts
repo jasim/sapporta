@@ -20,15 +20,28 @@ export type {
 } from "./api/server.js";
 
 // Table definition
-export { sapportaTable } from "./schema/table.js";
+export {
+  bool,
+  date,
+  money,
+  number,
+  percentage,
+  sapportaTable,
+  select,
+  text,
+  timestamp,
+} from "./schema/table.js";
 export type {
   TableDef,
   TableOptions,
   SapportaMeta,
   SapportaTableInputMeta,
   ColumnMeta,
-  SelectMeta,
   ChildMeta,
+  TableValidation,
+  TableValidationContext,
+  TableValidationField,
+  TableValidationValue,
 } from "./schema/table.js";
 
 // Schema loader
@@ -45,9 +58,22 @@ export type { SchemaIssue } from "./schema/check.js";
 // Migration readiness
 export { assertMigrationsReady } from "./migrations/guard.js";
 
-// Validation
-export { buildZodSchema, validate } from "./data/validate.js";
-export type { ValidationErrorDetail } from "./data/validate.js";
+// Canonical table API, save-boundary, and column-value Zod
+export {
+  getColumnEnumValues,
+  zodForColumnValue,
+} from "./schema/table-value-zod.js";
+export type {
+  ColumnValueZod,
+  TableObjectZod,
+} from "./schema/table-value-zod.js";
+export { tableApiZod } from "./api/table-api-zod.js";
+export { tableWriteZod } from "./data/table-write-zod.js";
+export { parseTableWrite } from "./data/validate.js";
+export type {
+  TableWriteParseResult,
+  ValidationErrorDetail,
+} from "./data/validate.js";
 
 // Save pipeline
 export { savePipeline, insertRow, updateRow } from "./data/save-pipeline.js";

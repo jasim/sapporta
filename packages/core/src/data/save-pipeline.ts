@@ -1,11 +1,23 @@
+/**
+ * The final table-write path before Drizzle.
+ *
+ * Callers supply records keyed by public SQL column names. API callers normally
+ * arrive through row security, which has already enforced field ownership,
+ * merged trusted values, and checked reference visibility. `parseTableWrite()`
+ * remains authoritative for value structure and application validation. The
+ * parsed output is translated to Drizzle property names only for the database
+ * call, and returned rows are translated back to public SQL names.
+ */
+
 import { and, eq, type SQL } from "drizzle-orm";
 import type { BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
+import { getTableConfig } from "drizzle-orm/sqlite-core";
 import type { TableDef } from "../schema/table.js";
 import type { RowId } from "@sapporta/shared/row-id";
 import { findPkColumn } from "../schema/pk.js";
-import { validate } from "./validate.js";
+import { parseTableWrite } from "./validate.js";
 import { ValidationError } from "../db/errors.js";
-import { rejectControlChars } from "./sanitize.js";
+import { resolveRowFields } from "./row-fields.js";
 
 /**
  * Insert a new row using Drizzle's table API.
@@ -23,13 +35,16 @@ export function insertRowSync(
   db: BetterSQLite3Database,
   record: Record<string, unknown>,
 ): Record<string, unknown> {
+  const fields = resolveRowFields(schema, Object.keys(record));
   const result = db
     .insert(schema.drizzle)
-    .values(record as typeof schema.drizzle.$inferInsert)
+    .values(
+      fields.toDatabaseValues(record) as typeof schema.drizzle.$inferInsert,
+    )
     .returning()
     .all() as Record<string, unknown>[];
 
-  return result[0] as Record<string, unknown>;
+  return allRowFields(schema).pick(result[0] as Record<string, unknown>);
 }
 
 /**
@@ -43,15 +58,14 @@ export async function updateRow(
   options: { updatePredicate?: SQL } = {},
 ): Promise<Record<string, unknown>> {
   const pkCol = findPkColumn(schema);
-  const drizzleCol = (schema.drizzle as any)[pkCol.name];
-  const pkPredicate = eq(drizzleCol, id);
+  const pkPredicate = eq(pkCol, id);
   const wherePredicate = options.updatePredicate
     ? and(pkPredicate, options.updatePredicate)!
     : pkPredicate;
 
   const result = await db
     .update(schema.drizzle)
-    .set(record as any)
+    .set(resolveRowFields(schema, Object.keys(record)).toDatabaseValues(record))
     .where(wherePredicate)
     .returning();
 
@@ -59,12 +73,16 @@ export async function updateRow(
     throw new Error(`Record with id ${id} not found`);
   }
 
-  return result[0] as Record<string, unknown>;
+  return allRowFields(schema).pick(result[0] as Record<string, unknown>);
 }
 
 /**
- * The save pipeline: validate -> insert or update.
- * If `id` is provided, it updates; otherwise it inserts.
+ * Parse and persist one prepared insert or patch.
+ *
+ * An `id` selects patch semantics and scopes the update to that row. An absent
+ * `id` selects insert semantics, including required-field and default rules.
+ * The function accepts trusted prepared values as ordinary records; no public
+ * "prepared insert" type or lifecycle is required.
  */
 export async function savePipeline(
   schema: TableDef,
@@ -73,13 +91,12 @@ export async function savePipeline(
   id?: RowId,
   options: { updatePredicate?: SQL } = {},
 ): Promise<Record<string, unknown>> {
-  validateForSave(schema, record, id);
+  const parsed = parseForSave(schema, record, id);
 
-  // Step 2: Insert or update
   if (id != null) {
-    return updateRow(schema, db, id, record, options);
+    return updateRow(schema, db, id, parsed, options);
   } else {
-    return insertRow(schema, db, record);
+    return insertRow(schema, db, parsed);
   }
 }
 
@@ -88,35 +105,27 @@ export function savePipelineInsertSync(
   db: BetterSQLite3Database,
   record: Record<string, unknown>,
 ): Record<string, unknown> {
-  validateForSave(schema, record);
-  return insertRowSync(schema, db, record);
+  const parsed = parseForSave(schema, record);
+  return insertRowSync(schema, db, parsed);
 }
 
-function validateForSave(
+function parseForSave(
   schema: TableDef,
   record: Record<string, unknown>,
   id?: RowId,
-): void {
-  // Step 0: Reject control characters in string values
-  for (const [key, value] of Object.entries(record)) {
-    if (typeof value === "string") {
-      try {
-        rejectControlChars(value);
-      } catch {
-        throw new ValidationError([
-          { field: key, message: "Value contains control characters" },
-        ]);
-      }
-    }
-  }
-
-  // Step 1: Validate (partial for updates — only submitted fields are checked)
-  const errors = validate(
+): Record<string, unknown> {
+  const result = parseTableWrite(
     schema,
     record,
-    id != null ? { partial: true } : undefined,
+    id != null ? "patch" : "insert",
   );
-  if (errors.length > 0) {
-    throw new ValidationError(errors);
-  }
+  if (!result.success) throw new ValidationError(result.issues);
+  return result.data;
+}
+
+function allRowFields(schema: TableDef) {
+  return resolveRowFields(
+    schema,
+    getTableConfig(schema.drizzle).columns.map((column) => column.name),
+  );
 }

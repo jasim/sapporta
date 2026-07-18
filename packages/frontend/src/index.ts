@@ -51,12 +51,12 @@ export { NewRecordPage } from "./table/form/NewRecordPage";
 export { RecordFormField } from "./table/form/RecordFormField";
 export {
   RecordFormProvider,
+  useRecordFieldIssue,
   useRecordFieldValue,
   useRecordFormSetValue,
   useRecordFormStore,
 } from "./table/form/RecordFormProvider";
 export {
-  compactRecordFormValues,
   createRecordFormStore,
   initialRecordFormValues,
   type RecordFormState,

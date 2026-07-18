@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { ColumnSchema } from "@sapporta/shared/contracts";
-import { preset } from "@sapporta/grid/column-preset";
+import { parse, preset } from "@sapporta/grid/column-preset";
 import { StaticSearchLookup, StaticValueLookup } from "@sapporta/grid/lookup";
 import {
   createTGridColumnMapper,
@@ -156,6 +156,19 @@ describe("TGridColumnMapper.columnFor", () => {
     expect(p?.kind).toBe("currency");
     if (!p || !("currency" in p)) throw new Error("expected currency preset");
     expect(p.currency.zeroDisplay).toBe("dot");
+  });
+
+  it("uses table draft decoding for patch values", () => {
+    const column = mapColumn({
+      name: "amount",
+      label: "Amount",
+      kind: "number",
+    });
+    const parser = parse(column);
+
+    expect(parser?.("1,250.50", undefined as never)).toBe(1250.5);
+    expect(parser?.("", undefined as never)).toBeNull();
+    expect(parser?.("-", undefined as never)).toBe("-");
   });
 
   it("assigns FK label and editor lookups to preset data", () => {

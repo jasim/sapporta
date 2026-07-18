@@ -8,7 +8,9 @@ import { schemaApi, extractSchemas, extractSchema } from "./extract.js";
 const accountsTable = sqliteTable("accounts", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   name: text("name").notNull(),
-  type: text("type").notNull(),
+  type: text("type", {
+    enum: ["asset", "liability", "equity", "revenue", "expense"],
+  }).notNull(),
   balance: integer("balance"),
   active: integer("active", { mode: "boolean" }).default(true),
   created_at: timestamp("created_at")
@@ -21,13 +23,7 @@ const accounts = sapportaTable({
   meta: {
     label: "Accounts",
     rowLabelColumns: ["name"],
-    selects: [
-      {
-        type: "select",
-        column: "type",
-        options: ["asset", "liability", "equity", "revenue", "expense"],
-      },
-    ],
+    columns: { name: { apiWritable: false } },
   },
 });
 
@@ -96,7 +92,6 @@ describe("extractSchemas", () => {
     expect(ledger.meta).toMatchObject({
       label: "ledger",
       rowScope: "workspaceUserScoped",
-      selects: [],
       immutable: true,
       references: {},
       children: [],
@@ -118,6 +113,7 @@ describe("extractSchemas", () => {
     expect(nameCol.dataType).toBe("string");
     expect(nameCol.primary).toBe(false);
     expect(nameCol.label).toBe("Name");
+    expect(nameCol.apiWritable).toBe(false);
 
     const balanceCol = cols.find((c) => c.name === "balance")!;
     expect(balanceCol.notNull).toBe(false);

@@ -5,9 +5,13 @@ import { valueKindSchema } from "./value-kind-schema.js";
  * Wire shapes for `/meta/*` introspection responses.
  *
  * The server's `extractSchemas` (in `@sapporta/server/schema/extract.ts`)
- * emits values that conform to these schemas; the UI consumes them as
- * `TableSchema[]`. Single source of truth — both sides import the type
- * from here.
+ * emits values that conform to these schemas. The UI parses the HTTP response
+ * with the same Zod definitions before treating it as `TableSchema[]`.
+ *
+ * `ColumnSchema.kind` is required because metadata-driven display, filtering,
+ * create-draft decoding, and grid patch decoding all branch on it. The server
+ * guarantees the value during extraction; the wire parser prevents incomplete
+ * or stale metadata from silently reaching those consumers.
  *
  * Table metadata and route-based grid datasets use separate wire types.
  * Grid dataset columns live in `@sapporta/shared/grid-dataset`.
@@ -55,7 +59,7 @@ export const selectOptionsSchema = z.object({
 export const columnSchemaSchema = z.object({
   name: z.string(),
   label: z.string(),
-  kind: valueKindSchema.optional(),
+  kind: valueKindSchema,
   displayFormat: z.enum(["currency", "percentage"]).optional(),
   textDisplay: z.enum(["multiLine", "markdown"]).optional(),
 
@@ -74,7 +78,7 @@ export const columnSchemaSchema = z.object({
   zeroDisplay: z.enum(["blank", "dot"]).optional(),
   strong: z.boolean().optional(),
   notes: z.string().optional(),
-  clientEditable: z.boolean().optional(),
+  apiWritable: z.boolean().optional(),
   links: z.array(reportLinkSchema).optional(),
 });
 export type ColumnSchema = z.output<typeof columnSchemaSchema>;
