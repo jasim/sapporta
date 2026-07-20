@@ -73,7 +73,8 @@ export type TGridSessionContext<
 };
 
 // Runtime contract passed into renderers for every visible cell.
-// Includes the path-bound grid level, row value, and render helpers.
+// Includes the path-bound grid level, typed values, and render helpers without
+// duplicating identity already owned by `level` and the core render props.
 export type TGridCellContext<
   RowsByLevel extends TGridRowsByLevel,
   AppServices,
@@ -83,7 +84,6 @@ export type TGridCellContext<
   level: GridLevelRuntime;
   value: unknown;
   row: Readonly<RowsByLevel[LevelId]>;
-  rowKey: RowKey;
   column: TGridColumnContext<RowsByLevel[LevelId]>;
   runtime: GridRuntime;
   appServices: AppServices;

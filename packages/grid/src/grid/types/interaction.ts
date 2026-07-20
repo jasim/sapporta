@@ -1,34 +1,39 @@
-// Interaction configuration is the grid's small "operating mode" language.
+// Interaction configuration answers navigation and selection questions. It
+// does not describe a view composition.
 //
-// The base grid supports two different ideas that are easy to blur together:
+// Read a configuration in this order:
 //
-//   - a *cell grid*, like a spreadsheet, where the keyboard target is a
-//     particular cell and Shift+arrows may create a rectangular cell range;
-//   - a *row list*, like a master-detail list, where the keyboard target is a
-//     row and Shift+arrows may extend a row operation selection.
+//   1. `mode` chooses the keyboard cursor. A cell grid moves between cells. A
+//      row list moves between whole rows. This is the primary choice.
+//   2. `activeCell` and `activeRow` expose context derived from that cursor.
+//      An active row is simply the row carrying application context; it does
+//      not imply that a detail view exists.
+//   3. `selectedCells` and `selectedRows` choose operation targets. Selection
+//      answers what copy/delete/export/bulk-edit affects. It is separate from
+//      the cursor that keyboard navigation moves.
+//   4. Row activation gestures are configured here, while application
+//      reactions stay outside the configuration. Runtime subscriptions expose
+//      state; runtime events report semantic activation commands.
 //
-// This module names those choices explicitly so the rest of the runtime does
-// not have to infer intent from "whatever the user touched last". Once a
-// runtime is constructed, `interaction.mode` owns keyboard routing. Checkbox
-// clicks, row-selector cells, or side-panel selection chrome are allowed to
-// change row selection, but they never change whether ArrowUp means "move a
-// cell" or "move a row".
+// `interaction.mode` owns keyboard routing for the runtime's lifetime. A
+// checkbox or row selector may change row selection, but it never changes
+// whether ArrowUp moves a cell or a row.
 //
-// The presets below are examples of valid compositions, not special cases in
-// the runtime. Consumers can build their own config from the same primitives.
+// The presets at the bottom are named examples of these primitives. The
+// runtime does not branch on a preset identity, and consumers may define a
+// custom `GridInteractionConfig` when none of the examples fits.
 //
 // Vocabulary:
 //
 //   - cursor: where the next navigation action starts.
-//   - cell selection: a selected rectangle of cells inside one GridPath.
-//   - row selection: selected rows inside one GridPath, either stored
-//     independently or derived from active row.
 //   - active row: the row carrying row-level context.
-//   - row operation target: rows a command such as delete/export/bulk edit will
-//     affect. This is a command-level projection, not a controller field.
-//   - scope: the set of GridPaths a command includes. Interaction config
-//     describes behavior inside a path; multi-path aggregation is a caller
-//     decision.
+//   - selection: the cells or rows targeted by an operation.
+//   - scope: the GridPaths included by an operation. Config describes behavior
+//     inside one path; the caller decides how to aggregate multiple paths.
+
+// ---------------------------------------------------------------------------
+// Row operation selection
+// ---------------------------------------------------------------------------
 
 export type RowSelectionMode = "single" | "range" | "multi";
 
@@ -43,8 +48,7 @@ export type RowSelectionGesture = "replace" | "extend" | "toggle";
 // storage layer: the effective selected rows are computed from the active row,
 // and controller.rowSelection is ignored.
 export type SelectedRowsSync =
-  | { readonly kind: "follows-active-row" }
-  | { readonly kind: "independent" };
+  { readonly kind: "follows-active-row" } | { readonly kind: "independent" };
 
 export type SelectedRowsKeyboardConfig = {
   readonly space: "toggle-active-row" | "ignore";
@@ -63,8 +67,11 @@ export type SelectedRowsConfig =
     };
 
 export type SelectedCellsConfig =
-  | { readonly kind: "none" }
-  | { readonly kind: "range" };
+  { readonly kind: "none" } | { readonly kind: "range" };
+
+// ---------------------------------------------------------------------------
+// Cell-first navigation
+// ---------------------------------------------------------------------------
 
 export type CellArrowKeyBehavior = "grid" | "field-list";
 
@@ -79,12 +86,43 @@ export type CellGridActiveRowConfig =
   | { readonly kind: "none" }
   // Active row is a derived view of the active cell's row. No row cursor is
   // created in cell-grid mode.
-  | { readonly kind: "from-active-cell" };
+  | {
+      readonly kind: "from-active-cell";
+      /** Semantic row activation is disabled when omitted. */
+      readonly activation?: RowActivationConfig;
+    };
+
+// ---------------------------------------------------------------------------
+// Row-first navigation
+// ---------------------------------------------------------------------------
+
+export type RowActivationGesture = "enter" | "click" | "doubleClick";
+
+export type RowActivationTrigger =
+  | { readonly kind: "keyboard"; readonly gesture: "enter" }
+  | {
+      readonly kind: "pointer";
+      readonly gesture: "click" | "doubleClick";
+    };
+
+/** Renderer-neutral pointer input used before a semantic activation exists. */
+export type GridPointerInput = {
+  readonly gesture: "click" | "doubleClick";
+  readonly button: number;
+  readonly altKey: boolean;
+  readonly ctrlKey: boolean;
+  readonly metaKey: boolean;
+  readonly shiftKey: boolean;
+};
+
+export type RowActivationConfig = {
+  readonly startsOn: readonly RowActivationGesture[];
+};
 
 export type ActiveRowKeyboardConfig = {
   readonly arrows: "move-active-row";
   readonly shiftArrows: "extend-selected-rows" | "move-active-row";
-  readonly expansion: "left-right-enter" | "none";
+  readonly expansion: "left-right" | "left-right-enter" | "none";
 };
 
 export type RowListActiveRowConfig = {
@@ -93,6 +131,8 @@ export type RowListActiveRowConfig = {
   // is the thing arrows move. Selection only participates when Shift+arrows
   // are explicitly configured to extend independent selected rows.
   readonly keyboard: ActiveRowKeyboardConfig;
+  /** Semantic row activation is disabled when omitted. */
+  readonly activation?: RowActivationConfig;
 };
 
 export type CellGridInteractionConfig = {
@@ -115,9 +155,13 @@ export type RowListInteractionConfig = {
 };
 
 export type GridInteractionConfig =
-  | CellGridInteractionConfig
-  | RowListInteractionConfig;
+  CellGridInteractionConfig | RowListInteractionConfig;
 
+// ---------------------------------------------------------------------------
+// Cell-first presets
+// ---------------------------------------------------------------------------
+
+/** Spreadsheet-style editing with rectangular cell selection. */
 export const CELL_EDITING_GRID = {
   mode: "cell-grid",
   activeCell: {
@@ -129,6 +173,7 @@ export const CELL_EDITING_GRID = {
   selectedRows: { kind: "none" },
 } satisfies GridInteractionConfig;
 
+/** Spreadsheet-style editing with one active cell and no cell range. */
 export const CELL_EDITING_NO_SELECTION_GRID = {
   mode: "cell-grid",
   activeCell: {
@@ -140,6 +185,7 @@ export const CELL_EDITING_NO_SELECTION_GRID = {
   selectedRows: { kind: "none" },
 } satisfies GridInteractionConfig;
 
+/** Cell-first navigation that also exposes the active cell's row as context. */
 export const CELL_GRID_WITH_ACTIVE_ROW = {
   mode: "cell-grid",
   activeCell: {
@@ -151,6 +197,10 @@ export const CELL_GRID_WITH_ACTIVE_ROW = {
   selectedRows: { kind: "none" },
 } satisfies GridInteractionConfig;
 
+/**
+ * Cell-first navigation with a separate multi-row operation selection. Moving
+ * the active cell does not replace the selected rows.
+ */
 export const CELL_GRID_WITH_INDEPENDENT_ROW_SELECTION = {
   mode: "cell-grid",
   activeCell: {
@@ -167,6 +217,11 @@ export const CELL_GRID_WITH_INDEPENDENT_ROW_SELECTION = {
   },
 } satisfies GridInteractionConfig;
 
+/**
+ * Cell-first navigation where the active cell's row is also the single
+ * operation target. The name describes a common use, but this preset renders
+ * no panel.
+ */
 export const CELL_PRIMARY_WITH_SIDE_PANEL_ROW = {
   mode: "cell-grid",
   activeCell: {
@@ -183,6 +238,10 @@ export const CELL_PRIMARY_WITH_SIDE_PANEL_ROW = {
   },
 } satisfies GridInteractionConfig;
 
+/**
+ * Cell-first navigation with one independently chosen row operation target.
+ * The name describes a common use, but this preset renders no panel.
+ */
 export const CELL_PRIMARY_WITH_SELECTED_SIDE_PANEL_ROW = {
   mode: "cell-grid",
   activeCell: {
@@ -199,6 +258,16 @@ export const CELL_PRIMARY_WITH_SELECTED_SIDE_PANEL_ROW = {
   },
 } satisfies GridInteractionConfig;
 
+// ---------------------------------------------------------------------------
+// Row-first presets
+// ---------------------------------------------------------------------------
+
+/**
+ * Full-row navigation with the active row as the single operation target.
+ * Arrow keys change active-row context. Enter and the horizontal arrow keys
+ * preserve hierarchical expansion controls.
+ * Despite its historical name, this preset creates no detail view or layout.
+ */
 export const ROW_PRIMARY_MASTER_DETAIL = {
   mode: "row-list",
   activeCell: { kind: "none" },
@@ -219,6 +288,27 @@ export const ROW_PRIMARY_MASTER_DETAIL = {
   },
 } satisfies GridInteractionConfig;
 
+/**
+ * Full-row navigation with semantic activation on Enter and double-click.
+ * Left and right retain hierarchical expansion; Enter is reserved for the
+ * application activation command.
+ */
+export const ROW_PRIMARY_MASTER_DETAIL_WITH_ACTIVATION = {
+  ...ROW_PRIMARY_MASTER_DETAIL,
+  activeRow: {
+    ...ROW_PRIMARY_MASTER_DETAIL.activeRow,
+    keyboard: {
+      ...ROW_PRIMARY_MASTER_DETAIL.activeRow.keyboard,
+      expansion: "left-right",
+    },
+    activation: { startsOn: ["enter", "doubleClick"] },
+  },
+} satisfies GridInteractionConfig;
+
+/**
+ * Full-row navigation with independent multi-row operation selection. Space
+ * toggles a row and Shift+arrows extends the selection.
+ */
 export const ROW_MULTISELECT_LIST = {
   mode: "row-list",
   activeCell: { kind: "none" },

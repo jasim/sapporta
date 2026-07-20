@@ -51,6 +51,7 @@ export const GridRow = memo(function GridRow({
 }) {
   const runtime = useGridRuntime();
   const internals = runtimeInternalsFor(runtime);
+  const controller = internals.controllerFor(path);
   const row = useDisplayedRow(path, rowId);
   const { active, selected } =
     rowChromeStateFromInteractionStatus(rowInteractionStatus);
@@ -86,6 +87,26 @@ export const GridRow = memo(function GridRow({
         } else {
           internals.cursorManager.moveRowCursorTo({ path, rowId: row.id });
         }
+      }}
+      onClick={(event) => {
+        controller.handleRowPointer(row.id, {
+          gesture: "click",
+          button: event.button,
+          altKey: event.altKey,
+          ctrlKey: event.ctrlKey,
+          metaKey: event.metaKey,
+          shiftKey: event.shiftKey,
+        });
+      }}
+      onDoubleClick={(event) => {
+        controller.handleRowPointer(row.id, {
+          gesture: "doubleClick",
+          button: event.button,
+          altKey: event.altKey,
+          ctrlKey: event.ctrlKey,
+          metaKey: event.metaKey,
+          shiftKey: event.shiftKey,
+        });
       }}
     >
       <RowInteractionStatusProvider status={rowInteractionStatus}>

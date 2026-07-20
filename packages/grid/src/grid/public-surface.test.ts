@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, expectTypeOf, it } from "vitest";
 import * as advanced from "./advanced";
 import {
   createGridRuntime,
@@ -6,8 +6,23 @@ import {
   makeRowId,
   rootPath,
   ROW_MULTISELECT_LIST,
+  type CellActivationGesture,
+  type CellActivationTrigger,
+  type GridActiveRow,
   type GridSchema,
+  type LevelRowOfKind,
 } from "./index";
+
+type ActiveRowFor<Kind extends GridActiveRow["row"]["kind"]> = Extract<
+  GridActiveRow,
+  { row: { kind: Kind } }
+>;
+
+const publicCellActivationGesture: CellActivationGesture = "doubleClick";
+const publicCellActivationTrigger: CellActivationTrigger = {
+  kind: "pointer",
+  gesture: publicCellActivationGesture,
+};
 
 const runtimeSchema: GridSchema = {
   rootLevel: "rows",
@@ -47,6 +62,42 @@ function publicRuntime() {
 }
 
 describe("grid public surface", () => {
+  it("represents every active-row kind through the public discriminated union", () => {
+    expectTypeOf<LevelRowOfKind<"data">["kind"]>().toEqualTypeOf<"data">();
+    expectTypeOf<LevelRowOfKind<"rollup">["kind"]>().toEqualTypeOf<"rollup">();
+    expectTypeOf<LevelRowOfKind<"opening">["kind"]>().toEqualTypeOf<"opening">();
+    expectTypeOf<LevelRowOfKind<"closing">["kind"]>().toEqualTypeOf<"closing">();
+    expectTypeOf<
+      LevelRowOfKind<"subtotal">["kind"]
+    >().toEqualTypeOf<"subtotal">();
+    expectTypeOf<LevelRowOfKind<"footer">["kind"]>().toEqualTypeOf<"footer">();
+    expectTypeOf<LevelRowOfKind<"phantom">["kind"]>().toEqualTypeOf<"phantom">();
+    expectTypeOf<ActiveRowFor<"data">["row"]["kind"]>().toEqualTypeOf<"data">();
+    expectTypeOf<
+      ActiveRowFor<"rollup">["row"]["kind"]
+    >().toEqualTypeOf<"rollup">();
+    expectTypeOf<
+      ActiveRowFor<"opening">["row"]["kind"]
+    >().toEqualTypeOf<"opening">();
+    expectTypeOf<
+      ActiveRowFor<"closing">["row"]["kind"]
+    >().toEqualTypeOf<"closing">();
+    expectTypeOf<
+      ActiveRowFor<"subtotal">["row"]["kind"]
+    >().toEqualTypeOf<"subtotal">();
+    expectTypeOf<
+      ActiveRowFor<"footer">["row"]["kind"]
+    >().toEqualTypeOf<"footer">();
+    expectTypeOf<
+      ActiveRowFor<"phantom">["row"]["kind"]
+    >().toEqualTypeOf<"phantom">();
+  });
+  it("retains the public cell activation type names", () => {
+    expect(publicCellActivationTrigger).toEqual({
+      kind: "pointer",
+      gesture: "doubleClick",
+    });
+  });
   it("does not export removed internal grid APIs", async () => {
     const mod = (await import("./index")) as Record<string, unknown>;
 
@@ -67,6 +118,7 @@ describe("grid public surface", () => {
     expect(typeof mod.GridCopyContextMenu).toBe("function");
     expect(typeof mod.serializeGridCopyTargetToCsv).toBe("function");
     expect(typeof mod.useGridRuntimeEffect).toBe("function");
+    expect(typeof mod.useGridActiveRow).toBe("function");
     expect(typeof mod.GridLevel).toBe("function");
     expect(typeof mod.inMemoryGridDataSource).toBe("function");
     expect(typeof mod.restGridDataSource).toBe("function");
@@ -81,6 +133,7 @@ describe("grid public surface", () => {
     const runtime = publicRuntime();
 
     expect(Object.keys(runtime).sort()).toEqual([
+      "activeRow",
       "dispose",
       "interaction",
       "level",
@@ -90,6 +143,7 @@ describe("grid public surface", () => {
       "rowOperations",
       "schema",
       "schemaAt",
+      "subscribeActiveRow",
       "subscribeLevels",
     ]);
     expect(runtime).not.toHaveProperty("controllerFor");
@@ -142,5 +196,6 @@ describe("grid public surface", () => {
     expect(Object.isFrozen(runtime.interaction)).toBe(true);
     expect(Object.isFrozen(runtime.interaction.activeRow)).toBe(true);
     expect(Object.isFrozen(runtime.interaction.selectedRows)).toBe(true);
+    expect(runtime.interaction.activeRow).not.toHaveProperty("activation");
   });
 });

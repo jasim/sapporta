@@ -45,6 +45,7 @@ import {
   keyEventToCellIntent,
   keyEventToRowIntent,
   pointerEventToCellIntent,
+  pointerEventToRowIntent,
   type CellKeyboardPresentation,
 } from "./key-handling";
 import type {
@@ -64,7 +65,11 @@ import type {
 } from "../types/action";
 import type { GridEffect } from "../types/effects";
 import type { CellSelectionState } from "../types/selection";
-import type { GridInteractionConfig } from "../types/interaction";
+import type {
+  GridPointerInput,
+  GridInteractionConfig,
+  RowActivationTrigger,
+} from "../types/interaction";
 import type { RowSelection } from "../types/row-selection";
 import { reduceController } from "./reducer";
 
@@ -76,7 +81,11 @@ export interface GridControllerPublicVerbs {
   readonly activateCell: (coord: Coord, trigger: CellActivationTrigger) => void;
   readonly handleCellPointer: (
     coord: Coord,
-    gesture: "click" | "doubleClick",
+    pointer: GridPointerInput,
+  ) => boolean;
+  readonly handleRowPointer: (
+    rowId: RowId,
+    pointer: GridPointerInput,
   ) => boolean;
   readonly cancelEdit: () => void;
   // commitEdit closes the editor, performs the cell write, and (when
@@ -124,7 +133,9 @@ export type GridControllerPublic = ReadonlyControllerStore &
   GridControllerPublicVerbs;
 
 type MutableGridControllerPublicVerbs = {
-  -readonly [Key in keyof GridControllerPublicVerbs]: GridControllerPublicVerbs[Key];
+  -readonly [
+    Key in keyof GridControllerPublicVerbs
+  ]: GridControllerPublicVerbs[Key];
 };
 
 export type GridControllerStore = StoreApi<ControllerState> &
@@ -151,6 +162,11 @@ export type CreateControllerArgs = {
   // `mutationCommitted`.
   writeValue?: (coord: Coord, newValue: unknown) => void;
   activateCell?: (coord: Coord, trigger: CellActivationTrigger) => void;
+  activateRow?: (
+    rowId: RowId,
+    trigger: RowActivationTrigger,
+    coord?: Coord,
+  ) => boolean;
 };
 
 const INITIAL: ControllerState = {
@@ -244,7 +260,7 @@ export function createGridController(
   store.activateCell = (coord, trigger) => {
     args.activateCell?.(coord, trigger);
   };
-  store.handleCellPointer = (coord, gesture) => {
+  store.handleCellPointer = (coord, pointer) => {
     if (args.interaction.mode !== "cell-grid") return false;
     const row = args.getDisplayed().rowById.get(coord.rowId);
     const column = args.getSchema().find((c) => c.id === coord.colId);
@@ -253,10 +269,38 @@ export function createGridController(
       column,
       rowId: coord.rowId,
       editable: args.capabilitiesFor(row.kind).editable,
-      gesture,
+      gesture: pointer.gesture,
     });
-    if (!intent) return false;
-    return applyCellIntent(intent);
+    if (intent) {
+      args.onNavigateCell?.({
+        type: "cellPressed",
+        target: coord,
+        extend: false,
+      });
+      return applyCellIntent(intent);
+    }
+    const rowIntent = pointerEventToRowIntent({
+      config: args.interaction,
+      rowId: coord.rowId,
+      pointer,
+    });
+    if (!rowIntent || rowIntent.type !== "activateRow" || !args.activateRow) {
+      return false;
+    }
+    args.onNavigateCell?.({
+      type: "cellPressed",
+      target: coord,
+      extend: false,
+    });
+    return args.activateRow(rowIntent.rowId, rowIntent.trigger, coord);
+  };
+  store.handleRowPointer = (rowId, pointer) => {
+    const intent = pointerEventToRowIntent({
+      config: args.interaction,
+      rowId,
+      pointer,
+    });
+    return intent ? applyRowIntent(intent) : false;
   };
   store.cancelEdit = () => dispatch({ type: "CANCEL_EDIT" });
   store.clearCellSelection = () => {
@@ -299,6 +343,9 @@ export function createGridController(
       case "activateCell":
         args.activateCell?.(intent.coord, intent.trigger);
         return !!args.activateCell;
+      case "activateRow":
+        if (!args.activateRow) return false;
+        return args.activateRow(intent.rowId, intent.trigger, intent.coord);
       case "startEdit":
         if (intent.trigger === "type") {
           dispatch({
@@ -351,6 +398,9 @@ export function createGridController(
       case "toggleActiveRowExpansion":
         args.onNavigateRow?.(intent);
         return !!args.onNavigateRow;
+      case "activateRow":
+        if (!args.activateRow) return false;
+        return args.activateRow(intent.rowId, intent.trigger);
     }
     return false;
   }

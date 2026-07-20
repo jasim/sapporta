@@ -42,7 +42,7 @@ function assertReadonlyPublicModels(
   // @ts-expect-error Draft arrays are readonly.
   runtime.root.drafts.get().push(draft);
   // @ts-expect-error Row-operation targets are readonly.
-  target.rowKey = "other";
+  target.row = row;
   // @ts-expect-error Runtime construction arguments are readonly.
   args.schema = runtime.schema;
   // @ts-expect-error Runtime source-view methods are stable readonly ports.

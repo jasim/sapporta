@@ -13,10 +13,7 @@ import type {
   PhantomRowLifecycle,
   PhantomRowLifecycleDeps,
 } from "./runtime/phantom-row-lifecycle";
-import {
-  runtimeInternalsFor,
-  type GridRuntime,
-} from "./runtime/runtime";
+import { runtimeInternalsFor, type GridRuntime } from "./runtime/runtime";
 import type { CellCursor, Coord, GridPath, RowId } from "./types/identity";
 import type { RowCursor, RowSelection } from "./types/row-selection";
 import type {
@@ -29,6 +26,7 @@ import type { PhantomRow } from "./types/level-row";
 import type { CommitTarget } from "./types/action";
 import type { ControllerState } from "./types/controller-state";
 import type { GridEffect } from "./types/effects";
+import type { GridPointerInput } from "./types/interaction";
 
 const cursorWrappers = new WeakMap<GridRuntime, CursorManager>();
 const controllerWrappers = new WeakMap<
@@ -182,9 +180,13 @@ export function controllerFor(
       assertLevel();
       raw.activateCell(coord, trigger);
     },
-    handleCellPointer(coord: Coord, gesture: "click" | "doubleClick") {
+    handleCellPointer(coord: Coord, pointer: GridPointerInput) {
       assertLevel();
-      return raw.handleCellPointer(coord, gesture);
+      return raw.handleCellPointer(coord, pointer);
+    },
+    handleRowPointer(rowId: RowId, pointer: GridPointerInput) {
+      assertLevel();
+      return raw.handleRowPointer(rowId, pointer);
     },
     cancelEdit() {
       assertLevel();

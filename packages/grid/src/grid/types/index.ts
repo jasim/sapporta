@@ -61,6 +61,7 @@ export type {
   LevelOptions,
   LevelRow,
   LevelRowKind,
+  LevelRowOfKind,
   TreeBackedLevelRow,
   FooterLevelRow,
   FooterRow,
@@ -122,6 +123,7 @@ export {
   CELL_PRIMARY_WITH_SELECTED_SIDE_PANEL_ROW,
   ROW_MULTISELECT_LIST,
   ROW_PRIMARY_MASTER_DETAIL,
+  ROW_PRIMARY_MASTER_DETAIL_WITH_ACTIVATION,
 } from "./interaction";
 export type * from "./row-selection";
 export { rowInteractionStatusFor } from "./row-selection";

@@ -5,10 +5,8 @@ import {
   type ReactNode,
 } from "react";
 import { useStore } from "zustand";
-import {
-  runtimeInternalsFor,
-  type GridRuntime,
-} from "../runtime/runtime";
+import { runtimeInternalsFor, type GridRuntime } from "../runtime/runtime";
+import type { GridActiveRow } from "../runtime/grid-active-row";
 import type { LevelSnapshot, LevelSourceState } from "../data-sources/types";
 import type { CellCursor, Coord, GridPath, RowId } from "../types/identity";
 import type { CellSelectionState } from "../types/selection";
@@ -46,6 +44,32 @@ export function useGridRuntime(): GridRuntime {
   if (!v)
     throw new Error("useGridRuntime must be used inside <GridRuntimeProvider>");
   return v;
+}
+
+/**
+ * Reads the row currently carrying application context across the grid.
+ *
+ * The returned value is already React state: it updates when the row cursor
+ * moves and when the active row's displayed values change. Applications can
+ * render a detail panel directly from it without copying it into `useState`.
+ */
+export function useGridActiveRow(
+  explicitRuntime?: GridRuntime,
+): GridActiveRow | null {
+  const contextRuntime = useContext(RuntimeContext);
+  const runtime = explicitRuntime ?? contextRuntime;
+
+  if (!runtime) {
+    throw new Error(
+      "useGridActiveRow requires a runtime argument or GridRuntimeProvider",
+    );
+  }
+
+  return useSyncExternalStore(
+    runtime.subscribeActiveRow,
+    runtime.activeRow,
+    () => null,
+  );
 }
 
 // Subscribe to one path's snapshot. Re-renders only when the source emits.

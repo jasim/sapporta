@@ -146,9 +146,13 @@ selection that still names a removed or hidden row.
 Interaction has several projections over related state. Each projection has a
 separate subscription because it answers a different application question.
 
-- `subscribeActiveRow` answers which row currently drives active-row behavior.
-  It follows the cell cursor in configured cell grids and the row cursor in row
-  lists.
+- `level.subscribeActiveRow` answers which row currently drives active-row
+  behavior on one path. It follows the cell cursor in configured cell grids and
+  the row cursor in row lists.
+- `runtime.subscribeActiveRow` observes the one global active-row snapshot. The
+  snapshot contains the live `level` and displayed `row`. `level.path` locates
+  the row and `row.id` is its identity, so the subscription also wakes when the
+  current row's displayed values change.
 - `subscribeSelectedRows` observes the selection value. That value can be
   disabled, derived from the active row, or stored independently.
 - `subscribeSelectedRowIds` observes the selected rows after projecting the
@@ -165,6 +169,20 @@ when that listener's projection is unchanged.
 Cell selection and row selection are separate domains. A cell range identifies
 cells for editing and copy behavior. Row selection identifies row operation
 targets. A command can change one without moving or changing the other.
+
+Row activation is an optional semantic command on an enabled active-row
+configuration. Omission disables it. In cell-grid mode, a cell activation has
+first precedence, editing has second precedence, and row activation is the
+fallback. Row-list Enter expansion wins unless the
+configuration explicitly reserves Enter for row activation. A configuration
+cannot assign both click and double-click to row activation because browsers
+deliver click events before `dblclick`.
+
+`runtime.activeRow()` and `runtime.subscribeActiveRow()` expose grid-wide
+current state. The level interaction reads and subscriptions expose current
+state for one path. React renders the grid-wide snapshot through
+`useGridActiveRow(runtime)` in a provider-owning component or
+`useGridActiveRow()` in a provider descendant.
 
 ## Other subscription surfaces
 
@@ -188,11 +206,26 @@ such as focus and reveal requests. These are separate because controller state
 can change without scheduling DOM work, and DOM work can remain queued while a
 collapsed level is not mounted.
 
-`runtime.on(event, listener)` observes host events with payloads. These events
-describe commands and outcomes such as committed mutations, reconciliation,
-selection changes, status changes, and draft creation results. Host events are
-not render invalidations. Source-internal refreshes can change displayed data
-without emitting `mutationCommitted`.
+`RuntimeArgs.on` installs construction-time event listeners before the root
+source is acquired. `runtime.on(event, listener)` installs listeners during the
+runtime lifetime. Runtime disposal clears both listener sets.
+
+Events describe discrete commands, outcomes, and defined transitions. They are
+separate from current-state subscriptions:
+
+- `cellSelectionChanged` reports a transition in the controller's stored cell
+  selection.
+- `rowSelectionChanged` reports a transition in the controller's stored row
+  selection. Derived `selectedRows()`, `selectedRowIds()`, and
+  `rowInteractionSnapshot()` values can also change when the active row or
+  displayed rows change.
+- `levelStatusChanged` reports each source status transition observed by the
+  runtime. Source data changes with the same status do not produce this event.
+- `rowActivated` reports every successful configured row activation. Repeated
+  activation of the same active row produces repeated events.
+
+Host events are not render invalidations. Source-internal refreshes can change
+displayed data without emitting `mutationCommitted`.
 
 Every subscription returns an idempotent unsubscribe function. A level tracks
 subscriptions created through its public surface and releases them when that

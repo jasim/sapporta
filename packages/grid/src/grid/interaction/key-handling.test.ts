@@ -7,8 +7,10 @@ import {
 import { capabilitiesFor } from "../types/capabilities";
 import {
   CELL_EDITING_GRID,
+  CELL_GRID_WITH_ACTIVE_ROW,
   ROW_MULTISELECT_LIST,
   ROW_PRIMARY_MASTER_DETAIL,
+  ROW_PRIMARY_MASTER_DETAIL_WITH_ACTIVATION,
 } from "../types/interaction";
 import { makeLevelRowId, makeRowId, rootPath } from "../types/identity";
 import type { ControllerState } from "../types/controller-state";
@@ -110,7 +112,7 @@ function keyEventToCellIntent(
 function keyEventToRowIntent(e: KeyboardEvent, state: ControllerState) {
   return parseRowIntent(
     e,
-    ROW_PRIMARY_MASTER_DETAIL,
+    ROW_PRIMARY_MASTER_DETAIL_WITH_ACTIVATION,
     state,
     makeRows([{ key: "r0", kind: "data" }]),
   );
@@ -401,6 +403,31 @@ describe("keyEventToCellIntent", () => {
     });
   });
 
+  it("falls back to configured cell-grid row activation on Enter", () => {
+    const rowId = makeRowId(path, "r0");
+    expect(
+      parseCellIntent(
+        ev("Enter"),
+        {
+          ...CELL_GRID_WITH_ACTIVE_ROW,
+          activeRow: {
+            kind: "from-active-cell",
+            activation: { startsOn: ["enter"] },
+          },
+        },
+        focusAt("r0", "a"),
+        displayed,
+        [{ ...cols[0], edit: undefined }, cols[1]],
+        capabilitiesFor,
+      ),
+    ).toEqual({
+      type: "activateRow",
+      rowId,
+      coord: { rowId, colId: "a" },
+      trigger: { kind: "keyboard", gesture: "enter" },
+    });
+  });
+
   it("Enter and Space activate cells that own those gestures", () => {
     const expansionColumns = [
       {
@@ -666,10 +693,15 @@ describe("keyEventToRowIntent", () => {
     });
   });
 
-  it("maps Enter to active-row expansion toggle", () => {
+  it("maps configured Enter activation to a semantic row command", () => {
     expect(keyEventToRowIntent(ev("Enter"), rowFocused)).toEqual({
-      type: "toggleActiveRowExpansion",
+      type: "activateRow",
+      rowId: makeRowId(path, "r0"),
+      trigger: { kind: "keyboard", gesture: "enter" },
     });
+    expect(
+      keyEventToRowIntent(ev("Enter", { ctrlKey: true }), rowFocused),
+    ).toBe(null);
   });
 
   it("ignores expansion keys when row expansion is not configured", () => {

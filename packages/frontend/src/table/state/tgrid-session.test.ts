@@ -7,7 +7,11 @@ import {
   parseFiltersForTable,
   type FilterCondition,
 } from "@sapporta/shared/filter";
-import { makeRowId, rootPath } from "@sapporta/grid";
+import {
+  makeRowId,
+  rootPath,
+  ROW_PRIMARY_MASTER_DETAIL_WITH_ACTIVATION,
+} from "@sapporta/grid";
 import { controllerFor, cursorManagerFor } from "@sapporta/grid/advanced";
 import { createTGridSession } from "./tgrid-session";
 import { defineTGrid } from "../grid-adapter/tgrid-runtime-config";
@@ -74,6 +78,78 @@ function deferred<T>(): {
 }
 
 describe("TGridSession", () => {
+  it("exposes typed active-row state and delegates the row Enter command", async () => {
+    const rowsClient: TableRowsClient = {
+      fetch: vi.fn(async () => ({
+        data: [
+          { id: 1, customer: "Acme", status: "open" },
+          { id: 2, customer: "Beta", status: "open" },
+        ],
+        meta: { total: 2, page: 1, limit: 50, pages: 1 },
+      })),
+      create: vi.fn(async (_table, data) => ({ data })),
+      update: vi.fn(async (_table, _id, data) => ({ data })),
+      remove: vi.fn(async (_table, id) => ({ data: { id } })),
+    };
+    const definition = defineTGrid<RowsByLevel>({
+      rootLevel: "orders",
+      interaction: ROW_PRIMARY_MASTER_DETAIL_WITH_ACTIVATION,
+      levels: {
+        orders: {
+          table: ordersTable,
+          childLevels: [],
+          query: { owner: "host" },
+          rowsClient,
+        },
+      },
+    });
+    const session = createTGridSession<RowsByLevel>(definition);
+
+    try {
+      await flush();
+      const path = rootPath("orders");
+      const firstRowId = makeRowId(path, "1");
+      const activeRowChanged = vi.fn();
+      const onRowActivate = vi.fn();
+      session.subscribeActiveRow(activeRowChanged);
+      session.onRowActivate(onRowActivate);
+      cursorManagerFor(session.runtime).moveRowCursorTo({
+        path,
+        rowId: firstRowId,
+      });
+
+      expect(session.activeRow()).toEqual(
+        expect.objectContaining({
+          kind: "data",
+          id: firstRowId,
+          levelId: "orders",
+          values: { id: 1, customer: "Acme", status: "open" },
+          level: expect.objectContaining({ path }),
+          runtime: session.runtime,
+        }),
+      );
+      expect(activeRowChanged).toHaveBeenCalledTimes(1);
+
+      const controller = controllerFor(session.runtime, path);
+      expect(controller.handleKey(keyEvent("Enter"))).toBe(true);
+      expect(onRowActivate).toHaveBeenCalledWith({
+        activeRow: expect.objectContaining({
+          kind: "data",
+          id: firstRowId,
+          levelId: "orders",
+          values: { id: 1, customer: "Acme", status: "open" },
+        }),
+        trigger: { kind: "keyboard", gesture: "enter" },
+      });
+
+      cursorManagerFor(session.runtime).clearRowCursor();
+      expect(session.activeRow()).toBe(null);
+      expect(activeRowChanged).toHaveBeenCalledTimes(2);
+    } finally {
+      session.dispose();
+    }
+  });
+
   it("uses level initial filters when no route query seed is provided", () => {
     const initialFilter = eqCondition("status", "open");
     const definition = defineTGrid<RowsByLevel>({

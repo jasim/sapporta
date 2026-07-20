@@ -1,19 +1,7 @@
-import {
-  CELL_EDITING_GRID,
-  type GridInteractionConfig,
+import type {
+  GridInteractionConfig,
+  RowActivationGesture,
 } from "../types/interaction";
-
-// Runtime construction is the only place where an optional interaction config
-// becomes mandatory. After `createGridRuntime`, all code can branch on the
-// normalized discriminants instead of asking whether the caller provided a
-// config at all.
-export function normalizeInteraction(
-  interaction?: GridInteractionConfig,
-): GridInteractionConfig {
-  const normalized = interaction ?? CELL_EDITING_GRID;
-  assertValidInteraction(normalized);
-  return normalized;
-}
 
 export function assertValidInteraction(
   interaction: GridInteractionConfig,
@@ -40,6 +28,12 @@ export function assertValidInteraction(
         "cell-grid interaction has an invalid cards arrow policy.",
       );
     }
+    if (
+      interaction.activeRow.kind === "from-active-cell" &&
+      interaction.activeRow.activation
+    ) {
+      assertValidRowActivation(interaction.activeRow.activation, "cell-grid");
+    }
     return;
   }
 
@@ -51,10 +45,47 @@ export function assertValidInteraction(
   }
   if (
     interaction.activeRow.keyboard.expansion !== "left-right-enter" &&
+    interaction.activeRow.keyboard.expansion !== "left-right" &&
     interaction.activeRow.keyboard.expansion !== "none"
   ) {
     throw new Error(
       "row-list interaction has an invalid expansion key policy.",
+    );
+  }
+  if (interaction.activeRow.activation) {
+    assertValidRowActivation(interaction.activeRow.activation, "row-list");
+  }
+  if (
+    interaction.activeRow.keyboard.expansion === "left-right-enter" &&
+    interaction.activeRow.activation?.startsOn.includes("enter")
+  ) {
+    throw new Error(
+      "row-list interaction cannot assign Enter to both activation and expansion.",
+    );
+  }
+}
+
+function assertValidRowActivation(
+  activation: { readonly startsOn: readonly RowActivationGesture[] },
+  mode: "cell-grid" | "row-list",
+): void {
+  const seen = new Set<RowActivationGesture>();
+  for (const gesture of activation.startsOn) {
+    if (
+      gesture !== "enter" &&
+      gesture !== "click" &&
+      gesture !== "doubleClick"
+    ) {
+      throw new Error(`${mode} interaction has an invalid activation gesture.`);
+    }
+    if (seen.has(gesture)) {
+      throw new Error(`${mode} interaction repeats a row activation gesture.`);
+    }
+    seen.add(gesture);
+  }
+  if (seen.has("click") && seen.has("doubleClick")) {
+    throw new Error(
+      `${mode} interaction cannot assign both click and doubleClick to row activation.`,
     );
   }
 }

@@ -19,7 +19,19 @@ export type ProtoRow =
       readonly source: TreeNode;
     }
   | {
-      readonly kind: "opening" | "closing" | "subtotal";
+      readonly kind: "opening";
+      readonly rowKey: RowKey;
+      readonly columns: Readonly<Record<ColId, unknown>>;
+      readonly source: TreeNode;
+    }
+  | {
+      readonly kind: "closing";
+      readonly rowKey: RowKey;
+      readonly columns: Readonly<Record<ColId, unknown>>;
+      readonly source: TreeNode;
+    }
+  | {
+      readonly kind: "subtotal";
       readonly rowKey: RowKey;
       readonly columns: Readonly<Record<ColId, unknown>>;
       readonly source: TreeNode;

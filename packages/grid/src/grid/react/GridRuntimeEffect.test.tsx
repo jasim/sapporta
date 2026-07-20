@@ -1,16 +1,25 @@
 // @vitest-environment happy-dom
 
-import { StrictMode, act, createElement } from "react";
-import type { ReactElement } from "react";
+import { Component, StrictMode, act, createElement } from "react";
+import type { ReactElement, ReactNode } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { inMemoryGridDataSource } from "../data-sources";
 import type { GridDataSource } from "../data-sources/types";
 import { createGridRuntime, type RuntimeArgs } from "../runtime";
-import { CELL_GRID_WITH_ACTIVE_ROW } from "../types/interaction";
+import { runtimeInternalsFor } from "../runtime/runtime";
+import {
+  CELL_GRID_WITH_ACTIVE_ROW,
+  ROW_PRIMARY_MASTER_DETAIL,
+} from "../types/interaction";
+import { makeRowId, rootPath } from "../types/identity";
 import type { GridSchema } from "../types/schema";
 import { useGridRuntimeEffect } from "./GridRuntimeEffect";
-import { GridRuntimeProvider, useGridRuntime } from "./GridRuntimeProvider";
+import {
+  GridRuntimeProvider,
+  useGridActiveRow,
+  useGridRuntime,
+} from "./GridRuntimeProvider";
 
 (
   globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
@@ -93,7 +102,7 @@ describe("useGridRuntimeEffect", () => {
             sortMode: "client",
             filterMode: "none",
             paginationMode: "none",
-            readonly: true,
+            readonly: false,
           },
         },
       }),
@@ -258,5 +267,142 @@ describe("useGridRuntimeEffect", () => {
     const { container } = await renderClient(createElement(Probe));
 
     expect(container.textContent).toBe("quotes");
+  });
+
+  it("provides active-row state through the dedicated hook", async () => {
+    const { args } = makeArgs("orders");
+    const runtime = createGridRuntime(args);
+
+    function ActiveRowProbe() {
+      const active = useGridActiveRow();
+      return createElement(
+        "output",
+        null,
+        String(active?.row.columns.name ?? ""),
+      );
+    }
+
+    const { container } = await renderClient(
+      createElement(GridRuntimeProvider, {
+        runtime,
+        children: createElement(ActiveRowProbe),
+      }),
+    );
+    const path = rootPath("orders");
+    await act(async () => {
+      runtimeInternalsFor(runtime).cursorManager.moveCellCursorTo({
+        path,
+        rowId: makeRowId(path, "one"),
+        colId: "name",
+      });
+    });
+
+    expect(container.textContent).toBe("orders");
+    runtime.dispose();
+  });
+
+  it("reads active-row state from an explicit runtime outside a provider", async () => {
+    const { args } = makeArgs("orders");
+    const runtime = createGridRuntime(args);
+
+    function ActiveRowProbe() {
+      const active = useGridActiveRow(runtime);
+      return createElement(
+        "output",
+        null,
+        String(active?.row.columns.name ?? "none"),
+      );
+    }
+
+    const { container } = await renderClient(createElement(ActiveRowProbe));
+    expect(container.textContent).toBe("none");
+
+    const path = rootPath("orders");
+    const rowId = makeRowId(path, "one");
+    await act(async () => {
+      runtimeInternalsFor(runtime).cursorManager.moveCellCursorTo({
+        path,
+        rowId,
+        colId: "name",
+      });
+    });
+    expect(container.textContent).toBe("orders");
+
+    await act(async () => {
+      runtime.root.writeCell({ rowId, colId: "name" }, "updated");
+    });
+    expect(container.textContent).toBe("updated");
+
+    await act(async () => {
+      await runtime.root.removeRow("one");
+    });
+    expect(container.textContent).toBe("none");
+    runtime.dispose();
+  });
+
+  it("prefers an explicit runtime over a provider runtime", async () => {
+    const explicitRuntime = createGridRuntime(makeArgs("explicit").args);
+    const contextRuntime = createGridRuntime(makeArgs("context").args);
+
+    for (const runtime of [explicitRuntime, contextRuntime]) {
+      const path = runtime.root.path;
+      runtimeInternalsFor(runtime).cursorManager.moveCellCursorTo({
+        path,
+        rowId: makeRowId(path, "one"),
+        colId: "name",
+      });
+    }
+
+    function ActiveRowProbe() {
+      const active = useGridActiveRow(explicitRuntime);
+      return createElement("output", null, String(active?.row.columns.name));
+    }
+
+    const { container } = await renderClient(
+      createElement(GridRuntimeProvider, {
+        runtime: contextRuntime,
+        children: createElement(ActiveRowProbe),
+      }),
+    );
+
+    expect(container.textContent).toBe("explicit");
+    explicitRuntime.dispose();
+    contextRuntime.dispose();
+  });
+
+  it("requires either an explicit runtime or a provider", async () => {
+    class ErrorBoundary extends Component<
+      { children: ReactNode },
+      { error: Error | null }
+    > {
+      state = { error: null as Error | null };
+
+      static getDerivedStateFromError(error: Error) {
+        return { error };
+      }
+
+      render() {
+        return this.state.error
+          ? createElement("output", null, this.state.error.message)
+          : this.props.children;
+      }
+    }
+
+    function ActiveRowProbe() {
+      useGridActiveRow();
+      return null;
+    }
+
+    const consoleError = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => {});
+    const { container } = await renderClient(
+      createElement(ErrorBoundary, null, createElement(ActiveRowProbe)),
+    );
+    consoleError.mockRestore();
+
+    expect(container.textContent).toBe(
+      "useGridActiveRow requires a runtime argument or GridRuntimeProvider",
+    );
   });
 });

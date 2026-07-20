@@ -1,4 +1,4 @@
-import { useRef } from "react";
+import { useCallback, useRef, useSyncExternalStore } from "react";
 import { useStore } from "zustand";
 import type { StoreApi } from "zustand/vanilla";
 import type {
@@ -13,6 +13,7 @@ import {
 } from "../state/tgrid-session";
 import type { TGridLevelQueryState } from "../state/tgrid-level-query-state";
 import type { TGridDefinition } from "./tgrid-runtime-config";
+import type { TGridActiveRow } from "../state/tgrid-active-row";
 import {
   createTGridColumnsBuilder,
   type TGridColumnsBuilder,
@@ -91,6 +92,31 @@ export function useTGridSession<
     () => createTGridSessionWithRef(definition, liveInputsRef),
     [definition],
   );
+}
+
+/**
+ * Reads the TGrid row currently carrying application context.
+ *
+ * The value updates when the row cursor moves and when the active row's
+ * displayed values change. Render detail UI directly from this value; there
+ * is no need to copy it into a second React state variable.
+ */
+export function useTGridActiveRow<
+  RowsByLevel extends TGridRowsByLevel,
+  AppServices,
+>(
+  session: TGridSession<RowsByLevel, AppServices> | null,
+): TGridActiveRow<RowsByLevel> | null {
+  const subscribe = useCallback(
+    (listener: () => void) =>
+      session?.subscribeActiveRow(listener) ?? (() => {}),
+    [session],
+  );
+  const getSnapshot = useCallback(
+    () => session?.activeRow() ?? null,
+    [session],
+  );
+  return useSyncExternalStore(subscribe, getSnapshot, () => null);
 }
 
 export function createColumnsBuilder<

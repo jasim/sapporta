@@ -1,4 +1,4 @@
-import { useMemo, type CSSProperties } from "react";
+import { useEffect, useMemo, useRef, type CSSProperties } from "react";
 import { Table2 } from "lucide-react";
 import {
   trailingEdge,
@@ -21,6 +21,7 @@ import {
   withTGridSessionContext,
   type TGridSessionContext,
 } from "../grid-adapter/tgrid-cell-context";
+import type { TGridRowActivatedEvent } from "../state/tgrid-active-row";
 import type { TGridRowsByLevel } from "../grid-adapter/tgrid-types";
 import type { TGridLevelQueryState } from "../state/tgrid-level-query-state";
 import type { TGridSession } from "../state/tgrid-session";
@@ -69,16 +70,22 @@ export function TGrid<
   style,
   viewRelatedRows,
   presentation = "tabular",
+  onRowActivate,
 }: {
   session: TGridSession<RowsByLevel, AppServices>;
   className?: string;
   style?: CSSProperties;
   viewRelatedRows?: ViewRelatedRowsOption;
   presentation?: TGridPresentation;
+  /** Receives configured Enter, click, or double-click row activations. */
+  onRowActivate?: (event: TGridRowActivatedEvent<RowsByLevel>) => void;
 }) {
   const runtime = session.runtime;
   const sessionContext = session as TGridRenderableSessionContext;
   const root = runtime.root.path;
+  const onRowActivateRef = useRef(onRowActivate);
+  onRowActivateRef.current = onRowActivate;
+  const observesRowActivation = onRowActivate !== undefined;
   const chrome = useMemo(() => {
     const presetChrome = columnPreset.chrome<TGridTableColumnMeta, TGridFilter>(
       {
@@ -90,8 +97,7 @@ export function TGrid<
         commandOverrides: (level) => {
           const levelId = runtime.level(level.path).schema.name;
           const queryStore = sessionContext.levels[levelId]?.queryStore as
-            | { getState(): TGridLevelQueryState }
-            | undefined;
+            { getState(): TGridLevelQueryState } | undefined;
           if (!queryStore) return {};
           // Header controls run against the concrete GridPath that rendered the
           // header. A level id names shared query state; a path names one loaded
@@ -115,6 +121,13 @@ export function TGrid<
       viewRelatedRows,
     });
   }, [className, root, sessionContext, style, viewRelatedRows]);
+
+  useEffect(() => {
+    if (!observesRowActivation) return;
+    return session.onRowActivate((event) => {
+      onRowActivateRef.current?.(event);
+    });
+  }, [observesRowActivation, session]);
 
   return (
     <GridRuntimeProvider runtime={runtime}>

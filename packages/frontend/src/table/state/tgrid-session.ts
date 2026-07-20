@@ -3,6 +3,7 @@ import {
   createGridRuntime,
   makeRowId,
   restGridDataSource,
+  type GridActiveRow,
   type GridPath,
   type GridRuntime,
   type LoadedRowsBoundaryEvent,
@@ -36,6 +37,11 @@ import type {
   TGridRuntimeLevel,
   TGridSessionContext,
 } from "../grid-adapter/tgrid-cell-context";
+import {
+  projectTGridActiveRow,
+  type TGridRowActivatedEvent,
+  type TGridActiveRow,
+} from "./tgrid-active-row";
 import {
   createLookupStore,
   type LookupForColumn,
@@ -104,6 +110,14 @@ export type TGridSession<
   rootSource: RuntimeLevelDataSource;
   columnMapper: TGridColumnMapper;
   levelInfoById: Record<TGridLevelId<RowsByLevel>, TGridLevelInfo>;
+  /** Reads the current row with TGrid level and application context. */
+  activeRow(): TGridActiveRow<RowsByLevel> | null;
+  /** Observes active-row identity and displayed-value changes. */
+  subscribeActiveRow(listener: () => void): () => void;
+  /** Observes configured row activation gestures. */
+  onRowActivate(
+    handler: (event: TGridRowActivatedEvent<RowsByLevel>) => void,
+  ): () => void;
   getVisibleRows<LevelId extends TGridLevelId<RowsByLevel>>(
     levelId?: LevelId,
     path?: GridPath,
@@ -188,6 +202,8 @@ class DefaultTGridSession<
   readonly columnMapper: TGridColumnMapper;
   readonly levelInfoById: Record<TGridLevelId<RowsByLevel>, TGridLevelInfo>;
   readonly levels: TGridSessionContext<RowsByLevel, AppServices>["levels"];
+  private activeGridRowSnapshot: GridActiveRow | null = null;
+  private activeTGridRowSnapshot: TGridActiveRow<RowsByLevel> | null = null;
 
   constructor(
     definition: TGridDefinition<RowsByLevel, AppServices>,
@@ -743,6 +759,47 @@ class DefaultTGridSession<
     return (
       this.queryStoresByLevel.get(levelId) ??
       this.queryStoresByLevel.get(this.rootLevel)
+    );
+  }
+
+  activeRow(): TGridActiveRow<RowsByLevel> | null {
+    const active = this.runtime.activeRow();
+    if (!active) {
+      this.activeGridRowSnapshot = null;
+      this.activeTGridRowSnapshot = null;
+      return null;
+    }
+    if (this.activeGridRowSnapshot === active && this.activeTGridRowSnapshot) {
+      return this.activeTGridRowSnapshot;
+    }
+    this.activeGridRowSnapshot = active;
+    this.activeTGridRowSnapshot = this.rowContext(active);
+    return this.activeTGridRowSnapshot;
+  }
+
+  subscribeActiveRow(listener: () => void): () => void {
+    return this.runtime.subscribeActiveRow(listener);
+  }
+
+  onRowActivate(
+    handler: (event: TGridRowActivatedEvent<RowsByLevel>) => void,
+  ): () => void {
+    return this.runtime.on("rowActivated", ({ activeRow, trigger }) => {
+      handler({ activeRow: this.rowContext(activeRow), trigger });
+    });
+  }
+
+  private rowContext(active: GridActiveRow): TGridActiveRow<RowsByLevel> {
+    const levelName = active.level.schema.name;
+    if (!(levelName in this.levels)) {
+      throw new Error(
+        `TGridSession: active row belongs to unknown level '${levelName}'`,
+      );
+    }
+    return projectTGridActiveRow<RowsByLevel>(
+      active,
+      this.runtime,
+      levelName as TGridLevelId<RowsByLevel>,
     );
   }
 

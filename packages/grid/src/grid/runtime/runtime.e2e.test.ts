@@ -452,7 +452,7 @@ describe("GridRuntime over restGridDataSource — full lifecycle", () => {
     expect(result).toMatchObject({
       kind: "partial",
       removed: [],
-      failed: { rowKey: "O1" },
+      failed: { row: { id: orderOne } },
       unattempted: [],
       error: failure,
     });

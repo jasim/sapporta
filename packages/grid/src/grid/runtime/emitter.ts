@@ -1,16 +1,12 @@
 // Emitters — how the grid talks to host code.
 //
-// Host callbacks (mutationCommitted, cellSelectionChanged, rowSelectionChanged,
-// cellReconciled, levelStatusChanged, phantomRowCommitted,
-// phantomRowCreateFailed) are wired via
-// `runtime.on(...)` at runtime construction and torn down with `dispose()`.
-// The runtime is created from a `RuntimeArgs` that includes initial
-// subscriptions; React props are not the carrier.
+// `RuntimeArgs.on` installs initial listeners before root-source acquisition.
+// `runtime.on(...)` installs listeners during the runtime lifetime. Runtime
+// disposal clears both sets of listeners. React props are not the core event
+// carrier.
 //
-// Why not callback props? React consumers whose handler identities change
-// on every render would churn subscriptions if they were wired through
-// props. The emitter pattern keeps a single subscription alive for the
-// runtime's lifetime.
+// UI-framework adapters may expose callback props, but they only subscribe to
+// these events. Gesture policy and event production remain in the runtime.
 //
 // Event structure for `cellReconciled`: the ReconcileEvent is wrapped as
 // `{ path, event: ReconcileEvent }` rather than spread into the payload,
@@ -22,9 +18,10 @@
 // updates only; they flow through source subscriptions and never emit this
 // event.
 //
-// Selection events are domain-specific. There is no generic
-// `selectionChanged`, because the grid has two unrelated selection concepts:
-// a rectangular cell range and row operation targets.
+// Selection events report stored controller transitions. They are distinct
+// from the runtime's derived, identity-stable selection snapshots. Displayed
+// rows or the active row can change `selectedRows()`, `selectedRowIds()`, or
+// `rowInteractionSnapshot()` without producing a stored-selection event.
 
 import type { Coord, GridPath, RowKey } from "../types/identity";
 import type { LevelStatus, ReconcileEvent } from "../data-sources/types";
@@ -32,6 +29,8 @@ import type { TreeNode } from "../types/level-row";
 import type { CellSelectionState } from "../types/selection";
 import type { RowSelection } from "../types/row-selection";
 import type { CellActivationTrigger } from "../types/schema";
+import type { RowActivationTrigger } from "../types/interaction";
+import type { GridActiveRow } from "./grid-active-row";
 import {
   createObserverList,
   type ObserverErrorReporter,
@@ -79,6 +78,11 @@ export type GridEvents = {
     readonly path: GridPath;
     readonly selection: RowSelection;
   };
+  /** A configured keyboard or pointer gesture activated the current row. */
+  rowActivated: {
+    readonly activeRow: GridActiveRow;
+    readonly trigger: RowActivationTrigger;
+  };
   // Reconciliation result for an optimistic edit. The path identifies the
   // source that emitted the event; the inner `event` is the source's own
   // ReconcileEvent (`agreed` | `diverged` | `rejected`). Wrapped rather
@@ -88,8 +92,8 @@ export type GridEvents = {
     readonly path: GridPath;
     readonly event: ReconcileEvent;
   };
-  // Source status transitions — fires on every transition observed by the
-  // runtime's source subscription.
+  // Each source status transition observed by the runtime. This event is not
+  // a general source-state invalidation.
   levelStatusChanged: {
     readonly path: GridPath;
     readonly status: LevelStatus;

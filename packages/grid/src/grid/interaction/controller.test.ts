@@ -1,9 +1,16 @@
 import { describe, expect, it, vi } from "vitest";
 import { createGridController } from "./controller";
 import { capabilitiesFor } from "../types/capabilities";
-import { CELL_EDITING_GRID } from "../types/interaction";
+import {
+  CELL_EDITING_GRID,
+  ROW_PRIMARY_MASTER_DETAIL,
+  ROW_PRIMARY_MASTER_DETAIL_WITH_ACTIVATION,
+} from "../types/interaction";
 import { makeLevelRowId, makeRowId, rootPath } from "../types/identity";
-import type { CellNavigationIntent } from "../types/action";
+import type {
+  CellNavigationIntent,
+  RowNavigationIntent,
+} from "../types/action";
 import type { Coord, GridPath } from "../types/identity";
 import type { ColumnSchema } from "../types/schema";
 import type { DisplayedRows, LevelRow } from "../types/level-row";
@@ -102,6 +109,72 @@ function makeController(
 }
 
 describe("GridController — verbs", () => {
+  it("uses Enter for expansion when configured", () => {
+    const onNavigateRow = vi.fn<(intent: RowNavigationIntent) => void>();
+    const controller = createGridController({
+      path,
+      interaction: {
+        ...ROW_PRIMARY_MASTER_DETAIL,
+        activeRow: {
+          ...ROW_PRIMARY_MASTER_DETAIL.activeRow,
+          keyboard: {
+            ...ROW_PRIMARY_MASTER_DETAIL.activeRow.keyboard,
+            expansion: "left-right-enter",
+          },
+        },
+      },
+      getDisplayed: () => displayed,
+      getSchema: () => cols,
+      capabilitiesFor,
+      onNavigateRow,
+    });
+    controller.setLiveRowFocus(makeRowId(path, "r0"));
+
+    expect(
+      controller.handleKey({
+        key: "Enter",
+        ctrlKey: false,
+        metaKey: false,
+        shiftKey: false,
+        altKey: false,
+      } as KeyboardEvent),
+    ).toBe(true);
+    expect(onNavigateRow).toHaveBeenCalledWith({
+      type: "toggleActiveRowExpansion",
+    });
+  });
+
+  it("routes configured Enter activation through the core row command", () => {
+    const onNavigateRow = vi.fn<(intent: RowNavigationIntent) => void>();
+    const activateRow = vi.fn(() => true);
+    const controller = createGridController({
+      path,
+      interaction: ROW_PRIMARY_MASTER_DETAIL_WITH_ACTIVATION,
+      getDisplayed: () => displayed,
+      getSchema: () => cols,
+      capabilitiesFor,
+      onNavigateRow,
+      activateRow,
+    });
+    const rowId = makeRowId(path, "r0");
+    controller.setLiveRowFocus(rowId);
+
+    expect(
+      controller.handleKey({
+        key: "Enter",
+        ctrlKey: false,
+        metaKey: false,
+        shiftKey: false,
+        altKey: false,
+      } as KeyboardEvent),
+    ).toBe(true);
+    expect(activateRow).toHaveBeenCalledWith(rowId, {
+      kind: "keyboard",
+      gesture: "enter",
+    });
+    expect(onNavigateRow).not.toHaveBeenCalled();
+  });
+
   it("startEdit / cancelEdit toggle the editor without writing selection", () => {
     const c = makeController();
     c.startEdit({ rowId: makeRowId(path, "r0"), colId: "a" }, "f2");

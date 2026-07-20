@@ -49,11 +49,11 @@
 // level name, with `rootLevel` and `childLevels` describing the tree's
 // shape. Data lives on a `GridDataSource` (in-memory, REST, or custom).
 // The runtime is a plain TypeScript value, not a React thing. Components
-// reach it via context. Host events (mutationCommitted, cellSelectionChanged,
-// rowSelectionChanged, cellReconciled, levelStatusChanged,
-// phantomRowCommitted, phantomRowCreateFailed)
-// are wired at construction via `runtime.on(…)`, not through React props —
-// see `emitter.ts`.
+// reach it via context. `RuntimeArgs.on` installs construction-time host event
+// listeners. `runtime.on(…)` installs lifetime listeners for events such as
+// mutationCommitted, cellSelectionChanged, rowSelectionChanged, rowActivated,
+// cellReconciled, levelStatusChanged, phantomRowCommitted, and
+// phantomRowCreateFailed. See `emitter.ts`.
 //
 // Reading order:
 //   1. index.ts — public API and architecture signpost.
@@ -175,6 +175,13 @@
 //
 // Active row and selected rows are canonical runtime reads:
 //
+//   - `runtime.activeRow()` resolves the global cursor to its current live
+//     level and displayed row. It is the application-facing snapshot across
+//     paths and updates when that row's displayed values change.
+//     `runtime.subscribeActiveRow()` invalidates this snapshot. React consumers
+//     use `useGridActiveRow(runtime)` outside a provider or
+//     `useGridActiveRow()` inside one.
+//
 //   - `runtime.level(path).activeRow()` derives from the cell cursor in cell-grid
 //     mode when configured, or from live row focus in row-list mode.
 //
@@ -189,6 +196,10 @@
 //
 // Cell range selection and row operation selection use separate types and
 // separate capability gates: `selectable` for cells, `rowSelectable` for rows.
+// Runtime selection events report stored controller transitions. Derived row
+// selection reads can change when the active row or displayed rows change
+// without a corresponding stored-selection event. `rowActivated` is a
+// repeatable semantic event after runtime activation policy succeeds.
 //
 // =====================================================================
 // The effects channel
@@ -374,7 +385,9 @@
 
 export {
   createGridRuntime,
+  type GridActiveRow,
   type GridLevelRuntime,
+  type GridRowActivatedEvent,
   type GridRuntime,
   type RowOperationTarget,
   type RowRemovalResult,
@@ -389,6 +402,7 @@ export {
   GridRuntimeProvider,
   GridCopyContextMenu,
   useGridRuntimeEffect,
+  useGridActiveRow,
   useActiveCell,
   useActiveCellForPath,
   useActiveRow,
@@ -497,6 +511,7 @@ export type {
   LevelOptions,
   LevelRow,
   LevelRowKind,
+  LevelRowOfKind,
   TreeBackedLevelRow,
   FooterLevelRow,
   FooterRow,
@@ -520,6 +535,10 @@ export type {
   ColPolicy,
   RowDirection,
   RowSelectionGesture,
+  RowActivationGesture,
+  RowActivationTrigger,
+  GridPointerInput,
+  RowActivationConfig,
   CellNavigationIntent,
   RowNavigationIntent,
   SortDescriptor,
@@ -536,6 +555,7 @@ export {
   CELL_PRIMARY_WITH_SELECTED_SIDE_PANEL_ROW,
   ROW_MULTISELECT_LIST,
   ROW_PRIMARY_MASTER_DETAIL,
+  ROW_PRIMARY_MASTER_DETAIL_WITH_ACTIVATION,
   rootPath,
   childPath,
   decomposePath,

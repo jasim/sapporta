@@ -101,6 +101,46 @@ lines.writeCell({ rowId: lineId, colId: "quantity" }, 2);
 `runtime.registeredLevels()` returns every registered level, including retained
 collapsed levels. `runtime.subscribeLevels()` reports changes to that set.
 
+## State and events
+
+The runtime exposes identity-stable snapshots with matching invalidation
+subscriptions. `runtime.activeRow()` returns the current grid-wide active row.
+`runtime.subscribeActiveRow()` observes row identity, disappearance, and
+displayed-value changes.
+
+`useGridActiveRow(runtime)` adapts that state for a component that owns the
+provider. Provider descendants can call `useGridActiveRow()` without an
+argument.
+
+```tsx
+import {
+  GridLevel,
+  GridRuntimeProvider,
+  rootPath,
+  useGridActiveRow,
+  type GridRuntime,
+} from "@sapporta/grid";
+
+function OrdersGrid({ runtime }: { runtime: GridRuntime }) {
+  const activeRow = useGridActiveRow(runtime);
+
+  return (
+    <section>
+      <GridRuntimeProvider runtime={runtime}>
+        <GridLevel path={rootPath(runtime.schema.rootLevel)} />
+      </GridRuntimeProvider>
+      <output>{String(activeRow?.row.columns.status ?? "")}</output>
+    </section>
+  );
+}
+```
+
+`RuntimeArgs.on` installs listeners before root-source acquisition.
+`runtime.on(event, listener)` installs listeners during the runtime lifetime.
+Events report discrete commands, outcomes, and defined transitions.
+`rowActivated` reports every successful configured row activation. Stored cell
+and row selection events remain separate from derived selection snapshots.
+
 ## Advanced composition
 
 `@sapporta/grid/advanced` provides cursor and controller helpers for custom

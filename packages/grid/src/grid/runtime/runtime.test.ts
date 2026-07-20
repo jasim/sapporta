@@ -16,7 +16,9 @@ import {
   childPath,
   makeLevelRowId,
   makeRowId,
+  pathOfRowId,
   rootPath,
+  rowKeyOfRowId,
   type GridPath,
   type RowKey,
 } from "../types/identity";
@@ -28,6 +30,8 @@ import {
   CELL_GRID_WITH_INDEPENDENT_ROW_SELECTION,
   CELL_PRIMARY_WITH_SIDE_PANEL_ROW,
   ROW_MULTISELECT_LIST,
+  ROW_PRIMARY_MASTER_DETAIL,
+  ROW_PRIMARY_MASTER_DETAIL_WITH_ACTIVATION,
 } from "../types/interaction";
 import { rowInteractionStatusFor } from "../types/row-selection";
 
@@ -406,6 +410,54 @@ describe("GridRuntime", () => {
     runtime.dispose();
   });
 
+  it("rejects assigning Enter to both row activation and expansion", () => {
+    expect(() =>
+      createGridRuntime({
+        schema: tableSchema,
+        dataSource: tableDataSource(),
+        interaction: {
+          ...ROW_PRIMARY_MASTER_DETAIL,
+          activeRow: {
+            ...ROW_PRIMARY_MASTER_DETAIL.activeRow,
+            keyboard: {
+              ...ROW_PRIMARY_MASTER_DETAIL.activeRow.keyboard,
+              expansion: "left-right-enter",
+            },
+            activation: { startsOn: ["enter"] },
+          },
+        },
+      }),
+    ).toThrow(/cannot assign Enter to both activation and expansion/);
+  });
+
+  it("rejects ambiguous click and double-click row activation", () => {
+    expect(() =>
+      createGridRuntime({
+        schema: tableSchema,
+        dataSource: tableDataSource(),
+        interaction: {
+          ...CELL_GRID_WITH_ACTIVE_ROW,
+          activeRow: {
+            kind: "from-active-cell",
+            activation: { startsOn: ["click", "doubleClick"] },
+          },
+        },
+      }),
+    ).toThrow(/cannot assign both click and doubleClick/);
+  });
+
+  it("uses one immutable interaction configuration internally and publicly", () => {
+    const rt = createGridRuntime({
+      schema: tableSchema,
+      dataSource: tableDataSource(),
+      interaction: ROW_PRIMARY_MASTER_DETAIL,
+    });
+
+    expect(rt.interaction).toBe(runtimeInternalsFor(rt).interaction);
+    expect(rt.interaction.activeRow).not.toHaveProperty("activation");
+    expect(Object.isFrozen(rt.interaction)).toBe(true);
+  });
+
   it("root displayedRows is identity-stable across no-op calls", () => {
     const rt = createGridRuntime({
       schema: tableSchema,
@@ -756,8 +808,8 @@ describe("GridRuntime", () => {
 
   it("emits cellReconciled when a writable source emits a reconcile event", () => {
     let reconcileFn:
-      | ((e: import("../data-sources/types").ReconcileEvent) => void)
-      | null = null;
+      ((e: import("../data-sources/types").ReconcileEvent) => void) | null =
+      null;
     const fakeWritable: WritableTestSource = {
       state: () =>
         readyState({
@@ -2248,6 +2300,297 @@ describe("GridRuntime", () => {
     );
   });
 
+  it("publishes the active row when its cursor or displayed values change", () => {
+    const rt = createGridRuntime({
+      schema: tableSchema,
+      dataSource: tableDataSource(),
+      interaction: ROW_PRIMARY_MASTER_DETAIL,
+    });
+    const changed = vi.fn();
+    const rowId = makeRowId(rowsRoot, "a");
+    rt.subscribeActiveRow(changed);
+
+    runtimeInternalsFor(rt).cursorManager.moveRowCursorTo({
+      path: rowsRoot,
+      rowId,
+    });
+
+    expect(rt.activeRow()).toEqual(
+      expect.objectContaining({
+        level: rt.root,
+        row: expect.objectContaining({
+          id: rowId,
+          kind: "data",
+          columns: expect.objectContaining({ name: "Apple" }),
+        }),
+      }),
+    );
+    expect(changed).toHaveBeenCalledTimes(1);
+
+    rt.root.writeCell({ rowId, colId: "name" }, "Apricot");
+
+    expect(rt.activeRow()?.row.columns.name).toBe("Apricot");
+    expect(changed).toHaveBeenCalledTimes(2);
+  });
+
+  it("emits configured row activation independently of listener count", () => {
+    const rt = createGridRuntime({
+      schema: tableSchema,
+      dataSource: tableDataSource(),
+      interaction: ROW_PRIMARY_MASTER_DETAIL_WITH_ACTIVATION,
+    });
+    const rowId = makeRowId(rowsRoot, "a");
+    const first = vi.fn();
+    const second = vi.fn();
+    const unsubscribeFirst = rt.on("rowActivated", first);
+    const unsubscribeSecond = rt.on("rowActivated", second);
+    runtimeInternalsFor(rt).cursorManager.moveRowCursorTo({
+      path: rowsRoot,
+      rowId,
+    });
+    const controller = runtimeInternalsFor(rt).controllerFor(rowsRoot);
+    const enter = {
+      key: "Enter",
+      ctrlKey: false,
+      metaKey: false,
+      shiftKey: false,
+      altKey: false,
+    } as KeyboardEvent;
+
+    expect(controller.handleKey(enter)).toBe(true);
+    expect(first).toHaveBeenCalledWith({
+      activeRow: rt.activeRow(),
+      trigger: { kind: "keyboard", gesture: "enter" },
+    });
+    expect(second).toHaveBeenCalledTimes(1);
+
+    unsubscribeFirst();
+    unsubscribeSecond();
+    expect(controller.handleKey(enter)).toBe(true);
+    expect(first).toHaveBeenCalledTimes(1);
+    expect(second).toHaveBeenCalledTimes(1);
+  });
+
+  it("activates a row from a cell-grid pointer command", () => {
+    const rt = createGridRuntime({
+      schema: tableSchema,
+      dataSource: tableDataSource(),
+      interaction: {
+        ...CELL_GRID_WITH_ACTIVE_ROW,
+        activeRow: {
+          kind: "from-active-cell",
+          activation: { startsOn: ["click"] },
+        },
+      },
+    });
+    const activated = vi.fn();
+    rt.on("rowActivated", activated);
+    const rowId = makeRowId(rowsRoot, "a");
+
+    expect(
+      runtimeInternalsFor(rt).controllerFor(rowsRoot).handleCellPointer(
+        { rowId, colId: "name" },
+        {
+          gesture: "click",
+          button: 0,
+          altKey: false,
+          ctrlKey: false,
+          metaKey: false,
+          shiftKey: false,
+        },
+      ),
+    ).toBe(true);
+    expect(rt.activeRow()).toEqual(
+      expect.objectContaining({
+        level: expect.objectContaining({ path: rowsRoot }),
+        row: expect.objectContaining({ id: rowId }),
+      }),
+    );
+    expect(activated).toHaveBeenCalledWith({
+      activeRow: rt.activeRow(),
+      trigger: { kind: "pointer", gesture: "click" },
+    });
+  });
+
+  it("activates a focusable structural row in cell-grid mode", () => {
+    const rt = createGridRuntime({
+      schema: tableSchema,
+      dataSource: inMemoryGridDataSource({
+        schema: tableSchema,
+        tree: [
+          {
+            kind: "subtotal",
+            rowKey: "total",
+            levelName: "rows",
+            columns: { name: "Total", qty: 3 },
+          },
+        ],
+        levels: {
+          rows: {
+            sortMode: "none",
+            filterMode: "none",
+            paginationMode: "none",
+          },
+        },
+      }),
+      interaction: {
+        ...CELL_GRID_WITH_ACTIVE_ROW,
+        activeRow: {
+          kind: "from-active-cell",
+          activation: { startsOn: ["enter"] },
+        },
+      },
+    });
+    const activated = vi.fn();
+    rt.on("rowActivated", activated);
+    const rowId = makeLevelRowId(rowsRoot, "subtotal", "total");
+    const row = rt.root.displayedRow(rowId);
+    expect(row?.rowSelectable).toBe(false);
+
+    runtimeInternalsFor(rt).cursorManager.moveCellCursorTo({
+      path: rowsRoot,
+      rowId,
+      colId: "name",
+    });
+    const handled = runtimeInternalsFor(rt)
+      .controllerFor(rowsRoot)
+      .handleKey({
+        key: "Enter",
+        ctrlKey: false,
+        metaKey: false,
+        shiftKey: false,
+        altKey: false,
+      } as KeyboardEvent);
+
+    expect(handled).toBe(true);
+    expect(activated).toHaveBeenCalledWith({
+      activeRow: expect.objectContaining({
+        row: expect.objectContaining({ kind: "subtotal", id: rowId }),
+      }),
+      trigger: { kind: "keyboard", gesture: "enter" },
+    });
+  });
+
+  it("gives cell editing precedence over conflicting row activation", () => {
+    const rt = createGridRuntime({
+      schema: tableSchema,
+      dataSource: tableDataSource(),
+      interaction: {
+        ...CELL_GRID_WITH_ACTIVE_ROW,
+        activeRow: {
+          kind: "from-active-cell",
+          activation: { startsOn: ["enter", "doubleClick"] },
+        },
+      },
+    });
+    const activated = vi.fn();
+    rt.on("rowActivated", activated);
+    const rowId = makeRowId(rowsRoot, "a");
+    const controller = runtimeInternalsFor(rt).controllerFor(rowsRoot);
+
+    expect(
+      controller.handleCellPointer(
+        { rowId, colId: "name" },
+        {
+          gesture: "doubleClick",
+          button: 0,
+          altKey: false,
+          ctrlKey: false,
+          metaKey: false,
+          shiftKey: false,
+        },
+      ),
+    ).toBe(true);
+    expect(controller.getState().editing?.coord).toEqual({
+      rowId,
+      colId: "name",
+    });
+    expect(activated).not.toHaveBeenCalled();
+
+    controller.cancelEdit();
+    expect(
+      controller.handleKey({
+        key: "Enter",
+        ctrlKey: false,
+        metaKey: false,
+        shiftKey: false,
+        altKey: false,
+      } as KeyboardEvent),
+    ).toBe(true);
+    expect(controller.getState().editing?.editStart).toEqual({
+      trigger: "enter",
+    });
+    expect(activated).not.toHaveBeenCalled();
+  });
+
+  it("gives cell activation precedence over row activation on Enter", () => {
+    const cellActivated = vi.fn();
+    const activationSchema: GridSchema = {
+      rootLevel: "rows",
+      levels: {
+        rows: {
+          name: "rows",
+          rowHeaderColumn: "none",
+          columns: [
+            {
+              ...textColumn("name", "Name"),
+              activation: {
+                startsOn: ["enter"],
+                describe: "Open cell",
+                run: cellActivated,
+              },
+            },
+          ],
+          options: {},
+          childLevels: [],
+        },
+      },
+    };
+    const rt = createGridRuntime({
+      schema: activationSchema,
+      dataSource: inMemoryGridDataSource({
+        schema: activationSchema,
+        tree: [{ rowKey: "a", levelName: "rows", columns: { name: "Apple" } }],
+        levels: {
+          rows: {
+            sortMode: "none",
+            filterMode: "none",
+            paginationMode: "none",
+          },
+        },
+      }),
+      interaction: {
+        ...CELL_GRID_WITH_ACTIVE_ROW,
+        activeRow: {
+          kind: "from-active-cell",
+          activation: { startsOn: ["enter"] },
+        },
+      },
+    });
+    const rowActivated = vi.fn();
+    rt.on("rowActivated", rowActivated);
+    const rowId = makeRowId(rowsRoot, "a");
+    runtimeInternalsFor(rt).cursorManager.moveCellCursorTo({
+      path: rowsRoot,
+      rowId,
+      colId: "name",
+    });
+
+    expect(
+      runtimeInternalsFor(rt)
+        .controllerFor(rowsRoot)
+        .handleKey({
+          key: "Enter",
+          ctrlKey: false,
+          metaKey: false,
+          shiftKey: false,
+          altKey: false,
+        } as KeyboardEvent),
+    ).toBe(true);
+    expect(cellActivated).toHaveBeenCalledTimes(1);
+    expect(rowActivated).not.toHaveBeenCalled();
+  });
+
   it("row interaction snapshot projects active and selected row chrome", () => {
     const rt = createGridRuntime({
       schema: tableSchema,
@@ -2292,8 +2635,8 @@ describe("GridRuntime", () => {
 
     expect(
       rt.rowOperations.targets().map((target) => ({
-        rowId: target.rowId,
-        rowKey: target.rowKey,
+        rowId: target.row.id,
+        rowKey: rowKeyOfRowId(target.row.id),
       })),
     ).toEqual([
       { rowId: a, rowKey: "a" },
@@ -2322,8 +2665,8 @@ describe("GridRuntime", () => {
 
     expect(
       rt.rowOperations.targets().map((target) => ({
-        rowId: target.rowId,
-        rowKey: target.rowKey,
+        rowId: target.row.id,
+        rowKey: rowKeyOfRowId(target.row.id),
       })),
     ).toEqual([{ rowId: b, rowKey: "b" }]);
   });
@@ -2346,8 +2689,8 @@ describe("GridRuntime", () => {
 
     expect(
       rt.rowOperations.targets().map((target) => ({
-        path: target.path,
-        rowKey: target.rowKey,
+        path: pathOfRowId(target.row.id),
+        rowKey: rowKeyOfRowId(target.row.id),
       })),
     ).toEqual([
       { path: itemsPath, rowKey: "Apple" },
@@ -2443,8 +2786,10 @@ describe("GridRuntime", () => {
     const itemsPath = childPath(reportRoot, "Fruit", "items") as GridPath;
     const rootActive = vi.fn();
     const childActive = vi.fn();
+    const globalActive = vi.fn();
     rt.root.subscribeActiveRow(rootActive);
     rt.level(itemsPath).subscribeActiveRow(childActive);
+    rt.subscribeActiveRow(globalActive);
 
     const internals = runtimeInternalsFor(rt);
     internals.cursorManager.moveCellCursorTo({
@@ -2454,6 +2799,7 @@ describe("GridRuntime", () => {
     });
     expect(rootActive).toHaveBeenCalledTimes(1);
     expect(childActive).not.toHaveBeenCalled();
+    expect(globalActive).toHaveBeenCalledTimes(1);
 
     internals.cursorManager.moveCellCursorTo({
       path: itemsPath,
@@ -2462,10 +2808,24 @@ describe("GridRuntime", () => {
     });
     expect(rootActive).toHaveBeenCalledTimes(2);
     expect(childActive).toHaveBeenCalledTimes(1);
+    expect(globalActive).toHaveBeenCalledTimes(2);
     expect(rt.root.activeRow()).toBe(null);
     expect(rt.level(itemsPath).activeRow()).toEqual({
       path: itemsPath,
       rowId: makeRowId(itemsPath, "Apple"),
     });
+    expect(rt.activeRow()).toEqual(
+      expect.objectContaining({
+        level: expect.objectContaining({ path: itemsPath }),
+        row: expect.objectContaining({ id: makeRowId(itemsPath, "Apple") }),
+      }),
+    );
+
+    rt.level(itemsPath).writeCell(
+      { rowId: makeRowId(itemsPath, "Apple"), colId: "name" },
+      "Apricot",
+    );
+    expect(rt.activeRow()?.row.columns.name).toBe("Apricot");
+    expect(globalActive).toHaveBeenCalledTimes(3);
   });
 });

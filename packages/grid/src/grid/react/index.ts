@@ -5,6 +5,7 @@ export {
 } from "./GridCopyContextMenu";
 export {
   GridRuntimeProvider,
+  useGridActiveRow,
   useActiveCell,
   useActiveCellForPath,
   useActiveRow,

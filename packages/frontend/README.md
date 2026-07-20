@@ -59,3 +59,46 @@ export function AppTableRoute() {
 The same component can be passed directly as `actions` on
 `SchemaTableGridView`. Public table hooks can read query, selection, and source
 status from the supplied session when an action needs reactive table state.
+
+## TGrid active rows
+
+`useTGridActiveRow(session)` exposes the current typed application row as React
+state. The hook updates when row identity or displayed values change. `TGrid`
+forwards successful configured row activations through `onRowActivate`.
+Repeated activation of the same active row produces repeated callbacks.
+
+```tsx
+import {
+  TGrid,
+  useTGridActiveRow,
+  type TGridSession,
+} from "@sapporta/frontend";
+
+type OrdersRows = {
+  orders: { id: string; customer: string };
+};
+
+function OrdersGrid({ session }: { session: TGridSession<OrdersRows> }) {
+  const activeRow = useTGridActiveRow(session);
+
+  return (
+    <section>
+      <TGrid
+        session={session}
+        onRowActivate={(event) => {
+          if (event.activeRow.kind === "data") {
+            openOrder(event.activeRow.values.id);
+          }
+        }}
+      />
+      <output>
+        {activeRow?.kind === "data" ? activeRow.values.customer : ""}
+      </output>
+    </section>
+  );
+}
+```
+
+`TGridSession.activeRow()` and `TGridSession.subscribeActiveRow()` provide the
+same typed state outside React. `TGridSession.onRowActivate()` provides the
+framework-neutral row-activation event adapter.

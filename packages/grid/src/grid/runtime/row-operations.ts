@@ -1,4 +1,8 @@
-import type { DisplayedRows, LevelRow } from "../types/level-row";
+import type {
+  DisplayedRows,
+  LevelRow,
+  LevelRowOfKind,
+} from "../types/level-row";
 import {
   decomposePath,
   pathOfRowId,
@@ -8,23 +12,16 @@ import {
   type RowKey,
 } from "../types/identity";
 
+declare const issuedRowOperationTarget: unique symbol;
+
 export type RowOperationTarget<
   Kind extends LevelRow["kind"] = LevelRow["kind"],
-> = {
-  readonly path: GridPath;
-  readonly rowId: RowId;
-  readonly rowKey: RowKey;
-  readonly row: RowOfKind<Kind>;
-};
-
-type RowOfKind<Kind extends LevelRow["kind"]> = Kind extends
-  | "opening"
-  | "closing"
-  | "subtotal"
-  ? Extract<LevelRow, { kind: "opening" | "closing" | "subtotal" }> & {
-      readonly kind: Kind;
+> = Kind extends LevelRow["kind"]
+  ? {
+      readonly row: LevelRowOfKind<Kind>;
+      readonly [issuedRowOperationTarget]: true;
     }
-  : Extract<LevelRow, { kind: Kind }>;
+  : never;
 
 export type RowRemovalResult =
   | {
@@ -113,12 +110,7 @@ export function createRowOperations(
     const generation = ports.membershipGeneration(path, rowKey);
     if (generation === undefined) return undefined;
 
-    const target = Object.freeze({
-      path,
-      rowId,
-      rowKey,
-      row,
-    }) as RowOperationTarget<Kind>;
+    const target = Object.freeze({ row }) as RowOperationTarget<Kind>;
     issuedTargets.set(target, { generation });
     return target;
   }
@@ -131,7 +123,7 @@ export function createRowOperations(
     const row = ports.displayedRows(path).rowById.get(rowId);
     if (!row?.rowSelectable) return undefined;
     const rowKey = rowKeyOfRowId(rowId);
-    const target = Object.freeze({ path, rowId, rowKey, row });
+    const target = Object.freeze({ row }) as RowOperationTarget;
     if (row.kind === "data") {
       const generation = ports.membershipGeneration(path, rowKey);
       if (generation === undefined) return undefined;
@@ -195,9 +187,10 @@ export function createRowOperations(
 
       for (let index = 0; index < execution.length; index += 1) {
         const target = execution[index];
+        const path = pathOfRowId(target.row.id);
         try {
           validateTarget(target);
-          touched.add(target.path);
+          touched.add(path);
           await ports.removeTarget(target);
           removed.push(target);
         } catch (error) {
@@ -231,7 +224,7 @@ export function createRowOperations(
     const seen = new Set<string>();
     for (const target of requested) {
       validateTarget(target);
-      const key = `${target.path}\u0000${target.rowId}`;
+      const key = target.row.id;
       if (seen.has(key)) continue;
       seen.add(key);
       unique.push(target);
@@ -246,25 +239,26 @@ export function createRowOperations(
         "GridRuntime.rowOperations.remove: target was not issued by this runtime.",
       );
     }
-    if (!ports.isRegistered(target.path)) {
+    const rowId = target.row.id;
+    const path = pathOfRowId(rowId);
+    const rowKey = rowKeyOfRowId(rowId);
+    if (!ports.isRegistered(path)) {
       throw new Error("Grid level is no longer registered.");
     }
-    assertRowIdPath(target.path, target.rowId);
-    const current = ports.displayedRows(target.path).rowById.get(target.rowId);
-    const generation = ports.membershipGeneration(target.path, target.rowKey);
+    const current = ports.displayedRows(path).rowById.get(rowId);
+    const generation = ports.membershipGeneration(path, rowKey);
     if (
       !current ||
       current.kind !== "data" ||
-      rowKeyOfRowId(target.rowId) !== target.rowKey ||
       generation !== issued.generation
     ) {
       throw new Error(
-        `GridRuntime.rowOperations.remove: stale row target "${target.rowId}".`,
+        `GridRuntime.rowOperations.remove: stale row target "${rowId}".`,
       );
     }
-    if (!ports.isWritable(target.path)) {
+    if (!ports.isWritable(path)) {
       throw new Error(
-        `GridRuntime: source for path "${target.path}" is readonly — row removal is not available.`,
+        `GridRuntime: source for path "${path}" is readonly — row removal is not available.`,
       );
     }
   }
@@ -278,16 +272,20 @@ export function createRowOperations(
       ports.registeredPaths().map((path, index) => [path, index] as const),
     );
     return targets
-      .map((target, order) => ({
-        target,
-        order,
-        depth: decomposePath(target.path).edges.length,
-        registeredOrder:
-          registeredOrder.get(target.path) ?? Number.MAX_SAFE_INTEGER,
-        displayedOrder:
-          ports.displayedRows(target.path).rowIndexById.get(target.rowId) ??
-          Number.MAX_SAFE_INTEGER,
-      }))
+      .map((target, order) => {
+        const rowId = target.row.id;
+        const path = pathOfRowId(rowId);
+        return {
+          target,
+          order,
+          depth: decomposePath(path).edges.length,
+          registeredOrder:
+            registeredOrder.get(path) ?? Number.MAX_SAFE_INTEGER,
+          displayedOrder:
+            ports.displayedRows(path).rowIndexById.get(rowId) ??
+            Number.MAX_SAFE_INTEGER,
+        };
+      })
       .sort(
         (a, b) =>
           b.depth - a.depth ||

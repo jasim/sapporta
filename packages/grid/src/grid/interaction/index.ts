@@ -34,7 +34,4 @@ export {
   keyEventToRowIntent,
   rowSelectionGestureFromModifiers,
 } from "./key-handling";
-export {
-  normalizeInteraction,
-  assertValidInteraction,
-} from "./normalize-interaction";
+export { assertValidInteraction } from "./validate-interaction";

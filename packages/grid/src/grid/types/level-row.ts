@@ -65,13 +65,7 @@ export type TreeNode = {
 };
 
 export type LevelRowKind =
-  | "data"
-  | "rollup"
-  | "opening"
-  | "closing"
-  | "subtotal"
-  | "footer"
-  | "phantom";
+  "data" | "rollup" | "opening" | "closing" | "subtotal" | "footer" | "phantom";
 
 // Discriminated union: render and capability-checks branch on `kind`,
 // the interaction layer branches only via capabilitiesFor(kind).
@@ -92,7 +86,21 @@ export type LevelRow =
       readonly source: TreeNode;
     }
   | {
-      readonly kind: "opening" | "closing" | "subtotal";
+      readonly kind: "opening";
+      readonly id: RowId;
+      readonly rowSelectable: boolean;
+      readonly columns: Readonly<Record<ColId, unknown>>;
+      readonly source: TreeNode;
+    }
+  | {
+      readonly kind: "closing";
+      readonly id: RowId;
+      readonly rowSelectable: boolean;
+      readonly columns: Readonly<Record<ColId, unknown>>;
+      readonly source: TreeNode;
+    }
+  | {
+      readonly kind: "subtotal";
       readonly id: RowId;
       readonly rowSelectable: boolean;
       readonly columns: Readonly<Record<ColId, unknown>>;
@@ -112,6 +120,11 @@ export type LevelRow =
       readonly columns: Readonly<Record<ColId, unknown>>;
       readonly source: PhantomRow;
     };
+
+export type LevelRowOfKind<Kind extends LevelRowKind> = Extract<
+  LevelRow,
+  { kind: Kind }
+>;
 
 export type TreeBackedLevelRow = Extract<
   LevelRow,

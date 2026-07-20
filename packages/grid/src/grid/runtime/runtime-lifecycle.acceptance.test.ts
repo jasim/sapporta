@@ -14,6 +14,7 @@ import {
   childPath,
   makeRowId,
   rootPath,
+  rowKeyOfRowId,
   type GridPath,
   type RowKey,
 } from "../types/identity";
@@ -378,14 +379,18 @@ describe("runtime lifecycle acceptance", () => {
       { rowId: b, colId: "name" },
     );
 
-    expect(runtime.rowOperations.targets().map(({ rowKey }) => rowKey)).toEqual(
-      ["a", "b"],
-    );
+    expect(
+      runtime.rowOperations
+        .targets()
+        .map(({ row }) => rowKeyOfRowId(row.id)),
+    ).toEqual(["a", "b"]);
     expect(runtime.rowOperations.selectedDataTargets()).toEqual([]);
 
     runtime.root.setRowSelection({ kind: "single", rowId: b });
     expect(
-      runtime.rowOperations.selectedDataTargets().map(({ rowKey }) => rowKey),
+      runtime.rowOperations
+        .selectedDataTargets()
+        .map(({ row }) => rowKeyOfRowId(row.id)),
     ).toEqual(["b"]);
   });
 
@@ -422,7 +427,7 @@ describe("runtime lifecycle acceptance", () => {
     firstSource.publish([]);
     firstSource.publish(flatNodes());
     await expect(first.rowOperations.remove([a])).rejects.toThrow(
-      `stale row target "${a.rowId}"`,
+      `stale row target "${a.row.id}"`,
     );
     expect(firstSource.removeNode).not.toHaveBeenCalled();
 
@@ -494,9 +499,9 @@ describe("runtime lifecycle acceptance", () => {
 
     expect(result).toMatchObject({
       kind: "partial",
-      removed: [{ rowKey: "apple" }],
-      failed: { rowKey: "banana" },
-      unattempted: [{ rowKey: "fruit" }],
+      removed: [{ row: { id: selected.apple } }],
+      failed: { row: { id: selected.banana } },
+      unattempted: [{ row: { id: selected.fruit } }],
       error: failed,
     });
     expect(calls).toEqual(["child:apple", "child:banana"]);
@@ -571,7 +576,11 @@ describe("runtime lifecycle acceptance", () => {
 
     expect(result).toMatchObject({
       kind: "complete",
-      removed: [{ rowKey: "apple" }, { rowKey: "banana" }, { rowKey: "fruit" }],
+      removed: [
+        { row: { id: selected.apple } },
+        { row: { id: selected.banana } },
+        { row: { id: selected.fruit } },
+      ],
     });
     expect(calls).toEqual(["child:apple", "child:banana", "root:fruit"]);
     expect(observations).toEqual([

@@ -165,9 +165,6 @@ function dataTarget(path: GridPath, rowKey: string): TableDeleteTarget {
     columns: { id: rowKey },
   };
   return {
-    path,
-    rowId,
-    rowKey,
     row: {
       kind: "data",
       id: rowId,
@@ -176,7 +173,7 @@ function dataTarget(path: GridPath, rowKey: string): TableDeleteTarget {
       hasChildren: false,
       source,
     },
-  };
+  } as unknown as TableDeleteTarget;
 }
 
 function complete(removed: readonly TableDeleteTarget[]): RowRemovalResult {

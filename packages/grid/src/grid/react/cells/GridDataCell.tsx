@@ -74,27 +74,38 @@ export function GridDataCell({
     });
   }
 
-  function onClick() {
-    if (runtime.interaction.mode !== "cell-grid") return;
+  function onClick(event: MouseEvent) {
     if (rowHeader) return;
     const coord = { rowId: row.id, colId: column.id };
-    if (controller.handleCellPointer(coord, "click")) return;
+    if (
+      controller.handleCellPointer(coord, {
+        gesture: "click",
+        button: event.button,
+        altKey: event.altKey,
+        ctrlKey: event.ctrlKey,
+        metaKey: event.metaKey,
+        shiftKey: event.shiftKey,
+      })
+    ) {
+      event.stopPropagation();
+    }
   }
 
-  function onDoubleClick() {
-    if (runtime.interaction.mode !== "cell-grid") return;
+  function onDoubleClick(event: MouseEvent) {
     if (rowHeader) return;
     const coord = { rowId: row.id, colId: column.id };
-    // Editing assumes the logical cursor and the path-local live-focus mirror
-    // already identify the edited cell. Reapplying a plain cell press is
-    // idempotent for the normal browser sequence and also preserves that
-    // invariant for synthesized double-click events.
-    internals.coordinator.navigateCell(path, {
-      type: "cellPressed",
-      target: coord,
-      extend: false,
-    });
-    controller.handleCellPointer(coord, "doubleClick");
+    if (
+      controller.handleCellPointer(coord, {
+        gesture: "doubleClick",
+        button: event.button,
+        altKey: event.altKey,
+        ctrlKey: event.ctrlKey,
+        metaKey: event.metaKey,
+        shiftKey: event.shiftKey,
+      })
+    ) {
+      event.stopPropagation();
+    }
   }
 
   const value = row.columns[column.id];

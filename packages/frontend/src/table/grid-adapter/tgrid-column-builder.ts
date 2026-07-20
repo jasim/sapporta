@@ -14,7 +14,7 @@ import type {
   RowHeaderColumn,
   RowKey,
 } from "@sapporta/grid";
-import { rowKeyOfRowId, validateLevelRowHeaderColumn } from "@sapporta/grid";
+import { validateLevelRowHeaderColumn } from "@sapporta/grid";
 import { withRowExpansionColumn } from "@sapporta/grid";
 import { columnPreset, type ColumnWidth } from "@sapporta/grid/column-preset";
 import type {
@@ -657,7 +657,6 @@ function cellContextFor<
     level: session.runtime.level(props.path),
     value: props.value,
     row: props.row.columns as RowsByLevel[LevelId],
-    rowKey: rowKeyOfRowId(props.row.id),
     column,
     runtime: session.runtime,
     appServices: session.appServices,

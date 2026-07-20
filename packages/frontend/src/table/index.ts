@@ -29,6 +29,10 @@ export {
   type TGridDefinition,
 } from "./grid-adapter/tgrid-runtime-config";
 export * from "./grid-adapter/tgrid-cell-context";
+export type {
+  TGridActiveRow,
+  TGridRowActivatedEvent,
+} from "./state/tgrid-active-row";
 export * from "./grid-adapter/tgrid-column-spec";
 
 export * from "./grid-adapter/tgrid-filter";

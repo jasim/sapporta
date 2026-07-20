@@ -4,7 +4,7 @@ import type {
   CellEditGesture,
   NonTypedCellEditGesture,
 } from "./schema";
-import type { RowSelectionGesture } from "./interaction";
+import type { RowActivationTrigger, RowSelectionGesture } from "./interaction";
 
 export type NavigationDirection =
   | "up"
@@ -113,6 +113,12 @@ export type CellNavigationIntent =
       readonly coord: Coord;
       readonly trigger: CellActivationTrigger;
     }
+  | {
+      readonly type: "activateRow";
+      readonly rowId: RowId;
+      readonly coord: Coord;
+      readonly trigger: RowActivationTrigger;
+    }
   // Pointer selection enters through the same coordinator as keyboard
   // navigation. The coordinator can therefore apply one cross-path selection
   // rule before the cursor manager updates path-local focus and ranges.
@@ -158,6 +164,11 @@ export type RowNavigationIntent =
   | { readonly type: "focusFirstRow" }
   | { readonly type: "toggleActiveRowSelection" }
   | { readonly type: "clearRowSelection" }
+  | {
+      readonly type: "activateRow";
+      readonly rowId: RowId;
+      readonly trigger: RowActivationTrigger;
+    }
   | { readonly type: "expandActiveRow" }
   | { readonly type: "collapseActiveRow" }
   | { readonly type: "toggleActiveRowExpansion" };

@@ -57,6 +57,10 @@
 //     cell-grid it is derived from the cell cursor when configured; in a
 //     row-list it is derived from that path's live row focus.
 //
+//   - `runtime.activeRow()` is the application projection across paths. It
+//     resolves the global cursor to its live level and displayed row, and its
+//     subscription follows both cursor movement and changes to that row.
+//
 //   - `selectedRowsFor(path)` is the canonical read for selected operation
 //     targets. It may be disabled, derived from active row, or read from the
 //     path-local stored row selection depending on `interaction.selectedRows`.
@@ -66,11 +70,11 @@
 //     checkbox column be ordinary presentation chrome on top of headless
 //     runtime primitives.
 //
-// Runtime row interaction reads are path-scoped. A `GridPath` names one
-// rendered grid part: the root level, an expanded child level under a row, or a
-// deeper descendant. The runtime can enumerate registered paths, but it does
-// not store one whole-table row selection. Page-level commands must choose
-// their scope and aggregate path-local projections explicitly.
+// Level row interaction reads are path-scoped. A `GridPath` names one rendered
+// grid part: the root level, an expanded child level under a row, or a deeper
+// descendant. The global active-row projection is singular because both cursor
+// modes have one global cursor. Row selection remains path-scoped; page-level
+// commands must choose their scope and aggregate those projections explicitly.
 //
 // Row operation targets are a command-level idea. They may be sourced from
 // explicit row selection, rows covered by cell selection, or active-row
@@ -97,8 +101,12 @@ import type {
   RowId,
   RowKey,
 } from "../types/identity";
-import type { GridInteractionConfig } from "../types/interaction";
-import { normalizeInteraction } from "../interaction/normalize-interaction";
+import {
+  CELL_EDITING_GRID,
+  type GridInteractionConfig,
+  type RowActivationTrigger,
+} from "../types/interaction";
+import { assertValidInteraction } from "../interaction/validate-interaction";
 import type {
   RowCursor,
   RowInteractionSnapshot,
@@ -174,6 +182,7 @@ import {
   disposePhantomPath,
 } from "../data-sources/phantom-channel";
 import { createEmitter, type GridEmitter, type GridEvents } from "./emitter";
+export type GridRowActivatedEvent = GridEvents["rowActivated"];
 import type { PhantomChannel } from "../data-sources/types";
 import {
   createSourceRegistry,
@@ -196,6 +205,8 @@ import {
   disposeGridLevelRuntime,
   type GridLevelRuntime,
 } from "./grid-level-runtime";
+import { createGridActiveRow, type GridActiveRow } from "./grid-active-row";
+export type { GridActiveRow } from "./grid-active-row";
 import {
   createRowOperations,
   type GridRowOperations,
@@ -234,7 +245,7 @@ export type RuntimeArgs = {
 export type GridRuntime = {
   /** The immutable schema snapshot used by this runtime. */
   readonly schema: GridSchema;
-  /** The normalized immutable interaction configuration. */
+  /** The immutable interaction configuration used by this runtime. */
   readonly interaction: GridInteractionConfig;
   /** The eagerly registered root level. */
   readonly root: GridLevelRuntime;
@@ -250,6 +261,10 @@ export type GridRuntime = {
    * data, selection, and ordinary expansion changes do not wake it.
    */
   subscribeLevels(listener: () => void): () => void;
+  /** Reads the current row and its latest displayed values. */
+  activeRow(): GridActiveRow | null;
+  /** Observes active-row identity and displayed-value changes. */
+  subscribeActiveRow(listener: () => void): () => void;
   /** Resolves static level schema from a well-formed path. */
   schemaAt(path: GridPath): LevelSchema;
   /** Builds and removes validated row-operation targets across paths. */
@@ -387,9 +402,7 @@ export type RowInteractionCommands = {
 
 const kernels = new WeakMap<GridRuntime, RuntimeKernel>();
 
-export function runtimeInternalsFor(
-  runtime: GridRuntime,
-): RuntimeKernel {
+export function runtimeInternalsFor(runtime: GridRuntime): RuntimeKernel {
   const internals = kernels.get(runtime);
   if (!internals) {
     throw new Error("GridRuntime: value was not created by createGridRuntime.");
@@ -403,9 +416,9 @@ export function createGridRuntime(args: RuntimeArgs): GridRuntime {
   let schemaTopology: SchemaTopology;
   try {
     schema = snapshotGridSchema(args.schema);
-    interaction = snapshotGridInteraction(
-      normalizeInteraction(args.interaction),
-    );
+    const configuredInteraction = args.interaction ?? CELL_EDITING_GRID;
+    assertValidInteraction(configuredInteraction);
+    interaction = snapshotGridInteraction(configuredInteraction);
     schemaTopology = buildSchemaTopology(schema);
     assertRowHeaderInteractionCompatibility(schema, interaction);
   } catch (error) {
@@ -445,8 +458,7 @@ export function createGridRuntime(args: RuntimeArgs): GridRuntime {
   const phantomLifecycleSources = new Map<GridPath, LevelDataSource>();
   let sourceRegistry: SourceRegistry;
   let loadedBoundaryRuntime:
-    | ReturnType<typeof createLoadedBoundaryRuntime>
-    | undefined;
+    ReturnType<typeof createLoadedBoundaryRuntime> | undefined;
   const phantomLifecycle = createPhantomRowLifecycle({
     config: args.phantomRows,
     getSource: sourceForPhantomLifecycle,
@@ -1132,6 +1144,8 @@ export function createGridRuntime(args: RuntimeArgs): GridRuntime {
       activateCell: (coord, trigger) => {
         activateCell(path, coord, trigger);
       },
+      activateRow: (rowId, trigger, coord) =>
+        activateRow(path, rowId, trigger, coord),
     });
     const cleanup = controller.subscribe((s, prev) => {
       if (s.cellSelection !== prev.cellSelection) {
@@ -1225,6 +1239,51 @@ export function createGridRuntime(args: RuntimeArgs): GridRuntime {
     };
   }
 
+  function activateRow(
+    path: GridPath,
+    rowId: RowId,
+    trigger: RowActivationTrigger,
+    coord?: Coord,
+  ): boolean {
+    assertLive();
+    const row = displayedRowFor(path, rowId);
+    if (
+      !row ||
+      !capabilitiesFor(row.kind).focusable ||
+      interaction.activeRow.kind === "none"
+    ) {
+      return false;
+    }
+
+    if (interaction.mode === "row-list") {
+      cursorManager.moveRowCursorTo({ path, rowId });
+    } else {
+      const current = coordinator.getState().cellCursor;
+      const colId =
+        coord?.rowId === rowId
+          ? coord.colId
+          : current?.path === path
+            ? current.colId
+            : schemaForPath(path).columns[0]?.id;
+      if (!colId) return false;
+      if (!schemaForPath(path).columns.some((column) => column.id === colId)) {
+        return false;
+      }
+      cursorManager.moveCellCursorTo({ path, rowId, colId });
+    }
+
+    const active = activeRowForRuntime();
+    if (
+      !active ||
+      active.level.path !== path ||
+      active.row.id !== rowId
+    ) {
+      return false;
+    }
+    emitter.emit("rowActivated", { activeRow: active, trigger });
+    return true;
+  }
+
   function activationTarget(
     path: GridPath,
     coord: Coord,
@@ -1271,6 +1330,72 @@ export function createGridRuntime(args: RuntimeArgs): GridRuntime {
     if (rowCursorSnapshotEqual(prev, next)) return prev;
     interactionRuntime.activeRows.set(path, next);
     return next;
+  }
+
+  let runtimeActiveRowSnapshot: GridActiveRow | null = null;
+
+  function activeRowCursorForRuntime(): RowCursor | null {
+    const state = coordinator.getState();
+    if (interaction.mode === "row-list") return state.rowCursor;
+    return interaction.activeRow.kind === "from-active-cell" && state.cellCursor
+      ? { path: state.cellCursor.path, rowId: state.cellCursor.rowId }
+      : null;
+  }
+
+  function activeRowForRuntime(): GridActiveRow | null {
+    assertLive();
+    const cursor = activeRowCursorForRuntime();
+    if (!cursor) {
+      runtimeActiveRowSnapshot = null;
+      return null;
+    }
+    const row = displayedRowFor(cursor.path, cursor.rowId);
+    if (!row) {
+      runtimeActiveRowSnapshot = null;
+      return null;
+    }
+    const level = levelRuntimeFor(cursor.path);
+    if (
+      runtimeActiveRowSnapshot?.level.path === cursor.path &&
+      runtimeActiveRowSnapshot.row.id === cursor.rowId &&
+      runtimeActiveRowSnapshot.row === row &&
+      runtimeActiveRowSnapshot.level === level
+    ) {
+      return runtimeActiveRowSnapshot;
+    }
+    runtimeActiveRowSnapshot = createGridActiveRow(level, row);
+    return runtimeActiveRowSnapshot;
+  }
+
+  function subscribeRuntimeActiveRow(fn: () => void): () => void {
+    let prev = activeRowForRuntime();
+    let unsubscribeRow = subscribeToRow(prev);
+
+    function subscribeToRow(active: GridActiveRow | null): () => void {
+      return active
+        ? subscribeDisplayedRow(active.level.path, active.row.id, update)
+        : () => {};
+    }
+
+    function update(): void {
+      const next = activeRowForRuntime();
+      if (
+        prev?.level.path !== next?.level.path ||
+        prev?.row.id !== next?.row.id
+      ) {
+        unsubscribeRow();
+        unsubscribeRow = subscribeToRow(next);
+      }
+      if (prev === next) return;
+      prev = next;
+      fn();
+    }
+
+    const unsubscribeCursor = coordinator.subscribe(update);
+    return () => {
+      unsubscribeCursor();
+      unsubscribeRow();
+    };
   }
 
   function selectedRowsForPath(path: GridPath): RowSelection {
@@ -1756,54 +1881,57 @@ export function createGridRuntime(args: RuntimeArgs): GridRuntime {
   async function removeRowOperationTarget(
     target: RowOperationTarget<"data">,
   ): Promise<void> {
-    const source = sourceRegistry.source(target.path);
+    const rowId = target.row.id;
+    const path = pathOfRowId(rowId);
+    const rowKey = rowKeyOfRowId(rowId);
+    const source = sourceRegistry.source(path);
     const write = source?.write;
     if (!source || !write) {
       throw new Error("Grid level is no longer registered.");
     }
     const { node, index } = readNodeWithIndex(
-      sourceRegistry.state(target.path).snapshot,
-      target.rowKey,
+      sourceRegistry.state(path).snapshot,
+      rowKey,
     );
-    const pending = sourceRegistry.pendingRemovals(target.path);
+    const pending = sourceRegistry.pendingRemovals(path);
     if (!pending) throw new Error("Grid level is no longer registered.");
-    pending.add(target.rowKey);
+    pending.add(rowKey);
 
     try {
-      await write.removeNode(target.rowKey);
+      await write.removeNode(rowKey);
       // A conforming source publishes before the promise settles. Read once
       // more for custom sources that settled synchronously without notifying.
       if (
         sourceRegistry
-          .state(target.path)
+          .state(path)
           .snapshot.nodes.some(
-            (candidate) => candidate.rowKey === target.rowKey,
+            (candidate) => candidate.rowKey === rowKey,
           )
       ) {
-        receiveSourceNotification(target.path);
+        receiveSourceNotification(path);
       }
       const stillPresent = sourceRegistry
-        .state(target.path)
-        .snapshot.nodes.some((candidate) => candidate.rowKey === target.rowKey);
+        .state(path)
+        .snapshot.nodes.some((candidate) => candidate.rowKey === rowKey);
       if (stillPresent) {
         throw new Error(
-          `GridRuntime.removeRow: source settled without publishing removal of rowKey '${target.rowKey}'.`,
+          `GridRuntime.removeRow: source settled without publishing removal of rowKey '${rowKey}'.`,
         );
       }
       applyAuthoritativeRemovalCleanup(
-        target.path,
-        sourceRegistry.state(target.path).snapshot.nodes,
+        path,
+        sourceRegistry.state(path).snapshot.nodes,
       );
       if (!shutdownRequested) {
         emitter.emit("mutationCommitted", {
           kind: "remove",
-          path: target.path,
+          path,
           node,
           atIndex: index,
         });
       }
     } catch (error) {
-      pending.delete(target.rowKey);
+      pending.delete(rowKey);
       throw error;
     }
   }
@@ -1832,7 +1960,10 @@ export function createGridRuntime(args: RuntimeArgs): GridRuntime {
   ): RowRemovalCursorToken {
     const origin = coordinator.getState();
     const continuation = planCursorContinuationForRowRemoval(
-      targets.map(({ path, rowId }) => ({ path, rowId })),
+      targets.map(({ row }) => ({
+        path: pathOfRowId(row.id),
+        rowId: row.id,
+      })),
     );
     applyCursorContinuation(continuation);
     return Object.freeze({
@@ -1853,7 +1984,9 @@ export function createGridRuntime(args: RuntimeArgs): GridRuntime {
     if (cursorRevision !== token.revision && currentCursorIsValid()) return;
     if (complete && currentCursorIsValid()) return;
     const removalsByPath = new Map<GridPath, Set<RowId>>();
-    for (const { path, rowId } of removed) {
+    for (const { row } of removed) {
+      const rowId = row.id;
+      const path = pathOfRowId(rowId);
       const rowIds = removalsByPath.get(path) ?? new Set<RowId>();
       rowIds.add(rowId);
       removalsByPath.set(path, rowIds);
@@ -2074,6 +2207,11 @@ export function createGridRuntime(args: RuntimeArgs): GridRuntime {
     },
     registeredLevels,
     subscribeLevels: subscribeRegistry,
+    activeRow: activeRowForRuntime,
+    subscribeActiveRow(listener: () => void) {
+      assertLive();
+      return subscribeRuntimeActiveRow(isolateObserver(listener));
+    },
     schemaAt: schemaForPath,
     rowOperations: requireRowOperationsController().public,
     on<E extends keyof GridEvents>(
@@ -2188,7 +2326,19 @@ function snapshotGridInteraction(
         }),
       }),
       selectedCells: Object.freeze({ ...interaction.selectedCells }),
-      activeRow: Object.freeze({ ...interaction.activeRow }),
+      activeRow:
+        interaction.activeRow.kind === "none"
+          ? Object.freeze({ kind: "none" as const })
+          : interaction.activeRow.activation === undefined
+            ? Object.freeze({ ...interaction.activeRow })
+            : Object.freeze({
+                ...interaction.activeRow,
+                activation: Object.freeze({
+                  startsOn: Object.freeze([
+                    ...interaction.activeRow.activation.startsOn,
+                  ]),
+                }),
+              }),
       selectedRows: snapshotSelectedRows(interaction.selectedRows),
     });
   }
@@ -2199,6 +2349,15 @@ function snapshotGridInteraction(
     activeRow: Object.freeze({
       ...interaction.activeRow,
       keyboard: Object.freeze({ ...interaction.activeRow.keyboard }),
+      ...(interaction.activeRow.activation
+        ? {
+            activation: Object.freeze({
+              startsOn: Object.freeze([
+                ...interaction.activeRow.activation.startsOn,
+              ]),
+            }),
+          }
+        : {}),
     }),
     selectedRows: snapshotSelectedRows(interaction.selectedRows),
   });

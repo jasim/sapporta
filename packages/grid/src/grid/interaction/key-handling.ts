@@ -10,6 +10,8 @@ import type {
 } from "../types/action";
 import type {
   CellGridInteractionConfig,
+  GridPointerInput,
+  GridInteractionConfig,
   RowSelectionGesture,
   RowListInteractionConfig,
 } from "../types/interaction";
@@ -231,17 +233,37 @@ export function keyEventToCellIntent(
   }
 
   const caps = capabilities(focusedRow.kind);
-  if (!caps.editable) return null;
-  if (!column?.edit) return null;
+  if (caps.editable && column?.edit) {
+    if (e.key === "F2" && editStartsOn(column, "f2")) {
+      return { type: "startEdit", coord: focus, trigger: "f2" };
+    }
+    if (isHardEditCommit(e) && editStartsOn(column, "enter")) {
+      return { type: "startEdit", coord: focus, trigger: "enter" };
+    }
+    if (isPrintableKey(e) && editStartsOn(column, "type")) {
+      return {
+        type: "startEdit",
+        coord: focus,
+        trigger: "type",
+        initial: e.key,
+      };
+    }
+  }
 
-  if (e.key === "F2" && editStartsOn(column, "f2")) {
-    return { type: "startEdit", coord: focus, trigger: "f2" };
-  }
-  if (isHardEditCommit(e) && editStartsOn(column, "enter")) {
-    return { type: "startEdit", coord: focus, trigger: "enter" };
-  }
-  if (isPrintableKey(e) && editStartsOn(column, "type")) {
-    return { type: "startEdit", coord: focus, trigger: "type", initial: e.key };
+  if (
+    e.key === "Enter" &&
+    !e.shiftKey &&
+    !e.ctrlKey &&
+    !e.metaKey &&
+    !e.altKey &&
+    rowActivationStartsOn(config, "enter")
+  ) {
+    return {
+      type: "activateRow",
+      rowId: focus.rowId,
+      coord: focus,
+      trigger: { kind: "keyboard", gesture: "enter" },
+    };
   }
 
   return null;
@@ -272,6 +294,39 @@ export function pointerEventToCellIntent(args: {
   return null;
 }
 
+export function pointerEventToRowIntent(args: {
+  config: GridInteractionConfig;
+  rowId: RowId;
+  pointer: GridPointerInput;
+}): RowNavigationIntent | null {
+  const { pointer } = args;
+  if (
+    pointer.button !== 0 ||
+    pointer.altKey ||
+    pointer.ctrlKey ||
+    pointer.metaKey ||
+    pointer.shiftKey ||
+    !rowActivationStartsOn(args.config, pointer.gesture)
+  ) {
+    return null;
+  }
+  return {
+    type: "activateRow",
+    rowId: args.rowId,
+    trigger: { kind: "pointer", gesture: pointer.gesture },
+  };
+}
+
+export function rowActivationStartsOn(
+  config: GridInteractionConfig,
+  gesture: "enter" | "click" | "doubleClick",
+): boolean {
+  return (
+    config.activeRow.kind !== "none" &&
+    (config.activeRow.activation?.startsOn.includes(gesture) ?? false)
+  );
+}
+
 export function keyEventToRowIntent(
   e: KeyEventLike,
   config: RowListInteractionConfig,
@@ -291,7 +346,20 @@ export function keyEventToRowIntent(
     if (!direction) return null;
     return { type: "focusFirstRow" };
   }
-  if (e.key === "Enter" && !e.shiftKey) {
+  if (
+    e.key === "Enter" &&
+    !e.shiftKey &&
+    !e.ctrlKey &&
+    !e.metaKey &&
+    !e.altKey
+  ) {
+    if (rowActivationStartsOn(config, "enter")) {
+      return {
+        type: "activateRow",
+        rowId: state.liveRowFocus,
+        trigger: { kind: "keyboard", gesture: "enter" },
+      };
+    }
     return config.activeRow.keyboard.expansion === "left-right-enter"
       ? { type: "toggleActiveRowExpansion" }
       : null;
@@ -306,11 +374,11 @@ export function keyEventToRowIntent(
 
   switch (direction) {
     case "right":
-      return config.activeRow.keyboard.expansion === "left-right-enter"
+      return config.activeRow.keyboard.expansion !== "none"
         ? { type: "expandActiveRow" }
         : null;
     case "left":
-      return config.activeRow.keyboard.expansion === "left-right-enter"
+      return config.activeRow.keyboard.expansion !== "none"
         ? { type: "collapseActiveRow" }
         : null;
     case "up":

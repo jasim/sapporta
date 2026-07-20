@@ -2,16 +2,15 @@
 
 import { act, createElement, type ReactElement } from "react";
 import { createRoot, type Root } from "react-dom/client";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { columnPreset } from "../../../column-preset";
 import { inMemoryGridDataSource } from "../../data-sources/memory/in-memory-grid-source";
-import {
-  createGridRuntime,
-  runtimeInternalsFor,
-} from "../../runtime/runtime";
+import { createGridRuntime, runtimeInternalsFor } from "../../runtime/runtime";
 import {
   CELL_GRID_WITH_INDEPENDENT_ROW_SELECTION,
   ROW_MULTISELECT_LIST,
+  ROW_PRIMARY_MASTER_DETAIL,
+  ROW_PRIMARY_MASTER_DETAIL_WITH_ACTIVATION,
   type GridInteractionConfig,
 } from "../../types/interaction";
 import { childPath, makeRowId, rootPath } from "../../types/identity";
@@ -162,7 +161,7 @@ async function unmount(root: Root, container: HTMLElement): Promise<void> {
   container.remove();
 }
 
-function createQuotesRuntime(interaction?: typeof ROW_MULTISELECT_LIST) {
+function createQuotesRuntime(interaction?: GridInteractionConfig) {
   return createGridRuntime({
     schema,
     dataSource: inMemoryGridDataSource({
@@ -492,6 +491,44 @@ describe("GridRow cards presentation", () => {
     expect(
       runtimeInternalsFor(runtime).coordinator.getState().rowCursor?.rowId,
     ).toContain("q1");
+  });
+
+  it("forwards double-click so the core can emit configured row activation", async () => {
+    const runtime = createQuotesRuntime(
+      ROW_PRIMARY_MASTER_DETAIL_WITH_ACTIVATION,
+    );
+    const activated = vi.fn();
+    runtime.on("rowActivated", activated);
+    mounted = await render(
+      createElement(GridRuntimeProvider, {
+        runtime,
+        children: createElement(GridLevel, {
+          path: rootPath("quotes"),
+        }),
+      }),
+    );
+
+    const row = mounted.container.querySelector('[data-grid-part="row"]');
+    if (!(row instanceof HTMLElement)) throw new Error("expected row");
+
+    await act(async () => {
+      row.dispatchEvent(
+        new MouseEvent("mousedown", { bubbles: true, button: 0 }),
+      );
+      row.dispatchEvent(
+        new MouseEvent("dblclick", { bubbles: true, ctrlKey: true }),
+      );
+    });
+    expect(activated).not.toHaveBeenCalled();
+
+    await act(async () => {
+      row.dispatchEvent(new MouseEvent("dblclick", { bubbles: true }));
+    });
+
+    expect(activated).toHaveBeenCalledWith({
+      activeRow: runtime.activeRow(),
+      trigger: { kind: "pointer", gesture: "doubleClick" },
+    });
   });
 });
 
