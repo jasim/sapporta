@@ -1,11 +1,11 @@
 /**
  * Converts a metadata-driven new-record form draft into a create request body.
  *
- * Record form controls store draft values in `record-form-store.ts`. Numeric,
- * currency, percentage, date, and timestamp controls keep their raw text while
- * the user edits. Raw text can represent an incomplete value such as `-`, or
- * an invalid value that the control must continue to display. Converting on
- * every `onChange` would either lose that text or replace it with `null`.
+ * Form controls keep numeric, currency, percentage, date, and timestamp drafts
+ * as raw text while the user edits. Raw text can represent an incomplete value
+ * such as `-`, or an invalid value that the control must continue to display.
+ * Converting on every `onChange` would either lose that text or replace it with
+ * `null`.
  *
  * `NewRecordPage` calls `parseCreateDraft()` once in its submit handler. This
  * module reads the shared `TableSchema` metadata and produces public SQL column
@@ -25,11 +25,11 @@
  * entered. An empty string is never converted to `null`; required text reports
  * an issue and optional text remains `""` in the request.
  *
- * A successful value flows through `createRecord()` to the generated table
- * create endpoint. This parser is an immediate-feedback and request-decoding
- * boundary, not the authoritative validation or authorization boundary. The
- * frontend metadata and editability projection cannot be trusted by the
- * server. Backend API policy rejects fields callers may not set and adds
+ * A successful value can flow through `createTableRow()` to the generated
+ * table create endpoint. This parser is an immediate-feedback and
+ * request-decoding boundary, not the authoritative validation or authorization
+ * boundary. The frontend metadata and editability projection cannot be trusted
+ * by the server. Backend API policy rejects fields callers may not set and adds
  * trusted scope values. The scoped-row/save pipeline then performs structural
  * Zod parsing, Temporal canonicalization, and application validation
  * immediately before Drizzle writes the row. Database constraints still apply

@@ -374,6 +374,7 @@ describe("renderScaffoldFiles", () => {
       "drizzle-orm",
       "hono",
       "@sapporta/rest-core",
+      "@tanstack/react-form",
       "@js-temporal/polyfill",
       "zod",
       "react",
@@ -386,6 +387,7 @@ describe("renderScaffoldFiles", () => {
       "drizzle-orm",
       "hono",
       "@sapporta/rest-core",
+      "@tanstack/react-form",
       "@js-temporal/polyfill",
       "zod",
       "react",
@@ -406,6 +408,7 @@ describe("shared runtime dependency catalog", () => {
       ),
     ).toEqual([
       "@sapporta/rest-core",
+      "@tanstack/react-form",
       "@js-temporal/polyfill",
       "zod",
       "react",

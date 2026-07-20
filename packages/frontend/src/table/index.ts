@@ -5,21 +5,6 @@ export { createRecord, navigateToNewRecord } from "./actions/record-actions";
 export * from "./api/rows";
 export { FormField } from "./form/FormField";
 export { NewRecordPage } from "./form/NewRecordPage";
-export { RecordFormField } from "./form/RecordFormField";
-export {
-  RecordFormProvider,
-  useRecordFieldIssue,
-  useRecordFieldValue,
-  useRecordFormSetValue,
-  useRecordFormStore,
-} from "./form/RecordFormProvider";
-export {
-  createRecordFormStore,
-  initialRecordFormValues,
-  type RecordFormState,
-  type RecordFormStore,
-  type RecordFormValues,
-} from "./form/record-form-store";
 export {
   parseCreateDraft,
   type CreateDraftIssue,
@@ -33,6 +18,9 @@ export {
 } from "./model/table-value-draft";
 export {
   buildRecordFormFields,
+  fieldModelForColumn,
+  foreignKeyFieldModelForColumn,
+  type ForeignKeyRecordFormFieldModel,
   type RecordFormFieldModel,
 } from "./form/record-form-fields";
 export * from "./grid-adapter/schema-tgrid";

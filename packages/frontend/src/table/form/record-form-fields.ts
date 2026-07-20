@@ -19,6 +19,11 @@ export type RecordFormFieldModel =
       lookup: LookupCapabilities;
     };
 
+export type ForeignKeyRecordFormFieldModel = Extract<
+  RecordFormFieldModel,
+  { kind: "foreignKey" }
+>;
+
 export function buildRecordFormFields(args: {
   table: TableSchema;
   lookups: LookupStore;
@@ -73,4 +78,34 @@ export function buildRecordFormFields(args: {
   }
 
   return fields;
+}
+
+/** Returns the Sapporta field model derived for one SQL column. */
+export function fieldModelForColumn(
+  fields: readonly RecordFormFieldModel[],
+  columnName: string,
+): RecordFormFieldModel {
+  const field = fields.find(
+    (candidate) => candidate.column.name === columnName,
+  );
+  if (!field) {
+    throw new Error(
+      `Sapporta form metadata does not contain a field for column "${columnName}".`,
+    );
+  }
+  return field;
+}
+
+/** Returns the foreign-key field model derived for one SQL column. */
+export function foreignKeyFieldModelForColumn(
+  fields: readonly RecordFormFieldModel[],
+  columnName: string,
+): ForeignKeyRecordFormFieldModel {
+  const field = fieldModelForColumn(fields, columnName);
+  if (field.kind !== "foreignKey") {
+    throw new Error(
+      `Sapporta form metadata for column "${columnName}" is not a foreign key.`,
+    );
+  }
+  return field;
 }
