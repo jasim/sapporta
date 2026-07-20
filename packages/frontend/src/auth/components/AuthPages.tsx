@@ -40,7 +40,7 @@ const MODE_CONTENT: Record<AuthMode, ModeContent> = {
     endpoint: "/auth/sign-in/email",
   },
   signup: {
-    title: "Create your account",
+    title: "Sign up and create your first workspace",
     intro: "Enter your details to get started.",
     submit: "Create account",
     submitting: "Creating account...",
@@ -197,6 +197,15 @@ export function VerifyEmailPage() {
             Back
           </Link>
         </>
+      )}
+      {!token && import.meta.env.DEV && (
+        <div
+          role="note"
+          className="rounded-lg border border-sap-warning/40 bg-sap-warning/10 p-3 text-sm font-medium text-sap-warning"
+        >
+          Development mode: Check the development server logs for the email
+          verification link.
+        </div>
       )}
     </AuthFrame>
   );

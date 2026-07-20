@@ -328,6 +328,7 @@ describe("auth pages", () => {
     });
     await renderAuthPageRoutes("/signup");
 
+    await waitForText("Sign up and create your first Sapporta workspace");
     await fillInput("Name", "Owner");
     await fillInput("Email", "owner@example.test");
     await fillInput("Password", "correct-horse-battery-staple");
@@ -417,6 +418,25 @@ describe("auth pages", () => {
     await submitForm();
 
     await waitForText("Verification email sent.");
+  });
+
+  it("points development verification to the development server logs", async () => {
+    installFetch((request) => {
+      if (request.path === "/api/meta/info") {
+        return jsonResponse({ name: "Test Project", slug: "test-project" });
+      }
+      return jsonResponse({ error: "Unexpected request" }, 500);
+    });
+
+    await renderRoutes(
+      "/verify-email",
+      createElement(Route, {
+        path: "/verify-email",
+        element: createElement(VerifyEmailPage),
+      }),
+    );
+
+    await waitForText("Check the development server logs");
   });
 
   it("logs out from the account menu and returns protected routes to login", async () => {
