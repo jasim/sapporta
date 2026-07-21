@@ -50,6 +50,11 @@
       "sapporta:source": "./src/platform/index.ts",
       "default": "./dist/platform.js"
     },
+    "./form": {
+      "types": "./dist/form/index.d.ts",
+      "sapporta:source": "./src/form/index.ts",
+      "default": "./dist/form.js"
+    },
     "./schema": {
       "types": "./dist/schema-catalog/index.d.ts",
       "sapporta:source": "./src/schema-catalog/index.ts",

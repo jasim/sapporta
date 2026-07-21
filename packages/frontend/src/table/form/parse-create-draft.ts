@@ -45,14 +45,12 @@
  */
 
 import type { TableSchema } from "@sapporta/shared/contracts";
+import type { FieldIssue } from "@sapporta/shared/validation";
 import { decodeTableValueDraft } from "../model/table-value-draft";
 import { isRecordFormEditableColumn } from "./field-policy";
 
-/** A local issue associated with the public SQL name of one form field. */
-export interface CreateDraftIssue {
-  field: string;
-  message: string;
-}
+/** @deprecated Use FieldIssue from @sapporta/shared/validation. */
+export type CreateDraftIssue = FieldIssue;
 
 export type ParseCreateDraftResult =
   | { ok: true; value: Record<string, unknown> }

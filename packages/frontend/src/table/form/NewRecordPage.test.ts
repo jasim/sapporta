@@ -71,6 +71,27 @@ describe("NewRecordPage", () => {
       "A project with that name already exists.",
     );
   });
+
+  it("maps structured server details into TanStack field errors", async () => {
+    createTableRow.mockRejectedValue(
+      new ApiError(422, {
+        error: "Validation failed",
+        code: "VALIDATION_FAILED",
+        details: [
+          { field: "name", message: "A project with this name exists." },
+        ],
+      }),
+    );
+    const container = await renderPage();
+    const input = container.querySelector<HTMLInputElement>("#field-name");
+    if (!input) throw new Error("Expected the project name input.");
+
+    await changeInput(input, "Roadmap");
+    await submit(container);
+
+    expect(container.textContent).toContain("Validation failed");
+    expect(container.textContent).toContain("A project with this name exists.");
+  });
 });
 
 async function renderPage(): Promise<HTMLElement> {

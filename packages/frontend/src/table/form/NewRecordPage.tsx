@@ -4,8 +4,13 @@ import { useNavigate } from "react-router-dom";
 import { ArrowLeft, Loader2 } from "lucide-react";
 import type { TableSchema } from "@sapporta/shared/contracts";
 import { ApiError } from "@sapporta/shared/client";
+import { apiProblemFromBody } from "@sapporta/shared/validation";
 import { TopBar, TopBarButton } from "../../shell/components/TopBar";
 import { Button } from "@sapporta/ui/button";
+import {
+  fieldIssuesForSubmissionError,
+  firstFormErrorMessage,
+} from "../../form";
 import { FormField } from "./FormField";
 import { parseCreateDraft } from "./parse-create-draft";
 import {
@@ -43,8 +48,14 @@ export function NewRecordPage({ tableSchema }: { tableSchema: TableSchema }) {
         reloadTGridRows(tableSchema.name);
         navigate(tableUrl, { replace: true });
       } catch (error: unknown) {
+        const fieldIssues = fieldIssuesForSubmissionError(error);
         formApi.setErrorMap({
-          onSubmit: { form: createErrorMessage(error), fields: {} },
+          onSubmit: {
+            form: createErrorMessage(error),
+            fields: Object.fromEntries(
+              fieldIssues.map((issue) => [issue.field, issue.message]),
+            ),
+          },
         });
         throw error;
       }
@@ -88,7 +99,7 @@ export function NewRecordPage({ tableSchema }: { tableSchema: TableSchema }) {
                   <FormField
                     field={fieldModel}
                     value={field.state.value}
-                    issue={firstString(field.state.meta.errors)}
+                    issue={firstFormErrorMessage(field.state.meta.errors)}
                     onChange={field.handleChange}
                   />
                 )}
@@ -158,10 +169,6 @@ function createDraftErrors(
   };
 }
 
-function firstString(errors: readonly unknown[]): string | undefined {
-  return errors.find((error): error is string => typeof error === "string");
-}
-
 function formErrorMessage(error: unknown): string | undefined {
   if (typeof error === "string") return error;
   if (error && typeof error === "object" && "form" in error) {
@@ -173,21 +180,5 @@ function formErrorMessage(error: unknown): string | undefined {
 
 function createErrorMessage(err: unknown): string {
   if (!(err instanceof ApiError)) return "Could not save this record.";
-  const body = err.body;
-  if (!body || typeof body !== "object") return "Could not save this record.";
-
-  const details = "details" in body ? body.details : undefined;
-  if (Array.isArray(details)) {
-    const messages = details.flatMap((detail) => {
-      if (!detail || typeof detail !== "object") return [];
-      const field = "field" in detail ? detail.field : undefined;
-      const message = "message" in detail ? detail.message : undefined;
-      if (typeof field !== "string" || typeof message !== "string") return [];
-      return [`${field}: ${message}`];
-    });
-    if (messages.length > 0) return messages.join(", ");
-  }
-
-  const error = "error" in body ? body.error : undefined;
-  return typeof error === "string" ? error : "Could not save this record.";
+  return apiProblemFromBody(err.body)?.summary ?? "Could not save this record.";
 }

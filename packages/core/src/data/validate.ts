@@ -8,13 +8,15 @@
  */
 
 import type { TableDef } from "../schema/table.js";
+import {
+  fieldIssuesFromZodError,
+  type FieldIssue,
+} from "@sapporta/shared/validation";
 import { tableWriteZod } from "./table-write-zod.js";
 import { rejectControlChars } from "./sanitize.js";
 
-export interface ValidationErrorDetail {
-  field: string;
-  message: string;
-}
+/** @deprecated Use FieldIssue from @sapporta/shared/validation. */
+export type ValidationErrorDetail = FieldIssue;
 
 export type TableWriteParseResult =
   | { success: true; data: Record<string, unknown> }
@@ -58,10 +60,7 @@ export function parseTableWrite(
   if (!result.success) {
     return {
       success: false,
-      issues: result.error.issues.map((issue) => ({
-        field: issue.path.join("."),
-        message: issue.message,
-      })),
+      issues: fieldIssuesFromZodError(result.error),
     };
   }
 

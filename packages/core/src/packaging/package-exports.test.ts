@@ -263,6 +263,7 @@ describe("Sapporta package exports", () => {
           import * as frontend from "@sapporta/frontend";
           import * as frontendApp from "@sapporta/frontend/app";
           import * as frontendAuthProfile from "@sapporta/frontend/auth/profile";
+          import * as frontendForm from "@sapporta/frontend/form";
           import * as grid from "@sapporta/grid";
           import * as gridRuntime from "@sapporta/grid/grid";
           import * as ui from "@sapporta/ui";
@@ -276,11 +277,13 @@ describe("Sapporta package exports", () => {
           import * as sharedCsv from "@sapporta/shared/csv";
           import * as contracts from "@sapporta/shared/contracts";
           import * as sharedError from "@sapporta/shared/error";
+          import * as sharedValidation from "@sapporta/shared/validation";
 
           export {
             frontend,
             frontendApp,
             frontendAuthProfile,
+            frontendForm,
             grid,
             gridRuntime,
             ui,
@@ -293,6 +296,7 @@ describe("Sapporta package exports", () => {
             shared,
             sharedCsv,
             sharedError,
+            sharedValidation,
             contracts,
           };
         `,

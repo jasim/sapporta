@@ -49,6 +49,7 @@ export {
 export { NewRecordRoute } from "./table/route/NewRecordRoute";
 export { NewRecordPage } from "./table/form/NewRecordPage";
 export * from "./table";
+export * from "./form";
 
 export * from "./lookup";
 
