@@ -31,6 +31,7 @@ export type DependencyKey =
   | "typesNodemailer"
   | "restCore"
   | "tanstackReactForm"
+  | "tanstackReactQuery"
   | "temporal"
   | "zod"
   | "betterAuth"
@@ -228,6 +229,12 @@ export const DEPENDENCY_DEFINITIONS = [
     "tanstackReactForm",
     "@tanstack/react-form",
     "%%SAPPORTA:TANSTACK_REACT_FORM_VERSION%%",
+    { browser: true, server: false },
+  ),
+  frontendInstalledDependency(
+    "tanstackReactQuery",
+    "@tanstack/react-query",
+    "%%SAPPORTA:TANSTACK_REACT_QUERY_VERSION%%",
     { browser: true, server: false },
   ),
   dependency(

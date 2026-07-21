@@ -304,6 +304,21 @@ describe("renderScaffoldFiles", () => {
     expect(byDest.get("packages/frontend/src/main.tsx")).toContain(
       'import { SapportaApp } from "./SapportaApp";',
     );
+    expect(byDest.get("packages/frontend/src/main.tsx")).toContain(
+      'import { QueryClient, QueryClientProvider } from "@tanstack/react-query";',
+    );
+    expect(byDest.get("packages/frontend/src/main.tsx")).toContain(
+      "const queryClient = new QueryClient({",
+    );
+    expect(byDest.get("packages/frontend/src/main.tsx")).toContain(
+      "<QueryClientProvider client={queryClient}>",
+    );
+    const frontendPackage = JSON.parse(
+      byDest.get("packages/frontend/package.json") ?? "{}",
+    ) as { dependencies?: Record<string, string> };
+    expect(frontendPackage.dependencies?.["@tanstack/react-query"]).toMatch(
+      /^\^?\d+\.\d+\.\d+/,
+    );
     expect(byDest.get("packages/frontend/src/App.tsx")).toContain(
       "export const appPublicRoutes",
     );
@@ -396,6 +411,7 @@ describe("renderScaffoldFiles", () => {
       "hono",
       "@sapporta/rest-core",
       "@tanstack/react-form",
+      "@tanstack/react-query",
       "@js-temporal/polyfill",
       "zod",
       "react",
@@ -409,6 +425,7 @@ describe("renderScaffoldFiles", () => {
       "hono",
       "@sapporta/rest-core",
       "@tanstack/react-form",
+      "@tanstack/react-query",
       "@js-temporal/polyfill",
       "zod",
       "react",
@@ -430,6 +447,7 @@ describe("shared runtime dependency catalog", () => {
     ).toEqual([
       "@sapporta/rest-core",
       "@tanstack/react-form",
+      "@tanstack/react-query",
       "@js-temporal/polyfill",
       "zod",
       "react",

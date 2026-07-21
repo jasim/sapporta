@@ -14,6 +14,7 @@
     "@sapporta/shared": "%%SAPPORTA:SHARED_SPEC%%",
     "@sapporta/ui": "%%SAPPORTA:UI_SPEC%%",
     "@tanstack/react-form": "%%SAPPORTA:TANSTACK_REACT_FORM_VERSION%%",
+    "@tanstack/react-query": "%%SAPPORTA:TANSTACK_REACT_QUERY_VERSION%%",
     "%%SAPPORTA:SLUG%%-shared": "workspace:*",
     "better-auth": "^1.6.13",
     "@js-temporal/polyfill": "%%SAPPORTA:TEMPORAL_VERSION%%",
