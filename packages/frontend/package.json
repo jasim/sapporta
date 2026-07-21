@@ -90,6 +90,11 @@
       "sapporta:source": "./src/routes/new-record.ts",
       "default": "./dist/routes/new-record.js"
     },
+    "./table/query": {
+      "types": "./dist/table/query/index.d.ts",
+      "sapporta:source": "./src/table/query/index.ts",
+      "default": "./dist/table/query.js"
+    },
     "./report": {
       "types": "./dist/report/index.d.ts",
       "sapporta:source": "./src/report/index.ts",
@@ -132,7 +137,7 @@
   "peerDependencies": {
     "@sapporta/rest-core": "3.52.2",
     "@tanstack/react-form": "^1.33.2",
-    "@tanstack/react-query": "^5.101.4",
+    "@tanstack/react-query": "^5.0.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "react-router-dom": "^7.13.1",

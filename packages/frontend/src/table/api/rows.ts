@@ -12,6 +12,13 @@ import {
   type TypedFilterCondition,
 } from "@sapporta/shared/filter";
 import type { RowId } from "@sapporta/shared/row-id";
+import {
+  requestTableRecord,
+  requestTableRecordsPage,
+  type TableReadOptions,
+} from "./read-table-data";
+
+export type TableFetchOptions = TableReadOptions;
 
 export interface FetchTableRowsParams {
   tableName: string;
@@ -44,19 +51,18 @@ export function buildTableRowsQuery(
 
 export async function fetchTableRows(
   params: FetchTableRowsParams,
+  options: TableFetchOptions = {},
 ): Promise<PaginatedRows> {
   const { tableName, ...rest } = params;
-  return uiClient.listRows({
-    params: { tableName },
-    query: buildTableRowsQuery(rest),
-  });
+  return requestTableRecordsPage(tableName, buildTableRowsQuery(rest), options);
 }
 
 export async function fetchTableRow(
   tableName: string,
-  id: RowId,
+  recordId: RowId,
+  options: TableFetchOptions = {},
 ): Promise<SingleRow> {
-  return uiClient.getRow({ params: { tableName, id } });
+  return requestTableRecord(tableName, recordId, options);
 }
 
 export async function createTableRow(

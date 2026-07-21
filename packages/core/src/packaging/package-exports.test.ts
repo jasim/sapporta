@@ -264,6 +264,7 @@ describe("Sapporta package exports", () => {
           import * as frontendApp from "@sapporta/frontend/app";
           import * as frontendAuthProfile from "@sapporta/frontend/auth/profile";
           import * as frontendForm from "@sapporta/frontend/form";
+          import * as frontendTableQuery from "@sapporta/frontend/table/query";
           import * as grid from "@sapporta/grid";
           import * as gridRuntime from "@sapporta/grid/grid";
           import * as ui from "@sapporta/ui";
@@ -284,6 +285,7 @@ describe("Sapporta package exports", () => {
             frontendApp,
             frontendAuthProfile,
             frontendForm,
+            frontendTableQuery,
             grid,
             gridRuntime,
             ui,

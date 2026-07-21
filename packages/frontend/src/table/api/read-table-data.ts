@@ -1,0 +1,30 @@
+import { uiClient } from "../../platform/client";
+import type { PaginatedRows, SingleRow } from "@sapporta/shared/contracts";
+import type { RowId } from "@sapporta/shared/row-id";
+
+export type TableReadOptions = {
+  signal?: AbortSignal;
+};
+
+export function requestTableRecordsPage(
+  tableName: string,
+  query: Readonly<Record<string, string>>,
+  options: TableReadOptions = {},
+): Promise<PaginatedRows> {
+  return uiClient.listRows({
+    params: { tableName },
+    query,
+    fetchOptions: { signal: options.signal },
+  });
+}
+
+export function requestTableRecord(
+  tableName: string,
+  recordId: RowId,
+  options: TableReadOptions = {},
+): Promise<SingleRow> {
+  return uiClient.getRow({
+    params: { tableName, id: recordId },
+    fetchOptions: { signal: options.signal },
+  });
+}

@@ -81,6 +81,7 @@ export * from "./page/table-selection";
 export * from "./page/table-view-pref";
 export * from "./page/tgrid-lifecycle";
 export * from "./page/tgrid-source-status";
+export * from "./query";
 export { NewRecordRoute } from "./route/NewRecordRoute";
 export {
   TableRoute,
