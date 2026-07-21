@@ -252,6 +252,27 @@ describe("renderScaffoldFiles", () => {
     expect(byDest.get("README.md")).toContain("# Acme App");
     expect(byDest.get("README.md")).toContain("Uses [Sapporta]");
     expect(byDest.get("AGENTS.md")).toContain("shadcn/ui conventions");
+    expect(byDest.get("AGENTS.md")).toContain(
+      "follow `VISUAL-DESIGN-GUIDELINES.md`",
+    );
+    expect(byDest.get("AGENTS.md")).toContain(
+      "After writing a major code change or addition",
+    );
+    expect(byDest.get("AGENTS.md")).toContain(
+      "use a separate sub-agent or\ncoding-agent thread",
+    );
+    expect(byDest.get("AGENTS.md")).toContain(
+      "must happen after the\ncode has been written",
+    );
+    expect(byDest.get("CODING-PRINCIPLES.md")).toContain(
+      "# Coding principles",
+    );
+    expect(byDest.get("CODING-PRINCIPLES.md")).toContain(
+      "input → parsed domain values → decisions → optional effect plan → I/O",
+    );
+    expect(byDest.get("VISUAL-DESIGN-GUIDELINES.md")).toContain(
+      "# Compact Interface Design Guideline",
+    );
     expect(byDest.get("AGENTS.md")).toContain("The `/api/hello` example");
     expect(byDest.get("AGENTS.md")).toContain("createSapportaMailer()");
     expect(byDest.get("CLAUDE.md")).toBe(

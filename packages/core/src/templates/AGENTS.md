@@ -13,6 +13,11 @@ APIs, auth-aware row access, and a React app shell.
 
 Prefer the project-local CLI form: `pnpm exec sapporta ...`.
 
+After writing a major code change or addition, use a separate sub-agent or
+coding-agent thread to read `CODING-PRINCIPLES.md`, review the written code, and
+apply the principles to it. This review and application must happen after the
+code has been written, not during the initial implementation.
+
 ## Where to make changes
 
 - Tables: add or edit schema files in `packages/api/schema/`, then generate and
@@ -90,6 +95,8 @@ The frontend uses React, Vite, Tailwind, `@sapporta/ui`, shadcn/ui conventions,
 and Radix primitives. Prefer existing Sapporta UI components and local patterns
 before adding new component abstractions. Use lucide icons for icon buttons when
 an appropriate icon exists.
+
+When designing user interfaces, follow `VISUAL-DESIGN-GUIDELINES.md`.
 
 Protected app routes live in `appProtectedRoutes`; public routes live in
 `appPublicRoutes`.

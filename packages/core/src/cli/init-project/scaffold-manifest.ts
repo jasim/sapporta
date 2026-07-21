@@ -132,6 +132,8 @@ export const SCAFFOLD_MANIFEST: ScaffoldManifest = [
   scaffoldFile(".dockerignore", "workspace"),
   scaffoldFile("README.md", "workspace"),
   scaffoldFile("AGENTS.md", "workspace"),
+  scaffoldFile("CODING-PRINCIPLES.md", "workspace"),
+  scaffoldFile("VISUAL-DESIGN-GUIDELINES.md", "workspace"),
   scaffoldFile("CLAUDE.md", "workspace"),
   scaffoldFile("DEPLOYMENT.md", "workspace"),
   scaffoldFileAt("gitignore", ".gitignore", "workspace"),
