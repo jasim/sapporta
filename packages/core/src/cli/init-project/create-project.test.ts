@@ -305,13 +305,19 @@ describe("renderScaffoldFiles", () => {
       'import { SapportaApp } from "./SapportaApp";',
     );
     expect(byDest.get("packages/frontend/src/main.tsx")).toContain(
-      'import { QueryClient, QueryClientProvider } from "@tanstack/react-query";',
+      'import { QueryClientProvider } from "@tanstack/react-query";',
     );
     expect(byDest.get("packages/frontend/src/main.tsx")).toContain(
-      "const queryClient = new QueryClient({",
+      'import { queryClient } from "./query-client";',
     );
     expect(byDest.get("packages/frontend/src/main.tsx")).toContain(
       "<QueryClientProvider client={queryClient}>",
+    );
+    expect(byDest.get("packages/frontend/src/main.tsx")).not.toContain(
+      "new QueryClient(",
+    );
+    expect(byDest.get("packages/frontend/src/query-client.ts")).toContain(
+      "export const queryClient = new QueryClient({",
     );
     const frontendPackage = JSON.parse(
       byDest.get("packages/frontend/package.json") ?? "{}",

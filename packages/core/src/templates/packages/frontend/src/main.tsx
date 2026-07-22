@@ -1,4 +1,4 @@
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClientProvider } from "@tanstack/react-query";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
@@ -6,16 +6,7 @@ import { BrowserRouter } from "react-router-dom";
 // @sapporta/ui's tokens and base rules — edit it to customize.
 import "./app.css";
 import { SapportaApp } from "./SapportaApp";
-
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      staleTime: 30_000,
-      retry: 1,
-      refetchOnWindowFocus: false,
-    },
-  },
-});
+import { queryClient } from "./query-client";
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>

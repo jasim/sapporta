@@ -95,6 +95,10 @@ describe("refreshScaffoldProject", () => {
       join(target, "packages/frontend/src/SapportaApp.tsx"),
       "custom framework app host\n",
     );
+    writeFileSync(
+      join(target, "packages/frontend/src/query-client.ts"),
+      "custom query client\n",
+    );
     writeFileSync(join(target, "packages/api/schema/accounts.ts"), "schema\n");
     const summary = refreshScaffoldProject({
       projectDir: target,
@@ -112,6 +116,9 @@ describe("refreshScaffoldProject", () => {
     );
     expect(summary.skipped).toContain(
       "packages/frontend/src/App.tsx (workspace)",
+    );
+    expect(summary.skipped).toContain(
+      "packages/frontend/src/query-client.ts (workspace)",
     );
     expect(summary.created).toContain("packages/frontend/src/api.ts");
     expect(summary.merged).toContain("packages/api/package.json");
@@ -136,6 +143,12 @@ describe("refreshScaffoldProject", () => {
         "utf-8",
       ),
     ).toContain("export function SapportaApp");
+    expect(
+      readFileSync(
+        join(target, "packages/frontend/src/query-client.ts"),
+        "utf-8",
+      ),
+    ).toBe("custom query client\n");
     expect(
       readFileSync(join(target, "packages/api/schema/accounts.ts"), "utf-8"),
     ).toBe("schema\n");

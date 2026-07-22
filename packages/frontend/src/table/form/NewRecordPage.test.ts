@@ -2,17 +2,24 @@
 
 import { act, createElement } from "react";
 import { createRoot, type Root } from "react-dom/client";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ApiError } from "@sapporta/shared/client";
 import type { TableSchema } from "@sapporta/shared/contracts";
+import { tableQueryKeys } from "../query";
 import { NewRecordPage } from "./NewRecordPage";
 
-const { createTableRow } = vi.hoisted(() => ({
+const { createTableRow, reloadTGridRows } = vi.hoisted(() => ({
   createTableRow: vi.fn(),
+  reloadTGridRows: vi.fn(),
 }));
 
-vi.mock("../api/rows", () => ({ createTableRow }));
+vi.mock("../api/rows", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../api/rows")>()),
+  createTableRow,
+}));
+vi.mock("../state/tgrid-session-registry", () => ({ reloadTGridRows }));
 
 (
   globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
@@ -37,9 +44,13 @@ const TABLE: TableSchema = {
 };
 
 let mounted: { root: Root; container: HTMLElement } | null = null;
+let queryClient: QueryClient | null = null;
 
 afterEach(async () => {
   createTableRow.mockReset();
+  reloadTGridRows.mockReset();
+  queryClient?.clear();
+  queryClient = null;
   if (!mounted) return;
   await act(async () => mounted?.root.unmount());
   mounted.container.remove();
@@ -92,19 +103,52 @@ describe("NewRecordPage", () => {
     expect(container.textContent).toContain("Validation failed");
     expect(container.textContent).toContain("A project with this name exists.");
   });
+
+  it("invalidates the table query hierarchy and reloads mounted grids after creation", async () => {
+    createTableRow.mockResolvedValue({ data: { id: 42, name: "Roadmap" } });
+    const pageKey = tableQueryKeys.page({
+      tableName: TABLE.name,
+      page: 1,
+      limit: 20,
+    });
+    const otherTableKey = tableQueryKeys.page({
+      tableName: "teams",
+      page: 1,
+      limit: 20,
+    });
+    const container = await renderPage();
+    queryClient?.setQueryData(pageKey, { data: [], meta: {} });
+    queryClient?.setQueryData(otherTableKey, { data: [], meta: {} });
+    const input = container.querySelector<HTMLInputElement>("#field-name");
+    if (!input) throw new Error("Expected the project name input.");
+
+    await changeInput(input, "Roadmap");
+    await submit(container);
+
+    expect(reloadTGridRows).toHaveBeenCalledWith(TABLE.name);
+    expect(queryClient?.getQueryState(pageKey)?.isInvalidated).toBe(true);
+    expect(queryClient?.getQueryState(otherTableKey)?.isInvalidated).toBe(false);
+  });
 });
 
 async function renderPage(): Promise<HTMLElement> {
   const container = document.createElement("div");
   document.body.append(container);
   const root = createRoot(container);
+  queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  });
   mounted = { root, container };
   await act(async () => {
     root.render(
       createElement(
-        MemoryRouter,
-        null,
-        createElement(NewRecordPage, { tableSchema: TABLE }),
+        QueryClientProvider,
+        { client: queryClient! },
+        createElement(
+          MemoryRouter,
+          null,
+          createElement(NewRecordPage, { tableSchema: TABLE }),
+        ),
       ),
     );
   });

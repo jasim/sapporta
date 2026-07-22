@@ -92,9 +92,34 @@ is documented in `DEPLOYMENT.md`.
 ## Frontend
 
 The frontend uses React, Vite, Tailwind, `@sapporta/ui`, shadcn/ui conventions,
-and Radix primitives. Prefer existing Sapporta UI components and local patterns
-before adding new component abstractions. Use lucide icons for icon buttons when
-an appropriate icon exists.
+Base UI primitives, TanStack Form, and TanStack Query. Prefer existing Sapporta
+UI components and local patterns before adding new component abstractions. Use
+lucide icons for icon buttons when an appropriate icon exists.
+
+The generated frontend mounts one `QueryClientProvider` in
+`packages/frontend/src/main.tsx`. That file is framework-owned boot wiring.
+Reuse its provider, and keep application-wide cache policy in the
+workspace-owned `packages/frontend/src/query-client.ts`. Customize
+`query-client.ts`, not `main.tsx`. Use
+`tableRecordQueryOptions()`, `tableRecordsPageQueryOptions()`, and
+`tableQueryKeys` from `@sapporta/frontend/table/query` for generated table
+reads. App-owned endpoints use an application-owned query-key namespace. Do not
+copy table records into `useEffect`/`useState` loaders or create a second generic
+table client.
+
+Use TanStack Form for application form state. Compose standard table fields
+with Sapporta's public form surface, including `FormField`,
+`buildRecordFormFields()`, and `parseCreateDraft()`. Use
+`FormSubmissionError`, `fieldIssuesForSubmissionError()`, and
+`firstFormErrorMessage()` from `@sapporta/frontend/form` for local and API field
+errors instead of adding an application-wide error parser.
+
+After a successful mutation, invalidate every affected TanStack Query cache
+before navigation or closing the form. Invalidate
+`tableQueryKeys.table(tableName)` when a generated-table mutation can affect a
+record and its paginated lists. TGrid sessions use a separate data source, so
+also call `reloadTGridRows(tableName)` for each affected table that may have a
+mounted Grid.
 
 When designing user interfaces, follow `VISUAL-DESIGN-GUIDELINES.md`.
 

@@ -1,5 +1,6 @@
 import { useMemo, type FormEvent } from "react";
 import { useForm } from "@tanstack/react-form";
+import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft, Loader2 } from "lucide-react";
 import type { TableSchema } from "@sapporta/shared/contracts";
@@ -18,11 +19,13 @@ import {
   type RecordFormFieldModel,
 } from "./record-form-fields";
 import { createTableRow } from "../api/rows";
+import { tableQueryKeys } from "../query";
 import { reloadTGridRows } from "../state/tgrid-session-registry";
 import { useLookupStore } from "../../lookup";
 
 export function NewRecordPage({ tableSchema }: { tableSchema: TableSchema }) {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const tableLabel = tableSchema.label ?? tableSchema.name;
   const tableUrl = `/tables/${tableSchema.name}`;
   const lookups = useLookupStore();
@@ -46,6 +49,9 @@ export function NewRecordPage({ tableSchema }: { tableSchema: TableSchema }) {
       try {
         await createTableRow(tableSchema.name, parsed.value);
         reloadTGridRows(tableSchema.name);
+        await queryClient.invalidateQueries({
+          queryKey: tableQueryKeys.table(tableSchema.name),
+        });
         navigate(tableUrl, { replace: true });
       } catch (error: unknown) {
         const fieldIssues = fieldIssuesForSubmissionError(error);
