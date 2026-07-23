@@ -7,7 +7,11 @@ import type {
   TGridLevelId,
   TGridRowsByLevel,
 } from "../grid-adapter/tgrid-types";
-import type { TGridSession } from "../state/tgrid-session";
+import type {
+  TGridLoadedRowsBoundaryHandler,
+  TGridSession,
+} from "../state/tgrid-session";
+import { paginateTGridLoadedRowsBoundary } from "../state/tgrid-loaded-rows-boundary";
 import { TGrid, type ViewRelatedRowsOption } from "./TGrid";
 import { TableGridHeader } from "./TableGridHeader";
 import { TableGridPager } from "./TableGridPager";
@@ -61,6 +65,10 @@ export type TableGridViewProps<
   loadLookups?: boolean;
   onNewRecord?: () => void;
   actions?: ComponentType<TableGridActionsProps<RowsByLevel, AppServices>>;
+  onLoadedRowsBoundary?: TGridLoadedRowsBoundaryHandler<
+    RowsByLevel,
+    AppServices
+  >;
   viewRelatedRows?: ViewRelatedRowsOption;
   className?: string;
   gridClassName?: string;
@@ -98,6 +106,7 @@ export function useTableGrid<
   loadLookups,
   onNewRecord,
   actions,
+  onLoadedRowsBoundary = paginateTGridLoadedRowsBoundary,
   viewRelatedRows,
   className,
   gridClassName,
@@ -116,6 +125,7 @@ export function useTableGrid<
     services,
     routeQuerySeeds: urlState.routeQuerySeeds,
     onQueryUrlChange: urlState.onQueryUrlChange,
+    onLoadedRowsBoundary,
   });
 
   useTGridLifecycle({
@@ -157,6 +167,7 @@ export function TableGridView<
   loadLookups,
   onNewRecord,
   actions,
+  onLoadedRowsBoundary,
   viewRelatedRows,
   className,
   gridClassName,
@@ -170,6 +181,7 @@ export function TableGridView<
     loadLookups,
     onNewRecord,
     actions,
+    onLoadedRowsBoundary,
     viewRelatedRows,
     className,
     gridClassName,

@@ -22,7 +22,13 @@ import {
   type TablePageGridOptions,
 } from "../../index";
 import type { TableGridActionsProps as TablePublicActionsProps } from "../index";
-import type { TableGridBinding, TableGridViewProps } from "./TableGridView";
+import type { CreateTGridSessionArgs } from "../state/tgrid-session";
+import { paginateTGridLoadedRowsBoundary } from "../state/tgrid-loaded-rows-boundary";
+import {
+  useTableGrid,
+  type TableGridBinding,
+  type TableGridViewProps,
+} from "./TableGridView";
 import {
   SchemaTableGridView,
   type SchemaTableGridViewProps,
@@ -35,10 +41,11 @@ import {
 
 type CapturedTableGridViewProps = TableGridViewProps<SchemaTableRowsByLevel>;
 
-const { tableGridViewSpy } = vi.hoisted(() => ({
+const { tableGridViewSpy, useTGridSessionSpy } = vi.hoisted(() => ({
   tableGridViewSpy: vi.fn((_props: CapturedTableGridViewProps): ReactElement =>
     createElement("div", null, "table grid view"),
   ),
+  useTGridSessionSpy: vi.fn(),
 }));
 
 vi.mock("./TableGridView", async (importOriginal) => {
@@ -55,7 +62,10 @@ vi.mock("../grid-adapter/tgrid-binding", async (importOriginal) => {
     await importOriginal<typeof import("../grid-adapter/tgrid-binding")>();
   return {
     ...actual,
-    useTGridSession: () => null,
+    useTGridSession: (...args: unknown[]) => {
+      useTGridSessionSpy(...args);
+      return null;
+    },
   };
 });
 
@@ -145,6 +155,7 @@ describe("SchemaTableGridView", () => {
       mounted = null;
     }
     tableGridViewSpy.mockClear();
+    useTGridSessionSpy.mockClear();
   });
 
   it("renders a schema table grid at the route path", async () => {
@@ -339,6 +350,62 @@ describe("SchemaTableGridView", () => {
 
     expect(binding?.actions).toBe(Actions);
     expect(binding?.level).toBe("orders");
+  });
+
+  it("installs the standard loaded-row pagination policy through useTableGrid", async () => {
+    const source = {
+      table: ordersTable,
+      tablesByName: { orders: ordersTable, order_lines: orderLinesTable },
+    };
+    const route = {
+      path: "/orders-workbench",
+      searchParams: new URLSearchParams(),
+      navigate: vi.fn(),
+    };
+
+    function BindingProbe(): ReactElement | null {
+      useSchemaTableGrid({
+        source,
+        route,
+        loadLookups: false,
+      });
+      return null;
+    }
+
+    mounted = await render(createElement(BindingProbe));
+
+    const args = useTGridSessionSpy.mock.calls[0]?.[1] as
+      CreateTGridSessionArgs<SchemaTableRowsByLevel> | undefined;
+    expect(args?.onLoadedRowsBoundary).toBe(paginateTGridLoadedRowsBoundary);
+  });
+
+  it("forwards a custom loaded-row boundary policy through useTableGrid", async () => {
+    const definition = {
+      rootLevel: "orders",
+    } as unknown as TGridDefinition<SchemaTableRowsByLevel>;
+    const route = {
+      path: "/orders-workbench",
+      searchParams: new URLSearchParams(),
+      navigate: vi.fn(),
+    };
+    const onLoadedRowsBoundary = vi.fn(() => false as const);
+
+    function BindingProbe(): ReactElement | null {
+      useTableGrid({
+        definition,
+        table: ordersTable,
+        route,
+        loadLookups: false,
+        onLoadedRowsBoundary,
+      });
+      return null;
+    }
+
+    mounted = await render(createElement(BindingProbe));
+
+    const args = useTGridSessionSpy.mock.calls[0]?.[1] as
+      CreateTGridSessionArgs<SchemaTableRowsByLevel> | undefined;
+    expect(args?.onLoadedRowsBoundary).toBe(onLoadedRowsBoundary);
   });
 
   it("exposes the component slot through the table and root public surfaces", () => {

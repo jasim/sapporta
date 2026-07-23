@@ -60,6 +60,15 @@ import type {
 } from "./tgrid-level-query-state";
 export type { TGridRouteQuerySeed } from "./tgrid-level-query-state";
 
+export type TGridLoadedRowsBoundaryHandler<
+  RowsByLevel extends TGridRowsByLevel = TGridRowsByLevel,
+  AppServices = unknown,
+> = (
+  event: LoadedRowsBoundaryEvent,
+  levelId: TGridLevelId<RowsByLevel>,
+  session: TGridSession<RowsByLevel, AppServices>,
+) => Promise<SourceLoadResult> | false;
+
 // Options for a table page. Pass `services` for custom cells/editors,
 // `routeQuerySeeds` for route-provided starting controls, and `onQueryUrlChange`
 // when the page should keep its URL in sync with table controls.
@@ -77,6 +86,10 @@ export type CreateTGridSessionArgs<
   }) => void;
   routeQuerySeeds?: Partial<
     Record<TGridLevelId<RowsByLevel>, TGridRouteQuerySeed>
+  >;
+  onLoadedRowsBoundary?: TGridLoadedRowsBoundaryHandler<
+    RowsByLevel,
+    AppServices
   >;
 };
 
@@ -479,40 +492,12 @@ class DefaultTGridSession<
   private handleLoadedRowsBoundary(
     event: LoadedRowsBoundaryEvent,
   ): Promise<SourceLoadResult> | false {
-    // The low-level grid reports only "loaded rows ended before/after this
-    // path". TGrid translates that into its own table contract: one-based page
-    // numbers, page-size policy, route state, and total-count checks. Returning
-    // false tells the runtime to try an ancestor path or normal append-row
-    // fallback.
+    const handler = this.liveInputsRef.current.onLoadedRowsBoundary;
+    if (!handler) return false;
+
     const level = this.runtime.level(event.loadPath);
     const levelId = level.schema.name as TGridLevelId<RowsByLevel>;
-    const store = this.queryStoresByLevel.get(levelId);
-    if (!store) return false;
-    const query = store.getState();
-    if (!Number.isFinite(query.pageSize)) return false;
-
-    const nextPage =
-      event.direction === "after" ? query.page + 1 : query.page - 1;
-    if (nextPage < 1) return false;
-
-    const sourceState = level.data.state();
-    if (sourceState.status !== "ready") return false;
-    if (
-      event.direction === "after" &&
-      query.totalCount !== null &&
-      query.page * query.pageSize >= query.totalCount
-    ) {
-      return false;
-    }
-    if (
-      event.direction === "after" &&
-      query.totalCount === null &&
-      sourceState.snapshot.nodes.length < query.pageSize
-    ) {
-      return false;
-    }
-
-    return this.setLevelPage(levelId, event.loadPath, nextPage, query.pageSize);
+    return handler(event, levelId, this);
   }
 
   private refetchSource(path: GridPath): Promise<SourceLoadResult> {

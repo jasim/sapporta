@@ -92,9 +92,11 @@ export * from "./state/tgrid-level-query-state";
 export {
   createTGridSession,
   type CreateTGridSessionArgs,
+  type TGridLoadedRowsBoundaryHandler,
   type TGridRouteQuerySeed,
   type TGridSession,
 } from "./state/tgrid-session";
+export { paginateTGridLoadedRowsBoundary } from "./state/tgrid-loaded-rows-boundary";
 export {
   reloadTGridRows,
   registerTGridSession,

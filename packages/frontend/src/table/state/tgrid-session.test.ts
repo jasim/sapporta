@@ -13,7 +13,11 @@ import {
   ROW_PRIMARY_MASTER_DETAIL_WITH_ACTIVATION,
 } from "@sapporta/grid";
 import { controllerFor, cursorManagerFor } from "@sapporta/grid/advanced";
-import { createTGridSession } from "./tgrid-session";
+import {
+  createTGridSession,
+  type TGridLoadedRowsBoundaryHandler,
+} from "./tgrid-session";
+import { paginateTGridLoadedRowsBoundary } from "./tgrid-loaded-rows-boundary";
 import { defineTGrid } from "../grid-adapter/tgrid-runtime-config";
 import type { TableRowsClient } from "../grid-adapter/tgrid-level-config";
 
@@ -388,8 +392,20 @@ describe("TGridSession", () => {
       },
     });
     const onQueryUrlChange = vi.fn();
+    const onLoadedRowsBoundary = vi.fn<
+      TGridLoadedRowsBoundaryHandler<RowsByLevel>
+    >((event, levelId, session) => {
+      const query = session.getQueryState(levelId);
+      return session.setLevelPage(
+        levelId,
+        event.loadPath,
+        query.page + 1,
+        query.pageSize,
+      );
+    });
     const session = createTGridSession<RowsByLevel>(definition, {
       onQueryUrlChange,
+      onLoadedRowsBoundary,
     });
 
     try {
@@ -417,6 +433,67 @@ describe("TGridSession", () => {
       expect(cursors.currentCellCursor()).toEqual({
         path,
         rowId: makeRowId(path, "2"),
+        colId: "customer",
+      });
+      expect(onLoadedRowsBoundary).toHaveBeenCalledTimes(1);
+      expect(onLoadedRowsBoundary.mock.calls[0]?.[0]).toMatchObject({
+        kind: "cell",
+        loadPath: path,
+        direction: "after",
+        origin: {
+          path,
+          rowId: makeRowId(path, "1"),
+          colId: "customer",
+        },
+      });
+      expect(onLoadedRowsBoundary.mock.calls[0]?.[1]).toBe("orders");
+      expect(onLoadedRowsBoundary.mock.calls[0]?.[2]).toBe(session);
+    } finally {
+      session.dispose();
+    }
+  });
+
+  it("leaves a loaded-row boundary unhandled when no parent policy is installed", async () => {
+    const rowsClient: TableRowsClient = {
+      fetch: vi.fn(async ({ page }) => ({
+        data: [{ id: page, customer: "Acme", status: "open" }],
+        meta: { total: 2, page, limit: 1, pages: 2 },
+      })),
+      create: vi.fn(async (_table, data) => ({ data })),
+      update: vi.fn(async (_table, _id, data) => ({ data })),
+      remove: vi.fn(async (_table, id) => ({ data: { id } })),
+    };
+    const definition = defineTGrid<RowsByLevel>({
+      rootLevel: "orders",
+      levels: {
+        orders: {
+          table: ordersTable,
+          childLevels: [],
+          query: { owner: "host", pageSize: 1 },
+          rowsClient,
+        },
+      },
+    });
+    const session = createTGridSession<RowsByLevel>(definition);
+
+    try {
+      await flush();
+      const path = rootPath("orders");
+      const cursors = cursorManagerFor(session.runtime);
+      cursors.moveCellCursorTo({
+        path,
+        rowId: makeRowId(path, "1"),
+        colId: "customer",
+      });
+
+      controllerFor(session.runtime, path).handleKey(keyEvent("ArrowDown"));
+      await flush();
+
+      expect(session.getQueryState().page).toBe(1);
+      expect(rowsClient.fetch).toHaveBeenCalledTimes(1);
+      expect(cursors.currentCellCursor()).toEqual({
+        path,
+        rowId: makeRowId(path, "1"),
         colId: "customer",
       });
     } finally {
@@ -458,6 +535,7 @@ describe("TGridSession", () => {
     const onQueryUrlChange = vi.fn();
     const session = createTGridSession<RowsByLevel>(definition, {
       onQueryUrlChange,
+      onLoadedRowsBoundary: paginateTGridLoadedRowsBoundary,
     });
 
     try {
@@ -517,6 +595,7 @@ describe("TGridSession", () => {
     const onQueryUrlChange = vi.fn();
     const session = createTGridSession<RowsByLevel>(definition, {
       onQueryUrlChange,
+      onLoadedRowsBoundary: paginateTGridLoadedRowsBoundary,
     });
 
     try {
@@ -598,6 +677,7 @@ describe("TGridSession", () => {
     const onQueryUrlChange = vi.fn();
     const session = createTGridSession<RowsByLevel>(definition, {
       onQueryUrlChange,
+      onLoadedRowsBoundary: paginateTGridLoadedRowsBoundary,
     });
 
     try {

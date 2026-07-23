@@ -86,6 +86,7 @@ export function useTGridSession<
     services: args.services,
     onQueryUrlChange: args.onQueryUrlChange,
     routeQuerySeeds: args.routeQuerySeeds,
+    onLoadedRowsBoundary: args.onLoadedRowsBoundary,
   };
 
   return useCommittedDisposableResource(
