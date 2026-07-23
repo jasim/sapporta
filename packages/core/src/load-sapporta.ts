@@ -35,6 +35,9 @@ import {
   makeMetaHandlers,
   makeAuthorizedTableHandlers,
 } from "./api/index.js";
+import { logger } from "./db/logger.js";
+
+const log = logger.child({ module: "load-sapporta" });
 
 export interface LoadSapportaProjectOptions {
   /** Human-readable project name shown in the frontend chrome and auth pages. */
@@ -93,6 +96,12 @@ export async function loadSapportaProject(
   const { tables } = await loadSchemas(dirs.schemaDir);
   assertSchemaDefinitions(tables);
   const catalog = createTableCatalog(tables);
+  for (const warning of catalog.searchWarnings) {
+    log.warn(warning.message, {
+      table: warning.table,
+      column: warning.column,
+    });
+  }
 
   assertMigrationsReady({
     projectRoot: opts.projectRoot,

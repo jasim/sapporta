@@ -343,12 +343,17 @@ describe("/api/tables table operations", () => {
       expect(body.data.length).toBeGreaterThanOrEqual(4);
     });
 
-    it("returns 400 when q is set but the table has no search config", async () => {
+    it("returns 400 when table search is explicitly disabled", async () => {
       const res = await request("/api/tables/accounts?q=foo");
       expect(res.status).toBe(400);
 
       const body = await res.json();
       expect(body.code).toBe("no_search_config");
+    });
+
+    it("accepts q on a table with default search configuration", async () => {
+      const res = await request("/api/tables/agents?q=alpha");
+      expect(res.status).toBe(200);
     });
   });
 

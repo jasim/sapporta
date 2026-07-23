@@ -102,7 +102,7 @@ export const tableSchemaSchema = z.object({
   rowLinks: z.array(reportLinkSchema).optional(),
   rowLabelColumns: z.array(z.string()).nonempty(),
   rowCount: z.number().optional(),
-  search: z.object({ columns: z.array(z.string()) }).optional(),
+  searchable: z.boolean(),
 });
 export type TableSchema = z.output<typeof tableSchemaSchema>;
 

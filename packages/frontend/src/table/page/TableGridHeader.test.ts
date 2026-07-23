@@ -44,6 +44,7 @@ const ordersTable: TableSchema = {
   name: "orders",
   label: "Orders",
   immutable: false,
+  searchable: true,
   rowLabelColumns: ["customer"],
   columns: [
     { name: "id", label: "ID", primary: true, kind: "text" },
@@ -124,6 +125,21 @@ afterEach(async () => {
 });
 
 describe("TableGridHeader", () => {
+  it("hides the search control when the table is not searchable", async () => {
+    hookMocks.useTableLevelQuery.mockReturnValue({
+      ...query,
+      searchable: false,
+    });
+    mounted = await renderHeader("wide", {
+      ...ordersTable,
+      searchable: false,
+    });
+
+    expect(
+      document.body.querySelector('input[placeholder="Search..."]'),
+    ).toBeNull();
+  });
+
   it("keeps the wide controls and filter row mounted while inserting delete before New", async () => {
     mounted = await renderHeader("wide");
     const search = searchInput();

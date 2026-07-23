@@ -1,12 +1,13 @@
 /**
  * Row-scoped table operations for generated routes and ordinary product code.
  *
- * `scopedRows(db, auth, table)` is Sapporta's default table API after a request
- * has an auth context. The principal may be signed in or anonymous; row access
- * comes from `auth.dataAuthority`, not from assuming there is always a
- * workspace user. The helper binds one Drizzle table to the request's
- * row-security policy, then exposes CRUD, lookup, count, and export operations
- * that never let callers choose or bypass ownership columns.
+ * `scopedRows()` is Sapporta's default table API after a request has an auth
+ * context and the catalog has supplied that table's compiled search plan. The
+ * principal may be signed in or anonymous; row access comes from
+ * `auth.dataAuthority`, not from assuming there is always a workspace user.
+ * The helper binds one Drizzle table to the request's row-security policy,
+ * then exposes CRUD, lookup, count, and export operations that never let
+ * callers choose or bypass ownership columns.
  *
  * The important rule is that primary keys and API payloads are not security
  * boundaries. Reads and destructive writes add the table's workspace/user
@@ -30,7 +31,7 @@
  * applies row visibility, performs persistence, and returns plain row objects.
  */
 
-import { asc, eq, inArray, or, sql, type SQL } from "drizzle-orm";
+import { and, asc, eq, inArray, or, sql, type SQL } from "drizzle-orm";
 import type { BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
 import { getTableConfig, type SQLiteColumn } from "drizzle-orm/sqlite-core";
 import type { RowId } from "@sapporta/shared/row-id";
@@ -45,6 +46,8 @@ import { parseQuery, type ParsedQuery } from "./query-parser.js";
 import { rowLabeller } from "./row-label.js";
 import { resolveRowFields, UnknownRowFieldsError } from "./row-fields.js";
 import type { LookupEntry } from "@sapporta/shared/contracts";
+import type { SearchPlan } from "../search/search-plan.js";
+import { buildSearchPredicate } from "../search/search-sql.js";
 
 export interface ListRowsInput {
   [key: string]: string | undefined;
@@ -71,6 +74,11 @@ export interface ScopedRows {
   exportRows(query?: ListRowsInput): Promise<Record<string, unknown>[]>;
   lookup(query?: ListRowsInput): Promise<LookupEntry[]>;
   count(query?: ListRowsInput): Promise<Record<string, number>>;
+}
+
+export interface ScopedRowsOptions {
+  /** Catalog-compiled plan for this exact table. */
+  searchPlan: SearchPlan;
 }
 
 export class ImmutableTableOperationError extends Error {
@@ -103,7 +111,13 @@ export function scopedRows(
   db: BetterSQLite3Database,
   auth: SapportaAuthContext,
   table: TableDef,
+  options: ScopedRowsOptions,
 ): ScopedRows {
+  if (options.searchPlan.table !== table) {
+    throw new Error(
+      `Search plan for "${options.searchPlan.table.sqlName}" cannot be used with table "${table.sqlName}".`,
+    );
+  }
   // Resolve the request-bound access policy once so every operation below uses
   // the same table metadata, workspace, user, and row-scope interpretation.
   const access = auth.rowSecurity.forTable(table);
@@ -118,7 +132,7 @@ export function scopedRows(
       // Parse filtering/search/sort/pagination first, then wrap the parsed
       // predicate in row ownership before using it for both rows and totals.
       const query = parseRowsQuery(input, table);
-      const where = access.ownedRows(query.where);
+      const where = access.ownedRows(rowsQueryPredicate(query));
       const total = await countRows(db, table, where);
       const rows = (await applyOrderBy(
         db.select().from(table.drizzle).where(where),
@@ -207,7 +221,7 @@ export function scopedRows(
       // Export is the unpaginated list path; it keeps query parsing, ordering,
       // and row ownership identical to list.
       const query = parseRowsQuery(input, table);
-      const where = access.ownedRows(query.where);
+      const where = access.ownedRows(rowsQueryPredicate(query));
       const rows = (await applyOrderBy(
         db.select().from(table.drizzle).where(where),
         query,
@@ -332,6 +346,13 @@ export function scopedRows(
       return result;
     },
   };
+
+  function rowsQueryPredicate(query: ParsedQuery): SQL | undefined {
+    const search = query.searchTerm
+      ? buildSearchPredicate(options.searchPlan, query.searchTerm, auth)
+      : undefined;
+    return and(query.where, search);
+  }
 }
 
 // Drizzle exposes columns by property name, while query parameters and result

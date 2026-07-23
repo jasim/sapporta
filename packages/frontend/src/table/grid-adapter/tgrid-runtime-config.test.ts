@@ -196,6 +196,7 @@ describe("compileTGridRuntimeConfig", () => {
     name: "orders",
     label: "Orders",
     immutable: false,
+    searchable: true,
     rowLabelColumns: ["customer"],
     columns: [
       { name: "id", label: "ID", primary: true, kind: "number" },
@@ -214,6 +215,7 @@ describe("compileTGridRuntimeConfig", () => {
     name: "lines",
     label: "Lines",
     immutable: false,
+    searchable: true,
     rowLabelColumns: ["sku"],
     columns: [
       { name: "id", label: "ID", primary: true, kind: "number" },
@@ -229,6 +231,7 @@ describe("compileTGridRuntimeConfig", () => {
     name: "allocations",
     label: "Allocations",
     immutable: true,
+    searchable: true,
     rowLabelColumns: ["warehouse"],
     columns: [
       { name: "id", label: "ID", primary: true, kind: "number" },
@@ -461,6 +464,7 @@ describe("compileTGridRuntimeConfig", () => {
       name: "orders",
       label: "Orders",
       immutable: false,
+      searchable: true,
       rowLabelColumns: ["customer"],
       columns: [
         {

@@ -338,7 +338,7 @@ describe("extractSchemas", () => {
 });
 
 describe("search config surfacing", () => {
-  it("includes meta.search.columns when declared", () => {
+  it("exposes search capability without serializing the server plan", () => {
     const searchableTable = sqliteTable("docs", {
       id: integer("id").primaryKey({ autoIncrement: true }),
       title: text("title").notNull(),
@@ -348,16 +348,32 @@ describe("search config surfacing", () => {
       drizzle: searchableTable,
       meta: {
         rowLabelColumns: ["title"],
-        search: { columns: ["title", "body"] },
+        search: { self: ["title", "body"] },
       },
     });
     const [result] = extractSchemas([docs]);
-    expect(result.search).toEqual({ columns: ["title", "body"] });
+    expect(result.searchable).toBe(true);
+    expect(result).not.toHaveProperty("search");
   });
 
-  it("omits search when meta.search is not declared", () => {
+  it("enables search by default", () => {
     const [result] = extractSchemas([accounts]);
-    expect(result.search).toBeUndefined();
+    expect(result.searchable).toBe(true);
+  });
+
+  it("exposes search: false as a disabled capability", () => {
+    const privateNotes = sapportaTable({
+      drizzle: sqliteTable("private_notes", {
+        id: integer("id").primaryKey(),
+        note: text("note").notNull(),
+      }),
+      meta: {
+        rowLabelColumns: ["note"],
+        search: false,
+      },
+    });
+    const [result] = extractSchemas([privateNotes]);
+    expect(result.searchable).toBe(false);
   });
 });
 

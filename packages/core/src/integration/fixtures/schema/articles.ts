@@ -2,9 +2,8 @@ import { sapportaTable, timestamp } from "@sapporta/server/table";
 import { sqliteTable, text, integer } from "drizzle-orm/sqlite-core";
 
 /**
- * Search fixture. Declares `meta.search` so the list endpoint exposes a
- * `q` query parameter that ORs an ILIKE match across `title` and `body`.
- * Kept separate from other fixtures so their tests stay decoupled.
+ * Search fixture with an explicit subset of article fields. A `q` value
+ * matches a literal substring in either `title` or `body`.
  */
 export const articlesTable = sqliteTable("articles", {
   id: integer("id").primaryKey({ autoIncrement: true }),
@@ -25,7 +24,7 @@ export const articles = sapportaTable({
     label: "Articles",
     rowScope: "workspaceUserScoped",
     rowLabelColumns: ["title"],
-    search: { columns: ["title", "body"] },
+    search: { self: ["title", "body"] },
   },
 });
 

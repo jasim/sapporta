@@ -130,9 +130,9 @@ export function makeMetaHandlers<E extends SapportaEnv>(
         const limit = parseSampleLimit(request.query?.limit) ?? 5;
         const fields = parseSampleFields(request.query?.fields);
         const rowFields = resolveSampleRowFields(def, fields);
-        const result = await scopedRows(db, auth, def).list({
-          limit: String(limit),
-        });
+        const result = await scopedRows(db, auth, def, {
+          searchPlan: catalog.searchPlanFor(def.sqlName),
+        }).list({ limit: String(limit) });
 
         return c.json(result.data.map((row) => rowFields.pick(row)));
       } catch (err) {

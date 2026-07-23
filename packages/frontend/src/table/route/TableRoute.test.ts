@@ -31,6 +31,7 @@ const ordersTable: TableSchema = {
   name: "orders",
   label: "Orders",
   immutable: false,
+  searchable: true,
   rowLabelColumns: ["customer"],
   columns: [
     { name: "id", label: "ID", primary: true, kind: "text" },
@@ -43,6 +44,7 @@ const quotesTable: TableSchema = {
   name: "quotes",
   label: "Quotes",
   immutable: false,
+  searchable: true,
   rowLabelColumns: ["text"],
   columns: [
     { name: "id", label: "ID", primary: true, kind: "text" },

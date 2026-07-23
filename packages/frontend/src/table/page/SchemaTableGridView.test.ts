@@ -73,6 +73,7 @@ const ordersTable: TableSchema = {
   name: "orders",
   label: "Orders",
   immutable: false,
+  searchable: true,
   rowLabelColumns: ["customer"],
   columns: [
     { name: "id", label: "ID", primary: true, kind: "text" },
@@ -93,6 +94,7 @@ const orderLinesTable: TableSchema = {
   name: "order_lines",
   label: "Order lines",
   immutable: false,
+  searchable: true,
   rowLabelColumns: ["line_no"],
   columns: [
     { name: "id", label: "ID", primary: true, kind: "text" },

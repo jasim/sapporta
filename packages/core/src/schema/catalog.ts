@@ -1,9 +1,16 @@
 import type { TableDef } from "./table.js";
+import {
+  compileSearchPlans,
+  type SearchPlan,
+  type SearchPlanWarning,
+} from "../search/search-plan.js";
 
 export interface TableCatalog {
   readonly tables: readonly TableDef[];
+  readonly searchWarnings: readonly SearchPlanWarning[];
   get(name: string): TableDef | undefined;
   has(name: string): boolean;
+  searchPlanFor(tableName: string): SearchPlan;
 }
 
 /**
@@ -23,14 +30,25 @@ export function createTableCatalog(tables: readonly TableDef[]): TableCatalog {
     }
     byName.set(def.sqlName, def);
   }
+  const compiledSearch = compileSearchPlans(orderedTables);
 
   return {
     tables: Object.freeze(orderedTables),
+    searchWarnings: compiledSearch.warnings,
     get(name) {
       return byName.get(name);
     },
     has(name) {
       return byName.has(name);
+    },
+    searchPlanFor(tableName) {
+      const plan = compiledSearch.plans.get(tableName);
+      if (!plan) {
+        throw new Error(
+          `Cannot resolve a search plan for unregistered table "${tableName}".`,
+        );
+      }
+      return plan;
     },
   };
 }

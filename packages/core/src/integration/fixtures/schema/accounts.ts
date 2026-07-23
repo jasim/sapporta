@@ -19,6 +19,7 @@ export const accounts = sapportaTable({
     label: "Accounts",
     rowScope: "workspaceGlobal",
     rowLabelColumns: ["name"],
+    search: false,
   },
 });
 

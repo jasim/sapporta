@@ -29,6 +29,7 @@ const TABLE: TableSchema = {
   name: "projects",
   label: "Projects",
   immutable: false,
+  searchable: true,
   rowLabelColumns: ["name"],
   children: [],
   columns: [

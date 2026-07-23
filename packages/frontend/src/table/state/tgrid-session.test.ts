@@ -46,6 +46,7 @@ const ordersTable: TableSchema = {
   name: "orders",
   label: "Orders",
   immutable: false,
+  searchable: true,
   rowLabelColumns: ["customer"],
   columns: [
     { name: "id", label: "ID", primary: true, kind: "number" },

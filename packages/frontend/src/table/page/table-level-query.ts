@@ -42,7 +42,7 @@ export function useTableLevelQuery<
     columns: table.columns,
     filters,
     search,
-    searchable: (table.search?.columns.length ?? 0) > 0,
+    searchable: table.searchable,
     hasSort,
     activeFilterCount: filters.length,
     lookupForColumn: session.lookupForColumn,

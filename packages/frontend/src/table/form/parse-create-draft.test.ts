@@ -7,6 +7,7 @@ const TABLE: TableSchema = {
   name: "invoices",
   label: "Invoices",
   immutable: false,
+  searchable: true,
   rowLabelColumns: ["number"],
   children: [],
   columns: [

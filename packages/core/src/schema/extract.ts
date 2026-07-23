@@ -173,9 +173,7 @@ export function extractSchemas(defs: readonly TableDef[]): TableSchema[] {
       children,
       ...(rowLinks.length > 0 ? { rowLinks } : {}),
       rowLabelColumns,
-      ...(schema.meta.search
-        ? { search: { columns: schema.meta.search.columns } }
-        : {}),
+      searchable: schema.meta.search !== false,
     };
   });
 }

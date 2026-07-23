@@ -34,16 +34,16 @@ const searchableOrders = sapportaTable({
   drizzle: ordersTable,
   meta: {
     rowLabelColumns: ["customer"],
-    search: { columns: ["customer", "status"] },
+    search: { self: ["customer", "status"] },
   },
 });
 const singleSearchOrders = sapportaTable({
   drizzle: ordersTable,
-  meta: { rowLabelColumns: ["customer"], search: { columns: ["customer"] } },
+  meta: { rowLabelColumns: ["customer"], search: { self: ["customer"] } },
 });
-const badSearchTable = sapportaTable({
+const disabledSearchTable = sapportaTable({
   drizzle: ordersTable,
-  meta: { rowLabelColumns: ["customer"], search: { columns: ["nope"] } },
+  meta: { rowLabelColumns: ["customer"], search: false },
 });
 
 describe("parseQuery()", () => {
@@ -264,51 +264,29 @@ describe("parseQuery()", () => {
     });
   });
 
-  // ── Cross-column search (q) — unchanged from pre-redesign ────────────
+  // ── Search term parsing ───────────────────────────────────────────────
 
-  describe("cross-column search (q)", () => {
-    it("builds an OR across exactly the configured search columns, parameterized", () => {
+  describe("search term (q)", () => {
+    it("returns the complete trimmed term for the compiled search plan", () => {
       const q = parseQuery({ q: "foo" }, searchableOrders);
-      const { sql, params } = compile(q.where);
-      expect(sql).toBe(
-        '("orders"."customer" like ? or "orders"."status" like ?)',
-      );
-      expect(params).toEqual(["%foo%", "%foo%"]);
+      expect(q.searchTerm).toBe("foo");
+      expect(q.where).toBeUndefined();
     });
 
-    it("does not interpolate qTerm into SQL text (parameter binding)", () => {
-      const qTerm = "' OR 1=1 --";
-      const q = parseQuery({ q: qTerm }, searchableOrders);
-      const { sql, params } = compile(q.where);
-      expect(sql).not.toContain(qTerm);
-      expect(sql).not.toContain("OR 1=1");
-      expect(params).toEqual([`%${qTerm}%`, `%${qTerm}%`]);
+    it("does not split or otherwise interpret the term", () => {
+      const q = parseQuery({ q: "  blue moon  " }, singleSearchOrders);
+      expect(q.searchTerm).toBe("blue moon");
     });
 
-    it("omits the OR wrapper when only one search column is configured", () => {
-      const q = parseQuery({ q: "foo" }, singleSearchOrders);
-      const { sql, params } = compile(q.where);
-      expect(sql).toBe('"orders"."customer" like ?');
-      expect(sql).not.toMatch(/ or /i);
-      expect(params).toEqual(["%foo%"]);
-    });
-
-    it("passes LIKE wildcards in qTerm through verbatim", () => {
-      const q = parseQuery({ q: "10%_foo" }, singleSearchOrders);
-      const { params } = compile(q.where);
-      expect(params).toEqual(["%10%_foo%"]);
-    });
-
-    it("AND-s the search OR-group with filter predicates", () => {
+    it("keeps structured filters separate from search", () => {
       const q = parseQuery(
         { q: "foo", "filter[status][eq]": "paid" },
         searchableOrders,
       );
       const { sql, params } = compile(q.where);
-      expect(sql).toBe(
-        '("orders"."status" = ? and ("orders"."customer" like ? or "orders"."status" like ?))',
-      );
-      expect(params).toEqual(["paid", "%foo%", "%foo%"]);
+      expect(sql).toBe('"orders"."status" = ?');
+      expect(params).toEqual(["paid"]);
+      expect(q.searchTerm).toBe("foo");
     });
 
     it("composes with sort and pagination", () => {
@@ -316,8 +294,7 @@ describe("parseQuery()", () => {
         { q: "foo", sort: "-created_at", page: "2", limit: "25" },
         searchableOrders,
       );
-      const { params } = compile(q.where);
-      expect(params).toEqual(["%foo%", "%foo%"]);
+      expect(q.searchTerm).toBe("foo");
       expect(q.orderBy).toHaveLength(1);
       expect(toSql(q.orderBy[0])).toMatch(/"created_at" desc/i);
       expect(q.limit).toBe(25);
@@ -327,22 +304,18 @@ describe("parseQuery()", () => {
     it("treats empty q as absent (no predicate, no error)", () => {
       const q = parseQuery({ q: "" }, searchableOrders);
       expect(q.where).toBeUndefined();
+      expect(q.searchTerm).toBeUndefined();
     });
 
     it("treats whitespace-only q as absent", () => {
       const q = parseQuery({ q: "   " }, searchableOrders);
       expect(q.where).toBeUndefined();
+      expect(q.searchTerm).toBeUndefined();
     });
 
-    it("throws no_search_config when q is set but meta.search is missing", () => {
-      expect(() => parseQuery({ q: "foo" }, orders)).toThrow(
+    it("throws no_search_config when table search is disabled", () => {
+      expect(() => parseQuery({ q: "foo" }, disabledSearchTable)).toThrow(
         expect.objectContaining({ code: "no_search_config" }),
-      );
-    });
-
-    it("throws unknown_search_column when a configured column doesn't exist", () => {
-      expect(() => parseQuery({ q: "foo" }, badSearchTable)).toThrow(
-        expect.objectContaining({ code: "unknown_search_column" }),
       );
     });
   });

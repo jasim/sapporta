@@ -88,11 +88,33 @@ export type {
   ListRowsInput,
   ListRowsResult,
   ScopedRows,
+  ScopedRowsOptions,
 } from "./data/scoped-rows.js";
 
 // Query parser
 export { parseQuery } from "./data/query-parser.js";
 export type { ParsedQuery } from "./data/query-parser.js";
+
+// Table search planning and request-bound SQL compilation
+export { normalizeTableSearch } from "./search/search-types.js";
+export type {
+  NormalizedTableSearch,
+  SearchSelf,
+  TableSearch,
+} from "./search/search-types.js";
+export {
+  compileSearchPlans,
+  SearchPlanValidationError,
+} from "./search/search-plan.js";
+export type {
+  ChildSearchPlan,
+  CompiledSearchPlans,
+  SearchPlan,
+  SearchPlanIssue,
+  SearchPlanWarning,
+  SearchValuePlan,
+} from "./search/search-plan.js";
+export { buildSearchPredicate } from "./search/search-sql.js";
 
 // Schema API. Wire-shape types (`TableSchema`, `ColumnSchema`,
 // `ChildSchema`) live in `@sapporta/shared/contracts` — import from

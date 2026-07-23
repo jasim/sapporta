@@ -62,6 +62,7 @@ const accountsTable: TableSchema = {
   name: "accounts",
   label: "Accounts",
   immutable: false,
+  searchable: true,
   rowLabelColumns: ["name"],
   columns: [
     { name: "id", label: "ID", kind: "text", primary: true },

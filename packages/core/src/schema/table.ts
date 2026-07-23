@@ -19,6 +19,12 @@ import {
   type ReferenceRule,
   type RowScope,
 } from "../auth/row-scope.js";
+import {
+  normalizeTableSearch,
+  type NormalizedTableSearch,
+  type TableSearch,
+} from "../search/search-types.js";
+export type { SearchSelf, TableSearch } from "../search/search-types.js";
 
 /**
  * Column factories live in `./columns.ts` — importing them here so users
@@ -130,13 +136,21 @@ export interface SapportaMeta {
   children: ChildMeta[];
   /** Per-column metadata keyed by column name */
   columns: Record<string, ColumnMeta>;
-  /** Cross-column search configuration for the `q` query parameter.
-   *  Columns are matched with ILIKE and OR-ed together. */
-  search?: { columns: string[] };
+  /**
+   * Values that represent a row during table search. Search is enabled for all
+   * visible application columns by default.
+   */
+  search: NormalizedTableSearch;
 }
 
 type SapportaMetaDefaultedField =
-  "label" | "immutable" | "rowScope" | "references" | "children" | "columns";
+  | "label"
+  | "immutable"
+  | "rowScope"
+  | "references"
+  | "children"
+  | "columns"
+  | "search";
 
 /** Sparse public metadata accepted by `sapportaTable()`.
  *
@@ -151,6 +165,8 @@ export type SapportaTableInputMeta = Omit<
   references?: Record<string, ReferenceRule>;
   children?: ChildMeta[];
   columns?: Record<string, ColumnMeta>;
+  /** Defaults to `"allColumns"`. Use `false` to disable table search. */
+  search?: TableSearch;
   /**
    * Defaults to `workspaceUserScoped`, the strictest row boundary. Use
    * `workspaceGlobal` or `systemGlobal` only for data that intentionally has a
@@ -312,6 +328,7 @@ function normalizeSapportaMeta(
     references: input.references ?? {},
     children: input.children ?? [],
     columns,
+    search: normalizeTableSearch(input.search),
   };
 }
 

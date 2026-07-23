@@ -13,7 +13,6 @@ import {
   asc,
   desc,
   and,
-  or,
   sql,
   type SQL,
   type AnyColumn,
@@ -35,6 +34,7 @@ import {
 
 export interface ParsedQuery {
   where: SQL | undefined;
+  searchTerm: string | undefined;
   orderBy: SQL[];
   limit: number;
   offset: number;
@@ -49,7 +49,7 @@ const MAX_LIMIT = 1000;
  * Grammar is owned by `@sapporta/shared/filter` — the same `decodeFilters`
  * the UI uses to build the URL also validates it here. This module layers
  * on the server-only concerns: column existence, SQL emission, and
- * pagination/search policy.
+ * pagination and root search policy.
  *
  * Filter grammar (from shared):
  *   eq, neq                         equality / inequality
@@ -60,9 +60,9 @@ const MAX_LIMIT = 1000;
  *   is                              value must be `null` or `notnull`
  *
  * Top-level (server-only):
- *   q=term                          OR LIKE across meta.search.columns,
- *                                   AND-ed with filters. Empty / whitespace
- *                                   `q` is treated as absent.
+ *   q=term                          trimmed search term returned for the
+ *                                   catalog-compiled search plan. Empty /
+ *                                   whitespace `q` is treated as absent.
  *   sort=col,-col2                  leading `-` is descending
  *   page=N, limit=M                 M ∈ [1, MAX_LIMIT]
  *
@@ -73,8 +73,7 @@ const MAX_LIMIT = 1000;
  *   unknown_column                  filter or sort names a column not on
  *                                   the table
  *   bad_limit, bad_page             non-numeric or out-of-range
- *   no_search_config                q set on a table with no meta.search
- *   unknown_search_column           meta.search references a missing column
+ *   no_search_config                q set on a table with search: false
  *
  * Silent-ignore is rejected as a class: typos like filter[naration]=foo
  * return 400, not "all rows".
@@ -99,11 +98,11 @@ export function parseQuery(
     conditions.push(buildFilterSql(col, cond));
   }
 
-  const qClause = buildSearchSql(params.q, schema);
-  if (qClause) conditions.push(qClause);
+  const searchTerm = parseSearchTerm(params.q, schema);
 
   return {
     where: conditions.length > 0 ? and(...conditions) : undefined,
+    searchTerm,
     orderBy: parseSortClauses(params.sort, schema),
     limit,
     offset,
@@ -196,31 +195,19 @@ function bindText(v: TypedValue): string {
   return v;
 }
 
-function buildSearchSql(
+function parseSearchTerm(
   rawQ: string | undefined,
   schema: TableDef,
-): SQL | null {
+): string | undefined {
   const qTerm = rawQ?.trim();
-  if (!qTerm) return null;
-  const searchCols = schema.meta.search?.columns;
-  if (!searchCols || searchCols.length === 0) {
+  if (!qTerm) return undefined;
+  if (schema.meta.search === false) {
     throw new QueryParseError(
       "no_search_config",
-      `Table \`${schema.sqlName}\` has no search columns configured`,
+      `Table \`${schema.sqlName}\` has search disabled`,
     );
   }
-  const likeParts: SQL[] = [];
-  for (const colName of searchCols) {
-    const col = findColumn(schema, colName);
-    if (!col) {
-      throw new QueryParseError(
-        "unknown_search_column",
-        `Search column \`${colName}\` does not exist on table \`${schema.sqlName}\``,
-      );
-    }
-    likeParts.push(like(col, `%${qTerm}%`));
-  }
-  return likeParts.length === 1 ? likeParts[0] : or(...likeParts)!;
+  return qTerm;
 }
 
 function parseSortClauses(raw: string | undefined, schema: TableDef): SQL[] {

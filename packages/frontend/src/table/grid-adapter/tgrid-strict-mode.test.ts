@@ -36,13 +36,13 @@ const ordersTable: TableSchema = {
   name: "orders",
   label: "Orders",
   immutable: false,
+  searchable: true,
   rowLabelColumns: ["customer"],
   columns: [
     { name: "id", label: "ID", kind: "text", primary: true },
     { name: "customer", label: "Customer", kind: "text" },
   ],
   children: [],
-  search: { columns: ["customer"] },
 };
 
 const rowsClient: TableRowsClient = {

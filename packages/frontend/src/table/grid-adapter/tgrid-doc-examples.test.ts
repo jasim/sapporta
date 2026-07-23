@@ -55,6 +55,7 @@ const invoicesTable: TableSchema = {
   name: "invoices",
   label: "Invoices",
   immutable: false,
+  searchable: true,
   rowLabelColumns: ["customer_id"],
   columns: [
     { name: "id", label: "ID", kind: "text", primary: true },
@@ -69,13 +70,13 @@ const invoicesTable: TableSchema = {
     },
   ],
   children: [],
-  search: { columns: ["customer_id"] },
 };
 
 const invoiceItemsTable: TableSchema = {
   name: "invoice_items",
   label: "Invoice items",
   immutable: false,
+  searchable: true,
   rowLabelColumns: ["item_id"],
   columns: [
     { name: "id", label: "ID", kind: "text", primary: true },

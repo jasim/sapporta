@@ -78,7 +78,9 @@ export function makeAuthorizedTableHandlers<E extends SapportaEnv>(
       ({ def }) =>
       async ({ c }) => {
         const auth = authorizeTableAction(c, guard(c), "read", def);
-        const rows = scopedRows(db, auth, def);
+        const rows = scopedRows(db, auth, def, {
+          searchPlan: catalog.searchPlanFor(def.sqlName),
+        });
         try {
           return c.json(await rows.list(queryParams(c)), 200);
         } catch (err) {
@@ -89,7 +91,9 @@ export function makeAuthorizedTableHandlers<E extends SapportaEnv>(
       ({ def }) =>
       async ({ c, request }) => {
         const auth = authorizeTableAction(c, guard(c), "read", def);
-        const rows = scopedRows(db, auth, def);
+        const rows = scopedRows(db, auth, def, {
+          searchPlan: catalog.searchPlanFor(def.sqlName),
+        });
         try {
           return c.json({ data: await rows.get(request.params.id) }, 200);
         } catch (err) {
@@ -115,7 +119,9 @@ export function makeAuthorizedTableHandlers<E extends SapportaEnv>(
               body,
             );
           }
-          const rows = scopedRows(db, auth, def);
+          const rows = scopedRows(db, auth, def, {
+            searchPlan: catalog.searchPlanFor(def.sqlName),
+          });
           return c.json({ data: await rows.create(body) }, 201);
         } catch (err) {
           return tableWriteErrorResponse(c, def, err);
@@ -125,7 +131,9 @@ export function makeAuthorizedTableHandlers<E extends SapportaEnv>(
       ({ def }) =>
       async ({ c, request }) => {
         const auth = authorizeTableAction(c, guard(c), "update", def);
-        const rows = scopedRows(db, auth, def);
+        const rows = scopedRows(db, auth, def, {
+          searchPlan: catalog.searchPlanFor(def.sqlName),
+        });
         try {
           return c.json(
             { data: await rows.update(request.params.id, request.body) },
@@ -139,7 +147,9 @@ export function makeAuthorizedTableHandlers<E extends SapportaEnv>(
       ({ def }) =>
       async ({ c, request }) => {
         const auth = authorizeTableAction(c, guard(c), "delete", def);
-        const rows = scopedRows(db, auth, def);
+        const rows = scopedRows(db, auth, def, {
+          searchPlan: catalog.searchPlanFor(def.sqlName),
+        });
         try {
           return c.json({ data: await rows.delete(request.params.id) }, 200);
         } catch (err) {
@@ -150,7 +160,9 @@ export function makeAuthorizedTableHandlers<E extends SapportaEnv>(
       ({ def }) =>
       async ({ c }) => {
         const auth = authorizeTableAction(c, guard(c), "export", def);
-        const rows = scopedRows(db, auth, def);
+        const rows = scopedRows(db, auth, def, {
+          searchPlan: catalog.searchPlanFor(def.sqlName),
+        });
         try {
           return await streamCsv(c, def, await rows.exportRows(queryParams(c)));
         } catch (err) {
@@ -162,7 +174,9 @@ export function makeAuthorizedTableHandlers<E extends SapportaEnv>(
       const def = catalog.get(tableName);
       if (!def) return tableNotFoundResponse(tableName);
       const auth = authorizeTableAction(c, guard(c), "read", def);
-      const rows = scopedRows(db, auth, def);
+      const rows = scopedRows(db, auth, def, {
+        searchPlan: catalog.searchPlanFor(def.sqlName),
+      });
       return handleLookup(c, rows);
     },
     count: ({ c, request }) => {
@@ -170,7 +184,9 @@ export function makeAuthorizedTableHandlers<E extends SapportaEnv>(
       const def = catalog.get(tableName);
       if (!def) return tableNotFoundResponse(tableName);
       const auth = authorizeTableAction(c, guard(c), "read", def);
-      const rows = scopedRows(db, auth, def);
+      const rows = scopedRows(db, auth, def, {
+        searchPlan: catalog.searchPlanFor(def.sqlName),
+      });
       return handleCount(c, rows);
     },
   };
