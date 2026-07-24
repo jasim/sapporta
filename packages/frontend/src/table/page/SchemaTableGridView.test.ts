@@ -2,9 +2,11 @@
 
 import {
   act,
+  createRef,
   createElement,
   type ComponentType,
   type ReactElement,
+  type RefCallback,
 } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -20,6 +22,7 @@ import {
   type TableGridActionsProps as PublicTableGridActionsProps,
   type TableGridOptionsByTable,
   type TablePageGridOptions,
+  type TGridSession as PublicTGridSession,
 } from "../../index";
 import type { TableGridActionsProps as TablePublicActionsProps } from "../index";
 import type { CreateTGridSessionArgs } from "../state/tgrid-session";
@@ -320,6 +323,17 @@ describe("SchemaTableGridView", () => {
     expect(props.definition.levels.orders).not.toHaveProperty("actions");
   });
 
+  it("forwards the session ref without adding it to the TGrid definition", async () => {
+    const sessionRef: RefCallback<
+      PublicTGridSession<SchemaTableRowsByLevel>
+    > = () => undefined;
+    const props = await renderSchemaTableGridView({ sessionRef });
+
+    expect(props.sessionRef).toBe(sessionRef);
+    expect(props.definition).not.toHaveProperty("sessionRef");
+    expect(props.definition.levels.orders).not.toHaveProperty("sessionRef");
+  });
+
   it("preserves actions through useSchemaTableGrid and useTableGrid on the binding", async () => {
     const Actions = (
       _props: PublicTableGridActionsProps<SchemaTableRowsByLevel>,
@@ -466,14 +480,25 @@ describe("SchemaTableGridView", () => {
     expect(args?.onLoadedRowsBoundary).toBe(onLoadedRowsBoundary);
   });
 
-  it("exposes the component slot through the table and root public surfaces", () => {
+  it("exposes actions and typed session refs through the public surfaces", () => {
     const Actions = (
       _props: PublicTableGridActionsProps<SchemaTableRowsByLevel>,
     ) => null;
     const TableSurfaceActions: ComponentType<
       TablePublicActionsProps<SchemaTableRowsByLevel>
     > = Actions;
-    const pageOptions = { actions: Actions } satisfies TablePageGridOptions;
+    const callbackSessionRef: RefCallback<
+      PublicTGridSession<SchemaTableRowsByLevel>
+    > = () => undefined;
+    const objectSessionRef =
+      createRef<PublicTGridSession<SchemaTableRowsByLevel>>();
+    const pageOptions = {
+      actions: Actions,
+      sessionRef: callbackSessionRef,
+    } satisfies TablePageGridOptions;
+    const objectRefOptions = {
+      sessionRef: objectSessionRef,
+    } satisfies TablePageGridOptions;
     const routeOptions = {
       orders: pageOptions,
     } satisfies TableGridOptionsByTable;
@@ -481,5 +506,7 @@ describe("SchemaTableGridView", () => {
     expect(PublicSchemaTableGridView).toBe(SchemaTableGridView);
     expect(TableSurfaceActions).toBe(Actions);
     expect(routeOptions.orders.actions).toBe(Actions);
+    expect(routeOptions.orders.sessionRef).toBe(callbackSessionRef);
+    expect(objectRefOptions.sessionRef).toBe(objectSessionRef);
   });
 });

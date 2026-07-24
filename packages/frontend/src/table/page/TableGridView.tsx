@@ -1,4 +1,11 @@
-import { useEffect, useMemo, useRef, type ComponentType } from "react";
+import {
+  useEffect,
+  useImperativeHandle,
+  useMemo,
+  useRef,
+  type ComponentType,
+  type Ref,
+} from "react";
 import { useStore } from "zustand";
 import type { TableSchema } from "@sapporta/shared/contracts";
 import { useTGridSession } from "../grid-adapter/tgrid-binding";
@@ -71,6 +78,8 @@ export type TableGridViewProps<
   loadLookups?: boolean;
   onNewRecord?: () => void;
   actions?: ComponentType<TableGridActionsProps<RowsByLevel, AppServices>>;
+  /** Receive the borrowed live session. TableGridView owns and disposes it. */
+  sessionRef?: Ref<TGridSession<RowsByLevel, AppServices>>;
   /** Replace the standard pager-focus behavior at loaded-row boundaries. */
   onLoadedRowsBoundary?: TGridLoadedRowsBoundaryHandler<
     RowsByLevel,
@@ -84,7 +93,7 @@ export type TableGridViewProps<
 export type UseTableGridArgs<
   RowsByLevel extends TGridRowsByLevel,
   AppServices = unknown,
-> = TableGridViewProps<RowsByLevel, AppServices>;
+> = Omit<TableGridViewProps<RowsByLevel, AppServices>, "sessionRef">;
 
 export type TableGridBinding<
   RowsByLevel extends TGridRowsByLevel,
@@ -176,6 +185,7 @@ export function TableGridView<
   loadLookups,
   onNewRecord,
   actions,
+  sessionRef,
   onLoadedRowsBoundary,
   viewRelatedRows,
   className,
@@ -230,6 +240,7 @@ export function TableGridView<
       routePath={tableGrid.routePath}
       onNewRecord={tableGrid.onNewRecord}
       actions={tableGrid.actions}
+      sessionRef={sessionRef}
       viewRelatedRows={tableGrid.viewRelatedRows}
       className={tableGrid.className}
       gridClassName={tableGrid.gridClassName}
@@ -251,6 +262,7 @@ function TableGridViewWithSession<
   routePath,
   onNewRecord,
   actions,
+  sessionRef,
   viewRelatedRows,
   className,
   gridClassName,
@@ -263,12 +275,15 @@ function TableGridViewWithSession<
   routePath: string;
   onNewRecord?: () => void;
   actions?: ComponentType<TableGridActionsProps<RowsByLevel, AppServices>>;
+  sessionRef?: Ref<TGridSession<RowsByLevel, AppServices>>;
   viewRelatedRows?: ViewRelatedRowsOption;
   className?: string;
   gridClassName?: string;
   pagerButtonRefs: TableGridPagerButtonRefs;
   pagerBoundary: TableGridPagerBoundaryController<RowsByLevel, AppServices>;
 }) {
+  useImperativeHandle(sessionRef, () => session, [session]);
+
   const rootRowsLoadState = useTGridSourceStatus(session);
   const errorMessage =
     rootRowsLoadState.status === "initialError" ||

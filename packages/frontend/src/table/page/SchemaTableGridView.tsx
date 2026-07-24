@@ -1,4 +1,4 @@
-import { useMemo, type ComponentType } from "react";
+import { useMemo, type ComponentType, type Ref } from "react";
 import type { GridInteractionConfig } from "@sapporta/grid";
 import type { TableSchema } from "@sapporta/shared/contracts";
 import {
@@ -9,7 +9,10 @@ import {
   type SchemaTableRowsByLevel,
 } from "../grid-adapter/schema-tgrid";
 import type { TGridDefinition } from "../grid-adapter/tgrid-runtime-config";
-import type { TGridLoadedRowsBoundaryHandler } from "../state/tgrid-session";
+import type {
+  TGridLoadedRowsBoundaryHandler,
+  TGridSession,
+} from "../state/tgrid-session";
 import type { TableGridRoute } from "./table-grid-url-state";
 import {
   TableGridView,
@@ -35,6 +38,8 @@ export type SchemaTableGridViewProps = {
   onNewRecord?: () => void;
   /** Render application-defined actions in the table toolbar and action sheet. */
   actions?: ComponentType<TableGridActionsProps<SchemaTableRowsByLevel>>;
+  /** Receive the borrowed live session. TableGridView owns and disposes it. */
+  sessionRef?: Ref<TGridSession<SchemaTableRowsByLevel>>;
   /** Replace the standard pager-focus behavior at loaded-row boundaries. */
   onLoadedRowsBoundary?: TGridLoadedRowsBoundaryHandler<SchemaTableRowsByLevel>;
   /** Tune row expansion, row loading, interaction, controls, and styling. */
@@ -47,7 +52,10 @@ export type SchemaTableGridViewProps = {
   gridClassName?: string;
 };
 
-export type UseSchemaTableGridArgs = SchemaTableGridViewProps;
+export type UseSchemaTableGridArgs = Omit<
+  SchemaTableGridViewProps,
+  "sessionRef"
+>;
 
 const schemaTableGridDefaultRootRows: SchemaTableRootRowsOptions = {
   urlSync: true,
@@ -174,6 +182,7 @@ export function SchemaTableGridView({
   registerAs,
   onNewRecord,
   actions,
+  sessionRef,
   onLoadedRowsBoundary,
   viewRelatedRows,
   rootRows,
@@ -199,6 +208,7 @@ export function SchemaTableGridView({
       loadLookups={loadLookups}
       onNewRecord={onNewRecord}
       actions={actions}
+      sessionRef={sessionRef}
       onLoadedRowsBoundary={onLoadedRowsBoundary}
       viewRelatedRows={viewRelatedRows}
       className={className}
