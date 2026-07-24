@@ -11,6 +11,7 @@ import { rowSelectionGestureFromModifiers } from "../../interaction/key-handling
 import { CellShell } from "./CellShell";
 import { useGridRuntime } from "../GridRuntimeProvider";
 import { runtimeInternalsFor } from "../../runtime/runtime";
+import { eventTargetIsWithin } from "../internal/dom-targets";
 
 // Per-cell view. One narrow subscription on the transient channel:
 //
@@ -54,6 +55,9 @@ export function GridDataCell({
   // `focusContainer`, and this path's EffectRunner focuses the grid root after
   // React commits the state change.
   function onMouseDown(e: MouseEvent) {
+    // Without this check, pressing a button in a dialog opened by this cell
+    // moves the grid cursor here and takes focus away from the dialog.
+    if (!eventTargetIsWithin(e.target, e.currentTarget)) return;
     if (e.button !== 0) return;
     if (runtime.interaction.mode !== "cell-grid") return;
     e.preventDefault();
@@ -75,6 +79,9 @@ export function GridDataCell({
   }
 
   function onClick(event: MouseEvent) {
+    // Without this check, clicking inside a dialog opened by this cell also
+    // activates the cell.
+    if (!eventTargetIsWithin(event.target, event.currentTarget)) return;
     if (rowHeader) return;
     const coord = { rowId: row.id, colId: column.id };
     if (
@@ -92,6 +99,9 @@ export function GridDataCell({
   }
 
   function onDoubleClick(event: MouseEvent) {
+    // Without this check, double-clicking inside a dialog opened by this cell
+    // can start editing the cell behind it.
+    if (!eventTargetIsWithin(event.target, event.currentTarget)) return;
     if (rowHeader) return;
     const coord = { rowId: row.id, colId: column.id };
     if (

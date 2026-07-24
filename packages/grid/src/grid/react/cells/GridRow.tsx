@@ -5,7 +5,10 @@ import type { ColumnSchema, RowHeaderColumn } from "../../types/schema";
 import { capabilitiesFor } from "../../types/capabilities";
 import { useDisplayedRow, useGridRuntime } from "../GridRuntimeProvider";
 import type { GridPresentation } from "../Grid";
-import { gridRowIdentityAttrs } from "../internal/dom-targets";
+import {
+  eventTargetIsWithin,
+  gridRowIdentityAttrs,
+} from "../internal/dom-targets";
 import { GridDataCell } from "./GridDataCell";
 import { EmptyRowHeaderCell } from "./RowHeaderCell";
 import { runtimeInternalsFor } from "../../runtime/runtime";
@@ -72,6 +75,9 @@ export const GridRow = memo(function GridRow({
       aria-selected={selected ? true : undefined}
       role="row"
       onMouseDown={(event) => {
+        // Without this check, pressing a button in a dialog opened by this row
+        // moves the row cursor and returns focus to the grid.
+        if (!eventTargetIsWithin(event.target, event.currentTarget)) return;
         if (event.button !== 0) return;
         if (runtime.interaction.mode !== "row-list") return;
         if (!row.rowSelectable) return;
@@ -89,6 +95,9 @@ export const GridRow = memo(function GridRow({
         }
       }}
       onClick={(event) => {
+        // Without this check, clicking inside a dialog opened by this row also
+        // activates the row.
+        if (!eventTargetIsWithin(event.target, event.currentTarget)) return;
         controller.handleRowPointer(row.id, {
           gesture: "click",
           button: event.button,
@@ -99,6 +108,9 @@ export const GridRow = memo(function GridRow({
         });
       }}
       onDoubleClick={(event) => {
+        // Without this check, double-clicking inside a dialog opened by this
+        // row also runs the row's double-click action.
+        if (!eventTargetIsWithin(event.target, event.currentTarget)) return;
         controller.handleRowPointer(row.id, {
           gesture: "doubleClick",
           button: event.button,

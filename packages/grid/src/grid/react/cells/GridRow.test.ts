@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 
-import { act, createElement, type ReactElement } from "react";
+import { act, createElement, Fragment, type ReactElement } from "react";
+import { createPortal } from "react-dom";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { columnPreset } from "../../../column-preset";
@@ -286,6 +287,246 @@ function createExpandableRowHeaderRuntime(rowHeaderColumn: RowHeaderColumn) {
     interaction: CELL_GRID_WITH_INDEPENDENT_ROW_SELECTION,
   });
 }
+
+describe("GridRow portal interaction boundaries", () => {
+  let mounted: { root: Root; container: HTMLElement } | null = null;
+  let portalHost: HTMLDivElement | null = null;
+
+  afterEach(async () => {
+    if (mounted) {
+      await unmount(mounted.root, mounted.container);
+      mounted = null;
+    }
+    portalHost?.remove();
+    portalHost = null;
+  });
+
+  function portalSchema(activation: CellActivation["run"]): GridSchema {
+    portalHost = document.createElement("div");
+    document.body.append(portalHost);
+    const host = portalHost;
+    return {
+      rootLevel: "quotes",
+      levels: {
+        quotes: {
+          name: "quotes",
+          rowHeaderColumn: "none",
+          columns: [
+            {
+              id: "text",
+              name: "Text",
+              renderCell: () =>
+                createElement(
+                  Fragment,
+                  null,
+                  createElement(
+                    "span",
+                    { "data-testid": "cell-control" },
+                    "Open",
+                  ),
+                  createPortal(
+                    createElement(
+                      "button",
+                      { "data-testid": "portal-control" },
+                      "Dialog control",
+                    ),
+                    host,
+                  ),
+                ),
+              activation: {
+                startsOn: ["click"],
+                describe: "Open",
+                run: activation,
+              },
+              edit: {
+                editor: () => null,
+                startsOn: ["doubleClick"],
+              },
+            },
+          ],
+          options: {},
+          childLevels: [],
+        },
+      },
+    };
+  }
+
+  function portalRuntime(
+    portalGridSchema: GridSchema,
+    interaction: GridInteractionConfig,
+  ) {
+    return createGridRuntime({
+      schema: portalGridSchema,
+      dataSource: inMemoryGridDataSource({
+        schema: portalGridSchema,
+        tree: [
+          {
+            rowKey: "q1",
+            levelName: "quotes",
+            columns: { text: "Call me Ishmael." },
+          },
+        ],
+        levels: {
+          quotes: {
+            sortMode: "none",
+            filterMode: "none",
+            paginationMode: "none",
+          },
+        },
+      }),
+      interaction,
+    });
+  }
+
+  it("keeps portalled mouse events out of cell focus, activation, and editing", async () => {
+    const activated = vi.fn<CellActivation["run"]>();
+    const portalGridSchema = portalSchema(activated);
+    const runtime = portalRuntime(
+      portalGridSchema,
+      CELL_GRID_WITH_INDEPENDENT_ROW_SELECTION,
+    );
+    mounted = await render(
+      createElement(GridRuntimeProvider, {
+        runtime,
+        children: createElement(GridLevel, {
+          path: rootPath("quotes"),
+        }),
+      }),
+    );
+
+    const portalControl = portalHost?.querySelector(
+      '[data-testid="portal-control"]',
+    );
+    if (!(portalControl instanceof HTMLButtonElement)) {
+      throw new Error("expected portalled control");
+    }
+
+    const portalMouseDown = new MouseEvent("mousedown", {
+      bubbles: true,
+      button: 0,
+      cancelable: true,
+    });
+    const portalClick = new MouseEvent("click", {
+      bubbles: true,
+      button: 0,
+      cancelable: true,
+    });
+    const portalDoubleClick = new MouseEvent("dblclick", {
+      bubbles: true,
+      button: 0,
+      cancelable: true,
+    });
+    await act(async () => {
+      portalControl.dispatchEvent(portalMouseDown);
+      portalControl.dispatchEvent(portalClick);
+      portalControl.dispatchEvent(portalDoubleClick);
+    });
+
+    const internals = runtimeInternalsFor(runtime);
+    expect(portalMouseDown.defaultPrevented).toBe(false);
+    expect(portalClick.defaultPrevented).toBe(false);
+    expect(portalDoubleClick.defaultPrevented).toBe(false);
+    expect(internals.coordinator.getState().cellCursor).toBeNull();
+    expect(
+      internals.controllerFor(rootPath("quotes")).getState().editing,
+    ).toBeNull();
+    expect(activated).not.toHaveBeenCalled();
+
+    const cellControl = mounted.container.querySelector(
+      '[data-testid="cell-control"]',
+    );
+    if (!(cellControl instanceof HTMLElement)) {
+      throw new Error("expected in-cell control");
+    }
+    const cellMouseDown = new MouseEvent("mousedown", {
+      bubbles: true,
+      button: 0,
+      cancelable: true,
+    });
+    await act(async () => {
+      cellControl.dispatchEvent(cellMouseDown);
+      cellControl.dispatchEvent(
+        new MouseEvent("click", { bubbles: true, button: 0 }),
+      );
+    });
+
+    expect(cellMouseDown.defaultPrevented).toBe(true);
+    expect(internals.coordinator.getState().cellCursor).toEqual({
+      path: rootPath("quotes"),
+      rowId: quoteOneId,
+      colId: "text",
+    });
+    expect(activated).toHaveBeenCalledOnce();
+    runtime.dispose();
+  });
+
+  it.each(["click", "doubleClick"] as const)(
+    "keeps portalled mouse events out of row focus and %s activation",
+    async (gesture) => {
+      const cellActivated = vi.fn();
+      const portalGridSchema = portalSchema(cellActivated);
+      const rowInteraction = {
+        ...ROW_PRIMARY_MASTER_DETAIL_WITH_ACTIVATION,
+        activeRow: {
+          ...ROW_PRIMARY_MASTER_DETAIL_WITH_ACTIVATION.activeRow,
+          activation: { startsOn: [gesture] },
+        },
+      } satisfies GridInteractionConfig;
+      const runtime = portalRuntime(portalGridSchema, rowInteraction);
+      const rowActivated = vi.fn();
+      runtime.on("rowActivated", rowActivated);
+      mounted = await render(
+        createElement(GridRuntimeProvider, {
+          runtime,
+          children: createElement(GridLevel, {
+            path: rootPath("quotes"),
+          }),
+        }),
+      );
+
+      const portalControl = portalHost?.querySelector(
+        '[data-testid="portal-control"]',
+      );
+      if (!(portalControl instanceof HTMLButtonElement)) {
+        throw new Error("expected portalled control");
+      }
+      const mouseDown = new MouseEvent("mousedown", {
+        bubbles: true,
+        button: 0,
+        cancelable: true,
+      });
+      const activationEvent = gesture === "click" ? "click" : "dblclick";
+      await act(async () => {
+        portalControl.dispatchEvent(mouseDown);
+        portalControl.dispatchEvent(
+          new MouseEvent(activationEvent, { bubbles: true, button: 0 }),
+        );
+      });
+
+      const internals = runtimeInternalsFor(runtime);
+      expect(mouseDown.defaultPrevented).toBe(false);
+      expect(internals.coordinator.getState().rowCursor).toBeNull();
+      expect(rowActivated).not.toHaveBeenCalled();
+
+      const row = mounted.container.querySelector('[data-grid-part="row"]');
+      if (!(row instanceof HTMLElement)) throw new Error("expected grid row");
+      await act(async () => {
+        row.dispatchEvent(
+          new MouseEvent("mousedown", { bubbles: true, button: 0 }),
+        );
+        row.dispatchEvent(
+          new MouseEvent(activationEvent, { bubbles: true, button: 0 }),
+        );
+      });
+
+      expect(internals.coordinator.getState().rowCursor?.rowId).toBe(
+        quoteOneId,
+      );
+      expect(rowActivated).toHaveBeenCalledOnce();
+      runtime.dispose();
+    },
+  );
+});
 
 describe("GridRow cards presentation", () => {
   let mounted: { root: Root; container: HTMLElement } | null = null;

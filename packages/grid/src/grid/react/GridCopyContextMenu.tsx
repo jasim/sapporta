@@ -1,4 +1,4 @@
-import { useRef, useState, type MouseEvent, type ReactNode } from "react";
+import { useRef, useState, type ReactNode } from "react";
 import {
   ContextMenu,
   ContextMenuContent,
@@ -8,6 +8,7 @@ import {
 import { serializeGridCopyTargetToCsv, type GridCopyTarget } from "../copy";
 import { prepareGridCopyTarget } from "../copy/target";
 import { useGridRuntime } from "./GridRuntimeProvider";
+import { eventTargetIsWithin } from "./internal/dom-targets";
 
 export type GridCopyContextMenuProps = {
   children: ReactNode;
@@ -18,8 +19,8 @@ export function GridCopyContextMenu({ children }: GridCopyContextMenuProps) {
   const targetRef = useRef<GridCopyTarget | null>(null);
   const [hasCopyTarget, setHasCopyTarget] = useState(false);
 
-  function prepareTarget(event: MouseEvent<HTMLDivElement>): void {
-    const target = prepareGridCopyTarget(runtime, event.target);
+  function prepareTarget(eventTarget: EventTarget | null): void {
+    const target = prepareGridCopyTarget(runtime, eventTarget);
     targetRef.current = target;
     setHasCopyTarget(target !== null);
   }
@@ -38,7 +39,25 @@ export function GridCopyContextMenu({ children }: GridCopyContextMenuProps) {
     <ContextMenu>
       <ContextMenuTrigger
         render={<div data-grid-copy-menu-scope="true" />}
-        onContextMenuCapture={prepareTarget}
+        onContextMenu={(event) => {
+          if (!eventTargetIsWithin(event.target, event.currentTarget)) {
+            // Without this check, right-clicking a dialog opened from the grid
+            // also opens the grid's Copy menu. Stop only the grid menu trigger.
+            // The dialog and the browser still handle the right-click normally.
+            event.preventBaseUIHandler();
+            return;
+          }
+          prepareTarget(event.target);
+        }}
+        onTouchStart={(event) => {
+          if (!eventTargetIsWithin(event.target, event.currentTarget)) {
+            // A long press inside a dialog opened from the grid must not start
+            // the grid's context-menu timer.
+            event.preventBaseUIHandler();
+            return;
+          }
+          prepareTarget(event.target);
+        }}
       >
         {children}
       </ContextMenuTrigger>

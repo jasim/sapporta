@@ -59,6 +59,21 @@ export function eventBelongsToGridRoot(
   return elementFromEventTarget(target)?.closest(GRID_ROOT_SELECTOR) === root;
 }
 
+export function eventTargetIsWithin(
+  target: EventTarget | null,
+  currentTarget: Node,
+): boolean {
+  // A cell can open a dialog that is rendered elsewhere in the document.
+  // React still sends the dialog's events through the cell and row that opened
+  // it. This check distinguishes those events from clicks inside the actual
+  // grid element.
+  return (
+    typeof Node !== "undefined" &&
+    target instanceof Node &&
+    currentTarget.contains(target)
+  );
+}
+
 export function findGridRowElement(
   container: ParentNode,
   rowId: RowId,

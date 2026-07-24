@@ -5,12 +5,15 @@ import {
   act,
   cloneElement,
   createElement,
+  Fragment,
   isValidElement,
   type HTMLAttributes,
   type MouseEventHandler,
   type ReactElement,
   type ReactNode,
+  type TouchEventHandler,
 } from "react";
+import { createPortal } from "react-dom";
 import { createRoot, type Root } from "react-dom/client";
 import { GridCopyContextMenu } from "./GridCopyContextMenu";
 import { GridRuntimeProvider } from "./GridRuntimeProvider";
@@ -39,26 +42,63 @@ vi.mock("@sapporta/ui/context-menu", async () => {
   const { createElement: h } =
     await vi.importActual<typeof import("react")>("react");
 
+  type BaseUIContextMenuEvent = Parameters<
+    MouseEventHandler<HTMLDivElement>
+  >[0] & {
+    preventBaseUIHandler: () => void;
+    baseUIHandlerPrevented?: boolean;
+  };
+
   return {
     ContextMenu: ({ children }: { children: ReactNode }) =>
       h("div", { "data-testid": "context-menu" }, children),
     ContextMenuTrigger: ({
       children,
-      onContextMenuCapture,
+      onContextMenu,
+      onTouchStart,
       render,
     }: {
       children: ReactNode;
-      onContextMenuCapture?: MouseEventHandler<HTMLDivElement>;
+      onContextMenu?: (event: BaseUIContextMenuEvent) => void;
+      onTouchStart?: (
+        event: Parameters<TouchEventHandler<HTMLDivElement>>[0] & {
+          preventBaseUIHandler: () => void;
+          baseUIHandlerPrevented?: boolean;
+        },
+      ) => void;
       render?: ReactElement<
         HTMLAttributes<HTMLDivElement> & { "data-testid"?: string }
       >;
-    }) =>
-      isValidElement(render)
+    }) => {
+      const handleContextMenu: MouseEventHandler<HTMLDivElement> = (event) => {
+        const baseUIEvent = event as BaseUIContextMenuEvent;
+        baseUIEvent.preventBaseUIHandler = () => {
+          baseUIEvent.baseUIHandlerPrevented = true;
+        };
+        onContextMenu?.(baseUIEvent);
+        if (baseUIEvent.baseUIHandlerPrevented) return;
+        event.preventDefault();
+        event.currentTarget.dataset.contextMenuOpen = "true";
+      };
+      const handleTouchStart: TouchEventHandler<HTMLDivElement> = (event) => {
+        const baseUIEvent = event as Parameters<
+          NonNullable<typeof onTouchStart>
+        >[0];
+        baseUIEvent.preventBaseUIHandler = () => {
+          baseUIEvent.baseUIHandlerPrevented = true;
+        };
+        onTouchStart?.(baseUIEvent);
+        if (baseUIEvent.baseUIHandlerPrevented) return;
+        event.currentTarget.dataset.contextMenuTouchPending = "true";
+      };
+
+      return isValidElement(render)
         ? cloneElement(
             render,
             {
               "data-testid": "context-menu-trigger",
-              onContextMenuCapture,
+              onContextMenu: handleContextMenu,
+              onTouchStart: handleTouchStart,
             },
             children,
           )
@@ -66,10 +106,12 @@ vi.mock("@sapporta/ui/context-menu", async () => {
             "div",
             {
               "data-testid": "context-menu-trigger",
-              onContextMenuCapture,
+              onContextMenu: handleContextMenu,
+              onTouchStart: handleTouchStart,
             },
             children,
-          ),
+          );
+    },
     ContextMenuContent: ({ children }: { children: ReactNode }) =>
       h("div", { "data-testid": "context-menu-content" }, children),
     ContextMenuItem: ({
@@ -125,6 +167,7 @@ const tree: TreeNode[] = [
 
 let mounted: { root: Root; container: HTMLElement } | null = null;
 const runtimes: GridRuntime[] = [];
+const portalHosts: HTMLElement[] = [];
 
 afterEach(async () => {
   if (mounted) {
@@ -136,6 +179,9 @@ afterEach(async () => {
   }
   for (const runtime of runtimes.splice(0)) {
     runtime.dispose();
+  }
+  for (const portalHost of portalHosts.splice(0)) {
+    portalHost.remove();
   }
 });
 
@@ -187,6 +233,60 @@ describe("GridCopyContextMenu", () => {
     expect(button(container, "Copy").disabled).toBe(true);
     expect(button(container, "Copy with headers").disabled).toBe(true);
   });
+
+  it("does not trigger the grid menu for a portalled descendant", async () => {
+    const runtime = makeRuntime();
+    const portalHandler = vi.fn();
+    const portalHost = document.createElement("div");
+    document.body.append(portalHost);
+    portalHosts.push(portalHost);
+    const container = await renderWithRuntime(
+      runtime,
+      createElement(
+        Fragment,
+        null,
+        renderGridCell(cashId, "account", "Cash"),
+        createPortal(
+          createElement(
+            "span",
+            {
+              "data-testid": "portal-context-target",
+              onContextMenu: portalHandler,
+            },
+            "Dialog quote",
+          ),
+          portalHost,
+        ),
+      ),
+    );
+    const trigger = container.querySelector<HTMLElement>(
+      "[data-testid=context-menu-trigger]",
+    );
+    const portalTarget = portalHost.querySelector(
+      "[data-testid=portal-context-target]",
+    );
+
+    const portalEvent = await dispatchContextMenu(portalTarget);
+
+    expect(portalEvent.defaultPrevented).toBe(false);
+    expect(portalHandler).toHaveBeenCalledOnce();
+    expect(trigger?.dataset.contextMenuOpen).toBeUndefined();
+
+    const gridEvent = await dispatchContextMenu(
+      container.querySelector("span"),
+    );
+
+    expect(gridEvent.defaultPrevented).toBe(true);
+    expect(trigger?.dataset.contextMenuOpen).toBe("true");
+
+    await touchStart(portalTarget);
+
+    expect(trigger?.dataset.contextMenuTouchPending).toBeUndefined();
+
+    await touchStart(container.querySelector("span"));
+
+    expect(trigger?.dataset.contextMenuTouchPending).toBe("true");
+  });
 });
 
 async function renderWithRuntime(
@@ -209,10 +309,29 @@ async function renderWithRuntime(
 }
 
 async function contextMenu(target: Element | null): Promise<void> {
+  await dispatchContextMenu(target);
+}
+
+async function dispatchContextMenu(
+  target: Element | null,
+): Promise<MouseEvent> {
   if (!target) throw new Error("Expected context menu target");
+  const event = new MouseEvent("contextmenu", {
+    bubbles: true,
+    button: 2,
+    cancelable: true,
+  });
+  await act(async () => {
+    target.dispatchEvent(event);
+  });
+  return event;
+}
+
+async function touchStart(target: Element | null): Promise<void> {
+  if (!target) throw new Error("Expected touch target");
   await act(async () => {
     target.dispatchEvent(
-      new MouseEvent("contextmenu", { bubbles: true, button: 2 }),
+      new Event("touchstart", { bubbles: true, cancelable: true }),
     );
   });
 }
