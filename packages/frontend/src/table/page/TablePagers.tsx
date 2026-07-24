@@ -1,5 +1,5 @@
 import { useEffect, useId, useMemo, useState } from "react";
-import type { FormEvent, MouseEvent } from "react";
+import type { FormEvent, MouseEvent, Ref } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { visiblePaginationItems } from "../grid-adapter/visible-pagination-items";
 import type { TableLevelPager } from "./table-level-pager";
@@ -7,12 +7,25 @@ import { clampPage, parsePageJump } from "./table-pager-math";
 
 const MIN_PAGE_SLOT_DIGITS = 4;
 
+export type TablePagerDirection = "before" | "after";
+
+type TablePagerProps = TableLevelPager & {
+  previousButtonRef?: Ref<HTMLButtonElement>;
+  nextButtonRef?: Ref<HTMLButtonElement>;
+  onPagerButtonActivate?: (direction: TablePagerDirection) => boolean;
+  onPagerBoundaryExit?: () => void;
+};
+
 export function NumberedTablePager({
   page,
   pages,
   onPageChange,
   hrefForPage,
-}: TableLevelPager) {
+  previousButtonRef,
+  nextButtonRef,
+  onPagerButtonActivate,
+  onPagerBoundaryExit,
+}: TablePagerProps) {
   const pageJumpId = useId();
   const [draftPage, setDraftPage] = useState(String(page));
   const pageItems = useMemo(
@@ -35,10 +48,14 @@ export function NumberedTablePager({
 
   const safePage = clampPage(page, pages);
 
-  function goToPage(nextPage: number): void {
+  function goToPage(nextPage: number, direction?: TablePagerDirection): void {
+    if (direction && onPagerButtonActivate?.(direction)) return;
+    onPagerBoundaryExit?.();
     const clamped = clampPage(nextPage, pages);
     setDraftPage(String(clamped));
-    if (clamped !== page) onPageChange(clamped);
+    if (clamped !== page) {
+      onPageChange(clamped);
+    }
   }
 
   function commitPageJump(): void {
@@ -80,9 +97,11 @@ export function NumberedTablePager({
     >
       <div className="flex shrink-0 items-center gap-[12px]">
         <button
+          ref={previousButtonRef}
           type="button"
           disabled={safePage <= 1}
-          onClick={() => goToPage(safePage - 1)}
+          onClick={() => goToPage(safePage - 1, "before")}
+          onBlur={onPagerBoundaryExit}
           className="flex h-11 min-w-[84px] shrink-0 items-center justify-center gap-[5px] rounded-[6px] border border-sap-border-soft bg-sap-surface px-[12px] text-sap-emph text-sap-soft hover:bg-sap-row-hover hover:text-sap-fg focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-40"
           aria-label="Previous page"
         >
@@ -112,9 +131,11 @@ export function NumberedTablePager({
         <span className="h-6 border-l border-sap-border" aria-hidden="true" />
 
         <button
+          ref={nextButtonRef}
           type="button"
           disabled={safePage >= pages}
-          onClick={() => goToPage(safePage + 1)}
+          onClick={() => goToPage(safePage + 1, "after")}
+          onBlur={onPagerBoundaryExit}
           className="flex h-11 min-w-[84px] shrink-0 items-center justify-center gap-[5px] rounded-[6px] border border-sap-border-soft bg-sap-surface px-[12px] text-sap-emph text-sap-soft hover:bg-sap-row-hover hover:text-sap-fg focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-40"
           aria-label="Next page"
         >
@@ -183,7 +204,11 @@ export function CompactTablePager({
   page,
   pages,
   onPageChange,
-}: TableLevelPager) {
+  previousButtonRef,
+  nextButtonRef,
+  onPagerButtonActivate,
+  onPagerBoundaryExit,
+}: TablePagerProps) {
   const pageJumpId = useId();
   const safePage = clampPage(page, pages);
   const [draftPage, setDraftPage] = useState(String(safePage));
@@ -194,10 +219,14 @@ export function CompactTablePager({
 
   if (pages <= 1) return null;
 
-  function goToPage(nextPage: number): void {
+  function goToPage(nextPage: number, direction?: TablePagerDirection): void {
+    if (direction && onPagerButtonActivate?.(direction)) return;
+    onPagerBoundaryExit?.();
     const clamped = clampPage(nextPage, pages);
     setDraftPage(String(clamped));
-    if (clamped !== page) onPageChange(clamped);
+    if (clamped !== page) {
+      onPageChange(clamped);
+    }
   }
 
   function commitPageJump(): void {
@@ -220,9 +249,11 @@ export function CompactTablePager({
       className="grid min-h-[44px] shrink-0 grid-cols-[40px_minmax(0,1fr)_40px] items-center gap-1.5 border-t border-sap-border bg-sap-surface px-2 py-0.5"
     >
       <button
+        ref={previousButtonRef}
         type="button"
         disabled={safePage <= 1}
-        onClick={() => goToPage(safePage - 1)}
+        onClick={() => goToPage(safePage - 1, "before")}
+        onBlur={onPagerBoundaryExit}
         className="flex h-10 w-10 items-center justify-center rounded-[6px] border border-sap-border-soft bg-sap-surface text-sap-soft hover:bg-sap-row-hover hover:text-sap-fg focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-40"
         aria-label="Previous page"
       >
@@ -250,9 +281,11 @@ export function CompactTablePager({
       </form>
 
       <button
+        ref={nextButtonRef}
         type="button"
         disabled={safePage >= pages}
-        onClick={() => goToPage(safePage + 1)}
+        onClick={() => goToPage(safePage + 1, "after")}
+        onBlur={onPagerBoundaryExit}
         className="flex h-10 w-10 items-center justify-center rounded-[6px] border border-sap-border-soft bg-sap-surface text-sap-soft hover:bg-sap-row-hover hover:text-sap-fg focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-40"
         aria-label="Next page"
       >

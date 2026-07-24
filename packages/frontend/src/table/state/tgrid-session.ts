@@ -87,6 +87,7 @@ export type CreateTGridSessionArgs<
   routeQuerySeeds?: Partial<
     Record<TGridLevelId<RowsByLevel>, TGridRouteQuerySeed>
   >;
+  /** Handle loaded-row edges in the composition that owns the surrounding UI. */
   onLoadedRowsBoundary?: TGridLoadedRowsBoundaryHandler<
     RowsByLevel,
     AppServices
@@ -268,6 +269,8 @@ class DefaultTGridSession<
       dataSource,
       interaction: definition.interaction,
       phantomRows: definition.phantomRows,
+      // The runtime keeps one stable callback. The session adapter delegates
+      // each event to the current host policy supplied through live inputs.
       onLoadedRowsBoundary: (event) => this.handleLoadedRowsBoundary(event),
       on: {
         cellReconciled: ({ event }) => {

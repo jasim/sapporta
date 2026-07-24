@@ -96,7 +96,6 @@ export {
   type TGridRouteQuerySeed,
   type TGridSession,
 } from "./state/tgrid-session";
-export { paginateTGridLoadedRowsBoundary } from "./state/tgrid-loaded-rows-boundary";
 export {
   reloadTGridRows,
   registerTGridSession,

@@ -5,7 +5,16 @@ import type {
 import type { TGridSession } from "../state/tgrid-session";
 import type { TablePageMode } from "./table-page-mode";
 import { useTableLevelPager } from "./table-level-pager";
-import { CompactTablePager, NumberedTablePager } from "./TablePagers";
+import {
+  CompactTablePager,
+  NumberedTablePager,
+  type TablePagerDirection,
+} from "./TablePagers";
+import type { TableGridPagerButtonRefs } from "./table-grid-pager-boundary";
+export {
+  focusTableGridPagerBoundary,
+  type TableGridPagerButtonRefs,
+} from "./table-grid-pager-boundary";
 
 export function TableGridPager<
   RowsByLevel extends TGridRowsByLevel,
@@ -15,18 +24,36 @@ export function TableGridPager<
   session,
   level,
   routePath,
+  buttonRefs,
+  onPagerButtonActivate,
+  onPagerBoundaryExit,
 }: {
   mode: TablePageMode;
   session: TGridSession<RowsByLevel, AppServices>;
   level: TGridLevelId<RowsByLevel>;
   routePath: string;
+  buttonRefs?: TableGridPagerButtonRefs;
+  onPagerButtonActivate?: (direction: TablePagerDirection) => boolean;
+  onPagerBoundaryExit?: () => void;
 }) {
   const pager = useTableLevelPager(session, level, routePath);
 
   if (pager.pages <= 1) return null;
   return mode === "narrowCards" ? (
-    <CompactTablePager {...pager} />
+    <CompactTablePager
+      {...pager}
+      previousButtonRef={buttonRefs?.previous}
+      nextButtonRef={buttonRefs?.next}
+      onPagerButtonActivate={onPagerButtonActivate}
+      onPagerBoundaryExit={onPagerBoundaryExit}
+    />
   ) : (
-    <NumberedTablePager {...pager} />
+    <NumberedTablePager
+      {...pager}
+      previousButtonRef={buttonRefs?.previous}
+      nextButtonRef={buttonRefs?.next}
+      onPagerButtonActivate={onPagerButtonActivate}
+      onPagerBoundaryExit={onPagerBoundaryExit}
+    />
   );
 }

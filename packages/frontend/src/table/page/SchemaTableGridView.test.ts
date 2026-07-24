@@ -23,9 +23,7 @@ import {
 } from "../../index";
 import type { TableGridActionsProps as TablePublicActionsProps } from "../index";
 import type { CreateTGridSessionArgs } from "../state/tgrid-session";
-import { paginateTGridLoadedRowsBoundary } from "../state/tgrid-loaded-rows-boundary";
 import {
-  useTableGrid,
   type TableGridBinding,
   type TableGridViewProps,
 } from "./TableGridView";
@@ -354,7 +352,7 @@ describe("SchemaTableGridView", () => {
     expect(binding?.level).toBe("orders");
   });
 
-  it("installs the standard loaded-row pagination policy through useTableGrid", async () => {
+  it("leaves loaded-row boundary policy unset in the lower-level hook", async () => {
     const source = {
       table: ordersTable,
       tablesByName: { orders: ordersTable, order_lines: orderLinesTable },
@@ -378,13 +376,42 @@ describe("SchemaTableGridView", () => {
 
     const args = useTGridSessionSpy.mock.calls[0]?.[1] as
       CreateTGridSessionArgs<SchemaTableRowsByLevel> | undefined;
-    expect(args?.onLoadedRowsBoundary).toBe(paginateTGridLoadedRowsBoundary);
+    expect(args?.onLoadedRowsBoundary).toBeUndefined();
   });
 
-  it("forwards a custom loaded-row boundary policy through useTableGrid", async () => {
+  it("installs the pager-focus boundary policy in the standard view", async () => {
+    const actual =
+      await vi.importActual<typeof import("./TableGridView")>(
+        "./TableGridView",
+      );
     const definition = {
       rootLevel: "orders",
     } as unknown as TGridDefinition<SchemaTableRowsByLevel>;
+    const ActualTableGridView = actual.TableGridView<SchemaTableRowsByLevel>;
+
+    mounted = await render(
+      createElement(ActualTableGridView, {
+        definition,
+        table: ordersTable,
+        route: {
+          path: "/orders-workbench",
+          searchParams: new URLSearchParams(),
+          navigate: vi.fn(),
+        },
+        loadLookups: false,
+      }),
+    );
+
+    const args = useTGridSessionSpy.mock.calls[0]?.[1] as
+      CreateTGridSessionArgs<SchemaTableRowsByLevel> | undefined;
+    expect(args?.onLoadedRowsBoundary).toEqual(expect.any(Function));
+  });
+
+  it("forwards a custom loaded-row boundary policy through the schema hook", async () => {
+    const source = {
+      table: ordersTable,
+      tablesByName: { orders: ordersTable, order_lines: orderLinesTable },
+    };
     const route = {
       path: "/orders-workbench",
       searchParams: new URLSearchParams(),
@@ -393,9 +420,8 @@ describe("SchemaTableGridView", () => {
     const onLoadedRowsBoundary = vi.fn(() => false as const);
 
     function BindingProbe(): ReactElement | null {
-      useTableGrid({
-        definition,
-        table: ordersTable,
+      useSchemaTableGrid({
+        source,
         route,
         loadLookups: false,
         onLoadedRowsBoundary,
@@ -404,6 +430,36 @@ describe("SchemaTableGridView", () => {
     }
 
     mounted = await render(createElement(BindingProbe));
+
+    const args = useTGridSessionSpy.mock.calls[0]?.[1] as
+      CreateTGridSessionArgs<SchemaTableRowsByLevel> | undefined;
+    expect(args?.onLoadedRowsBoundary).toBe(onLoadedRowsBoundary);
+  });
+
+  it("lets the standard view replace its pager-focus boundary policy", async () => {
+    const actual =
+      await vi.importActual<typeof import("./TableGridView")>(
+        "./TableGridView",
+      );
+    const definition = {
+      rootLevel: "orders",
+    } as unknown as TGridDefinition<SchemaTableRowsByLevel>;
+    const onLoadedRowsBoundary = vi.fn(() => false as const);
+    const ActualTableGridView = actual.TableGridView<SchemaTableRowsByLevel>;
+
+    mounted = await render(
+      createElement(ActualTableGridView, {
+        definition,
+        table: ordersTable,
+        route: {
+          path: "/orders-workbench",
+          searchParams: new URLSearchParams(),
+          navigate: vi.fn(),
+        },
+        loadLookups: false,
+        onLoadedRowsBoundary,
+      }),
+    );
 
     const args = useTGridSessionSpy.mock.calls[0]?.[1] as
       CreateTGridSessionArgs<SchemaTableRowsByLevel> | undefined;

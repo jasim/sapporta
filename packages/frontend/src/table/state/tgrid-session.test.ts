@@ -17,7 +17,6 @@ import {
   createTGridSession,
   type TGridLoadedRowsBoundaryHandler,
 } from "./tgrid-session";
-import { paginateTGridLoadedRowsBoundary } from "./tgrid-loaded-rows-boundary";
 import { defineTGrid } from "../grid-adapter/tgrid-runtime-config";
 import type { TableRowsClient } from "../grid-adapter/tgrid-level-config";
 
@@ -81,6 +80,30 @@ function deferred<T>(): {
   });
   return { promise, resolve, reject };
 }
+
+const paginateLoadedRowsForTest: TGridLoadedRowsBoundaryHandler<RowsByLevel> = (
+  event,
+  levelId,
+  session,
+) => {
+  const query = session.getQueryState(levelId);
+  const nextPage =
+    event.direction === "after" ? query.page + 1 : query.page - 1;
+  if (nextPage < 1) return false;
+  if (
+    event.direction === "after" &&
+    query.totalCount !== null &&
+    query.page * query.pageSize >= query.totalCount
+  ) {
+    return false;
+  }
+  return session.setLevelPage(
+    levelId,
+    event.loadPath,
+    nextPage,
+    query.pageSize,
+  );
+};
 
 describe("TGridSession", () => {
   it("exposes typed active-row state and delegates the row Enter command", async () => {
@@ -536,7 +559,7 @@ describe("TGridSession", () => {
     const onQueryUrlChange = vi.fn();
     const session = createTGridSession<RowsByLevel>(definition, {
       onQueryUrlChange,
-      onLoadedRowsBoundary: paginateTGridLoadedRowsBoundary,
+      onLoadedRowsBoundary: paginateLoadedRowsForTest,
     });
 
     try {
@@ -596,7 +619,7 @@ describe("TGridSession", () => {
     const onQueryUrlChange = vi.fn();
     const session = createTGridSession<RowsByLevel>(definition, {
       onQueryUrlChange,
-      onLoadedRowsBoundary: paginateTGridLoadedRowsBoundary,
+      onLoadedRowsBoundary: paginateLoadedRowsForTest,
     });
 
     try {
@@ -678,7 +701,7 @@ describe("TGridSession", () => {
     const onQueryUrlChange = vi.fn();
     const session = createTGridSession<RowsByLevel>(definition, {
       onQueryUrlChange,
-      onLoadedRowsBoundary: paginateTGridLoadedRowsBoundary,
+      onLoadedRowsBoundary: paginateLoadedRowsForTest,
     });
 
     try {

@@ -9,6 +9,7 @@ import {
   type SchemaTableRowsByLevel,
 } from "../grid-adapter/schema-tgrid";
 import type { TGridDefinition } from "../grid-adapter/tgrid-runtime-config";
+import type { TGridLoadedRowsBoundaryHandler } from "../state/tgrid-session";
 import type { TableGridRoute } from "./table-grid-url-state";
 import {
   TableGridView,
@@ -34,6 +35,8 @@ export type SchemaTableGridViewProps = {
   onNewRecord?: () => void;
   /** Render application-defined actions in the table toolbar and action sheet. */
   actions?: ComponentType<TableGridActionsProps<SchemaTableRowsByLevel>>;
+  /** Replace the standard pager-focus behavior at loaded-row boundaries. */
+  onLoadedRowsBoundary?: TGridLoadedRowsBoundaryHandler<SchemaTableRowsByLevel>;
   /** Tune row expansion, row loading, interaction, controls, and styling. */
   viewRelatedRows?: ViewRelatedRowsOption;
   rootRows?: SchemaTableRootRowsOptions;
@@ -171,6 +174,7 @@ export function SchemaTableGridView({
   registerAs,
   onNewRecord,
   actions,
+  onLoadedRowsBoundary,
   viewRelatedRows,
   rootRows,
   relatedRows,
@@ -195,6 +199,7 @@ export function SchemaTableGridView({
       loadLookups={loadLookups}
       onNewRecord={onNewRecord}
       actions={actions}
+      onLoadedRowsBoundary={onLoadedRowsBoundary}
       viewRelatedRows={viewRelatedRows}
       className={className}
       gridClassName={gridClassName}
@@ -208,6 +213,7 @@ export function useSchemaTableGrid({
   registerAs,
   onNewRecord,
   actions,
+  onLoadedRowsBoundary,
   viewRelatedRows,
   rootRows,
   relatedRows,
@@ -231,6 +237,7 @@ export function useSchemaTableGrid({
     loadLookups,
     onNewRecord,
     actions,
+    onLoadedRowsBoundary,
     viewRelatedRows,
     className,
     gridClassName,

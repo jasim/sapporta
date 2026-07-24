@@ -1,4 +1,4 @@
-import { useEffect, type ComponentType } from "react";
+import { useEffect, useMemo, useRef, type ComponentType } from "react";
 import { useStore } from "zustand";
 import type { TableSchema } from "@sapporta/shared/contracts";
 import { useTGridSession } from "../grid-adapter/tgrid-binding";
@@ -11,10 +11,16 @@ import type {
   TGridLoadedRowsBoundaryHandler,
   TGridSession,
 } from "../state/tgrid-session";
-import { paginateTGridLoadedRowsBoundary } from "../state/tgrid-loaded-rows-boundary";
 import { TGrid, type ViewRelatedRowsOption } from "./TGrid";
 import { TableGridHeader } from "./TableGridHeader";
-import { TableGridPager } from "./TableGridPager";
+import {
+  TableGridPager,
+  type TableGridPagerButtonRefs,
+} from "./TableGridPager";
+import {
+  createTableGridPagerBoundaryController,
+  type TableGridPagerBoundaryController,
+} from "./table-grid-pager-boundary";
 import { TableGridSurface } from "./TableGridSurface";
 import {
   useTableGridUrlState,
@@ -65,6 +71,7 @@ export type TableGridViewProps<
   loadLookups?: boolean;
   onNewRecord?: () => void;
   actions?: ComponentType<TableGridActionsProps<RowsByLevel, AppServices>>;
+  /** Replace the standard pager-focus behavior at loaded-row boundaries. */
   onLoadedRowsBoundary?: TGridLoadedRowsBoundaryHandler<
     RowsByLevel,
     AppServices
@@ -106,7 +113,7 @@ export function useTableGrid<
   loadLookups,
   onNewRecord,
   actions,
-  onLoadedRowsBoundary = paginateTGridLoadedRowsBoundary,
+  onLoadedRowsBoundary,
   viewRelatedRows,
   className,
   gridClassName,
@@ -121,6 +128,8 @@ export function useTableGrid<
     level: definition.rootLevel,
   });
 
+  // This hook does not own pagination chrome, so it does not choose a loaded-
+  // row boundary policy. A composition can provide one explicitly.
   const session = useTGridSession(definition, {
     services,
     routeQuerySeeds: urlState.routeQuerySeeds,
@@ -172,6 +181,23 @@ export function TableGridView<
   className,
   gridClassName,
 }: TableGridViewProps<RowsByLevel, AppServices>) {
+  const previousPageButtonRef = useRef<HTMLButtonElement>(null);
+  const nextPageButtonRef = useRef<HTMLButtonElement>(null);
+  const pagerButtonRefs = useMemo<TableGridPagerButtonRefs>(
+    () => ({
+      previous: previousPageButtonRef,
+      next: nextPageButtonRef,
+    }),
+    [],
+  );
+  const pagerBoundary = useMemo(
+    () =>
+      createTableGridPagerBoundaryController<RowsByLevel, AppServices>(
+        definition.rootLevel,
+        pagerButtonRefs,
+      ),
+    [definition, pagerButtonRefs],
+  );
   const tableGrid = useTableGrid({
     definition,
     table,
@@ -181,7 +207,8 @@ export function TableGridView<
     loadLookups,
     onNewRecord,
     actions,
-    onLoadedRowsBoundary,
+    onLoadedRowsBoundary:
+      onLoadedRowsBoundary ?? pagerBoundary.onLoadedRowsBoundary,
     viewRelatedRows,
     className,
     gridClassName,
@@ -206,6 +233,8 @@ export function TableGridView<
       viewRelatedRows={tableGrid.viewRelatedRows}
       className={tableGrid.className}
       gridClassName={tableGrid.gridClassName}
+      pagerButtonRefs={pagerButtonRefs}
+      pagerBoundary={pagerBoundary}
     />
   );
 }
@@ -225,6 +254,8 @@ function TableGridViewWithSession<
   viewRelatedRows,
   className,
   gridClassName,
+  pagerButtonRefs,
+  pagerBoundary,
 }: {
   session: TGridSession<RowsByLevel, AppServices>;
   table: TableSchema;
@@ -235,6 +266,8 @@ function TableGridViewWithSession<
   viewRelatedRows?: ViewRelatedRowsOption;
   className?: string;
   gridClassName?: string;
+  pagerButtonRefs: TableGridPagerButtonRefs;
+  pagerBoundary: TableGridPagerBoundaryController<RowsByLevel, AppServices>;
 }) {
   const rootRowsLoadState = useTGridSourceStatus(session);
   const errorMessage =
@@ -282,6 +315,9 @@ function TableGridViewWithSession<
           session={session}
           level={level}
           routePath={routePath}
+          buttonRefs={pagerButtonRefs}
+          onPagerButtonActivate={pagerBoundary.onPagerButtonActivate}
+          onPagerBoundaryExit={pagerBoundary.onPagerBoundaryExit}
         />
       }
       className={className}
