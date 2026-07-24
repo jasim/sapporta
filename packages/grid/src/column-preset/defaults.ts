@@ -134,7 +134,6 @@ function base(overrides: Partial<KindDefaults>): KindDefaults {
 
 export const DEFAULT_PRESET_EDIT_GESTURES: readonly CellEditGesture[] = [
   "enter",
-  "f2",
   "type",
   "doubleClick",
 ];

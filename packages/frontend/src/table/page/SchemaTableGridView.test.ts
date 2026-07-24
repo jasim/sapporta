@@ -249,14 +249,13 @@ describe("SchemaTableGridView", () => {
             keyboard: {
               arrows: "move-active-row",
               shiftArrows: "move-active-row",
-              expansion: "left-right-enter",
+              expansion: "enabled",
             },
           },
           selectedRows: {
             kind: "enabled",
             mode: "single",
             sync: { kind: "follows-active-row" },
-            keyboard: { space: "ignore" },
           },
         } satisfies GridInteractionConfig,
       });

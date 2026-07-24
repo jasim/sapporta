@@ -1129,7 +1129,10 @@ export function createGridRuntime(args: RuntimeArgs): GridRuntime {
       interaction,
       getDisplayed: () => displayedRowsFor(path),
       getSchema: () => schemaForPath(path).columns,
-      capabilitiesFor,
+      // Keep this lazy for the controller's lifetime. An identity error can
+      // disable writes after the controller is created, and a later valid
+      // refresh can restore them; the next primary action must see that state.
+      isWritable: () => sourceRegistry.isWritable(path),
       onNavigateCell: (intent) => {
         coordinator.navigateCell(path, intent);
       },
@@ -2372,7 +2375,6 @@ function snapshotSelectedRows(
   return Object.freeze({
     ...selectedRows,
     sync: Object.freeze({ ...selectedRows.sync }),
-    keyboard: Object.freeze({ ...selectedRows.keyboard }),
   });
 }
 

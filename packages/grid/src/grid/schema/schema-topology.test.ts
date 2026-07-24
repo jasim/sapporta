@@ -275,15 +275,38 @@ describe("buildSchemaTopology", () => {
     );
   });
 
-  it("throws when edit and activation claim the same owning gesture", () => {
-    const bad: GridSchema = {
+  it("allows Enter to resolve edit or activation at runtime", () => {
+    const schema: GridSchema = {
       rootLevel: "rows",
       levels: {
         rows: levelWithColumns("rows", [
           column("name", {
             edit: {
               editor: () => null,
-              startsOn: ["enter", "doubleClick"],
+              startsOn: ["enter"],
+            },
+            activation: {
+              startsOn: ["enter"],
+              describe: "Open",
+              run: () => {},
+            },
+          }),
+        ]),
+      },
+    };
+
+    expect(() => buildSchemaTopology(schema)).not.toThrow();
+  });
+
+  it("rejects ambiguous double-click ownership", () => {
+    const schema: GridSchema = {
+      rootLevel: "rows",
+      levels: {
+        rows: levelWithColumns("rows", [
+          column("name", {
+            edit: {
+              editor: () => null,
+              startsOn: ["doubleClick"],
             },
             activation: {
               startsOn: ["doubleClick"],
@@ -295,7 +318,7 @@ describe("buildSchemaTopology", () => {
       },
     };
 
-    expect(() => buildSchemaTopology(bad)).toThrow(
+    expect(() => buildSchemaTopology(schema)).toThrow(
       /column "rows\.name" assigns "doubleClick" to both edit and activation/,
     );
   });

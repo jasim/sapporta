@@ -107,8 +107,10 @@ export function Grid({
       // Only the innermost grid containing the event target should act —
       // otherwise a key inside a child grid would also move the parent.
       if (!eventBelongsToGridRoot(e.target, root)) return;
-      // Structural row-header controls own Space and Escape themselves. They
-      // deliberately have no cell coordinate for the grid key handler to use.
+      // This native listener runs before React delegates the row-header
+      // control's onKeyDown handler. Yield by DOM identity rather than waiting
+      // for propagation to stop: structural controls have no cell coordinate,
+      // and their React handler owns Shift+Space and Escape.
       if (
         e.target instanceof Element &&
         e.target.closest('[data-grid-part="row-header-control"]')

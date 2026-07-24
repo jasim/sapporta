@@ -149,10 +149,6 @@ function useStableInteractionOptions(
     interaction?.selectedRows.kind === "enabled"
       ? interaction.selectedRows.sync.kind
       : undefined;
-  const selectedRowsSpace =
-    interaction?.selectedRows.kind === "enabled"
-      ? interaction.selectedRows.keyboard.space
-      : undefined;
 
   // The config object may be inline; the finite interaction fields are the
   // dependency contract.
@@ -170,7 +166,6 @@ function useStableInteractionOptions(
       rowListShiftArrows,
       selectedRowsKind,
       selectedRowsMode,
-      selectedRowsSpace,
       selectedRowsSync,
     ],
   );

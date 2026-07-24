@@ -30,7 +30,9 @@
 // mounts in parallel.
 //
 // `column.edit` declares which gestures can open a supplied editor. Absence
-// means the cell cannot enter edit mode.
+// means the cell cannot enter edit mode. Enter may also be declared by
+// `column.activation`: it edits when the focused cell is editable at runtime
+// and otherwise runs the activation as that cell's primary action.
 // `column.activation` declares which gestures run a cell action. Renderers get
 // a narrow activation affordance; keyboard and pointer input are owned by the
 // grid.
@@ -45,7 +47,7 @@ import type { CommitTarget } from "./action";
 import type { ColId, Coord, GridPath, RowId } from "./identity";
 import type { LevelOptions, LevelRow } from "./level-row";
 
-export type CellEditGesture = "enter" | "f2" | "type" | "doubleClick";
+export type CellEditGesture = "enter" | "type" | "doubleClick";
 export type NonTypedCellEditGesture = Exclude<CellEditGesture, "type">;
 
 export type CellEditorStart =
@@ -59,7 +61,6 @@ export type CellEditorStart =
 
 export const DEFAULT_CELL_EDIT_GESTURES: readonly CellEditGesture[] = [
   "enter",
-  "f2",
   "type",
   "doubleClick",
 ] as const;

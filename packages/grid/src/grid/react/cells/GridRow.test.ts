@@ -42,7 +42,31 @@ describe("rowChromeStateFromInteractionStatus", () => {
 });
 
 describe("withRowExpansionColumn", () => {
-  it("uses a supplied activation while preserving edit gesture filtering", () => {
+  it("adds stable expansion gestures without rewriting edit gestures", () => {
+    const TestEditor = () => null;
+    const editableColumn = withRowExpansionColumn({
+      id: "editable",
+      name: "Editable",
+      renderCell: ({ value }: { value: unknown }) => String(value ?? ""),
+      edit: {
+        editor: TestEditor,
+        startsOn: ["enter", "type", "doubleClick"],
+      },
+    });
+
+    expect(editableColumn.activation?.startsOn).toEqual([
+      "enter",
+      "space",
+      "click",
+    ]);
+    expect(editableColumn.edit?.startsOn).toEqual([
+      "enter",
+      "type",
+      "doubleClick",
+    ]);
+  });
+
+  it("uses a supplied activation without rewriting edit gestures", () => {
     const TestEditor = () => null;
     const activation = {
       startsOn: ["enter"],
@@ -57,14 +81,14 @@ describe("withRowExpansionColumn", () => {
         renderCell: ({ value }: { value: unknown }) => String(value ?? ""),
         edit: {
           editor: TestEditor,
-          startsOn: ["enter", "f2", "type", "doubleClick"],
+          startsOn: ["enter", "type", "doubleClick"],
         },
       },
       { activation },
     );
 
     expect(column.activation).toBe(activation);
-    expect(column.edit?.startsOn).toEqual(["f2", "type", "doubleClick"]);
+    expect(column.edit?.startsOn).toEqual(["enter", "type", "doubleClick"]);
   });
 });
 
@@ -972,7 +996,7 @@ describe("GridRow row headers", () => {
     ).toBe("text");
   });
 
-  it("supports Space and Escape on both data-backed and structural row headers", async () => {
+  it("supports Shift+Space and Escape on data-backed and structural row headers", async () => {
     const dataRuntime = await renderRowHeaders({ column: "id" });
     const path = rootPath("quotes");
     const dataHeader = mounted!.container.querySelector(
@@ -992,7 +1016,11 @@ describe("GridRow row headers", () => {
         new MouseEvent("mousedown", { bubbles: true, button: 0 }),
       );
       gridRoot.dispatchEvent(
-        new KeyboardEvent("keydown", { bubbles: true, key: " " }),
+        new KeyboardEvent("keydown", {
+          bubbles: true,
+          key: " ",
+          shiftKey: true,
+        }),
       );
     });
     expect(dataRuntime.level(path).selectedRowIds()).toEqual([]);
@@ -1009,6 +1037,16 @@ describe("GridRow row headers", () => {
     await act(async () => {
       control.dispatchEvent(
         new KeyboardEvent("keydown", { bubbles: true, key: " " }),
+      );
+    });
+    expect(structuralRuntime.level(path).selectedRowIds()).toEqual([]);
+    await act(async () => {
+      control.dispatchEvent(
+        new KeyboardEvent("keydown", {
+          bubbles: true,
+          key: " ",
+          shiftKey: true,
+        }),
       );
     });
     expect(structuralRuntime.level(path).selectedRowIds()).toHaveLength(1);

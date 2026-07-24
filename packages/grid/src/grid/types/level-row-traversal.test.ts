@@ -80,8 +80,8 @@ describe("level-row-traversal", () => {
 
   it("returns null when no row is focusable", () => {
     const d = buildDisplayed([
-      { key: "f1", kind: "footer" },
-      { key: "f2", kind: "footer" },
+      { key: "footer-1", kind: "footer" },
+      { key: "footer-2", kind: "footer" },
     ]);
     expect(firstFocusableRow(d, capabilitiesFor)).toBeNull();
     expect(lastFocusableRow(d, capabilitiesFor)).toBeNull();
@@ -121,8 +121,8 @@ describe("level-row-traversal", () => {
   it("nextFocusableRow skips non-focusable rows in the walk direction", () => {
     const d = buildDisplayed([
       { key: "a", kind: "data" },
-      { key: "f1", kind: "footer" },
-      { key: "f2", kind: "footer" },
+      { key: "footer-1", kind: "footer" },
+      { key: "footer-2", kind: "footer" },
       { key: "b", kind: "data" },
     ]);
     expect(nextFocusableRow(d, 0, 1, capabilitiesFor)?.id).toBe(
@@ -136,8 +136,8 @@ describe("level-row-traversal", () => {
   it("nextFocusableRow returns null when no focusable row exists in the walk direction", () => {
     const d = buildDisplayed([
       { key: "a", kind: "data" },
-      { key: "f1", kind: "footer" },
-      { key: "f2", kind: "footer" },
+      { key: "footer-1", kind: "footer" },
+      { key: "footer-2", kind: "footer" },
     ]);
     expect(nextFocusableRow(d, 0, 1, capabilitiesFor)).toBeNull();
   });

@@ -25,7 +25,7 @@ const cols: ColumnSchema[] = [
     renderCell: ({ value }) => String(value ?? ""),
     edit: {
       editor: TestEditor,
-      startsOn: ["enter", "f2", "type", "doubleClick"],
+      startsOn: ["enter", "type", "doubleClick"],
     },
   },
   {
@@ -34,7 +34,7 @@ const cols: ColumnSchema[] = [
     renderCell: ({ value }) => String(value ?? ""),
     edit: {
       editor: TestEditor,
-      startsOn: ["enter", "f2", "type", "doubleClick"],
+      startsOn: ["enter", "type", "doubleClick"],
     },
   },
 ];
@@ -101,7 +101,7 @@ function makeController(
     interaction: CELL_EDITING_GRID,
     getDisplayed: () => displayed,
     getSchema: () => cols,
-    capabilitiesFor,
+    isWritable: () => true,
     onNavigateCell: opts.onNavigate,
     clearCellRange: opts.clearCellRange,
     writeValue: opts.writeValue,
@@ -109,26 +109,73 @@ function makeController(
 }
 
 describe("GridController — verbs", () => {
-  it("uses Enter for expansion when configured", () => {
+  it("routes Enter and Space to activation when the source is readonly", () => {
+    const activateCell = vi.fn();
+    const controller = createGridController({
+      path,
+      interaction: CELL_EDITING_GRID,
+      getDisplayed: () => displayed,
+      getSchema: () => [
+        {
+          ...cols[0],
+          activation: {
+            startsOn: ["enter", "space"],
+            describe: "Expand row",
+            run: () => {},
+          },
+        },
+      ],
+      isWritable: () => false,
+      activateCell,
+    });
+    const coord = { rowId: makeRowId(path, "r0"), colId: "a" };
+    controller.setLiveCellFocus(coord);
+
+    for (const [key, gesture] of [
+      ["Enter", "enter"],
+      [" ", "space"],
+    ] as const) {
+      expect(
+        controller.handleKey({
+          key,
+          ctrlKey: false,
+          metaKey: false,
+          shiftKey: false,
+          altKey: false,
+        } as KeyboardEvent),
+      ).toBe(true);
+      expect(activateCell).toHaveBeenLastCalledWith(coord, {
+        kind: "keyboard",
+        gesture,
+      });
+    }
+    expect(controller.getState().editing).toBeNull();
+  });
+
+  it("uses Space for row expansion and leaves Enter unhandled", () => {
     const onNavigateRow = vi.fn<(intent: RowNavigationIntent) => void>();
     const controller = createGridController({
       path,
-      interaction: {
-        ...ROW_PRIMARY_MASTER_DETAIL,
-        activeRow: {
-          ...ROW_PRIMARY_MASTER_DETAIL.activeRow,
-          keyboard: {
-            ...ROW_PRIMARY_MASTER_DETAIL.activeRow.keyboard,
-            expansion: "left-right-enter",
-          },
-        },
-      },
+      interaction: ROW_PRIMARY_MASTER_DETAIL,
       getDisplayed: () => displayed,
       getSchema: () => cols,
-      capabilitiesFor,
+      isWritable: () => true,
       onNavigateRow,
     });
     controller.setLiveRowFocus(makeRowId(path, "r0"));
+
+    expect(
+      controller.handleKey({
+        key: " ",
+        ctrlKey: false,
+        metaKey: false,
+        shiftKey: false,
+        altKey: false,
+      } as KeyboardEvent),
+    ).toBe(true);
+    expect(onNavigateRow).toHaveBeenLastCalledWith({
+      type: "toggleActiveRowExpansion",
+    });
 
     expect(
       controller.handleKey({
@@ -138,10 +185,8 @@ describe("GridController — verbs", () => {
         shiftKey: false,
         altKey: false,
       } as KeyboardEvent),
-    ).toBe(true);
-    expect(onNavigateRow).toHaveBeenCalledWith({
-      type: "toggleActiveRowExpansion",
-    });
+    ).toBe(false);
+    expect(onNavigateRow).toHaveBeenCalledTimes(1);
   });
 
   it("routes configured Enter activation through the core row command", () => {
@@ -152,7 +197,7 @@ describe("GridController — verbs", () => {
       interaction: ROW_PRIMARY_MASTER_DETAIL_WITH_ACTIVATION,
       getDisplayed: () => displayed,
       getSchema: () => cols,
-      capabilitiesFor,
+      isWritable: () => true,
       onNavigateRow,
       activateRow,
     });
@@ -177,10 +222,10 @@ describe("GridController — verbs", () => {
 
   it("startEdit / cancelEdit toggle the editor without writing selection", () => {
     const c = makeController();
-    c.startEdit({ rowId: makeRowId(path, "r0"), colId: "a" }, "f2");
+    c.startEdit({ rowId: makeRowId(path, "r0"), colId: "a" }, "enter");
     expect(c.getState().editing).toEqual({
       coord: { rowId: makeRowId(path, "r0"), colId: "a" },
-      editStart: { trigger: "f2" },
+      editStart: { trigger: "enter" },
     });
     expect(c.getState().cellSelection).toBe(null);
     c.cancelEdit();
@@ -190,7 +235,7 @@ describe("GridController — verbs", () => {
   it("commitEdit closes the editor and forwards the new value to writeValue", () => {
     const writeValue = vi.fn();
     const c = makeController({ writeValue });
-    c.startEdit({ rowId: makeRowId(path, "r0"), colId: "a" }, "f2");
+    c.startEdit({ rowId: makeRowId(path, "r0"), colId: "a" }, "enter");
     c.commitEdit("after");
     expect(c.getState().editing).toBe(null);
     expect(writeValue).toHaveBeenCalledWith(
@@ -202,7 +247,7 @@ describe("GridController — verbs", () => {
   it("commitEdit queues focusContainer when the editor closes", () => {
     const writeValue = vi.fn();
     const c = makeController({ writeValue });
-    c.startEdit({ rowId: makeRowId(path, "r0"), colId: "a" }, "f2");
+    c.startEdit({ rowId: makeRowId(path, "r0"), colId: "a" }, "enter");
     c.flushEffects();
     c.commitEdit("v");
     const types = c.effects.getState().map((e) => e.type);
@@ -227,7 +272,7 @@ describe("GridController — verbs", () => {
   it("commitEdit with commit='next' emits a commit movement intent", () => {
     const onNavigate = vi.fn();
     const c = makeController({ onNavigate });
-    c.startEdit({ rowId: makeRowId(path, "r0"), colId: "a" }, "f2");
+    c.startEdit({ rowId: makeRowId(path, "r0"), colId: "a" }, "enter");
     c.commitEdit("x", "next");
     expect(onNavigate).toHaveBeenCalledWith({
       type: "commitMove",
@@ -248,7 +293,7 @@ describe("GridController — verbs", () => {
 
   it("flushEffects clears the queue", () => {
     const c = makeController();
-    c.startEdit({ rowId: makeRowId(path, "r0"), colId: "a" }, "f2");
+    c.startEdit({ rowId: makeRowId(path, "r0"), colId: "a" }, "enter");
     expect(c.effects.getState().length).toBeGreaterThan(0);
     c.flushEffects();
     expect(c.effects.getState()).toEqual([]);
@@ -266,10 +311,10 @@ describe("GridController — verbs", () => {
           renderCell: ({ value }) => String(value ?? ""),
         },
       ],
-      capabilitiesFor,
+      isWritable: () => true,
     });
 
-    c.startEdit({ rowId: makeRowId(path, "r0"), colId: "a" }, "f2");
+    c.startEdit({ rowId: makeRowId(path, "r0"), colId: "a" }, "enter");
 
     expect(c.getState().editing).toBe(null);
   });
@@ -287,10 +332,10 @@ describe("GridController — verbs", () => {
           edit: { editor: TestEditor, startsOn: ["enter"] },
         },
       ],
-      capabilitiesFor,
+      isWritable: () => true,
     });
 
-    c.startEdit({ rowId: makeRowId(path, "r0"), colId: "a" }, "f2");
+    c.startEdit({ rowId: makeRowId(path, "r0"), colId: "a" }, "doubleClick");
     expect(c.getState().editing).toBe(null);
 
     c.startEdit({ rowId: makeRowId(path, "r0"), colId: "a" }, "enter");
@@ -304,7 +349,7 @@ describe("GridController — verbs", () => {
 describe("GridController — effects channel identity", () => {
   it("preserves array reference across no-op transitions", () => {
     const c = makeController();
-    c.startEdit({ rowId: makeRowId(path, "r0"), colId: "a" }, "f2");
+    c.startEdit({ rowId: makeRowId(path, "r0"), colId: "a" }, "enter");
     const before = c.effects.getState();
     c.flushEffects();
     const empty = c.effects.getState();

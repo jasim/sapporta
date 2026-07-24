@@ -157,7 +157,7 @@ cursors.moveCellCursorTo({
 });
 
 const controller = controllerFor(runtime, lines.path);
-controller.startEdit({ rowId: lineId, colId: "quantity" }, "f2");
+controller.startEdit({ rowId: lineId, colId: "quantity" }, "enter");
 controller.cancelEdit();
 
 runtime.dispose();

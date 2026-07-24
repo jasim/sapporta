@@ -89,7 +89,7 @@ describe("preset editor start values", () => {
 
   it("does not decorate currency or percentage raw values for editing", () => {
     expect(numericInitialValue({ trigger: "enter" }, 12.5)).toBe("12.5");
-    expect(numericInitialValue({ trigger: "f2" }, 0.15)).toBe("0.15");
+    expect(numericInitialValue({ trigger: "doubleClick" }, 0.15)).toBe("0.15");
   });
 
   it("initializes date edits from the raw value unless type-started", () => {

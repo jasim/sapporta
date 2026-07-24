@@ -44,8 +44,7 @@ export function assertValidInteraction(
     throw new Error("row-list interaction cannot have selected cells.");
   }
   if (
-    interaction.activeRow.keyboard.expansion !== "left-right-enter" &&
-    interaction.activeRow.keyboard.expansion !== "left-right" &&
+    interaction.activeRow.keyboard.expansion !== "enabled" &&
     interaction.activeRow.keyboard.expansion !== "none"
   ) {
     throw new Error(
@@ -54,14 +53,6 @@ export function assertValidInteraction(
   }
   if (interaction.activeRow.activation) {
     assertValidRowActivation(interaction.activeRow.activation, "row-list");
-  }
-  if (
-    interaction.activeRow.keyboard.expansion === "left-right-enter" &&
-    interaction.activeRow.activation?.startsOn.includes("enter")
-  ) {
-    throw new Error(
-      "row-list interaction cannot assign Enter to both activation and expansion.",
-    );
   }
 }
 

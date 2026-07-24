@@ -69,7 +69,7 @@ const cols: ColumnSchema[] = [
     renderCell: ({ value }) => String(value ?? ""),
     edit: {
       editor: TestEditor,
-      startsOn: ["enter", "f2", "type", "doubleClick"],
+      startsOn: ["enter", "type", "doubleClick"],
     },
   },
   {
@@ -79,7 +79,7 @@ const cols: ColumnSchema[] = [
     compare: (a, b) => (Number(a) || 0) - (Number(b) || 0),
     edit: {
       editor: TestEditor,
-      startsOn: ["enter", "f2", "type", "doubleClick"],
+      startsOn: ["enter", "type", "doubleClick"],
     },
   },
 ];
@@ -410,26 +410,6 @@ describe("GridRuntime", () => {
     runtime.dispose();
   });
 
-  it("rejects assigning Enter to both row activation and expansion", () => {
-    expect(() =>
-      createGridRuntime({
-        schema: tableSchema,
-        dataSource: tableDataSource(),
-        interaction: {
-          ...ROW_PRIMARY_MASTER_DETAIL,
-          activeRow: {
-            ...ROW_PRIMARY_MASTER_DETAIL.activeRow,
-            keyboard: {
-              ...ROW_PRIMARY_MASTER_DETAIL.activeRow.keyboard,
-              expansion: "left-right-enter",
-            },
-            activation: { startsOn: ["enter"] },
-          },
-        },
-      }),
-    ).toThrow(/cannot assign Enter to both activation and expansion/);
-  });
-
   it("rejects ambiguous click and double-click row activation", () => {
     expect(() =>
       createGridRuntime({
@@ -623,7 +603,7 @@ describe("GridRuntime", () => {
     }).not.toThrow();
   });
 
-  it("writeCell on a readonly source throws synchronously", () => {
+  it("blocks editing and direct writes on a readonly source", () => {
     const readonlyDataSource: GridDataSource = {
       rootSource() {
         const writable = inMemoryLevelSource({
@@ -650,9 +630,11 @@ describe("GridRuntime", () => {
       schema: tableSchema,
       dataSource: readonlyDataSource,
     });
-    expect(() =>
-      rt.root.writeCell({ rowId: makeRowId(rowsRoot, "a"), colId: "qty" }, 7),
-    ).toThrow(/readonly/);
+    const coord = { rowId: makeRowId(rowsRoot, "a"), colId: "qty" };
+    const internals = runtimeInternalsFor(rt);
+    internals.controllerFor(rowsRoot).startEdit(coord, "doubleClick");
+    expect(internals.controllerFor(rowsRoot).getState().editing).toBeNull();
+    expect(() => rt.root.writeCell(coord, 7)).toThrow(/readonly/);
   });
 
   it("expandRow resolves the child source exactly once per (path, rowKey, childLevel)", () => {
@@ -973,7 +955,7 @@ describe("GridRuntime", () => {
     const c = internals.controllerFor(rowsRoot);
     const coord = { rowId: makeRowId(rowsRoot, "a"), colId: "qty" };
     internals.cursorManager.setCellRange(rowsRoot, coord, coord);
-    c.startEdit(coord, "f2");
+    c.startEdit(coord, "doubleClick");
     c.commitEdit(42);
     expect(handler).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -999,7 +981,7 @@ describe("GridRuntime", () => {
     const bQty = { rowId: makeRowId(rowsRoot, "b"), colId: "qty" };
 
     internals.cursorManager.setCellRange(rowsRoot, aQty, bQty);
-    c.startEdit(aQty, "f2");
+    c.startEdit(aQty, "doubleClick");
     c.commitEdit(42);
 
     expect(rt.root.displayedRow(aQty.rowId)?.columns.qty).toBe(42);
@@ -1037,7 +1019,7 @@ describe("GridRuntime", () => {
     const bQty = { rowId: makeRowId(rowsRoot, "b"), colId: "qty" };
 
     internals.cursorManager.setCellRange(rowsRoot, aName, bQty);
-    c.startEdit(aQty, "f2");
+    c.startEdit(aQty, "doubleClick");
     c.commitEdit(42);
 
     expect(rt.root.displayedRow(aQty.rowId)?.columns.qty).toBe(42);
@@ -1061,7 +1043,7 @@ describe("GridRuntime", () => {
     const c = runtimeInternalsFor(rt).controllerFor(rowsRoot);
     const coord = { rowId: makeRowId(rowsRoot, "a"), colId: "qty" };
 
-    c.startEdit(coord, "f2");
+    c.startEdit(coord, "doubleClick");
     c.commitEdit(42);
 
     expect(rt.root.displayedRow(coord.rowId)?.columns.qty).toBe(42);
@@ -1099,7 +1081,7 @@ describe("GridRuntime", () => {
     const phantomQty = { rowId: phantomRowId, colId: "qty" };
 
     internals.cursorManager.setCellRange(rowsRoot, bQty, phantomQty);
-    c.startEdit(bQty, "f2");
+    c.startEdit(bQty, "doubleClick");
     c.commitEdit(42);
 
     expect(rt.root.displayedRow(makeRowId(rowsRoot, "a"))?.columns.qty).toBe(1);
@@ -2244,7 +2226,7 @@ describe("GridRuntime", () => {
     const controller = runtimeInternalsFor(rt).controllerFor(rowsRoot);
     controller.startEdit(
       { rowId: makeRowId(rowsRoot, "a"), colId: "name" },
-      "f2",
+      "doubleClick",
     );
 
     expect(controller.getState().editing).toBe(null);

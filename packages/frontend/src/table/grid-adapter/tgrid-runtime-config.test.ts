@@ -828,7 +828,20 @@ describe("compileTGridRuntimeConfig", () => {
     expect(isValidElement(rendered) ? rendered.type : null).toBe(
       ExpandableCellFrame,
     );
-    expect(col.activation).toBeDefined();
+    expect(col.activation?.startsOn).toEqual(["enter", "space", "click"]);
+
+    const editableExpansionColumn =
+      config.gridSchema.levels["orders.lines"].columns[0];
+    expect(editableExpansionColumn.activation?.startsOn).toEqual([
+      "enter",
+      "space",
+      "click",
+    ]);
+    expect(editableExpansionColumn.edit?.startsOn).toEqual([
+      "enter",
+      "type",
+      "doubleClick",
+    ]);
   });
 
   it("child endpoint applies the parent FK filter and default sort", async () => {

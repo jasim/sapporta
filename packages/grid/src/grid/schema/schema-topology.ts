@@ -11,7 +11,8 @@
 //   - Each level's column ids must be unique.
 //   - A data-backed row header must reference the first visible column, and
 //     that column must be readonly.
-//   - Column edit and activation gestures must be internally consistent.
+//   - Column edit and activation gesture lists must not contain duplicates.
+//     Enter may overlap: runtime editability decides which primary action wins.
 //   - Every level receives stable identity from required `TreeNode.rowKey`
 //     values at the source boundary.
 //   - No cycles: a level cannot appear as both ancestor and descendant
@@ -22,13 +23,7 @@
 // `childLevels` order is semantically significant: it determines the render order
 // of child levels under an expanded row.
 
-import type {
-  CellActivationGesture,
-  CellEditGesture,
-  ColumnSchema,
-  GridSchema,
-  LevelSchema,
-} from "../types/schema";
+import type { ColumnSchema, GridSchema, LevelSchema } from "../types/schema";
 
 export type SchemaTopology = {
   readonly rootLevelName: string;
@@ -208,13 +203,16 @@ function validateColumnInteractions(
   }
 
   if (!column.edit || !column.activation) return;
-  const editGestures = new Set<CellEditGesture>(column.edit.startsOn);
-  for (const activationGesture of column.activation.startsOn) {
-    if (gestureOverlaps(editGestures, activationGesture)) {
-      throw new Error(
-        `SchemaTopology: column "${levelName}.${column.id}" assigns "${activationGesture}" to both edit and activation`,
-      );
-    }
+  // Enter has an explicit runtime precedence rule because a cell's editability
+  // depends on its current source and displayed row. Double-click has no such
+  // fallback contract, so assigning it to both actions would stay ambiguous.
+  if (
+    column.activation.startsOn.includes("doubleClick") &&
+    column.edit.startsOn.includes("doubleClick")
+  ) {
+    throw new Error(
+      `SchemaTopology: column "${levelName}.${column.id}" assigns "doubleClick" to both edit and activation`,
+    );
   }
 }
 
@@ -226,19 +224,5 @@ function assertUniqueGestures<TGesture extends string>(
   for (const gesture of gestures) {
     if (seen.has(gesture)) throw new Error(`${message} "${gesture}"`);
     seen.add(gesture);
-  }
-}
-
-function gestureOverlaps(
-  editGestures: Set<CellEditGesture>,
-  activationGesture: CellActivationGesture,
-): boolean {
-  switch (activationGesture) {
-    case "enter":
-    case "doubleClick":
-      return editGestures.has(activationGesture);
-    case "space":
-    case "click":
-      return false;
   }
 }

@@ -54,8 +54,8 @@ import type {
   NonTypedCellEditGesture,
 } from "../types/schema";
 import type { ControllerState } from "../types/controller-state";
-import type { DisplayedRows, LevelRowKind } from "../types/level-row";
-import type { RowCapabilities } from "../types/capabilities";
+import type { DisplayedRows, LevelRow } from "../types/level-row";
+import { capabilitiesFor } from "../types/capabilities";
 import type { Coord, GridPath, RowId } from "../types/identity";
 import type {
   CommitTarget,
@@ -150,12 +150,14 @@ export type GridControllerStore = StoreApi<ControllerState> &
 export type CreateControllerArgs = {
   path: GridPath;
   interaction: GridInteractionConfig;
-  // The runtime supplies these as live getters — the controller doesn't store
-  // them so changing the displayed/schema/capabilities does not invalidate
-  // the store.
+  // These values are intentionally read when an input is handled. A controller
+  // can outlive row refreshes and source-state changes, so a captured snapshot
+  // could make the next Enter key act on a row or write capability that is no
+  // longer current.
   getDisplayed: () => DisplayedRows;
   getSchema: () => readonly ColumnSchema[];
-  capabilitiesFor: (kind: LevelRowKind) => RowCapabilities;
+  /** Returns whether this path's source currently accepts writes. */
+  isWritable: () => boolean;
   onNavigateCell?: (intent: CellNavigationIntent) => void;
   onNavigateRow?: (intent: RowNavigationIntent) => void;
   clearCellRange?: (path: GridPath) => void;
@@ -195,8 +197,21 @@ export function createGridController(
     return {
       displayed: args.getDisplayed(),
       schema: args.getSchema(),
-      capabilitiesFor: args.capabilitiesFor,
+      isCellEditable,
     };
+  }
+
+  function isCellEditable(row: LevelRow, column: ColumnSchema): boolean {
+    // An app can use the same editable column schema with writable and readonly
+    // sources, while one displayed level can also contain structural rows that
+    // must never open an editor. Keep this as one shared runtime predicate so
+    // keyboard and pointer input choose the same primary action, and direct
+    // startEdit calls are checked against the same current conditions.
+    return (
+      args.isWritable() &&
+      capabilitiesFor(row.kind).editable &&
+      column.edit !== undefined
+    );
   }
 
   function pushEffects(toAppend: GridEffect[]): void {
@@ -271,7 +286,7 @@ export function createGridController(
     const intent = pointerEventToCellIntent({
       column,
       rowId: coord.rowId,
-      editable: args.capabilitiesFor(row.kind).editable,
+      editable: isCellEditable(row, column),
       gesture: pointer.gesture,
     });
     if (intent) {
@@ -429,26 +444,23 @@ export function createGridController(
 
   store.handleKey = (e, presentation) => {
     const state = store.getState();
-    const displayed = args.getDisplayed();
     // Mode owns keyboard routing. The controller does not ask which UI element
     // was touched last; a cell-grid runtime always parses keys as cell intents,
     // and a row-list runtime always parses keys as row intents.
-    const intent =
-      args.interaction.mode === "cell-grid"
-        ? keyEventToCellIntent(
-            e,
-            args.interaction,
-            state,
-            displayed,
-            args.getSchema(),
-            args.capabilitiesFor,
-            presentation,
-          )
-        : keyEventToRowIntent(e, args.interaction, state, displayed);
-    if (!intent) return false;
-    return args.interaction.mode === "cell-grid"
-      ? applyCellIntent(intent as CellNavigationIntent)
-      : applyRowIntent(intent as RowNavigationIntent);
+    if (args.interaction.mode === "cell-grid") {
+      const intent = keyEventToCellIntent(
+        e,
+        args.interaction,
+        state,
+        args.getDisplayed(),
+        args.getSchema(),
+        isCellEditable,
+        presentation,
+      );
+      return intent ? applyCellIntent(intent) : false;
+    }
+    const intent = keyEventToRowIntent(e, args.interaction, state);
+    return intent ? applyRowIntent(intent) : false;
   };
 
   store.flushEffects = () => {

@@ -37,15 +37,16 @@ export function EmptyRowHeaderCell({
     });
   }
 
-  // Grid installs a native keydown listener on each grid root. That listener
-  // ignores `row-header-control` targets because this React handler owns Space
-  // and Escape. The DOM guard and propagation stop work together so one key
-  // produces exactly one row-selection command, including inside nested grids.
+  // Grid's native listener yields to `row-header-control` before this delegated
+  // React handler runs. Stopping propagation here then prevents ancestor grids
+  // from seeing the same input. Plain Space is consumed too: a browser normally
+  // turns Space on a button into a click, which would otherwise select the row
+  // through the pointer path and silently restore the old shortcut.
   function selectFromKeyboard(event: KeyboardEvent<HTMLButtonElement>) {
     if (event.key === " ") {
       event.preventDefault();
       event.stopPropagation();
-      if (!disabled) {
+      if (event.shiftKey && !disabled) {
         coordinator.navigateCell(path, {
           type: "rowPressed",
           target: row.id,
@@ -71,6 +72,7 @@ export function EmptyRowHeaderCell({
       <button
         type="button"
         aria-label="Select row"
+        aria-keyshortcuts="Shift+Space"
         aria-pressed={selected}
         disabled={disabled}
         data-grid-part="row-header-control"

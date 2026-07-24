@@ -24,7 +24,7 @@ describe("ColumnSchema helpers", () => {
       renderCell: ({ value }) => String(value ?? ""),
       edit: {
         editor: () => null,
-        startsOn: ["enter", "f2"] as const,
+        startsOn: ["enter", "doubleClick"] as const,
       },
     };
 

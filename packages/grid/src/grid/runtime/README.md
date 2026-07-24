@@ -171,12 +171,14 @@ cells for editing and copy behavior. Row selection identifies row operation
 targets. A command can change one without moving or changing the other.
 
 Row activation is an optional semantic command on an enabled active-row
-configuration. Omission disables it. In cell-grid mode, a cell activation has
-first precedence, editing has second precedence, and row activation is the
-fallback. Row-list Enter expansion wins unless the
-configuration explicitly reserves Enter for row activation. A configuration
-cannot assign both click and double-click to row activation because browsers
-deliver click events before `dblclick`.
+configuration. Omission disables it. In cell-grid mode, Enter edits the focused
+cell when its source, displayed row, and column are all editable. Otherwise it
+runs the cell activation, then falls back to row activation. Space runs a
+declared cell activation, including row expansion, while Shift+Space toggles an
+independent row selection. In row-list mode, Space toggles expansion and Enter
+runs row activation when configured. A configuration cannot assign both click
+and double-click to row activation because browsers deliver click events before
+`dblclick`.
 
 `runtime.activeRow()` and `runtime.subscribeActiveRow()` expose grid-wide
 current state. The level interaction reads and subscriptions expose current

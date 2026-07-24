@@ -581,8 +581,8 @@ export function createGridCoordinator(
     if (intent.type === "toggleActiveRowSelection") {
       // In cell-grid mode the active row is derived from the cell cursor.
       // Resolve it before any selection writes, clear remembered ranges, and
-      // keep the cursor in place so Space toggles an operation target without
-      // moving keyboard focus.
+      // keep the cursor in place so the keyboard selection command toggles an
+      // operation target without moving keyboard focus.
       const active = runtime.activeRowFor(fromPath);
       if (!active) return;
       clearCellRangesAcrossGrid(runtime, cursorManager);

@@ -32,7 +32,7 @@ const testColumn = (id: string, name: string) => ({
   renderCell: ({ value }: { value: unknown }) => String(value ?? ""),
   edit: {
     editor: TestEditor,
-    startsOn: ["enter", "f2", "type", "doubleClick"] as const,
+    startsOn: ["enter", "type", "doubleClick"] as const,
   },
 });
 
@@ -485,7 +485,7 @@ describe("GridCoordinator", () => {
     ]);
   });
 
-  it("keyboard row toggles clear cell ranges without moving cell focus", () => {
+  it("Shift+Space row toggles clear cell ranges without moving cell focus", () => {
     const rt = setupExpanded(CELL_GRID_WITH_INDEPENDENT_ROW_SELECTION);
     const anchor = { rowId: makeRowId(root, "Fruit"), colId: "name" as const };
     const head = { rowId: makeRowId(root, "Fruit"), colId: "qty" as const };
@@ -496,7 +496,7 @@ describe("GridCoordinator", () => {
         key: " ",
         ctrlKey: false,
         metaKey: false,
-        shiftKey: false,
+        shiftKey: true,
         altKey: false,
       } as KeyboardEvent),
     ).toBe(true);
@@ -1067,7 +1067,7 @@ describe("GridCoordinator", () => {
     const coord = { rowId: makeRowId(root, "Fruit"), colId: "name" as const };
     focusCell(rt, root, coord);
     const controller = rt.controllerFor(root);
-    controller.startEdit(coord, "f2");
+    controller.startEdit(coord, "doubleClick");
     controller.commitEdit("x", "next");
     expect(rt.coordinator.getState().cellCursor).toEqual({
       path: root,
@@ -1331,7 +1331,7 @@ describe("GridCoordinator", () => {
     });
   });
 
-  it("handleKey Enter toggles expansion from the focused expansion cell", () => {
+  it("uses Enter for edit and Space for expansion on an editable cell", () => {
     const rt = setupCollapsed();
     rt.cursorManager.applyCellCursor({
       path: root,
@@ -1348,12 +1348,12 @@ describe("GridCoordinator", () => {
         altKey: false,
       } as KeyboardEvent),
     ).toBe(true);
-    expect(
-      rt.coordinator
-        .getState()
-        .expansion.get(root)
-        ?.has(makeRowId(root, "Fruit")),
-    ).toBe(true);
+    expect(rt.controllerFor(root).getState().editing).toMatchObject({
+      coord: { rowId: makeRowId(root, "Fruit"), colId: "name" },
+      editStart: { trigger: "enter" },
+    });
+    expect(rt.coordinator.getState().expansion.get(root)).toBeUndefined();
+    rt.controllerFor(root).cancelEdit();
 
     expect(
       rt.controllerFor(root).handleKey({
@@ -1364,7 +1364,12 @@ describe("GridCoordinator", () => {
         altKey: false,
       } as KeyboardEvent),
     ).toBe(true);
-    expect(rt.coordinator.getState().expansion.get(root)).toBeUndefined();
+    expect(
+      rt.coordinator
+        .getState()
+        .expansion.get(root)
+        ?.has(makeRowId(root, "Fruit")),
+    ).toBe(true);
   });
 
   it("handleKey ArrowUp from a parent enters the previous expanded child's last row", () => {

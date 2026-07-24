@@ -8,6 +8,7 @@ import { capabilitiesFor } from "../types/capabilities";
 import {
   CELL_EDITING_GRID,
   CELL_GRID_WITH_ACTIVE_ROW,
+  CELL_GRID_WITH_INDEPENDENT_ROW_SELECTION,
   ROW_MULTISELECT_LIST,
   ROW_PRIMARY_MASTER_DETAIL,
   ROW_PRIMARY_MASTER_DETAIL_WITH_ACTIVATION,
@@ -26,7 +27,7 @@ const testColumn = (id: string, name: string): ColumnSchema => ({
   renderCell: ({ value }) => String(value ?? ""),
   edit: {
     editor: TestEditor,
-    startsOn: ["enter", "f2", "type", "doubleClick"],
+    startsOn: ["enter", "type", "doubleClick"],
   },
 });
 const cols: ColumnSchema[] = [
@@ -34,6 +35,8 @@ const cols: ColumnSchema[] = [
   testColumn("b", "B"),
   testColumn("c", "C"),
 ];
+const cellEditable = (row: LevelRow, column: ColumnSchema): boolean =>
+  capabilitiesFor(row.kind).editable && column.edit !== undefined;
 
 function makeRows(
   specs: Array<{ key: string; kind: LevelRow["kind"] }>,
@@ -104,18 +107,20 @@ function keyEventToCellIntent(
   state: ControllerState,
   displayed: DisplayedRows,
   schema: ColumnSchema[],
-  caps: typeof capabilitiesFor,
+  isCellEditable: (row: LevelRow, column: ColumnSchema) => boolean,
 ) {
-  return parseCellIntent(e, CELL_EDITING_GRID, state, displayed, schema, caps);
+  return parseCellIntent(
+    e,
+    CELL_EDITING_GRID,
+    state,
+    displayed,
+    schema,
+    isCellEditable,
+  );
 }
 
 function keyEventToRowIntent(e: KeyboardEvent, state: ControllerState) {
-  return parseRowIntent(
-    e,
-    ROW_PRIMARY_MASTER_DETAIL_WITH_ACTIVATION,
-    state,
-    makeRows([{ key: "r0", kind: "data" }]),
-  );
+  return parseRowIntent(e, ROW_PRIMARY_MASTER_DETAIL_WITH_ACTIVATION, state);
 }
 
 function ev(key: string, mods: Partial<KeyboardEvent> = {}): KeyboardEvent {
@@ -178,7 +183,7 @@ describe("keyEventToCellIntent", () => {
       },
       editing: {
         coord: { rowId: makeRowId(path, "r0"), colId: "a" },
-        editStart: { trigger: "f2" },
+        editStart: { trigger: "doubleClick" },
       },
       liveRowFocus: null,
       rowSelection: null,
@@ -189,7 +194,7 @@ describe("keyEventToCellIntent", () => {
         editing,
         displayed,
         cols,
-        capabilitiesFor,
+        cellEditable,
       ),
     ).toBe(null);
     expect(
@@ -198,7 +203,7 @@ describe("keyEventToCellIntent", () => {
         editing,
         displayed,
         cols,
-        capabilitiesFor,
+        cellEditable,
       ),
     ).toBe(null);
   });
@@ -209,7 +214,7 @@ describe("keyEventToCellIntent", () => {
       baseState,
       displayed,
       cols,
-      capabilitiesFor,
+      cellEditable,
     );
     expect(r).toEqual({ type: "focusFirstCell" });
   });
@@ -217,21 +222,15 @@ describe("keyEventToCellIntent", () => {
   it("ignores edit-trigger keys when there is no live focus", () => {
     expect(
       keyEventToCellIntent(
-        ev("F2"),
+        ev("Enter"),
         baseState,
         displayed,
         cols,
-        capabilitiesFor,
+        cellEditable,
       ),
     ).toBe(null);
     expect(
-      keyEventToCellIntent(
-        ev("a"),
-        baseState,
-        displayed,
-        cols,
-        capabilitiesFor,
-      ),
+      keyEventToCellIntent(ev("a"), baseState, displayed, cols, cellEditable),
     ).toBe(null);
   });
 
@@ -242,7 +241,7 @@ describe("keyEventToCellIntent", () => {
         focusAt("r0", "a"),
         displayed,
         cols,
-        capabilitiesFor,
+        cellEditable,
       ),
     ).toEqual({ type: "clearCellSelection" });
   });
@@ -258,14 +257,46 @@ describe("keyEventToCellIntent", () => {
     };
 
     expect(
-      keyEventToCellIntent(
-        ev("Escape"),
-        state,
+      keyEventToCellIntent(ev("Escape"), state, displayed, cols, cellEditable),
+    ).toEqual({ type: "clearRowSelection" });
+  });
+
+  it("reserves Shift+Space for independent row selection", () => {
+    expect(
+      parseCellIntent(
+        ev(" ", { shiftKey: true }),
+        CELL_GRID_WITH_INDEPENDENT_ROW_SELECTION,
+        focusAt("r0", "a"),
         displayed,
         cols,
-        capabilitiesFor,
+        cellEditable,
       ),
-    ).toEqual({ type: "clearRowSelection" });
+    ).toEqual({ type: "toggleActiveRowSelection" });
+    expect(
+      parseCellIntent(
+        ev(" "),
+        CELL_GRID_WITH_INDEPENDENT_ROW_SELECTION,
+        focusAt("r0", "a"),
+        displayed,
+        cols,
+        cellEditable,
+      ),
+    ).toEqual({
+      type: "startEdit",
+      coord: { rowId: makeRowId(path, "r0"), colId: "a" },
+      trigger: "type",
+      initial: " ",
+    });
+    expect(
+      parseCellIntent(
+        ev(" ", { shiftKey: true }),
+        CELL_EDITING_GRID,
+        focusAt("r0", "a"),
+        displayed,
+        cols,
+        cellEditable,
+      ),
+    ).toBe(null);
   });
 
   it("ArrowDown emits a moveRow intent", () => {
@@ -274,7 +305,7 @@ describe("keyEventToCellIntent", () => {
       focusAt("r0", "a"),
       displayed,
       cols,
-      capabilitiesFor,
+      cellEditable,
     );
     expect(r).toEqual({
       type: "moveRow",
@@ -292,7 +323,7 @@ describe("keyEventToCellIntent", () => {
         focusAt("r0", "a"),
         displayed,
         cols,
-        capabilitiesFor,
+        cellEditable,
         "cards",
       ),
     ).toEqual({ type: "commitMove", target: "next" });
@@ -303,7 +334,7 @@ describe("keyEventToCellIntent", () => {
         focusAt("r0", "b"),
         displayed,
         cols,
-        capabilitiesFor,
+        cellEditable,
         "cards",
       ),
     ).toEqual({ type: "commitMove", target: "prev" });
@@ -317,7 +348,7 @@ describe("keyEventToCellIntent", () => {
         focusAt("r0", "a"),
         displayed,
         cols,
-        capabilitiesFor,
+        cellEditable,
         "cards",
       ),
     ).toEqual({ type: "commitMove", target: "next" });
@@ -328,7 +359,7 @@ describe("keyEventToCellIntent", () => {
         focusAt("r0", "b"),
         displayed,
         cols,
-        capabilitiesFor,
+        cellEditable,
         "cards",
       ),
     ).toEqual({ type: "commitMove", target: "prev" });
@@ -340,7 +371,7 @@ describe("keyEventToCellIntent", () => {
       focusAt("r0", "a"),
       displayed,
       cols,
-      capabilitiesFor,
+      cellEditable,
     );
     expect(r).toEqual({
       type: "moveRow",
@@ -357,7 +388,7 @@ describe("keyEventToCellIntent", () => {
         focusAt("r0", "a"),
         displayed,
         cols,
-        capabilitiesFor,
+        cellEditable,
       ),
     ).toEqual({ type: "commitMove", target: "next" });
     expect(
@@ -366,25 +397,9 @@ describe("keyEventToCellIntent", () => {
         focusAt("r0", "b"),
         displayed,
         cols,
-        capabilitiesFor,
+        cellEditable,
       ),
     ).toEqual({ type: "commitMove", target: "prev" });
-  });
-
-  it("F2 opens an edit on a data cell", () => {
-    expect(
-      keyEventToCellIntent(
-        ev("F2"),
-        focusAt("r0", "a"),
-        displayed,
-        cols,
-        capabilitiesFor,
-      ),
-    ).toEqual({
-      type: "startEdit",
-      coord: { rowId: makeRowId(path, "r0"), colId: "a" },
-      trigger: "f2",
-    });
   });
 
   it("Enter opens an edit", () => {
@@ -394,7 +409,7 @@ describe("keyEventToCellIntent", () => {
         focusAt("r0", "a"),
         displayed,
         cols,
-        capabilitiesFor,
+        cellEditable,
       ),
     ).toEqual({
       type: "startEdit",
@@ -418,7 +433,7 @@ describe("keyEventToCellIntent", () => {
         focusAt("r0", "a"),
         displayed,
         [{ ...cols[0], edit: undefined }, cols[1]],
-        capabilitiesFor,
+        cellEditable,
       ),
     ).toEqual({
       type: "activateRow",
@@ -434,7 +449,7 @@ describe("keyEventToCellIntent", () => {
         ...testColumn("a", "A"),
         edit: {
           editor: TestEditor,
-          startsOn: ["f2", "type", "doubleClick"] as const,
+          startsOn: ["type", "doubleClick"] as const,
         },
         activation: {
           startsOn: ["enter", "space"] as const,
@@ -451,7 +466,7 @@ describe("keyEventToCellIntent", () => {
         focusAt("r0", "a"),
         displayed,
         expansionColumns,
-        capabilitiesFor,
+        cellEditable,
       ),
     ).toEqual({
       type: "activateCell",
@@ -464,7 +479,64 @@ describe("keyEventToCellIntent", () => {
         focusAt("r0", "a"),
         displayed,
         expansionColumns,
-        capabilitiesFor,
+        cellEditable,
+      ),
+    ).toEqual({
+      type: "activateCell",
+      coord: { rowId: makeRowId(path, "r0"), colId: "a" },
+      trigger: { kind: "keyboard", gesture: "space" },
+    });
+  });
+
+  it("routes overlapping Enter and Space by runtime editability", () => {
+    const expansionColumns = [
+      {
+        ...testColumn("a", "A"),
+        activation: {
+          startsOn: ["enter", "space"] as const,
+          describe: "Expand row",
+          run: () => {},
+        },
+      },
+    ];
+    const state = focusAt("r0", "a");
+
+    expect(
+      parseCellIntent(
+        ev("Enter"),
+        CELL_EDITING_GRID,
+        state,
+        displayed,
+        expansionColumns,
+        () => true,
+      ),
+    ).toEqual({
+      type: "startEdit",
+      coord: { rowId: makeRowId(path, "r0"), colId: "a" },
+      trigger: "enter",
+    });
+    expect(
+      parseCellIntent(
+        ev("Enter"),
+        CELL_EDITING_GRID,
+        state,
+        displayed,
+        expansionColumns,
+        () => false,
+      ),
+    ).toEqual({
+      type: "activateCell",
+      coord: { rowId: makeRowId(path, "r0"), colId: "a" },
+      trigger: { kind: "keyboard", gesture: "enter" },
+    });
+    expect(
+      parseCellIntent(
+        ev(" "),
+        CELL_EDITING_GRID,
+        state,
+        displayed,
+        expansionColumns,
+        () => true,
       ),
     ).toEqual({
       type: "activateCell",
@@ -492,7 +564,7 @@ describe("keyEventToCellIntent", () => {
         focusAt("r0", "b"),
         displayed,
         expansionColumns,
-        capabilitiesFor,
+        cellEditable,
       ),
     ).toEqual({
       type: "startEdit",
@@ -508,7 +580,7 @@ describe("keyEventToCellIntent", () => {
         focusAt("r0", "a"),
         displayed,
         cols,
-        capabilitiesFor,
+        cellEditable,
       ),
     ).toEqual({
       type: "startEdit",
@@ -525,7 +597,7 @@ describe("keyEventToCellIntent", () => {
         focusAt("r0", "a"),
         displayed,
         cols,
-        capabilitiesFor,
+        cellEditable,
       ),
     ).toBe(null);
   });
@@ -534,7 +606,7 @@ describe("keyEventToCellIntent", () => {
     const restricted: ColumnSchema[] = [
       {
         ...testColumn("a", "A"),
-        edit: { editor: TestEditor, startsOn: ["f2", "enter"] },
+        edit: { editor: TestEditor, startsOn: ["enter"] },
       },
       testColumn("b", "B"),
       testColumn("c", "C"),
@@ -545,21 +617,21 @@ describe("keyEventToCellIntent", () => {
         focusAt("r0", "a"),
         displayed,
         restricted,
-        capabilitiesFor,
+        cellEditable,
       ),
     ).toBe(null);
     expect(
       keyEventToCellIntent(
-        ev("F2"),
+        ev("Enter"),
         focusAt("r0", "a"),
         displayed,
         restricted,
-        capabilitiesFor,
+        cellEditable,
       ),
     ).toEqual({
       type: "startEdit",
       coord: { rowId: makeRowId(path, "r0"), colId: "a" },
-      trigger: "f2",
+      trigger: "enter",
     });
   });
 
@@ -574,11 +646,11 @@ describe("keyEventToCellIntent", () => {
 
     expect(
       keyEventToCellIntent(
-        ev("F2"),
+        ev("Enter"),
         focusAt("r0", "a"),
         displayed,
         noEditor,
-        capabilitiesFor,
+        cellEditable,
       ),
     ).toBe(null);
   });
@@ -590,11 +662,11 @@ describe("keyEventToCellIntent", () => {
     ]);
     expect(
       keyEventToCellIntent(
-        ev("F2"),
+        ev("Enter"),
         focusAt("open", "a"),
         d,
         cols,
-        capabilitiesFor,
+        cellEditable,
       ),
     ).toBe(null);
     expect(
@@ -603,7 +675,7 @@ describe("keyEventToCellIntent", () => {
         focusAt("open", "a"),
         d,
         cols,
-        capabilitiesFor,
+        cellEditable,
       ),
     ).toBe(null);
   });
@@ -614,7 +686,7 @@ describe("keyEventToCellIntent", () => {
       focusAt("r1", "c"),
       displayed,
       cols,
-      capabilitiesFor,
+      cellEditable,
     );
     expect(r).toEqual({
       type: "moveGridEdge",
@@ -630,7 +702,7 @@ describe("keyEventToCellIntent", () => {
       focusAt("r0", "a"),
       displayed,
       cols,
-      capabilitiesFor,
+      cellEditable,
     );
     expect(r).toEqual({
       type: "moveGridEdge",
@@ -647,7 +719,7 @@ describe("keyEventToCellIntent", () => {
         focusAt("r0", "a"),
         displayed,
         cols,
-        capabilitiesFor,
+        cellEditable,
       ),
     ).toEqual({
       type: "moveRowDelta",
@@ -664,7 +736,7 @@ describe("keyEventToCellIntent", () => {
         focusAt("r1", "b"),
         displayed,
         cols,
-        capabilitiesFor,
+        cellEditable,
       ),
     ).toEqual({
       type: "moveRowDelta",
@@ -693,6 +765,26 @@ describe("keyEventToRowIntent", () => {
     });
   });
 
+  it("uses Space for expansion and Shift+Space for row selection", () => {
+    const config = {
+      ...ROW_MULTISELECT_LIST,
+      activeRow: {
+        ...ROW_MULTISELECT_LIST.activeRow,
+        keyboard: {
+          ...ROW_MULTISELECT_LIST.activeRow.keyboard,
+          expansion: "enabled" as const,
+        },
+      },
+    };
+
+    expect(parseRowIntent(ev(" "), config, rowFocused)).toEqual({
+      type: "toggleActiveRowExpansion",
+    });
+    expect(
+      parseRowIntent(ev(" ", { shiftKey: true }), config, rowFocused),
+    ).toEqual({ type: "toggleActiveRowSelection" });
+  });
+
   it("maps configured Enter activation to a semantic row command", () => {
     expect(keyEventToRowIntent(ev("Enter"), rowFocused)).toEqual({
       type: "activateRow",
@@ -706,20 +798,13 @@ describe("keyEventToRowIntent", () => {
 
   it("ignores expansion keys when row expansion is not configured", () => {
     expect(
-      parseRowIntent(
-        ev("ArrowRight"),
-        ROW_MULTISELECT_LIST,
-        rowFocused,
-        makeRows([{ key: "r0", kind: "data" }]),
-      ),
+      parseRowIntent(ev("ArrowRight"), ROW_MULTISELECT_LIST, rowFocused),
     ).toBe(null);
-    expect(
-      parseRowIntent(
-        ev("Enter"),
-        ROW_MULTISELECT_LIST,
-        rowFocused,
-        makeRows([{ key: "r0", kind: "data" }]),
-      ),
-    ).toBe(null);
+    expect(parseRowIntent(ev("Enter"), ROW_MULTISELECT_LIST, rowFocused)).toBe(
+      null,
+    );
+    expect(parseRowIntent(ev(" "), ROW_MULTISELECT_LIST, rowFocused)).toBe(
+      null,
+    );
   });
 });

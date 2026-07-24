@@ -4,7 +4,6 @@ import type { GridPath, RowId } from "../../types/identity";
 import type {
   CellActivation,
   CellActivationGesture,
-  CellEditGesture,
   CellRenderActivation,
   ColumnSchema,
 } from "../../types/schema";
@@ -91,18 +90,12 @@ export function withRowExpansionColumn(
 ): ColumnSchema {
   const renderCell = column.renderCell;
   const activation = options.activation ?? rowExpansionActivation();
-  const edit = column.edit
-    ? {
-        ...column.edit,
-        startsOn: column.edit.startsOn.filter(
-          (gesture) =>
-            !activationConflictsWithEdit(activation.startsOn, gesture),
-        ),
-      }
-    : undefined;
+  // Preserve the column's edit gestures even when Enter is also an expansion
+  // gesture. The focused cell decides its primary action at runtime: Enter
+  // edits a writable data cell and otherwise activates expansion, while Space
+  // always remains available as the explicit expansion command.
   return {
     ...column,
-    edit: edit && edit.startsOn.length > 0 ? edit : undefined,
     activation,
     renderCell: (props) => (
       <ExpandableCellFrame
@@ -114,15 +107,4 @@ export function withRowExpansionColumn(
       </ExpandableCellFrame>
     ),
   };
-}
-
-function activationConflictsWithEdit(
-  activationGestures: readonly CellActivationGesture[],
-  editGesture: CellEditGesture,
-): boolean {
-  if (editGesture === "enter") return activationGestures.includes("enter");
-  if (editGesture === "doubleClick") {
-    return activationGestures.includes("doubleClick");
-  }
-  return false;
 }

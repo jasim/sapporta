@@ -1,8 +1,7 @@
 import type { ColumnSchema } from "../types/schema";
 import { editStartsOn } from "../types/schema";
 import type { ControllerState } from "../types/controller-state";
-import type { DisplayedRows, LevelRowKind } from "../types/level-row";
-import type { RowCapabilities } from "../types/capabilities";
+import type { DisplayedRows, LevelRow } from "../types/level-row";
 import type { GridAction } from "../types/action";
 import type { GridEffect } from "../types/effects";
 
@@ -23,7 +22,7 @@ import type { GridEffect } from "../types/effects";
 export type ReducerContext = {
   displayed: DisplayedRows;
   schema: readonly ColumnSchema[];
-  capabilitiesFor: (kind: LevelRowKind) => RowCapabilities;
+  isCellEditable: (row: LevelRow, column: ColumnSchema) => boolean;
 };
 
 export type ReducerOutcome = {
@@ -55,9 +54,12 @@ function transitionFor(
     case "START_EDIT": {
       const row = ctx.displayed.rowById.get(action.coord.rowId);
       if (!row) return null;
-      if (!ctx.capabilitiesFor(row.kind).editable) return null;
       const column = ctx.schema.find((c) => c.id === action.coord.colId);
-      if (!column?.edit) return null;
+      // Keyboard parsing is not the only way to request an edit: applications
+      // can call controller.startEdit directly. Recheck the shared live
+      // predicate here so every entry point honors readonly sources,
+      // non-editable row kinds, and columns without an editor.
+      if (!column || !ctx.isCellEditable(row, column)) return null;
       if (!editStartsOn(column, action.trigger)) return null;
       const editStart =
         action.trigger === "type"

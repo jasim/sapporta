@@ -46,13 +46,10 @@ export type RowSelectionGesture = "replace" | "extend" | "toggle";
 // Row selection can either be derived from the active row or stored
 // independently. "Follows active row" is deliberately read-only at the
 // storage layer: the effective selected rows are computed from the active row,
-// and controller.rowSelection is ignored.
+// and controller.rowSelection is ignored. Shift+Space toggles an independent
+// selection from the current cell or row cursor.
 export type SelectedRowsSync =
   { readonly kind: "follows-active-row" } | { readonly kind: "independent" };
-
-export type SelectedRowsKeyboardConfig = {
-  readonly space: "toggle-active-row" | "ignore";
-};
 
 export type SelectedRowsConfig =
   | { readonly kind: "none" }
@@ -63,7 +60,6 @@ export type SelectedRowsConfig =
       // order, so callers never depend on Set insertion order.
       readonly mode: RowSelectionMode;
       readonly sync: SelectedRowsSync;
-      readonly keyboard: SelectedRowsKeyboardConfig;
     };
 
 export type SelectedCellsConfig =
@@ -122,7 +118,8 @@ export type RowActivationConfig = {
 export type ActiveRowKeyboardConfig = {
   readonly arrows: "move-active-row";
   readonly shiftArrows: "extend-selected-rows" | "move-active-row";
-  readonly expansion: "left-right" | "left-right-enter" | "none";
+  /** Enabled expansion uses Space to toggle and Left/Right to collapse/expand. */
+  readonly expansion: "enabled" | "none";
 };
 
 export type RowListActiveRowConfig = {
@@ -213,7 +210,6 @@ export const CELL_GRID_WITH_INDEPENDENT_ROW_SELECTION = {
     kind: "enabled",
     mode: "multi",
     sync: { kind: "independent" },
-    keyboard: { space: "toggle-active-row" },
   },
 } satisfies GridInteractionConfig;
 
@@ -234,7 +230,6 @@ export const CELL_PRIMARY_WITH_SIDE_PANEL_ROW = {
     kind: "enabled",
     mode: "single",
     sync: { kind: "follows-active-row" },
-    keyboard: { space: "ignore" },
   },
 } satisfies GridInteractionConfig;
 
@@ -254,7 +249,6 @@ export const CELL_PRIMARY_WITH_SELECTED_SIDE_PANEL_ROW = {
     kind: "enabled",
     mode: "single",
     sync: { kind: "independent" },
-    keyboard: { space: "toggle-active-row" },
   },
 } satisfies GridInteractionConfig;
 
@@ -264,8 +258,8 @@ export const CELL_PRIMARY_WITH_SELECTED_SIDE_PANEL_ROW = {
 
 /**
  * Full-row navigation with the active row as the single operation target.
- * Arrow keys change active-row context. Enter and the horizontal arrow keys
- * preserve hierarchical expansion controls.
+ * Arrow keys change active-row context. Space and the horizontal arrow keys
+ * control hierarchical expansion.
  * Despite its historical name, this preset creates no detail view or layout.
  */
 export const ROW_PRIMARY_MASTER_DETAIL = {
@@ -277,14 +271,13 @@ export const ROW_PRIMARY_MASTER_DETAIL = {
     keyboard: {
       arrows: "move-active-row",
       shiftArrows: "move-active-row",
-      expansion: "left-right-enter",
+      expansion: "enabled",
     },
   },
   selectedRows: {
     kind: "enabled",
     mode: "single",
     sync: { kind: "follows-active-row" },
-    keyboard: { space: "ignore" },
   },
 } satisfies GridInteractionConfig;
 
@@ -297,17 +290,13 @@ export const ROW_PRIMARY_MASTER_DETAIL_WITH_ACTIVATION = {
   ...ROW_PRIMARY_MASTER_DETAIL,
   activeRow: {
     ...ROW_PRIMARY_MASTER_DETAIL.activeRow,
-    keyboard: {
-      ...ROW_PRIMARY_MASTER_DETAIL.activeRow.keyboard,
-      expansion: "left-right",
-    },
     activation: { startsOn: ["enter", "doubleClick"] },
   },
 } satisfies GridInteractionConfig;
 
 /**
- * Full-row navigation with independent multi-row operation selection. Space
- * toggles a row and Shift+arrows extends the selection.
+ * Full-row navigation with independent multi-row operation selection.
+ * Shift+Space toggles a row and Shift+arrows extends the selection.
  */
 export const ROW_MULTISELECT_LIST = {
   mode: "row-list",
@@ -325,6 +314,5 @@ export const ROW_MULTISELECT_LIST = {
     kind: "enabled",
     mode: "multi",
     sync: { kind: "independent" },
-    keyboard: { space: "toggle-active-row" },
   },
 } satisfies GridInteractionConfig;

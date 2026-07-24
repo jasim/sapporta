@@ -19,7 +19,7 @@ const columns: ColumnSchema[] = [
     renderCell: ({ value }) => String(value ?? ""),
     edit: {
       editor: TestEditor,
-      startsOn: ["enter", "f2", "type", "doubleClick"],
+      startsOn: ["enter", "type", "doubleClick"],
     },
   },
 ];
@@ -47,7 +47,8 @@ function start(action: GridAction) {
   return reduceController(state, action, {
     displayed,
     schema: columns,
-    capabilitiesFor,
+    isCellEditable: (row, column) =>
+      capabilitiesFor(row.kind).editable && column.edit !== undefined,
   })?.state.editing;
 }
 
@@ -92,19 +93,6 @@ describe("reduceController START_EDIT", () => {
     ).toEqual({
       coord: { rowId, colId: "a" },
       editStart: { trigger: "enter" },
-    });
-  });
-
-  it("stores no typed seed for f2-started edits", () => {
-    expect(
-      start({
-        type: "START_EDIT",
-        coord: { rowId, colId: "a" },
-        trigger: "f2",
-      }),
-    ).toEqual({
-      coord: { rowId, colId: "a" },
-      editStart: { trigger: "f2" },
     });
   });
 });

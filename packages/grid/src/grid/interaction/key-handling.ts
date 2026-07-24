@@ -1,8 +1,7 @@
 import type { RowId } from "../types/identity";
 import type { ColumnSchema } from "../types/schema";
 import type { ControllerState } from "../types/controller-state";
-import type { DisplayedRows, LevelRowKind } from "../types/level-row";
-import type { RowCapabilities } from "../types/capabilities";
+import type { DisplayedRows, LevelRow } from "../types/level-row";
 import type {
   CellNavigationIntent,
   NavigationDirection,
@@ -30,7 +29,6 @@ import { activationStartsOn, editStartsOn } from "../types/schema";
 // make ArrowUp suddenly behave like row navigation in a spreadsheet-style grid.
 const PAGE_SIZE = 10;
 
-type CapabilitiesFn = (kind: LevelRowKind) => RowCapabilities;
 export type CellKeyboardPresentation = "tabular" | "cards";
 export type KeyEventLike = Pick<
   KeyboardEvent,
@@ -86,20 +84,29 @@ function isPrintableKey(
   return e.key.length === 1;
 }
 
-function isHardEditCommit(e: Pick<KeyboardEvent, "key" | "shiftKey">): boolean {
-  return e.key === "Enter" && !e.shiftKey;
+function isPlainEnter(e: KeyEventLike): boolean {
+  return (
+    e.key === "Enter" && !e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey
+  );
+}
+
+function isPlainSpace(e: KeyEventLike): boolean {
+  return e.key === " " && !e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey;
+}
+
+function isShiftSpace(e: KeyEventLike): boolean {
+  return e.key === " " && e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey;
 }
 
 function canToggleRows(
   config: CellGridInteractionConfig | RowListInteractionConfig,
 ): boolean {
-  // Space mutates stored row selection only when there is such a stored value.
-  // If selection follows active row, Space would have nowhere meaningful to
-  // write and the effective selection remains derived from movement.
+  // Shift+Space mutates stored row selection only when there is such a stored
+  // value. If selection follows active row, it would have nowhere meaningful
+  // to write and the effective selection remains derived from movement.
   return (
     config.selectedRows.kind === "enabled" &&
-    config.selectedRows.sync.kind === "independent" &&
-    config.selectedRows.keyboard.space === "toggle-active-row"
+    config.selectedRows.sync.kind === "independent"
   );
 }
 
@@ -109,7 +116,7 @@ export function keyEventToCellIntent(
   state: ControllerState,
   displayed: DisplayedRows,
   schema: readonly ColumnSchema[],
-  capabilities: CapabilitiesFn,
+  isCellEditable: (row: LevelRow, column: ColumnSchema) => boolean,
   presentation: CellKeyboardPresentation = "tabular",
 ): CellNavigationIntent | null {
   if (state.editing) return null;
@@ -129,8 +136,8 @@ export function keyEventToCellIntent(
   const focusedRow = displayed.rowById.get(focus.rowId as RowId);
   const column = schema.find((c) => c.id === focus.colId);
 
-  if (e.key === " " && canToggleRows(config)) {
-    return { type: "toggleActiveRowSelection" };
+  if (isShiftSpace(e)) {
+    return canToggleRows(config) ? { type: "toggleActiveRowSelection" } : null;
   }
 
   if (direction) {
@@ -201,30 +208,12 @@ export function keyEventToCellIntent(
   }
 
   if (!focusedRow) return null;
-  if (
-    column &&
-    e.key === "Enter" &&
-    !e.shiftKey &&
-    !e.ctrlKey &&
-    !e.metaKey &&
-    !e.altKey &&
-    activationStartsOn(column, "enter")
-  ) {
-    return {
-      type: "activateCell",
-      coord: focus,
-      trigger: { kind: "keyboard", gesture: "enter" },
-    };
-  }
-  if (
-    column &&
-    e.key === " " &&
-    !e.shiftKey &&
-    !e.ctrlKey &&
-    !e.metaKey &&
-    !e.altKey &&
-    activationStartsOn(column, "space")
-  ) {
+
+  // Space is the expansion command for a column that exposes row expansion.
+  // Resolve it before printable-key editing because the browser reports Space
+  // as a one-character key. Shift+Space has already been reserved for row
+  // selection above, so these two commands cannot start the same interaction.
+  if (column && isPlainSpace(e) && activationStartsOn(column, "space")) {
     return {
       type: "activateCell",
       coord: focus,
@@ -232,37 +221,43 @@ export function keyEventToCellIntent(
     };
   }
 
-  const caps = capabilities(focusedRow.kind);
-  if (caps.editable && column?.edit) {
-    if (e.key === "F2" && editStartsOn(column, "f2")) {
-      return { type: "startEdit", coord: focus, trigger: "f2" };
-    }
-    if (isHardEditCommit(e) && editStartsOn(column, "enter")) {
+  if (isPlainEnter(e)) {
+    // Enter means "perform this cell's primary action." Keep this order: a
+    // writable data cell opens its editor; the same column on a readonly source
+    // or structural row runs its cell activation; row activation is the final
+    // fallback. Expansion columns intentionally declare both edit and Enter
+    // activation so this decision can follow the focused cell's live state.
+    if (
+      column &&
+      isCellEditable(focusedRow, column) &&
+      editStartsOn(column, "enter")
+    ) {
       return { type: "startEdit", coord: focus, trigger: "enter" };
     }
-    if (isPrintableKey(e) && editStartsOn(column, "type")) {
+    if (column && activationStartsOn(column, "enter")) {
       return {
-        type: "startEdit",
+        type: "activateCell",
         coord: focus,
-        trigger: "type",
-        initial: e.key,
+        trigger: { kind: "keyboard", gesture: "enter" },
       };
     }
+    return rowActivationStartsOn(config, "enter")
+      ? {
+          type: "activateRow",
+          rowId: focus.rowId,
+          coord: focus,
+          trigger: { kind: "keyboard", gesture: "enter" },
+        }
+      : null;
   }
 
-  if (
-    e.key === "Enter" &&
-    !e.shiftKey &&
-    !e.ctrlKey &&
-    !e.metaKey &&
-    !e.altKey &&
-    rowActivationStartsOn(config, "enter")
-  ) {
+  if (!column || !isCellEditable(focusedRow, column)) return null;
+  if (isPrintableKey(e) && editStartsOn(column, "type")) {
     return {
-      type: "activateRow",
-      rowId: focus.rowId,
+      type: "startEdit",
       coord: focus,
-      trigger: { kind: "keyboard", gesture: "enter" },
+      trigger: "type",
+      initial: e.key,
     };
   }
 
@@ -331,14 +326,13 @@ export function keyEventToRowIntent(
   e: KeyEventLike,
   config: RowListInteractionConfig,
   state: ControllerState,
-  _displayed: DisplayedRows,
 ): RowNavigationIntent | null {
   if (e.key === "Escape") {
     return state.rowSelection ? { type: "clearRowSelection" } : null;
   }
 
-  if (e.key === " " && canToggleRows(config)) {
-    return { type: "toggleActiveRowSelection" };
+  if (isShiftSpace(e)) {
+    return canToggleRows(config) ? { type: "toggleActiveRowSelection" } : null;
   }
 
   const direction = directionForKey(e);
@@ -346,13 +340,15 @@ export function keyEventToRowIntent(
     if (!direction) return null;
     return { type: "focusFirstRow" };
   }
-  if (
-    e.key === "Enter" &&
-    !e.shiftKey &&
-    !e.ctrlKey &&
-    !e.metaKey &&
-    !e.altKey
-  ) {
+  // A row list has no focused cell whose primary action needs resolving:
+  // Space owns expansion, while Enter remains available for the app's row
+  // activation command.
+  if (isPlainSpace(e)) {
+    return config.activeRow.keyboard.expansion === "enabled"
+      ? { type: "toggleActiveRowExpansion" }
+      : null;
+  }
+  if (isPlainEnter(e)) {
     if (rowActivationStartsOn(config, "enter")) {
       return {
         type: "activateRow",
@@ -360,9 +356,7 @@ export function keyEventToRowIntent(
         trigger: { kind: "keyboard", gesture: "enter" },
       };
     }
-    return config.activeRow.keyboard.expansion === "left-right-enter"
-      ? { type: "toggleActiveRowExpansion" }
-      : null;
+    return null;
   }
   if (!direction) return null;
 
@@ -374,11 +368,11 @@ export function keyEventToRowIntent(
 
   switch (direction) {
     case "right":
-      return config.activeRow.keyboard.expansion !== "none"
+      return config.activeRow.keyboard.expansion === "enabled"
         ? { type: "expandActiveRow" }
         : null;
     case "left":
-      return config.activeRow.keyboard.expansion !== "none"
+      return config.activeRow.keyboard.expansion === "enabled"
         ? { type: "collapseActiveRow" }
         : null;
     case "up":
