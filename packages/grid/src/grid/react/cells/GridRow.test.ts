@@ -54,11 +54,7 @@ describe("withRowExpansionColumn", () => {
       },
     });
 
-    expect(editableColumn.activation?.startsOn).toEqual([
-      "enter",
-      "space",
-      "click",
-    ]);
+    expect(editableColumn.activation?.startsOn).toEqual(["enter", "space"]);
     expect(editableColumn.edit?.startsOn).toEqual([
       "enter",
       "type",
@@ -1104,7 +1100,7 @@ describe("GridRow row headers", () => {
     expect(document.activeElement).toBe(gridRoot);
   });
 
-  it("preserves expansion for data-backed and structural row-header composition", async () => {
+  it("keeps cell-content clicks distinct from caret expansion across row-header compositions", async () => {
     const dataRuntime = createExpandableRowHeaderRuntime({ column: "id" });
     mounted = await render(
       createElement(GridRuntimeProvider, {
@@ -1172,14 +1168,44 @@ describe("GridRow row headers", () => {
     const firstDataCell = firstRow?.querySelector(
       '[data-grid-part="cell"][data-col-id="id"]',
     );
-    const chevron = firstDataCell?.querySelector("button");
+    const content = firstDataCell?.querySelector(
+      '[data-grid-part="expand-content"]',
+    );
+    const chevron = firstDataCell?.querySelector(
+      '[data-grid-part="expand-chevron"]',
+    );
     expect(firstRow?.firstElementChild).toBe(handle);
     expect(handle?.nextElementSibling).toBe(firstDataCell);
-    if (!(chevron instanceof HTMLButtonElement)) {
-      throw new Error("expected expansion chevron after structural handle");
+    if (
+      !(content instanceof HTMLElement) ||
+      !(chevron instanceof HTMLButtonElement)
+    ) {
+      throw new Error("expected expansion content and caret after row header");
     }
     await act(async () => {
-      chevron.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      content.dispatchEvent(
+        new MouseEvent("mousedown", { bubbles: true, button: 0 }),
+      );
+      content.dispatchEvent(
+        new MouseEvent("click", { bubbles: true, button: 0 }),
+      );
+    });
+    expect(structuralRuntime.root.isExpanded(orderRowId)).toBe(false);
+    expect(
+      runtimeInternalsFor(structuralRuntime).coordinator.getState().cellCursor,
+    ).toEqual({
+      path: rootPath("orders"),
+      rowId: orderRowId,
+      colId: "id",
+    });
+
+    await act(async () => {
+      chevron.dispatchEvent(
+        new MouseEvent("mousedown", { bubbles: true, button: 0 }),
+      );
+      chevron.dispatchEvent(
+        new MouseEvent("click", { bubbles: true, button: 0 }),
+      );
     });
     expect(structuralRuntime.root.isExpanded(orderRowId)).toBe(true);
     expect(structuralRuntime.root.selectedRowIds()).toEqual([]);

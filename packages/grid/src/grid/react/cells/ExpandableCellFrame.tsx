@@ -14,7 +14,10 @@ export function rowExpansionActivation(options?: {
   startsOn?: readonly CellActivationGesture[];
 }): CellActivation {
   return {
-    startsOn: options?.startsOn ?? ["enter", "space", "click"],
+    // Pointer expansion belongs to the explicit caret button rendered by
+    // ExpandableCellFrame. Keeping click out of the default gestures lets the
+    // rest of the cell focus, select, edit, or activate normally.
+    startsOn: options?.startsOn ?? ["enter", "space"],
     describe: ({ path, row, actions }) => {
       if (!actions.rowExpansion.canToggle({ path, row })) {
         return {
