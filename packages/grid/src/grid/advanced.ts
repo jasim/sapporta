@@ -204,6 +204,10 @@ export function controllerFor(
       assertLevel();
       raw.clearRowSelection();
     },
+    focus() {
+      assertLevel();
+      raw.focus();
+    },
     handleKey(event: KeyboardEvent, presentation?: CellKeyboardPresentation) {
       assertLevel();
       return raw.handleKey(event, presentation);

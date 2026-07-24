@@ -1,5 +1,5 @@
 import { useEffect, useId, useMemo, useState } from "react";
-import type { FormEvent, MouseEvent, Ref } from "react";
+import type { FormEvent, KeyboardEvent, MouseEvent, Ref } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { visiblePaginationItems } from "../grid-adapter/visible-pagination-items";
 import type { TableLevelPager } from "./table-level-pager";
@@ -13,6 +13,7 @@ type TablePagerProps = TableLevelPager & {
   previousButtonRef?: Ref<HTMLButtonElement>;
   nextButtonRef?: Ref<HTMLButtonElement>;
   onPagerButtonActivate?: (direction: TablePagerDirection) => boolean;
+  onPagerArrowKey?: () => boolean;
   onPagerBoundaryExit?: () => void;
 };
 
@@ -24,6 +25,7 @@ export function NumberedTablePager({
   previousButtonRef,
   nextButtonRef,
   onPagerButtonActivate,
+  onPagerArrowKey,
   onPagerBoundaryExit,
 }: TablePagerProps) {
   const pageJumpId = useId();
@@ -101,6 +103,9 @@ export function NumberedTablePager({
           type="button"
           disabled={safePage <= 1}
           onClick={() => goToPage(safePage - 1, "before")}
+          onKeyDown={(event) =>
+            returnGridFocusFromPagerArrow(event, onPagerArrowKey)
+          }
           onBlur={onPagerBoundaryExit}
           className="flex h-11 min-w-[84px] shrink-0 items-center justify-center gap-[5px] rounded-[6px] border border-sap-border-soft bg-sap-surface px-[12px] text-sap-emph text-sap-soft hover:bg-sap-row-hover hover:text-sap-fg focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-40"
           aria-label="Previous page"
@@ -135,6 +140,9 @@ export function NumberedTablePager({
           type="button"
           disabled={safePage >= pages}
           onClick={() => goToPage(safePage + 1, "after")}
+          onKeyDown={(event) =>
+            returnGridFocusFromPagerArrow(event, onPagerArrowKey)
+          }
           onBlur={onPagerBoundaryExit}
           className="flex h-11 min-w-[84px] shrink-0 items-center justify-center gap-[5px] rounded-[6px] border border-sap-border-soft bg-sap-surface px-[12px] text-sap-emph text-sap-soft hover:bg-sap-row-hover hover:text-sap-fg focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-40"
           aria-label="Next page"
@@ -207,6 +215,7 @@ export function CompactTablePager({
   previousButtonRef,
   nextButtonRef,
   onPagerButtonActivate,
+  onPagerArrowKey,
   onPagerBoundaryExit,
 }: TablePagerProps) {
   const pageJumpId = useId();
@@ -253,6 +262,9 @@ export function CompactTablePager({
         type="button"
         disabled={safePage <= 1}
         onClick={() => goToPage(safePage - 1, "before")}
+        onKeyDown={(event) =>
+          returnGridFocusFromPagerArrow(event, onPagerArrowKey)
+        }
         onBlur={onPagerBoundaryExit}
         className="flex h-10 w-10 items-center justify-center rounded-[6px] border border-sap-border-soft bg-sap-surface text-sap-soft hover:bg-sap-row-hover hover:text-sap-fg focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-40"
         aria-label="Previous page"
@@ -285,6 +297,9 @@ export function CompactTablePager({
         type="button"
         disabled={safePage >= pages}
         onClick={() => goToPage(safePage + 1, "after")}
+        onKeyDown={(event) =>
+          returnGridFocusFromPagerArrow(event, onPagerArrowKey)
+        }
         onBlur={onPagerBoundaryExit}
         className="flex h-10 w-10 items-center justify-center rounded-[6px] border border-sap-border-soft bg-sap-surface text-sap-soft hover:bg-sap-row-hover hover:text-sap-fg focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-40"
         aria-label="Next page"
@@ -293,4 +308,24 @@ export function CompactTablePager({
       </button>
     </nav>
   );
+}
+
+function returnGridFocusFromPagerArrow(
+  event: KeyboardEvent<HTMLButtonElement>,
+  onPagerArrowKey: (() => boolean) | undefined,
+): void {
+  if (
+    event.altKey ||
+    event.ctrlKey ||
+    event.metaKey ||
+    event.shiftKey ||
+    (event.key !== "ArrowUp" &&
+      event.key !== "ArrowDown" &&
+      event.key !== "ArrowLeft" &&
+      event.key !== "ArrowRight")
+  ) {
+    return;
+  }
+  if (!onPagerArrowKey?.()) return;
+  event.preventDefault();
 }

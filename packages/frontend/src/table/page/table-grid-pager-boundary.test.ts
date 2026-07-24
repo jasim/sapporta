@@ -15,6 +15,7 @@ import { controllerFor, cursorManagerFor } from "@sapporta/grid/advanced";
 import type { TGridSession } from "../state/tgrid-session";
 import {
   createTableGridPagerBoundaryController,
+  focusTableGrid,
   type TableGridPagerButtonRefs,
 } from "./table-grid-pager-boundary";
 
@@ -206,6 +207,31 @@ describe("table grid pager boundary controller", () => {
       rowId: makeRowId(path, "b"),
       colId: "name",
     });
+  });
+
+  it("returns browser focus to the originating grid without changing its cursor", async () => {
+    const { runtime, boundary, setLevelPage, next } = setup();
+    const cursors = cursorManagerFor(runtime);
+    const controller = controllerFor(runtime, path);
+    const origin = {
+      path,
+      rowId: makeRowId(path, "b"),
+      colId: "name",
+    };
+    cursors.moveCellCursorTo(origin);
+    controller.flushEffects();
+
+    controller.handleKey(key("ArrowDown"));
+
+    expect(document.activeElement).toBe(next);
+    boundary.onPagerBoundaryExit();
+    focusTableGrid(runtime);
+    expect(setLevelPage).not.toHaveBeenCalled();
+    expect(cursors.currentCellCursor()).toEqual(origin);
+    expect(controller.effects.getState()).toEqual([{ type: "focusContainer" }]);
+
+    await Promise.resolve();
+    expect(boundary.onPagerButtonActivate("after")).toBe(false);
   });
 
   it("cancels the grid landing when focus leaves the pager", async () => {

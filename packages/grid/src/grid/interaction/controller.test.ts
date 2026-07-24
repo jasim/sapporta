@@ -209,6 +209,21 @@ describe("GridController — verbs", () => {
     expect(types).toContain("focusContainer");
   });
 
+  it("focus queues only browser focus without changing grid state", () => {
+    const c = makeController();
+    c.setLiveCellFocus({ rowId: makeRowId(path, "r0"), colId: "a" });
+    c.setCellSelection({
+      anchor: { rowId: makeRowId(path, "r0"), colId: "a" },
+      head: { rowId: makeRowId(path, "r1"), colId: "a" },
+    });
+    const before = c.getState();
+
+    c.focus();
+
+    expect(c.getState()).toBe(before);
+    expect(c.effects.getState()).toEqual([{ type: "focusContainer" }]);
+  });
+
   it("commitEdit with commit='next' emits a commit movement intent", () => {
     const onNavigate = vi.fn();
     const c = makeController({ onNavigate });

@@ -11,8 +11,10 @@ import {
   type TablePagerDirection,
 } from "./TablePagers";
 import type { TableGridPagerButtonRefs } from "./table-grid-pager-boundary";
+import { focusTableGrid } from "./table-grid-pager-boundary";
 export {
   focusTableGridPagerBoundary,
+  focusTableGrid,
   type TableGridPagerButtonRefs,
 } from "./table-grid-pager-boundary";
 
@@ -37,6 +39,11 @@ export function TableGridPager<
   onPagerBoundaryExit?: () => void;
 }) {
   const pager = useTableLevelPager(session, level, routePath);
+  const returnFocusToGrid = () => {
+    onPagerBoundaryExit?.();
+    focusTableGrid(session.runtime);
+    return true;
+  };
 
   if (pager.pages <= 1) return null;
   return mode === "narrowCards" ? (
@@ -45,6 +52,7 @@ export function TableGridPager<
       previousButtonRef={buttonRefs?.previous}
       nextButtonRef={buttonRefs?.next}
       onPagerButtonActivate={onPagerButtonActivate}
+      onPagerArrowKey={returnFocusToGrid}
       onPagerBoundaryExit={onPagerBoundaryExit}
     />
   ) : (
@@ -53,6 +61,7 @@ export function TableGridPager<
       previousButtonRef={buttonRefs?.previous}
       nextButtonRef={buttonRefs?.next}
       onPagerButtonActivate={onPagerButtonActivate}
+      onPagerArrowKey={returnFocusToGrid}
       onPagerBoundaryExit={onPagerBoundaryExit}
     />
   );

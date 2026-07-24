@@ -94,6 +94,9 @@ export interface GridControllerPublicVerbs {
   readonly commitEdit: (value: unknown, commit?: CommitTarget) => void;
   readonly clearCellSelection: () => void;
   readonly clearRowSelection: () => void;
+  // Return browser focus to this grid without changing its cursor, selection,
+  // editing state, or viewport.
+  readonly focus: () => void;
   // host I/O — stable; bound once to DOM by Grid.tsx. Returns true if the
   // event was consumed (caller should preventDefault), false otherwise.
   readonly handleKey: (
@@ -307,6 +310,9 @@ export function createGridController(
     args.clearCellRange?.(args.path);
   };
   store.clearRowSelection = () => args.clearRowSelection?.(args.path);
+  store.focus = () => {
+    store.queueEffect({ type: "focusContainer" });
+  };
   store.revealCell = (coord) => {
     store.queueEffect({ type: "scrollFocusIntoView", coord });
   };

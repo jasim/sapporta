@@ -1,5 +1,6 @@
 import type { RefObject } from "react";
-import type { SourceLoadResult } from "@sapporta/grid";
+import type { GridRuntime, SourceLoadResult } from "@sapporta/grid";
+import { controllerFor, cursorManagerFor } from "@sapporta/grid/advanced";
 import type {
   TGridLevelId,
   TGridRowsByLevel,
@@ -90,6 +91,15 @@ export function createTableGridPagerBoundaryController<
     },
     onPagerBoundaryExit: cancelPending,
   };
+}
+
+export function focusTableGrid(runtime: GridRuntime): void {
+  const cursors = cursorManagerFor(runtime);
+  const activePath =
+    runtime.interaction.mode === "cell-grid"
+      ? cursors.currentCellCursor()?.path
+      : cursors.currentRowCursor()?.path;
+  controllerFor(runtime, activePath ?? runtime.root.path).focus();
 }
 
 export function focusTableGridPagerBoundary(

@@ -174,6 +174,40 @@ describe("NumberedTablePager", () => {
     expect(onPagerButtonActivate).not.toHaveBeenCalled();
   });
 
+  it("returns arrow keys to the grid focus handler", async () => {
+    const onPageChange = vi.fn();
+    const onPagerArrowKey = vi.fn(() => true);
+    mounted = await render(
+      createElement(NumberedTablePager, {
+        page: 2,
+        pages: 10,
+        onPageChange,
+        onPagerArrowKey,
+      }),
+    );
+    const previous = mounted.container.querySelector<HTMLButtonElement>(
+      'button[aria-label="Previous page"]',
+    );
+    const next = mounted.container.querySelector<HTMLButtonElement>(
+      'button[aria-label="Next page"]',
+    );
+    if (!previous || !next) throw new Error("expected pagination buttons");
+
+    const up = await pressKey(previous, "ArrowUp");
+    const down = await pressKey(next, "ArrowDown");
+    const left = await pressKey(previous, "ArrowLeft");
+    const right = await pressKey(next, "ArrowRight");
+    const pageDown = await pressKey(next, "PageDown");
+
+    expect(up.defaultPrevented).toBe(true);
+    expect(down.defaultPrevented).toBe(true);
+    expect(left.defaultPrevented).toBe(true);
+    expect(right.defaultPrevented).toBe(true);
+    expect(pageDown.defaultPrevented).toBe(false);
+    expect(onPagerArrowKey).toHaveBeenCalledTimes(4);
+    expect(onPageChange).not.toHaveBeenCalled();
+  });
+
   it("lets a boundary continuation own explicit button activation", async () => {
     const onPageChange = vi.fn();
     const onPagerButtonActivate = vi.fn(() => true);
@@ -284,6 +318,31 @@ describe("CompactTablePager", () => {
 
     expect(previousEvent.defaultPrevented).toBe(false);
     expect(nextEvent.defaultPrevented).toBe(false);
+    expect(onPageChange).not.toHaveBeenCalled();
+  });
+
+  it("returns unmodified arrow keys to the grid focus handler", async () => {
+    const onPageChange = vi.fn();
+    const onPagerArrowKey = vi.fn(() => true);
+    mounted = await render(
+      createElement(CompactTablePager, {
+        page: 2,
+        pages: 10,
+        onPageChange,
+        onPagerArrowKey,
+      }),
+    );
+    const next = mounted.container.querySelector<HTMLButtonElement>(
+      'button[aria-label="Next page"]',
+    );
+    if (!next) throw new Error("expected next page button");
+
+    const arrow = await pressKey(next, "ArrowLeft");
+    const modified = await pressKey(next, "ArrowDown", { shiftKey: true });
+
+    expect(arrow.defaultPrevented).toBe(true);
+    expect(modified.defaultPrevented).toBe(false);
+    expect(onPagerArrowKey).toHaveBeenCalledOnce();
     expect(onPageChange).not.toHaveBeenCalled();
   });
 });
