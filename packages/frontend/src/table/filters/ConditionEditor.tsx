@@ -19,13 +19,6 @@ import {
 import type { ColumnSchema } from "@sapporta/shared/contracts";
 import { isLookupValue } from "@sapporta/grid/lookup";
 import type { LookupForColumn } from "../../lookup";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@sapporta/ui/select";
 import { Combobox, comboboxClassNames } from "@sapporta/ui/combobox";
 import { cn } from "@sapporta/ui/cn";
 import {
@@ -281,27 +274,65 @@ export function ConditionEditor({
 
       {type && (
         <Field label="Operator">
-          <Select
-            items={catalog[type].ops.map((op) => ({
-              label: op.label,
-              value: op.key,
-            }))}
-            value={draft.opKey}
-            onValueChange={(nextKey) => {
-              if (nextKey !== null) setDraft({ ...draft, opKey: nextKey });
+          <Combobox.Root<OpEntry>
+            items={catalog[type].ops}
+            value={entry}
+            onValueChange={(next) => {
+              if (next !== null) {
+                setDraft({ ...draft, opKey: next.key });
+              }
             }}
+            itemToStringLabel={(operator) => operator.label}
+            itemToStringValue={(operator) => operator.key}
+            isItemEqualToValue={(operator, selected) =>
+              operator.key === selected.key
+            }
           >
-            <SelectTrigger className="h-sap-ctl">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {catalog[type].ops.map((o) => (
-                <SelectItem key={o.key} value={o.key}>
-                  {o.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+            <Combobox.InputGroup
+              className={cn(comboboxClassNames.inputGroup, "h-sap-ctl")}
+            >
+              <Combobox.Input
+                aria-label="Search operators"
+                className={comboboxClassNames.input}
+                onKeyDown={(event) => event.stopPropagation()}
+              />
+              <Combobox.Trigger
+                aria-label="Open operator choices"
+                className={cn(comboboxClassNames.action, "me-1")}
+              >
+                <ChevronDown aria-hidden />
+              </Combobox.Trigger>
+            </Combobox.InputGroup>
+            <Combobox.Portal>
+              <Combobox.Positioner
+                align="start"
+                sideOffset={4}
+                className={comboboxClassNames.positioner}
+              >
+                <Combobox.Popup className={comboboxClassNames.popup}>
+                  <Combobox.Empty className={comboboxClassNames.empty}>
+                    No matching operators.
+                  </Combobox.Empty>
+                  <Combobox.List className={comboboxClassNames.list}>
+                    {(operator: OpEntry) => (
+                      <Combobox.Item
+                        key={operator.key}
+                        value={operator}
+                        className={comboboxClassNames.item}
+                      >
+                        {operator.label}
+                        <Combobox.ItemIndicator
+                          className={comboboxClassNames.itemIndicator}
+                        >
+                          <Check aria-hidden />
+                        </Combobox.ItemIndicator>
+                      </Combobox.Item>
+                    )}
+                  </Combobox.List>
+                </Combobox.Popup>
+              </Combobox.Positioner>
+            </Combobox.Portal>
+          </Combobox.Root>
         </Field>
       )}
 

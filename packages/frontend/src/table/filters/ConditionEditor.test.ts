@@ -88,7 +88,7 @@ describe("ConditionEditor enum interaction", () => {
         }),
       );
     });
-    const input = container.querySelector('input[role="combobox"]');
+    const input = container.querySelector('input[placeholder="Search…"]');
     if (!(input instanceof HTMLInputElement)) {
       throw new Error("Expected the enum combobox input.");
     }

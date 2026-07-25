@@ -91,11 +91,6 @@
       "sapporta:source": "./src/ui/primitives/popover.tsx",
       "default": "./dist/popover.js"
     },
-    "./select": {
-      "types": "./dist/ui/primitives/select.d.ts",
-      "sapporta:source": "./src/ui/primitives/select.tsx",
-      "default": "./dist/select.js"
-    },
     "./sheet": {
       "types": "./dist/ui/primitives/sheet.d.ts",
       "sapporta:source": "./src/ui/primitives/sheet.tsx",

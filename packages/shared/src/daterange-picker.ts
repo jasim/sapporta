@@ -5,8 +5,8 @@ import { RELATIVE_DURATIONS, type RelativeDuration } from "./daterange.js";
 // ---------------------------------------------------------------------------
 //
 // The picker collapses the three-arm union into one flat key space so a
-// single `<select>` can drive the whole control. `custom` names the *mode*
-// — the concrete start/end live alongside it in the state.
+// single searchable choice control can drive the whole control. `custom` names
+// the *mode* — the concrete start/end live alongside it in the state.
 
 export type DateRangeSelectKey = "all_time" | RelativeDuration | "custom";
 

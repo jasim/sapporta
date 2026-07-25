@@ -43,13 +43,6 @@ export { Input } from "./primitives/input";
 export { Label } from "./primitives/label";
 export { Popover, PopoverContent, PopoverTrigger } from "./primitives/popover";
 export {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "./primitives/select";
-export {
   Sheet,
   SheetContent,
   SheetDescription,
