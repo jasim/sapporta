@@ -1,4 +1,5 @@
 import { readFileSync } from "node:fs";
+import type { GettingStartedEnv } from "./getting-started-env.js";
 import type { ProjectLayout } from "./project-layout.js";
 import {
   DEPENDENCY_CATALOG,
@@ -31,12 +32,15 @@ export function buildTemplateVariables(opts: {
   packages: ScaffoldPackages;
   authCookiePrefix: string;
   betterAuthDevSecret: string;
+  gettingStartedEnv: GettingStartedEnv;
 }): TemplateVariables {
   const variables: TemplateVariables = {
     "%%SAPPORTA:SLUG%%": opts.project.slug,
     "%%SAPPORTA:NAME%%": opts.project.name,
     "%%SAPPORTA:AUTH_COOKIE_PREFIX%%": opts.authCookiePrefix,
     "%%SAPPORTA:BETTER_AUTH_DEV_SECRET%%": opts.betterAuthDevSecret,
+    "%%SAPPORTA:DOCS_BROWSER_URL%%": opts.gettingStartedEnv.docsBrowserUrl,
+    "%%SAPPORTA:DOCS_AGENT_URL%%": opts.gettingStartedEnv.docsAgentUrl,
     // The template treats the executable and preload as one token so every
     // source-linked API uses the same scoped resolver. Registry output receives
     // the ordinary `node` command and never loads framework-development code.

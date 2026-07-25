@@ -44,7 +44,7 @@ export function initProjectPackagePaths(
 
 /**
  * Paths to Sapporta packages in a source checkout used by
- * SAPPORTA_DEV_MODE_PACKAGE_ROOT. Source-mode scaffolds symlink these packages
+ * SAPPORTA_PACKAGE_ROOT. Source-mode scaffolds symlink these packages
  * via link: specs so init can be tested directly from the monorepo and pick up
  * newly created build output without reinstalling.
  */

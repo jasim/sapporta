@@ -1,4 +1,4 @@
-import { resolve } from "node:path";
+import { basename, resolve } from "node:path";
 import { OperationError, type OperationResult } from "../introspect/types.js";
 import { createProject } from "./init-project/create-project.js";
 import { ensureSapportaSkillInstalled } from "./init-project/sapporta-skill.js";
@@ -14,16 +14,33 @@ const progress: ProgressLogger = (message) => {
   console.error(message);
 };
 
+export type InitProjectTarget = Readonly<{
+  projectDir: string;
+  projectName: string;
+}>;
+
+export function resolveInitProjectTarget(
+  target: string,
+  cwd: string = process.cwd(),
+): InitProjectTarget {
+  const projectDir = resolve(cwd, target);
+  return {
+    projectDir,
+    projectName: basename(projectDir),
+  };
+}
+
 export async function init(args: string[]): Promise<OperationResult> {
-  const projectName = args[0];
-  if (!projectName) {
+  const projectTarget = args[0];
+  if (!projectTarget) {
     return {
       ok: false,
       error:
-        "Usage: sapporta init <name>\n\n  <name> is the project directory to create.",
+        "Usage: sapporta init <target>\n\n  <target> is the project directory to create.",
       code: "MISSING_NAME",
     };
   }
+  const { projectDir, projectName } = resolveInitProjectTarget(projectTarget);
   if (!VALID_DIR_NAME.test(projectName)) {
     return {
       ok: false,
@@ -31,7 +48,6 @@ export async function init(args: string[]): Promise<OperationResult> {
       code: "INVALID_NAME",
     };
   }
-  const projectDir = resolve(projectName);
 
   try {
     createProject({ dir: projectDir, name: projectName, progress });
@@ -53,7 +69,7 @@ export async function init(args: string[]): Promise<OperationResult> {
           "*** Ready!",
           "",
           "Your Sapporta project is now ready. Run:",
-          `  cd ${projectName}`,
+          `  cd ${shellQuote(projectDir)}`,
           "  pnpm dev",
           "",
         ].join("\n"),
@@ -69,4 +85,9 @@ export async function init(args: string[]): Promise<OperationResult> {
     }
     throw err;
   }
+}
+
+function shellQuote(value: string): string {
+  if (/^[A-Za-z0-9_./:@+-]+$/.test(value)) return value;
+  return `'${value.replaceAll("'", `'\\''`)}'`;
 }

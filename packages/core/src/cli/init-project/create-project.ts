@@ -89,10 +89,7 @@ export function createProject(opts: CreateProjectOptions): CreateProjectResult {
     progress,
     "Resolving Sapporta package versions for the new project's package.json files",
   );
-  const files = renderScaffoldFiles(
-    project,
-    process.env.SAPPORTA_DEV_MODE_PACKAGE_ROOT,
-  );
+  const files = renderScaffoldFiles(project, process.env.SAPPORTA_PACKAGE_ROOT);
 
   const stagingRoot = stagingRootFor(
     project.root,

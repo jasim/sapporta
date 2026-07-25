@@ -17,9 +17,9 @@ import {
   Stethoscope,
 } from "lucide-react";
 
-const sapportaDocsUrl = "https://sapporta.com/docs/getting-started/introduction/";
+const sapportaDocsUrl = "%%SAPPORTA:DOCS_BROWSER_URL%%";
 
-const projectReferences = `Read README.md and AGENTS.md first. Follow the Sapporta skill and the getting-started guide: https://sapporta.com/docs/getting-started`;
+const projectReferences = `Read README.md and AGENTS.md first. Follow the Sapporta skill and the getting-started guide: %%SAPPORTA:DOCS_AGENT_URL%%`;
 
 const appIdeas = [
   {

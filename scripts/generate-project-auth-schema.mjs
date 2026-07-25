@@ -29,7 +29,7 @@ const scaffoldSpecsJson = (
 
     const packages = resolveScaffoldPackages(
       initProjectPackagePaths(),
-      process.env.SAPPORTA_DEV_MODE_PACKAGE_ROOT ?? process.cwd(),
+      process.env.SAPPORTA_PACKAGE_ROOT ?? process.cwd(),
     );
     console.log(JSON.stringify({
       betterAuth: packages.specs.betterAuth,

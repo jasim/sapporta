@@ -9,6 +9,7 @@ import {
   sharedRuntimeDefinitions,
 } from "./dependency-catalog.js";
 import type { InitCommandRunner } from "./init-shell.js";
+import { resolveGettingStartedEnv } from "./getting-started-env.js";
 import { resolveOwningPackage } from "./package-metadata.js";
 import { initProjectPackagePaths } from "./paths.js";
 import { layoutForRoot, projectIdentityFromOptions } from "./project-layout.js";
@@ -65,8 +66,7 @@ describe("createProject", () => {
   it("checks registry access before resolving scaffold packages", () => {
     const parent = makeTempDir();
     const target = join(parent, "acme-app");
-    const previousDevModePackageRoot =
-      process.env.SAPPORTA_DEV_MODE_PACKAGE_ROOT;
+    const previousPackageRoot = process.env.SAPPORTA_PACKAGE_ROOT;
     const runCommand = commandRunnerThatFails((command, args) => {
       if (command === "pnpm" && args[0] === "view") {
         return new Error("getaddrinfo ENOTFOUND registry.npmjs.org");
@@ -74,7 +74,7 @@ describe("createProject", () => {
       return undefined;
     });
 
-    process.env.SAPPORTA_DEV_MODE_PACKAGE_ROOT = join(
+    process.env.SAPPORTA_PACKAGE_ROOT = join(
       parent,
       "missing-sapporta-checkout",
     );
@@ -88,10 +88,10 @@ describe("createProject", () => {
         }),
       ).toThrow(/minimal package lookup/);
     } finally {
-      if (previousDevModePackageRoot === undefined) {
-        delete process.env.SAPPORTA_DEV_MODE_PACKAGE_ROOT;
+      if (previousPackageRoot === undefined) {
+        delete process.env.SAPPORTA_PACKAGE_ROOT;
       } else {
-        process.env.SAPPORTA_DEV_MODE_PACKAGE_ROOT = previousDevModePackageRoot;
+        process.env.SAPPORTA_PACKAGE_ROOT = previousPackageRoot;
       }
     }
 
@@ -264,9 +264,7 @@ describe("renderScaffoldFiles", () => {
     expect(byDest.get("AGENTS.md")).toContain(
       "must happen after the\ncode has been written",
     );
-    expect(byDest.get("CODING-PRINCIPLES.md")).toContain(
-      "# Coding principles",
-    );
+    expect(byDest.get("CODING-PRINCIPLES.md")).toContain("# Coding principles");
     expect(byDest.get("CODING-PRINCIPLES.md")).toContain(
       "input → parsed domain values → decisions → optional effect plan → I/O",
     );
@@ -442,6 +440,35 @@ describe("renderScaffoldFiles", () => {
       expect(overrides[packageName], packageName).toMatch(/^\d+\.\d+\.\d+/);
     }
   });
+
+  it("renders configured documentation URLs into starter prompts", () => {
+    const project = layoutForRoot(
+      projectIdentityFromOptions({
+        dir: "/tmp/acme-app",
+        name: "Acme App",
+      }),
+    );
+    const gettingStartedEnv = resolveGettingStartedEnv({
+      SAPPORTA_DOCS_ORIGIN: "http://127.0.0.1:4321",
+    });
+    const files = renderScaffoldFiles(
+      project,
+      process.cwd(),
+      "test-secret",
+      gettingStartedEnv,
+    );
+    const welcome = files.find(
+      (file) => file.dest === "packages/frontend/src/Welcome.tsx",
+    )?.content;
+
+    expect(welcome).toContain(
+      '"http://127.0.0.1:4321/docs/getting-started/introduction/"',
+    );
+    expect(welcome).toContain(
+      "http://127.0.0.1:4321/docs/getting-started/introduction.md",
+    );
+    expect(welcome).not.toContain("%%SAPPORTA:");
+  });
 });
 
 describe("shared runtime dependency catalog", () => {
@@ -508,6 +535,8 @@ describe("scaffold template inventory", () => {
       "%%SAPPORTA:NAME%%",
       "%%SAPPORTA:AUTH_COOKIE_PREFIX%%",
       "%%SAPPORTA:BETTER_AUTH_DEV_SECRET%%",
+      "%%SAPPORTA:DOCS_BROWSER_URL%%",
+      "%%SAPPORTA:DOCS_AGENT_URL%%",
       "%%SAPPORTA:NODE_COMMAND%%",
       "%%SAPPORTA:VITE_SOURCE_LINK_RESOLUTION%%",
       ...DEPENDENCY_CATALOG.tokenByKey.values(),

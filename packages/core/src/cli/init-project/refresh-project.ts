@@ -43,7 +43,7 @@ export function refreshScaffoldProject(
   );
   const files = renderScaffoldFiles(
     project,
-    opts.devModePackageRoot ?? process.env.SAPPORTA_DEV_MODE_PACKAGE_ROOT,
+    opts.devModePackageRoot ?? process.env.SAPPORTA_PACKAGE_ROOT,
   );
   const mode = opts.mode ?? "write";
   const plan = buildRefreshPlan(projectDir, mode, files);

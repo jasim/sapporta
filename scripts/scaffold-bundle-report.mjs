@@ -29,7 +29,7 @@ try {
       [join(root, "packages/core/bin/sapporta.mjs"), "init", projectName],
       parentDir,
       {
-        SAPPORTA_DEV_MODE_PACKAGE_ROOT: root,
+        SAPPORTA_PACKAGE_ROOT: root,
       },
     );
   }

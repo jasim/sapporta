@@ -55,6 +55,13 @@ describe("CLI command registry help", () => {
     expect(help).toContain("sql");
   });
 
+  it("documents init targets outside the current directory", () => {
+    const help = helpFor(["init"]);
+
+    expect(help).toContain("Usage: sapporta init [options] <target>");
+    expect(help).toContain("sapporta init ../apps/my-app");
+  });
+
   it("documents row create payload input", () => {
     const help = helpFor(["rows", "create"]);
 

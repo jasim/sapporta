@@ -390,7 +390,9 @@ export class TsRestApi<E extends Env = Env, DocCtx = void> extends Hono<E> {
    * via `parentApp.route(prefix, other)`). This is the decoupling point:
    * per-sub-app Hono autonomy, centralized spec emission.
    */
-  extend(other: { docEmitters: readonly DocEmitter<unknown>[] }): this {
+  extend(other: { docEmitters: readonly DocEmitter<DocCtx>[] }): this;
+  extend(other: { docEmitters: readonly DocEmitter<void>[] }): this;
+  extend(other: { docEmitters: readonly DocEmitter<never>[] }): this {
     for (const emit of other.docEmitters) {
       this.docEmitters.push(emit as DocEmitter<DocCtx>);
     }

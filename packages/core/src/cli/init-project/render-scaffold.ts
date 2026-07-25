@@ -1,5 +1,9 @@
 import { randomBytes } from "node:crypto";
 import { resolveScaffoldPackages } from "./dependency-catalog.js";
+import {
+  resolveGettingStartedEnv,
+  type GettingStartedEnv,
+} from "./getting-started-env.js";
 import type { ProjectLayout } from "./project-layout.js";
 import { initProjectPackagePaths } from "./paths.js";
 import {
@@ -16,6 +20,7 @@ export function renderScaffoldFiles(
   project: ProjectLayout,
   devModePackageRoot: string | undefined,
   betterAuthDevSecret: string = randomBytes(32).toString("base64url"),
+  gettingStartedEnv: GettingStartedEnv = resolveGettingStartedEnv(),
 ): RenderedScaffoldFile[] {
   const initPaths = initProjectPackagePaths();
   const packages = resolveScaffoldPackages(initPaths, devModePackageRoot);
@@ -24,6 +29,7 @@ export function renderScaffoldFiles(
     packages,
     authCookiePrefix: createProjectAuthCookiePrefix(project.slug),
     betterAuthDevSecret,
+    gettingStartedEnv,
   });
   const files = renderScaffoldTemplates({
     templates: readScaffoldTemplates(initPaths),

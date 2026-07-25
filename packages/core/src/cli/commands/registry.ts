@@ -46,11 +46,11 @@ export const CLI_COMMANDS: readonly CliCommandSpec[] = [
   command({
     name: ["init"],
     summary: "Create a new Sapporta project directory",
-    args: [{ name: "name", required: true }],
-    inputSchema: z.object({ name: requiredString("name") }),
-    examples: ["sapporta init my-app"],
+    args: [{ name: "target", required: true }],
+    inputSchema: z.object({ target: requiredString("target") }),
+    examples: ["sapporta init my-app", "sapporta init ../apps/my-app"],
     run: async (input) => {
-      const result = await init([input.name]);
+      const result = await init([input.target]);
       if (!result.ok) {
         throw new Error(result.error);
       }

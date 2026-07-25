@@ -220,9 +220,9 @@ export function createTempProject(opts: TempProjectOptions = {}): E2eProject {
   env.SAPPORTA_REQUIRE_VERIFIED_EMAIL = "false";
   env.SAPPORTA_MAIL_FROM = "Sapporta <no-reply@example.test>";
   if (opts.devMode ?? true) {
-    env.SAPPORTA_DEV_MODE_PACKAGE_ROOT = MONOREPO_ROOT;
+    env.SAPPORTA_PACKAGE_ROOT = MONOREPO_ROOT;
   } else {
-    delete env.SAPPORTA_DEV_MODE_PACKAGE_ROOT;
+    delete env.SAPPORTA_PACKAGE_ROOT;
   }
   process.stderr.write(`[e2e path] temp parent: ${parentDir}\n`);
   process.stderr.write(`[e2e path] project dir: ${projectDir}\n`);
@@ -1885,7 +1885,7 @@ export async function startBuiltServer(
   const output: string[] = [];
 
   const serverProcess = await step("boot scaffolded server", async () => {
-    const nodeArgs = project.env.SAPPORTA_DEV_MODE_PACKAGE_ROOT
+    const nodeArgs = project.env.SAPPORTA_PACKAGE_ROOT
       ? ["--import", "@sapporta/server/source-link-runtime", "dist/boot.js"]
       : ["dist/boot.js"];
     const child = spawn("node", nodeArgs, {

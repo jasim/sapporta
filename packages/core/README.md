@@ -47,16 +47,16 @@ Use `auth.rowSecurity.forTable(table)` directly for advanced Drizzle workflows s
 
 ## Environment variables
 
-| Variable                         | Purpose                                                                                                                                  |
-| -------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
-| `SAPPORTA_DEV_MODE_PACKAGE_ROOT` | Monorepo root. When set, `create-project` uses `link:` specs instead of published versions. Must be set explicitly — see DEVELOPMENT.md. |
-| `SAPPORTA_API_URL`               | Server URL for CLI commands. Default: `http://localhost:3000`.                                                                           |
-| `SAPPORTA_API_TOKEN`             | Bearer token for protected API-backed CLI commands. Preferred for agents and automation.                                                 |
-| `SAPPORTA_OUTPUT_FORMAT`         | Default CLI output format: `json` or `table`.                                                                                            |
-| `SAPPORTA_API_PORT`              | Explicit app API port. Defaults to `3000` when neither port variable is set.                                                             |
-| `PORT`                           | Hosting-platform API port used when `SAPPORTA_API_PORT` is absent.                                                                       |
-| `LOG_FORMAT`                     | Set to `json` for structured logging.                                                                                                    |
-| `LOG_LEVEL`                      | Log level. Default: `debug`.                                                                                                             |
+| Variable                 | Purpose                                                                                                                                  |
+| ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| `SAPPORTA_PACKAGE_ROOT`  | Monorepo root. When set, `create-project` uses `link:` specs instead of published versions. Must be set explicitly — see DEVELOPMENT.md. |
+| `SAPPORTA_API_URL`       | Server URL for CLI commands. Default: `http://localhost:3000`.                                                                           |
+| `SAPPORTA_API_TOKEN`     | Bearer token for protected API-backed CLI commands. Preferred for agents and automation.                                                 |
+| `SAPPORTA_OUTPUT_FORMAT` | Default CLI output format: `json` or `table`.                                                                                            |
+| `SAPPORTA_API_PORT`      | Explicit app API port. Defaults to `3000` when neither port variable is set.                                                             |
+| `PORT`                   | Hosting-platform API port used when `SAPPORTA_API_PORT` is absent.                                                                       |
+| `LOG_FORMAT`             | Set to `json` for structured logging.                                                                                                    |
+| `LOG_LEVEL`              | Log level. Default: `debug`.                                                                                                             |
 
 ## Sapporta Code Project Layout
 

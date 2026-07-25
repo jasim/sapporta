@@ -197,12 +197,10 @@ export function mountOpenApi(
   app: Hono<SapportaEnv>,
   project: SapportaProject,
   frameworkApi: SapportaFrameworkApi,
-  ...userApis: ReadonlyArray<{ docEmitters: ReadonlyArray<unknown> }>
+  ...userApis: ReadonlyArray<Pick<TsRestApi<SapportaEnv>, "docEmitters">>
 ): void {
   for (const userApi of userApis) {
-    frameworkApi.extend(
-      userApi as unknown as { docEmitters: readonly never[] },
-    );
+    frameworkApi.extend(userApi);
   }
   app.get("/api/openapi.json", (c) =>
     c.json(
