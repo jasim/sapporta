@@ -421,12 +421,11 @@
 
 :where(.presetGrid [data-grid-part="header-sort-indicator"]) {
   align-items: center;
-  color: var(--sap-fg-subtle);
+  color: var(--sap-fg);
   display: inline-flex;
   flex: none;
   font-size: var(--text-sap-tiny);
   gap: 1px;
-  opacity: 0.75;
 }
 
 .cellPopover {

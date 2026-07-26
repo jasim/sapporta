@@ -205,7 +205,6 @@ function WideTableHeader<
               href={exportUrl}
               download
               icon={<Download className="h-[12px] w-[12px]" />}
-              shortcut="Cmd+E"
             >
               Export
             </TopBarButton>
@@ -223,7 +222,6 @@ function WideTableHeader<
                 tone="primary"
                 icon={<Plus className="h-[12px] w-[12px]" />}
                 onClick={onNewRecord}
-                shortcut="Cmd+N"
               >
                 New record
               </TopBarButton>

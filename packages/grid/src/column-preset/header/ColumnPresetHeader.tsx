@@ -5,7 +5,7 @@ import {
   type PointerEvent,
   type ReactNode,
 } from "react";
-import { ChevronDown, ChevronUp } from "lucide-react";
+import { ChevronDown, ChevronUp, EllipsisVertical } from "lucide-react";
 import type { ColumnSchema, RowHeaderColumn } from "../../grid/types/schema";
 import type { GridPath } from "../../grid/types/identity";
 import { decomposePath } from "../../grid/types/identity";
@@ -265,7 +265,11 @@ function HeaderCell<TMeta = unknown, TFilter = unknown>({
                 />
               }
             >
-              <ChevronDown aria-hidden="true" size={11} strokeWidth={1.8} />
+              <EllipsisVertical
+                aria-hidden="true"
+                size={14}
+                strokeWidth={2}
+              />
             </PopoverTrigger>
             <PopoverContent
               align="end"
@@ -330,9 +334,9 @@ function defaultHeader(
       {direction ? (
         <span data-grid-part="header-sort-indicator">
           {direction === "asc" ? (
-            <ChevronUp aria-hidden="true" size={10} strokeWidth={1.8} />
+            <ChevronUp aria-hidden="true" size={14} strokeWidth={2.25} />
           ) : (
-            <ChevronDown aria-hidden="true" size={10} strokeWidth={1.8} />
+            <ChevronDown aria-hidden="true" size={14} strokeWidth={2.25} />
           )}
           {rank}
         </span>
