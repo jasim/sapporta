@@ -6,8 +6,8 @@ import type { AppAbility, AppAuthFacts } from "./types.js";
  *
  * No rule means no access. Generated table routes ask for actions such as
  * `read`, `create`, and `export` on the table name. Custom routes can use
- * feature subjects such as `quote_publication` or `public_api_sample` and then
- * apply their own row predicates through `auth.rowSecurity`.
+ * subjects such as `quote_publication`. Row access is defined separately in
+ * `request-data-authority.ts`.
  */
 export function buildAbility(ctx: AppAuthFacts): AppAbility {
   const { can, build } = new AbilityBuilder<AppAbility>(createMongoAbility);

@@ -1,23 +1,8 @@
 /**
- * Sample route file. Default-exports a `TsRestApi` instance; mounted by
- * `loadApp()` in `../app.ts` so the `/hello` route below is served at
- * `/api/hello`.
+ * Sample custom endpoint.
  *
- * `TsRestApi` IS-A Hono sub-app, so `api.use(...)`, `api.get(...)`, and
- * the rest of Hono's surface work here too. `api.register(...)`
- * additionally wires the route into the auto-generated
- * `/api/openapi.json` spec.
- *
- * The contract (`helloContract`) and the `APP_NAME` constant live in the
- * `%%SAPPORTA:SLUG%%-shared` workspace package. The frontend imports the same
- * contract via `createApiClient(helloContract)` (see
- * `packages/frontend/src/api.ts`) so request and response shapes can never
- * drift between the two sides.
- *
- * Delete this file (and `packages/frontend/src/api.ts`,
- * `packages/shared/src/contracts/hello.ts`, the `app.route("/", helloApi)` call
- * in `app.ts`) once you have your own routes, or use the trio as a
- * template.
+ * `helloContract` defines the API shared by the server and frontend. This file
+ * adds the handler and permission check. `../app.ts` mounts it at `/api/hello`.
  */
 import { forbidUnless, TsRestApi, type SapportaEnv } from "@sapporta/server";
 import { APP_NAME, helloContract } from "%%SAPPORTA:SLUG%%-shared";

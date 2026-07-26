@@ -1,11 +1,8 @@
-// Typed client for this project's own contracts.
+// Typed browser clients for the application's custom APIs.
 //
-// Use `getApiBase` so calls work in development through the Vite proxy and in
-// production against the deployed API URL.
-//
-// Each method returns the 2xx body on success and throws `ApiError` on
-// non-2xx. Add a client entry each time you ship a new contract in
-// `%%SAPPORTA:SLUG%%-shared`.
+// Each client uses the same contract as its server handler. `getApiBase` picks
+// the local or deployed API URL. Methods return the 2xx body and throw
+// `ApiError` for other responses.
 //
 // Usage:
 //   import { customApi } from "./api";

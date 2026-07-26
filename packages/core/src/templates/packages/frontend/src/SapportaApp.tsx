@@ -15,9 +15,14 @@ import {
   sapportaPublicRoutes,
 } from "./SapportaRoutes";
 
+/**
+ * This component joins the application UI with Sapporta's supplied UI.
+ * `BootLoader` loads the session and table metadata. `AppShell` renders the
+ * layout and table navigation. The route tree combines `App.tsx` with the
+ * account and table pages in `SapportaRoutes.tsx`.
+ */
 export interface SapportaAppProps {
-  // Shows Sapporta's generated table navigation by default. Turn this off when
-  // the app provides its own navigation surface for built-in table routes.
+  // Show table links generated from the loaded schema.
   showFrameworkNavigation?: boolean;
 }
 

@@ -32,12 +32,11 @@ import {
 } from "./middleware.js";
 
 /**
- * Creates the request auth model for this application.
+ * Connects sign-in to the application's permissions and row access.
  *
- * The resulting object gives `boot.ts` the pieces it needs to keep private API
- * routes private by default, allow selected public routes, resolve browser
- * sessions and agent access tokens, and expose token-management screens in the
- * app UI.
+ * The middleware resolves each browser session or access token and stores the
+ * result at `c.get("auth")`. It also provides the sign-in, workspace, and
+ * access-token routes mounted by `boot.ts`.
  */
 export interface CreateProjectAuthOptions {
   conn: ProjectDbConnection;

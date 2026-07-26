@@ -9,7 +9,7 @@ import {
 import type { AppPrincipal } from "./types.js";
 
 /**
- * Chooses the trusted ownership facts this request may use.
+ * Defines which rows this request may access.
  *
  * The starter app keeps anonymous requests limited to system-wide tables and
  * signed-in requests limited to the user's own rows in the active workspace.

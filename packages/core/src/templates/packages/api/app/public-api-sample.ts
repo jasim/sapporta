@@ -6,7 +6,7 @@
  * internal data from public routes unless the feature is explicitly meant to
  * expose that data.
  *
- * Public does not mean unguarded: keep the CASL check below, and use
+ * Public does not mean unguarded: keep the permission check below, and use
  * `auth.rowSecurity.forTable(table).ownedRows(...)` for any table-backed
  * public data.
  */

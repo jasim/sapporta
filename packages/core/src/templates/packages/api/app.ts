@@ -1,13 +1,9 @@
 /**
  * App-specific API routes.
  *
- * Mount each `packages/api/app/*.ts` sub-app here. `app` is already scoped to
- * `/api`, so `app.route("/bank", bankApi)` is served at `/api/bank`; do not
- * repeat the `/api` prefix.
- *
- * Add a route here when you want it available from the browser, CLI, or API
- * clients. New files under `packages/api/app/` are not exposed until you mount
- * them here.
+ * Sapporta creates standard APIs for tables in `schema/`. Mount custom APIs,
+ * such as reports and workflows, in `loadApp()` below. The app is already
+ * scoped to `/api`, so `app.route("/bank", bankApi)` serves `/api/bank`.
  */
 import type {
   ProjectDbConnection,
@@ -24,11 +20,13 @@ export interface LoadAppOptions {
   mailer: SapportaMailer;
 }
 
+// Files in `app/` are not exposed until they are mounted here.
 export function loadApp(app: TsRestApi<SapportaEnv>, _options: LoadAppOptions) {
   app.route("/", helloApi);
   app.route("/", publicApiSample);
 }
 
+// These custom routes may be called without signing in.
 export const publicApiRoutes = [
   { method: "GET", path: "/api/public-api-sample" },
 ] as const satisfies readonly PublicRoutePattern[];

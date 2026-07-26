@@ -3,7 +3,13 @@ import { Route } from "react-router-dom";
 import { NotFoundView } from "@sapporta/frontend/app";
 import { PublicOnlyGate } from "@sapporta/frontend/auth/runtime";
 
-// Load screens on demand so the app starts quickly.
+/**
+ * These are Sapporta's account and table routes. The table pages use
+ * `:tableName` and the metadata loaded by `BootLoader` to render the standard
+ * grid and form.
+ */
+
+// Load each supplied screen only when its URL is visited.
 const LoginPage = lazy(() =>
   import("@sapporta/frontend/auth/pages").then((m) => ({
     default: m.LoginPage,

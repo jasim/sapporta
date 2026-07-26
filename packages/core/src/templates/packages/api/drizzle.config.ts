@@ -5,6 +5,11 @@ import { dirname, join } from "node:path";
 const projectRoot = findProjectRoot(process.cwd());
 const databasePath = join(projectRoot, "data", "sqlite.db");
 
+/**
+ * Drizzle reads the application and auth schemas to generate migrations.
+ * Sapporta loads the application schema at runtime to create its table APIs and
+ * screens.
+ */
 export default defineConfig({
   dialect: "sqlite",
   schema: ["./schema/**/*.ts", "./project-auth/schema.ts"],

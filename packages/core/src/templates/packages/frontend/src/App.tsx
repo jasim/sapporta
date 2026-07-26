@@ -3,6 +3,11 @@ import { Route, Navigate } from "react-router-dom";
 import type { Navigation } from "@sapporta/frontend/shell";
 import { Sparkles } from "lucide-react";
 
+/**
+ * Add the application's routes and navigation here. `SapportaApp.tsx` combines
+ * them with Sapporta's account and table routes. Table links are added from the
+ * loaded schema.
+ */
 const welcomePath = "/welcome";
 
 const PublicPage = lazy(() =>

@@ -13,6 +13,10 @@ import {
 } from "./options.js";
 import * as authSchema from "./schema.js";
 
+/**
+ * Configures sign-in, sessions, and account emails. Application permissions
+ * and row access are defined separately in `authz/`.
+ */
 export interface BetterAuthSessionApi {
   getSession: (context: {
     headers: Headers;
