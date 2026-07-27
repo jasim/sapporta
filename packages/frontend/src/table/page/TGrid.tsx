@@ -144,7 +144,13 @@ export function TGrid<
   );
 }
 
-function mergeTGridChrome({
+/**
+ * Applies TGrid's table-specific header and layout behavior to Grid chrome.
+ *
+ * This keeps the remaining chrome slots intact, so features supplied by the
+ * column preset continue to work when the Grid is rendered through TGrid.
+ */
+export function mergeTGridChrome({
   chrome,
   root,
   className,
@@ -160,6 +166,7 @@ function mergeTGridChrome({
   viewRelatedRows: ViewRelatedRowsOption | undefined;
 }): GridLevelChrome {
   return {
+    ...chrome,
     renderHeader: (ctx) =>
       ctx.presentation === "cards" ? (
         renderCardsLevelHeader(session, ctx, root, viewRelatedRows)

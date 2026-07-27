@@ -782,9 +782,10 @@ export function createGridRuntime(args: RuntimeArgs): GridRuntime {
     return out;
   }
 
-  // Imperative snapshot read for code that needs full rows and lookup maps:
-  // interaction, navigation, and tests. React body rendering uses the sequence
-  // surface below because it must not wake on cell-content edits.
+  // Snapshot read for code that needs full rows and lookup maps. Interaction
+  // and navigation read it imperatively; multi-row React consumers subscribe
+  // through `subscribeDisplayedRows`. Body rendering uses the sequence surface
+  // below because it must not wake on cell-content edits.
   function displayedRowsFor(path: GridPath): DisplayedRows {
     return displayedRowsRuntime.rows(path);
   }
@@ -1669,6 +1670,10 @@ export function createGridRuntime(args: RuntimeArgs): GridRuntime {
           assertLevelLive(path);
           const operations = requireRowOperationsController();
           return operations.targetForKind(path, rowId, "data");
+        },
+        subscribeDisplayedRows: (listener) => {
+          assertLevelLive(path);
+          return displayedRowsRuntime.subscribeRows(path, observe(listener));
         },
         subscribeDisplayedRowSequence: (listener) => {
           assertLevelLive(path);

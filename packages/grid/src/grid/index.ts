@@ -259,9 +259,10 @@
 //   DisplayedRows
 //               — the full row-content snapshot for one path: ordered
 //                 `LevelRow` objects plus lookup maps. Interaction and
-//                 navigation use this imperative read model; row React
-//                 subscribers read one `LevelRow` by id. No component reads
-//                 `LevelSnapshot.nodes` directly.
+//                 navigation read it imperatively. Multi-row React consumers
+//                 subscribe to the full snapshot; row rendering subscribes to
+//                 one `LevelRow` by id. No component reads `LevelSnapshot.nodes`
+//                 directly.
 //                 (displayed-rows/)
 //
 //   LevelRow    — uniform row shape regardless of source kind (data,
@@ -284,10 +285,10 @@
 //     (CellEditorOverlay's `useState` measures DOM geometry only —
 //     local to the overlay, not grid state.)
 //
-//   - No `useMemo` / `useCallback` over data. The runtime returns
-//     identity-stable values; selectors are inline. Zustand's equality
-//     bailout keeps subscribers idle on no-op transitions without
-//     needing memoized selector references.
+//   - Do not use `useMemo` / `useCallback` to compensate for unstable store
+//     reads. Runtime snapshots are identity-stable and selectors are inline.
+//     A public hook may memoize a projection of stable snapshots when the
+//     hook's own return identity is part of its consumer contract.
 //
 //   - One `useEffect` over data: `EffectRunner`, draining the effects
 //     channel. The single `useEffect` in `Grid.tsx` is for DOM wiring
@@ -407,6 +408,7 @@ export {
   useActiveCellForPath,
   useActiveRow,
   useCellSelection,
+  useCellSelectionRectangle,
   useDisplayedRow,
   useDisplayedRowSequence,
   useGridRuntime,
@@ -424,6 +426,7 @@ export {
   type GridChromeContext,
   type GridStatusContext,
   type GridEmptyContext,
+  type GridSelectionSummaryContext,
   type GridLevelChrome,
   type GridPresentation,
   type GridCopyContextMenuProps,
@@ -524,6 +527,7 @@ export type {
   RowCapabilities,
   CellSelectionState,
   CellSelectionStatus,
+  CellSelectionRectangle,
   EditingState,
   ControllerState,
   GridEffect,
@@ -581,6 +585,7 @@ export {
   lastFocusableRow,
   nextFocusableRow,
   makeSelection,
+  resolveCellSelectionRectangle,
   selectionFocus,
   selectionContainsCoord,
   selectionIsSingleCell,

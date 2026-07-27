@@ -12,6 +12,7 @@ import {
 import styles from "../sapporta-preset.module.css";
 import { PresetEmptyLevel, PresetLevelStatusBand } from "../LevelStateChrome";
 import { ColumnPresetHeader } from "./ColumnPresetHeader";
+import { ColumnPresetSelectionSummary } from "../SelectionSummary";
 
 export function chrome<TMeta = unknown, TFilter = unknown>(
   options: PresetChromeOptions<TMeta, TFilter> = {},
@@ -20,6 +21,9 @@ export function chrome<TMeta = unknown, TFilter = unknown>(
     ...defaultGridLevelChrome,
     renderStatus: ({ path }) => <PresetLevelStatusBand path={path} />,
     renderEmpty: ({ path }) => <PresetEmptyLevel path={path} />,
+    renderSelectionSummary: (context) => (
+      <ColumnPresetSelectionSummary {...context} />
+    ),
     renderHeader: ({
       path,
       levelName,

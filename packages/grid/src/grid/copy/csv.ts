@@ -3,6 +3,7 @@ import type { GridRuntime } from "../runtime/runtime";
 import type { GridPath } from "../types/identity";
 import type { LevelRow } from "../types/level-row";
 import type { ColumnSchema, GridCopyColumn } from "../types/schema";
+import { resolveCellSelectionRectangle } from "../types/selection";
 import type { GridCopyTarget } from "./target";
 
 export type GridCopyCsvOptions = {
@@ -40,28 +41,17 @@ function readGridCopySelection(
   if (!level) return null;
   const displayed = level.displayedRows();
   const columns = level.schema.columns;
-
-  const anchorRowIndex = displayed.rowIndexById.get(
-    target.selection.anchor.rowId,
+  const selection = resolveCellSelectionRectangle(
+    target.selection,
+    displayed,
+    columns,
   );
-  const headRowIndex = displayed.rowIndexById.get(target.selection.head.rowId);
-  if (anchorRowIndex == null || headRowIndex == null) return null;
-
-  const anchorColumnIndex = columnIndex(columns, target.selection.anchor.colId);
-  const headColumnIndex = columnIndex(columns, target.selection.head.colId);
-  if (anchorColumnIndex < 0 || headColumnIndex < 0) return null;
-
-  const minRowIndex = Math.min(anchorRowIndex, headRowIndex);
-  const maxRowIndex = Math.max(anchorRowIndex, headRowIndex);
-  const minColumnIndex = Math.min(anchorColumnIndex, headColumnIndex);
-  const maxColumnIndex = Math.max(anchorColumnIndex, headColumnIndex);
-  const selectedColumns = columns.slice(minColumnIndex, maxColumnIndex + 1);
-  const selectedRows = displayed.rows.slice(minRowIndex, maxRowIndex + 1);
+  if (!selection) return null;
 
   return {
     path: target.path,
-    rows: selectedRows,
-    columns: selectedColumns,
+    rows: selection.rows,
+    columns: selection.columns,
   };
 }
 
@@ -125,10 +115,6 @@ function uniqueCopyHeaders(headers: readonly string[]): string[] {
     countsByHeader.set(header, nextCount);
     return count === 0 ? header : `${header}_${nextCount}`;
   });
-}
-
-function columnIndex(columns: readonly ColumnSchema[], colId: string): number {
-  return columns.findIndex((column) => column.id === colId);
 }
 
 function safeRead<T>(read: () => T): T | null {

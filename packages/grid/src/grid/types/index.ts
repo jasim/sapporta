@@ -88,9 +88,14 @@ export {
   nextFocusableRow,
 } from "./level-row-traversal";
 
-export type { CellSelectionState, CellSelectionStatus } from "./selection";
+export type {
+  CellSelectionRectangle,
+  CellSelectionState,
+  CellSelectionStatus,
+} from "./selection";
 export {
   makeSelection,
+  resolveCellSelectionRectangle,
   selectionFocus,
   selectionContainsCoord,
   selectionIsSingleCell,

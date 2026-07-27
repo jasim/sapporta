@@ -87,6 +87,45 @@ describe("createDisplayedRowsStore", () => {
     expect(listener).toHaveBeenCalledTimes(1);
   });
 
+  it("notifies full-snapshot subscribers when row content changes", () => {
+    const sequence = buildDisplayedRowSequence([rowA]);
+    const first: DisplayedRowsState = {
+      displayedRows: displayed([rowA]),
+      displayedRowSequence: sequence,
+    };
+    const second: DisplayedRowsState = {
+      displayedRows: displayed([rowA2]),
+      displayedRowSequence: sequence,
+    };
+    const store = createDisplayedRowsStore({
+      readInput: input,
+      deriveDisplayedRowsState: vi
+        .fn()
+        .mockReturnValueOnce(first)
+        .mockReturnValueOnce(second),
+    });
+    const listener = vi.fn();
+    store.subscribeDisplayedRows(listener);
+
+    store.invalidateDisplayedRows({ type: "source" });
+
+    expect(listener).toHaveBeenCalledOnce();
+  });
+
+  it("does not notify full-snapshot subscribers when the snapshot is reused", () => {
+    const first = state([rowA]);
+    const store = createDisplayedRowsStore({
+      readInput: input,
+      deriveDisplayedRowsState: vi.fn(() => first),
+    });
+    const listener = vi.fn();
+    store.subscribeDisplayedRows(listener);
+
+    store.invalidateDisplayedRows({ type: "source" });
+
+    expect(listener).not.toHaveBeenCalled();
+  });
+
   it("does not notify row-sequence subscribers when row content changes only", () => {
     const sequence = buildDisplayedRowSequence([rowA]);
     const first: DisplayedRowsState = {
@@ -237,17 +276,21 @@ describe("createDisplayedRowsStore", () => {
         .mockReturnValueOnce(first)
         .mockReturnValueOnce(second),
     });
+    const rows = vi.fn();
     const sequence = vi.fn();
     const rowListener = vi.fn();
+    store.subscribeDisplayedRows(rows);
     store.subscribeDisplayedRowSequence(sequence);
     store.subscribeDisplayedRow(rowA.id, rowListener);
 
     store.dispose();
     store.dispose();
+    store.subscribeDisplayedRows(rows);
     store.subscribeDisplayedRowSequence(sequence);
     store.subscribeDisplayedRow(rowA.id, rowListener);
     store.invalidateDisplayedRows({ type: "source" });
 
+    expect(rows).not.toHaveBeenCalled();
     expect(sequence).not.toHaveBeenCalled();
     expect(rowListener).not.toHaveBeenCalled();
   });

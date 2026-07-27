@@ -123,9 +123,12 @@ Source snapshots contain source-backed nodes and optional footers. Draft rows
 live in a separate phantom channel. The displayed-row store combines those
 inputs with the level schema and derives the complete row read model.
 
-The store exposes two similar subscription levels because the consumers have
+The store exposes three subscription levels because the consumers have
 different work to do:
 
+- `subscribeDisplayedRows` observes the complete displayed-row snapshot. It is
+  useful for consumers such as range summaries that depend on several rows and
+  need one coherent value when any displayed content or structure changes.
 - `subscribeDisplayedRowSequence` observes the ordered `{ id, kind }` list. It
   is useful for code that mounts, removes, or reorders row shells. A cell value
   change does not wake it when the row order and kinds stay the same.

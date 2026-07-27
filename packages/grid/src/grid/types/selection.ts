@@ -1,5 +1,6 @@
 import type { ColId, Coord, RowId } from "./identity";
-import type { DisplayedRows } from "./level-row";
+import type { DisplayedRows, LevelRow } from "./level-row";
+import type { ColumnSchema } from "./schema";
 
 export type CellSelectionState = {
   readonly anchor: Coord;
@@ -35,25 +36,57 @@ export function selectionContainsCoord(
   displayed: DisplayedRows,
   colOrder: readonly ColId[],
 ): boolean {
-  const ai = displayed.rowIndexById.get(selection.anchor.rowId);
-  const hi = displayed.rowIndexById.get(selection.head.rowId);
+  const rowBounds = selectionRowBounds(selection, displayed);
   const ci = displayed.rowIndexById.get(coord.rowId);
-  if (ai == null || hi == null || ci == null) return false;
-  const minR = Math.min(ai, hi);
-  const maxR = Math.max(ai, hi);
-  if (ci < minR || ci > maxR) return false;
+  if (!rowBounds || ci == null) return false;
+  if (ci < rowBounds.first || ci > rowBounds.last) return false;
 
-  const ac = colOrder.indexOf(selection.anchor.colId);
-  const hc = colOrder.indexOf(selection.head.colId);
+  const columnBounds = selectionColumnBounds(selection, colOrder);
   const cc = colOrder.indexOf(coord.colId);
-  if (ac < 0 || hc < 0 || cc < 0) return false;
-  const minC = Math.min(ac, hc);
-  const maxC = Math.max(ac, hc);
-  return cc >= minC && cc <= maxC;
+  if (!columnBounds || cc < 0) return false;
+  return cc >= columnBounds.first && cc <= columnBounds.last;
 }
 
 export function selectionIsSingleCell(s: CellSelectionState): boolean {
   return s.anchor.rowId === s.head.rowId && s.anchor.colId === s.head.colId;
+}
+
+/**
+ * The displayed rows and columns covered by a cell selection.
+ *
+ * Both arrays follow the order currently shown in the Grid. This makes the
+ * value suitable for calculations, auxiliary UI, and copy behavior without
+ * requiring callers to translate row or column positions themselves.
+ */
+export type CellSelectionRectangle = {
+  readonly rows: readonly LevelRow[];
+  readonly columns: readonly ColumnSchema[];
+};
+
+/**
+ * Resolves a stored cell selection against the rows and columns currently
+ * displayed by a level.
+ *
+ * Use this in imperative Grid integrations. React components can use
+ * `useCellSelectionRectangle` to receive the same value as live state. A
+ * `null` result means that an endpoint is no longer displayed.
+ */
+export function resolveCellSelectionRectangle(
+  selection: CellSelectionState,
+  displayed: DisplayedRows,
+  columns: readonly ColumnSchema[],
+): CellSelectionRectangle | null {
+  const rowBounds = selectionRowBounds(selection, displayed);
+  const columnBounds = selectionColumnBounds(
+    selection,
+    columns.map((column) => column.id),
+  );
+  if (!rowBounds || !columnBounds) return null;
+
+  return {
+    rows: displayed.rows.slice(rowBounds.first, rowBounds.last + 1),
+    columns: columns.slice(columnBounds.first, columnBounds.last + 1),
+  };
 }
 
 // Project a cell selection to the rows it covers in one displayed path. This
@@ -63,10 +96,36 @@ export function rowsInSelection(
   s: CellSelectionState,
   displayed: DisplayedRows,
 ): readonly RowId[] {
-  const ai = displayed.rowIndexById.get(s.anchor.rowId);
-  const hi = displayed.rowIndexById.get(s.head.rowId);
-  if (ai == null || hi == null) return [];
-  const lo = Math.min(ai, hi);
-  const hi2 = Math.max(ai, hi);
-  return displayed.rows.slice(lo, hi2 + 1).map((r) => r.id);
+  const bounds = selectionRowBounds(s, displayed);
+  if (!bounds) return [];
+  return displayed.rows
+    .slice(bounds.first, bounds.last + 1)
+    .map((row) => row.id);
+}
+
+type IndexBounds = {
+  readonly first: number;
+  readonly last: number;
+};
+
+function selectionRowBounds(
+  selection: CellSelectionState,
+  displayed: DisplayedRows,
+): IndexBounds | null {
+  const anchor = displayed.rowIndexById.get(selection.anchor.rowId);
+  const head = displayed.rowIndexById.get(selection.head.rowId);
+  return anchor == null || head == null ? null : orderedBounds(anchor, head);
+}
+
+function selectionColumnBounds(
+  selection: CellSelectionState,
+  colOrder: readonly ColId[],
+): IndexBounds | null {
+  const anchor = colOrder.indexOf(selection.anchor.colId);
+  const head = colOrder.indexOf(selection.head.colId);
+  return anchor < 0 || head < 0 ? null : orderedBounds(anchor, head);
+}
+
+function orderedBounds(a: number, b: number): IndexBounds {
+  return { first: Math.min(a, b), last: Math.max(a, b) };
 }

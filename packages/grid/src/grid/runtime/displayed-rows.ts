@@ -86,6 +86,11 @@ export function createDisplayedRowsRuntime(args: {
     return storeFor(path).subscribeDisplayedRowSequence(listener);
   }
 
+  function subscribeRows(path: GridPath, listener: () => void) {
+    args.assertLive();
+    return storeFor(path).subscribeDisplayedRows(listener);
+  }
+
   function subscribeRow(path: GridPath, rowId: RowId, listener: () => void) {
     args.assertLive();
     return storeFor(path).subscribeDisplayedRow(rowId, listener);
@@ -124,6 +129,7 @@ export function createDisplayedRowsRuntime(args: {
     rows,
     sequence,
     row,
+    subscribeRows,
     subscribeSequence,
     subscribeRow,
     invalidate,

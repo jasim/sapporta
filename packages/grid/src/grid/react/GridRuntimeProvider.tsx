@@ -1,6 +1,7 @@
 import {
   createContext,
   useContext,
+  useMemo,
   useSyncExternalStore,
   type ReactNode,
 } from "react";
@@ -22,6 +23,10 @@ import type {
   LevelRow,
   PhantomRow,
 } from "../types/level-row";
+import {
+  resolveCellSelectionRectangle,
+  type CellSelectionRectangle,
+} from "../types/selection";
 
 const RuntimeContext = createContext<GridRuntime | null>(null);
 
@@ -169,6 +174,44 @@ export function useCellSelection(path: GridPath): CellSelectionState | null {
   return useStore(
     runtimeInternalsFor(runtime).controllerFor(path),
     (s: ControllerState) => s.cellSelection,
+  );
+}
+
+/**
+ * Resolves one path's live cell range to the displayed rows and columns it
+ * currently covers.
+ *
+ * Use this in a component around the Grid when the selected cells should drive
+ * a toolbar, side panel, calculation, or another piece of application UI. For
+ * checkbox-style row selection, use `useSelectedRows` or `useSelectedRowIds`
+ * instead.
+ *
+ * The returned object keeps its identity until the stored range, displayed
+ * rows, or level registration changes, so composing components can use it as
+ * React input without mirroring grid state.
+ */
+export function useCellSelectionRectangle(
+  path: GridPath,
+): CellSelectionRectangle | null {
+  const runtime = useGridRuntime();
+  const level = runtime.level(path);
+  const selection = useCellSelection(path);
+  const displayed = useSyncExternalStore(
+    level.subscribeDisplayedRows,
+    level.displayedRows,
+    level.displayedRows,
+  );
+
+  return useMemo(
+    () =>
+      selection
+        ? resolveCellSelectionRectangle(
+            selection,
+            displayed,
+            level.schema.columns,
+          )
+        : null,
+    [displayed, level, selection],
   );
 }
 

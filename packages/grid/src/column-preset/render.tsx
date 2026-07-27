@@ -19,6 +19,7 @@ import { BooleanCell } from "./cells/BooleanCell";
 import { SelectCell } from "./cells/SelectCell";
 import { LookupValueCell } from "./cells/LookupValueCell";
 import type { LookupValue } from "../lookup";
+import { finiteNumericValue } from "./numeric";
 
 export function renderWithPresetRuntime<TMeta = unknown>(
   runtime: ColumnPresetRuntime<TMeta>,
@@ -106,13 +107,7 @@ function numericCellValue<TMeta>(
   runtime: ColumnPresetRuntime<TMeta>,
   preset: NumberPreset | CurrencyPreset | PercentagePreset,
 ): { value: number | null; text: string } {
-  const n =
-    rawValue === null || rawValue === undefined || rawValue === ""
-      ? null
-      : typeof rawValue === "number"
-        ? rawValue
-        : Number(rawValue);
-  const value = n !== null && Number.isFinite(n) ? n : null;
+  const value = finiteNumericValue(rawValue);
   const isEmpty = value === null || value === 0;
   const display =
     preset.kind === "number"

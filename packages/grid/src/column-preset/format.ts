@@ -1,3 +1,5 @@
+import { finiteNumericValue } from "./numeric";
+
 export function formatText(value: unknown): string {
   if (value === null || value === undefined) return "";
   return String(value);
@@ -5,29 +7,31 @@ export function formatText(value: unknown): string {
 
 export function formatNumber(value: unknown): string {
   if (value === null || value === undefined || value === "") return "";
-  const n = typeof value === "number" ? value : Number(value);
-  return Number.isFinite(n) ? new Intl.NumberFormat().format(n) : String(value);
+  const number = finiteNumericValue(value);
+  return number === null
+    ? String(value)
+    : new Intl.NumberFormat().format(number);
 }
 
 export function formatCurrency(value: unknown): string {
   if (value === null || value === undefined || value === "") return "";
-  const n = typeof value === "number" ? value : Number(value);
-  return Number.isFinite(n)
+  const number = finiteNumericValue(value);
+  return number !== null
     ? new Intl.NumberFormat(undefined, {
         minimumFractionDigits: 2,
         maximumFractionDigits: 2,
-      }).format(n)
+      }).format(number)
     : String(value);
 }
 
 export function formatPercentage(value: unknown): string {
   if (value === null || value === undefined || value === "") return "";
-  const n = typeof value === "number" ? value : Number(value);
-  return Number.isFinite(n)
+  const number = finiteNumericValue(value);
+  return number !== null
     ? new Intl.NumberFormat(undefined, {
         style: "percent",
         maximumFractionDigits: 2,
-      }).format(n)
+      }).format(number)
     : String(value);
 }
 

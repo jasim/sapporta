@@ -1125,6 +1125,29 @@ describe("GridRuntime", () => {
     expect(rt.root.displayedRowSequence()).not.toBe(afterInsert);
   });
 
+  it("subscribeDisplayedRows wakes on both content and structure changes", async () => {
+    const rt = createGridRuntime({
+      schema: tableSchema,
+      dataSource: tableDataSource(),
+    });
+    const listener = vi.fn();
+    const before = rt.root.displayedRows();
+    rt.root.subscribeDisplayedRows(listener);
+
+    rt.root.writeCell({ rowId: makeRowId(rowsRoot, "a"), colId: "qty" }, 99);
+
+    expect(listener).toHaveBeenCalledTimes(1);
+    expect(rt.root.displayedRows()).not.toBe(before);
+
+    await rt.root.createRow({
+      rowKey: "c",
+      levelName: "rows",
+      columns: { id: "c", name: "Cherry", qty: 3 },
+    });
+
+    expect(listener).toHaveBeenCalledTimes(2);
+  });
+
   it("subscribeDisplayedRow wakes on a single-cell edit without waking the row sequence", () => {
     const rt = createGridRuntime({
       schema: tableSchema,

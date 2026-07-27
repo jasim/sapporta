@@ -14,16 +14,24 @@ import {
   useGridRuntime,
   useLevelSourceState,
   usePhantoms,
+  useCellSelectionRectangle,
   useRowInteractionSnapshot,
 } from "./GridRuntimeProvider";
 import { rowInteractionStatusFor } from "../types/row-selection";
 import type { LevelSourceState, SourceLoadResult } from "../data-sources";
 import { runtimeInternalsFor } from "../runtime/runtime";
+import type { CellSelectionRectangle } from "../types/selection";
 
 export type GridLevelChrome = {
   renderHeader?: (ctx: GridChromeContext) => ReactNode;
   renderStatus?: (ctx: GridStatusContext) => ReactNode;
   renderEmpty?: (ctx: GridEmptyContext) => ReactNode;
+  /**
+   * Renders chrome derived from the current cell range, such as totals beneath
+   * selected numeric columns. The callback runs only while the range resolves
+   * to rows and columns that are still displayed.
+   */
+  renderSelectionSummary?: (ctx: GridSelectionSummaryContext) => ReactNode;
   levelContainerClassName?: (ctx: GridChromeContext) => string | undefined;
   levelContainerStyle?: (ctx: GridChromeContext) => CSSProperties | undefined;
 };
@@ -36,6 +44,16 @@ export type GridStatusContext = GridChromeContext & {
 export type GridEmptyContext = GridChromeContext & {
   state: Extract<LevelSourceState, { status: "ready" }>;
   phantomCount: number;
+};
+
+/**
+ * The level and resolved cell range passed to `renderSelectionSummary`.
+ *
+ * Rows and columns follow their current display order and update as visible
+ * values, drafts, or the selection change.
+ */
+export type GridSelectionSummaryContext = GridChromeContext & {
+  selection: CellSelectionRectangle;
 };
 
 // The recursive unit — the only component that bridges the two stores.
@@ -129,6 +147,12 @@ export function GridLevel({
           chrome={chrome}
           presentation={presentation}
         />
+        {chrome?.renderSelectionSummary ? (
+          <SelectionSummaryChrome
+            context={chromeContext}
+            render={chrome.renderSelectionSummary}
+          />
+        ) : null}
       </Grid>
       {empty}
     </>
@@ -195,6 +219,17 @@ function DisplayedRowsBody({
       })}
     </div>
   );
+}
+
+function SelectionSummaryChrome({
+  context,
+  render,
+}: {
+  context: GridChromeContext;
+  render: (context: GridSelectionSummaryContext) => ReactNode;
+}) {
+  const selection = useCellSelectionRectangle(context.path);
+  return selection ? render({ ...context, selection }) : null;
 }
 
 // Per-child-row wrapper that gates the full `<GridLevel>` mount on the

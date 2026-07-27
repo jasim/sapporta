@@ -166,6 +166,53 @@
   z-index: var(--sap-z-grid-header);
 }
 
+.selectionSummary {
+  background: var(--grid-selection-summary-background, var(--sap-surface));
+  border-top: 1px solid var(--sap-border);
+  color: var(--sap-fg);
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: subgrid;
+  min-width: 0;
+}
+
+.presetGrid[data-grid-depth="0"] > .selectionSummary {
+  bottom: 0;
+  position: sticky;
+  z-index: var(--sap-z-grid-header);
+}
+
+.selectionSummaryCell {
+  min-height: var(--grid-cell-min-height, var(--height-sap-row));
+  min-width: 0;
+}
+
+.selectionSummaryContent {
+  align-items: baseline;
+  display: flex;
+  gap: 6px;
+  justify-content: flex-end;
+  min-height: var(--grid-cell-min-height, var(--height-sap-row));
+  overflow: hidden;
+  padding: var(--grid-cell-padding, 0 10px);
+}
+
+.selectionSummaryLabel {
+  color: var(--sap-fg-muted);
+  flex: none;
+  font-size: var(--text-sap-tiny);
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.selectionSummaryValue {
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 :where(.presetGrid [data-grid-part="level-label-row"]) {
   border-bottom: 0;
 }

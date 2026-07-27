@@ -117,8 +117,10 @@ describe("grid public surface", () => {
     expect(typeof mod.GridRuntimeProvider).toBe("function");
     expect(typeof mod.GridCopyContextMenu).toBe("function");
     expect(typeof mod.serializeGridCopyTargetToCsv).toBe("function");
+    expect(typeof mod.resolveCellSelectionRectangle).toBe("function");
     expect(typeof mod.useGridRuntimeEffect).toBe("function");
     expect(typeof mod.useGridActiveRow).toBe("function");
+    expect(typeof mod.useCellSelectionRectangle).toBe("function");
     expect(typeof mod.GridLevel).toBe("function");
     expect(typeof mod.inMemoryGridDataSource).toBe("function");
     expect(typeof mod.restGridDataSource).toBe("function");
@@ -127,6 +129,7 @@ describe("grid public surface", () => {
     expect(mod).not.toHaveProperty("useGridRuntimeResource");
     expect(mod).not.toHaveProperty("inMemoryLevelSource");
     expect(mod).not.toHaveProperty("restLevelSource");
+    expect(mod).not.toHaveProperty("summarizeCellSelection");
   });
 
   it("publishes exactly the proposed GridRuntime keys", () => {

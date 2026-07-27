@@ -15,6 +15,7 @@ import {
   formatPercentage,
   formatText,
 } from "./format";
+import { finiteNumericValue } from "./numeric";
 import { parseBoolean, parseDate, parseNumber, parseText } from "./parse";
 import { TextEditor } from "./editors/TextEditor";
 import { NumericEditor } from "./editors/NumericEditor";
@@ -42,9 +43,9 @@ const textCompare = (a: unknown, b: unknown) =>
   formatText(a).localeCompare(formatText(b));
 
 const numberCompare = (a: unknown, b: unknown) => {
-  const an = Number(a);
-  const bn = Number(b);
-  if (Number.isFinite(an) && Number.isFinite(bn)) return an - bn;
+  const an = finiteNumericValue(a);
+  const bn = finiteNumericValue(b);
+  if (an !== null && bn !== null) return an - bn;
   return textCompare(a, b);
 };
 

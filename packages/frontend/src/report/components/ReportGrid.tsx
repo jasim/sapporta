@@ -143,10 +143,6 @@ function useReportGridChrome(reportName: string): GridLevelChrome {
           base.levelContainerClassName?.(context),
           "sapporta-report-tgrid__level",
         ),
-      levelContainerStyle: base.levelContainerStyle,
-      renderHeader: base.renderHeader,
-      renderStatus: base.renderStatus,
-      renderEmpty: base.renderEmpty,
     };
   }, [reportName]);
 }

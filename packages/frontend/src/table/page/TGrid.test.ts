@@ -12,7 +12,12 @@ import {
 } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { CELL_GRID_WITH_ACTIVE_ROW, makeRowId, rootPath } from "@sapporta/grid";
+import {
+  CELL_GRID_WITH_ACTIVE_ROW,
+  makeRowId,
+  rootPath,
+  type GridLevelChrome,
+} from "@sapporta/grid";
 import { controllerFor, cursorManagerFor } from "@sapporta/grid/advanced";
 import type { TableSchema } from "@sapporta/shared/contracts";
 import type { TableRowsClient } from "../grid-adapter/tgrid-level-config";
@@ -22,7 +27,7 @@ import {
   useTGridSession,
 } from "../grid-adapter/tgrid-binding";
 import { createTGridSession, type TGridSession } from "../state/tgrid-session";
-import { TGrid } from "./TGrid";
+import { mergeTGridChrome, TGrid } from "./TGrid";
 
 (
   globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
@@ -124,6 +129,22 @@ afterEach(async () => {
 });
 
 describe("TGrid", () => {
+  it("preserves non-TGrid chrome slots", () => {
+    const renderSelectionSummary = vi.fn(() => null);
+    const chrome: GridLevelChrome = { renderSelectionSummary };
+    type MergeArgs = Parameters<typeof mergeTGridChrome>[0];
+    const merged = mergeTGridChrome({
+      chrome,
+      root: "accounts",
+      className: undefined,
+      style: undefined,
+      session: {} as MergeArgs["session"],
+      viewRelatedRows: undefined,
+    });
+
+    expect(merged.renderSelectionSummary).toBe(renderSelectionSummary);
+  });
+
   it("supports a nullable session during committed React creation", async () => {
     const states: string[] = [];
 

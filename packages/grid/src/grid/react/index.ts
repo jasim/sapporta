@@ -10,6 +10,7 @@ export {
   useActiveCellForPath,
   useActiveRow,
   useCellSelection,
+  useCellSelectionRectangle,
   useDisplayedRow,
   useDisplayedRowSequence,
   useGridRuntime,
@@ -26,6 +27,7 @@ export {
   type GridLevelChrome,
   type GridStatusContext,
   type GridEmptyContext,
+  type GridSelectionSummaryContext,
 } from "./GridLevel";
 export { defaultGridLevelChrome } from "./default-grid-level-chrome";
 export {

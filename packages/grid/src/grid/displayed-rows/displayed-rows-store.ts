@@ -30,6 +30,14 @@ export type DisplayedRowsStore = {
   getDisplayedRowSequence(): DisplayedRowSequence;
   getDisplayedRow(rowId: RowId): LevelRow | undefined;
   invalidateDisplayedRows(reason: DisplayedRowsInvalidationReason): void;
+  /**
+   * Observes the complete displayed-row value.
+   *
+   * Use this when a result depends on several visible rows, such as a selected
+   * range summary. Row rendering should use the narrower sequence and
+   * single-row subscriptions instead.
+   */
+  subscribeDisplayedRows(fn: () => void): () => void;
   subscribeDisplayedRowSequence(fn: () => void): () => void;
   subscribeDisplayedRow(rowId: RowId, fn: () => void): () => void;
   dispose(): void;
@@ -37,8 +45,9 @@ export type DisplayedRowsStore = {
 
 // External store for exactly one grid path's body read model.
 //
-// The store owns cached full-row and row-sequence snapshots plus two
+// The store owns cached full-row and row-sequence snapshots plus three
 // subscription surfaces:
+//   - full-row subscribers care about the complete displayed-row snapshot;
 //   - sequence subscribers care about the ordered row refs the body maps;
 //   - row subscribers care about one `LevelRow` object by id.
 //
@@ -51,6 +60,7 @@ export function createDisplayedRowsStore(
   args: CreateDisplayedRowsStoreArgs,
 ): DisplayedRowsStore {
   let current = args.deriveDisplayedRowsState(args.readInput(), undefined);
+  const displayedRowsSubscribers = createObserverList<[]>(args.onObserverError);
   const displayedRowSequenceSubscribers = createObserverList<[]>(
     args.onObserverError,
   );
@@ -82,6 +92,10 @@ export function createDisplayedRowsStore(
       current = next;
       args.beforeNotify?.();
 
+      if (previous.displayedRows !== next.displayedRows) {
+        displayedRowsSubscribers.notify();
+      }
+
       if (previous.displayedRowSequence !== next.displayedRowSequence) {
         notifyDisplayedRowSequenceSubscribers();
       }
@@ -94,6 +108,10 @@ export function createDisplayedRowsStore(
           notifyDisplayedRowSubscribers(rowId);
         }
       }
+    },
+    subscribeDisplayedRows(fn) {
+      if (disposed) return () => {};
+      return displayedRowsSubscribers.subscribe(fn);
     },
     subscribeDisplayedRowSequence(fn) {
       if (disposed) return () => {};
@@ -118,6 +136,7 @@ export function createDisplayedRowsStore(
     dispose() {
       if (disposed) return;
       disposed = true;
+      displayedRowsSubscribers.clear();
       displayedRowSequenceSubscribers.clear();
       for (const observers of displayedRowSubscribersById.values()) {
         observers.clear();

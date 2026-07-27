@@ -49,6 +49,14 @@ export type GridLevelRuntime = {
    */
   dataRowTarget(rowId: RowId): RowOperationTarget<"data"> | undefined;
   /**
+   * Observes changes to the complete displayed rows for this level.
+   *
+   * Use this with `displayedRows()` when a calculation depends on several
+   * visible rows. Components concerned with row order or one row should prefer
+   * the narrower subscriptions below.
+   */
+  subscribeDisplayedRows(listener: () => void): () => void;
+  /**
    * Observes additions, removals, reordering, and row-kind changes.
    * Cell-content changes do not wake this subscription when row refs stay the
    * same.
@@ -241,6 +249,7 @@ export function createGridLevelRuntime(args: {
     displayedRowSequence: command(args.ports.displayedRowSequence),
     displayedRow: command(args.ports.displayedRow),
     dataRowTarget: command(args.ports.dataRowTarget),
+    subscribeDisplayedRows: subscription(args.ports.subscribeDisplayedRows),
     subscribeDisplayedRowSequence: subscription(
       args.ports.subscribeDisplayedRowSequence,
     ),
