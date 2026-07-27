@@ -77,6 +77,7 @@ const session = {
 
 const actionPropsSpy =
   vi.fn<(props: TableGridActionsProps<TestRows>) => void>();
+const viewPreferenceChange = vi.fn();
 
 function TestActions(props: TableGridActionsProps<TestRows>): ReactElement {
   actionPropsSpy(props);
@@ -106,6 +107,7 @@ beforeEach(() => {
     totalCount: 3,
   });
   actionPropsSpy.mockClear();
+  viewPreferenceChange.mockClear();
   getVisibleRows.mockClear();
   reloadRows.mockClear();
 });
@@ -341,6 +343,45 @@ describe("TableGridHeader", () => {
       expect(findButtonWithText("Reload 1 visible row")).toBeUndefined();
     });
   });
+
+  it("lets people change the layout from the narrow action sheet", async () => {
+    mounted = await renderHeader("narrowCards");
+
+    await act(async () => {
+      const openActions = document.body.querySelector(
+        'button[aria-label="Open table actions"]',
+      );
+      if (!(openActions instanceof HTMLButtonElement)) {
+        throw new Error("expected the table actions trigger");
+      }
+      openActions.click();
+    });
+
+    const layoutOptions = [...document.body.querySelectorAll("button")].filter(
+      (button) => button.getAttribute("role") === "menuitemradio",
+    );
+    expect(layoutOptions.map((button) => button.textContent?.trim())).toEqual([
+      "Auto",
+      "Tabular",
+      "Cards",
+    ]);
+
+    const tabular = layoutOptions.find(
+      (button) => button.textContent?.trim() === "Tabular",
+    );
+    if (!(tabular instanceof HTMLButtonElement)) {
+      throw new Error("expected the Tabular layout option");
+    }
+
+    await act(async () => {
+      tabular.click();
+    });
+
+    expect(viewPreferenceChange).toHaveBeenCalledWith("tabular");
+    await vi.waitFor(() => {
+      expect(document.body.textContent).not.toContain("Table actions");
+    });
+  });
 });
 
 function rowsSelection(
@@ -390,7 +431,7 @@ function headerElement(
     table,
     level: "orders",
     viewPreference: "auto",
-    onViewPreferenceChange: vi.fn(),
+    onViewPreferenceChange: viewPreferenceChange,
     onNewRecord: vi.fn(),
     actions,
   });

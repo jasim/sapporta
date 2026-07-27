@@ -33,7 +33,7 @@ import type {
   TGridRowsByLevel,
 } from "../grid-adapter/tgrid-types";
 import type { TGridSession } from "../state/tgrid-session";
-import { TableViewSwitch } from "./TableViewSwitch";
+import { TableViewOptions, TableViewSwitch } from "./TableViewSwitch";
 import {
   CompactHeaderButton,
   CompactHeaderLink,
@@ -108,6 +108,8 @@ export function TableGridHeader<
         totalCount={totalCount}
         query={query}
         exportUrl={session.csvExportUrl(level)}
+        viewPreference={viewPreference}
+        onViewPreferenceChange={onViewPreferenceChange}
         deleteControl={deleteControl}
         onNewRecord={onNewRecord}
         actions={Actions}
@@ -176,7 +178,6 @@ function WideTableHeader<
   return (
     <>
       <TopBar
-        section="Tables"
         title={tableLabel}
         subtitle={formatRecordCount(totalCount)}
         actions={
@@ -249,6 +250,8 @@ function NarrowCardTableHeader<
   totalCount,
   query,
   exportUrl,
+  viewPreference,
+  onViewPreferenceChange,
   deleteControl,
   onNewRecord,
   actions: Actions,
@@ -259,6 +262,8 @@ function NarrowCardTableHeader<
   totalCount: number;
   query: TableLevelQuery;
   exportUrl: string;
+  viewPreference: TableViewPreference;
+  onViewPreferenceChange: (view: TableViewPreference) => void;
   deleteControl?: TableDeleteControl;
   onNewRecord?: () => void;
   actions?: ComponentType<TableGridActionsProps<RowsByLevel, AppServices>>;
@@ -369,6 +374,13 @@ function NarrowCardTableHeader<
             </SheetDescription>
           </SheetHeader>
           <div className="mt-4 grid gap-2">
+            <TableViewOptions
+              value={viewPreference}
+              onChange={(view) => {
+                onViewPreferenceChange(view);
+                setActionsOpen(false);
+              }}
+            />
             {Actions && (
               <Actions
                 session={session}

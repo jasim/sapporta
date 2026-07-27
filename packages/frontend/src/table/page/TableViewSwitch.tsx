@@ -42,42 +42,56 @@ export function TableViewSwitch({
         sideOffset={6}
         className="w-[220px] border-sap-border bg-sap-surface p-1 text-sap-body"
       >
-        <div
-          className="px-2 py-1 text-sap-label font-bold uppercase tracking-sap-section text-sap-subtle"
-          id="table-view-layout-label"
-        >
-          Layout
-        </div>
-        <div role="menu" aria-labelledby="table-view-layout-label">
-          {options.map((option) => {
-            const Icon = option.icon;
-            const active = option.value === value;
-            return (
-              <button
-                key={option.value}
-                type="button"
-                role="menuitemradio"
-                aria-checked={active}
-                className={cn(
-                  "flex w-full items-center gap-2 rounded-[5px] px-2 py-[7px] text-left text-sap-data text-sap-soft hover:bg-sap-row-hover hover:text-sap-fg",
-                  active && "text-sap-fg",
-                )}
-                onClick={() => selectView(option.value)}
-              >
-                <span className="inline-flex h-[14px] w-[14px] shrink-0 items-center justify-center text-sap-subtle">
-                  <Icon className="h-[13px] w-[13px]" />
-                </span>
-                <span className="min-w-0 flex-1 truncate font-medium">
-                  {option.label}
-                </span>
-                <span className="inline-flex h-[14px] w-[14px] items-center justify-center text-sap-fg">
-                  {active && <Check className="h-[13px] w-[13px]" />}
-                </span>
-              </button>
-            );
-          })}
-        </div>
+        <TableViewOptions value={value} onChange={selectView} />
       </PopoverContent>
     </Popover>
+  );
+}
+
+export function TableViewOptions({
+  value,
+  onChange,
+}: {
+  value: TableViewPreference;
+  onChange: (view: TableViewPreference) => void;
+}) {
+  return (
+    <>
+      <div
+        className="px-2 py-1 text-sap-label font-bold uppercase tracking-sap-section text-sap-subtle"
+        id="table-view-layout-label"
+      >
+        Layout
+      </div>
+      <div role="menu" aria-labelledby="table-view-layout-label">
+        {options.map((option) => {
+          const Icon = option.icon;
+          const active = option.value === value;
+          return (
+            <button
+              key={option.value}
+              type="button"
+              role="menuitemradio"
+              aria-checked={active}
+              className={cn(
+                "flex w-full items-center gap-2 rounded-[5px] px-2 py-[7px] text-left text-sap-data text-sap-soft hover:bg-sap-row-hover hover:text-sap-fg",
+                active && "text-sap-fg",
+              )}
+              onClick={() => onChange(option.value)}
+            >
+              <span className="inline-flex h-[14px] w-[14px] shrink-0 items-center justify-center text-sap-subtle">
+                <Icon className="h-[13px] w-[13px]" />
+              </span>
+              <span className="min-w-0 flex-1 truncate font-medium">
+                {option.label}
+              </span>
+              <span className="inline-flex h-[14px] w-[14px] items-center justify-center text-sap-fg">
+                {active && <Check className="h-[13px] w-[13px]" />}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+    </>
   );
 }
