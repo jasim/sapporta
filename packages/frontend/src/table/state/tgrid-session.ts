@@ -47,7 +47,7 @@ import {
   type LookupForColumn,
   type LookupStore,
 } from "../../lookup";
-import { buildTableRowsQuery } from "../api/rows";
+import { buildTableRowsQuery, buildTableSelectionQuery } from "../api/rows";
 import { getApiBase } from "../../platform/client";
 import type {
   TGridLevelId,
@@ -442,7 +442,7 @@ class DefaultTGridSession<
     ];
     const search = hasQueryState ? state.search : (query.initialSearch ?? null);
     const queryString = new URLSearchParams(
-      buildTableRowsQuery({
+      buildTableSelectionQuery({
         sort: [...sort],
         filters: [...filters],
         search: search ?? undefined,

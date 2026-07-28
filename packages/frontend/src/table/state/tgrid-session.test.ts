@@ -386,6 +386,8 @@ describe("TGridSession", () => {
       expect(url.pathname).toBe("/api/tables/orders/export.csv");
       expect(url.searchParams.get("filter[status][eq]")).toBe("open");
       expect(url.searchParams.get("filter[customer][eq]")).toBe("ACME");
+      expect(url.searchParams.has("page")).toBe(false);
+      expect(url.searchParams.has("limit")).toBe(false);
     } finally {
       session.dispose();
     }

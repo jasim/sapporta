@@ -24,23 +24,34 @@ export interface FetchTableRowsParams {
   search?: string;
 }
 
-/** Serialize filter/sort/search/pagination into the query-shape the server's
- *  `parseQuery()` expects. Single source of truth for both the typed list
- *  fetch and the CSV-export URL. Filter encoding is delegated to
- *  `@sapporta/shared/filter` so the URL the router produces and the query
- *  this fetch layer sends use the same format. */
-export function buildTableRowsQuery(
-  params: Omit<FetchTableRowsParams, "tableName">,
+export type TableRowsSelectionParams = Pick<
+  FetchTableRowsParams,
+  "sort" | "filters" | "search"
+>;
+
+/** Serialize the filter, sort, and search selection shared by paged reads and
+ *  CSV exports. Filter encoding is delegated to `@sapporta/shared/filter` so
+ *  both surfaces use the same canonical URL grammar. */
+export function buildTableSelectionQuery(
+  params: TableRowsSelectionParams,
 ): Record<string, string> {
   const out: Record<string, string> = {};
   if (params.filters) {
     for (const [k, v] of encodeTypedFilters(params.filters)) out[k] = v;
   }
-  if (params.page) out.page = String(params.page);
-  if (params.limit) out.limit = String(params.limit);
   const sortStr = params.sort ? stringifySortOrder(params.sort) : null;
   if (sortStr) out.sort = sortStr;
   if (params.search) out.q = params.search;
+  return out;
+}
+
+/** Add pagination to a table selection for the paged rows endpoint. */
+export function buildTableRowsQuery(
+  params: Omit<FetchTableRowsParams, "tableName">,
+): Record<string, string> {
+  const out = buildTableSelectionQuery(params);
+  if (params.page) out.page = String(params.page);
+  if (params.limit) out.limit = String(params.limit);
   return out;
 }
 

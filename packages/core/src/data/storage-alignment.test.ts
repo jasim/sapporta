@@ -12,7 +12,10 @@
  */
 
 import { describe, expect, it } from "vitest";
+import { asc, eq, gt } from "drizzle-orm";
 import { integer, sqliteTable } from "drizzle-orm/sqlite-core";
+import { resolvePageQuery } from "../api/table-query.js";
+import { createTableCatalog } from "../schema/catalog.js";
 import { sapportaTable } from "../schema/table.js";
 import type { TableDef } from "../schema/table.js";
 import {
@@ -27,6 +30,7 @@ import { scopedRows } from "./scoped-rows.js";
 import { ValidationError } from "../db/errors.js";
 import { createTestAuthContext } from "../testing/auth-context.js";
 import { createTestDb } from "../testing/test-utils.js";
+import { parsePlainDate } from "@sapporta/shared/temporal";
 
 // ── Numbers: REAL storage, numeric compare/sort ─────────────────────────
 
@@ -62,9 +66,9 @@ describe("storage alignment — numbers", () => {
 
   it("gt filter matches numerically, not lexicographically", async () => {
     const { rows } = await setup();
-    const body = await rows.list({
-      "filter[balance][gt]": "10000",
-      sort: "balance",
+    const body = await rows.page({
+      where: gt(accounts.balance, 10000),
+      orderBy: asc(accounts.balance),
     });
     expect(body.data.map((row) => row.balance)).toEqual([25000, 100000]);
   });
@@ -115,9 +119,9 @@ describe("storage alignment — dates", () => {
 
   it("gt filter matches calendrically", async () => {
     const { rows } = await setup();
-    const body = await rows.list({
-      "filter[occurred_on][gt]": "2024-02-01",
-      sort: "occurred_on",
+    const body = await rows.page({
+      where: gt(events.occurred_on, parsePlainDate("2024-02-01")),
+      orderBy: asc(events.occurred_on),
     });
     expect(body.data.map((row) => String(row.occurred_on))).toEqual([
       "2024-02-03",
@@ -195,7 +199,7 @@ describe("storage alignment — booleans", () => {
     expect(rawRows.map((r) => r.is_active)).toEqual([1, 0, 1]);
 
     // The API roundtrips as booleans.
-    const body = await rows.list({ "filter[is_active][eq]": "true" });
+    const body = await rows.page({ where: eq(toggles.is_active, true) });
     expect(body.data).toHaveLength(2);
     for (const row of body.data) expect(row.is_active).toBe(true);
   });
@@ -275,7 +279,9 @@ describe("URL round-trip — encoded filters execute and match", () => {
     qs.append("filter[opened_on][lt]", "2024-07-01");
     qs.append("sort", "balance");
 
-    const body = await rows.list(Object.fromEntries(qs));
+    const body = await rows.page(
+      resolveHttpListQuery(Object.fromEntries(qs), accounts_def),
+    );
     expect(body.data.map((row) => row.balance)).toEqual([15000, 120000]);
   });
 });
@@ -289,4 +295,15 @@ function rowsFor(
     createTestAuthContext({ tables: [tableDef] }),
     tableDef,
   );
+}
+
+function resolveHttpListQuery(
+  query: Record<string, string>,
+  tableDef: TableDef,
+) {
+  const catalog = createTableCatalog([tableDef]);
+  return resolvePageQuery(query, tableDef, {
+    auth: createTestAuthContext({ tables: [tableDef] }),
+    searchPlan: catalog.searchPlanFor(tableDef.sqlName),
+  });
 }

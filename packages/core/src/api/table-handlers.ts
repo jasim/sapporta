@@ -50,7 +50,12 @@ import {
   type SapportaAuthContext,
 } from "../auth/index.js";
 import type { TableDef } from "../schema/table.js";
-import { resolveCountQuery } from "../data/count-query.js";
+import {
+  resolveCountQuery,
+  resolveExportQuery,
+  resolveLookupQuery,
+  resolvePageQuery,
+} from "./table-query.js";
 
 const log = logger.child({ module: "table-handlers" });
 
@@ -78,16 +83,15 @@ export function makeAuthorizedTableHandlers<E extends SapportaEnv>(
   return {
     list:
       ({ def }) =>
-      async ({ c }) => {
+      async ({ c, request }) => {
         const auth = authorizeTableAction(c, guard(c), "read", def);
         const rows = scopedRows(db, auth, def);
         try {
-          return c.json(
-            await rows.list(queryParams(c), {
-              searchPlan: catalog.searchPlanFor(def.sqlName),
-            }),
-            200,
-          );
+          const input = resolvePageQuery(request.query, def, {
+            auth,
+            searchPlan: catalog.searchPlanFor(def.sqlName),
+          });
+          return c.json(await rows.page(input), 200);
         } catch (err) {
           return tableReadErrorResponse(c, err);
         }
@@ -155,28 +159,35 @@ export function makeAuthorizedTableHandlers<E extends SapportaEnv>(
       },
     exportCsv:
       ({ def }) =>
-      async ({ c }) => {
+      async ({ c, request }) => {
         const auth = authorizeTableAction(c, guard(c), "export", def);
         const rows = scopedRows(db, auth, def);
         try {
-          return await streamCsv(
-            c,
-            def,
-            await rows.exportRows(queryParams(c), {
-              searchPlan: catalog.searchPlanFor(def.sqlName),
-            }),
-          );
+          const input = resolveExportQuery(request.query, def, {
+            auth,
+            searchPlan: catalog.searchPlanFor(def.sqlName),
+          });
+          return await streamCsv(c, def, rows.scan(input));
         } catch (err) {
           return tableReadErrorResponse(c, err);
         }
       },
-    lookup: ({ c, request }) => {
+    lookup: async ({ c, request }) => {
       const tableName = request.params.tableName;
       const def = catalog.get(tableName);
       if (!def) return tableNotFoundResponse(tableName);
       const auth = authorizeTableAction(c, guard(c), "read", def);
       const rows = scopedRows(db, auth, def);
-      return handleLookup(c, rows);
+      try {
+        return c.json(
+          {
+            entries: await rows.lookup(resolveLookupQuery(request.query, def)),
+          },
+          200,
+        );
+      } catch (err) {
+        return tableReadErrorResponse(c, err);
+      }
     },
     count: async ({ c, request }) => {
       const tableName = request.params.tableName;
@@ -216,17 +227,6 @@ function authorizeTableAction<E extends SapportaEnv>(
   // that follows, not by CASL condition objects.
   forbidUnless(c, auth.ability.can(action, table.sqlName));
   return auth;
-}
-
-async function handleLookup<E extends Env>(
-  c: Context<E>,
-  rows: ReturnType<typeof scopedRows>,
-): Promise<Response> {
-  try {
-    return c.json({ entries: await rows.lookup(queryParams(c)) }, 200);
-  } catch (err) {
-    return tableReadErrorResponse(c, err);
-  }
 }
 
 async function handleMasterDetailCreate<E extends SapportaEnv>(
@@ -378,7 +378,7 @@ function tableWriteErrorResponse<E extends Env>(
 async function streamCsv<E extends Env>(
   c: Context<E>,
   table: TableDef,
-  rows: readonly Record<string, unknown>[],
+  rows: AsyncIterable<Record<string, unknown>>,
 ): Promise<Response> {
   const columns = getTableConfig(table.drizzle).columns;
   c.header("Content-Type", "text/csv; charset=utf-8");
@@ -389,17 +389,13 @@ async function streamCsv<E extends Env>(
 
   return stream(c, async (s) => {
     await s.write(columns.map((col) => csvEscape(col.name)).join(",") + "\n");
-    for (const row of rows) {
+    for await (const row of rows) {
       await s.write(
         columns.map((col) => csvEscape(cellToString(row[col.name]))).join(",") +
           "\n",
       );
     }
   });
-}
-
-function queryParams<E extends Env>(c: Context<E>): Record<string, string> {
-  return Object.fromEntries(new URL(c.req.url).searchParams.entries());
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

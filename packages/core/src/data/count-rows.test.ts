@@ -3,12 +3,10 @@ import Database from "better-sqlite3";
 import { and, isNotNull, ne } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/better-sqlite3";
 import { integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
-import { countQuerySchema } from "@sapporta/shared/contracts";
 import { createTestAuthContext } from "../testing/auth-context.js";
 import { createTestDb } from "../testing/test-utils.js";
 import { date } from "../schema/columns.js";
 import { sapportaTable } from "../schema/table.js";
-import { resolveCountQuery } from "./count-query.js";
 import { scopedRows } from "./scoped-rows.js";
 
 const tasksTable = sqliteTable("tasks", {
@@ -66,7 +64,9 @@ describe("scoped counts", () => {
     const { rows, sqlite } = setupTasks();
     try {
       await expect(
-        rows.count({ where: ne(tasksTable.status, "done") }),
+        rows.count({
+          where: ne(tasksTable.status, "done"),
+        }),
       ).resolves.toBe(7);
     } finally {
       sqlite.close();
@@ -114,47 +114,6 @@ describe("scoped counts", () => {
     }
   });
 
-  it("resolves canonical filters and grouping from a validated route query", async () => {
-    const { rows, sqlite } = setupTasks();
-    try {
-      const resolved = resolveCountQuery(
-        countQuerySchema.parse({
-          "filter[status][neq]": "done",
-          "filter[assignee_id][is]": "notnull",
-          group_by: "assignee_id",
-          limit: "2",
-        }),
-        tasks,
-      );
-      expect(resolved.kind).toBe("grouped");
-      if (resolved.kind !== "grouped") {
-        throw new Error("Expected a grouped count query");
-      }
-      await expect(rows.countBy(resolved.input)).resolves.toEqual([
-        { value: 1, count: 2 },
-        { value: 2, count: 2 },
-      ]);
-    } finally {
-      sqlite.close();
-    }
-  });
-
-  it("rejects invalid and contradictory route queries", () => {
-    expect(() => countQuerySchema.parse({ group_by: "" })).toThrow();
-    expect(() =>
-      countQuerySchema.parse({ group_by: "id", limit: 1001 }),
-    ).toThrow();
-    expect(() =>
-      resolveCountQuery(countQuerySchema.parse({ group_by: "missing" }), tasks),
-    ).toThrow(expect.objectContaining({ code: "unknown_column" }));
-    expect(() =>
-      resolveCountQuery(countQuerySchema.parse({ order: "asc" }), tasks),
-    ).toThrow(expect.objectContaining({ code: "bad_value" }));
-    expect(() =>
-      resolveCountQuery(countQuerySchema.parse({ surprise: "yes" }), tasks),
-    ).toThrow(expect.objectContaining({ code: "bad_value" }));
-  });
-
   it("rejects invalid direct grouped-count inputs", async () => {
     const { rows, sqlite } = setupTasks();
     const otherTable = sqliteTable("other", {
@@ -164,9 +123,11 @@ describe("scoped counts", () => {
       await expect(
         rows.countBy({ column: tasksTable.id, limit: 0 }),
       ).rejects.toBeInstanceOf(RangeError);
-      await expect(rows.countBy({ column: otherTable.id })).rejects.toThrow(
-        /does not belong/,
-      );
+      await expect(
+        rows.countBy({
+          column: otherTable.id as unknown as typeof tasksTable.id,
+        }),
+      ).rejects.toThrow(/does not belong/);
     } finally {
       sqlite.close();
     }

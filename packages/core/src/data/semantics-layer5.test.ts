@@ -22,10 +22,11 @@ import {
 import { sapportaTable } from "../schema/table.js";
 import type { TableDef } from "../schema/table.js";
 import { timestamp, date } from "../schema/columns.js";
-import { parseQuery } from "./query-parser.js";
+import { resolvePageQuery } from "../api/table-query.js";
 import { scopedRows } from "./scoped-rows.js";
 import { createTestDb } from "../testing/test-utils.js";
 import { createTestAuthContext } from "../testing/auth-context.js";
+import { createTableCatalog } from "../schema/catalog.js";
 import {
   parsePlainDate,
   parseCanonicalInstant,
@@ -54,7 +55,10 @@ describe("strict calendar validity", () => {
 
     // Impossible date routed through the server's filter parse → 400.
     expect(() =>
-      parseQuery({ "filter[occurred_on][eq]": "2024-02-30" }, events_def),
+      resolveHttpListQuery(
+        { "filter[occurred_on][eq]": "2024-02-30" },
+        events_def,
+      ),
     ).toThrow(QueryParseError);
   });
 });
@@ -116,8 +120,11 @@ describe("LIKE escaping — user wildcards match literally", () => {
     rows: ReturnType<typeof rowsFor>,
     query: string,
   ): Promise<string[]> {
-    const body = await rows.list(
-      Object.fromEntries(new URLSearchParams(query)),
+    const body = await rows.page(
+      resolveHttpListQuery(
+        Object.fromEntries(new URLSearchParams(query)),
+        promos_def,
+      ),
     );
     return body.data.map((row) => String(row.name));
   }
@@ -194,4 +201,15 @@ function rowsFor(
     createTestAuthContext({ tables: [tableDef] }),
     tableDef,
   );
+}
+
+function resolveHttpListQuery(
+  query: Record<string, string>,
+  tableDef: TableDef,
+) {
+  const catalog = createTableCatalog([tableDef]);
+  return resolvePageQuery(query, tableDef, {
+    auth: createTestAuthContext({ tables: [tableDef] }),
+    searchPlan: catalog.searchPlanFor(tableDef.sqlName),
+  });
 }

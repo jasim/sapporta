@@ -5,9 +5,8 @@
  * context. The principal may be signed in or anonymous; row access comes from
  * `auth.dataAuthority`, not from assuming there is always a workspace user.
  * The helper binds one Drizzle table to the request's row-security policy,
- * then exposes CRUD, lookup, count, and export operations that never let
- * callers choose or bypass ownership columns. Search planning is supplied only
- * to list or export calls that actually contain a search term.
+ * then exposes CRUD, paged reads, scans, lookup, and count operations that
+ * never let callers choose or bypass ownership columns.
  *
  * The important rule is that primary keys and API payloads are not security
  * boundaries. Reads and destructive writes add the table's workspace/user
@@ -27,40 +26,71 @@
  * values where the table scope requires them.
  *
  * This file intentionally stays below HTTP concerns. Route handlers translate
- * these domain errors into responses; this module only parses table queries,
+ * URL query strings into the Drizzle-shaped inputs accepted here. This module
  * applies row visibility, performs persistence, and returns plain row objects.
  */
 
-import { and, asc, eq, inArray, or, sql, type SQL } from "drizzle-orm";
+import { asc, eq, inArray, or, sql, type SQL } from "drizzle-orm";
 import type { BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
-import { getTableConfig, type SQLiteColumn } from "drizzle-orm/sqlite-core";
+import {
+  getTableConfig,
+  type AnySQLiteTable,
+  type SQLiteColumn,
+} from "drizzle-orm/sqlite-core";
 import type { RowId } from "@sapporta/shared/row-id";
-import { parseOptionalBoundedInteger } from "@sapporta/shared/validation";
 import type { SapportaAuthContext } from "../auth/context.js";
-import { QueryParseError, ValidationError } from "../db/errors.js";
+import { ValidationError } from "../db/errors.js";
 import { findPkColumn } from "../schema/pk.js";
 import { resolveColumnKind } from "../schema/resolve-kind.js";
 import type { TableDef } from "../schema/table.js";
 import { savePipeline } from "./save-pipeline.js";
-import { parseQuery, type ParsedQuery } from "./query-parser.js";
 import { rowLabeller } from "./row-label.js";
-import { resolveRowFields, UnknownRowFieldsError } from "./row-fields.js";
+import { resolveRowFields } from "./row-fields.js";
 import type { GroupCount } from "@sapporta/shared";
 import type { LookupEntry } from "@sapporta/shared/contracts";
-import type { SearchPlan } from "../search/search-plan.js";
-import { buildSearchPredicate } from "../search/search-sql.js";
-import {
-  countTableRows,
-  countTableRowsBy,
-  type CountRowsByInput,
-  type CountRowsInput,
-} from "./count-rows.js";
+import { countTableRows, countTableRowsBy } from "./count-rows.js";
 
-export interface ListRowsInput {
-  [key: string]: string | undefined;
+export type TableColumn<TTable extends AnySQLiteTable = AnySQLiteTable> =
+  TTable["_"]["columns"][keyof TTable["_"]["columns"]];
+
+export type RowsOrderBy = SQLiteColumn | SQL;
+
+export interface RowSelection {
+  where?: SQL;
+  orderBy?: RowsOrderBy | readonly RowsOrderBy[];
 }
 
-export interface ListRowsResult {
+export interface PageRowsInput extends RowSelection {
+  page?: number;
+  limit?: number;
+}
+
+export interface ScanRowsInput extends RowSelection {
+  batchSize?: number;
+}
+
+export interface LookupRowsInput<
+  TTable extends AnySQLiteTable = AnySQLiteTable,
+> {
+  ids?: readonly (string | number)[];
+  search?: string;
+  fields?: readonly TableColumn<TTable>[];
+  limit?: number;
+}
+
+export interface CountRowsInput {
+  where?: SQL;
+}
+
+export interface CountRowsByInput<
+  TTable extends AnySQLiteTable = AnySQLiteTable,
+> extends CountRowsInput {
+  column: TableColumn<TTable>;
+  order?: "asc" | "desc";
+  limit?: number;
+}
+
+export interface PageRowsResult {
   data: Record<string, unknown>[];
   meta: {
     total: number;
@@ -70,29 +100,18 @@ export interface ListRowsResult {
   };
 }
 
-export interface ScopedRows {
-  list(
-    query?: ListRowsInput,
-    options?: ScopedRowsSearchOptions,
-  ): Promise<ListRowsResult>;
+export interface ScopedRows<TTable extends AnySQLiteTable = AnySQLiteTable> {
+  page(input?: PageRowsInput): Promise<PageRowsResult>;
   get(id: RowId): Promise<Record<string, unknown>>;
   create(
     input: unknown,
   ): Promise<Record<string, unknown> | Record<string, unknown>[]>;
   update(id: RowId, patch: unknown): Promise<Record<string, unknown>>;
   delete(id: RowId): Promise<Record<string, unknown>>;
-  exportRows(
-    query?: ListRowsInput,
-    options?: ScopedRowsSearchOptions,
-  ): Promise<Record<string, unknown>[]>;
-  lookup(query?: ListRowsInput): Promise<LookupEntry[]>;
+  scan(input?: ScanRowsInput): AsyncIterable<Record<string, unknown>>;
+  lookup(input?: LookupRowsInput<TTable>): Promise<LookupEntry[]>;
   count(input?: CountRowsInput): Promise<number>;
-  countBy(input: CountRowsByInput): Promise<GroupCount[]>;
-}
-
-export interface ScopedRowsSearchOptions {
-  /** Required only when the query contains `q`. */
-  searchPlan: SearchPlan;
+  countBy(input: CountRowsByInput<TTable>): Promise<GroupCount[]>;
 }
 
 export class ImmutableTableOperationError extends Error {
@@ -109,7 +128,14 @@ export class RowNotFoundError extends Error {
   }
 }
 
-type OrderClause = SQL | SQLiteColumn;
+export const DEFAULT_PAGE = 1;
+export const DEFAULT_PAGE_LIMIT = 50;
+export const MAX_PAGE_LIMIT = 1000;
+export const MAX_LOOKUP_LIMIT = 500;
+const DEFAULT_SCAN_BATCH_SIZE = 250;
+const MAX_SCAN_BATCH_SIZE = 1000;
+
+type OrderClause = RowsOrderBy;
 type OffsettableRowsQuery = {
   offset(offset: number): PromiseLike<unknown>;
 };
@@ -121,11 +147,11 @@ type OrderableRowsQuery = {
   orderBy(...clauses: OrderClause[]): OrderedRowsQuery;
 };
 
-export function scopedRows(
+export function scopedRows<TTable extends AnySQLiteTable>(
   db: BetterSQLite3Database,
   auth: SapportaAuthContext,
-  table: TableDef,
-): ScopedRows {
+  table: TableDef<TTable>,
+): ScopedRows<TTable> {
   // Resolve the request-bound access policy once so every operation below uses
   // the same table metadata, workspace, user, and row-scope interpretation.
   const access = auth.rowSecurity.forTable(table);
@@ -136,28 +162,27 @@ export function scopedRows(
   );
 
   return {
-    async list(input = {}, options) {
-      // Parse filtering/search/sort/pagination first, then wrap the parsed
-      // predicate in row ownership before using it for both rows and totals.
-      const query = parseRowsQuery(input, table);
-      const where = access.ownedRows(rowsQueryPredicate(query, options));
+    async page(input = {}) {
+      const { page, limit, offset } = normalizedPageWindow(input);
+      const where = access.ownedRows(input.where);
+      const orderBy = normalizeOrderBy(input.orderBy);
       const total = await countTableRows(db, table, where);
       const rows = (await applyOrderBy(
         db.select().from(table.drizzle).where(where),
-        query,
+        orderBy,
         table,
         pk.drizzlePk,
       )
-        .limit(query.limit)
-        .offset(query.offset)) as Record<string, unknown>[];
+        .limit(limit)
+        .offset(offset)) as Record<string, unknown>[];
 
       return {
         data: rows.map((row) => publicRow.pick(row)),
         meta: {
           total,
-          page: Math.floor(query.offset / query.limit) + 1,
-          limit: query.limit,
-          pages: Math.ceil(total / query.limit),
+          page,
+          limit,
+          pages: Math.ceil(total / limit),
         },
       };
     },
@@ -225,18 +250,27 @@ export function scopedRows(
       return publicRow.pick(deleted[0]!);
     },
 
-    async exportRows(input = {}, options) {
-      // Export is the unpaginated list path; it keeps query parsing, ordering,
-      // and row ownership identical to list.
-      const query = parseRowsQuery(input, table);
-      const where = access.ownedRows(rowsQueryPredicate(query, options));
-      const rows = (await applyOrderBy(
-        db.select().from(table.drizzle).where(where),
-        query,
-        table,
-        pk.drizzlePk,
-      )) as unknown as Record<string, unknown>[];
-      return rows.map((row) => publicRow.pick(row));
+    scan(input = {}) {
+      const where = access.ownedRows(input.where);
+      const orderBy = normalizeOrderBy(input.orderBy);
+      const batchSize = normalizedScanBatchSize(input.batchSize);
+
+      return (async function* scanRows() {
+        let offset = 0;
+        while (true) {
+          const batch = (await applyOrderBy(
+            db.select().from(table.drizzle).where(where),
+            orderBy,
+            table,
+            pk.drizzlePk,
+          )
+            .limit(batchSize)
+            .offset(offset)) as Record<string, unknown>[];
+          for (const row of batch) yield publicRow.pick(row);
+          if (batch.length < batchSize) return;
+          offset += batch.length;
+        }
+      })();
     },
 
     async lookup(input = {}) {
@@ -244,10 +278,10 @@ export function scopedRows(
       // selected entries. Search follows the fields displayed by the picker;
       // returned metadata contains only ordinary visible table fields.
       const { pkName, labelColumns, label } = rowLabeller(table);
-      const idsParam = input.ids;
-      const searchText = input.q?.trim().toLocaleLowerCase() ?? "";
-      const limit = parseLookupLimit(input.limit);
-      const displayedFields = resolveLookupDisplayedFields(table, input.fields);
+      const ids = normalizeLookupIds(input.ids, table, pk.pkCol.name);
+      const searchText = input.search?.trim().toLocaleLowerCase() ?? "";
+      const limit = normalizeLookupLimit(input.limit);
+      const displayedFields = normalizeLookupFields(table, input.fields);
       const visibleFields = getTableConfig(table.drizzle)
         .columns.map((column) => column.name)
         .filter(
@@ -261,7 +295,7 @@ export function scopedRows(
       );
 
       let rows: Record<string, unknown>[];
-      if (idsParam === undefined) {
+      if (ids === undefined) {
         const searchWhere =
           searchText === ""
             ? undefined
@@ -280,7 +314,6 @@ export function scopedRows(
           ? query
           : query.limit(limit))) as Record<string, unknown>[];
       } else {
-        const ids = parseLookupIds(idsParam, table, pk.pkCol.name);
         if (ids.length === 0) return [];
         rows = (await db
           .select(queryFields.databaseSelection)
@@ -306,35 +339,23 @@ export function scopedRows(
       return entries;
     },
 
-    async count(input: CountRowsInput = {}) {
+    async count(input = {}) {
       return countTableRows(db, table, access.ownedRows(input.where));
     },
 
-    async countBy(input: CountRowsByInput) {
-      return countTableRowsBy(db, table, input, access.ownedRows(input.where));
+    async countBy(input) {
+      return countTableRowsBy(
+        db,
+        table,
+        {
+          column: input.column,
+          order: input.order,
+          limit: input.limit,
+        },
+        access.ownedRows(input.where),
+      );
     },
   };
-
-  function rowsQueryPredicate(
-    query: ParsedQuery,
-    options: ScopedRowsSearchOptions | undefined,
-  ): SQL | undefined {
-    if (!query.searchTerm) return query.where;
-    const searchPlan = options?.searchPlan;
-    if (!searchPlan) {
-      throw new QueryParseError(
-        "no_search_config",
-        `Search on table \`${table.sqlName}\` requires a compiled search plan`,
-      );
-    }
-    if (searchPlan.table !== table) {
-      throw new Error(
-        `Search plan for "${searchPlan.table.sqlName}" cannot be used with table "${table.sqlName}".`,
-      );
-    }
-    const search = buildSearchPredicate(searchPlan, query.searchTerm, auth);
-    return and(query.where, search);
-  }
 }
 
 // Drizzle exposes columns by property name, while query parameters and result
@@ -348,113 +369,138 @@ function resolvePk(table: TableDef) {
 // structural types model only the call chain this module needs.
 function applyOrderBy(
   queryBuilder: unknown,
-  query: ParsedQuery,
+  orderBy: readonly OrderClause[],
   table: TableDef,
   pk: SQLiteColumn,
 ): OrderedRowsQuery {
   const orderable = queryBuilder as OrderableRowsQuery;
-  if (query.orderBy.length > 0) return orderable.orderBy(...query.orderBy);
-  if (table.meta.defaultSort) return orderable.orderBy(table.meta.defaultSort);
+  if (orderBy.length > 0) {
+    return orderable.orderBy(...orderBy, asc(pk));
+  }
+  if (table.meta.defaultSort) {
+    return orderable.orderBy(table.meta.defaultSort, asc(pk));
+  }
   return orderable.orderBy(asc(pk));
 }
 
-function parseRowsQuery(input: ListRowsInput, table: TableDef): ParsedQuery {
-  return parseQuery(withoutUndefinedValues(input), table);
+function normalizeOrderBy(
+  orderBy: RowSelection["orderBy"],
+): readonly OrderClause[] {
+  if (orderBy === undefined) return [];
+  return isOrderByArray(orderBy) ? [...orderBy] : [orderBy];
 }
 
-function withoutUndefinedValues(input: ListRowsInput): Record<string, string> {
-  const params: Record<string, string> = {};
-  for (const [key, value] of Object.entries(input)) {
-    if (value !== undefined) params[key] = value;
+function isOrderByArray(
+  value: RowsOrderBy | readonly RowsOrderBy[],
+): value is readonly RowsOrderBy[] {
+  return Array.isArray(value);
+}
+
+function normalizedPageWindow(input: PageRowsInput): {
+  page: number;
+  limit: number;
+  offset: number;
+} {
+  const page = input.page ?? DEFAULT_PAGE;
+  if (!Number.isInteger(page) || page < 1) {
+    throw new RangeError("Page must be a positive integer.");
   }
-  return params;
+  const limit = input.limit ?? DEFAULT_PAGE_LIMIT;
+  if (!Number.isInteger(limit) || limit < 1 || limit > MAX_PAGE_LIMIT) {
+    throw new RangeError(
+      `Page limit must be an integer from 1 to ${MAX_PAGE_LIMIT}.`,
+    );
+  }
+  return { page, limit, offset: (page - 1) * limit };
 }
 
-function parseCommaSeparatedValues(value: string): string[] {
-  return value
-    .split(",")
-    .map((value) => value.trim())
-    .filter(Boolean);
+function normalizedScanBatchSize(batchSize: number | undefined): number {
+  const normalized = batchSize ?? DEFAULT_SCAN_BATCH_SIZE;
+  if (
+    !Number.isInteger(normalized) ||
+    normalized < 1 ||
+    normalized > MAX_SCAN_BATCH_SIZE
+  ) {
+    throw new RangeError(
+      `Scan batch size must be an integer from 1 to ${MAX_SCAN_BATCH_SIZE}.`,
+    );
+  }
+  return normalized;
 }
 
-function parseLookupIds(
-  idsParam: string,
+function normalizeLookupIds(
+  ids: readonly (string | number)[] | undefined,
   table: TableDef,
   primaryKeyColumn: string,
-): Array<string | number> {
-  const ids = parseCommaSeparatedValues(idsParam);
+): readonly (string | number)[] | undefined {
+  if (ids === undefined) return undefined;
   const kind = resolveColumnKind(table, primaryKeyColumn);
   switch (kind) {
-    case "text":
+    case "text": {
+      const invalid = ids.find((id) => typeof id !== "string");
+      if (invalid !== undefined) {
+        throw new TypeError(
+          `Lookup id for text column "${primaryKeyColumn}" must be a string, got ${JSON.stringify(invalid)}.`,
+        );
+      }
       return ids;
-    case "number":
-      return ids.map((id) => {
-        const value = Number(id);
-        if (!Number.isFinite(value)) {
-          throw new QueryParseError(
-            "bad_value",
-            `lookup id for column "${primaryKeyColumn}" must be a finite number, got ${JSON.stringify(id)}`,
-          );
-        }
-        return value;
-      });
+    }
+    case "number": {
+      const invalid = ids.find(
+        (id) => typeof id !== "number" || !Number.isFinite(id),
+      );
+      if (invalid !== undefined) {
+        throw new TypeError(
+          `Lookup id for numeric column "${primaryKeyColumn}" must be a finite number, got ${JSON.stringify(invalid)}.`,
+        );
+      }
+      return ids;
+    }
     case "boolean":
     case "date":
     case "timestamp":
-      throw new QueryParseError(
-        "bad_value",
-        `lookup does not support ${kind} primary keys`,
-      );
+      throw new TypeError(`Lookup does not support ${kind} primary keys.`);
     case undefined:
-      throw new QueryParseError(
-        "unknown_column",
-        `Column "${primaryKeyColumn}" not found`,
-      );
+      throw new Error(`Column "${primaryKeyColumn}" not found.`);
   }
 }
 
-function parseLookupLimit(limitParam: string | undefined): number | undefined {
-  return parseOptionalBoundedInteger(limitParam, {
-    name: "limit",
-    min: 1,
-    max: 500,
-    makeError: (message) => new QueryParseError("bad_limit", message),
-  });
-}
-
-function resolveLookupDisplayedFields(
-  table: TableDef,
-  fieldsParam: string | undefined,
-): readonly string[] {
-  if (fieldsParam === undefined) return [];
-  const fields = uniqueNames(parseCommaSeparatedValues(fieldsParam));
-
-  try {
-    resolveRowFields(table, fields);
-  } catch (error) {
-    if (error instanceof UnknownRowFieldsError) {
-      throw new QueryParseError("unknown_column", error.message);
-    }
-    throw error;
-  }
-
-  const hiddenFields = fields.filter(
-    (field) => table.meta.columns[field]?.visuallyHidden === true,
-  );
-  if (hiddenFields.length > 0) {
-    throw new QueryParseError(
-      "unknown_column",
-      `Lookup field(s) are not visible on table "${table.sqlName}": ${hiddenFields.join(", ")}`,
+function normalizeLookupLimit(limit: number | undefined): number | undefined {
+  if (limit === undefined) return undefined;
+  if (!Number.isInteger(limit) || limit < 1 || limit > MAX_LOOKUP_LIMIT) {
+    throw new RangeError(
+      `Lookup limit must be an integer from 1 to ${MAX_LOOKUP_LIMIT}.`,
     );
   }
+  return limit;
+}
 
-  return fields;
+function normalizeLookupFields<TTable extends AnySQLiteTable>(
+  table: TableDef<TTable>,
+  fields: readonly TableColumn<TTable>[] | undefined,
+): SQLiteColumn[] {
+  if (fields === undefined) return [];
+  const tableColumns = new Set(getTableConfig(table.drizzle).columns);
+  const unique = Array.from(new Set<SQLiteColumn>(fields));
+  for (const column of unique) {
+    if (!tableColumns.has(column)) {
+      throw new Error(
+        `Lookup field "${column.name}" does not belong to table "${table.sqlName}".`,
+      );
+    }
+    if (table.meta.columns[column.name]?.visuallyHidden === true) {
+      throw new Error(
+        `Lookup field "${column.name}" is not visible on table "${table.sqlName}".`,
+      );
+    }
+  }
+  return unique;
 }
 
 function lookupDisplayedFieldsSearchCondition(
   table: TableDef,
   labelFields: readonly string[],
-  displayedFields: readonly string[],
+  displayedFields: readonly SQLiteColumn[],
   searchText: string,
 ): SQL | undefined {
   const labelColumns = Object.values(
@@ -473,12 +519,9 @@ function lookupDisplayedFieldsSearchCondition(
 
   const pattern = `%${searchText}%`;
   const conditions: SQL[] = [sql`lower(${labelExpression}) like ${pattern}`];
-  const labelFieldSet = new Set(labelFields);
-  for (const column of Object.values(
-    resolveRowFields(
-      table,
-      displayedFields.filter((field) => !labelFieldSet.has(field)),
-    ).databaseSelection,
+  const labelFieldSet = new Set(labelColumns);
+  for (const column of displayedFields.filter(
+    (field) => !labelFieldSet.has(field),
   )) {
     conditions.push(
       sql`lower(coalesce(cast(${column} as text), '')) like ${pattern}`,

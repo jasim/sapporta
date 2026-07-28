@@ -109,7 +109,9 @@ api.register(
 );
 ```
 
-The `scopedRows(db, auth, table)` call returns an object that lets you call list, get, create, update, delete, lookup, and export. All of these are tightly scoped to the current user's role and permissions.
+The `scopedRows(db, auth, table)` call provides paged reads, bounded scans,
+lookup, counts, and row writes. Read methods accept ordinary Drizzle
+expressions, while Sapporta adds the current row scope before executing them.
 
 ## Libraries & Frameworks
 

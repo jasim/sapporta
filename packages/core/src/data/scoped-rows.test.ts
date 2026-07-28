@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
+import { asc, desc, eq, gt } from "drizzle-orm";
 import { integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
 import { sapportaTable } from "../schema/table.js";
-import { QueryParseError, ValidationError } from "../db/errors.js";
+import { ValidationError } from "../db/errors.js";
 import { createTestAuthContext } from "../testing/auth-context.js";
 import { createTestDb } from "../testing/test-utils.js";
 import {
@@ -107,10 +108,60 @@ describe("scopedRows", () => {
     await rows.create({ name: "Cash", type: "asset" });
     await rows.create({ name: "Revenue", type: "revenue" });
 
-    const result = await rows.list();
+    const result = await rows.page();
     expect(result.data).toHaveLength(2);
     expect(result.meta.total).toBe(2);
     expect(result.meta.page).toBe(1);
+  });
+
+  it("accepts Drizzle expressions for filtering, ordering, and pagination", async () => {
+    const { rows } = setupAccounts();
+    await rows.create({ name: "Cash", type: "asset", balance: 100 });
+    await rows.create({ name: "Revenue", type: "revenue", balance: 250 });
+    await rows.create({ name: "Rent", type: "expense", balance: 300 });
+
+    const result = await rows.page({
+      where: gt(accountsTable.balance, 100),
+      orderBy: desc(accountsTable.balance),
+      limit: 1,
+      page: 2,
+    });
+
+    expect(result.data.map((row) => row.name)).toEqual(["Revenue"]);
+    expect(result.meta).toEqual({
+      total: 2,
+      page: 2,
+      limit: 1,
+      pages: 2,
+    });
+  });
+
+  it("validates direct page windows", async () => {
+    const { rows } = setupAccounts();
+
+    await expect(rows.page({ limit: 0 })).rejects.toBeInstanceOf(RangeError);
+    await expect(rows.page({ page: 0 })).rejects.toBeInstanceOf(RangeError);
+  });
+
+  it("scans with transport-free filtering, ordering, and bounded batches", async () => {
+    const { rows } = setupAccounts();
+    await rows.create({ name: "Cash", type: "asset" });
+    await rows.create({ name: "Petty Cash", type: "asset" });
+    await rows.create({ name: "Revenue", type: "revenue" });
+
+    const scanned: Record<string, unknown>[] = [];
+    for await (const row of rows.scan({
+      where: eq(accountsTable.type, "asset"),
+      orderBy: [asc(accountsTable.name), asc(accountsTable.id)],
+      batchSize: 1,
+    })) {
+      scanned.push(row);
+    }
+
+    expect(scanned).toEqual([
+      expect.objectContaining({ name: "Cash", type: "asset" }),
+      expect.objectContaining({ name: "Petty Cash", type: "asset" }),
+    ]);
   });
 
   it("gets one record by primary key", async () => {
@@ -198,7 +249,7 @@ describe("scopedRows", () => {
       documents,
     );
 
-    const result = await rows.list();
+    const result = await rows.page();
     expect(result.data.map((row) => row.title)).toEqual(["Visible"]);
     expect(result.meta.total).toBe(1);
     await expect(rows.get("2")).rejects.toBeInstanceOf(RowNotFoundError);
@@ -214,7 +265,7 @@ describe("scopedRows", () => {
     await rows.create({ name: "Revenue", type: "revenue", balance: 250 });
     await rows.create({ name: "Rent", type: "expense", balance: 300 });
 
-    await expect(rows.lookup({ ids: "1,2" })).resolves.toEqual([
+    await expect(rows.lookup({ ids: [1, 2] })).resolves.toEqual([
       {
         value: 1,
         label: "Cash",
@@ -226,7 +277,7 @@ describe("scopedRows", () => {
         meta: { id: 2, name: "Revenue", type: "revenue", balance: 250 },
       },
     ]);
-    await expect(rows.lookup({ q: "re" })).resolves.toEqual([
+    await expect(rows.lookup({ search: "re" })).resolves.toEqual([
       {
         value: 2,
         label: "Revenue",
@@ -238,14 +289,14 @@ describe("scopedRows", () => {
         meta: { id: 3, name: "Rent", type: "expense", balance: 300 },
       },
     ]);
-    await expect(rows.lookup({ q: "re", limit: "1" })).resolves.toEqual([
+    await expect(rows.lookup({ search: "re", limit: 1 })).resolves.toEqual([
       {
         value: 2,
         label: "Revenue",
         meta: { id: 2, name: "Revenue", type: "revenue", balance: 250 },
       },
     ]);
-    await expect(rows.lookup({ limit: "2" })).resolves.toEqual([
+    await expect(rows.lookup({ limit: 2 })).resolves.toEqual([
       {
         value: 1,
         label: "Cash",
@@ -257,31 +308,33 @@ describe("scopedRows", () => {
         meta: { id: 2, name: "Revenue", type: "revenue", balance: 250 },
       },
     ]);
-    await expect(rows.lookup({ q: "asset" })).resolves.toEqual([]);
-    await expect(rows.lookup({ q: "asset", fields: "type" })).resolves.toEqual([
+    await expect(rows.lookup({ search: "asset" })).resolves.toEqual([]);
+    await expect(
+      rows.lookup({ search: "asset", fields: [accountsTable.type] }),
+    ).resolves.toEqual([
       {
         value: 1,
         label: "Cash",
         meta: { id: 1, name: "Cash", type: "asset", balance: 100 },
       },
     ]);
-    await expect(rows.lookup({ q: "250" })).resolves.toEqual([]);
-    await expect(rows.lookup({ q: "250", fields: "balance" })).resolves.toEqual(
-      [
-        {
-          value: 2,
-          label: "Revenue",
-          meta: { id: 2, name: "Revenue", type: "revenue", balance: 250 },
-        },
-      ],
-    );
+    await expect(rows.lookup({ search: "250" })).resolves.toEqual([]);
+    await expect(
+      rows.lookup({ search: "250", fields: [accountsTable.balance] }),
+    ).resolves.toEqual([
+      {
+        value: 2,
+        label: "Revenue",
+        meta: { id: 2, name: "Revenue", type: "revenue", balance: 250 },
+      },
+    ]);
   });
 
   it("rejects non-numeric lookup ids for numeric primary keys", async () => {
     const { rows } = setupAccounts();
 
-    await expect(rows.lookup({ ids: "not-a-number" })).rejects.toBeInstanceOf(
-      QueryParseError,
+    await expect(rows.lookup({ ids: ["not-a-number"] })).rejects.toBeInstanceOf(
+      TypeError,
     );
   });
 
@@ -315,17 +368,20 @@ describe("scopedRows", () => {
       contacts,
     );
 
-    await expect(rows.lookup({ ids: "1" })).resolves.toEqual([
+    await expect(rows.lookup({ ids: [1] })).resolves.toEqual([
       {
         value: 1,
         label: "Alice Adams",
         meta: { id: 1, display_name: "Alice Adams" },
       },
     ]);
-    await expect(rows.lookup({ q: "internal-7305" })).resolves.toEqual([]);
+    await expect(rows.lookup({ search: "internal-7305" })).resolves.toEqual([]);
     await expect(
-      rows.lookup({ q: "internal-7305", fields: "secret_code" }),
-    ).rejects.toMatchObject({ code: "unknown_column" });
+      rows.lookup({
+        search: "internal-7305",
+        fields: [contactsTable.secretCode],
+      }),
+    ).rejects.toThrow(/not visible/);
   });
 
   it("keeps lookup ids as strings for text primary keys", async () => {
@@ -355,7 +411,7 @@ describe("scopedRows", () => {
       agents,
     );
 
-    await expect(rows.lookup({ ids: "001" })).resolves.toEqual([
+    await expect(rows.lookup({ ids: ["001"] })).resolves.toEqual([
       {
         value: "001",
         label: "Agent One",

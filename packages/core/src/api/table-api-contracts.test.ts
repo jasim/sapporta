@@ -51,7 +51,7 @@ describe("listRoute — list response pagination envelope", () => {
   it("parses a valid envelope", () => {
     const r = envelope.safeParse({
       data: [{ id: 1, name: "Cash", type: "asset", balance: 100 }],
-      meta: { total: 1, limit: 20, offset: 0 },
+      meta: { total: 1, page: 1, limit: 20, pages: 1 },
     });
     expect(r.success).toBe(true);
   });
@@ -59,14 +59,17 @@ describe("listRoute — list response pagination envelope", () => {
   it("rejects a string-typed `total` (no coercion on responses)", () => {
     const r = envelope.safeParse({
       data: [],
-      meta: { total: "1", limit: 20, offset: 0 },
+      meta: { total: "1", page: 1, limit: 20, pages: 0 },
     });
     expect(r.success).toBe(false);
     if (!r.success) expect(r.error.issues[0].path).toEqual(["meta", "total"]);
   });
 
   it("rejects a missing `limit`", () => {
-    const r = envelope.safeParse({ data: [], meta: { total: 0, offset: 0 } });
+    const r = envelope.safeParse({
+      data: [],
+      meta: { total: 0, page: 1, pages: 0 },
+    });
     expect(r.success).toBe(false);
     if (!r.success) expect(r.error.issues[0].path).toEqual(["meta", "limit"]);
   });

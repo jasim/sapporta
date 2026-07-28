@@ -43,10 +43,49 @@ api.register(
 );
 ```
 
+The read side uses the same expressions as an ordinary Drizzle query. The row
+scope is still added by `scopedRows()` before the query reaches SQLite.
+
+```ts
+import { desc, eq } from "drizzle-orm";
+import { invoices, invoicesTable } from "../schema/invoices.js";
+
+const rows = scopedRows(c.get("db"), auth, invoices);
+const pending = await rows.page({
+  where: eq(invoicesTable.status, "pending"),
+  orderBy: desc(invoicesTable.createdAt),
+  limit: 25,
+  page: 2,
+});
+```
+
+Large sequential reads use a bounded async scan. This keeps exports and similar
+workflows from loading every matching row into memory:
+
+```ts
+for await (const invoice of rows.scan({
+  where: eq(invoicesTable.status, "pending"),
+  orderBy: desc(invoicesTable.createdAt),
+})) {
+  // Process one visible invoice.
+}
+```
+
+Lookup inputs are typed too. IDs are values rather than comma-separated text,
+and displayed search fields are Drizzle columns rather than HTTP field names:
+
+```ts
+await rows.lookup({
+  ids: [12, 14, 19],
+  fields: [invoicesTable.id, invoicesTable.reference],
+  limit: 20,
+});
+```
+
 `scopedRows()` exposes `count()` for scalar totals and `countBy()` for bounded
 grouped counts that must keep the same row boundary as generated reads. Both
-accept Drizzle `where` expressions, and `countBy()` accepts the group column;
-generated HTTP and CLI routes translate canonical filters into those
+accept Drizzle expressions for `where`, and `countBy()` accepts the group
+column. Generated HTTP and CLI routes translate canonical filters into those
 transport-free inputs. Use
 `auth.rowSecurity.forTable(table)` directly for advanced Drizzle workflows such
 as joins, transactions, multi-table state transitions, custom SQL, and

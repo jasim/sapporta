@@ -107,6 +107,28 @@ describe("/api/tables table operations", () => {
     });
   });
 
+  describe("read query boundaries", () => {
+    it("rejects unknown list parameters instead of silently ignoring them", async () => {
+      const res = await request("/api/tables/accounts?srot=name");
+
+      expect(res.status).toBe(400);
+      expect(await res.json()).toMatchObject({ code: "bad_value" });
+    });
+
+    it("exports the complete selection and rejects pagination parameters", async () => {
+      const exported = await request(
+        "/api/tables/accounts/export.csv?sort=name&filter[type][eq]=asset",
+      );
+      expect(exported.status).toBe(200);
+      expect(exported.headers.get("content-type")).toContain("text/csv");
+      expect(await exported.text()).toContain("Alpha");
+
+      const paged = await request("/api/tables/accounts/export.csv?page=2");
+      expect(paged.status).toBe(400);
+      expect(await paged.json()).toMatchObject({ code: "bad_value" });
+    });
+  });
+
   // ── Sorting ─────────────────────────────────────────────────────────
 
   describe("sorting", () => {

@@ -50,25 +50,35 @@ export const lookupResponseSchema = z.object({
 });
 export type LookupResponse = z.output<typeof lookupResponseSchema>;
 
-/** Query shape for the row-listing endpoint. Filters are encoded as
- *  additional `filter[col][op]` keys (see `@sapporta/shared/filter`); the contract
- *  uses `.loose()` so those pass through validation. */
+const rowSelectionQueryShape = {
+  sort: z.string().optional(),
+  q: z.string().optional(),
+};
+
+/** Query shape shared by reads that select rows without pagination.
+ *  Filters are additional `filter[col][op]` keys; `.loose()` lets those
+ *  table-defined keys reach the server's strict query resolver. */
+export const exportRowsQuerySchema = z.object(rowSelectionQueryShape).loose();
+export type ExportRowsQuery = z.output<typeof exportRowsQuerySchema>;
+
+/** Query shape for the paged row-listing endpoint. */
 export const listRowsQuerySchema = z
   .object({
+    ...rowSelectionQueryShape,
     page: z.string().optional(),
     limit: z.string().optional(),
-    sort: z.string().optional(),
-    q: z.string().optional(),
   })
   .loose();
 export type ListRowsQuery = z.output<typeof listRowsQuerySchema>;
 
-export const lookupQuerySchema = z.object({
-  ids: z.string().optional(),
-  q: z.string().optional(),
-  limit: z.string().optional(),
-  fields: z.string().optional(),
-});
+export const lookupQuerySchema = z
+  .object({
+    ids: z.string().optional(),
+    q: z.string().optional(),
+    limit: z.string().optional(),
+    fields: z.string().optional(),
+  })
+  .strict();
 export type LookupQuery = z.output<typeof lookupQuerySchema>;
 
 const countGroupValueSchema = z.union([

@@ -23,20 +23,17 @@
 
 import { z } from "zod";
 import { initContract } from "@sapporta/rest-core";
-import { errorBodySchema } from "@sapporta/shared/contracts";
+import {
+  errorBodySchema,
+  exportRowsQuerySchema,
+  listMetaSchema,
+  listRowsQuerySchema,
+} from "@sapporta/shared/contracts";
 import type { TableDef } from "../schema/table.js";
 import { tableZodComponentId } from "../schema/table-value-zod.js";
 import { tableApiZod } from "./table-api-zod.js";
 
 const c = initContract();
-
-const listMetaSchema = z.object({
-  total: z.number(),
-  page: z.number().optional(),
-  limit: z.number(),
-  pages: z.number().optional(),
-  offset: z.number().optional(),
-});
 
 type ApiPayloadZod = z.ZodType;
 
@@ -47,15 +44,7 @@ export function listRoute(def: TableDef) {
     path: `/tables/${def.sqlName}`,
     summary: `List rows in ${def.sqlName}`,
     metadata: { tags: ["tables"] },
-    query: z
-      .object({
-        limit: z.coerce.number().int().positive().max(1000).optional(),
-        offset: z.coerce.number().int().nonnegative().optional(),
-        page: z.coerce.number().int().positive().optional(),
-        sort: z.string().optional(),
-        q: z.string().optional(),
-      })
-      .loose(),
+    query: listRowsQuerySchema,
     responses: {
       200: z.object({ data: z.array(row), meta: listMetaSchema }),
       400: errorBodySchema,
@@ -254,8 +243,10 @@ export function exportCsvRoute(def: TableDef) {
     path: `/tables/${def.sqlName}/export.csv`,
     summary: `Export ${def.sqlName} rows as CSV`,
     metadata: { tags: ["tables"] },
+    query: exportRowsQuerySchema,
     responses: {
       200: c.otherResponse({ contentType: "text/csv", body: z.string() }),
+      400: errorBodySchema,
     },
   });
 }

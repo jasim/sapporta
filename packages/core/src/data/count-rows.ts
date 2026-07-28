@@ -9,11 +9,7 @@ import {
 import type { TableDef } from "../schema/table.js";
 import { zodForColumnValue } from "../schema/table-value-zod.js";
 
-export interface CountRowsInput {
-  where?: SQL;
-}
-
-export interface CountRowsByInput extends CountRowsInput {
+export interface CountTableRowsByInput {
   column: SQLiteColumn;
   order?: "asc" | "desc";
   limit?: number;
@@ -34,7 +30,7 @@ export async function countTableRows(
 export async function countTableRowsBy(
   db: BetterSQLite3Database,
   table: TableDef,
-  input: CountRowsByInput,
+  input: CountTableRowsByInput,
   scopedWhere: SQL,
 ): Promise<GroupCount[]> {
   assertTableColumn(table, input.column);
@@ -57,7 +53,7 @@ export async function countTableRowsBy(
   }));
 }
 
-function normalizedGroupOptions(input: CountRowsByInput): {
+function normalizedGroupOptions(input: CountTableRowsByInput): {
   order: "asc" | "desc";
   limit: number;
 } {

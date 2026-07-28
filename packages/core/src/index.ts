@@ -86,17 +86,21 @@ export {
   scopedRows,
 } from "./data/scoped-rows.js";
 export type {
-  ListRowsInput,
-  ListRowsResult,
+  CountRowsByInput,
+  CountRowsInput,
+  LookupRowsInput,
+  PageRowsInput,
+  PageRowsResult,
+  RowSelection,
+  RowsOrderBy,
+  ScanRowsInput,
   ScopedRows,
-  ScopedRowsSearchOptions,
+  TableColumn,
 } from "./data/scoped-rows.js";
-export type { CountRowsByInput, CountRowsInput } from "./data/count-rows.js";
 export type { GroupCount } from "@sapporta/shared";
 
-// Query parser
-export { parseQuery } from "./data/query-parser.js";
-export type { ParsedQuery } from "./data/query-parser.js";
+// Generated table HTTP query resolvers
+export { tableHttpQuery } from "./api/table-query.js";
 
 // Table search planning and request-bound SQL compilation
 export { normalizeTableSearch } from "./search/search-types.js";

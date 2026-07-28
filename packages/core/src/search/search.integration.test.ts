@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import { index, integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
 import { sapportaTable } from "../schema/table.js";
 import { createTableCatalog } from "../schema/catalog.js";
+import type { TableCatalog } from "../schema/catalog.js";
+import type { SapportaAuthContext } from "../auth/context.js";
 import { createTestAuthContext } from "../testing/auth-context.js";
 import { createTestDb } from "../testing/test-utils.js";
 import { scopedRows } from "../data/scoped-rows.js";
@@ -113,35 +115,50 @@ function setup() {
     catalog,
     auth,
     rows: scopedRows(db, auth, books),
-    search: { searchPlan: catalog.searchPlanFor("books") },
+  };
+}
+
+function searchInput(
+  catalog: TableCatalog,
+  auth: SapportaAuthContext,
+  term: string,
+) {
+  return {
+    where: buildSearchPredicate(catalog.searchPlanFor("books"), term, auth),
   };
 }
 
 describe("explicit relational table search", () => {
-  it("requires search planning only when a query contains a search term", async () => {
+  it("keeps HTTP search terms out of the scoped row API", async () => {
     const { rows } = setup();
 
-    await expect(rows.list({ q: "Horizon" })).rejects.toMatchObject({
-      code: "no_search_config",
-    });
-    await expect(rows.list()).resolves.toMatchObject({
+    await expect(rows.page()).resolves.toMatchObject({
       meta: { total: 4 },
     });
+
+    if (false) {
+      // @ts-expect-error HTTP search terms must be resolved to a predicate first
+      await rows.page({ q: "Horizon" });
+    }
   });
 
   it("searches root values, FK row labels, and explicitly configured quotes", async () => {
-    const { rows, search } = setup();
+    const { rows, catalog, auth } = setup();
 
-    await expect(rows.list({ q: "Horizon" }, search)).resolves.toMatchObject({
+    await expect(
+      rows.page(searchInput(catalog, auth, "Horizon")),
+    ).resolves.toMatchObject({
       data: [{ id: 101 }],
       meta: { total: 1 },
     });
-    await expect(rows.list({ q: "Jane Doe" }, search)).resolves.toMatchObject({
+    await expect(
+      rows.page(searchInput(catalog, auth, "Jane Doe")),
+    ).resolves.toMatchObject({
       data: [{ id: 101 }, { id: 103 }, { id: 104 }],
       meta: { total: 3 },
     });
     await expect(
-      rows.list({ q: "sea remembers" }, search),
+      rows.page(searchInput(catalog, auth, "sea remembers")),
     ).resolves.toMatchObject({
       data: [{ id: 101 }],
       meta: { total: 1 },
@@ -149,14 +166,16 @@ describe("explicit relational table search", () => {
   });
 
   it("does not search raw FK ids or visually hidden columns", async () => {
-    const { rows, search } = setup();
+    const { rows, catalog, auth } = setup();
 
-    await expect(rows.list({ q: "7002" }, search)).resolves.toMatchObject({
+    await expect(
+      rows.page(searchInput(catalog, auth, "7002")),
+    ).resolves.toMatchObject({
       data: [],
       meta: { total: 0 },
     });
     await expect(
-      rows.list({ q: "hidden-cipher" }, search),
+      rows.page(searchInput(catalog, auth, "hidden-cipher")),
     ).resolves.toMatchObject({
       data: [],
       meta: { total: 0 },
@@ -164,30 +183,34 @@ describe("explicit relational table search", () => {
   });
 
   it("treats LIKE syntax literally and does not duplicate matching roots", async () => {
-    const { rows, search } = setup();
+    const { rows, catalog, auth } = setup();
 
-    const literal = await rows.list({ q: "%_" }, search);
+    const literal = await rows.page(searchInput(catalog, auth, "%_"));
     expect(literal.data.map((row) => row.id)).toEqual([103]);
 
-    const duplicateMatches = await rows.list({ q: "blue" }, search);
+    const duplicateMatches = await rows.page(
+      searchInput(catalog, auth, "blue"),
+    );
     expect(duplicateMatches.data.map((row) => row.id)).toEqual([101]);
     expect(duplicateMatches.meta.total).toBe(1);
-    await expect(rows.exportRows({ q: "blue" }, search)).resolves.toHaveLength(
-      1,
-    );
+    const scanned: Record<string, unknown>[] = [];
+    for await (const row of rows.scan(searchInput(catalog, auth, "blue"))) {
+      scanned.push(row);
+    }
+    expect(scanned).toHaveLength(1);
   });
 
   it("applies child row scope and omits unreadable relationship branches", async () => {
-    const { db, rows, auth, search } = setup();
+    const { db, rows, auth, catalog } = setup();
 
     await expect(
-      rows.list({ q: "scope-secret" }, search),
+      rows.page(searchInput(catalog, auth, "scope-secret")),
     ).resolves.toMatchObject({
       data: [],
       meta: { total: 0 },
     });
     await expect(
-      rows.list({ q: "Octavia Butler" }, search),
+      rows.page(searchInput(catalog, auth, "Octavia Butler")),
     ).resolves.toMatchObject({
       data: [],
       meta: { total: 0 },
@@ -203,7 +226,7 @@ describe("explicit relational table search", () => {
     };
     const unreadableRows = scopedRows(db, noQuoteRead, books);
     await expect(
-      unreadableRows.list({ q: "sea remembers" }, search),
+      unreadableRows.page(searchInput(catalog, noQuoteRead, "sea remembers")),
     ).resolves.toMatchObject({
       data: [],
       meta: { total: 0 },
@@ -219,7 +242,7 @@ describe("explicit relational table search", () => {
     };
     const unreadableLabels = scopedRows(db, noAuthorRead, books);
     await expect(
-      unreadableLabels.list({ q: "Jane Doe" }, search),
+      unreadableLabels.page(searchInput(catalog, noAuthorRead, "Jane Doe")),
     ).resolves.toMatchObject({
       data: [],
       meta: { total: 0 },

@@ -6,9 +6,18 @@ import {
   SQLiteSyncDialect,
 } from "drizzle-orm/sqlite-core";
 import type { SQL } from "drizzle-orm";
+import { countQuerySchema } from "@sapporta/shared/contracts";
 import { timestamp } from "../schema/table.js";
 import { sapportaTable } from "../schema/table.js";
-import { parseQuery } from "./query-parser.js";
+import type { TableDef } from "../schema/table.js";
+import { createTableCatalog } from "../schema/catalog.js";
+import { createTestAuthContext } from "../testing/auth-context.js";
+import {
+  resolveCountQuery,
+  resolveExportQuery,
+  resolveLookupQuery,
+  resolvePageQuery,
+} from "./table-query.js";
 
 const dialect = new SQLiteSyncDialect();
 const toSql = (s: SQL | undefined) => (s ? dialect.sqlToQuery(s).sql : "");
@@ -46,19 +55,97 @@ const disabledSearchTable = sapportaTable({
   meta: { rowLabelColumns: ["customer"], search: false },
 });
 
-describe("parseQuery()", () => {
+function parseQuery(
+  params: Record<string, string>,
+  table: TableDef = orders,
+): {
+  where: SQL | undefined;
+  orderBy: SQL[];
+  page: number;
+  limit: number;
+} {
+  const catalog = createTableCatalog([table]);
+  const resolved = resolvePageQuery(params, table, {
+    auth: createTestAuthContext({ tables: [table] }),
+    searchPlan: catalog.searchPlanFor(table.sqlName),
+  });
+  return {
+    where: resolved.where as SQL | undefined,
+    orderBy: resolved.orderBy as SQL[],
+    page: resolved.page ?? 1,
+    limit: resolved.limit ?? 50,
+  };
+}
+
+describe("resolvePageQuery()", () => {
   it("defaults to page 1, limit 50", () => {
     const q = parseQuery({}, orders);
+    expect(q.page).toBe(1);
     expect(q.limit).toBe(50);
-    expect(q.offset).toBe(0);
     expect(q.where).toBeUndefined();
     expect(q.orderBy).toEqual([]);
   });
 
   it("parses page and limit", () => {
     const q = parseQuery({ page: "3", limit: "25" }, orders);
+    expect(q.page).toBe(3);
     expect(q.limit).toBe(25);
-    expect(q.offset).toBe(50); // (3-1) * 25
+  });
+
+  it("resolves export filters and ordering without pagination", () => {
+    const catalog = createTableCatalog([orders]);
+    const resolved = resolveExportQuery(
+      {
+        "filter[status][eq]": "paid",
+        sort: "-created_at",
+      },
+      orders,
+      {
+        auth: createTestAuthContext({ tables: [orders] }),
+        searchPlan: catalog.searchPlanFor(orders.sqlName),
+      },
+    );
+
+    expect(compile(resolved.where as SQL).params).toEqual(["paid"]);
+    expect(resolved.orderBy).toHaveLength(1);
+  });
+
+  it("rejects pagination on exports", () => {
+    const catalog = createTableCatalog([orders]);
+    expect(() =>
+      resolveExportQuery({ page: "3" }, orders, {
+        auth: createTestAuthContext({ tables: [orders] }),
+        searchPlan: catalog.searchPlanFor(orders.sqlName),
+      }),
+    ).toThrow(expect.objectContaining({ code: "bad_value" }));
+  });
+
+  it("resolves lookup IDs, fields, search, and limit into typed values", () => {
+    const resolved = resolveLookupQuery(
+      {
+        ids: "1, 2",
+        fields: "id,customer,id",
+        q: "  Acme  ",
+        limit: "20",
+      },
+      orders,
+    );
+
+    expect(resolved).toEqual({
+      ids: [1, 2],
+      fields: [ordersTable.id, ordersTable.customer],
+      search: "Acme",
+      limit: 20,
+    });
+  });
+
+  it("rejects invalid lookup IDs and fields at the HTTP boundary", () => {
+    expect(() => resolveLookupQuery({ ids: "nope" }, orders)).toThrow(
+      expect.objectContaining({ code: "bad_value" }),
+    );
+    expect(() => resolveLookupQuery({ fields: "missing" }, orders)).toThrow(
+      expect.objectContaining({ code: "unknown_column" }),
+    );
   });
 
   // ── Filter operators ─────────────────────────────────────────────────
@@ -197,6 +284,12 @@ describe("parseQuery()", () => {
       );
     });
 
+    it("rejects unknown top-level parameters", () => {
+      expect(() => parseQuery({ srot: "customer" }, orders)).toThrow(
+        expect.objectContaining({ code: "bad_value" }),
+      );
+    });
+
     it("unknown_op — op not in the supported set", () => {
       expect(() =>
         parseQuery({ "filter[status][like]": "paid" }, orders),
@@ -267,26 +360,27 @@ describe("parseQuery()", () => {
   // ── Search term parsing ───────────────────────────────────────────────
 
   describe("search term (q)", () => {
-    it("returns the complete trimmed term for the compiled search plan", () => {
+    it("compiles the complete trimmed term into the search predicate", () => {
       const q = parseQuery({ q: "foo" }, searchableOrders);
-      expect(q.searchTerm).toBe("foo");
-      expect(q.where).toBeUndefined();
+      const { sql, params } = compile(q.where);
+      expect(sql.toLowerCase()).toContain("like");
+      expect(params).toEqual(["%foo%", "%foo%"]);
     });
 
     it("does not split or otherwise interpret the term", () => {
       const q = parseQuery({ q: "  blue moon  " }, singleSearchOrders);
-      expect(q.searchTerm).toBe("blue moon");
+      expect(compile(q.where).params).toEqual(["%blue moon%"]);
     });
 
-    it("keeps structured filters separate from search", () => {
+    it("composes structured filters with search", () => {
       const q = parseQuery(
         { q: "foo", "filter[status][eq]": "paid" },
         searchableOrders,
       );
       const { sql, params } = compile(q.where);
-      expect(sql).toBe('"orders"."status" = ?');
-      expect(params).toEqual(["paid"]);
-      expect(q.searchTerm).toBe("foo");
+      expect(sql).toContain('"orders"."status" = ?');
+      expect(sql.toLowerCase()).toContain("like");
+      expect(params).toEqual(["paid", "%foo%", "%foo%"]);
     });
 
     it("composes with sort and pagination", () => {
@@ -294,23 +388,21 @@ describe("parseQuery()", () => {
         { q: "foo", sort: "-created_at", page: "2", limit: "25" },
         searchableOrders,
       );
-      expect(q.searchTerm).toBe("foo");
+      expect(compile(q.where).params).toEqual(["%foo%", "%foo%"]);
       expect(q.orderBy).toHaveLength(1);
       expect(toSql(q.orderBy[0])).toMatch(/"created_at" desc/i);
+      expect(q.page).toBe(2);
       expect(q.limit).toBe(25);
-      expect(q.offset).toBe(25);
     });
 
     it("treats empty q as absent (no predicate, no error)", () => {
       const q = parseQuery({ q: "" }, searchableOrders);
       expect(q.where).toBeUndefined();
-      expect(q.searchTerm).toBeUndefined();
     });
 
     it("treats whitespace-only q as absent", () => {
       const q = parseQuery({ q: "   " }, searchableOrders);
       expect(q.where).toBeUndefined();
-      expect(q.searchTerm).toBeUndefined();
     });
 
     it("throws no_search_config when table search is disabled", () => {
@@ -318,5 +410,49 @@ describe("parseQuery()", () => {
         expect.objectContaining({ code: "no_search_config" }),
       );
     });
+  });
+});
+
+describe("resolveCountQuery()", () => {
+  it("resolves canonical filters and grouping", () => {
+    const resolved = resolveCountQuery(
+      countQuerySchema.parse({
+        "filter[amount][gte]": "100",
+        group_by: "status",
+        order: "asc",
+        limit: "2",
+      }),
+      orders,
+    );
+
+    expect(resolved.kind).toBe("grouped");
+    if (resolved.kind !== "grouped") {
+      throw new Error("Expected a grouped count query");
+    }
+    expect(compile(resolved.input.where).params).toEqual([100]);
+    expect(resolved.input).toMatchObject({
+      column: ordersTable.status,
+      order: "asc",
+      limit: 2,
+    });
+  });
+
+  it("rejects invalid and contradictory count queries", () => {
+    expect(() => countQuerySchema.parse({ group_by: "" })).toThrow();
+    expect(() =>
+      countQuerySchema.parse({ group_by: "id", limit: 1001 }),
+    ).toThrow();
+    expect(() =>
+      resolveCountQuery(
+        countQuerySchema.parse({ group_by: "missing" }),
+        orders,
+      ),
+    ).toThrow(expect.objectContaining({ code: "unknown_column" }));
+    expect(() =>
+      resolveCountQuery(countQuerySchema.parse({ order: "asc" }), orders),
+    ).toThrow(expect.objectContaining({ code: "bad_value" }));
+    expect(() =>
+      resolveCountQuery(countQuerySchema.parse({ surprise: "yes" }), orders),
+    ).toThrow(expect.objectContaining({ code: "bad_value" }));
   });
 });
