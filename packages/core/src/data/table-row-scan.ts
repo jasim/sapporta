@@ -1,5 +1,5 @@
 import Database from "better-sqlite3";
-import { asc, type SQL } from "drizzle-orm";
+import { asc, type InferSelectModel, type SQL } from "drizzle-orm";
 import type { BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
 import {
   getTableConfig,
@@ -35,7 +35,7 @@ export function scanTableRows<TTable extends AnySQLiteTable>(
   db: BetterSQLite3Database,
   table: TableDef<TTable>,
   input: TableRowScanInput = {},
-): AsyncIterable<Record<string, unknown>> {
+): AsyncIterable<InferSelectModel<TTable, { dbColumnNames: true }>> {
   const columns = getTableConfig(table.drizzle).columns;
   const selection: Record<string, SQLiteColumn> = Object.fromEntries(
     columns.map((column) => [column.name, column]),
@@ -57,7 +57,7 @@ export function scanTableRows<TTable extends AnySQLiteTable>(
       while (true) {
         const result = iterator.next();
         if (result.done) return;
-        yield mapDriverRow(columns, result.value);
+        yield mapDriverRow<TTable>(columns, result.value);
       }
     } finally {
       iterator.return?.();
@@ -79,10 +79,10 @@ function deterministicOrder(
     : [asc(primaryKey)];
 }
 
-function mapDriverRow(
+function mapDriverRow<TTable extends AnySQLiteTable>(
   columns: readonly SQLiteColumn[],
   values: readonly unknown[],
-): Record<string, unknown> {
+): InferSelectModel<TTable, { dbColumnNames: true }> {
   if (values.length !== columns.length) {
     throw new Error(
       `SQLite returned ${values.length} values for ${columns.length} selected columns.`,
@@ -97,7 +97,7 @@ function mapDriverRow(
         value === null ? null : column.mapFromDriverValue(value),
       ];
     }),
-  );
+  ) as InferSelectModel<TTable, { dbColumnNames: true }>;
 }
 
 function betterSqliteClient(db: BetterSQLite3Database): Database.Database {

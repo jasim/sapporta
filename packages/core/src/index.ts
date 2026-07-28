@@ -94,7 +94,6 @@ export type {
   PageRowsResult,
   RowsOrderBy,
   RowsQuery,
-  ScanRowsInput,
   ScopedRows,
   TableColumn,
   TableRow,

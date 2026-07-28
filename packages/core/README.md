@@ -63,8 +63,9 @@ const pending = await rows.findMany({
 Use `page()` when the response also needs the matching total and page metadata;
 it composes the same bounded selection with `count()`.
 
-Large sequential reads use a bounded async scan. This keeps exports and similar
-workflows from loading every matching row into memory:
+Large sequential reads use one async SQLite cursor. This keeps exports and
+similar workflows from loading every matching row into memory or rerunning
+progressively slower `LIMIT`/`OFFSET` queries:
 
 ```ts
 for await (const invoice of rows.scan({
@@ -74,6 +75,12 @@ for await (const invoice of rows.scan({
   // Process one visible invoice.
 }
 ```
+
+Every scan applies row scope and the caller's `where` expression in one
+statement. It uses the table's default sort when `orderBy` is omitted and adds
+the primary key as a deterministic tie-breaker. The cursor holds one read
+snapshot until the scan finishes or the consumer cancels it, then releases the
+statement.
 
 Lookup inputs are typed too. IDs are values rather than comma-separated text,
 and displayed search fields are Drizzle columns rather than HTTP field names:

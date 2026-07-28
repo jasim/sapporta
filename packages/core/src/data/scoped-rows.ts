@@ -57,6 +57,7 @@ import { resolveRowFields } from "./row-fields.js";
 import type { GroupCount } from "@sapporta/shared";
 import type { LookupEntry } from "@sapporta/shared/contracts";
 import { countTableRows, countTableRowsBy } from "./count-rows.js";
+import { scanTableRows } from "./table-row-scan.js";
 
 export type TableColumn<TTable extends AnySQLiteTable = AnySQLiteTable> =
   TTable["_"]["columns"][keyof TTable["_"]["columns"]];
@@ -82,10 +83,6 @@ export interface FindManyRowsInput extends RowsQuery {
 export interface PageRowsInput extends RowsQuery {
   page?: number;
   limit?: number;
-}
-
-export interface ScanRowsInput extends RowsQuery {
-  batchSize?: number;
 }
 
 export interface LookupRowsInput<
@@ -130,7 +127,7 @@ export interface ScopedRows<TTable extends AnySQLiteTable = AnySQLiteTable> {
   create(input: unknown): Promise<TableRow<TTable> | TableRow<TTable>[]>;
   update(id: RowId, patch: unknown): Promise<TableRow<TTable>>;
   delete(id: RowId): Promise<TableRow<TTable>>;
-  scan(input?: ScanRowsInput): AsyncIterable<TableRow<TTable>>;
+  scan(input?: RowsQuery): AsyncIterable<TableRow<TTable>>;
   lookup(input?: LookupRowsInput<TTable>): Promise<LookupEntry[]>;
   count(input?: CountRowsInput): Promise<number>;
   countBy(input: CountRowsByInput<TTable>): Promise<GroupCount[]>;
@@ -154,8 +151,6 @@ export const DEFAULT_PAGE = 1;
 export const DEFAULT_PAGE_LIMIT = 50;
 export const MAX_PAGE_LIMIT = 1000;
 export const MAX_LOOKUP_LIMIT = 500;
-const DEFAULT_SCAN_BATCH_SIZE = 250;
-const MAX_SCAN_BATCH_SIZE = 1000;
 
 type OrderClause = RowsOrderBy;
 type OffsettableRowsQuery = {
@@ -308,26 +303,10 @@ export function scopedRows<TTable extends AnySQLiteTable>(
     },
 
     scan(input = {}) {
-      const where = access.ownedRows(input.where);
-      const orderBy = normalizeOrderBy(input.orderBy);
-      const batchSize = normalizedScanBatchSize(input.batchSize);
-
-      return (async function* scanRows() {
-        let offset = 0;
-        while (true) {
-          const batch = (await applyOrderBy(
-            db.select().from(table.drizzle).where(where),
-            orderBy,
-            table,
-            pk.drizzlePk,
-          )
-            .limit(batchSize)
-            .offset(offset)) as Record<string, unknown>[];
-          for (const row of batch) yield pickPublicRow(row);
-          if (batch.length < batchSize) return;
-          offset += batch.length;
-        }
-      })();
+      return scanTableRows(db, table, {
+        where: access.ownedRows(input.where),
+        orderBy: input.orderBy,
+      });
     },
 
     async lookup(input = {}) {
@@ -491,20 +470,6 @@ function normalizedPageWindow(input: PageRowsInput): {
 
 function isUnknownArray(value: unknown): value is readonly unknown[] {
   return Array.isArray(value);
-}
-
-function normalizedScanBatchSize(batchSize: number | undefined): number {
-  const normalized = batchSize ?? DEFAULT_SCAN_BATCH_SIZE;
-  if (
-    !Number.isInteger(normalized) ||
-    normalized < 1 ||
-    normalized > MAX_SCAN_BATCH_SIZE
-  ) {
-    throw new RangeError(
-      `Scan batch size must be an integer from 1 to ${MAX_SCAN_BATCH_SIZE}.`,
-    );
-  }
-  return normalized;
 }
 
 function normalizeLookupIds(

@@ -1,4 +1,4 @@
-import { describe, expect, expectTypeOf, it } from "vitest";
+import { describe, expect, expectTypeOf, it, vi } from "vitest";
 import { asc, desc, eq, gt, type InferSelectModel } from "drizzle-orm";
 import { integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
 import { sapportaTable } from "../schema/table.js";
@@ -11,6 +11,7 @@ import {
   RowNotFoundError,
   scopedRows,
   type PageRowsResult,
+  type TableRow,
 } from "./scoped-rows.js";
 
 const accountsTable = sqliteTable("accounts", {
@@ -221,7 +222,7 @@ describe("scopedRows", () => {
     expectTypeOf(updatePromise).toEqualTypeOf<Promise<AccountRow>>();
     await updatePromise;
 
-    const scan = rows.scan({ batchSize: 1 });
+    const scan = rows.scan();
     expectTypeOf(scan).toEqualTypeOf<AsyncIterable<AccountRow>>();
     for await (const row of scan) {
       expectTypeOf(row).toEqualTypeOf<AccountRow>();
@@ -236,7 +237,7 @@ describe("scopedRows", () => {
     await batchPromise;
   });
 
-  it("scans with transport-free filtering, ordering, and bounded batches", async () => {
+  it("scans with transport-free filtering and ordering", async () => {
     const { rows } = setupAccounts();
     await rows.create({ name: "Cash", type: "asset" });
     await rows.create({ name: "Petty Cash", type: "asset" });
@@ -246,7 +247,6 @@ describe("scopedRows", () => {
     for await (const row of rows.scan({
       where: eq(accountsTable.type, "asset"),
       orderBy: [asc(accountsTable.name), asc(accountsTable.id)],
-      batchSize: 1,
     })) {
       scanned.push(row);
     }
@@ -314,7 +314,7 @@ describe("scopedRows", () => {
     );
   });
 
-  it("applies row scope to list/get/update/delete", async () => {
+  it("applies row scope to list/scan/get/update/delete", async () => {
     const documentsTable = sqliteTable("documents", {
       id: integer("id").primaryKey({ autoIncrement: true }),
       workspace_id: text("workspace_id").notNull(),
@@ -333,8 +333,9 @@ describe("scopedRows", () => {
         title TEXT NOT NULL
       );
       INSERT INTO documents (workspace_id, title) VALUES
-        ('workspace-1', 'Visible'),
-        ('workspace-2', 'Hidden');
+        ('workspace-1', 'Selected'),
+        ('workspace-1', 'Excluded'),
+        ('workspace-2', 'Selected');
     `);
     const rows = scopedRows(
       db,
@@ -344,15 +345,42 @@ describe("scopedRows", () => {
 
     const selected = await rows.findMany({ limit: 10 });
     const result = await rows.page();
-    expect(selected.map((row) => row.title)).toEqual(["Visible"]);
-    expect(result.data.map((row) => row.title)).toEqual(["Visible"]);
+    expect(selected.map((row) => row.title)).toEqual(["Selected", "Excluded"]);
+    expect(result.data.map((row) => row.title)).toEqual([
+      "Selected",
+      "Excluded",
+    ]);
     expect(result.data).toEqual(selected);
-    expect(result.meta.total).toBe(1);
-    await expect(rows.get("2")).rejects.toBeInstanceOf(RowNotFoundError);
+    expect(result.meta.total).toBe(2);
+
+    const prepare = vi.spyOn(sqlite, "prepare");
+    const scanned: TableRow<typeof documentsTable>[] = [];
+    try {
+      for await (const row of rows.scan({
+        where: eq(documentsTable.title, "Selected"),
+      })) {
+        scanned.push(row);
+      }
+      expect(prepare).toHaveBeenCalledTimes(1);
+      const scanSql = prepare.mock.calls[0]?.[0];
+      expect(scanSql).toMatch(/^select /i);
+      expect(scanSql).not.toMatch(/\boffset\b/i);
+    } finally {
+      prepare.mockRestore();
+    }
+    expect(scanned).toEqual([
+      expect.objectContaining({
+        id: 1,
+        workspace_id: "workspace-1",
+        title: "Selected",
+      }),
+    ]);
+
+    await expect(rows.get("3")).rejects.toBeInstanceOf(RowNotFoundError);
     await expect(
-      rows.update("2", { title: "Still hidden" }),
+      rows.update("3", { title: "Still hidden" }),
     ).rejects.toBeInstanceOf(RowNotFoundError);
-    await expect(rows.delete("2")).rejects.toBeInstanceOf(RowNotFoundError);
+    await expect(rows.delete("3")).rejects.toBeInstanceOf(RowNotFoundError);
   });
 
   it("looks up row labels inside row scope", async () => {
