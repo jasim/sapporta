@@ -21,7 +21,6 @@ import {
 } from "drizzle-orm/sqlite-core";
 import { sapportaTable } from "../schema/table.js";
 import type { TableDef } from "../schema/table.js";
-import { createTableCatalog } from "../schema/catalog.js";
 import { timestamp, date } from "../schema/columns.js";
 import { parseQuery } from "./query-parser.js";
 import { scopedRows } from "./scoped-rows.js";
@@ -190,11 +189,9 @@ function rowsFor(
   db: ReturnType<typeof createTestDb>["db"],
   tableDef: TableDef,
 ) {
-  const catalog = createTableCatalog([tableDef]);
   return scopedRows(
     db,
     createTestAuthContext({ tables: [tableDef] }),
     tableDef,
-    { searchPlan: catalog.searchPlanFor(tableDef.sqlName) },
   );
 }

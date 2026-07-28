@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { MAX_COUNT_GROUPS, type GroupCount } from "../count.js";
 
 /**
  * Wire shapes for `/tables/:tableName/*` envelopes (the loose,
@@ -49,14 +50,8 @@ export const lookupResponseSchema = z.object({
 });
 export type LookupResponse = z.output<typeof lookupResponseSchema>;
 
-/** Grouped child counts: { parentId → child count }. */
-export const countResponseSchema = z.object({
-  data: z.record(z.string(), z.number()),
-});
-export type CountResponse = z.output<typeof countResponseSchema>;
-
 /** Query shape for the row-listing endpoint. Filters are encoded as
- *  additional `f.*` keys (see `@sapporta/shared/filter`); the contract
+ *  additional `filter[col][op]` keys (see `@sapporta/shared/filter`); the contract
  *  uses `.loose()` so those pass through validation. */
 export const listRowsQuerySchema = z
   .object({
@@ -76,8 +71,47 @@ export const lookupQuerySchema = z.object({
 });
 export type LookupQuery = z.output<typeof lookupQuerySchema>;
 
-export const countQuerySchema = z.object({
-  group_by: z.string(),
-  ids: z.string(),
+const countGroupValueSchema = z.union([
+  z.string(),
+  z.number(),
+  z.boolean(),
+  z.null(),
+]);
+
+export const groupCountSchema: z.ZodType<GroupCount> = z.object({
+  value: countGroupValueSchema,
+  count: z.number().int().nonnegative(),
 });
+export type { GroupCount } from "../count.js";
+
+export const countResultSchema = z.discriminatedUnion("kind", [
+  z.object({
+    kind: z.literal("total"),
+    count: z.number().int().nonnegative(),
+  }),
+  z.object({
+    kind: z.literal("grouped"),
+    groups: z.array(groupCountSchema).max(MAX_COUNT_GROUPS),
+  }),
+]);
+export type CountResult = z.output<typeof countResultSchema>;
+
+export const countResponseSchema = z.object({
+  data: countResultSchema,
+});
+export type CountResponse = z.output<typeof countResponseSchema>;
+
+/**
+ * Count visible rows after applying canonical `filter[col][op]` parameters.
+ *
+ * Without `group_by`, the response contains one total. Grouped counts default
+ * to descending count order and a bounded result.
+ */
+export const countQuerySchema = z
+  .object({
+    group_by: z.string().min(1).optional(),
+    order: z.enum(["asc", "desc"]).optional(),
+    limit: z.coerce.number().int().min(1).max(MAX_COUNT_GROUPS).optional(),
+  })
+  .loose();
 export type CountQuery = z.output<typeof countQuerySchema>;

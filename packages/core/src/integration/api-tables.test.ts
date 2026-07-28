@@ -640,4 +640,104 @@ describe("/api/tables table operations", () => {
       );
     });
   });
+
+  describe("count reads", () => {
+    it("filters and groups counts inside user row scope", async () => {
+      const accountResponse = await postJson("/api/tables/accounts", {
+        name: "Count Scope Account",
+        type: "asset",
+      });
+      expect(accountResponse.status).toBe(201);
+      const account = (await accountResponse.json()) as {
+        data: { id: number };
+      };
+
+      for (const description of [
+        "Count scope user one A",
+        "Count scope user one B",
+      ]) {
+        expect(
+          (
+            await postJson("/api/tables/journal_entries", {
+              account_id: account.data.id,
+              description,
+              amount: 10,
+            })
+          ).status,
+        ).toBe(201);
+      }
+      const userTwo = asAuth({ userId: "aggregate-user-2" });
+      for (const description of [
+        "Count scope user two A",
+        "Count scope user two B",
+        "Count scope user two C",
+      ]) {
+        expect(
+          (
+            await userTwo.postJson("/api/tables/journal_entries", {
+              account_id: account.data.id,
+              description,
+              amount: 20,
+            })
+          ).status,
+        ).toBe(201);
+      }
+
+      const query =
+        "?filter[description][startswith]=Count%20scope" +
+        "&filter[account_id][is]=notnull" +
+        "&group_by=account_id" +
+        "&limit=10";
+      const userOneResponse = await request(
+        `/api/tables/journal_entries/_count${query}`,
+      );
+      expect(userOneResponse.status).toBe(200);
+      expect(await userOneResponse.json()).toEqual({
+        data: {
+          kind: "grouped",
+          groups: [{ value: account.data.id, count: 2 }],
+        },
+      });
+
+      const userTwoResponse = await userTwo.request(
+        `/api/tables/journal_entries/_count${query}`,
+      );
+      expect(userTwoResponse.status).toBe(200);
+      expect(await userTwoResponse.json()).toEqual({
+        data: {
+          kind: "grouped",
+          groups: [{ value: account.data.id, count: 3 }],
+        },
+      });
+
+      const totalResponse = await request(
+        "/api/tables/journal_entries/_count" +
+          "?filter[description][startswith]=Count%20scope",
+      );
+      expect(totalResponse.status).toBe(200);
+      expect(await totalResponse.json()).toEqual({
+        data: { kind: "total", count: 2 },
+      });
+    });
+
+    it("returns structured 400 errors for invalid count requests", async () => {
+      const requests = [
+        "/api/tables/accounts/_count?group_by=missing",
+        "/api/tables/accounts/_count?filter[type][like]=asset",
+        "/api/tables/accounts/_count?group_by=type&order=sideways",
+        "/api/tables/accounts/_count?limit=1",
+        "/api/tables/accounts/_count?group_by=type&limit=1001",
+      ];
+      for (const path of requests) {
+        const response = await request(path);
+        expect(response.status).toBe(400);
+        expect(await response.json()).toEqual(
+          expect.objectContaining({
+            error: expect.any(String),
+            code: expect.any(String),
+          }),
+        );
+      }
+    });
+  });
 });

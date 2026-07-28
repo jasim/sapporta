@@ -31,6 +31,7 @@ export {
   text,
   timestamp,
 } from "./schema/table.js";
+export { columnBySqlName, columnPropertyName } from "./schema/column.js";
 export type {
   TableDef,
   TableOptions,
@@ -88,8 +89,10 @@ export type {
   ListRowsInput,
   ListRowsResult,
   ScopedRows,
-  ScopedRowsOptions,
+  ScopedRowsSearchOptions,
 } from "./data/scoped-rows.js";
+export type { CountRowsByInput, CountRowsInput } from "./data/count-rows.js";
+export type { GroupCount } from "@sapporta/shared";
 
 // Query parser
 export { parseQuery } from "./data/query-parser.js";

@@ -273,6 +273,10 @@ describe("renderScaffoldFiles", () => {
     );
     expect(byDest.get("AGENTS.md")).toContain("The `/api/hello` example");
     expect(byDest.get("AGENTS.md")).toContain("createSapportaMailer()");
+    expect(byDest.get("AGENTS.md")).toContain("## Analytical questions");
+    expect(byDest.get("AGENTS.md")).toContain("sapporta rows count");
+    expect(byDest.get("AGENTS.md")).toContain("bounded grouped counts");
+    expect(byDest.get("AGENTS.md")).toContain("application-owned report");
     expect(byDest.get("CLAUDE.md")).toBe(
       "Please read the instructions in AGENTS.md.\n",
     );

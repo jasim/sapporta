@@ -73,6 +73,39 @@ describe("SapportaCliClient", () => {
     expect(url.searchParams.get("filter[id][in]")).toBe("1,2,3");
   });
 
+  it("maps row count semantics and filters to the scoped endpoint", async () => {
+    mockJsonResponse({ data: [] });
+
+    await new SapportaCliClient({
+      apiUrl: "http://localhost:3000",
+    }).countRows("tasks", {
+      groupBy: "assignee_id",
+      order: "desc",
+      limit: 10,
+      where: {
+        status: { neq: "done" },
+        assignee_id: { is: "notnull" },
+      },
+    });
+
+    const url = lastRequestUrl();
+    expect(url.pathname).toBe("/api/tables/tasks/_count");
+    expect(url.searchParams.get("group_by")).toBe("assignee_id");
+    expect(url.searchParams.get("order")).toBe("desc");
+    expect(url.searchParams.get("limit")).toBe("10");
+    expect(url.searchParams.get("filter[status][neq]")).toBe("done");
+    expect(url.searchParams.get("filter[assignee_id][is]")).toBe("notnull");
+    expect(url.searchParams.has("page")).toBe(false);
+  });
+
+  it("rejects an empty grouped-count column instead of sending a total", async () => {
+    await expect(
+      new SapportaCliClient({
+        apiUrl: "http://localhost:3000",
+      }).countRows("tasks", { groupBy: "" }),
+    ).rejects.toMatchObject({ code: "VALIDATION_FAILED" });
+  });
+
   it("maps row create and update to table POST and PUT bodies", async () => {
     mockJsonResponse({ data: { id: 1, title: "Relativity" } });
     const client = new SapportaCliClient({ apiUrl: "http://localhost:3000" });

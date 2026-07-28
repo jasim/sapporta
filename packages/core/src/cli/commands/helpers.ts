@@ -1,4 +1,5 @@
 import { ErrorCode, OperationError } from "../../introspect/types.js";
+import { countResponseSchema } from "@sapporta/shared/contracts";
 import { z } from "zod";
 
 export function jsonOption(flagName: string): z.ZodType<unknown> {
@@ -82,6 +83,20 @@ export function readDataRows(response: unknown): Record<string, unknown>[] {
   if (Array.isArray(data)) return data.filter(isRecord);
   if (isRecord(data)) return [data];
   return [];
+}
+
+export function readCountDataRows(
+  response: unknown,
+): Record<string, unknown>[] {
+  const parsed = countResponseSchema.safeParse(response);
+  if (!parsed.success) return [];
+  if (parsed.data.data.kind === "total") {
+    return [{ count: parsed.data.data.count }];
+  }
+  return parsed.data.data.groups.map((group) => ({
+    value: group.value,
+    count: group.count,
+  }));
 }
 
 export function readTableListRows(

@@ -124,13 +124,16 @@ export const lookupRoute = c.query({
 export const countRoute = c.query({
   method: "GET",
   path: "/tables/:tableName/_count",
-  summary: "Grouped child counts for a table",
+  summary: "Count visible rows in a table",
+  description:
+    "Counts rows after request row security and canonical filter[col][op]=value filters. Optionally groups results and returns a deterministically ordered, bounded group list.",
   metadata: { tags: ["tables"] },
   pathParams: tableNameParam,
   query: countQuerySchema,
   responses: {
     200: countResponseSchema,
     400: errorBodySchema,
+    403: errorBodySchema,
     404: errorBodySchema,
   },
 });

@@ -88,10 +88,10 @@ function isInvalidSqliteSql(code: string): boolean {
   return code === "SQLITE_ERROR" || code === "SQLITE_RANGE";
 }
 
-/** Closed taxonomy of parseQuery() failures. Every code maps to HTTP 400 at
- *  the table handler — silent-ignore is rejected as a class, so typos and
- *  malformed query strings surface as client errors rather than returning
- *  "all rows". */
+/** Closed taxonomy of generated table-query parse failures. Every code maps
+ *  to HTTP 400 at the table handler — silent-ignore is rejected as a class,
+ *  so typos and malformed query strings surface as client errors rather than
+ *  returning broader results. */
 export type QueryParseErrorCode =
   | "unknown_filter_shape"
   | "unknown_column"

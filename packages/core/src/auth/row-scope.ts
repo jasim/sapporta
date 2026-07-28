@@ -1,4 +1,4 @@
-import { getTableConfig, type SQLiteColumn } from "drizzle-orm/sqlite-core";
+import type { SQLiteColumn } from "drizzle-orm/sqlite-core";
 import {
   SCOPED_TO_USER_ID_SQL_COLUMN,
   SCOPED_TO_USER_ID_TS_COLUMN,
@@ -6,6 +6,7 @@ import {
   WORKSPACE_ID_TS_COLUMN,
 } from "@sapporta/shared/row-scope";
 import type { TableDef } from "../schema/table.js";
+import { columnBySqlName, columnPropertyName } from "../schema/column.js";
 
 export {
   isSystemManagedScopeFieldName,
@@ -56,29 +57,6 @@ export interface ScopeColumnFact {
 
 export function isRowScope(value: unknown): value is RowScope {
   return typeof value === "string" && rowScopes.includes(value as RowScope);
-}
-
-export function columnBySqlName(
-  table: TableDef,
-  sqlName: string,
-): SQLiteColumn | null {
-  return (
-    getTableConfig(table.drizzle).columns.find(
-      (column) => column.name === sqlName,
-    ) ?? null
-  );
-}
-
-export function columnPropertyName(
-  table: TableDef,
-  column: SQLiteColumn,
-): string | null {
-  for (const [key, value] of Object.entries(
-    table.drizzle as unknown as Record<string, unknown>,
-  )) {
-    if (value === column) return key;
-  }
-  return null;
 }
 
 export function scopeColumnFact(

@@ -4,7 +4,8 @@ Sapporta is a TypeScript library for building database applications — personal
 
 This is what Sapporta provides to make building database applications easy:
 
-- REST endpoints for create, read, update, delete, lookup, count, and export
+- REST endpoints for create, read, update, delete, lookup, scoped counts, and
+  export
 - Data grids with filtering, sorting, and search
 - Forms for data entry with validation and keyboard navigation
 - Relationship lookups that link related records across tables
@@ -140,3 +141,4 @@ npx skills add https://github.com/jasim/sapporta-skills --global
 - [Server Package](./packages/core/README.md) - use `@sapporta/server`, `scopedRows`, and CLI-backed project commands
 - [Shared Package](./packages/shared/README.md) - use shared contracts, filters, date helpers, and client types
 - [Honest](./packages/honest/README.md) - use the Hono + ts-rest adapter directly
+- [Count Queries](./docs/count-queries.md) - run filtered, grouped, and bounded scoped counts

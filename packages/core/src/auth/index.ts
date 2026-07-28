@@ -35,8 +35,6 @@ export {
   SCOPED_TO_USER_ID_TS_COLUMN,
   WORKSPACE_ID_SQL_COLUMN,
   WORKSPACE_ID_TS_COLUMN,
-  columnBySqlName,
-  columnPropertyName,
   isRowScope,
   isSystemManagedScopeFieldName,
   rowScopes,

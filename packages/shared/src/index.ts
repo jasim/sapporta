@@ -7,4 +7,5 @@ export * from "./csv.js";
 export * from "./row-id.js";
 export * from "./row-scope.js";
 export * from "./labels.js";
+export * from "./count.js";
 export * from "./validation/index.js";

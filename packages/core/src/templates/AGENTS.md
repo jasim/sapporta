@@ -76,6 +76,17 @@ use row-scoped helpers for ordinary table work.
 Do not trust clients to choose workspace, owner, role, or scope columns. Raw SQL
 bypasses row helpers and should be a fallback, not the default mutation path.
 
+## Analytical questions
+
+Use an existing report or domain endpoint when it defines the business meaning
+of a question. Otherwise use `pnpm exec sapporta rows count` for filtered,
+single-table counts. State how terms such as "pending" map to stored values.
+
+Use `--group-by`, `--order`, and `--limit` for bounded grouped counts, and use a
+separate lookup for foreign-key labels. If a scoped count cannot express the
+question without loading complete rows, add an application-owned report or
+domain endpoint.
+
 ## Email
 
 This project uses Nodemailer through `packages/api/mailer.ts`.

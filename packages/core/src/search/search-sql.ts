@@ -6,7 +6,7 @@ import {
   type SQLiteColumn,
 } from "drizzle-orm/sqlite-core";
 import type { SapportaAuthContext } from "../auth/context.js";
-import { columnBySqlName } from "../auth/row-scope.js";
+import { columnBySqlName } from "../schema/column.js";
 import type { TableDef } from "../schema/table.js";
 import type {
   ChildSearchPlan,

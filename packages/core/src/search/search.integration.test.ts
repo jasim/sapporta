@@ -112,63 +112,83 @@ function setup() {
     sqlite,
     catalog,
     auth,
-    rows: scopedRows(db, auth, books, {
-      searchPlan: catalog.searchPlanFor("books"),
-    }),
+    rows: scopedRows(db, auth, books),
+    search: { searchPlan: catalog.searchPlanFor("books") },
   };
 }
 
 describe("explicit relational table search", () => {
-  it("searches root values, FK row labels, and explicitly configured quotes", async () => {
+  it("requires search planning only when a query contains a search term", async () => {
     const { rows } = setup();
 
-    await expect(rows.list({ q: "Horizon" })).resolves.toMatchObject({
+    await expect(rows.list({ q: "Horizon" })).rejects.toMatchObject({
+      code: "no_search_config",
+    });
+    await expect(rows.list()).resolves.toMatchObject({
+      meta: { total: 4 },
+    });
+  });
+
+  it("searches root values, FK row labels, and explicitly configured quotes", async () => {
+    const { rows, search } = setup();
+
+    await expect(rows.list({ q: "Horizon" }, search)).resolves.toMatchObject({
       data: [{ id: 101 }],
       meta: { total: 1 },
     });
-    await expect(rows.list({ q: "Jane Doe" })).resolves.toMatchObject({
+    await expect(rows.list({ q: "Jane Doe" }, search)).resolves.toMatchObject({
       data: [{ id: 101 }, { id: 103 }, { id: 104 }],
       meta: { total: 3 },
     });
-    await expect(rows.list({ q: "sea remembers" })).resolves.toMatchObject({
+    await expect(
+      rows.list({ q: "sea remembers" }, search),
+    ).resolves.toMatchObject({
       data: [{ id: 101 }],
       meta: { total: 1 },
     });
   });
 
   it("does not search raw FK ids or visually hidden columns", async () => {
-    const { rows } = setup();
+    const { rows, search } = setup();
 
-    await expect(rows.list({ q: "7002" })).resolves.toMatchObject({
+    await expect(rows.list({ q: "7002" }, search)).resolves.toMatchObject({
       data: [],
       meta: { total: 0 },
     });
-    await expect(rows.list({ q: "hidden-cipher" })).resolves.toMatchObject({
+    await expect(
+      rows.list({ q: "hidden-cipher" }, search),
+    ).resolves.toMatchObject({
       data: [],
       meta: { total: 0 },
     });
   });
 
   it("treats LIKE syntax literally and does not duplicate matching roots", async () => {
-    const { rows } = setup();
+    const { rows, search } = setup();
 
-    const literal = await rows.list({ q: "%_" });
+    const literal = await rows.list({ q: "%_" }, search);
     expect(literal.data.map((row) => row.id)).toEqual([103]);
 
-    const duplicateMatches = await rows.list({ q: "blue" });
+    const duplicateMatches = await rows.list({ q: "blue" }, search);
     expect(duplicateMatches.data.map((row) => row.id)).toEqual([101]);
     expect(duplicateMatches.meta.total).toBe(1);
-    await expect(rows.exportRows({ q: "blue" })).resolves.toHaveLength(1);
+    await expect(rows.exportRows({ q: "blue" }, search)).resolves.toHaveLength(
+      1,
+    );
   });
 
   it("applies child row scope and omits unreadable relationship branches", async () => {
-    const { db, rows, auth, catalog } = setup();
+    const { db, rows, auth, search } = setup();
 
-    await expect(rows.list({ q: "scope-secret" })).resolves.toMatchObject({
+    await expect(
+      rows.list({ q: "scope-secret" }, search),
+    ).resolves.toMatchObject({
       data: [],
       meta: { total: 0 },
     });
-    await expect(rows.list({ q: "Octavia Butler" })).resolves.toMatchObject({
+    await expect(
+      rows.list({ q: "Octavia Butler" }, search),
+    ).resolves.toMatchObject({
       data: [],
       meta: { total: 0 },
     });
@@ -181,11 +201,9 @@ describe("explicit relational table search", () => {
         },
       },
     };
-    const unreadableRows = scopedRows(db, noQuoteRead, books, {
-      searchPlan: catalog.searchPlanFor("books"),
-    });
+    const unreadableRows = scopedRows(db, noQuoteRead, books);
     await expect(
-      unreadableRows.list({ q: "sea remembers" }),
+      unreadableRows.list({ q: "sea remembers" }, search),
     ).resolves.toMatchObject({
       data: [],
       meta: { total: 0 },
@@ -199,11 +217,9 @@ describe("explicit relational table search", () => {
         },
       },
     };
-    const unreadableLabels = scopedRows(db, noAuthorRead, books, {
-      searchPlan: catalog.searchPlanFor("books"),
-    });
+    const unreadableLabels = scopedRows(db, noAuthorRead, books);
     await expect(
-      unreadableLabels.list({ q: "Jane Doe" }),
+      unreadableLabels.list({ q: "Jane Doe" }, search),
     ).resolves.toMatchObject({
       data: [],
       meta: { total: 0 },

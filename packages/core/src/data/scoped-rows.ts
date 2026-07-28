@@ -2,12 +2,12 @@
  * Row-scoped table operations for generated routes and ordinary product code.
  *
  * `scopedRows()` is Sapporta's default table API after a request has an auth
- * context and the catalog has supplied that table's compiled search plan. The
- * principal may be signed in or anonymous; row access comes from
+ * context. The principal may be signed in or anonymous; row access comes from
  * `auth.dataAuthority`, not from assuming there is always a workspace user.
  * The helper binds one Drizzle table to the request's row-security policy,
  * then exposes CRUD, lookup, count, and export operations that never let
- * callers choose or bypass ownership columns.
+ * callers choose or bypass ownership columns. Search planning is supplied only
+ * to list or export calls that actually contain a search term.
  *
  * The important rule is that primary keys and API payloads are not security
  * boundaries. Reads and destructive writes add the table's workspace/user
@@ -35,9 +35,9 @@ import { and, asc, eq, inArray, or, sql, type SQL } from "drizzle-orm";
 import type { BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
 import { getTableConfig, type SQLiteColumn } from "drizzle-orm/sqlite-core";
 import type { RowId } from "@sapporta/shared/row-id";
+import { parseOptionalBoundedInteger } from "@sapporta/shared/validation";
 import type { SapportaAuthContext } from "../auth/context.js";
 import { QueryParseError, ValidationError } from "../db/errors.js";
-import { parseOptionalBoundedInteger } from "@sapporta/shared/validation";
 import { findPkColumn } from "../schema/pk.js";
 import { resolveColumnKind } from "../schema/resolve-kind.js";
 import type { TableDef } from "../schema/table.js";
@@ -45,9 +45,16 @@ import { savePipeline } from "./save-pipeline.js";
 import { parseQuery, type ParsedQuery } from "./query-parser.js";
 import { rowLabeller } from "./row-label.js";
 import { resolveRowFields, UnknownRowFieldsError } from "./row-fields.js";
+import type { GroupCount } from "@sapporta/shared";
 import type { LookupEntry } from "@sapporta/shared/contracts";
 import type { SearchPlan } from "../search/search-plan.js";
 import { buildSearchPredicate } from "../search/search-sql.js";
+import {
+  countTableRows,
+  countTableRowsBy,
+  type CountRowsByInput,
+  type CountRowsInput,
+} from "./count-rows.js";
 
 export interface ListRowsInput {
   [key: string]: string | undefined;
@@ -64,20 +71,27 @@ export interface ListRowsResult {
 }
 
 export interface ScopedRows {
-  list(query?: ListRowsInput): Promise<ListRowsResult>;
+  list(
+    query?: ListRowsInput,
+    options?: ScopedRowsSearchOptions,
+  ): Promise<ListRowsResult>;
   get(id: RowId): Promise<Record<string, unknown>>;
   create(
     input: unknown,
   ): Promise<Record<string, unknown> | Record<string, unknown>[]>;
   update(id: RowId, patch: unknown): Promise<Record<string, unknown>>;
   delete(id: RowId): Promise<Record<string, unknown>>;
-  exportRows(query?: ListRowsInput): Promise<Record<string, unknown>[]>;
+  exportRows(
+    query?: ListRowsInput,
+    options?: ScopedRowsSearchOptions,
+  ): Promise<Record<string, unknown>[]>;
   lookup(query?: ListRowsInput): Promise<LookupEntry[]>;
-  count(query?: ListRowsInput): Promise<Record<string, number>>;
+  count(input?: CountRowsInput): Promise<number>;
+  countBy(input: CountRowsByInput): Promise<GroupCount[]>;
 }
 
-export interface ScopedRowsOptions {
-  /** Catalog-compiled plan for this exact table. */
+export interface ScopedRowsSearchOptions {
+  /** Required only when the query contains `q`. */
   searchPlan: SearchPlan;
 }
 
@@ -111,13 +125,7 @@ export function scopedRows(
   db: BetterSQLite3Database,
   auth: SapportaAuthContext,
   table: TableDef,
-  options: ScopedRowsOptions,
 ): ScopedRows {
-  if (options.searchPlan.table !== table) {
-    throw new Error(
-      `Search plan for "${options.searchPlan.table.sqlName}" cannot be used with table "${table.sqlName}".`,
-    );
-  }
   // Resolve the request-bound access policy once so every operation below uses
   // the same table metadata, workspace, user, and row-scope interpretation.
   const access = auth.rowSecurity.forTable(table);
@@ -128,12 +136,12 @@ export function scopedRows(
   );
 
   return {
-    async list(input = {}) {
+    async list(input = {}, options) {
       // Parse filtering/search/sort/pagination first, then wrap the parsed
       // predicate in row ownership before using it for both rows and totals.
       const query = parseRowsQuery(input, table);
-      const where = access.ownedRows(rowsQueryPredicate(query));
-      const total = await countRows(db, table, where);
+      const where = access.ownedRows(rowsQueryPredicate(query, options));
+      const total = await countTableRows(db, table, where);
       const rows = (await applyOrderBy(
         db.select().from(table.drizzle).where(where),
         query,
@@ -217,11 +225,11 @@ export function scopedRows(
       return publicRow.pick(deleted[0]!);
     },
 
-    async exportRows(input = {}) {
+    async exportRows(input = {}, options) {
       // Export is the unpaginated list path; it keeps query parsing, ordering,
       // and row ownership identical to list.
       const query = parseRowsQuery(input, table);
-      const where = access.ownedRows(rowsQueryPredicate(query));
+      const where = access.ownedRows(rowsQueryPredicate(query, options));
       const rows = (await applyOrderBy(
         db.select().from(table.drizzle).where(where),
         query,
@@ -298,59 +306,33 @@ export function scopedRows(
       return entries;
     },
 
-    async count(input = {}) {
-      // Count supports generated relationship badges: count visible rows grouped
-      // by a requested foreign-key-like column for a supplied set of ids.
-      const groupBy = input.group_by;
-      const idsParam = input.ids;
-      if (!groupBy || !idsParam) return {};
+    async count(input: CountRowsInput = {}) {
+      return countTableRows(db, table, access.ownedRows(input.where));
+    },
 
-      const config = getTableConfig(table.drizzle);
-      const column = config.columns.find((col) => col.name === groupBy);
-      if (!column) {
-        throw new QueryParseError(
-          "unknown_column",
-          `Column "${groupBy}" not found`,
-        );
-      }
-
-      const ids = parseCommaSeparatedValues(idsParam);
-      if (ids.length === 0) return {};
-
-      const drizzleColumn = (
-        table.drizzle as unknown as Record<string, SQLiteColumn>
-      )[groupBy];
-      if (!drizzleColumn) {
-        throw new QueryParseError(
-          "unknown_column",
-          `Column "${groupBy}" not found`,
-        );
-      }
-
-      const rows = (await db
-        .select({
-          groupKey: drizzleColumn,
-          count: sql<number>`count(*)`,
-        })
-        .from(table.drizzle)
-        .where(access.ownedRows(inArray(drizzleColumn, ids)))
-        .groupBy(drizzleColumn)) as Array<{
-        groupKey: unknown;
-        count: number;
-      }>;
-
-      const result: Record<string, number> = {};
-      for (const row of rows) {
-        result[String(row.groupKey)] = row.count;
-      }
-      return result;
+    async countBy(input: CountRowsByInput) {
+      return countTableRowsBy(db, table, input, access.ownedRows(input.where));
     },
   };
 
-  function rowsQueryPredicate(query: ParsedQuery): SQL | undefined {
-    const search = query.searchTerm
-      ? buildSearchPredicate(options.searchPlan, query.searchTerm, auth)
-      : undefined;
+  function rowsQueryPredicate(
+    query: ParsedQuery,
+    options: ScopedRowsSearchOptions | undefined,
+  ): SQL | undefined {
+    if (!query.searchTerm) return query.where;
+    const searchPlan = options?.searchPlan;
+    if (!searchPlan) {
+      throw new QueryParseError(
+        "no_search_config",
+        `Search on table \`${table.sqlName}\` requires a compiled search plan`,
+      );
+    }
+    if (searchPlan.table !== table) {
+      throw new Error(
+        `Search plan for "${searchPlan.table.sqlName}" cannot be used with table "${table.sqlName}".`,
+      );
+    }
+    const search = buildSearchPredicate(searchPlan, query.searchTerm, auth);
     return and(query.where, search);
   }
 }
@@ -360,18 +342,6 @@ export function scopedRows(
 function resolvePk(table: TableDef) {
   const pkCol = findPkColumn(table);
   return { pkCol, drizzlePk: pkCol };
-}
-
-async function countRows(
-  db: BetterSQLite3Database,
-  table: TableDef,
-  where: SQL,
-): Promise<number> {
-  const rows = await db
-    .select({ count: sql<number>`count(*)` })
-    .from(table.drizzle)
-    .where(where);
-  return Number(rows[0]?.count ?? 0);
 }
 
 // Drizzle's fluent query types differ after orderBy/limit/offset. These small

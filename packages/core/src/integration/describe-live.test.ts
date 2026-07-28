@@ -89,6 +89,18 @@ describe("endpoints — live server", () => {
     const serialized = JSON.stringify(bodySchema);
     expect(serialized).toContain("name");
   });
+
+  it("endpoints show exposes count options", async () => {
+    const result = await endpointShowResult(
+      BASE_URL,
+      undefined,
+      "GET /api/tables/{tableName}/_count",
+    );
+    const endpoint = result.raw as EndpointDetail;
+    expect(endpoint.parameters.map((parameter) => parameter.name)).toEqual(
+      expect.arrayContaining(["tableName", "group_by", "order", "limit"]),
+    );
+  });
 });
 
 function readRecord(value: unknown): Record<string, unknown> {

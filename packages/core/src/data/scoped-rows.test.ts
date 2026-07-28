@@ -4,7 +4,6 @@ import { sapportaTable } from "../schema/table.js";
 import { QueryParseError, ValidationError } from "../db/errors.js";
 import { createTestAuthContext } from "../testing/auth-context.js";
 import { createTestDb } from "../testing/test-utils.js";
-import { createTableCatalog } from "../schema/catalog.js";
 import {
   ImmutableTableOperationError,
   RowNotFoundError,
@@ -31,7 +30,6 @@ const accounts = sapportaTable({
 describe("scopedRows", () => {
   function setupAccounts() {
     const { db, sqlite } = createTestDb();
-    const catalog = createTableCatalog([accounts]);
     sqlite.exec(`
       CREATE TABLE accounts (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -46,7 +44,6 @@ describe("scopedRows", () => {
         db,
         createTestAuthContext({ tables: [accounts] }),
         accounts,
-        { searchPlan: catalog.searchPlanFor(accounts.sqlName) },
       ),
     };
   }
@@ -72,7 +69,6 @@ describe("scopedRows", () => {
       },
     });
     const { db, sqlite } = createTestDb();
-    const catalog = createTableCatalog([privateAccounts]);
     sqlite.exec(`
       CREATE TABLE accounts (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -85,7 +81,6 @@ describe("scopedRows", () => {
       db,
       createTestAuthContext({ tables: [privateAccounts] }),
       privateAccounts,
-      { searchPlan: catalog.searchPlanFor(privateAccounts.sqlName) },
     );
 
     await expect(
@@ -154,7 +149,6 @@ describe("scopedRows", () => {
     });
 
     const { db, sqlite } = createTestDb();
-    const catalog = createTableCatalog([ledger]);
     sqlite.exec(`
       CREATE TABLE ledger (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -166,7 +160,6 @@ describe("scopedRows", () => {
       db,
       createTestAuthContext({ tables: [ledger] }),
       ledger,
-      { searchPlan: catalog.searchPlanFor(ledger.sqlName) },
     );
 
     await expect(
@@ -189,7 +182,6 @@ describe("scopedRows", () => {
     });
 
     const { db, sqlite } = createTestDb();
-    const catalog = createTableCatalog([documents]);
     sqlite.exec(`
       CREATE TABLE documents (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -204,7 +196,6 @@ describe("scopedRows", () => {
       db,
       createTestAuthContext({ tables: [documents] }),
       documents,
-      { searchPlan: catalog.searchPlanFor(documents.sqlName) },
     );
 
     const result = await rows.list();
@@ -309,7 +300,6 @@ describe("scopedRows", () => {
       },
     });
     const { db, sqlite } = createTestDb();
-    const catalog = createTableCatalog([contacts]);
     sqlite.exec(`
       CREATE TABLE contacts (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -323,7 +313,6 @@ describe("scopedRows", () => {
       db,
       createTestAuthContext({ tables: [contacts] }),
       contacts,
-      { searchPlan: catalog.searchPlanFor(contacts.sqlName) },
     );
 
     await expect(rows.lookup({ ids: "1" })).resolves.toEqual([
@@ -353,7 +342,6 @@ describe("scopedRows", () => {
     });
 
     const { db, sqlite } = createTestDb();
-    const catalog = createTableCatalog([agents]);
     sqlite.exec(`
       CREATE TABLE agents (
         id TEXT PRIMARY KEY,
@@ -365,7 +353,6 @@ describe("scopedRows", () => {
       db,
       createTestAuthContext({ tables: [agents] }),
       agents,
-      { searchPlan: catalog.searchPlanFor(agents.sqlName) },
     );
 
     await expect(rows.lookup({ ids: "001" })).resolves.toEqual([
@@ -375,16 +362,5 @@ describe("scopedRows", () => {
         meta: { id: "001", name: "Agent One" },
       },
     ]);
-  });
-
-  it("counts grouped rows inside row scope", async () => {
-    const { rows } = setupAccounts();
-    await rows.create({ name: "Cash", type: "asset" });
-    await rows.create({ name: "Bank", type: "asset" });
-    await rows.create({ name: "Revenue", type: "revenue" });
-
-    await expect(
-      rows.count({ group_by: "type", ids: "asset,revenue" }),
-    ).resolves.toEqual({ asset: 2, revenue: 1 });
   });
 });

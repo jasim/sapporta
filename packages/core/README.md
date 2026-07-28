@@ -43,7 +43,14 @@ api.register(
 );
 ```
 
-Use `auth.rowSecurity.forTable(table)` directly for advanced Drizzle workflows such as joins, transactions, multi-table state transitions, aggregates, custom SQL, and domain-specific invariants.
+`scopedRows()` exposes `count()` for scalar totals and `countBy()` for bounded
+grouped counts that must keep the same row boundary as generated reads. Both
+accept Drizzle `where` expressions, and `countBy()` accepts the group column;
+generated HTTP and CLI routes translate canonical filters into those
+transport-free inputs. Use
+`auth.rowSecurity.forTable(table)` directly for advanced Drizzle workflows such
+as joins, transactions, multi-table state transitions, custom SQL, and
+domain-specific invariants.
 
 ## Environment variables
 
@@ -166,6 +173,9 @@ Change schema, run Drizzle Kit generate, review SQL, run Drizzle Kit migrate, st
 sapporta rows list <table> --limit 50 --page 2 --sort "-created_at,name"
 sapporta rows list <table> --where '{"status":{"eq":"active"}}'
 
+# Count visible rows in SQL
+sapporta rows count tasks --where '{"status":{"neq":"done"}}'
+
 # Get a single row by ID
 sapporta rows get <table> <id>
 
@@ -225,7 +235,11 @@ Each namespace has a distinct prefix — route ordering no longer matters.
 - **SQL proxy**: `POST /api/meta/sql`
 - **Table operations**: `GET/POST /api/tables/{table}`, `GET/PUT/DELETE /api/tables/{table}/{id}`
 - **Lookup**: `GET /api/tables/{table}/_lookup`
+- **Count**: `GET /api/tables/{table}/_count`
 - **Route-based reports**: app-owned contracts such as `GET /api/reports/trial-balance`
+
+See [Count Queries](../../docs/count-queries.md) for filtered and grouped
+counts, result bounds, and foreign-key lookup composition.
 
 ### Table Zod Boundaries
 

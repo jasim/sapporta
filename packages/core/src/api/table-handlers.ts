@@ -19,6 +19,7 @@ import type { BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
 import type { Context } from "hono";
 import { stream } from "hono/streaming";
 import { getTableConfig } from "drizzle-orm/sqlite-core";
+import type { CountResult } from "@sapporta/shared/contracts";
 import type { TableCatalog } from "../schema/catalog.js";
 import { savePipeline, savePipelineInsertSync } from "../data/save-pipeline.js";
 import {
@@ -49,6 +50,7 @@ import {
   type SapportaAuthContext,
 } from "../auth/index.js";
 import type { TableDef } from "../schema/table.js";
+import { resolveCountQuery } from "../data/count-query.js";
 
 const log = logger.child({ module: "table-handlers" });
 
@@ -78,11 +80,14 @@ export function makeAuthorizedTableHandlers<E extends SapportaEnv>(
       ({ def }) =>
       async ({ c }) => {
         const auth = authorizeTableAction(c, guard(c), "read", def);
-        const rows = scopedRows(db, auth, def, {
-          searchPlan: catalog.searchPlanFor(def.sqlName),
-        });
+        const rows = scopedRows(db, auth, def);
         try {
-          return c.json(await rows.list(queryParams(c)), 200);
+          return c.json(
+            await rows.list(queryParams(c), {
+              searchPlan: catalog.searchPlanFor(def.sqlName),
+            }),
+            200,
+          );
         } catch (err) {
           return tableReadErrorResponse(c, err);
         }
@@ -91,9 +96,7 @@ export function makeAuthorizedTableHandlers<E extends SapportaEnv>(
       ({ def }) =>
       async ({ c, request }) => {
         const auth = authorizeTableAction(c, guard(c), "read", def);
-        const rows = scopedRows(db, auth, def, {
-          searchPlan: catalog.searchPlanFor(def.sqlName),
-        });
+        const rows = scopedRows(db, auth, def);
         try {
           return c.json({ data: await rows.get(request.params.id) }, 200);
         } catch (err) {
@@ -119,9 +122,7 @@ export function makeAuthorizedTableHandlers<E extends SapportaEnv>(
               body,
             );
           }
-          const rows = scopedRows(db, auth, def, {
-            searchPlan: catalog.searchPlanFor(def.sqlName),
-          });
+          const rows = scopedRows(db, auth, def);
           return c.json({ data: await rows.create(body) }, 201);
         } catch (err) {
           return tableWriteErrorResponse(c, def, err);
@@ -131,9 +132,7 @@ export function makeAuthorizedTableHandlers<E extends SapportaEnv>(
       ({ def }) =>
       async ({ c, request }) => {
         const auth = authorizeTableAction(c, guard(c), "update", def);
-        const rows = scopedRows(db, auth, def, {
-          searchPlan: catalog.searchPlanFor(def.sqlName),
-        });
+        const rows = scopedRows(db, auth, def);
         try {
           return c.json(
             { data: await rows.update(request.params.id, request.body) },
@@ -147,9 +146,7 @@ export function makeAuthorizedTableHandlers<E extends SapportaEnv>(
       ({ def }) =>
       async ({ c, request }) => {
         const auth = authorizeTableAction(c, guard(c), "delete", def);
-        const rows = scopedRows(db, auth, def, {
-          searchPlan: catalog.searchPlanFor(def.sqlName),
-        });
+        const rows = scopedRows(db, auth, def);
         try {
           return c.json({ data: await rows.delete(request.params.id) }, 200);
         } catch (err) {
@@ -160,11 +157,15 @@ export function makeAuthorizedTableHandlers<E extends SapportaEnv>(
       ({ def }) =>
       async ({ c }) => {
         const auth = authorizeTableAction(c, guard(c), "export", def);
-        const rows = scopedRows(db, auth, def, {
-          searchPlan: catalog.searchPlanFor(def.sqlName),
-        });
+        const rows = scopedRows(db, auth, def);
         try {
-          return await streamCsv(c, def, await rows.exportRows(queryParams(c)));
+          return await streamCsv(
+            c,
+            def,
+            await rows.exportRows(queryParams(c), {
+              searchPlan: catalog.searchPlanFor(def.sqlName),
+            }),
+          );
         } catch (err) {
           return tableReadErrorResponse(c, err);
         }
@@ -174,20 +175,32 @@ export function makeAuthorizedTableHandlers<E extends SapportaEnv>(
       const def = catalog.get(tableName);
       if (!def) return tableNotFoundResponse(tableName);
       const auth = authorizeTableAction(c, guard(c), "read", def);
-      const rows = scopedRows(db, auth, def, {
-        searchPlan: catalog.searchPlanFor(def.sqlName),
-      });
+      const rows = scopedRows(db, auth, def);
       return handleLookup(c, rows);
     },
-    count: ({ c, request }) => {
+    count: async ({ c, request }) => {
       const tableName = request.params.tableName;
       const def = catalog.get(tableName);
       if (!def) return tableNotFoundResponse(tableName);
       const auth = authorizeTableAction(c, guard(c), "read", def);
-      const rows = scopedRows(db, auth, def, {
-        searchPlan: catalog.searchPlanFor(def.sqlName),
-      });
-      return handleCount(c, rows);
+      const rows = scopedRows(db, auth, def);
+      try {
+        const count = resolveCountQuery(request.query, def);
+        if (count.kind === "total") {
+          const data: CountResult = {
+            kind: "total",
+            count: await rows.count(count.input),
+          };
+          return c.json({ data }, 200);
+        }
+        const data: CountResult = {
+          kind: "grouped",
+          groups: await rows.countBy(count.input),
+        };
+        return c.json({ data }, 200);
+      } catch (err) {
+        return tableReadErrorResponse(c, err);
+      }
     },
   };
 }
@@ -211,17 +224,6 @@ async function handleLookup<E extends Env>(
 ): Promise<Response> {
   try {
     return c.json({ entries: await rows.lookup(queryParams(c)) }, 200);
-  } catch (err) {
-    return tableReadErrorResponse(c, err);
-  }
-}
-
-async function handleCount<E extends Env>(
-  c: Context<E>,
-  rows: ReturnType<typeof scopedRows>,
-): Promise<Response> {
-  try {
-    return c.json({ data: await rows.count(queryParams(c)) }, 200);
   } catch (err) {
     return tableReadErrorResponse(c, err);
   }

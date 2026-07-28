@@ -1,5 +1,5 @@
 import { getTableConfig, type SQLiteColumn } from "drizzle-orm/sqlite-core";
-import { columnPropertyName } from "../auth/row-scope.js";
+import { columnPropertyName } from "../schema/column.js";
 import type { TableDef } from "../schema/table.js";
 
 export class UnknownRowFieldsError extends Error {

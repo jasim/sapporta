@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { countQuerySchema } from "@sapporta/shared/contracts";
 import { init } from "../init.js";
 import {
   endpointListResult,
@@ -14,6 +15,7 @@ import {
   optionalJsonArray,
   optionalJsonObject,
   optionalPositiveInteger,
+  readCountDataRows,
   readDataRows,
   readRecordArrayResponse,
   readTableListRows,
@@ -311,6 +313,77 @@ export const CLI_COMMANDS: readonly CliCommandSpec[] = [
         await context.client.getRow(input.table, input.id),
         readDataRows,
       ),
+  }),
+  command({
+    name: ["rows", "count"],
+    summary: "Count visible records without loading complete rows",
+    args: [{ name: "table", required: true }],
+    options: [
+      {
+        name: "groupBy",
+        flag: "--group-by <column>",
+        description: "Column used to group matching rows",
+        kind: "string",
+      },
+      {
+        name: "order",
+        flag: "--order <direction>",
+        description: "Grouped count order: asc or desc",
+        kind: "string",
+      },
+      {
+        name: "limit",
+        flag: "--limit <number>",
+        description: "Maximum grouped results",
+        kind: "string",
+      },
+      {
+        name: "where",
+        flag: "--where <json>",
+        description: "JSON filter object",
+        kind: "string",
+      },
+    ],
+    inputSchema: z
+      .object({
+        table: requiredString("table"),
+        groupBy: z.string().min(1, "--group-by must not be empty").optional(),
+        order: countQuerySchema.shape.order,
+        limit: countQuerySchema.shape.limit,
+        where: optionalJsonObject("where"),
+      })
+      .superRefine((input, context) => {
+        if (
+          input.groupBy === undefined &&
+          (input.order !== undefined || input.limit !== undefined)
+        ) {
+          context.addIssue({
+            code: "custom",
+            message: "--order and --limit require --group-by",
+          });
+        }
+      }),
+    examples: [
+      "sapporta rows count tasks",
+      "sapporta rows count tasks --where " +
+        `'{"status":{"neq":"done"},"assignee_id":{"is":"notnull"}}' ` +
+        "--group-by assignee_id --limit 10",
+    ],
+    run: async (input, context) => {
+      const options =
+        input.groupBy === undefined
+          ? { where: input.where }
+          : {
+              groupBy: input.groupBy,
+              order: input.order,
+              limit: input.limit,
+              where: input.where,
+            };
+      return resultFromResponse(
+        await context.client.countRows(input.table, options),
+        readCountDataRows,
+      );
+    },
   }),
   command({
     name: ["rows", "create"],

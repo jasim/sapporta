@@ -57,6 +57,7 @@ describe("openapi smoke — built-in sub-apps in /openapi.json", () => {
       components?: { schemas?: Record<string, any> };
     };
     expect(fullSpec.paths["/api/tables/accounts"]).toBeDefined();
+    expect(fullSpec.paths["/api/tables/{tableName}/_count"]).toBeDefined();
     const post = fullSpec.paths["/api/tables/accounts"].post;
     const schema = post.requestBody.content["application/json"].schema;
     const branches = schema.anyOf ?? schema.oneOf ?? [schema];

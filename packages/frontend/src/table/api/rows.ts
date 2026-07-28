@@ -1,10 +1,5 @@
 import { uiClient } from "../../platform/client";
-import type {
-  CountResponse,
-  PaginatedRows,
-  Row,
-  SingleRow,
-} from "@sapporta/shared/contracts";
+import type { PaginatedRows, Row, SingleRow } from "@sapporta/shared/contracts";
 import { stringifySortOrder } from "@sapporta/grid";
 import type { SortDescriptor } from "@sapporta/grid";
 import {
@@ -85,16 +80,4 @@ export async function deleteTableRow(
   id: RowId,
 ): Promise<SingleRow> {
   return uiClient.deleteRow({ params: { tableName, id } });
-}
-
-export async function fetchChildCounts(
-  childTable: string,
-  fkColumn: string,
-  parentIds: RowId[],
-): Promise<CountResponse> {
-  if (parentIds.length === 0) return { data: {} };
-  return uiClient.count({
-    params: { tableName: childTable },
-    query: { group_by: fkColumn, ids: parentIds.join(",") },
-  });
 }

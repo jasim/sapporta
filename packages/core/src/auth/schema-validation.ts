@@ -13,11 +13,11 @@
 import { getTableConfig } from "drizzle-orm/sqlite-core";
 import type { TableDef } from "../schema/table.js";
 import { findPkColumn } from "../schema/pk.js";
+import { columnBySqlName } from "../schema/column.js";
 import type { ValidationErrorDetail } from "../data/validate.js";
 import {
   SCOPED_TO_USER_ID_SQL_COLUMN,
   WORKSPACE_ID_SQL_COLUMN,
-  columnBySqlName,
   isRowScope,
   scopedToUserScopeColumn,
   systemManagedScopeFieldNames,

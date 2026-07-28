@@ -3,6 +3,7 @@ import type { Command } from "commander";
 import { z } from "zod";
 import { createCliProgram } from "./framework.js";
 import { CLI_COMMANDS } from "./registry.js";
+import { readCountDataRows } from "./helpers.js";
 import type { CliCommandContext, CliCommandSpec } from "./types.js";
 
 const ENV_VARS = ["SAPPORTA_API_URL", "SAPPORTA_API_TOKEN"] as const;
@@ -93,6 +94,17 @@ describe("CLI command registry help", () => {
     expect(help).toContain("--where <json>");
   });
 
+  it("documents deterministic count options", () => {
+    const help = helpFor(["rows", "count"]);
+
+    expect(help).toContain("Usage: sapporta rows count [options] <table>");
+    expect(help).toContain("--group-by <column>");
+    expect(help).toContain("--order <direction>");
+    expect(help).toContain("--limit <number>");
+    expect(help).toContain("--where <json>");
+    expect(help).toContain("--limit 10");
+  });
+
   it("documents table detail, indexes, and sample options", () => {
     expect(helpFor(["tables", "list"])).toContain("--detail");
     expect(helpFor(["tables", "indexes"])).toContain(
@@ -110,6 +122,33 @@ describe("CLI command registry help", () => {
     const executeHelp = helpFor(["sql", "execute"]);
     expect(executeHelp).toContain("--params <json>");
     expect(executeHelp).toContain("--dry-run");
+  });
+});
+
+describe("count command output", () => {
+  it("flattens explicit count results only at the table-rendering boundary", () => {
+    expect(readCountDataRows({ data: { kind: "total", count: 8 } })).toEqual([
+      { count: 8 },
+    ]);
+    expect(
+      readCountDataRows({
+        data: {
+          kind: "grouped",
+          groups: [{ value: "open", count: 3 }],
+        },
+      }),
+    ).toEqual([{ value: "open", count: 3 }]);
+  });
+
+  it("rejects grouped options without a group column", async () => {
+    const count = CLI_COMMANDS.find(
+      (spec) => spec.name[0] === "rows" && spec.name[1] === "count",
+    );
+    if (!count) throw new Error("Count command not found");
+
+    await expect(
+      count.inputSchema.parseAsync({ table: "tasks", limit: "10" }),
+    ).rejects.toThrow(/require --group-by/);
   });
 });
 

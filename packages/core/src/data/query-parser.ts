@@ -18,7 +18,7 @@ import {
   type AnyColumn,
 } from "drizzle-orm";
 import type { TableDef } from "../schema/table.js";
-import { columnBySqlName } from "../auth/row-scope.js";
+import { columnBySqlName } from "../schema/column.js";
 import { resolveColumnKind } from "../schema/resolve-kind.js";
 import { QueryParseError } from "../db/errors.js";
 import { parseBoundedInteger } from "@sapporta/shared/validation";
@@ -82,31 +82,40 @@ export function parseQuery(
   params: Record<string, string>,
   schema: TableDef,
 ): ParsedQuery {
-  const conditions: SQL[] = [];
-
   const limit = parseLimit(params.limit);
   const page = parsePage(params.page);
   const offset = (page - 1) * limit;
+  const where = parseTableFilters(params, schema);
 
-  // Grammar parse → typed-boundary parse → SQL. The typed parse owns
-  // column existence (via `resolveColumnKind` returning undefined),
-  // operator applicability, and value parsing per declared `kind`.
+  const searchTerm = parseSearchTerm(params.q, schema);
+
+  return {
+    where,
+    searchTerm,
+    orderBy: parseSortClauses(params.sort, schema),
+    limit,
+    offset,
+  };
+}
+
+/**
+ * Parse only the canonical `filter[col][op]=value` grammar.
+ *
+ * List and count reads share this boundary so a filter cannot be accepted
+ * by one surface and silently ignored or interpreted differently by another.
+ */
+export function parseTableFilters(
+  params: Record<string, string>,
+  schema: TableDef,
+): SQL | undefined {
+  const conditions: SQL[] = [];
   const rawConditions = parseFilterConditions(params);
   const typedConditions = parseFilterConditionsTyped(rawConditions, schema);
   for (const cond of typedConditions) {
     const col = findColumn(schema, cond.column)!;
     conditions.push(buildFilterSql(col, cond));
   }
-
-  const searchTerm = parseSearchTerm(params.q, schema);
-
-  return {
-    where: conditions.length > 0 ? and(...conditions) : undefined,
-    searchTerm,
-    orderBy: parseSortClauses(params.sort, schema),
-    limit,
-    offset,
-  };
+  return conditions.length > 0 ? and(...conditions) : undefined;
 }
 
 /** Delegate grammar parsing to shared, then rewrap its typed error into

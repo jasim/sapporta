@@ -1,6 +1,7 @@
 import { ErrorCode, OperationError } from "../../introspect/types.js";
 import { httpRequest, type HttpResult } from "../http-client.js";
 import type { HttpMethod } from "../openapi-spec.js";
+import type { CountQuery } from "@sapporta/shared/contracts";
 
 export interface SapportaCliClientOptions {
   apiUrl: string;
@@ -14,6 +15,22 @@ export interface RowListOptions {
   q?: string;
   where?: Record<string, unknown>;
 }
+
+interface CountRowsBaseOptions {
+  where?: Record<string, unknown>;
+}
+
+export type CountRowsOptions =
+  | (CountRowsBaseOptions & {
+      groupBy?: undefined;
+      order?: undefined;
+      limit?: undefined;
+    })
+  | (CountRowsBaseOptions & {
+      groupBy: string;
+      order?: CountQuery["order"];
+      limit?: CountQuery["limit"];
+    });
 
 export interface SqlQueryOptions {
   params?: unknown[];
@@ -85,6 +102,30 @@ export class SapportaCliClient {
     return this.request(
       "GET",
       `/api/tables/${encodePathSegment(table)}/${encodePathSegment(id)}`,
+    );
+  }
+
+  async countRows(
+    table: string,
+    opts: CountRowsOptions = {},
+  ): Promise<unknown> {
+    if (opts.groupBy === "") {
+      throw new OperationError(
+        "--group-by must not be empty",
+        ErrorCode.VALIDATION_FAILED,
+      );
+    }
+    return this.request(
+      "GET",
+      `/api/tables/${encodePathSegment(table)}/_count`,
+      {
+        query: {
+          ...(opts.groupBy !== undefined ? { group_by: opts.groupBy } : {}),
+          ...(opts.order ? { order: opts.order } : {}),
+          ...(opts.limit !== undefined ? { limit: opts.limit } : {}),
+          ...whereObjectToFilterParams(opts.where),
+        },
+      },
     );
   }
 
