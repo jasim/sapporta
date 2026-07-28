@@ -89,6 +89,8 @@ export type {
   CountRowsByInput,
   CountRowsInput,
   FindManyRowsInput,
+  LookupRowsByIdInput,
+  LookupRowsBySearchInput,
   LookupRowsInput,
   PageRowsInput,
   PageRowsResult,
@@ -101,7 +103,16 @@ export type {
 export type { GroupCount } from "@sapporta/shared";
 
 // Generated table HTTP query resolvers
-export { tableHttpQuery } from "./api/table-query.js";
+export {
+  resolveCountQuery,
+  resolveExportQuery,
+  resolveLookupQuery,
+  resolvePageQuery,
+} from "./api/table-query.js";
+export type {
+  ResolvedCountQuery,
+  ResolveRowsQueryOptions,
+} from "./api/table-query.js";
 
 // Table search planning and request-bound SQL compilation
 export { normalizeTableSearch } from "./search/search-types.js";

@@ -61,6 +61,14 @@ const filterQueryValueSchema: z.ZodType<QueryParamValue> = z.union([
   z.array(z.string()).min(1),
 ]);
 
+export const DEFAULT_PAGE = 1;
+export const DEFAULT_PAGE_SIZE = 50;
+export const MAX_PAGE_SIZE = 1000;
+export const MAX_PAGE = Math.floor(Number.MAX_SAFE_INTEGER / MAX_PAGE_SIZE);
+export const DEFAULT_LOOKUP_LIMIT = 50;
+export const MAX_LOOKUP_LIMIT = 500;
+export const MAX_LOOKUP_IDS = 500;
+
 /** Query shape shared by reads that select rows without pagination.
  *  Filters are additional `filter[col][op]` keys. Repeated filter keys remain
  *  arrays until the strict table query resolver validates their grammar. */
@@ -73,20 +81,49 @@ export type ExportRowsQuery = z.output<typeof exportRowsQuerySchema>;
 export const listRowsQuerySchema = z
   .object({
     ...rowSelectionQueryShape,
-    page: z.string().optional(),
-    limit: z.string().optional(),
+    page: z.coerce.number().int().min(1).max(MAX_PAGE).default(DEFAULT_PAGE),
+    limit: z.coerce
+      .number()
+      .int()
+      .min(1)
+      .max(MAX_PAGE_SIZE)
+      .default(DEFAULT_PAGE_SIZE),
   })
   .catchall(filterQueryValueSchema);
 export type ListRowsQuery = z.output<typeof listRowsQuerySchema>;
 
-export const lookupQuerySchema = z
+const lookupIdsQuerySchema = z
+  .string()
+  .transform((value) => value.split(",").map((id) => id.trim()))
+  .pipe(z.array(z.string().min(1)).min(1).max(MAX_LOOKUP_IDS));
+
+const lookupByIdsQuerySchema = z
   .object({
-    ids: z.string().optional(),
-    q: z.string().optional(),
-    limit: z.string().optional(),
-    fields: z.string().optional(),
+    ids: lookupIdsQuerySchema,
+    q: z.never().optional(),
+    fields: z.never().optional(),
+    limit: z.never().optional(),
   })
   .strict();
+
+const lookupBySearchQuerySchema = z
+  .object({
+    ids: z.never().optional(),
+    q: z.string().optional(),
+    fields: z.string().optional(),
+    limit: z.coerce
+      .number()
+      .int()
+      .min(1)
+      .max(MAX_LOOKUP_LIMIT)
+      .default(DEFAULT_LOOKUP_LIMIT),
+  })
+  .strict();
+
+export const lookupQuerySchema = z.union([
+  lookupByIdsQuerySchema,
+  lookupBySearchQuerySchema,
+]);
 export type LookupQuery = z.output<typeof lookupQuerySchema>;
 
 const countGroupValueSchema = z.union([

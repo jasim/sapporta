@@ -10,11 +10,13 @@ describe("lookup API query serialization", () => {
     expect(buildLookupValueQuery([1, "1", 2])).toEqual({ ids: "1,1,2" });
   });
 
-  it("omits ids when there are no values to request", () => {
-    expect(buildLookupValueQuery([])).toEqual({});
+  it("does not serialize an empty ID lookup mode", () => {
+    expect(() => buildLookupValueQuery([])).toThrow(
+      "A value lookup requires at least one ID.",
+    );
   });
 
-  it("sends only the fields displayed by the picker", () => {
+  it("serializes search without ID-mode parameters", () => {
     expect(
       buildLookupSearchQuery("alice", 25, ["name", "email", "name"]),
     ).toEqual({ q: "alice", limit: "25", fields: "name,email" });

@@ -230,6 +230,14 @@ describe("Sapporta package exports", () => {
           types: [],
         },
         source: `
+          import {
+            resolveCountQuery,
+            resolveExportQuery,
+            resolveLookupQuery,
+            resolvePageQuery,
+            type ResolvedCountQuery,
+            type ResolveRowsQueryOptions,
+          } from "@sapporta/server";
           import { sapportaTable, sqliteTable, text, integer } from "@sapporta/server/table";
           import * as shared from "@sapporta/shared";
           import * as filters from "@sapporta/shared/filter";
@@ -244,6 +252,13 @@ describe("Sapporta package exports", () => {
             drizzle: accountsDrizzle,
             meta: { rowLabelColumns: ["name"] },
           });
+          export {
+            resolveCountQuery,
+            resolveExportQuery,
+            resolveLookupQuery,
+            resolvePageQuery,
+          };
+          export type { ResolvedCountQuery, ResolveRowsQueryOptions };
           export { sqliteTable, shared, filters, contracts, rowIds };
         `,
       });

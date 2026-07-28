@@ -31,6 +31,7 @@ import {
   parsePlainDate,
   parseCanonicalInstant,
 } from "@sapporta/shared/temporal";
+import { listRowsQuerySchema } from "@sapporta/shared/contracts";
 import { QueryParseError } from "../db/errors.js";
 
 // §2 — Strict calendar validity (exercised through the boundary parse)
@@ -208,7 +209,7 @@ function resolveHttpListQuery(
   tableDef: TableDef,
 ) {
   const catalog = createTableCatalog([tableDef]);
-  return resolvePageQuery(query, tableDef, {
+  return resolvePageQuery(listRowsQuerySchema.parse(query), tableDef, {
     auth: createTestAuthContext({ tables: [tableDef] }),
     searchPlan: catalog.searchPlanFor(tableDef.sqlName),
   });

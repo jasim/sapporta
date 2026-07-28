@@ -1,8 +1,21 @@
-import { describe, expect, it } from "vitest";
-import { countQuerySchema, listRowsQuerySchema } from "./table-schema.js";
+import { describe, expect, expectTypeOf, it } from "vitest";
+import type { QueryParamValue } from "../query-params.js";
+import {
+  countQuerySchema,
+  DEFAULT_LOOKUP_LIMIT,
+  DEFAULT_PAGE,
+  DEFAULT_PAGE_SIZE,
+  lookupQuerySchema,
+  MAX_LOOKUP_IDS,
+  MAX_LOOKUP_LIMIT,
+  MAX_PAGE,
+  MAX_PAGE_SIZE,
+  listRowsQuerySchema,
+  type ListRowsQuery,
+} from "./table-schema.js";
 
 describe("table query contracts", () => {
-  it("keeps singleton fields as scalars and repeated filters as arrays", () => {
+  it("coerces and defaults bounded pagination while preserving filters", () => {
     expect(
       listRowsQuerySchema.parse({
         page: "2",
@@ -12,12 +25,92 @@ describe("table query contracts", () => {
         "filter[name][contains]": ["left", "right"],
       }),
     ).toEqual({
-      page: "2",
-      limit: "25",
+      page: 2,
+      limit: 25,
       sort: "name",
       q: "needle",
       "filter[name][contains]": ["left", "right"],
     });
+    expect(listRowsQuerySchema.parse({})).toEqual({
+      page: DEFAULT_PAGE,
+      limit: DEFAULT_PAGE_SIZE,
+    });
+
+    const output: ListRowsQuery = listRowsQuerySchema.parse({
+      "filter[name][contains]": ["left", "right"],
+    });
+    expectTypeOf(output.page).toEqualTypeOf<number>();
+    expectTypeOf(output.limit).toEqualTypeOf<number>();
+    expectTypeOf(
+      output["filter[name][contains]"],
+    ).toEqualTypeOf<QueryParamValue>();
+  });
+
+  it("rejects pagination values outside the static bounds", () => {
+    for (const query of [
+      { page: "0" },
+      { page: String(MAX_PAGE + 1) },
+      { page: "not-a-number" },
+      { limit: "0" },
+      { limit: String(MAX_PAGE_SIZE + 1) },
+      { limit: "not-a-number" },
+    ]) {
+      expect(() => listRowsQuerySchema.parse(query)).toThrow();
+    }
+  });
+
+  it("parses lookup ID and search modes into distinct output shapes", () => {
+    expect(lookupQuerySchema.parse({ ids: "1, 2" })).toEqual({
+      ids: ["1", "2"],
+    });
+    expect(
+      lookupQuerySchema.parse({
+        q: "alice",
+        fields: "name,email",
+        limit: "25",
+      }),
+    ).toEqual({
+      q: "alice",
+      fields: "name,email",
+      limit: 25,
+    });
+    expect(lookupQuerySchema.parse({})).toEqual({
+      limit: DEFAULT_LOOKUP_LIMIT,
+    });
+  });
+
+  it("rejects contradictory lookup modes", () => {
+    for (const query of [
+      { ids: "1", q: "alice" },
+      { ids: "1", fields: "name" },
+      { ids: "1", limit: "1" },
+    ]) {
+      expect(() => lookupQuerySchema.parse(query)).toThrow();
+    }
+  });
+
+  it("bounds lookup IDs separately from search results", () => {
+    const maximumIds = Array.from(
+      { length: MAX_LOOKUP_IDS },
+      (_, index) => index + 1,
+    ).join(",");
+    const tooManyIds = `${maximumIds},${MAX_LOOKUP_IDS + 1}`;
+
+    expect(lookupQuerySchema.parse({ ids: maximumIds })).toEqual({
+      ids: maximumIds.split(","),
+    });
+    expect(() => lookupQuerySchema.parse({ ids: tooManyIds })).toThrow();
+    for (const ids of ["", ",,,", "1,,2", "1, ,2"]) {
+      expect(() => lookupQuerySchema.parse({ ids })).toThrow();
+    }
+    expect(
+      lookupQuerySchema.parse({ limit: String(MAX_LOOKUP_LIMIT) }),
+    ).toEqual({
+      limit: MAX_LOOKUP_LIMIT,
+    });
+    expect(() =>
+      lookupQuerySchema.parse({ limit: String(MAX_LOOKUP_LIMIT + 1) }),
+    ).toThrow();
   });
 
   it("keeps count fields ergonomic alongside repeated filters", () => {

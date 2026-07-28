@@ -6,10 +6,15 @@ import { ValidationError } from "../db/errors.js";
 import { createTestAuthContext } from "../testing/auth-context.js";
 import { createTestDb } from "../testing/test-utils.js";
 import {
+  MAX_LOOKUP_IDS,
+  MAX_LOOKUP_LIMIT,
+  MAX_PAGE_SIZE,
+} from "@sapporta/shared/contracts";
+import {
   ImmutableTableOperationError,
-  MAX_PAGE_LIMIT,
   RowNotFoundError,
   scopedRows,
+  type LookupRowsInput,
   type PageRowsResult,
   type TableRow,
 } from "./scoped-rows.js";
@@ -142,7 +147,7 @@ describe("scopedRows", () => {
       RangeError,
     );
     await expect(
-      rows.findMany({ limit: MAX_PAGE_LIMIT + 1 }),
+      rows.findMany({ limit: MAX_PAGE_SIZE + 1 }),
     ).rejects.toBeInstanceOf(RangeError);
     await expect(
       rows.findMany({ limit: 1, offset: -1 }),
@@ -389,7 +394,7 @@ describe("scopedRows", () => {
     await rows.create({ name: "Revenue", type: "revenue", balance: 250 });
     await rows.create({ name: "Rent", type: "expense", balance: 300 });
 
-    await expect(rows.lookup({ ids: [1, 2] })).resolves.toEqual([
+    await expect(rows.lookup({ ids: ["1", "2"] })).resolves.toEqual([
       {
         value: 1,
         label: "Cash",
@@ -454,6 +459,57 @@ describe("scopedRows", () => {
     ]);
   });
 
+  it("exposes lookup as distinct ID and search input shapes", () => {
+    const { rows } = setupAccounts();
+    const byIds = {
+      ids: ["1", "2"],
+    } satisfies LookupRowsInput<typeof accountsTable>;
+    const bySearch = {
+      search: "cash",
+      fields: [accountsTable.name],
+      limit: 10,
+    } satisfies LookupRowsInput<typeof accountsTable>;
+
+    expect(byIds.ids).toEqual(["1", "2"]);
+    expect(bySearch.fields).toEqual([accountsTable.name]);
+
+    if (false) {
+      expectTypeOf(rows.lookup({ ids: ["1"] })).toEqualTypeOf<
+        Promise<import("@sapporta/shared/contracts").LookupEntry[]>
+      >();
+      void rows.lookup({
+        search: "cash",
+        fields: [accountsTable.name],
+        limit: 10,
+      });
+
+      // @ts-expect-error ID lookup cannot also search.
+      void rows.lookup({ ids: ["1"], search: "cash" });
+      // @ts-expect-error ID lookup cannot select search fields.
+      void rows.lookup({ ids: ["1"], fields: [accountsTable.name] });
+      // @ts-expect-error ID lookup cannot apply a result limit.
+      void rows.lookup({ ids: ["1"], limit: 1 });
+      // @ts-expect-error Search fields are table columns, not wire names.
+      void rows.lookup({ search: "cash", fields: ["name"] });
+    }
+  });
+
+  it("validates direct lookup bounds", async () => {
+    const { rows } = setupAccounts();
+
+    await expect(rows.lookup({ limit: 0 })).rejects.toBeInstanceOf(RangeError);
+    await expect(
+      rows.lookup({ limit: MAX_LOOKUP_LIMIT + 1 }),
+    ).rejects.toBeInstanceOf(RangeError);
+    await expect(
+      rows.lookup({
+        ids: Array.from({ length: MAX_LOOKUP_IDS + 1 }, (_, index) =>
+          String(index),
+        ),
+      }),
+    ).rejects.toBeInstanceOf(RangeError);
+  });
+
   it("rejects non-numeric lookup ids for numeric primary keys", async () => {
     const { rows } = setupAccounts();
 
@@ -504,7 +560,7 @@ describe("scopedRows", () => {
       void found!.displayName;
     }
 
-    await expect(rows.lookup({ ids: [1] })).resolves.toEqual([
+    await expect(rows.lookup({ ids: ["1"] })).resolves.toEqual([
       {
         value: 1,
         label: "Alice Adams",

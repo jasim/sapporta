@@ -83,21 +83,31 @@ snapshot until the scan finishes or the consumer cancels it, then releases the
 statement.
 
 Lookup inputs are typed too. IDs are values rather than comma-separated text,
-and displayed search fields are Drizzle columns rather than HTTP field names:
+and displayed search fields are Drizzle columns rather than HTTP field names.
+ID lookup and search are separate input shapes:
 
 ```ts
 await rows.lookup({
-  ids: [12, 14, 19],
+  ids: ["12", "14", "19"],
+});
+
+await rows.lookup({
+  search: "overdue",
   fields: [invoicesTable.id, invoicesTable.reference],
   limit: 20,
 });
 ```
 
+Search lookup defaults to 50 results and accepts at most 500. ID lookup accepts
+at most 500 IDs and does not accept search fields or a result limit.
+
 `scopedRows()` exposes `count()` for scalar totals and `countBy()` for bounded
 grouped counts that must keep the same row boundary as generated reads. Both
 accept Drizzle expressions for `where`, and `countBy()` accepts the group
 column. Generated HTTP and CLI routes translate canonical filters into those
-transport-free inputs. Use
+transport-free inputs. Custom table adapters can import the named
+`resolvePageQuery`, `resolveExportQuery`, `resolveLookupQuery`, and
+`resolveCountQuery` functions directly from `@sapporta/server`. Use
 `auth.rowSecurity.forTable(table)` directly for advanced Drizzle workflows such
 as joins, transactions, multi-table state transitions, custom SQL, and
 domain-specific invariants.

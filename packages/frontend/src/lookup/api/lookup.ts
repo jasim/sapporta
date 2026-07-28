@@ -4,10 +4,13 @@ import type { LookupEntry, LookupValue } from "@sapporta/grid/lookup";
 import type { LookupSearchPage } from "@sapporta/grid/lookup";
 
 export function buildLookupValueQuery(values: readonly LookupValue[]): {
-  ids?: string;
+  ids: string;
 } {
+  if (values.length === 0) {
+    throw new RangeError("A value lookup requires at least one ID.");
+  }
   const ids = values.map((value) => String(value)).join(",");
-  return ids ? { ids } : {};
+  return { ids };
 }
 
 export function buildLookupSearchQuery(

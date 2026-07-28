@@ -27,10 +27,6 @@ import {
   DEFAULT_COUNT_GROUP_LIMIT,
   type QueryParamRecord,
 } from "@sapporta/shared";
-import {
-  parseBoundedInteger,
-  parseOptionalBoundedInteger,
-} from "@sapporta/shared/validation";
 import type { AnySQLiteTable, SQLiteColumn } from "drizzle-orm/sqlite-core";
 import type { SapportaAuthContext } from "../auth/context.js";
 import type {
@@ -40,12 +36,6 @@ import type {
   PageRowsInput,
   RowsQuery,
   TableColumn,
-} from "../data/scoped-rows.js";
-import {
-  DEFAULT_PAGE,
-  DEFAULT_PAGE_LIMIT,
-  MAX_LOOKUP_LIMIT,
-  MAX_PAGE_LIMIT,
 } from "../data/scoped-rows.js";
 import { findPkColumn } from "../schema/pk.js";
 import type { TableDef } from "../schema/table.js";
@@ -104,7 +94,8 @@ const COUNT_QUERY_KEYS = new Set(["group_by", "order", "limit"]);
  *                                   catalog search plan. Empty / whitespace
  *                                   `q` is treated as absent.
  *   sort=col,-col2                  leading `-` is descending
- *   page=N, limit=M                 M ∈ [1, MAX_PAGE_LIMIT]
+ *   page=N, limit=M                 numeric bounds are enforced by the shared
+ *                                   HTTP contract
  *
  * Errors (QueryParseError → HTTP 400):
  *   unknown_filter_shape            filter[col] without [op], etc.
@@ -112,7 +103,6 @@ const COUNT_QUERY_KEYS = new Set(["group_by", "order", "limit"]);
  *   bad_value                       is={other}, in=/nin= empty or empty-item
  *   unknown_column                  filter or sort names a column not on
  *                                   the table
- *   bad_limit, bad_page             non-numeric or out-of-range
  *   no_search_config                q set on a table with search: false
  *
  * Silent-ignore is rejected as a class: typos like filter[naration]=foo
@@ -129,8 +119,8 @@ export function resolvePageQuery<TTable extends AnySQLiteTable>(
   return {
     where: resolveSearchWhere(where, searchTerm, table, options),
     orderBy: parseSortClauses(query.sort, table),
-    page: parsePage(query.page),
-    limit: parseLimit(query.limit),
+    page: query.page,
+    limit: query.limit,
   };
 }
 
@@ -152,14 +142,16 @@ export function resolveLookupQuery<TTable extends AnySQLiteTable>(
   query: LookupQuery,
   table: TableDef<TTable>,
 ): LookupRowsInput<TTable> {
+  if (query.ids !== undefined) {
+    return {
+      ids: parseLookupIds(query.ids, table, findPkColumn(table).name),
+    };
+  }
+
   return {
-    ids:
-      query.ids === undefined
-        ? undefined
-        : parseLookupIds(query.ids, table, findPkColumn(table).name),
-    search: normalizedSearch(query.q),
+    search: query.q?.trim() || undefined,
     fields: resolveLookupFields(table, query.fields),
-    limit: parseLookupLimit(query.limit),
+    limit: query.limit,
   };
 }
 
@@ -390,25 +382,6 @@ function parseSortClauses(raw: string | undefined, schema: TableDef): SQL[] {
   });
 }
 
-function parseLimit(raw: string | undefined): number {
-  return parseBoundedInteger(raw, {
-    name: "limit",
-    min: 1,
-    max: MAX_PAGE_LIMIT,
-    defaultValue: DEFAULT_PAGE_LIMIT,
-    makeError: (message) => new QueryParseError("bad_limit", message),
-  });
-}
-
-function parsePage(raw: string | undefined): number {
-  return parseBoundedInteger(raw, {
-    name: "page",
-    min: 1,
-    defaultValue: DEFAULT_PAGE,
-    makeError: (message) => new QueryParseError("bad_page", message),
-  });
-}
-
 function parseCommaSeparatedValues(value: string): string[] {
   return value
     .split(",")
@@ -417,17 +390,16 @@ function parseCommaSeparatedValues(value: string): string[] {
 }
 
 function parseLookupIds(
-  idsParam: string,
+  ids: readonly string[],
   table: TableDef,
   primaryKeyColumn: string,
-): Array<string | number> {
-  const ids = parseCommaSeparatedValues(idsParam);
+): readonly string[] {
   const kind = resolveColumnKind(table, primaryKeyColumn);
   switch (kind) {
     case "text":
       return ids;
-    case "number":
-      return ids.map((id) => {
+    case "number": {
+      for (const id of ids) {
         const value = Number(id);
         if (!Number.isFinite(value)) {
           throw new QueryParseError(
@@ -435,8 +407,9 @@ function parseLookupIds(
             `lookup id for column "${primaryKeyColumn}" must be a finite number, got ${JSON.stringify(id)}`,
           );
         }
-        return value;
-      });
+      }
+      return ids;
+    }
     case "boolean":
     case "date":
     case "timestamp":
@@ -450,20 +423,6 @@ function parseLookupIds(
         `Column "${primaryKeyColumn}" not found`,
       );
   }
-}
-
-function normalizedSearch(search: string | undefined): string | undefined {
-  const normalized = search?.trim();
-  return normalized ? normalized : undefined;
-}
-
-function parseLookupLimit(limitParam: string | undefined): number | undefined {
-  return parseOptionalBoundedInteger(limitParam, {
-    name: "limit",
-    min: 1,
-    max: MAX_LOOKUP_LIMIT,
-    makeError: (message) => new QueryParseError("bad_limit", message),
-  });
 }
 
 function resolveLookupFields<TTable extends AnySQLiteTable>(
@@ -507,10 +466,3 @@ function likeWithEscape(col: AnyColumn, pattern: string): SQL {
 function findColumn(schema: TableDef, name: string): AnyColumn | null {
   return columnBySqlName(schema, name);
 }
-
-export const tableHttpQuery = Object.freeze({
-  page: resolvePageQuery,
-  exportRows: resolveExportQuery,
-  lookup: resolveLookupQuery,
-  count: resolveCountQuery,
-});

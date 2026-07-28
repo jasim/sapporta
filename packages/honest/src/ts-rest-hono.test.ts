@@ -38,11 +38,11 @@ describe("TsRestApi query parsing", () => {
       method: "GET",
       path: "/rows",
       query: z
-        .object({ page: z.string().optional() })
+        .object({ page: z.coerce.number().int().min(1).optional() })
         .catchall(z.union([z.string(), z.array(z.string()).min(1)])),
       responses: {
         200: z.object({
-          page: z.string(),
+          page: z.number(),
           filters: z.array(z.string()),
         }),
       },
@@ -53,7 +53,7 @@ describe("TsRestApi query parsing", () => {
       return {
         status: 200,
         body: {
-          page: request.query.page ?? "",
+          page: request.query.page ?? 1,
           filters: typeof filters === "string" ? [filters] : filters,
         },
       };
@@ -66,7 +66,7 @@ describe("TsRestApi query parsing", () => {
 
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({
-      page: "2",
+      page: 2,
       filters: ["left", "right"],
     });
   });

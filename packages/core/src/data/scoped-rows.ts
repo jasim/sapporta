@@ -46,6 +46,16 @@ import {
   type SQLiteColumn,
 } from "drizzle-orm/sqlite-core";
 import type { RowId } from "@sapporta/shared/row-id";
+import {
+  DEFAULT_LOOKUP_LIMIT,
+  DEFAULT_PAGE,
+  DEFAULT_PAGE_SIZE,
+  MAX_LOOKUP_IDS,
+  MAX_LOOKUP_LIMIT,
+  MAX_PAGE,
+  MAX_PAGE_SIZE,
+  type LookupEntry,
+} from "@sapporta/shared/contracts";
 import type { SapportaAuthContext } from "../auth/context.js";
 import { ValidationError } from "../db/errors.js";
 import { findPkColumn } from "../schema/pk.js";
@@ -55,7 +65,6 @@ import { savePipeline } from "./save-pipeline.js";
 import { rowLabeller } from "./row-label.js";
 import { resolveRowFields } from "./row-fields.js";
 import type { GroupCount } from "@sapporta/shared";
-import type { LookupEntry } from "@sapporta/shared/contracts";
 import { countTableRows, countTableRowsBy } from "./count-rows.js";
 import { scanTableRows } from "./table-row-scan.js";
 
@@ -85,14 +94,24 @@ export interface PageRowsInput extends RowsQuery {
   limit?: number;
 }
 
-export interface LookupRowsInput<
+export type LookupRowsByIdInput = {
+  ids: readonly RowId[];
+  search?: never;
+  fields?: never;
+  limit?: never;
+};
+
+export type LookupRowsBySearchInput<
   TTable extends AnySQLiteTable = AnySQLiteTable,
-> {
-  ids?: readonly (string | number)[];
+> = {
+  ids?: never;
   search?: string;
   fields?: readonly TableColumn<TTable>[];
   limit?: number;
-}
+};
+
+export type LookupRowsInput<TTable extends AnySQLiteTable = AnySQLiteTable> =
+  LookupRowsByIdInput | LookupRowsBySearchInput<TTable>;
 
 export interface CountRowsInput {
   where?: SQL;
@@ -146,11 +165,6 @@ export class RowNotFoundError extends Error {
     this.name = "RowNotFoundError";
   }
 }
-
-export const DEFAULT_PAGE = 1;
-export const DEFAULT_PAGE_LIMIT = 50;
-export const MAX_PAGE_LIMIT = 1000;
-export const MAX_LOOKUP_LIMIT = 500;
 
 type OrderClause = RowsOrderBy;
 type OffsettableRowsQuery = {
@@ -314,10 +328,6 @@ export function scopedRows<TTable extends AnySQLiteTable>(
       // selected entries. Search follows the fields displayed by the picker;
       // returned metadata contains only ordinary visible table fields.
       const { pkName, labelColumns, label } = rowLabeller(table);
-      const ids = normalizeLookupIds(input.ids, table, pk.pkCol.name);
-      const searchText = input.search?.trim().toLocaleLowerCase() ?? "";
-      const limit = normalizeLookupLimit(input.limit);
-      const displayedFields = normalizeLookupFields(table, input.fields);
       const visibleFields = getTableConfig(table.drizzle)
         .columns.map((column) => column.name)
         .filter(
@@ -331,7 +341,10 @@ export function scopedRows<TTable extends AnySQLiteTable>(
       );
 
       let rows: Record<string, unknown>[];
-      if (ids === undefined) {
+      if (input.ids === undefined) {
+        const searchText = input.search?.trim().toLocaleLowerCase() ?? "";
+        const limit = normalizeLookupLimit(input.limit);
+        const displayedFields = normalizeLookupFields(table, input.fields);
         const searchWhere =
           searchText === ""
             ? undefined
@@ -346,10 +359,9 @@ export function scopedRows<TTable extends AnySQLiteTable>(
           .from(table.drizzle)
           .where(access.ownedRows(searchWhere))
           .orderBy(asc(pk.drizzlePk));
-        rows = (await (limit === undefined
-          ? query
-          : query.limit(limit))) as Record<string, unknown>[];
+        rows = (await query.limit(limit)) as Record<string, unknown>[];
       } else {
+        const ids = normalizeLookupIds(input.ids, table, pk.pkCol.name);
         if (ids.length === 0) return [];
         rows = (await db
           .select(queryFields.databaseSelection)
@@ -437,10 +449,10 @@ function normalizedFindManyWindow(input: FindManyRowsInput): {
   if (
     !Number.isInteger(input.limit) ||
     input.limit < 1 ||
-    input.limit > MAX_PAGE_LIMIT
+    input.limit > MAX_PAGE_SIZE
   ) {
     throw new RangeError(
-      `Find-many limit must be an integer from 1 to ${MAX_PAGE_LIMIT}.`,
+      `Find-many limit must be an integer from 1 to ${MAX_PAGE_SIZE}.`,
     );
   }
   const offset = input.offset ?? 0;
@@ -456,13 +468,13 @@ function normalizedPageWindow(input: PageRowsInput): {
   offset: number;
 } {
   const page = input.page ?? DEFAULT_PAGE;
-  if (!Number.isInteger(page) || page < 1) {
-    throw new RangeError("Page must be a positive integer.");
+  if (!Number.isInteger(page) || page < 1 || page > MAX_PAGE) {
+    throw new RangeError(`Page must be an integer from 1 to ${MAX_PAGE}.`);
   }
-  const limit = input.limit ?? DEFAULT_PAGE_LIMIT;
-  if (!Number.isInteger(limit) || limit < 1 || limit > MAX_PAGE_LIMIT) {
+  const limit = input.limit ?? DEFAULT_PAGE_SIZE;
+  if (!Number.isInteger(limit) || limit < 1 || limit > MAX_PAGE_SIZE) {
     throw new RangeError(
-      `Page limit must be an integer from 1 to ${MAX_PAGE_LIMIT}.`,
+      `Page limit must be an integer from 1 to ${MAX_PAGE_SIZE}.`,
     );
   }
   return { page, limit, offset: (page - 1) * limit };
@@ -473,11 +485,15 @@ function isUnknownArray(value: unknown): value is readonly unknown[] {
 }
 
 function normalizeLookupIds(
-  ids: readonly (string | number)[] | undefined,
+  ids: readonly RowId[],
   table: TableDef,
   primaryKeyColumn: string,
-): readonly (string | number)[] | undefined {
-  if (ids === undefined) return undefined;
+): readonly (string | number)[] {
+  if (ids.length > MAX_LOOKUP_IDS) {
+    throw new RangeError(
+      `Lookup ids must contain at most ${MAX_LOOKUP_IDS} values.`,
+    );
+  }
   const kind = resolveColumnKind(table, primaryKeyColumn);
   switch (kind) {
     case "text": {
@@ -489,17 +505,16 @@ function normalizeLookupIds(
       }
       return ids;
     }
-    case "number": {
-      const invalid = ids.find(
-        (id) => typeof id !== "number" || !Number.isFinite(id),
-      );
-      if (invalid !== undefined) {
-        throw new TypeError(
-          `Lookup id for numeric column "${primaryKeyColumn}" must be a finite number, got ${JSON.stringify(invalid)}.`,
-        );
-      }
-      return ids;
-    }
+    case "number":
+      return ids.map((id) => {
+        const value = Number(id);
+        if (!Number.isFinite(value)) {
+          throw new TypeError(
+            `Lookup id for numeric column "${primaryKeyColumn}" must be a finite number, got ${JSON.stringify(id)}.`,
+          );
+        }
+        return value;
+      });
     case "boolean":
     case "date":
     case "timestamp":
@@ -509,14 +524,18 @@ function normalizeLookupIds(
   }
 }
 
-function normalizeLookupLimit(limit: number | undefined): number | undefined {
-  if (limit === undefined) return undefined;
-  if (!Number.isInteger(limit) || limit < 1 || limit > MAX_LOOKUP_LIMIT) {
+function normalizeLookupLimit(limit: number | undefined): number {
+  const normalized = limit ?? DEFAULT_LOOKUP_LIMIT;
+  if (
+    !Number.isInteger(normalized) ||
+    normalized < 1 ||
+    normalized > MAX_LOOKUP_LIMIT
+  ) {
     throw new RangeError(
       `Lookup limit must be an integer from 1 to ${MAX_LOOKUP_LIMIT}.`,
     );
   }
-  return limit;
+  return normalized;
 }
 
 function normalizeLookupFields<TTable extends AnySQLiteTable>(

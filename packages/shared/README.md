@@ -23,10 +23,19 @@ pnpm add @sapporta/shared
 ```ts
 import {
   uiContract,
+  lookupQuerySchema,
+  DEFAULT_LOOKUP_LIMIT,
+  MAX_LOOKUP_LIMIT,
+  MAX_LOOKUP_IDS,
   type TableSchema,
   type Row,
 } from "@sapporta/shared/contracts";
 ```
+
+Table list contracts coerce `page` and `limit` query strings into bounded
+numbers. Lookup contracts keep ID and search modes separate: ID mode accepts a
+non-empty comma-separated list capped by `MAX_LOOKUP_IDS`, while search mode
+defaults to `DEFAULT_LOOKUP_LIMIT` and is capped by `MAX_LOOKUP_LIMIT`.
 
 ### Typed Client Helpers
 

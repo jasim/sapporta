@@ -340,6 +340,21 @@ describe("/api/tables table operations", () => {
       expect(res.status).toBe(400);
       expect(await res.json()).toMatchObject({ code: "unknown_column" });
     });
+
+    it("rejects contradictory and empty ID lookup modes", async () => {
+      for (const query of [
+        "ids=1&q=cash",
+        "ids=1&fields=name",
+        "ids=1&limit=1",
+        "ids=%2C%2C%2C",
+      ]) {
+        const res = await request(`/api/tables/accounts/_lookup?${query}`);
+        expect(res.status, query).toBe(400);
+        expect(await res.json(), query).toMatchObject({
+          code: "BAD_REQUEST",
+        });
+      }
+    });
   });
 
   // ── Search (cross-column q) ────────────────────────────────────────

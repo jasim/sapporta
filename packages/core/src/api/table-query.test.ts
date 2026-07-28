@@ -6,7 +6,11 @@ import {
   SQLiteSyncDialect,
 } from "drizzle-orm/sqlite-core";
 import type { SQL } from "drizzle-orm";
-import { countQuerySchema } from "@sapporta/shared/contracts";
+import {
+  countQuerySchema,
+  listRowsQuerySchema,
+  lookupQuerySchema,
+} from "@sapporta/shared/contracts";
 import type { QueryParamRecord } from "@sapporta/shared";
 import { timestamp } from "../schema/table.js";
 import { sapportaTable } from "../schema/table.js";
@@ -66,7 +70,7 @@ function parseQuery(
   limit: number;
 } {
   const catalog = createTableCatalog([table]);
-  const resolved = resolvePageQuery(params, table, {
+  const resolved = resolvePageQuery(listRowsQuerySchema.parse(params), table, {
     auth: createTestAuthContext({ tables: [table] }),
     searchPlan: catalog.searchPlanFor(table.sqlName),
   });
@@ -121,19 +125,26 @@ describe("resolvePageQuery()", () => {
     ).toThrow(expect.objectContaining({ code: "bad_value" }));
   });
 
-  it("resolves lookup IDs, fields, search, and limit into typed values", () => {
+  it("resolves lookup IDs according to the table primary key", () => {
     const resolved = resolveLookupQuery(
-      {
-        ids: "1, 2",
+      lookupQuerySchema.parse({ ids: "1, 2" }),
+      orders,
+    );
+
+    expect(resolved).toEqual({ ids: ["1", "2"] });
+  });
+
+  it("resolves lookup search fields while preserving numeric limits", () => {
+    const resolved = resolveLookupQuery(
+      lookupQuerySchema.parse({
         fields: "id,customer,id",
         q: "  Acme  ",
         limit: "20",
-      },
+      }),
       orders,
     );
 
     expect(resolved).toEqual({
-      ids: [1, 2],
       fields: [ordersTable.id, ordersTable.customer],
       search: "Acme",
       limit: 20,
@@ -141,26 +152,24 @@ describe("resolvePageQuery()", () => {
   });
 
   it("rejects invalid lookup IDs and fields at the HTTP boundary", () => {
-    expect(() => resolveLookupQuery({ ids: "nope" }, orders)).toThrow(
-      expect.objectContaining({ code: "bad_value" }),
-    );
-    expect(() => resolveLookupQuery({ fields: "missing" }, orders)).toThrow(
-      expect.objectContaining({ code: "unknown_column" }),
-    );
+    expect(() =>
+      resolveLookupQuery(lookupQuerySchema.parse({ ids: "nope" }), orders),
+    ).toThrow(expect.objectContaining({ code: "bad_value" }));
+    expect(() =>
+      resolveLookupQuery(
+        lookupQuerySchema.parse({ fields: "missing" }),
+        orders,
+      ),
+    ).toThrow(expect.objectContaining({ code: "unknown_column" }));
   });
 
   // ── Filter operators ─────────────────────────────────────────────────
 
   describe("filter operators", () => {
     it("AND-combines repeated column and operator conditions", () => {
-      const q = parseQuery(
-        { "filter[amount][gte]": ["100", "200"] },
-        orders,
-      );
+      const q = parseQuery({ "filter[amount][gte]": ["100", "200"] }, orders);
       const { sql, params } = compile(q.where);
-      expect(sql).toBe(
-        '("orders"."amount" >= ? and "orders"."amount" >= ?)',
-      );
+      expect(sql).toBe('("orders"."amount" >= ? and "orders"."amount" >= ?)');
       expect(params).toEqual([100, 200]);
     });
 
@@ -325,48 +334,6 @@ describe("resolvePageQuery()", () => {
       expect(() =>
         parseQuery({ "filter[status][in]": "paid,,void" }, orders),
       ).toThrow(expect.objectContaining({ code: "bad_value" }));
-    });
-
-    it("bad_limit — above cap", () => {
-      expect(() => parseQuery({ limit: "5000" }, orders)).toThrow(
-        expect.objectContaining({ code: "bad_limit" }),
-      );
-    });
-
-    it("bad_limit — zero", () => {
-      expect(() => parseQuery({ limit: "0" }, orders)).toThrow(
-        expect.objectContaining({ code: "bad_limit" }),
-      );
-    });
-
-    it("bad_limit — non-numeric", () => {
-      expect(() => parseQuery({ limit: "abc" }, orders)).toThrow(
-        expect.objectContaining({ code: "bad_limit" }),
-      );
-    });
-
-    it("bad_limit — non-canonical integer", () => {
-      expect(() => parseQuery({ limit: "01" }, orders)).toThrow(
-        expect.objectContaining({ code: "bad_limit" }),
-      );
-    });
-
-    it("bad_page — non-numeric", () => {
-      expect(() => parseQuery({ page: "abc" }, orders)).toThrow(
-        expect.objectContaining({ code: "bad_page" }),
-      );
-    });
-
-    it("bad_page — non-canonical integer", () => {
-      expect(() => parseQuery({ page: "01" }, orders)).toThrow(
-        expect.objectContaining({ code: "bad_page" }),
-      );
-    });
-
-    it("bad_page — zero", () => {
-      expect(() => parseQuery({ page: "0" }, orders)).toThrow(
-        expect.objectContaining({ code: "bad_page" }),
-      );
     });
   });
 

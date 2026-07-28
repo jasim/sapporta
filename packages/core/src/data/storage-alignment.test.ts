@@ -31,6 +31,7 @@ import { ValidationError } from "../db/errors.js";
 import { createTestAuthContext } from "../testing/auth-context.js";
 import { createTestDb } from "../testing/test-utils.js";
 import { parsePlainDate } from "@sapporta/shared/temporal";
+import { listRowsQuerySchema } from "@sapporta/shared/contracts";
 
 // ── Numbers: REAL storage, numeric compare/sort ─────────────────────────
 
@@ -302,7 +303,7 @@ function resolveHttpListQuery(
   tableDef: TableDef,
 ) {
   const catalog = createTableCatalog([tableDef]);
-  return resolvePageQuery(query, tableDef, {
+  return resolvePageQuery(listRowsQuerySchema.parse(query), tableDef, {
     auth: createTestAuthContext({ tables: [tableDef] }),
     searchPlan: catalog.searchPlanFor(tableDef.sqlName),
   });
