@@ -100,6 +100,11 @@ export type {
   TableColumn,
   TableRow,
 } from "./data/scoped-rows.js";
+export { scanTableRows } from "./data/table-row-scan.js";
+export type {
+  TableRowScanInput,
+  TableRowScanOrder,
+} from "./data/table-row-scan.js";
 export type { GroupCount } from "@sapporta/shared";
 
 // Generated table HTTP query resolvers

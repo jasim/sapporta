@@ -46,7 +46,7 @@ import { createApiClient, ApiError } from "@sapporta/shared/client";
 import { uiContract } from "@sapporta/shared/contracts";
 
 const client = createApiClient(uiContract, {
-  baseUrl: "http://localhost:3000/api",
+  baseUrl: () => "http://localhost:3000/api",
 });
 ```
 

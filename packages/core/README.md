@@ -82,6 +82,24 @@ the primary key as a deterministic tie-breaker. The cursor holds one read
 snapshot until the scan finishes or the consumer cancels it, then releases the
 statement.
 
+`scanTableRows()` is the underlying storage primitive when a custom workflow
+needs to compose its own scope:
+
+```ts
+import { scanTableRows } from "@sapporta/server";
+
+const access = auth.rowSecurity.forTable(invoices);
+for await (const invoice of scanTableRows(c.get("db"), invoices, {
+  where: access.ownedRows(eq(invoicesTable.status, "pending")),
+})) {
+  // Process one visible invoice.
+}
+```
+
+Unlike `scopedRows().scan()`, `scanTableRows()` does not add row scope. Pass an
+appropriate predicate explicitly, or use it only for deliberately unrestricted
+storage work.
+
 Lookup inputs are typed too. IDs are values rather than comma-separated text,
 and displayed search fields are Drizzle columns rather than HTTP field names.
 ID lookup and search are separate input shapes:
@@ -99,7 +117,7 @@ await rows.lookup({
 ```
 
 Search lookup defaults to 50 results and accepts at most 500. ID lookup accepts
-at most 500 IDs and does not accept search fields or a result limit.
+between 1 and 500 IDs and does not accept search fields or a result limit.
 
 `scopedRows()` exposes `count()` for scalar totals and `countBy()` for bounded
 grouped counts that must keep the same row boundary as generated reads. Both

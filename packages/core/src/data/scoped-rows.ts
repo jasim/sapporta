@@ -85,7 +85,7 @@ export interface RowsQuery {
 export interface FindManyRowsInput extends RowsQuery {
   /** Required upper bound for the number of returned rows. */
   limit: number;
-  /** Number of matching rows to skip. Defaults to zero. */
+  /** Safe-integer number of matching rows to skip. Defaults to zero. */
   offset?: number;
 }
 
@@ -362,7 +362,6 @@ export function scopedRows<TTable extends AnySQLiteTable>(
         rows = (await query.limit(limit)) as Record<string, unknown>[];
       } else {
         const ids = normalizeLookupIds(input.ids, table, pk.pkCol.name);
-        if (ids.length === 0) return [];
         rows = (await db
           .select(queryFields.databaseSelection)
           .from(table.drizzle)
@@ -456,8 +455,10 @@ function normalizedFindManyWindow(input: FindManyRowsInput): {
     );
   }
   const offset = input.offset ?? 0;
-  if (!Number.isInteger(offset) || offset < 0) {
-    throw new RangeError("Find-many offset must be a nonnegative integer.");
+  if (!Number.isSafeInteger(offset) || offset < 0) {
+    throw new RangeError(
+      "Find-many offset must be a nonnegative safe integer.",
+    );
   }
   return { limit: input.limit, offset };
 }
@@ -489,9 +490,9 @@ function normalizeLookupIds(
   table: TableDef,
   primaryKeyColumn: string,
 ): readonly (string | number)[] {
-  if (ids.length > MAX_LOOKUP_IDS) {
+  if (ids.length < 1 || ids.length > MAX_LOOKUP_IDS) {
     throw new RangeError(
-      `Lookup ids must contain at most ${MAX_LOOKUP_IDS} values.`,
+      `Lookup ids must contain between 1 and ${MAX_LOOKUP_IDS} values.`,
     );
   }
   const kind = resolveColumnKind(table, primaryKeyColumn);

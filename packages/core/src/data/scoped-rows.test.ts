@@ -155,6 +155,9 @@ describe("scopedRows", () => {
     await expect(
       rows.findMany({ limit: 1, offset: 0.5 }),
     ).rejects.toBeInstanceOf(RangeError);
+    await expect(
+      rows.findMany({ limit: 1, offset: Number.MAX_SAFE_INTEGER + 1 }),
+    ).rejects.toBeInstanceOf(RangeError);
 
     if (false) {
       // @ts-expect-error findMany always requires an explicit row bound.
@@ -508,6 +511,7 @@ describe("scopedRows", () => {
         ),
       }),
     ).rejects.toBeInstanceOf(RangeError);
+    await expect(rows.lookup({ ids: [] })).rejects.toBeInstanceOf(RangeError);
   });
 
   it("rejects non-numeric lookup ids for numeric primary keys", async () => {

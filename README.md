@@ -109,9 +109,10 @@ api.register(
 );
 ```
 
-The `scopedRows(db, auth, table)` call provides paged reads, bounded scans,
-lookup, counts, and row writes. Read methods accept ordinary Drizzle
-expressions, while Sapporta adds the current row scope before executing them.
+The `scopedRows(db, auth, table)` call provides bounded selections, paged reads,
+streaming scans, lookup, counts, and row writes. Read methods accept ordinary
+Drizzle expressions, while Sapporta adds the current row scope before executing
+them.
 
 ## Libraries & Frameworks
 

@@ -1,4 +1,5 @@
 import { describe, expect, expectTypeOf, it } from "vitest";
+import type { ClientInferRequest } from "@sapporta/rest-core";
 import type { QueryParamValue } from "../query-params.js";
 import {
   countQuerySchema,
@@ -13,6 +14,7 @@ import {
   listRowsQuerySchema,
   type ListRowsQuery,
 } from "./table-schema.js";
+import { listRowsRoute } from "./table-routes.js";
 
 describe("table query contracts", () => {
   it("coerces and defaults bounded pagination while preserving filters", () => {
@@ -44,6 +46,38 @@ describe("table query contracts", () => {
     expectTypeOf(
       output["filter[name][contains]"],
     ).toEqualTypeOf<QueryParamValue>();
+  });
+
+  it("keeps generated client pagination inputs in the string wire shape", () => {
+    type ListRowsClientQuery = ClientInferRequest<
+      typeof listRowsRoute
+    >["query"];
+
+    const query = {
+      page: "2",
+      limit: "25",
+      "filter[name][contains]": ["left", "right"],
+    } satisfies ListRowsClientQuery;
+
+    expect(query).toEqual({
+      page: "2",
+      limit: "25",
+      "filter[name][contains]": ["left", "right"],
+    });
+    expectTypeOf<ListRowsClientQuery["page"]>().toEqualTypeOf<
+      string | undefined
+    >();
+    expectTypeOf<ListRowsClientQuery["limit"]>().toEqualTypeOf<
+      string | undefined
+    >();
+
+    if (false) {
+      const numericPage = {
+        // @ts-expect-error HTTP query inputs use strings before Zod coercion.
+        page: 2,
+      } satisfies ListRowsClientQuery;
+      void numericPage;
+    }
   });
 
   it("rejects pagination values outside the static bounds", () => {

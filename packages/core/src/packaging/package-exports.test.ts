@@ -235,8 +235,11 @@ describe("Sapporta package exports", () => {
             resolveExportQuery,
             resolveLookupQuery,
             resolvePageQuery,
+            scanTableRows,
             type ResolvedCountQuery,
             type ResolveRowsQueryOptions,
+            type TableRowScanInput,
+            type TableRowScanOrder,
           } from "@sapporta/server";
           import { sapportaTable, sqliteTable, text, integer } from "@sapporta/server/table";
           import * as shared from "@sapporta/shared";
@@ -257,8 +260,14 @@ describe("Sapporta package exports", () => {
             resolveExportQuery,
             resolveLookupQuery,
             resolvePageQuery,
+            scanTableRows,
           };
-          export type { ResolvedCountQuery, ResolveRowsQueryOptions };
+          export type {
+            ResolvedCountQuery,
+            ResolveRowsQueryOptions,
+            TableRowScanInput,
+            TableRowScanOrder,
+          };
           export { sqliteTable, shared, filters, contracts, rowIds };
         `,
       });

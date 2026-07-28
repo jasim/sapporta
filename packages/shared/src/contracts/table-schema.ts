@@ -81,9 +81,14 @@ export type ExportRowsQuery = z.output<typeof exportRowsQuerySchema>;
 export const listRowsQuerySchema = z
   .object({
     ...rowSelectionQueryShape,
-    page: z.coerce.number().int().min(1).max(MAX_PAGE).default(DEFAULT_PAGE),
+    page: z.coerce
+      .number<string>()
+      .int()
+      .min(1)
+      .max(MAX_PAGE)
+      .default(DEFAULT_PAGE),
     limit: z.coerce
-      .number()
+      .number<string>()
       .int()
       .min(1)
       .max(MAX_PAGE_SIZE)
@@ -112,7 +117,7 @@ const lookupBySearchQuerySchema = z
     q: z.string().optional(),
     fields: z.string().optional(),
     limit: z.coerce
-      .number()
+      .number<string>()
       .int()
       .min(1)
       .max(MAX_LOOKUP_LIMIT)
@@ -166,7 +171,12 @@ export const countQuerySchema = z
   .object({
     group_by: z.string().min(1).optional(),
     order: z.enum(["asc", "desc"]).optional(),
-    limit: z.coerce.number().int().min(1).max(MAX_COUNT_GROUPS).optional(),
+    limit: z.coerce
+      .number<string>()
+      .int()
+      .min(1)
+      .max(MAX_COUNT_GROUPS)
+      .optional(),
   })
   .catchall(filterQueryValueSchema);
 export type CountQuery = z.output<typeof countQuerySchema>;
