@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
@@ -58,9 +58,10 @@ describe("makeMetaHandlers", () => {
   });
 
   it("serializes sample rows with SQL column names for all fields", async () => {
-    const { app, close } = createMetaApp((_, catalog) =>
+    const { app, close, sqlite } = createMetaApp((_, catalog) =>
       createSampleAuth(catalog),
     );
+    const prepare = vi.spyOn(sqlite, "prepare");
 
     try {
       const res = await app.request(
@@ -79,6 +80,12 @@ describe("makeMetaHandlers", () => {
       expect(body[0]).not.toHaveProperty("displayName");
       expect(body[0]).not.toHaveProperty("workspaceId");
       expect(body[0]).not.toHaveProperty("createdAt");
+      expect(prepare).toHaveBeenCalledTimes(1);
+      expect(
+        prepare.mock.calls.some(([statement]) =>
+          statement.toLowerCase().includes("count("),
+        ),
+      ).toBe(false);
     } finally {
       close();
     }
@@ -90,7 +97,11 @@ function createMetaApp(
     c: Parameters<SapportaAuthGuard>[0],
     catalog: TableCatalog,
   ) => SapportaAuthContext,
-): { app: Hono<SapportaEnv>; close: () => void } {
+): {
+  app: Hono<SapportaEnv>;
+  close: () => void;
+  sqlite: ReturnType<typeof createTestDb>["sqlite"];
+} {
   const { sqlite, db } = createTestDb();
   sqlite.exec(`
     CREATE TABLE camel_rows (
@@ -121,7 +132,7 @@ function createMetaApp(
   );
   app.route("/api", api);
 
-  return { app, close: () => sqlite.close() };
+  return { app, close: () => sqlite.close(), sqlite };
 }
 
 function createSampleAuth(catalog: TableCatalog): SapportaAuthContext {

@@ -35,7 +35,7 @@ import type {
   CountRowsInput,
   LookupRowsInput,
   PageRowsInput,
-  RowSelection,
+  RowsQuery,
   TableColumn,
 } from "../data/scoped-rows.js";
 import {
@@ -135,7 +135,7 @@ export function resolveExportQuery<TTable extends AnySQLiteTable>(
   query: ExportRowsQuery,
   table: TableDef<TTable>,
   options: ResolveRowsQueryOptions,
-): RowSelection {
+): RowsQuery {
   const filters = extractFilterParams(query, EXPORT_QUERY_KEYS, "export");
   const where = parseTableFilters(filters, table);
   const searchTerm = parseSearchTerm(query.q, table);

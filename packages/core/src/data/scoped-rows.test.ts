@@ -1,5 +1,5 @@
-import { describe, expect, it } from "vitest";
-import { asc, desc, eq, gt } from "drizzle-orm";
+import { describe, expect, expectTypeOf, it } from "vitest";
+import { asc, desc, eq, gt, type InferSelectModel } from "drizzle-orm";
 import { integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
 import { sapportaTable } from "../schema/table.js";
 import { ValidationError } from "../db/errors.js";
@@ -7,8 +7,10 @@ import { createTestAuthContext } from "../testing/auth-context.js";
 import { createTestDb } from "../testing/test-utils.js";
 import {
   ImmutableTableOperationError,
+  MAX_PAGE_LIMIT,
   RowNotFoundError,
   scopedRows,
+  type PageRowsResult,
 } from "./scoped-rows.js";
 
 const accountsTable = sqliteTable("accounts", {
@@ -114,6 +116,46 @@ describe("scopedRows", () => {
     expect(result.meta.page).toBe(1);
   });
 
+  it("finds bounded rows with Drizzle selection inputs", async () => {
+    const { rows } = setupAccounts();
+    await rows.create({ name: "Cash", type: "asset", balance: 100 });
+    await rows.create({ name: "Revenue", type: "revenue", balance: 250 });
+    await rows.create({ name: "Rent", type: "expense", balance: 300 });
+
+    await expect(
+      rows.findMany({
+        where: gt(accountsTable.balance, 100),
+        orderBy: desc(accountsTable.balance),
+        limit: 1,
+        offset: 1,
+      }),
+    ).resolves.toEqual([
+      expect.objectContaining({ name: "Revenue", balance: 250 }),
+    ]);
+  });
+
+  it("requires and validates findMany bounds", async () => {
+    const { rows } = setupAccounts();
+
+    await expect(rows.findMany({ limit: 0 })).rejects.toBeInstanceOf(
+      RangeError,
+    );
+    await expect(
+      rows.findMany({ limit: MAX_PAGE_LIMIT + 1 }),
+    ).rejects.toBeInstanceOf(RangeError);
+    await expect(
+      rows.findMany({ limit: 1, offset: -1 }),
+    ).rejects.toBeInstanceOf(RangeError);
+    await expect(
+      rows.findMany({ limit: 1, offset: 0.5 }),
+    ).rejects.toBeInstanceOf(RangeError);
+
+    if (false) {
+      // @ts-expect-error findMany always requires an explicit row bound.
+      await rows.findMany();
+    }
+  });
+
   it("accepts Drizzle expressions for filtering, ordering, and pagination", async () => {
     const { rows } = setupAccounts();
     await rows.create({ name: "Cash", type: "asset", balance: 100 });
@@ -126,8 +168,15 @@ describe("scopedRows", () => {
       limit: 1,
       page: 2,
     });
+    const direct = await rows.findMany({
+      where: gt(accountsTable.balance, 100),
+      orderBy: desc(accountsTable.balance),
+      limit: 1,
+      offset: 1,
+    });
 
     expect(result.data.map((row) => row.name)).toEqual(["Revenue"]);
+    expect(result.data).toEqual(direct);
     expect(result.meta).toEqual({
       total: 2,
       page: 2,
@@ -141,6 +190,50 @@ describe("scopedRows", () => {
 
     await expect(rows.page({ limit: 0 })).rejects.toBeInstanceOf(RangeError);
     await expect(rows.page({ page: 0 })).rejects.toBeInstanceOf(RangeError);
+  });
+
+  it("infers table rows across reads and writes", async () => {
+    type AccountRow = InferSelectModel<
+      typeof accountsTable,
+      { dbColumnNames: true }
+    >;
+
+    const { rows } = setupAccounts();
+    const createdPromise = rows.create({ name: "Cash", type: "asset" });
+    expectTypeOf(createdPromise).toEqualTypeOf<Promise<AccountRow>>();
+    const created = await createdPromise;
+
+    const foundPromise = rows.findMany({ limit: 1 });
+    expectTypeOf(foundPromise).toEqualTypeOf<Promise<AccountRow[]>>();
+    await foundPromise;
+
+    const pagePromise = rows.page({ limit: 1 });
+    expectTypeOf(pagePromise).toEqualTypeOf<
+      Promise<PageRowsResult<typeof accountsTable>>
+    >();
+    await pagePromise;
+
+    const getPromise = rows.get(String(created.id));
+    expectTypeOf(getPromise).toEqualTypeOf<Promise<AccountRow>>();
+    await getPromise;
+
+    const updatePromise = rows.update(String(created.id), { balance: 125 });
+    expectTypeOf(updatePromise).toEqualTypeOf<Promise<AccountRow>>();
+    await updatePromise;
+
+    const scan = rows.scan({ batchSize: 1 });
+    expectTypeOf(scan).toEqualTypeOf<AsyncIterable<AccountRow>>();
+    for await (const row of scan) {
+      expectTypeOf(row).toEqualTypeOf<AccountRow>();
+    }
+
+    const deletePromise = rows.delete(String(created.id));
+    expectTypeOf(deletePromise).toEqualTypeOf<Promise<AccountRow>>();
+    await deletePromise;
+
+    const batchPromise = rows.create([{ name: "Revenue", type: "revenue" }]);
+    expectTypeOf(batchPromise).toEqualTypeOf<Promise<AccountRow[]>>();
+    await batchPromise;
   });
 
   it("scans with transport-free filtering, ordering, and bounded batches", async () => {
@@ -249,8 +342,11 @@ describe("scopedRows", () => {
       documents,
     );
 
+    const selected = await rows.findMany({ limit: 10 });
     const result = await rows.page();
+    expect(selected.map((row) => row.title)).toEqual(["Visible"]);
     expect(result.data.map((row) => row.title)).toEqual(["Visible"]);
+    expect(result.data).toEqual(selected);
     expect(result.meta.total).toBe(1);
     await expect(rows.get("2")).rejects.toBeInstanceOf(RowNotFoundError);
     await expect(
@@ -367,6 +463,18 @@ describe("scopedRows", () => {
       createTestAuthContext({ tables: [contacts] }),
       contacts,
     );
+    type ContactRow = InferSelectModel<
+      typeof contactsTable,
+      { dbColumnNames: true }
+    >;
+    const foundPromise = rows.findMany({ limit: 1 });
+    expectTypeOf(foundPromise).toEqualTypeOf<Promise<ContactRow[]>>();
+    const [found] = await foundPromise;
+    expectTypeOf(found!.display_name).toEqualTypeOf<string>();
+    if (false) {
+      // @ts-expect-error public rows use SQL names, not Drizzle property names.
+      void found!.displayName;
+    }
 
     await expect(rows.lookup({ ids: [1] })).resolves.toEqual([
       {

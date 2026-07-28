@@ -88,14 +88,16 @@ export {
 export type {
   CountRowsByInput,
   CountRowsInput,
+  FindManyRowsInput,
   LookupRowsInput,
   PageRowsInput,
   PageRowsResult,
-  RowSelection,
   RowsOrderBy,
+  RowsQuery,
   ScanRowsInput,
   ScopedRows,
   TableColumn,
+  TableRow,
 } from "./data/scoped-rows.js";
 export type { GroupCount } from "@sapporta/shared";
 

@@ -51,13 +51,17 @@ import { desc, eq } from "drizzle-orm";
 import { invoices, invoicesTable } from "../schema/invoices.js";
 
 const rows = scopedRows(c.get("db"), auth, invoices);
-const pending = await rows.page({
+const pending = await rows.findMany({
   where: eq(invoicesTable.status, "pending"),
   orderBy: desc(invoicesTable.createdAt),
   limit: 25,
-  page: 2,
+  offset: 25,
 });
 ```
+
+`findMany()` requires a limit from 1 to 1,000 and returns rows directly.
+Use `page()` when the response also needs the matching total and page metadata;
+it composes the same bounded selection with `count()`.
 
 Large sequential reads use a bounded async scan. This keeps exports and similar
 workflows from loading every matching row into memory:

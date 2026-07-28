@@ -5,8 +5,8 @@
  * context. The principal may be signed in or anonymous; row access comes from
  * `auth.dataAuthority`, not from assuming there is always a workspace user.
  * The helper binds one Drizzle table to the request's row-security policy,
- * then exposes CRUD, paged reads, scans, lookup, and count operations that
- * never let callers choose or bypass ownership columns.
+ * then exposes CRUD, bounded and paged reads, scans, lookup, and count
+ * operations that never let callers choose or bypass ownership columns.
  *
  * The important rule is that primary keys and API payloads are not security
  * boundaries. Reads and destructive writes add the table's workspace/user
@@ -30,7 +30,15 @@
  * applies row visibility, performs persistence, and returns plain row objects.
  */
 
-import { asc, eq, inArray, or, sql, type SQL } from "drizzle-orm";
+import {
+  asc,
+  eq,
+  inArray,
+  or,
+  sql,
+  type InferSelectModel,
+  type SQL,
+} from "drizzle-orm";
 import type { BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
 import {
   getTableConfig,
@@ -55,17 +63,28 @@ export type TableColumn<TTable extends AnySQLiteTable = AnySQLiteTable> =
 
 export type RowsOrderBy = SQLiteColumn | SQL;
 
-export interface RowSelection {
+/** A table row keyed by public SQL column names. */
+export type TableRow<TTable extends AnySQLiteTable = AnySQLiteTable> =
+  InferSelectModel<TTable, { dbColumnNames: true }>;
+
+export interface RowsQuery {
   where?: SQL;
   orderBy?: RowsOrderBy | readonly RowsOrderBy[];
 }
 
-export interface PageRowsInput extends RowSelection {
+export interface FindManyRowsInput extends RowsQuery {
+  /** Required upper bound for the number of returned rows. */
+  limit: number;
+  /** Number of matching rows to skip. Defaults to zero. */
+  offset?: number;
+}
+
+export interface PageRowsInput extends RowsQuery {
   page?: number;
   limit?: number;
 }
 
-export interface ScanRowsInput extends RowSelection {
+export interface ScanRowsInput extends RowsQuery {
   batchSize?: number;
 }
 
@@ -90,8 +109,10 @@ export interface CountRowsByInput<
   limit?: number;
 }
 
-export interface PageRowsResult {
-  data: Record<string, unknown>[];
+export interface PageRowsResult<
+  TTable extends AnySQLiteTable = AnySQLiteTable,
+> {
+  data: TableRow<TTable>[];
   meta: {
     total: number;
     page: number;
@@ -101,14 +122,15 @@ export interface PageRowsResult {
 }
 
 export interface ScopedRows<TTable extends AnySQLiteTable = AnySQLiteTable> {
-  page(input?: PageRowsInput): Promise<PageRowsResult>;
-  get(id: RowId): Promise<Record<string, unknown>>;
-  create(
-    input: unknown,
-  ): Promise<Record<string, unknown> | Record<string, unknown>[]>;
-  update(id: RowId, patch: unknown): Promise<Record<string, unknown>>;
-  delete(id: RowId): Promise<Record<string, unknown>>;
-  scan(input?: ScanRowsInput): AsyncIterable<Record<string, unknown>>;
+  findMany(input: FindManyRowsInput): Promise<TableRow<TTable>[]>;
+  page(input?: PageRowsInput): Promise<PageRowsResult<TTable>>;
+  get(id: RowId): Promise<TableRow<TTable>>;
+  create(input: readonly unknown[]): Promise<TableRow<TTable>[]>;
+  create(input: Record<string, unknown>): Promise<TableRow<TTable>>;
+  create(input: unknown): Promise<TableRow<TTable> | TableRow<TTable>[]>;
+  update(id: RowId, patch: unknown): Promise<TableRow<TTable>>;
+  delete(id: RowId): Promise<TableRow<TTable>>;
+  scan(input?: ScanRowsInput): AsyncIterable<TableRow<TTable>>;
   lookup(input?: LookupRowsInput<TTable>): Promise<LookupEntry[]>;
   count(input?: CountRowsInput): Promise<number>;
   countBy(input: CountRowsByInput<TTable>): Promise<GroupCount[]>;
@@ -161,23 +183,75 @@ export function scopedRows<TTable extends AnySQLiteTable>(
     getTableConfig(table.drizzle).columns.map((column) => column.name),
   );
 
+  const pickPublicRow = (row: Record<string, unknown>): TableRow<TTable> =>
+    publicRow.pick(row) as TableRow<TTable>;
+
+  async function findMany(
+    input: FindManyRowsInput,
+  ): Promise<TableRow<TTable>[]> {
+    const { limit, offset } = normalizedFindManyWindow(input);
+    const where = access.ownedRows(input.where);
+    const orderBy = normalizeOrderBy(input.orderBy);
+    const rows = (await applyOrderBy(
+      db.select().from(table.drizzle).where(where),
+      orderBy,
+      table,
+      pk.drizzlePk,
+    )
+      .limit(limit)
+      .offset(offset)) as Record<string, unknown>[];
+
+    return rows.map(pickPublicRow);
+  }
+
+  async function create(input: readonly unknown[]): Promise<TableRow<TTable>[]>;
+  async function create(
+    input: Record<string, unknown>,
+  ): Promise<TableRow<TTable>>;
+  async function create(
+    input: unknown,
+  ): Promise<TableRow<TTable> | TableRow<TTable>[]>;
+  async function create(
+    input: unknown,
+  ): Promise<TableRow<TTable> | TableRow<TTable>[]> {
+    // Accept either a single API payload or a batch, but prepare each row
+    // independently so row-security can stamp trusted scope fields.
+    const isBatch = isUnknownArray(input);
+    const records = isBatch ? input : [input];
+    if (records.length === 0) {
+      throw new ValidationError([
+        { field: "body", message: "Expected at least one row" },
+      ]);
+    }
+    const results: TableRow<TTable>[] = [];
+    for (const record of records) {
+      const prepared = await access.insertValues(db, record);
+      results.push(
+        (await savePipeline(table, db, prepared)) as TableRow<TTable>,
+      );
+    }
+    return isBatch ? results : results[0]!;
+  }
+
+  async function count(input: CountRowsInput = {}): Promise<number> {
+    return countTableRows(db, table, access.ownedRows(input.where));
+  }
+
   return {
+    findMany,
+
     async page(input = {}) {
       const { page, limit, offset } = normalizedPageWindow(input);
-      const where = access.ownedRows(input.where);
-      const orderBy = normalizeOrderBy(input.orderBy);
-      const total = await countTableRows(db, table, where);
-      const rows = (await applyOrderBy(
-        db.select().from(table.drizzle).where(where),
-        orderBy,
-        table,
-        pk.drizzlePk,
-      )
-        .limit(limit)
-        .offset(offset)) as Record<string, unknown>[];
+      const total = await count({ where: input.where });
+      const data = await findMany({
+        where: input.where,
+        orderBy: input.orderBy,
+        limit,
+        offset,
+      });
 
       return {
-        data: rows.map((row) => publicRow.pick(row)),
+        data,
         meta: {
           total,
           page,
@@ -195,27 +269,10 @@ export function scopedRows<TTable extends AnySQLiteTable>(
         .where(access.ownedRows(eq(pk.drizzlePk, id)))
         .limit(1)) as Record<string, unknown>[];
       if (rows.length === 0) throw new RowNotFoundError();
-      return publicRow.pick(rows[0]!);
+      return pickPublicRow(rows[0]!);
     },
 
-    async create(input) {
-      // Accept either a single API payload or a batch, but prepare each row
-      // independently so row-security can stamp trusted scope fields.
-      const records = Array.isArray(input) ? input : [input];
-      if (records.length === 0) {
-        throw new ValidationError([
-          { field: "body", message: "Expected at least one row" },
-        ]);
-      }
-      const results: Record<string, unknown>[] = [];
-      for (const record of records) {
-        const prepared = await access.insertValues(db, record);
-        results.push(
-          (await savePipeline(table, db, prepared)) as Record<string, unknown>,
-        );
-      }
-      return Array.isArray(input) ? results : results[0]!;
-    },
+    create,
 
     async update(id, patch) {
       // Immutable tables may still be readable, but generated mutation paths
@@ -229,7 +286,7 @@ export function scopedRows<TTable extends AnySQLiteTable>(
         // predicate keeps the SQL update scoped even when the id exists.
         return (await savePipeline(table, db, preparedPatch, id, {
           updatePredicate: access.ownedRows(),
-        })) as Record<string, unknown>;
+        })) as TableRow<TTable>;
       } catch (err) {
         if (isPersistenceNotFoundError(err)) throw new RowNotFoundError();
         throw err;
@@ -247,7 +304,7 @@ export function scopedRows<TTable extends AnySQLiteTable>(
         .where(access.ownedRows(eq(pk.drizzlePk, id)))
         .returning()) as Record<string, unknown>[];
       if (deleted.length === 0) throw new RowNotFoundError();
-      return publicRow.pick(deleted[0]!);
+      return pickPublicRow(deleted[0]!);
     },
 
     scan(input = {}) {
@@ -266,7 +323,7 @@ export function scopedRows<TTable extends AnySQLiteTable>(
           )
             .limit(batchSize)
             .offset(offset)) as Record<string, unknown>[];
-          for (const row of batch) yield publicRow.pick(row);
+          for (const row of batch) yield pickPublicRow(row);
           if (batch.length < batchSize) return;
           offset += batch.length;
         }
@@ -339,9 +396,7 @@ export function scopedRows<TTable extends AnySQLiteTable>(
       return entries;
     },
 
-    async count(input = {}) {
-      return countTableRows(db, table, access.ownedRows(input.where));
-    },
+    count,
 
     async countBy(input) {
       return countTableRowsBy(
@@ -384,7 +439,7 @@ function applyOrderBy(
 }
 
 function normalizeOrderBy(
-  orderBy: RowSelection["orderBy"],
+  orderBy: RowsQuery["orderBy"],
 ): readonly OrderClause[] {
   if (orderBy === undefined) return [];
   return isOrderByArray(orderBy) ? [...orderBy] : [orderBy];
@@ -394,6 +449,26 @@ function isOrderByArray(
   value: RowsOrderBy | readonly RowsOrderBy[],
 ): value is readonly RowsOrderBy[] {
   return Array.isArray(value);
+}
+
+function normalizedFindManyWindow(input: FindManyRowsInput): {
+  limit: number;
+  offset: number;
+} {
+  if (
+    !Number.isInteger(input.limit) ||
+    input.limit < 1 ||
+    input.limit > MAX_PAGE_LIMIT
+  ) {
+    throw new RangeError(
+      `Find-many limit must be an integer from 1 to ${MAX_PAGE_LIMIT}.`,
+    );
+  }
+  const offset = input.offset ?? 0;
+  if (!Number.isInteger(offset) || offset < 0) {
+    throw new RangeError("Find-many offset must be a nonnegative integer.");
+  }
+  return { limit: input.limit, offset };
 }
 
 function normalizedPageWindow(input: PageRowsInput): {
@@ -412,6 +487,10 @@ function normalizedPageWindow(input: PageRowsInput): {
     );
   }
   return { page, limit, offset: (page - 1) * limit };
+}
+
+function isUnknownArray(value: unknown): value is readonly unknown[] {
+  return Array.isArray(value);
 }
 
 function normalizedScanBatchSize(batchSize: number | undefined): number {
