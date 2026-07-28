@@ -27,6 +27,7 @@ import {
   formatPlainDate,
   formatCanonicalInstant,
 } from "./temporal.js";
+import type { QueryParamRecord } from "./query-params.js";
 import { isOperatorApplicable } from "./value-kind.js";
 import type { ValueKind } from "./value-kind.js";
 
@@ -460,17 +461,15 @@ const FILTER_KEY_RE = /^filter\[([^\]]+)\]\[([^\]]+)\]$/;
  * with `filter[` but doesn't match the two-bracket shape is a grammar
  * error, not a silent skip — typos shouldn't widen the result set.
  *
- * Accepts either `URLSearchParams` (browser side) or a plain record of the
- * shape Hono returns from `c.req.query()` (server side). The two are the
- * only query-string representations the grammar ever sees.
+ * Accepts either `URLSearchParams` (browser side) or the lossless query
+ * record used at the server boundary. Repeated record values are decoded as
+ * separate conditions in their original order.
  */
 export function decodeFilters(
-  source: URLSearchParams | Record<string, string>,
+  source: URLSearchParams | Readonly<QueryParamRecord>,
 ): FilterCondition[] {
-  const entries: Iterable<[string, string]> =
-    source instanceof URLSearchParams ? source : Object.entries(source);
   const out: FilterCondition[] = [];
-  for (const [key, value] of entries) {
+  for (const [key, value] of filterQueryEntries(source)) {
     if (!key.startsWith(FILTER_PREFIX)) continue;
     const m = FILTER_KEY_RE.exec(key);
     if (!m) {
@@ -489,6 +488,29 @@ export function decodeFilters(
     out.push(parseCondition(column, op, value));
   }
   return out;
+}
+
+function* filterQueryEntries(
+  source: URLSearchParams | Readonly<QueryParamRecord>,
+): IterableIterator<[string, string]> {
+  if (source instanceof URLSearchParams) {
+    yield* source;
+    return;
+  }
+
+  for (const [key, value] of Object.entries(source)) {
+    if (typeof value === "string") {
+      yield [key, value];
+      continue;
+    }
+    if (value.length === 0 && key.startsWith(FILTER_PREFIX)) {
+      throw new FilterParseError(
+        "bad_value",
+        `Filter ${JSON.stringify(key)} requires at least one value`,
+      );
+    }
+    for (const item of value) yield [key, item];
+  }
 }
 
 function parseCondition(

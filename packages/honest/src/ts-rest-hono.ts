@@ -157,6 +157,15 @@ function parseMaybe(schema: unknown, value: unknown): unknown {
   return isZodSchema(schema) ? schema.parse(value) : value;
 }
 
+function queryFromRequest(c: Context): Record<string, string | string[]> {
+  return Object.fromEntries(
+    Object.entries(c.req.queries()).map(([key, values]) => [
+      key,
+      values.length === 1 ? values[0] : values,
+    ]),
+  );
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return !!value && typeof value === "object";
 }
@@ -186,7 +195,7 @@ async function execute<E extends Env>(
   const files: UploadedFiles = {};
   try {
     const params = parseMaybe(route.pathParams, c.req.param());
-    const query = parseMaybe(route.query, c.req.query());
+    const query = parseMaybe(route.query, queryFromRequest(c));
     const headers = parseMaybe(
       route.headers,
       Object.fromEntries(c.req.raw.headers),

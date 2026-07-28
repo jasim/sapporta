@@ -393,6 +393,46 @@ describe("TGridSession", () => {
     }
   });
 
+  it("preserves repeated filters in CSV export links", () => {
+    const definition = defineTGrid<RowsByLevel>({
+      rootLevel: "orders",
+      levels: {
+        orders: {
+          table: ordersTable,
+          childLevels: [],
+          query: {
+            owner: "host",
+            fixedFilters: [
+              {
+                id: "left",
+                column: "customer",
+                op: "contains",
+                value: "left",
+              },
+              {
+                id: "right",
+                column: "customer",
+                op: "contains",
+                value: "right",
+              },
+            ],
+          },
+        },
+      },
+    });
+    const session = createTGridSession<RowsByLevel>(definition);
+
+    try {
+      const url = new URL(session.csvExportUrl(), "http://localhost");
+      expect(url.searchParams.getAll("filter[customer][contains]")).toEqual([
+        "left",
+        "right",
+      ]);
+    } finally {
+      session.dispose();
+    }
+  });
+
   it("uses the query-store page path for keyboard page-boundary navigation", async () => {
     const rowsClient: TableRowsClient = {
       fetch: vi.fn(async ({ page }) => ({

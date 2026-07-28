@@ -30,6 +30,11 @@ import {
   type PartialClientInferRequest,
 } from "@sapporta/rest-core";
 import { ApiError } from "../error.js";
+import {
+  hasRepeatedQueryParams,
+  isQueryParamRecord,
+  queryParamRecordToSearchParams,
+} from "../query-params.js";
 
 type SuccessStatus = 200 | 201 | 202 | 204;
 
@@ -123,7 +128,12 @@ export function createApiClient<T extends AppRouter>(
   options: CreateApiClientOptions,
 ): ThrowingClient<T> {
   const dynamicBaseFetcher: ApiFetcher = (args) =>
-    tsRestFetchApi({ ...args, path: options.baseUrl() + args.path });
+    tsRestFetchApi({
+      ...args,
+      path:
+        options.baseUrl() +
+        pathWithLosslessRepeatedQueryParams(args.path, args.rawQuery),
+    });
 
   const raw = initClient(contract, {
     baseUrl: "",
@@ -134,6 +144,20 @@ export function createApiClient<T extends AppRouter>(
   });
 
   return wrapThrowing(raw);
+}
+
+function pathWithLosslessRepeatedQueryParams(
+  path: string,
+  rawQuery: unknown,
+): string {
+  if (!isQueryParamRecord(rawQuery) || !hasRepeatedQueryParams(rawQuery)) {
+    return path;
+  }
+
+  const queryStart = path.indexOf("?");
+  const routePath = queryStart === -1 ? path : path.slice(0, queryStart);
+  const queryString = queryParamRecordToSearchParams(rawQuery).toString();
+  return queryString ? `${routePath}?${queryString}` : routePath;
 }
 
 export { ApiError } from "../error.js";

@@ -7,6 +7,7 @@ import {
 } from "drizzle-orm/sqlite-core";
 import type { SQL } from "drizzle-orm";
 import { countQuerySchema } from "@sapporta/shared/contracts";
+import type { QueryParamRecord } from "@sapporta/shared";
 import { timestamp } from "../schema/table.js";
 import { sapportaTable } from "../schema/table.js";
 import type { TableDef } from "../schema/table.js";
@@ -56,7 +57,7 @@ const disabledSearchTable = sapportaTable({
 });
 
 function parseQuery(
-  params: Record<string, string>,
+  params: QueryParamRecord,
   table: TableDef = orders,
 ): {
   where: SQL | undefined;
@@ -151,6 +152,18 @@ describe("resolvePageQuery()", () => {
   // ── Filter operators ─────────────────────────────────────────────────
 
   describe("filter operators", () => {
+    it("AND-combines repeated column and operator conditions", () => {
+      const q = parseQuery(
+        { "filter[amount][gte]": ["100", "200"] },
+        orders,
+      );
+      const { sql, params } = compile(q.where);
+      expect(sql).toBe(
+        '("orders"."amount" >= ? and "orders"."amount" >= ?)',
+      );
+      expect(params).toEqual([100, 200]);
+    });
+
     it("parses eq", () => {
       const q = parseQuery({ "filter[status][eq]": "paid" }, orders);
       const { sql, params } = compile(q.where);

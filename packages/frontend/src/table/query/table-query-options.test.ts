@@ -78,6 +78,54 @@ describe("table query integration", () => {
     ]);
   });
 
+  it("sends repeated filters as repeated wire keys through the typed client", async () => {
+    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(
+      jsonResponse({
+        data: [],
+        meta: { total: 0, page: 1, limit: 20, pages: 0 },
+      }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const client = queryClient();
+    await client.fetchQuery(
+      tableRecordsPageQueryOptions({
+        tableName: "audit_events",
+        page: 1,
+        limit: 20,
+        filters: [
+          {
+            id: "left",
+            column: "message",
+            op: "contains",
+            kind: "text",
+            value: "left",
+          },
+          {
+            id: "right",
+            column: "message",
+            op: "contains",
+            kind: "text",
+            value: "right",
+          },
+        ],
+      }),
+    );
+
+    const requestUrl = new URL(
+      String(fetchMock.mock.calls[0]?.[0]),
+      "http://localhost",
+    );
+    expect(requestUrl.searchParams.getAll("filter[message][contains]")).toEqual(
+      ["left", "right"],
+    );
+    expect(requestUrl.searchParams.get("page")).toBe("1");
+    expect(requestUrl.searchParams.get("limit")).toBe("20");
+    expect(requestUrl.searchParams.has("filter[message][contains][0]")).toBe(
+      false,
+    );
+  });
+
   it("decodes domain rows without a framework table registry", async () => {
     type AuditEvent = {
       key: string;

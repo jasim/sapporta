@@ -1,4 +1,5 @@
 export * from "./filter.js";
+export * from "./query-params.js";
 export * from "./value-kind.js";
 export * from "./temporal.js";
 export * from "./daterange.js";

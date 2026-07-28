@@ -30,3 +30,63 @@ describe("TsRestApi.extend", () => {
     expect(document.paths["/status"]).toBeDefined();
   });
 });
+
+describe("TsRestApi query parsing", () => {
+  it("keeps singleton values scalar and repeated values lossless", async () => {
+    const c = initContract();
+    const route = c.query({
+      method: "GET",
+      path: "/rows",
+      query: z
+        .object({ page: z.string().optional() })
+        .catchall(z.union([z.string(), z.array(z.string()).min(1)])),
+      responses: {
+        200: z.object({
+          page: z.string(),
+          filters: z.array(z.string()),
+        }),
+      },
+    });
+    const api = new TsRestApi();
+    api.register("rows", route, ({ request }) => {
+      const filters = request.query["filter[name][contains]"];
+      return {
+        status: 200,
+        body: {
+          page: request.query.page ?? "",
+          filters: typeof filters === "string" ? [filters] : filters,
+        },
+      };
+    });
+
+    const response = await api.request(
+      "/rows?page=2&filter%5Bname%5D%5Bcontains%5D=left" +
+        "&filter%5Bname%5D%5Bcontains%5D=right",
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({
+      page: "2",
+      filters: ["left", "right"],
+    });
+  });
+
+  it("rejects repeated fields declared as singletons", async () => {
+    const c = initContract();
+    const route = c.query({
+      method: "GET",
+      path: "/rows",
+      query: z.object({ page: z.string().optional() }),
+      responses: { 200: z.object({ ok: z.literal(true) }) },
+    });
+    const api = new TsRestApi();
+    api.register("rows", route, () => ({
+      status: 200,
+      body: { ok: true as const },
+    }));
+
+    const response = await api.request("/rows?page=1&page=2");
+
+    expect(response.status).toBe(400);
+  });
+});

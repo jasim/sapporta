@@ -6,6 +6,7 @@ import {
 } from "@tanstack/react-query";
 import type { PaginatedRows, Row } from "@sapporta/shared/contracts";
 import type { RowId } from "@sapporta/shared/row-id";
+import type { QueryParamRecord } from "@sapporta/shared";
 import { buildTableRowsQuery, type FetchTableRowsParams } from "../api/rows";
 import {
   requestTableRecord,
@@ -32,7 +33,7 @@ function tableRecordsPagesQueryKey(tableName: string) {
 
 function tableRecordsPageQueryKey(
   tableName: string,
-  query: Readonly<Record<string, string>>,
+  query: Readonly<QueryParamRecord>,
 ) {
   return [...tableRecordsPagesQueryKey(tableName), query] as const;
 }

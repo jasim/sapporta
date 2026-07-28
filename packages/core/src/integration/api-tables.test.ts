@@ -115,6 +115,15 @@ describe("/api/tables table operations", () => {
       expect(await res.json()).toMatchObject({ code: "bad_value" });
     });
 
+    it("rejects malformed filter grammar instead of widening the read", async () => {
+      const res = await request("/api/tables/accounts?filter%5Bname%5D=unsafe");
+
+      expect(res.status).toBe(400);
+      expect(await res.json()).toMatchObject({
+        code: "unknown_filter_shape",
+      });
+    });
+
     it("exports the complete selection and rejects pagination parameters", async () => {
       const exported = await request(
         "/api/tables/accounts/export.csv?sort=name&filter[type][eq]=asset",
@@ -170,6 +179,29 @@ describe("/api/tables table operations", () => {
         expect(row.type).toBe("asset");
       }
       expect(body.data.some((r: any) => r.type === "revenue")).toBe(false);
+    });
+
+    it("AND-combines repeated filters with the same column and operator", async () => {
+      const left = "repeat-left-9d";
+      const right = "repeat-right-7q";
+      for (const name of [`${left} ${right}`, left, right]) {
+        const created = await postJson("/api/tables/accounts", {
+          name,
+          type: "asset",
+        });
+        expect(created.status).toBe(201);
+      }
+
+      const key = "filter%5Bname%5D%5Bcontains%5D";
+      const res = await request(
+        `/api/tables/accounts?${key}=${left}&${key}=${right}`,
+      );
+
+      expect(res.status).toBe(200);
+      const body = (await res.json()) as {
+        data: Array<{ name: string }>;
+      };
+      expect(body.data.map((row) => row.name)).toEqual([`${left} ${right}`]);
     });
   });
 

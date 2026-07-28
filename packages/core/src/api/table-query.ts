@@ -23,7 +23,10 @@ import type {
   ListRowsQuery,
   LookupQuery,
 } from "@sapporta/shared/contracts";
-import { DEFAULT_COUNT_GROUP_LIMIT } from "@sapporta/shared";
+import {
+  DEFAULT_COUNT_GROUP_LIMIT,
+  type QueryParamRecord,
+} from "@sapporta/shared";
 import {
   parseBoundedInteger,
   parseOptionalBoundedInteger,
@@ -221,8 +224,8 @@ function extractFilterParams(
   query: Record<string, unknown>,
   allowedKeys: ReadonlySet<string>,
   surface: string,
-): Record<string, string> {
-  const filters: Record<string, string> = {};
+): QueryParamRecord {
+  const filters: QueryParamRecord = {};
   for (const [key, value] of Object.entries(query)) {
     if (value === undefined) continue;
     if (allowedKeys.has(key)) continue;
@@ -232,10 +235,17 @@ function extractFilterParams(
         `Unknown ${surface} query parameter ${JSON.stringify(key)}.`,
       );
     }
-    if (typeof value !== "string") {
+    if (
+      typeof value !== "string" &&
+      !(
+        Array.isArray(value) &&
+        value.length > 0 &&
+        value.every((item) => typeof item === "string")
+      )
+    ) {
       throw new QueryParseError(
         "bad_value",
-        `${surface} filter ${JSON.stringify(key)} must be a string.`,
+        `${surface} filter ${JSON.stringify(key)} must contain one or more strings.`,
       );
     }
     filters[key] = value;
@@ -250,7 +260,7 @@ function extractFilterParams(
  * by one surface and silently ignored or interpreted differently by another.
  */
 function parseTableFilters(
-  params: Record<string, string>,
+  params: Readonly<QueryParamRecord>,
   schema: TableDef,
 ): SQL | undefined {
   const conditions: SQL[] = [];
@@ -267,7 +277,7 @@ function parseTableFilters(
  *  this package's `QueryParseError`. The error codes line up exactly, so
  *  the mapping is mechanical. */
 function parseFilterConditions(
-  params: Record<string, string>,
+  params: Readonly<QueryParamRecord>,
 ): ReturnType<typeof decodeFilters> {
   try {
     return decodeFilters(params);

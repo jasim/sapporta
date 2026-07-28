@@ -115,6 +115,27 @@ describe("parseTableSearchParams - sort", () => {
 });
 
 describe("parseTableSearchParams - filters", () => {
+  test("round-trips repeated column and operator filters", () => {
+    const params = new URLSearchParams();
+    params.append("filter[title][contains]", "left");
+    params.append("filter[title][contains]", "right");
+
+    const parsed = parseTableSearchParams(params, FILTER_COLUMNS);
+    expect(parsed.filters).toMatchObject([
+      { column: "title", op: "contains", value: "left" },
+      { column: "title", op: "contains", value: "right" },
+    ]);
+
+    expect(
+      buildTableSearchParams({
+        page: parsed.page,
+        sort: parsed.sort,
+        filters: parsed.filters,
+        search: parsed.search,
+      }).getAll("filter[title][contains]"),
+    ).toEqual(["left", "right"]);
+  });
+
   test("canonicalizes foreign-key equality to single-value membership", () => {
     const r = parseTableSearchParams(
       new URLSearchParams("filter%5Bbook_id%5D%5Beq%5D=6"),

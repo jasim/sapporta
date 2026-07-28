@@ -1,6 +1,7 @@
 import { uiClient } from "../../platform/client";
 import type { PaginatedRows, SingleRow } from "@sapporta/shared/contracts";
 import type { RowId } from "@sapporta/shared/row-id";
+import type { QueryParamRecord } from "@sapporta/shared";
 
 export type TableReadOptions = {
   signal?: AbortSignal;
@@ -8,7 +9,7 @@ export type TableReadOptions = {
 
 export function requestTableRecordsPage(
   tableName: string,
-  query: Readonly<Record<string, string>>,
+  query: Readonly<QueryParamRecord>,
   options: TableReadOptions = {},
 ): Promise<PaginatedRows> {
   return uiClient.listRows({

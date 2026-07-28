@@ -8,6 +8,10 @@ import {
 } from "@sapporta/shared/filter";
 import type { RowId } from "@sapporta/shared/row-id";
 import {
+  appendQueryParam,
+  type QueryParamRecord,
+} from "@sapporta/shared";
+import {
   requestTableRecord,
   requestTableRecordsPage,
   type TableReadOptions,
@@ -34,10 +38,12 @@ export type TableRowsSelectionParams = Pick<
  *  both surfaces use the same canonical URL grammar. */
 export function buildTableSelectionQuery(
   params: TableRowsSelectionParams,
-): Record<string, string> {
-  const out: Record<string, string> = {};
+): QueryParamRecord {
+  const out: QueryParamRecord = {};
   if (params.filters) {
-    for (const [k, v] of encodeTypedFilters(params.filters)) out[k] = v;
+    for (const [key, value] of encodeTypedFilters(params.filters)) {
+      appendQueryParam(out, key, value);
+    }
   }
   const sortStr = params.sort ? stringifySortOrder(params.sort) : null;
   if (sortStr) out.sort = sortStr;
@@ -48,7 +54,7 @@ export function buildTableSelectionQuery(
 /** Add pagination to a table selection for the paged rows endpoint. */
 export function buildTableRowsQuery(
   params: Omit<FetchTableRowsParams, "tableName">,
-): Record<string, string> {
+): QueryParamRecord {
   const out = buildTableSelectionQuery(params);
   if (params.page) out.page = String(params.page);
   if (params.limit) out.limit = String(params.limit);

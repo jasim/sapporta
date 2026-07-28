@@ -386,6 +386,17 @@ describe("encodeFilters → decodeFilters → parseFilters round-trip", () => {
     expect(typed[1]).toMatchObject({ op: "is", polarity: "notnull" });
   });
 
+  it("decodes repeated values from the lossless HTTP query record", () => {
+    expect(
+      decodeFilters({
+        "filter[status][eq]": ["open", "pending"],
+      }),
+    ).toMatchObject([
+      { column: "status", op: "eq", value: "open" },
+      { column: "status", op: "eq", value: "pending" },
+    ]);
+  });
+
   it("preserves wildcard characters through URL encoding (contains)", () => {
     // User-supplied `%` must survive the URL round-trip as a literal — the
     // LIKE-escape step happens downstream in buildFilterSql.

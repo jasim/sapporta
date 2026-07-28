@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { MAX_COUNT_GROUPS, type GroupCount } from "../count.js";
+import type { QueryParamValue } from "../query-params.js";
 
 /**
  * Wire shapes for `/tables/:tableName/*` envelopes (the loose,
@@ -55,10 +56,17 @@ const rowSelectionQueryShape = {
   q: z.string().optional(),
 };
 
+const filterQueryValueSchema: z.ZodType<QueryParamValue> = z.union([
+  z.string(),
+  z.array(z.string()).min(1),
+]);
+
 /** Query shape shared by reads that select rows without pagination.
- *  Filters are additional `filter[col][op]` keys; `.loose()` lets those
- *  table-defined keys reach the server's strict query resolver. */
-export const exportRowsQuerySchema = z.object(rowSelectionQueryShape).loose();
+ *  Filters are additional `filter[col][op]` keys. Repeated filter keys remain
+ *  arrays until the strict table query resolver validates their grammar. */
+export const exportRowsQuerySchema = z
+  .object(rowSelectionQueryShape)
+  .catchall(filterQueryValueSchema);
 export type ExportRowsQuery = z.output<typeof exportRowsQuerySchema>;
 
 /** Query shape for the paged row-listing endpoint. */
@@ -68,7 +76,7 @@ export const listRowsQuerySchema = z
     page: z.string().optional(),
     limit: z.string().optional(),
   })
-  .loose();
+  .catchall(filterQueryValueSchema);
 export type ListRowsQuery = z.output<typeof listRowsQuerySchema>;
 
 export const lookupQuerySchema = z
@@ -123,5 +131,5 @@ export const countQuerySchema = z
     order: z.enum(["asc", "desc"]).optional(),
     limit: z.coerce.number().int().min(1).max(MAX_COUNT_GROUPS).optional(),
   })
-  .loose();
+  .catchall(filterQueryValueSchema);
 export type CountQuery = z.output<typeof countQuerySchema>;

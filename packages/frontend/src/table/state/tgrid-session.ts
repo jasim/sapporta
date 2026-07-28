@@ -48,6 +48,7 @@ import {
   type LookupStore,
 } from "../../lookup";
 import { buildTableRowsQuery, buildTableSelectionQuery } from "../api/rows";
+import { queryParamRecordToSearchParams } from "@sapporta/shared";
 import { getApiBase } from "../../platform/client";
 import type {
   TGridLevelId,
@@ -441,7 +442,7 @@ class DefaultTGridSession<
         : parseFiltersForTable(query.initialFilters ?? [], level.table)),
     ];
     const search = hasQueryState ? state.search : (query.initialSearch ?? null);
-    const queryString = new URLSearchParams(
+    const queryString = queryParamRecordToSearchParams(
       buildTableSelectionQuery({
         sort: [...sort],
         filters: [...filters],
