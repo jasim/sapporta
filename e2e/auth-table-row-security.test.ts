@@ -115,12 +115,12 @@ function writeAuthMatrixSchema(projectDir: string): void {
   writeFileSync(
     join(schemaDir, "auth_matrix.ts"),
     [
-      'import { sapportaTable, sqliteTable, text, integer } from "@sapporta/server/table";',
+      'import { sapportaTable, sqliteTable, text, select, integer } from "@sapporta/server/table";',
       "",
       'export const tasksTable = sqliteTable("tasks", {',
       '  id: integer("id").primaryKey({ autoIncrement: true }),',
       '  title: text("title").notNull(),',
-      '  status: text("status", { enum: ["todo", "in_progress", "done"] }).notNull(),',
+      '  status: select("status", ["todo", "in_progress", "done"]).notNull(),',
       '  priority: integer("priority").notNull(),',
       '  workspace_id: text("workspace_id").notNull(),',
       "});",
@@ -139,7 +139,7 @@ function writeAuthMatrixSchema(projectDir: string): void {
       '  id: integer("id").primaryKey({ autoIncrement: true }),',
       '  title: text("title").notNull(),',
       '  body: text("body").notNull(),',
-      '  category: text("category", { enum: ["personal", "shared", "archive"] }).notNull(),',
+      '  category: select("category", ["personal", "shared", "archive"]).notNull(),',
       '  workspace_id: text("workspace_id").notNull(),',
       '  scoped_to_user_id: text("scoped_to_user_id").notNull(),',
       "});",

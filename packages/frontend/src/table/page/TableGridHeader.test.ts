@@ -147,7 +147,7 @@ describe("TableGridHeader", () => {
     const search = searchInput();
     const filter = buttonWithText("Add filter");
 
-    expect(document.body.textContent).toContain("Tables");
+    expect(document.body.textContent).toContain("Orders");
     expect(document.body.textContent).toContain("Export");
     expect(document.body.textContent).toContain("New record");
     expect(

@@ -328,7 +328,7 @@ describe("auth pages", () => {
     });
     await renderAuthPageRoutes("/signup");
 
-    await waitForText("Sign up and create your first Sapporta workspace");
+    await waitForText("Sign up and create your first workspace");
     await fillInput("Name", "Owner");
     await fillInput("Email", "owner@example.test");
     await fillInput("Password", "correct-horse-battery-staple");

@@ -828,14 +828,13 @@ describe("compileTGridRuntimeConfig", () => {
     expect(isValidElement(rendered) ? rendered.type : null).toBe(
       ExpandableCellFrame,
     );
-    expect(col.activation?.startsOn).toEqual(["enter", "space", "click"]);
+    expect(col.activation?.startsOn).toEqual(["enter", "space"]);
 
     const editableExpansionColumn =
       config.gridSchema.levels["orders.lines"].columns[0];
     expect(editableExpansionColumn.activation?.startsOn).toEqual([
       "enter",
       "space",
-      "click",
     ]);
     expect(editableExpansionColumn.edit?.startsOn).toEqual([
       "enter",
