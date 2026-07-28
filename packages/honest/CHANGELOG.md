@@ -1,5 +1,11 @@
 # @sapporta/honest
 
+## 0.3.7
+
+### Patch Changes
+
+- Release coinciding with updated homepage design
+
 ## 0.3.6
 
 ### Patch Changes

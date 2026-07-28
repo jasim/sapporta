@@ -1,6 +1,6 @@
 {
   "name": "@sapporta/honest",
-  "version": "0.3.6",
+  "version": "0.3.7",
   "type": "module",
   "description": "Honest — the Hono + ts-rest adapter. Mount ts-rest contracts on Hono with one-schema-two-uses request parsing and OpenAPI 3.1 emission. Adds dispatch families for runtime-resolved routes.",
   "keywords": [

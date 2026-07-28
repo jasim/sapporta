@@ -1,5 +1,16 @@
 # sapporta
 
+## 0.2.7
+
+### Patch Changes
+
+- Release coinciding with updated homepage design
+- Updated dependencies [369f4d1]
+- Updated dependencies [fd820be]
+- Updated dependencies
+- Updated dependencies [4e9bf62]
+  - @sapporta/server@0.3.0
+
 ## 0.2.6
 
 ### Patch Changes
