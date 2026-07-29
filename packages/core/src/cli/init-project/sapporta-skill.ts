@@ -4,15 +4,33 @@ import { join } from "node:path";
 import { spawnSync } from "node:child_process";
 import { createInterface } from "node:readline/promises";
 import { stdin as input, stdout as output } from "node:process";
+import { ErrorCode, OperationError } from "../../introspect/types.js";
 import {
   resolveGettingStartedEnv,
   type GettingStartedEnv,
 } from "./getting-started-env.js";
 
-type SkillInstallPlan = Readonly<{
+export type SkillInstallPlan = Readonly<{
   command: "npx";
   args: readonly string[];
   displayCommand: string;
+}>;
+
+type SkillInstallResult = Readonly<{
+  error?: Error;
+  status: number | null;
+  signal: NodeJS.Signals | null;
+}>;
+
+export type EnsureSapportaSkillOptions = Readonly<{
+  environment?: GettingStartedEnv;
+  isSkillInstalled?: () => boolean;
+  isInteractive?: boolean;
+  prompt?: (question: string) => Promise<string>;
+  runInstall?: (
+    plan: SkillInstallPlan,
+    projectDir: string,
+  ) => SkillInstallResult;
 }>;
 
 export function sapportaSkillInstallPlan(
@@ -24,6 +42,8 @@ export function sapportaSkillInstallPlan(
     environment.skillSource,
     "--skill",
     "sapporta",
+    "--global",
+    "--yes",
   ] as const;
   return {
     command: "npx",
@@ -32,85 +52,97 @@ export function sapportaSkillInstallPlan(
   };
 }
 
-function installCommandBlock(
-  projectDir: string,
-  plan: SkillInstallPlan,
-): string {
-  return [`  cd ${shellQuote(projectDir)}`, `  ${plan.displayCommand}`].join(
-    "\n",
-  );
-}
-
 export async function ensureSapportaSkillInstalled(
   projectDir: string,
+  options: EnsureSapportaSkillOptions = {},
 ): Promise<string> {
   const installedSkillPaths = [
     join(projectDir, ".agents", "skills", "sapporta", "SKILL.md"),
     join(homedir(), ".agents", "skills", "sapporta", "SKILL.md"),
     join(homedir(), ".codex", "skills", "sapporta", "SKILL.md"),
   ];
-  if (installedSkillPaths.some((path) => existsSync(path))) {
+  const isSkillInstalled =
+    options.isSkillInstalled ??
+    (() => installedSkillPaths.some((path) => existsSync(path)));
+  if (isSkillInstalled()) {
     return (
       "Sapporta skill is already installed. " +
       "You can use it with /sapporta from coding agents to build Sapporta applications."
     );
   }
 
-  const plan = sapportaSkillInstallPlan();
-  if (!input.isTTY || !output.isTTY) {
-    return [
-      "Sapporta skill is not installed.",
-      "To install it later, run:",
-      installCommandBlock(projectDir, plan),
-    ].join("\n");
-  }
+  const plan = sapportaSkillInstallPlan(options.environment);
+  const isInteractive =
+    options.isInteractive ?? (input.isTTY === true && output.isTTY === true);
 
-  const rl = createInterface({ input, output });
-  let answer: string;
-  try {
-    answer = await rl.question(
+  if (isInteractive) {
+    const answer = await (
+      options.prompt ??
+      ((question: string) => {
+        const rl = createInterface({ input, output });
+        return rl.question(question).finally(() => rl.close());
+      })
+    )(
       [
         "Sapporta skill is not installed.",
         "Install it now? We'll run:",
-        installCommandBlock(projectDir, plan),
+        `  ${plan.displayCommand}`,
         "Proceed? [Y/n] ",
       ].join("\n"),
     );
-  } finally {
-    rl.close();
+
+    const confirmed = answer.trim() === "" || /^y(es)?$/i.test(answer.trim());
+    if (!confirmed) {
+      throw skillInstallError(
+        projectDir,
+        plan,
+        "Sapporta skill installation was declined.",
+      );
+    }
   }
 
-  const confirmed = answer.trim() === "" || /^y(es)?$/i.test(answer.trim());
-  if (!confirmed) {
-    return [
-      "Sapporta skill was not installed.",
-      "You can install it later with:",
-      installCommandBlock(projectDir, plan),
-    ].join("\n");
-  }
-
-  const result = spawnSync(plan.command, [...plan.args], {
-    cwd: projectDir,
-    stdio: "inherit",
-  });
+  const runInstall =
+    options.runInstall ??
+    ((installPlan: SkillInstallPlan, cwd: string) =>
+      spawnSync(installPlan.command, [...installPlan.args], {
+        cwd,
+        stdio: "inherit",
+      }));
+  const result = runInstall(plan, projectDir);
   if (result.error) {
-    return [
+    throw skillInstallError(
+      projectDir,
+      plan,
       `Sapporta skill installation failed: ${result.error.message}`,
-      "You can retry with:",
-      installCommandBlock(projectDir, plan),
-    ].join("\n");
+    );
   }
   if (result.status !== 0) {
-    return [
+    throw skillInstallError(
+      projectDir,
+      plan,
       `Sapporta skill installation exited with status ${result.status ?? `signal ${result.signal}`}.`,
-      "You can retry with:",
-      installCommandBlock(projectDir, plan),
-    ].join("\n");
+    );
   }
 
   return (
     "Sapporta skill installed. " +
     "You can use it with /sapporta from coding agents to build Sapporta applications."
+  );
+}
+
+function skillInstallError(
+  projectDir: string,
+  plan: SkillInstallPlan,
+  reason: string,
+): OperationError {
+  return new OperationError(
+    [
+      reason,
+      `The project was created at ${projectDir}, but the Sapporta skill is required before building it.`,
+      "Install the skill by running:",
+      `  ${plan.displayCommand}`,
+    ].join("\n"),
+    ErrorCode.INIT_SETUP_FAILED,
   );
 }
 
