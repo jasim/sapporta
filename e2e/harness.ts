@@ -356,6 +356,38 @@ export function writeTasksSchema(projectDir: string): void {
   );
 }
 
+export function writeLibraryCatalogSchema(projectDir: string): void {
+  mkdirSync(join(projectDir, "packages", "api", "schema"), { recursive: true });
+  writeFileSync(
+    join(projectDir, "packages", "api", "schema", "library_books.ts"),
+    [
+      'import { sapportaTable, sqliteTable, text, integer } from "@sapporta/server/table";',
+      "",
+      'export const libraryBooksTable = sqliteTable("library_books", {',
+      '  id: integer("id").primaryKey({ autoIncrement: true }),',
+      '  title: text("title").notNull(),',
+      '  author: text("author").notNull(),',
+      '  isbn: text("isbn").notNull(),',
+      '  copies_available: integer("copies_available").notNull(),',
+      '  workspace_id: text("workspace_id").notNull(),',
+      "});",
+      "",
+      "export const libraryBooks = sapportaTable({",
+      "  drizzle: libraryBooksTable,",
+      "  meta: {",
+      '    label: "Library Books",',
+      '    rowScope: "workspaceGlobal",',
+      '    rowLabelColumns: ["title"],',
+      '    search: { self: ["title", "author", "isbn"] },',
+      "  },",
+      "});",
+      "",
+      "export default libraryBooks;",
+      "",
+    ].join("\n"),
+  );
+}
+
 export function writeAuthScopedTasksSchema(projectDir: string): void {
   mkdirSync(join(projectDir, "packages", "api", "schema"), { recursive: true });
   writeFileSync(
