@@ -59,6 +59,17 @@ afterEach(async () => {
 });
 
 describe("NewRecordPage", () => {
+  it("uses the standard page header and scrolling body", async () => {
+    const container = await renderPage();
+
+    expect(container.querySelector("[data-page-header]")).toBeInstanceOf(
+      HTMLElement,
+    );
+    expect(container.querySelector("[data-page-body]")).toBeInstanceOf(
+      HTMLElement,
+    );
+  });
+
   it("maps create-draft issues into TanStack field errors", async () => {
     const container = await renderPage();
 
@@ -128,7 +139,9 @@ describe("NewRecordPage", () => {
 
     expect(reloadTGridRows).toHaveBeenCalledWith(TABLE.name);
     expect(queryClient?.getQueryState(pageKey)?.isInvalidated).toBe(true);
-    expect(queryClient?.getQueryState(otherTableKey)?.isInvalidated).toBe(false);
+    expect(queryClient?.getQueryState(otherTableKey)?.isInvalidated).toBe(
+      false,
+    );
   });
 });
 

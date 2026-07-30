@@ -6,6 +6,7 @@ import {
 } from "@sapporta/frontend/auth/runtime";
 import { getApiBase } from "@sapporta/frontend/platform";
 import { useSchemaStore } from "@sapporta/frontend/schema";
+import { AppPage } from "@sapporta/frontend/layout";
 import { Button, buttonVariants } from "@sapporta/ui/button";
 import { cn } from "@sapporta/ui/cn";
 import {
@@ -132,7 +133,10 @@ ${projectReferences}`;
   }
 
   return (
-    <div className="flex-1 overflow-y-auto bg-sap-bg text-sap-fg">
+    <AppPage
+      title={viewMode === "diagnostics" ? "Project diagnostics" : "Welcome"}
+      bodyClassName="bg-sap-bg text-sap-fg"
+    >
       <div className="mx-auto max-w-[68rem] px-5 py-5 sm:px-8 sm:py-7 lg:px-10">
         {viewMode === "diagnostics" ? (
           <>
@@ -304,7 +308,7 @@ ${projectReferences}`;
           </>
         )}
       </div>
-    </div>
+    </AppPage>
   );
 }
 

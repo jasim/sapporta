@@ -1,0 +1,9 @@
+[data-shell-sidebar-toggle] ~ [data-shell-scroll-region] [data-page-header] {
+  padding-inline-start: 3.75rem;
+}
+
+@media (min-width: 40rem) {
+  [data-shell-sidebar-toggle] ~ [data-shell-scroll-region] [data-page-header] {
+    padding-inline-start: 4.25rem;
+  }
+}

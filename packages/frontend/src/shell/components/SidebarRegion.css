@@ -1,0 +1,24 @@
+[data-sidebar-hover-edge] {
+  display: none;
+}
+
+[data-sidebar-region][data-sidebar-state="collapsed"] [data-sidebar-surface] {
+  visibility: hidden;
+  transform: translateX(-100%);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  [data-sidebar-region][data-sidebar-state="collapsed"]
+    [data-sidebar-hover-edge] {
+    display: block;
+  }
+
+  [data-sidebar-region][data-sidebar-state="collapsed"]:is(
+      :hover,
+      :focus-within
+    )
+    [data-sidebar-surface] {
+    visibility: visible;
+    transform: translateX(0);
+  }
+}

@@ -148,6 +148,9 @@ describe("TableGridHeader", () => {
     const filter = buttonWithText("Add filter");
 
     expect(document.body.textContent).toContain("Orders");
+    expect(document.body.querySelector("[data-page-header]")).toBeInstanceOf(
+      HTMLElement,
+    );
     expect(document.body.textContent).toContain("Export");
     expect(document.body.textContent).toContain("New record");
     expect(
@@ -181,6 +184,9 @@ describe("TableGridHeader", () => {
     expect(
       document.body.querySelector('button[aria-label="New record"]'),
     ).toBeInstanceOf(HTMLButtonElement);
+    expect(document.body.querySelector("[data-page-header]")).toBeInstanceOf(
+      HTMLElement,
+    );
     expect(
       document.body.querySelector('button[aria-label="Open table actions"]'),
     ).toBeInstanceOf(HTMLButtonElement);

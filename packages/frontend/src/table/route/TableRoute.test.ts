@@ -152,7 +152,10 @@ describe("TableRoute", () => {
 
     const container = await renderTableRoute("/tables/missing");
 
-    expect(container.textContent).toBe("Table not found");
+    expect(container.textContent).toContain("Table not found");
+    expect(container.textContent).toContain(
+      'We could not find the schema for "missing".',
+    );
     expect(tablePageSpy).not.toHaveBeenCalled();
   });
 });

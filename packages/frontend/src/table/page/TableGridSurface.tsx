@@ -50,7 +50,10 @@ export const TableGridSurface = forwardRef<
     <div
       ref={ref}
       data-table-page-mode={mode}
-      className={cn("flex h-full flex-col bg-sap-surface", className)}
+      className={cn(
+        "flex h-full min-h-0 flex-col overflow-hidden bg-sap-surface",
+        className,
+      )}
     >
       {header}
 

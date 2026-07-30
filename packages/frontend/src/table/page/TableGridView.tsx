@@ -43,6 +43,7 @@ import {
   resolveTableGridPresentation,
   useTablePageMode,
 } from "./table-page-mode";
+import { AppPage } from "../../shell/components/Page";
 
 // Complete table experience for the common case: create a session, bind it to
 // the caller's route, and render the standard table layout from the live
@@ -226,9 +227,12 @@ export function TableGridView<
 
   if (!tableGrid.session) {
     return (
-      <div className="flex h-full items-center justify-center bg-sap-surface text-sap-muted">
+      <AppPage
+        title={table.label ?? table.name}
+        bodyClassName="flex items-center justify-center text-sap-muted"
+      >
         Loading table...
-      </div>
+      </AppPage>
     );
   }
 

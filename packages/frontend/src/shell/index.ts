@@ -16,8 +16,37 @@ export {
 } from "./components/AuthAccountMenu";
 export { SapportaMark } from "./components/Sidebar";
 export { SidebarShell } from "./components/SidebarShell";
+export {
+  SidebarRegion,
+  type SidebarRegionProps,
+} from "./components/SidebarRegion";
+export {
+  SidebarToggle,
+  type SidebarToggleProps,
+} from "./components/SidebarToggle";
 export { StatusBar } from "./components/StatusBar";
-export { TopBar, TopBarButton } from "./components/TopBar";
+export {
+  AppPage,
+  PageBody,
+  PageFrame,
+  type AppPageProps,
+  type PageBodyProps,
+  type PageFrameProps,
+} from "./components/Page";
+export {
+  PageHeader,
+  PageHeaderButton,
+  type PageHeaderProps,
+} from "./components/PageHeader";
+export {
+  SidebarProvider,
+  useSidebar,
+  SIDEBAR_DESKTOP_MEDIA_QUERY,
+  SIDEBAR_EXPANDED_PREF_KEY,
+  type SidebarController,
+  type SidebarProviderOptions,
+  type SidebarProviderProps,
+} from "./sidebar-controller";
 export {
   isNavigationItemActive,
   navigationItems,

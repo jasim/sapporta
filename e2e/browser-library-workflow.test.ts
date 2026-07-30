@@ -98,6 +98,7 @@ describe.sequential("generated app browser workflow - end-to-end", () => {
       await page.waitForURL("**/welcome");
 
       await signInWithPassword(page);
+      await verifyResponsiveSidebar(page);
       await page
         .getByRole("button", { name: `Open account menu for ${USER.name}` })
         .click();
@@ -167,6 +168,41 @@ async function signInWithPassword(page: Page): Promise<void> {
   await page.getByLabel("Password").fill(USER.password);
   await page.getByRole("button", { name: "Sign in" }).click();
   await page.waitForURL("**/welcome");
+}
+
+async function verifyResponsiveSidebar(page: Page): Promise<void> {
+  const region = page.locator("[data-sidebar-region]");
+  const surface = page.locator("[data-sidebar-surface]");
+
+  await page.getByRole("button", { name: "Collapse sidebar" }).click();
+  await playwrightExpect(region).toHaveAttribute(
+    "data-sidebar-state",
+    "collapsed",
+  );
+  await playwrightExpect(surface).toBeHidden();
+
+  await page.mouse.move(4, 300);
+  await playwrightExpect(surface).toBeVisible();
+  await page.getByRole("main").hover({ position: { x: 500, y: 300 } });
+  await playwrightExpect(surface).toBeHidden();
+
+  await page.getByRole("button", { name: "Expand sidebar" }).click();
+  await playwrightExpect(region).toHaveAttribute(
+    "data-sidebar-state",
+    "expanded",
+  );
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  const openDrawer = page.getByRole("button", { name: "Open sidebar" });
+  await openDrawer.click();
+  await playwrightExpect(page.locator("[data-sidebar-drawer]")).toBeVisible();
+  await page.keyboard.press("Escape");
+  await playwrightExpect(openDrawer).toBeVisible();
+
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await playwrightExpect(
+    page.getByRole("button", { name: "Collapse sidebar" }),
+  ).toBeVisible();
 }
 
 async function expectHeading(page: Page, name: string): Promise<void> {

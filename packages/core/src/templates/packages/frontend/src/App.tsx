@@ -1,6 +1,7 @@
 import { lazy, Suspense } from "react";
 import { Route, Navigate } from "react-router-dom";
 import type { Navigation } from "@sapporta/frontend/shell";
+import { AppPage } from "@sapporta/frontend/layout";
 import { Sparkles } from "lucide-react";
 
 /**
@@ -20,7 +21,12 @@ const Welcome = lazy(() =>
 
 function RouteFallback() {
   return (
-    <div className="p-[18px] text-sap-data text-sap-muted">Loading...</div>
+    <AppPage
+      title="Loading"
+      bodyClassName="p-[18px] text-sap-data text-sap-muted"
+    >
+      Loading...
+    </AppPage>
   );
 }
 
@@ -70,7 +76,11 @@ export const appProtectedRoutes = (
       }
     />
 
-    {/* Add protected app routes here, e.g.:
+    {/* Standard screens can use `AppPage` for the usual fixed header and
+        scrolling content area. Other screens can choose their own height and
+        scrolling behavior; `AppShell` keeps its sidebar control available.
+
+        Add protected app routes here, e.g.:
         <Route
           path="views/imports"
           element={

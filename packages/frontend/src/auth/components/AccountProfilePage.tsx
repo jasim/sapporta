@@ -36,23 +36,30 @@ import {
   getAccountInitials,
 } from "../../shell/components/AccountMenu";
 import { getApiBase } from "../../platform/base";
+import { AppPage } from "../../shell/components/Page";
 
 export function AccountProfilePage() {
   const session = useAuthStore((s) => s.session);
 
   if (session.kind === "unknown" || session.kind === "loading") {
     return (
-      <div className="flex h-full items-center justify-center text-sap-muted">
+      <AppPage
+        title="Account profile"
+        bodyClassName="flex items-center justify-center text-sap-muted"
+      >
         Loading...
-      </div>
+      </AppPage>
     );
   }
 
   if (session.kind !== "authenticated") {
     return (
-      <div className="flex h-full items-center justify-center text-sap-muted">
+      <AppPage
+        title="Account profile"
+        bodyClassName="flex items-center justify-center text-sap-muted"
+      >
         Not signed in.
-      </div>
+      </AppPage>
     );
   }
 
@@ -61,21 +68,21 @@ export function AccountProfilePage() {
   const initials = getAccountInitials(context.user);
 
   return (
-    <div className="min-h-full bg-sap-surface">
+    <AppPage title="Account profile">
       <div className="mx-auto w-full max-w-[760px] px-6 py-8">
-        <header className="mb-7 flex items-center gap-3">
+        <div className="mb-7 flex items-center gap-3">
           <span className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-[7px] bg-sap-active-nav text-sap-body font-bold text-sap-brand">
             {initials}
           </span>
           <div className="min-w-0">
-            <h1 className="truncate text-[22px] font-[680] leading-tight text-sap-fg">
-              Account profile
-            </h1>
-            <p className="mt-1 truncate text-sap-body text-sap-muted">
+            <h2 className="truncate text-[22px] font-[680] leading-tight text-sap-fg">
               {displayName}
+            </h2>
+            <p className="mt-1 truncate text-sap-body text-sap-muted">
+              {context.user.email}
             </p>
           </div>
-        </header>
+        </div>
 
         <section className="border-y border-sap-border-soft">
           <ProfileRow
@@ -111,7 +118,7 @@ export function AccountProfilePage() {
         <AccountSecurity />
         <AgentAccessTokens />
       </div>
-    </div>
+    </AppPage>
   );
 }
 

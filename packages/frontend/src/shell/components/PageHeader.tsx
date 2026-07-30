@@ -1,52 +1,67 @@
 import type { ReactNode } from "react";
 import { cn } from "@sapporta/ui/cn";
 import { Kbd } from "@sapporta/ui/kbd";
+import "./PageHeader.css";
 
-/**
- * Application top bar. 52px tall, sits on the content surface with a
- * hairline border below. Left side: breadcrumb (section/title) + optional
- * subtitle in mono. Right side: actions slot (buttons, search, etc.).
- *
- * Layout rule: everything in the top bar is either 30px tall (buttons,
- * search input) or vertically centered text. Nothing taller.
- */
-export function TopBar({
-  section,
-  title,
-  subtitle,
-  actions,
-}: {
+export interface PageHeaderProps {
   /** The group this view belongs to — "Tables", "Reports", etc. */
   section?: string;
   /** The view's own name. */
   title: string;
   /** Mono-styled right-of-title metadata (record counts, timing, etc.). */
   subtitle?: ReactNode;
-  /** Right-aligned slot. Actions should be 30px tall to match the bar. */
+  /** Right-aligned page actions. */
   actions?: ReactNode;
-}) {
+  className?: string;
+}
+
+/**
+ * The standard header for a bounded page. It stays in place because the
+ * adjacent `PageBody` scrolls; it does not rely on sticky positioning. When
+ * the default shell control is present, the shell adds enough leading room so
+ * the control and title do not overlap.
+ */
+export function PageHeader({
+  section,
+  title,
+  subtitle,
+  actions,
+  className,
+}: PageHeaderProps) {
   return (
-    <div className="sticky top-0 z-[var(--sap-z-shell-sticky)] h-sap-topbar shrink-0 flex items-center px-5 gap-[14px] border-b border-sap-border-soft bg-sap-surface/90">
-      {section && (
-        <>
-          <span className="text-sap-body text-sap-muted">{section}</span>
-          <span className="text-sap-body text-sap-subtle">/</span>
-        </>
+    <header
+      data-page-header
+      className={cn(
+        "z-[var(--sap-z-shell-sticky)] flex h-sap-topbar shrink-0 items-center gap-2 border-b border-sap-border-soft bg-sap-surface/90 px-3 sm:px-5",
+        className,
       )}
-      <span className="text-[15px] font-[720] text-sap-fg">{title}</span>
-      {subtitle && (
-        <span className="mono text-[11.5px] text-sap-muted ml-1">
-          {subtitle}
-        </span>
-      )}
+    >
+      <div className="flex min-w-0 items-center gap-[14px]">
+        {section && (
+          <>
+            <span className="hidden text-sap-body text-sap-muted sm:inline">
+              {section}
+            </span>
+            <span className="hidden text-sap-body text-sap-subtle sm:inline">
+              /
+            </span>
+          </>
+        )}
+        <h1 className="truncate text-[15px] font-[720] text-sap-fg">{title}</h1>
+        {subtitle && (
+          <span className="mono hidden shrink-0 text-[11.5px] text-sap-muted sm:inline">
+            {subtitle}
+          </span>
+        )}
+      </div>
       <div className="flex-1" />
       {actions && <div className="flex items-center gap-2">{actions}</div>}
-    </div>
+    </header>
   );
 }
 
 /**
- * Action button for the top bar. Three tones:
+ * Action button for the page header. Three tones:
  *   - primary: the affirmative action (New record, Save, etc.)
  *   - ghost:   secondary actions (Export, Filter, etc.)
  *   - danger:  destructive
@@ -55,7 +70,7 @@ export function TopBar({
  * buttons (reads as metadata on the surface bg), inverted on primary/danger
  * buttons (translucent-white wash on the solid fill).
  */
-export function TopBarButton({
+export function PageHeaderButton({
   tone = "ghost",
   icon,
   onClick,

@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { Loader2, Play } from "lucide-react";
-import { TopBar } from "../../shell/components/TopBar";
+import { PageHeader } from "../../shell/components/PageHeader";
+import { PageFrame } from "../../shell/components/Page";
 import { cn } from "@sapporta/ui/cn";
 
 export interface ReportScreenFrameProps {
@@ -17,15 +18,17 @@ export function ReportScreenFrame({
   children,
 }: ReportScreenFrameProps) {
   return (
-    <div className="flex h-full flex-col overflow-hidden">
-      <TopBar
+    <PageFrame>
+      <PageHeader
         section="Reports"
         title={title}
         subtitle={subtitle}
         actions={actions}
       />
-      {children}
-    </div>
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+        {children}
+      </div>
+    </PageFrame>
   );
 }
 

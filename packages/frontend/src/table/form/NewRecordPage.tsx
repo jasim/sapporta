@@ -6,7 +6,11 @@ import { ArrowLeft, Loader2 } from "lucide-react";
 import type { TableSchema } from "@sapporta/shared/contracts";
 import { ApiError } from "@sapporta/shared/client";
 import { apiProblemFromBody } from "@sapporta/shared/validation";
-import { TopBar, TopBarButton } from "../../shell/components/TopBar";
+import {
+  PageHeader,
+  PageHeaderButton,
+} from "../../shell/components/PageHeader";
+import { PageBody, PageFrame } from "../../shell/components/Page";
 import { Button } from "@sapporta/ui/button";
 import {
   fieldIssuesForSubmissionError,
@@ -75,22 +79,22 @@ export function NewRecordPage({ tableSchema }: { tableSchema: TableSchema }) {
   }
 
   return (
-    <div className="flex h-full flex-col bg-sap-surface">
-      <TopBar
+    <PageFrame>
+      <PageHeader
         section={`Tables / ${tableLabel}`}
         title="New record"
         actions={
-          <TopBarButton
+          <PageHeaderButton
             tone="ghost"
             onClick={() => navigate(tableUrl)}
             icon={<ArrowLeft className="h-[12px] w-[12px]" />}
           >
             Table
-          </TopBarButton>
+          </PageHeaderButton>
         }
       />
 
-      <div className="flex-1 overflow-auto px-5 py-6">
+      <PageBody className="px-5 py-6">
         <form
           onSubmit={handleSubmit}
           className="flex w-full max-w-[560px] flex-col gap-5"
@@ -151,8 +155,8 @@ export function NewRecordPage({ tableSchema }: { tableSchema: TableSchema }) {
             }}
           </form.Subscribe>
         </form>
-      </div>
-    </div>
+      </PageBody>
+    </PageFrame>
   );
 }
 

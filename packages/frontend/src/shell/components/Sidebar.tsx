@@ -5,6 +5,7 @@ import { ListFilter } from "lucide-react";
 import { useSchemaStore } from "../../schema-catalog/state/schema-store";
 import { AuthAccountMenu } from "./AuthAccountMenu";
 import { SidebarShell } from "./SidebarShell";
+import { useSidebar } from "../sidebar-controller";
 import {
   isNavigationItemActive,
   navigationItems,
@@ -14,6 +15,11 @@ import {
 
 export interface NavigationShellProps {
   navigation: Navigation;
+}
+
+export interface AppSidebarProps extends NavigationShellProps {
+  /** An optional control shown beside the application identity. */
+  sidebarToggle?: ReactNode;
 }
 
 export function SapportaMark({ size = 17 }: { size?: number }) {
@@ -113,11 +119,35 @@ export function NavItem({
   );
 }
 
-export function DesktopSidebar({ navigation }: NavigationShellProps) {
+/**
+ * Sapporta's standard full navigation. Selecting an item also dismisses the
+ * compact drawer, while desktop navigation remains in place. `AppShell` puts
+ * its collapse control beside the application identity whenever the desktop
+ * sidebar is expanded, so the action appears on the region it will change.
+ */
+export function AppSidebar({ navigation, sidebarToggle }: AppSidebarProps) {
   const location = useLocation();
+  const sidebar = useSidebar();
 
   return (
-    <SidebarShell header={<SidebarHeader />} footer={<AuthAccountMenu />}>
+    <SidebarShell
+      header={
+        <>
+          <SidebarHeader />
+          {sidebarToggle && (
+            <div
+              data-shell-sidebar-toggle
+              data-sidebar-toggle-location="sidebar"
+              className="ml-auto flex shrink-0"
+            >
+              {sidebarToggle}
+            </div>
+          )}
+        </>
+      }
+      footer={<AuthAccountMenu />}
+      onNavigate={sidebar.closeDrawer}
+    >
       {navigation.map((section) => (
         <NavSection key={section.label} label={section.label}>
           {section.items.map((item) => (
@@ -133,6 +163,11 @@ export function DesktopSidebar({ navigation }: NavigationShellProps) {
   );
 }
 
+/**
+ * Keeps common destinations visible at medium widths. The Browse control
+ * still exposes the complete navigation, and the shell control can open the
+ * full sidebar as a drawer.
+ */
 export function NavigationRail({ navigation }: NavigationShellProps) {
   const location = useLocation();
   const allItems = navigationItems(navigation);
@@ -144,7 +179,7 @@ export function NavigationRail({ navigation }: NavigationShellProps) {
     : allItems.slice(0, 8);
 
   return (
-    <aside className="hidden h-full w-[68px] shrink-0 flex-col items-center border-r border-sap-border-soft bg-sap-sidebar py-4 text-sap-fg md:flex lg:hidden">
+    <aside className="hidden h-full w-[68px] shrink-0 flex-col items-center border-r border-sap-border-soft bg-sap-sidebar py-4 text-sap-fg md:flex">
       <SapportaMark size={22} />
       <nav aria-label="Primary" className="mt-6 flex flex-col gap-1.5">
         {items.map((item) => (
@@ -162,6 +197,10 @@ export function NavigationRail({ navigation }: NavigationShellProps) {
   );
 }
 
+/**
+ * Keeps a few frequent destinations within thumb reach. Browse exposes every
+ * destination, while the shell control remains available for the full drawer.
+ */
 export function MobileBottomNav({
   navigation,
   pickerNavigation,

@@ -26,7 +26,10 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@sapporta/ui/sheet";
-import { TopBar, TopBarButton } from "../../shell/components/TopBar";
+import {
+  PageHeader,
+  PageHeaderButton,
+} from "../../shell/components/PageHeader";
 import { FilterCardsBar } from "../filters/FilterCardsBar";
 import type {
   TGridLevelId,
@@ -177,7 +180,7 @@ function WideTableHeader<
 
   return (
     <>
-      <TopBar
+      <PageHeader
         title={tableLabel}
         subtitle={formatRecordCount(totalCount)}
         actions={
@@ -193,39 +196,39 @@ function WideTableHeader<
               <SearchInput value={query.search} onChange={query.setSearch} />
             )}
             {query.hasSort && (
-              <TopBarButton
+              <PageHeaderButton
                 tone="ghost"
                 icon={<X className="h-[12px] w-[12px]" />}
                 onClick={query.clearSort}
               >
                 Clear sort
-              </TopBarButton>
+              </PageHeaderButton>
             )}
-            <TopBarButton
+            <PageHeaderButton
               tone="ghost"
               href={exportUrl}
               download
               icon={<Download className="h-[12px] w-[12px]" />}
             >
               Export
-            </TopBarButton>
+            </PageHeaderButton>
             {deleteControl && (
-              <TopBarButton
+              <PageHeaderButton
                 tone="danger"
                 icon={<Trash2 className="h-[12px] w-[12px]" />}
                 onClick={deleteControl.onRequest}
               >
                 {deleteRowsLabel(deleteControl.count)}
-              </TopBarButton>
+              </PageHeaderButton>
             )}
             {onNewRecord && (
-              <TopBarButton
+              <PageHeaderButton
                 tone="primary"
                 icon={<Plus className="h-[12px] w-[12px]" />}
                 onClick={onNewRecord}
               >
                 New record
-              </TopBarButton>
+              </PageHeaderButton>
             )}
           </>
         }
@@ -284,7 +287,10 @@ function NarrowCardTableHeader<
         }`;
 
   return (
-    <div className="sticky top-0 z-[var(--sap-z-shell-sticky)] border-b border-sap-border-soft bg-sap-surface/95">
+    <div
+      data-page-header
+      className="z-[var(--sap-z-shell-sticky)] shrink-0 border-b border-sap-border-soft bg-sap-surface/95"
+    >
       <div className="flex flex-col gap-2 px-3 py-2">
         <div className="flex min-w-0 items-center gap-2">
           <div className="min-w-0 flex-1">

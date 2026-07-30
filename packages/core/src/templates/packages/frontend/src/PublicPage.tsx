@@ -6,6 +6,7 @@
  * application explicitly intends to expose.
  */
 import { useEffect, useState } from "react";
+import { AppPage } from "@sapporta/frontend/layout";
 
 type PublicSampleState =
   | { kind: "loading" }
@@ -31,9 +32,14 @@ export function PublicPage() {
   }, []);
 
   return (
-    <main className="min-h-screen bg-sap-surface px-8 py-10 text-sap-fg">
+    <AppPage
+      title="Public page"
+      bodyClassName="bg-sap-surface px-8 py-10 text-sap-fg"
+    >
       <div className="mx-auto max-w-[560px] space-y-4">
-        <h1 className="text-[28px] font-semibold leading-tight">Public page</h1>
+        <p className="text-sap-body text-sap-muted">
+          This page is available without signing in.
+        </p>
         <div className="rounded-md border border-sap-border bg-sap-sidebar px-4 py-3 text-sap-data">
           {sample.kind === "loading"
             ? "Loading..."
@@ -42,6 +48,6 @@ export function PublicPage() {
               : sample.message}
         </div>
       </div>
-    </main>
+    </AppPage>
   );
 }

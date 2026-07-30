@@ -6,6 +6,7 @@
 import { useEffect } from "react";
 import { useParams } from "react-router-dom";
 import { useSchemaStore } from "../../schema-catalog/state/schema-store";
+import { AppPage } from "../../shell/components/Page";
 import { TablePage, type TablePageGridOptions } from "../page/TablePage";
 
 export type TableGridOptionsByTable = Record<string, TablePageGridOptions>;
@@ -28,9 +29,12 @@ export function TableRoute({ gridOptionsByTable }: TableRouteProps) {
   if (!loaded) return null;
   if (!tableName || !tableSchema) {
     return (
-      <div className="flex items-center justify-center h-full text-sap-muted">
-        Table not found
-      </div>
+      <AppPage
+        title="Table not found"
+        bodyClassName="flex items-center justify-center text-sap-muted"
+      >
+        We could not find the schema for "{tableName}".
+      </AppPage>
     );
   }
 

@@ -7,6 +7,7 @@ import {
   SchemaTableGridView,
   type SchemaTableGridViewProps,
 } from "./SchemaTableGridView";
+import { AppPage } from "../../shell/components/Page";
 
 export type TablePageGridOptions = Omit<
   // These values come from the current table route. Pass grid options for
@@ -30,9 +31,12 @@ export function TablePage({ tableName, gridOptions }: TablePageProps) {
 
   if (!tableSchema) {
     return (
-      <div className="flex items-center justify-center h-full text-sap-muted">
+      <AppPage
+        title="Table not found"
+        bodyClassName="flex items-center justify-center text-sap-muted"
+      >
         We could not find the schema for "{tableName}".
-      </div>
+      </AppPage>
     );
   }
 

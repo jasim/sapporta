@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { useParams } from "react-router-dom";
 import { useSchemaStore } from "../../schema-catalog/state/schema-store";
+import { AppPage } from "../../shell/components/Page";
 import { NewRecordPage } from "../form/NewRecordPage";
 
 export function NewRecordRoute() {
@@ -16,9 +17,12 @@ export function NewRecordRoute() {
   if (!loaded) return null;
   if (!tableName || !tableSchema) {
     return (
-      <div className="flex items-center justify-center h-full text-sap-muted">
-        Table not found
-      </div>
+      <AppPage
+        title="Table not found"
+        bodyClassName="flex items-center justify-center text-sap-muted"
+      >
+        We could not find the schema for "{tableName}".
+      </AppPage>
     );
   }
 

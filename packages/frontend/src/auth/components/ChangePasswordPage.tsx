@@ -8,6 +8,7 @@ import { Label } from "@sapporta/ui/label";
 import { errorMessage } from "../../platform/http";
 import { changePassword } from "../api/auth-context";
 import { useAuthStore } from "../state/auth-store";
+import { AppPage } from "../../shell/components/Page";
 
 export function ChangePasswordPage() {
   const navigate = useNavigate();
@@ -20,17 +21,23 @@ export function ChangePasswordPage() {
 
   if (session.kind === "unknown" || session.kind === "loading") {
     return (
-      <div className="flex h-full items-center justify-center text-sap-muted">
+      <AppPage
+        title="Change password"
+        bodyClassName="flex items-center justify-center text-sap-muted"
+      >
         Loading...
-      </div>
+      </AppPage>
     );
   }
 
   if (session.kind !== "authenticated") {
     return (
-      <div className="flex h-full items-center justify-center text-sap-muted">
+      <AppPage
+        title="Change password"
+        bodyClassName="flex items-center justify-center text-sap-muted"
+      >
         Not signed in.
-      </div>
+      </AppPage>
     );
   }
 
@@ -56,7 +63,7 @@ export function ChangePasswordPage() {
   }
 
   return (
-    <div className="min-h-full bg-sap-surface">
+    <AppPage title="Change password">
       <div className="mx-auto w-full max-w-[760px] px-6 py-8">
         <Link
           className={buttonVariants({
@@ -69,19 +76,16 @@ export function ChangePasswordPage() {
           Back to profile
         </Link>
 
-        <header className="mb-7 flex items-start gap-3">
+        <div className="mb-7 flex items-start gap-3">
           <span className="inline-flex size-12 shrink-0 items-center justify-center rounded-[7px] bg-sap-active-nav text-sap-brand">
             <KeyRound className="size-5" strokeWidth={1.7} />
           </span>
           <div className="min-w-0">
-            <h1 className="text-[22px] font-[680] leading-tight text-sap-fg">
-              Change password
-            </h1>
             <p className="mt-1 text-sap-body text-sap-muted">
               Enter your current password, then choose a new one.
             </p>
           </div>
-        </header>
+        </div>
 
         <form className="flex max-w-[420px] flex-col gap-5" onSubmit={submit}>
           <PasswordField
@@ -117,7 +121,7 @@ export function ChangePasswordPage() {
           </div>
         </form>
       </div>
-    </div>
+    </AppPage>
   );
 }
 

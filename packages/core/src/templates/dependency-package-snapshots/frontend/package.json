@@ -106,8 +106,8 @@
       "default": "./dist/lookup.js"
     },
     "./layout": {
-      "types": "./dist/shell/components/SidebarShell.d.ts",
-      "sapporta:source": "./src/shell/components/SidebarShell.tsx",
+      "types": "./dist/layout.d.ts",
+      "sapporta:source": "./src/layout.ts",
       "default": "./dist/layout.js"
     },
     "./shell": {
