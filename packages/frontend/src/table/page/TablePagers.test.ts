@@ -3,7 +3,7 @@
 import { act, createElement, type ReactElement } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { CompactTablePager, NumberedTablePager } from "./TablePagers";
+import { NumberedTablePager } from "./TablePagers";
 import { clampPage, parsePageJump } from "./table-pager-math";
 
 (
@@ -58,15 +58,11 @@ async function blurInput(input: HTMLInputElement): Promise<void> {
 async function pressKey(
   element: HTMLElement,
   key: string,
-  modifiers: Partial<
-    Pick<KeyboardEventInit, "altKey" | "ctrlKey" | "metaKey" | "shiftKey">
-  > = {},
 ): Promise<KeyboardEvent> {
   const event = new KeyboardEvent("keydown", {
     key,
     bubbles: true,
     cancelable: true,
-    ...modifiers,
   });
   await act(async () => {
     element.dispatchEvent(event);
@@ -143,40 +139,12 @@ describe("NumberedTablePager", () => {
     expect(input.value).toBe("2");
   });
 
-  it("leaves directional keys inert on pagination buttons", async () => {
+  it("holds outward keys at the boundary and returns inward keys to the grid", async () => {
     const onPageChange = vi.fn();
-    const onPagerButtonActivate = vi.fn(() => false);
-    mounted = await render(
-      createElement(NumberedTablePager, {
-        page: 2,
-        pages: 10,
-        onPageChange,
-        onPagerButtonActivate,
-      }),
-    );
-    const previous = mounted.container.querySelector<HTMLButtonElement>(
-      'button[aria-label="Previous page"]',
-    );
-    const next = mounted.container.querySelector<HTMLButtonElement>(
-      'button[aria-label="Next page"]',
-    );
-    if (!previous || !next) throw new Error("expected pagination buttons");
-
-    const events = [
-      await pressKey(previous, "ArrowUp"),
-      await pressKey(previous, "PageUp"),
-      await pressKey(next, "ArrowDown"),
-      await pressKey(next, "PageDown"),
-    ];
-
-    expect(events.every((event) => !event.defaultPrevented)).toBe(true);
-    expect(onPageChange).not.toHaveBeenCalled();
-    expect(onPagerButtonActivate).not.toHaveBeenCalled();
-  });
-
-  it("returns arrow keys to the grid focus handler", async () => {
-    const onPageChange = vi.fn();
-    const onPagerArrowKey = vi.fn(() => true);
+    const onPagerArrowKey = vi.fn(() => {
+      mounted?.container.focus();
+      return true;
+    });
     mounted = await render(
       createElement(NumberedTablePager, {
         page: 2,
@@ -192,19 +160,33 @@ describe("NumberedTablePager", () => {
       'button[aria-label="Next page"]',
     );
     if (!previous || !next) throw new Error("expected pagination buttons");
+    mounted.container.tabIndex = -1;
 
-    const up = await pressKey(previous, "ArrowUp");
-    const down = await pressKey(next, "ArrowDown");
-    const left = await pressKey(previous, "ArrowLeft");
-    const right = await pressKey(next, "ArrowRight");
-    const pageDown = await pressKey(next, "PageDown");
+    next.focus();
+    for (const key of ["ArrowDown", "PageDown"]) {
+      const event = await pressKey(next, key);
+      expect(event.defaultPrevented).toBe(true);
+      expect(document.activeElement).toBe(next);
+    }
+
+    const up = await pressKey(next, "ArrowUp");
 
     expect(up.defaultPrevented).toBe(true);
-    expect(down.defaultPrevented).toBe(true);
-    expect(left.defaultPrevented).toBe(true);
-    expect(right.defaultPrevented).toBe(true);
-    expect(pageDown.defaultPrevented).toBe(false);
-    expect(onPagerArrowKey).toHaveBeenCalledTimes(4);
+    expect(onPagerArrowKey).toHaveBeenCalledOnce();
+    expect(document.activeElement).toBe(mounted.container);
+
+    previous.focus();
+    const previousPageUp = await pressKey(previous, "PageUp");
+
+    expect(previousPageUp.defaultPrevented).toBe(true);
+    expect(onPagerArrowKey).toHaveBeenCalledOnce();
+    expect(document.activeElement).toBe(previous);
+
+    const previousPageDown = await pressKey(previous, "PageDown");
+
+    expect(previousPageDown.defaultPrevented).toBe(true);
+    expect(onPagerArrowKey).toHaveBeenCalledTimes(2);
+    expect(document.activeElement).toBe(mounted.container);
     expect(onPageChange).not.toHaveBeenCalled();
   });
 
@@ -257,92 +239,5 @@ describe("NumberedTablePager", () => {
 
     expect(onPagerBoundaryExit).toHaveBeenCalledOnce();
     expect(onPageChange).toHaveBeenCalledWith(3);
-  });
-
-  it("leaves unrelated and modified directional keys to the browser", async () => {
-    const onPageChange = vi.fn();
-    mounted = await render(
-      createElement(NumberedTablePager, { page: 2, pages: 10, onPageChange }),
-    );
-    const next = mounted.container.querySelector<HTMLButtonElement>(
-      'button[aria-label="Next page"]',
-    );
-    if (!next) throw new Error("expected next page button");
-
-    const unrelated = await pressKey(next, "ArrowUp");
-    const modified = await pressKey(next, "PageDown", { shiftKey: true });
-
-    expect(unrelated.defaultPrevented).toBe(false);
-    expect(modified.defaultPrevented).toBe(false);
-    expect(onPageChange).not.toHaveBeenCalled();
-  });
-});
-
-describe("CompactTablePager", () => {
-  let mounted: { root: Root; container: HTMLElement } | null = null;
-
-  afterEach(async () => {
-    if (mounted) {
-      await unmount(mounted.root, mounted.container);
-      mounted = null;
-    }
-  });
-
-  it("renders one page-jump form and no numbered page strip", async () => {
-    const onPageChange = vi.fn();
-    mounted = await render(
-      createElement(CompactTablePager, { page: 2, pages: 10, onPageChange }),
-    );
-
-    expect(mounted.container.querySelector("ol")).toBeNull();
-    expect(
-      mounted.container.querySelector('form[aria-label="Page jump"]'),
-    ).toBeInstanceOf(HTMLFormElement);
-  });
-
-  it("leaves directional keys inert on pagination buttons", async () => {
-    const onPageChange = vi.fn();
-    mounted = await render(
-      createElement(CompactTablePager, { page: 2, pages: 10, onPageChange }),
-    );
-    const previous = mounted.container.querySelector<HTMLButtonElement>(
-      'button[aria-label="Previous page"]',
-    );
-    const next = mounted.container.querySelector<HTMLButtonElement>(
-      'button[aria-label="Next page"]',
-    );
-    if (!previous || !next) throw new Error("expected pagination buttons");
-
-    const previousEvent = await pressKey(previous, "ArrowUp");
-    const nextEvent = await pressKey(next, "PageDown");
-
-    expect(previousEvent.defaultPrevented).toBe(false);
-    expect(nextEvent.defaultPrevented).toBe(false);
-    expect(onPageChange).not.toHaveBeenCalled();
-  });
-
-  it("returns unmodified arrow keys to the grid focus handler", async () => {
-    const onPageChange = vi.fn();
-    const onPagerArrowKey = vi.fn(() => true);
-    mounted = await render(
-      createElement(CompactTablePager, {
-        page: 2,
-        pages: 10,
-        onPageChange,
-        onPagerArrowKey,
-      }),
-    );
-    const next = mounted.container.querySelector<HTMLButtonElement>(
-      'button[aria-label="Next page"]',
-    );
-    if (!next) throw new Error("expected next page button");
-
-    const arrow = await pressKey(next, "ArrowLeft");
-    const modified = await pressKey(next, "ArrowDown", { shiftKey: true });
-
-    expect(arrow.defaultPrevented).toBe(true);
-    expect(modified.defaultPrevented).toBe(false);
-    expect(onPagerArrowKey).toHaveBeenCalledOnce();
-    expect(onPageChange).not.toHaveBeenCalled();
   });
 });

@@ -104,7 +104,7 @@ export function NumberedTablePager({
           disabled={safePage <= 1}
           onClick={() => goToPage(safePage - 1, "before")}
           onKeyDown={(event) =>
-            returnGridFocusFromPagerArrow(event, onPagerArrowKey)
+            handlePagerBoundaryKey(event, "before", onPagerArrowKey)
           }
           onBlur={onPagerBoundaryExit}
           className="flex h-11 min-w-[84px] shrink-0 items-center justify-center gap-[5px] rounded-[6px] border border-sap-border-soft bg-sap-surface px-[12px] text-sap-emph text-sap-soft hover:bg-sap-row-hover hover:text-sap-fg focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-40"
@@ -141,7 +141,7 @@ export function NumberedTablePager({
           disabled={safePage >= pages}
           onClick={() => goToPage(safePage + 1, "after")}
           onKeyDown={(event) =>
-            returnGridFocusFromPagerArrow(event, onPagerArrowKey)
+            handlePagerBoundaryKey(event, "after", onPagerArrowKey)
           }
           onBlur={onPagerBoundaryExit}
           className="flex h-11 min-w-[84px] shrink-0 items-center justify-center gap-[5px] rounded-[6px] border border-sap-border-soft bg-sap-surface px-[12px] text-sap-emph text-sap-soft hover:bg-sap-row-hover hover:text-sap-fg focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-40"
@@ -263,7 +263,7 @@ export function CompactTablePager({
         disabled={safePage <= 1}
         onClick={() => goToPage(safePage - 1, "before")}
         onKeyDown={(event) =>
-          returnGridFocusFromPagerArrow(event, onPagerArrowKey)
+          handlePagerBoundaryKey(event, "before", onPagerArrowKey)
         }
         onBlur={onPagerBoundaryExit}
         className="flex h-10 w-10 items-center justify-center rounded-[6px] border border-sap-border-soft bg-sap-surface text-sap-soft hover:bg-sap-row-hover hover:text-sap-fg focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-40"
@@ -298,7 +298,7 @@ export function CompactTablePager({
         disabled={safePage >= pages}
         onClick={() => goToPage(safePage + 1, "after")}
         onKeyDown={(event) =>
-          returnGridFocusFromPagerArrow(event, onPagerArrowKey)
+          handlePagerBoundaryKey(event, "after", onPagerArrowKey)
         }
         onBlur={onPagerBoundaryExit}
         className="flex h-10 w-10 items-center justify-center rounded-[6px] border border-sap-border-soft bg-sap-surface text-sap-soft hover:bg-sap-row-hover hover:text-sap-fg focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-40"
@@ -310,8 +310,9 @@ export function CompactTablePager({
   );
 }
 
-function returnGridFocusFromPagerArrow(
+function handlePagerBoundaryKey(
   event: KeyboardEvent<HTMLButtonElement>,
+  buttonDirection: TablePagerDirection,
   onPagerArrowKey: (() => boolean) | undefined,
 ): void {
   if (
@@ -319,13 +320,35 @@ function returnGridFocusFromPagerArrow(
     event.ctrlKey ||
     event.metaKey ||
     event.shiftKey ||
-    (event.key !== "ArrowUp" &&
-      event.key !== "ArrowDown" &&
-      event.key !== "ArrowLeft" &&
-      event.key !== "ArrowRight")
+    !onPagerArrowKey
   ) {
     return;
   }
-  if (!onPagerArrowKey?.()) return;
+
+  const keyDirection =
+    event.key === "ArrowUp" || event.key === "PageUp"
+      ? "before"
+      : event.key === "ArrowDown" || event.key === "PageDown"
+        ? "after"
+        : undefined;
+
+  // Row navigation parks on Next or Previous at a page boundary. Repeating the
+  // outward Arrow/Page key must keep focus parked here and suppress document
+  // scrolling; activating the button changes pages, while the opposite
+  // direction returns focus to the boundary row in the grid.
+  if (keyDirection === buttonDirection) {
+    event.preventDefault();
+    return;
+  }
+
+  if (
+    keyDirection === undefined &&
+    event.key !== "ArrowLeft" &&
+    event.key !== "ArrowRight"
+  ) {
+    return;
+  }
+
+  if (!onPagerArrowKey()) return;
   event.preventDefault();
 }
