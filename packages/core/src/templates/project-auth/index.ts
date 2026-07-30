@@ -162,6 +162,7 @@ export {
   type ResolveSapportaAuthContextInput,
 } from "./context.js";
 export {
+  isEmailVerificationRequired,
   readProjectAuthEnv,
   type MailTransportKind,
   type ProjectAuthEnv,

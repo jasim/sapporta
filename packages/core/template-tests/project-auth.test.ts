@@ -40,7 +40,10 @@ import type {
   AppWorkspaceMembership,
 } from "../src/templates/packages/api/authz/types.js";
 import { buildAbility as buildTemplateAbility } from "../src/templates/packages/api/authz/ability.js";
-import { readProjectAuthEnv } from "../src/templates/project-auth/env.js";
+import {
+  isEmailVerificationRequired,
+  readProjectAuthEnv,
+} from "../src/templates/project-auth/env.js";
 import {
   WorkspaceSwitchError,
   ensureActiveWorkspace,
@@ -85,6 +88,33 @@ describe("project auth template", () => {
         transport: "stream",
       },
     });
+  });
+
+  it("applies explicit email verification requirements before the environment default", () => {
+    expect(
+      isEmailVerificationRequired({
+        explicitRequirement: undefined,
+        nodeEnv: "development",
+      }),
+    ).toBe(false);
+    expect(
+      isEmailVerificationRequired({
+        explicitRequirement: undefined,
+        nodeEnv: "production",
+      }),
+    ).toBe(true);
+    expect(
+      isEmailVerificationRequired({
+        explicitRequirement: true,
+        nodeEnv: "development",
+      }),
+    ).toBe(true);
+    expect(
+      isEmailVerificationRequired({
+        explicitRequirement: false,
+        nodeEnv: "production",
+      }),
+    ).toBe(false);
   });
 
   it("trusts the public base URL origin", () => {

@@ -34,6 +34,9 @@ packages/shared/    API contracts and types shared by backend and frontend
 - `.env.development` is for local development and is ignored by git.
 - `.env.production.example` lists the production variables to set in your
   deployment environment.
+- Email verification is required by default when `NODE_ENV=production` and is
+  not required otherwise. Set `SAPPORTA_REQUIRE_VERIFIED_EMAIL=true` or `false`
+  to override that default.
 - `SAPPORTA_API_PORT` controls the API server port. Managed hosts may provide
   the conventional `PORT` variable instead. If both are set, they must match.
 - `SAPPORTA_FRONTEND_PORT` controls the Vite frontend server port.

@@ -47,14 +47,26 @@ export function readProjectAuthEnv(
     betterAuthSecret: readRequiredEnv(env, "BETTER_AUTH_SECRET"),
     publicAppUrl,
     trustedOrigins: readTrustedOrigins(env, publicAppUrl),
-    requireVerifiedEmail: readBooleanEnv(
-      env.SAPPORTA_REQUIRE_VERIFIED_EMAIL,
-      "SAPPORTA_REQUIRE_VERIFIED_EMAIL",
-      true,
-    ),
+    requireVerifiedEmail: isEmailVerificationRequired({
+      explicitRequirement: readOptionalBooleanEnv(
+        env.SAPPORTA_REQUIRE_VERIFIED_EMAIL,
+        "SAPPORTA_REQUIRE_VERIFIED_EMAIL",
+      ),
+      nodeEnv: env.NODE_ENV,
+    }),
     healthPolicy: readHealthPolicy(env.SAPPORTA_HEALTH_POLICY),
     mail: readMailConfig(env),
   };
+}
+
+export function isEmailVerificationRequired({
+  explicitRequirement,
+  nodeEnv,
+}: {
+  explicitRequirement: boolean | undefined;
+  nodeEnv: string | undefined;
+}): boolean {
+  return explicitRequirement ?? (nodeEnv === "production");
 }
 
 function readMailConfig(env: NodeJS.ProcessEnv): ProjectMailConfig {
@@ -134,7 +146,14 @@ function readBooleanEnv(
   name: string,
   fallback: boolean,
 ): boolean {
-  if (value === undefined || value === "") return fallback;
+  return readOptionalBooleanEnv(value, name) ?? fallback;
+}
+
+function readOptionalBooleanEnv(
+  value: string | undefined,
+  name: string,
+): boolean | undefined {
+  if (value === undefined || value === "") return undefined;
   if (value === "true") return true;
   if (value === "false") return false;
   throw new Error(`${name} must be "true" or "false".`);

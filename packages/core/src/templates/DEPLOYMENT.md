@@ -39,6 +39,10 @@ Shape (c) loses both; its extra configuration follows from that.
 - `.env.production.example` — placeholder production values. Copy the values
   into your deployment environment; `pnpm start` does not load development env.
 
+Email verification is required by default when `NODE_ENV=production` and is
+not required in other modes. Set `SAPPORTA_REQUIRE_VERIFIED_EMAIL=true` or
+`false` to override that default explicitly.
+
 `SAPPORTA_API_PORT` is the explicit application setting for the Hono listener.
 If it is absent, Sapporta accepts the conventional `PORT` value assigned by
 managed hosting platforms. The API defaults to `3000` when neither is set. If
@@ -221,13 +225,14 @@ Fit:
 
 | Variable                          | Read from            | Dev | (a)      | (b)      | (c)      | Purpose                                                                       |
 | --------------------------------- | -------------------- | --- | -------- | -------- | -------- | ----------------------------------------------------------------------------- |
+| `NODE_ENV`                        | API host process env | —   | yes      | yes      | yes      | Runtime mode. `production` requires verified email by default.                |
 | `SAPPORTA_API_PORT`               | API host process env | yes | yes      | yes      | yes      | Port Hono binds to. Defaults to `3000`.                                       |
 | `PORT`                            | API host process env | —   | yes      | yes      | yes      | Hosting-platform fallback when `SAPPORTA_API_PORT` is absent.                 |
 | `SAPPORTA_FRONTEND_PORT`          | Dev process env      | yes | —        | —        | —        | Vite frontend-server port. Match it to `SAPPORTA_PUBLIC_APP_URL` in dev.      |
 | `BETTER_AUTH_SECRET`              | API host process env | yes | yes      | yes      | yes      | Better Auth signing secret. Generated only for local development.             |
 | `SAPPORTA_PUBLIC_APP_URL`         | API host process env | yes | yes      | yes      | yes      | Public app origin used for Better Auth links, callbacks, and default trust.   |
 | `SAPPORTA_FRONTEND_ORIGINS`       | API host process env | yes | yes      | yes      | yes      | Extra browser origins trusted for credentialed API/auth requests.             |
-| `SAPPORTA_REQUIRE_VERIFIED_EMAIL` | API host process env | yes | optional | optional | optional | Whether email/password sign-up requires verified email.                       |
+| `SAPPORTA_REQUIRE_VERIFIED_EMAIL` | API host process env | optional | optional | optional | optional | Explicit override for the environment-based email verification default.      |
 | `SAPPORTA_HEALTH_POLICY`          | API host process env | yes | optional | optional | optional | Access policy for health endpoints: `public`, `authenticated`, or `disabled`. |
 | `SAPPORTA_MAIL_TRANSPORT`         | API host process env | yes | yes      | yes      | yes      | Mail transport: `stream`, `smtp`, or `disabled`.                              |
 | `SAPPORTA_MAIL_FROM`              | API host process env | yes | yes      | yes      | yes      | Default sender address for Better Auth and custom app emails.                 |
