@@ -17,35 +17,69 @@ import { valueKindSchema } from "./value-kind-schema.js";
  * Grid dataset columns live in `@sapporta/shared/grid-dataset`.
  */
 
-/** Maps target (table filter / report param) name → source column name on
- *  the current row. */
+/** Maps target (table filter / report param / URL query param) name → source
+ *  column name on the current row. */
 export const linkBindSchema = z.record(z.string(), z.string());
 export type LinkBind = z.output<typeof linkBindSchema>;
 
 /** Visual hint for which icon the UI should render.
  *  - drill-up:   jump to a single referenced row (FK drill-up)
  *  - drill-into: browse a filtered collection (master→children)
- *  - report:     open another report */
-export const linkIconSchema = z.enum(["drill-up", "drill-into", "report"]);
+ *  - report:     open another report
+ *  - external:   leave the app (arbitrary URL) */
+export const linkIconSchema = z.enum([
+  "drill-up",
+  "drill-into",
+  "report",
+  "external",
+]);
 export type LinkIcon = z.output<typeof linkIconSchema>;
 
-export const reportLinkSchema = z.discriminatedUnion("kind", [
+export const linkTargetSchema = z.enum(["_self", "_blank"]);
+export type LinkTarget = z.output<typeof linkTargetSchema>;
+
+/**
+ * A declarative navigation link carried by schema metadata and report
+ * datasets. `bind` names the values the destination needs, sourced from the
+ * current row: for `table` links each entry becomes an equality filter on the
+ * destination table; for `report` links each entry becomes a query parameter
+ * on the report route; for `url` links each entry becomes a query parameter
+ * on the given href (which may also embed `{column}` placeholders).
+ *
+ * A link only resolves when every bound source value is present on the row —
+ * rows with NULL sources simply don't offer that link.
+ */
+export const navLinkSchema = z.discriminatedUnion("kind", [
   z.object({
     kind: z.literal("table"),
     table: z.string(),
     bind: linkBindSchema,
     label: z.string().optional(),
     icon: linkIconSchema.optional(),
+    target: linkTargetSchema.optional(),
   }),
   z.object({
     kind: z.literal("report"),
+    /** Report route: either an absolute app path ("/reports/aging") or a
+     *  bare report name resolved as "/reports/<name>". */
     report: z.string(),
     bind: linkBindSchema,
     label: z.string().optional(),
     icon: linkIconSchema.optional(),
+    target: linkTargetSchema.optional(),
+  }),
+  z.object({
+    kind: z.literal("url"),
+    /** Destination href. `{column}` placeholders are substituted with the
+     *  row's URL-encoded values. */
+    href: z.string(),
+    bind: linkBindSchema.optional(),
+    label: z.string().optional(),
+    icon: linkIconSchema.optional(),
+    target: linkTargetSchema.optional(),
   }),
 ]);
-export type ReportLink = z.output<typeof reportLinkSchema>;
+export type NavLink = z.output<typeof navLinkSchema>;
 
 export const foreignKeyRefSchema = z.object({
   table: z.string(),
@@ -79,7 +113,7 @@ export const columnSchemaSchema = z.object({
   strong: z.boolean().optional(),
   notes: z.string().optional(),
   apiWritable: z.boolean().optional(),
-  links: z.array(reportLinkSchema).optional(),
+  links: z.array(navLinkSchema).optional(),
 });
 export type ColumnSchema = z.output<typeof columnSchemaSchema>;
 
@@ -99,7 +133,7 @@ export const tableSchemaSchema = z.object({
   immutable: z.boolean(),
   columns: z.array(columnSchemaSchema),
   children: z.array(childSchemaSchema),
-  rowLinks: z.array(reportLinkSchema).optional(),
+  rowLinks: z.array(navLinkSchema).optional(),
   rowLabelColumns: z.array(z.string()).nonempty(),
   rowCount: z.number().optional(),
   searchable: z.boolean(),

@@ -382,7 +382,6 @@ describe("ReportGridDataset", () => {
             {
               label: "Open account",
               href: `/tables/accounts/${node.columns.account_id}`,
-              kind: "record",
             },
           ],
         },
@@ -393,7 +392,6 @@ describe("ReportGridDataset", () => {
             {
               label: "Open journal",
               href: `/tables/journals/${node.columns.journal_id}`,
-              kind: "record",
             },
           ],
         },
@@ -412,6 +410,79 @@ describe("ReportGridDataset", () => {
     expect(container.innerHTML).toContain('href="/tables/journals/journal-1"');
     expect(container.textContent).toContain("125.00");
     expect(container.textContent).not.toContain("$125.00");
+  });
+
+  it("renders declarative dataset column links without app resolvers", async () => {
+    const dataset = {
+      name: "receivables",
+      label: "Receivables",
+      rootLevel: "customer",
+      levels: {
+        customer: {
+          columns: [
+            {
+              id: "customer_id",
+              label: "Customer ID",
+              kind: "text",
+              visuallyHidden: true,
+            },
+            {
+              id: "name",
+              label: "Customer",
+              kind: "text",
+              links: [
+                {
+                  kind: "table",
+                  table: "invoices",
+                  bind: { customer_id: "customer_id" },
+                  label: "Open invoices",
+                },
+              ],
+            },
+            { id: "balance", label: "Balance", kind: "number" },
+          ],
+          childLevels: [],
+          rowLinks: [
+            {
+              kind: "report",
+              report: "customer-statement",
+              bind: { customer_id: "customer_id" },
+              label: "Customer statement",
+            },
+          ],
+        },
+      },
+      nodes: [
+        {
+          rowKey: "cust-1",
+          levelName: "customer",
+          columns: { customer_id: "cust-1", name: "Acme", balance: 900 },
+        },
+        {
+          rowKey: "subtotal",
+          levelName: "customer",
+          kind: "subtotal",
+          columns: { customer_id: "x", name: "Subtotal", balance: 900 },
+        },
+      ],
+    } satisfies GridDataset;
+
+    const container = await renderClient(
+      createElement(ReportGridDataset, { dataset }),
+    );
+
+    await waitForText(container, "Acme");
+    // Declarative table link resolves the bind into an equality filter URL.
+    const nameCell = cellByColumn(container, "name", "Acme");
+    const anchor = nameCell.querySelector("a");
+    expect(anchor).not.toBeNull();
+    expect(anchor!.getAttribute("href")).toContain("/tables/invoices?");
+    expect(anchor!.getAttribute("href")).toContain("customer_id");
+    expect(anchor!.getAttribute("href")).toContain("cust-1");
+
+    // Synthetic rows never resolve declarative links.
+    const subtotalCell = cellByColumn(container, "name", "Subtotal");
+    expect(subtotalCell.querySelector("a")).toBeNull();
   });
 
   it("does not render drill-down links for footer rows", async () => {
@@ -447,7 +518,6 @@ describe("ReportGridDataset", () => {
       {
         label: "Open account",
         href: `/reports/accounts/${context.node.columns.account}`,
-        kind: "route" as const,
       },
     ]);
     const links = {

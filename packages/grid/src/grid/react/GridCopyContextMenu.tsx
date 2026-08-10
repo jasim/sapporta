@@ -12,17 +12,28 @@ import { eventTargetIsWithin } from "./internal/dom-targets";
 
 export type GridCopyContextMenuProps = {
   children: ReactNode;
+  /**
+   * Domain-supplied menu entries appended after the copy items. Receives the
+   * grid target the menu was opened on (null outside cells). Consumers use
+   * this for schema-derived contributions such as row and cell links; the
+   * grid itself stays domain-agnostic.
+   */
+  renderExtraItems?: (target: GridCopyTarget | null) => ReactNode;
 };
 
-export function GridCopyContextMenu({ children }: GridCopyContextMenuProps) {
+export function GridCopyContextMenu({
+  children,
+  renderExtraItems,
+}: GridCopyContextMenuProps) {
   const runtime = useGridRuntime();
   const targetRef = useRef<GridCopyTarget | null>(null);
-  const [hasCopyTarget, setHasCopyTarget] = useState(false);
+  const [menuTarget, setMenuTarget] = useState<GridCopyTarget | null>(null);
+  const hasCopyTarget = menuTarget !== null;
 
   function prepareTarget(eventTarget: EventTarget | null): void {
     const target = prepareGridCopyTarget(runtime, eventTarget);
     targetRef.current = target;
-    setHasCopyTarget(target !== null);
+    setMenuTarget(target);
   }
 
   async function copy(includeHeaders: boolean): Promise<void> {
@@ -74,6 +85,7 @@ export function GridCopyContextMenu({ children }: GridCopyContextMenuProps) {
         >
           Copy with headers
         </ContextMenuItem>
+        {renderExtraItems?.(menuTarget)}
       </ContextMenuContent>
     </ContextMenu>
   );

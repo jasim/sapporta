@@ -6,14 +6,21 @@ import {
   GridLevel,
   GridRuntimeProvider,
   type GridChromeContext,
+  type GridCopyTarget,
   type GridLevelChrome,
   type GridPresentation,
   type GridRuntime,
+  type LevelRow,
 } from "@sapporta/grid";
 import { columnPreset } from "@sapporta/grid/column-preset";
 import type { TableSchema } from "@sapporta/shared/contracts";
 import { cn } from "@sapporta/ui/cn";
 import { relatedRowsTableHref } from "../grid-adapter/tgrid-table-url";
+import {
+  resolveTGridCellLinks,
+  resolveTGridRowLinks,
+} from "../grid-adapter/tgrid-cell-links";
+import { LinkMenuItems } from "../../links/LinkMenuItems";
 import type { TGridFilter } from "../grid-adapter/tgrid-filter";
 import type { TGridTableColumnMeta } from "../grid-adapter/tgrid-column-mapper";
 import { renderTGridHeaderMenu } from "../grid-adapter/tgrid-header-menu";
@@ -131,7 +138,11 @@ export function TGrid<
 
   return (
     <GridRuntimeProvider runtime={runtime}>
-      <GridCopyContextMenu>
+      <GridCopyContextMenu
+        renderExtraItems={(target) =>
+          renderTGridLinkMenuItems(sessionContext, runtime, target)
+        }
+      >
         {withTGridSessionContext(
           sessionContext as unknown as TGridSessionContext<
             TGridRowsByLevel,
@@ -340,4 +351,39 @@ function resolveRelatedRowsLink(
 function compactLevelName(levelName: string): string {
   const dot = levelName.lastIndexOf(".");
   return dot >= 0 ? levelName.slice(dot + 1) : levelName;
+}
+
+/**
+ * Schema-derived context-menu contributions: the targeted cell's links first
+ * (FK drill-up, author-declared cell links), then the row's links (related
+ * data drill-into, cross-report). Renders nothing when the menu opened
+ * outside a data row or no link resolves.
+ */
+function renderTGridLinkMenuItems(
+  session: TGridRenderableSessionContext,
+  runtime: GridRuntime,
+  target: GridCopyTarget | null,
+) {
+  if (!target) return null;
+
+  let table: TableSchema | undefined;
+  let row: LevelRow | undefined;
+  try {
+    const level = runtime.level(target.path);
+    table = session.levels[level.schema.name]?.table;
+    row = level.displayedRow(target.selection.anchor.rowId);
+  } catch {
+    return null;
+  }
+  if (!table || !row) return null;
+
+  const column = table.columns.find(
+    (c) => c.name === target.selection.anchor.colId,
+  );
+  return (
+    <LinkMenuItems
+      cellLinks={column ? resolveTGridCellLinks(column, row) : []}
+      rowLinks={resolveTGridRowLinks(table.rowLinks, row)}
+    />
+  );
 }

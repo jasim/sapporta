@@ -335,6 +335,185 @@ describe("extractSchemas", () => {
     const [result] = extractSchemas([t]);
     expect(result.rowLinks).toBeUndefined();
   });
+
+  it("merges author-declared column links after the synthesized FK drill-up", () => {
+    const customersTable = sqliteTable("customers", {
+      id: integer("id").primaryKey({ autoIncrement: true }),
+      name: text("name").notNull(),
+    });
+    const ordersTable = sqliteTable("orders2", {
+      id: integer("id").primaryKey({ autoIncrement: true }),
+      customer_id: integer("customer_id")
+        .notNull()
+        .references(() => customersTable.id),
+    });
+
+    const customers = sapportaTable({
+      drizzle: customersTable,
+      meta: { label: "Customers", rowLabelColumns: ["name"] },
+    });
+    const orders = sapportaTable({
+      drizzle: ordersTable,
+      meta: {
+        label: "Orders",
+        rowLabelColumns: ["id"],
+        columns: {
+          customer_id: {
+            links: [
+              {
+                kind: "report",
+                report: "customer-statement",
+                bind: { customer_id: "customer_id" },
+                label: "Customer statement",
+              },
+            ],
+          },
+        },
+      },
+    });
+
+    const result = extractSchemas([customers, orders]);
+    const fkCol = result
+      .find((s) => s.name === "orders2")!
+      .columns.find((c) => c.name === "customer_id")!;
+    expect(fkCol.links).toHaveLength(2);
+    expect(fkCol.links![0].kind).toBe("table");
+    expect(fkCol.links![0].icon).toBe("drill-up");
+    expect(fkCol.links![1]).toMatchObject({
+      kind: "report",
+      report: "customer-statement",
+    });
+  });
+
+  it("puts author-declared rowLinks before synthesized child drill-intos", () => {
+    const parentTable = sqliteTable("parents", {
+      id: integer("id").primaryKey({ autoIncrement: true }),
+      name: text("name").notNull(),
+    });
+    const childTable = sqliteTable("kids", {
+      id: integer("id").primaryKey({ autoIncrement: true }),
+      parent_id: integer("parent_id")
+        .notNull()
+        .references(() => parentTable.id),
+    });
+
+    const parents = sapportaTable({
+      drizzle: parentTable,
+      meta: {
+        label: "Parents",
+        rowLabelColumns: ["name"],
+        children: [{ table: "kids", foreignKey: "parent_id" }],
+        rowLinks: [
+          {
+            kind: "report",
+            report: "parent-activity",
+            bind: { parent_id: "id" },
+            label: "Activity report",
+          },
+        ],
+      },
+    });
+    const kids = sapportaTable({
+      drizzle: childTable,
+      meta: { label: "Kids", rowLabelColumns: ["id"] },
+    });
+
+    const [parentSchema] = extractSchemas([parents, kids]);
+    expect(parentSchema.rowLinks).toHaveLength(2);
+    expect(parentSchema.rowLinks![0]).toMatchObject({
+      kind: "report",
+      report: "parent-activity",
+    });
+    expect(parentSchema.rowLinks![1]).toMatchObject({
+      kind: "table",
+      table: "kids",
+      icon: "drill-into",
+    });
+  });
+
+  it("rejects url links with placeholders naming unknown columns", () => {
+    const placeholderTable = sqliteTable("placeholder_rows", {
+      id: integer("id").primaryKey({ autoIncrement: true }),
+      name: text("name").notNull(),
+    });
+    const broken = sapportaTable({
+      drizzle: placeholderTable,
+      meta: {
+        label: "Placeholder",
+        rowLabelColumns: ["name"],
+        rowLinks: [
+          { kind: "url", href: "https://example.com/{missing_column}" },
+        ],
+      },
+    });
+    expect(() => extractSchemas([broken])).toThrow(
+      /unknown source column "missing_column"/,
+    );
+  });
+
+  it("rejects links bound to unknown source columns", () => {
+    const brokenTable = sqliteTable("broken", {
+      id: integer("id").primaryKey({ autoIncrement: true }),
+      name: text("name").notNull(),
+    });
+    const broken = sapportaTable({
+      drizzle: brokenTable,
+      meta: {
+        label: "Broken",
+        rowLabelColumns: ["name"],
+        rowLinks: [
+          {
+            kind: "report",
+            report: "somewhere",
+            bind: { param: "missing_column" },
+          },
+        ],
+      },
+    });
+    expect(() => extractSchemas([broken])).toThrow(
+      /unknown source column "missing_column"/,
+    );
+  });
+
+  it("rejects links to unknown tables and unknown target columns", () => {
+    const aTable = sqliteTable("a_rows", {
+      id: integer("id").primaryKey({ autoIncrement: true }),
+      name: text("name").notNull(),
+    });
+    const toMissingTable = sapportaTable({
+      drizzle: aTable,
+      meta: {
+        label: "A",
+        rowLabelColumns: ["name"],
+        rowLinks: [{ kind: "table", table: "nope", bind: { x: "id" } }],
+      },
+    });
+    expect(() => extractSchemas([toMissingTable])).toThrow(
+      /unknown table "nope"/,
+    );
+
+    const bTable = sqliteTable("b_rows", {
+      id: integer("id").primaryKey({ autoIncrement: true }),
+      label: text("label").notNull(),
+    });
+    const b = sapportaTable({
+      drizzle: bTable,
+      meta: { label: "B", rowLabelColumns: ["label"] },
+    });
+    const toMissingColumn = sapportaTable({
+      drizzle: aTable,
+      meta: {
+        label: "A",
+        rowLabelColumns: ["name"],
+        rowLinks: [
+          { kind: "table", table: "b_rows", bind: { not_a_column: "id" } },
+        ],
+      },
+    });
+    expect(() => extractSchemas([toMissingColumn, b])).toThrow(
+      /unknown column "not_a_column" on table "b_rows"/,
+    );
+  });
 });
 
 describe("search config surfacing", () => {

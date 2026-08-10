@@ -38,6 +38,11 @@ export * from "./grid-adapter/tgrid-column-spec";
 export * from "./grid-adapter/tgrid-filter";
 export * from "./grid-adapter/tgrid-level-config";
 export * from "./grid-adapter/tgrid-column-mapper";
+export {
+  resolveTGridCellLinks,
+  resolveTGridRowLinks,
+  withTGridCellLinks,
+} from "./grid-adapter/tgrid-cell-links";
 export * from "./grid-adapter/tgrid-column-builder";
 export * from "./grid-adapter/tgrid-binding";
 export * from "./grid-adapter/tgrid-types";

@@ -21,7 +21,6 @@ describe("@sapporta/frontend/report public surface", () => {
     const link = {
       label: "Open report",
       href: "/reports/sample",
-      kind: "route",
     } satisfies ReportCellLink;
     const resolvers = {
       summary: {

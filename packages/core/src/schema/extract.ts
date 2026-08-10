@@ -8,11 +8,12 @@ import { logger } from "../db/logger.js";
 import { findRowLabelColumns } from "../data/row-label.js";
 import { getColumnEnumValues } from "./table-value-zod.js";
 import { defaultColumnLabel } from "@sapporta/shared";
-import type {
-  ChildSchema,
-  ColumnSchema,
-  ReportLink,
-  TableSchema,
+import {
+  hrefPlaceholderColumns,
+  type ChildSchema,
+  type ColumnSchema,
+  type NavLink,
+  type TableSchema,
 } from "@sapporta/shared/contracts";
 
 const log = logger.child({ module: "schema" });
@@ -98,17 +99,27 @@ export function extractSchemas(defs: readonly TableDef[]): TableSchema[] {
 
       // Auto-synthesize a drill-up link for FK columns. Consumers (table &
       // report grids) render cell navigation uniformly from `links` — the FK
-      // case is just a default, not a parallel mechanism.
+      // case is just a default, not a parallel mechanism. Author-declared
+      // column links follow the synthesized drill-up so the FK cell's
+      // primary link stays the reference it displays.
       const fk = colSchema.foreignKey;
-      if (fk) {
-        colSchema.links = [
-          {
-            kind: "table",
-            table: fk.table,
-            bind: { [fk.column]: col.name },
-            icon: "drill-up",
-          },
-        ];
+      const fkLinks: NavLink[] = fk
+        ? [
+            {
+              kind: "table",
+              table: fk.table,
+              bind: { [fk.column]: col.name },
+              icon: "drill-up",
+            },
+          ]
+        : [];
+      const declaredLinks = columnMeta?.links ?? [];
+      for (const link of declaredLinks) {
+        validateLink(schema, byName, link, `column "${col.name}"`);
+      }
+      const links = dedupeLinks([...fkLinks, ...declaredLinks]);
+      if (links.length > 0) {
+        colSchema.links = links;
       }
 
       return colSchema;
@@ -155,15 +166,22 @@ export function extractSchemas(defs: readonly TableDef[]): TableSchema[] {
       });
     }
 
-    // Auto-synthesize row-level drill-into links from children. One link per
-    // child; bind maps the child's FK column → this table's PK on the row.
-    const rowLinks: ReportLink[] = children.map((child) => ({
+    // Row-level links: author-declared links first (they carry the table's
+    // domain intent), then drill-into links synthesized from children. One
+    // synthesized link per child; bind maps the child's FK column → this
+    // table's PK on the row.
+    const declaredRowLinks = schema.meta.rowLinks;
+    for (const link of declaredRowLinks) {
+      validateLink(schema, byName, link, "rowLinks");
+    }
+    const childRowLinks: NavLink[] = children.map((child) => ({
       kind: "table",
       table: child.table,
       bind: { [child.foreignKey]: parentPkName },
       label: `Open ${child.label}`,
       icon: "drill-into",
     }));
+    const rowLinks = dedupeLinks([...declaredRowLinks, ...childRowLinks]);
 
     return {
       name: schema.sqlName,
@@ -175,6 +193,75 @@ export function extractSchemas(defs: readonly TableDef[]): TableSchema[] {
       rowLabelColumns,
       searchable: schema.meta.search !== false,
     };
+  });
+}
+
+/**
+ * Rejects declared links that read columns that don't exist — bind sources
+ * and url `{column}` placeholders both resolve against the current row, so
+ * an unknown name would silently produce dead links in every grid; schema
+ * extraction fails instead. `where` names the declaration site for the
+ * error message.
+ */
+function validateLink(
+  schema: TableDef,
+  byName: ReadonlyMap<string, TableDef>,
+  link: NavLink,
+  where: string,
+): void {
+  const sourceColumns = new Set(
+    getTableConfig(schema.drizzle).columns.map((c) => c.name),
+  );
+  const readColumns = Object.values(link.bind ?? {});
+  if (link.kind === "url") {
+    readColumns.push(...hrefPlaceholderColumns(link.href));
+  }
+  for (const sourceColumn of readColumns) {
+    if (!sourceColumns.has(sourceColumn)) {
+      throw new Error(
+        `Table "${schema.sqlName}" ${where} declares a link reading ` +
+          `unknown source column "${sourceColumn}".`,
+      );
+    }
+  }
+
+  if (link.kind !== "table") return;
+  const target = byName.get(link.table);
+  if (!target) {
+    throw new Error(
+      `Table "${schema.sqlName}" ${where} declares a link to unknown ` +
+        `table "${link.table}".`,
+    );
+  }
+  const targetColumns = new Set(
+    getTableConfig(target.drizzle).columns.map((c) => c.name),
+  );
+  for (const targetColumn of Object.keys(link.bind ?? {})) {
+    if (!targetColumns.has(targetColumn)) {
+      throw new Error(
+        `Table "${schema.sqlName}" ${where} declares a link binding ` +
+          `unknown column "${targetColumn}" on table "${link.table}".`,
+      );
+    }
+  }
+}
+
+/** Drops links that repeat an identical destination and bind. */
+function dedupeLinks(links: readonly NavLink[]): NavLink[] {
+  const seen = new Set<string>();
+  return links.filter((link) => {
+    const key = JSON.stringify([
+      link.kind,
+      link.kind === "table"
+        ? link.table
+        : link.kind === "report"
+          ? link.report
+          : link.href,
+      link.bind ?? {},
+    ]);
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
   });
 }
 

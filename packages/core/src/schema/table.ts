@@ -14,6 +14,7 @@ import type {
   ColumnMeta as FactoryColumnMeta,
   ValueKind,
 } from "@sapporta/shared/value-kind";
+import type { NavLink } from "@sapporta/shared/contracts";
 import {
   isSystemManagedScopeFieldName,
   type ReferenceRule,
@@ -101,6 +102,14 @@ export interface ColumnMeta {
   notes?: string;
   /** Whether callers may write this column through generated table APIs. */
   apiWritable?: boolean;
+  /**
+   * Navigation links offered on this column's cells, in addition to the
+   * drill-up link Sapporta derives for FK columns. `bind` maps the
+   * destination's filter / parameter names to source columns on the current
+   * row. The first resolvable link is the cell's primary link; all links
+   * appear in the row's context menu.
+   */
+  links?: NavLink[];
 }
 
 /** Normalized Sapporta metadata attached to a TableDef.
@@ -134,6 +143,12 @@ export interface SapportaMeta {
   defaultSort?: SQL;
   /** Has-many child relationships for nested grid display */
   children: ChildMeta[];
+  /**
+   * Row-level navigation links (related data, drill-down reports), in
+   * addition to the drill-into links Sapporta derives from `children`.
+   * Offered in the row's context menu in table and report UIs.
+   */
+  rowLinks: NavLink[];
   /** Per-column metadata keyed by column name */
   columns: Record<string, ColumnMeta>;
   /**
@@ -149,6 +164,7 @@ type SapportaMetaDefaultedField =
   | "rowScope"
   | "references"
   | "children"
+  | "rowLinks"
   | "columns"
   | "search";
 
@@ -164,6 +180,7 @@ export type SapportaTableInputMeta = Omit<
   immutable?: boolean;
   references?: Record<string, ReferenceRule>;
   children?: ChildMeta[];
+  rowLinks?: NavLink[];
   columns?: Record<string, ColumnMeta>;
   /** Defaults to `"allColumns"`. Use `false` to disable table search. */
   search?: TableSearch;
@@ -327,6 +344,7 @@ function normalizeSapportaMeta(
     rowScope: input.rowScope ?? "workspaceUserScoped",
     references: input.references ?? {},
     children: input.children ?? [],
+    rowLinks: input.rowLinks ?? [],
     columns,
     search: normalizeTableSearch(input.search),
   };

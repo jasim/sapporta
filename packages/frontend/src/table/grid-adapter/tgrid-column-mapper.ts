@@ -17,6 +17,7 @@ import {
 } from "@sapporta/grid/column-preset";
 import { inferDisplayType, type DisplayType } from "../model/column-types";
 import { parseTablePatchValueDraft } from "../model/table-value-draft";
+import { withTGridCellLinks } from "./tgrid-cell-links";
 import type { LookupStore } from "../../lookup";
 
 export type TGridTableColumnMeta = {
@@ -51,6 +52,19 @@ export function createTGridColumnMapper(args: {
 }
 
 function columnFor(
+  lookups: LookupStore,
+  args: {
+    tableName: string;
+    column: TableColumnSchema;
+    immutable: boolean;
+  },
+): GridColumnSchema {
+  // Schema-declared cell links (FK drill-up and author-declared links)
+  // decorate the preset column with a primary-link adornment + activation.
+  return withTGridCellLinks(presetColumnFor(lookups, args), args.column);
+}
+
+function presetColumnFor(
   lookups: LookupStore,
   args: {
     tableName: string;

@@ -45,20 +45,27 @@ export {
   columnSchemaSchema,
   childSchemaSchema,
   tableSchemaSchema,
-  reportLinkSchema,
+  navLinkSchema,
   linkBindSchema,
   linkIconSchema,
+  linkTargetSchema,
   foreignKeyRefSchema,
   selectOptionsSchema,
   projectInfoSchema,
   type ColumnSchema,
   type ChildSchema,
   type TableSchema,
-  type ReportLink,
+  type NavLink,
   type LinkBind,
   type LinkIcon,
+  type LinkTarget,
   type ProjectInfo,
 } from "./meta-schema.js";
+
+export {
+  hrefPlaceholderColumns,
+  substituteHrefPlaceholders,
+} from "./link-placeholders.js";
 
 // ── Table wire shapes ───────────────────────────────────────────────────────
 export {

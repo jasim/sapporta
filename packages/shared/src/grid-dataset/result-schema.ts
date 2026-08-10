@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { navLinkSchema } from "../contracts/meta-schema.js";
 
 export const gridDatasetColumnKindSchema = z.enum([
   "text",
@@ -28,6 +29,11 @@ export const gridDatasetColumnSchema = z.object({
   sortable: z.boolean().optional(),
   filterable: z.boolean().optional(),
   searchable: z.boolean().optional(),
+  /** Declarative drill-down links for this column's cells. `bind` sources
+   *  read from the row's `columns` values (hidden helper ID columns work).
+   *  The first resolvable link renders as the cell's primary link; all
+   *  resolvable links appear in the right-click context menu. */
+  links: z.array(navLinkSchema).optional(),
 });
 export type GridDatasetColumn = z.output<typeof gridDatasetColumnSchema>;
 
@@ -66,6 +72,9 @@ export const gridDatasetLevelSchema = z.object({
   columns: z.array(gridDatasetColumnSchema),
   childLevels: z.array(z.string()),
   defaultCollapsed: z.boolean().optional(),
+  /** Declarative row-level links for this level (related data, drill-into).
+   *  Resolvable links appear in the row's right-click context menu. */
+  rowLinks: z.array(navLinkSchema).optional(),
 });
 export type GridDatasetLevel = z.output<typeof gridDatasetLevelSchema>;
 

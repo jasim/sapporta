@@ -1,0 +1,33 @@
+.tgrid-cell-link-wrap {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+
+.tgrid-cell-link-wrap__content {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.tgrid-cell-link {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  color: var(--sap-subtle, currentColor);
+  opacity: 0;
+  transition: opacity 80ms ease-in;
+}
+
+.tgrid-cell-link:hover {
+  color: var(--sap-link, currentColor);
+}
+
+/* Reveal on row hover or when the cell holds the cursor. */
+[role="row"]:hover .tgrid-cell-link,
+[data-cell-status="cursor"] .tgrid-cell-link,
+[data-cell-status="cursor-selected"] .tgrid-cell-link,
+.tgrid-cell-link:focus-visible {
+  opacity: 1;
+}

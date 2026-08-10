@@ -4,6 +4,7 @@ import {
   describeCellActivation,
   childPath,
   createGridRuntime,
+  decomposePath,
   GridCopyContextMenu,
   GridLevel,
   GridRuntimeProvider,
@@ -11,6 +12,7 @@ import {
   makeRowId,
   rootPath,
   rowExpansionActivation,
+  trailingEdge,
   treeNodeForRow,
   useGridRuntimeEffect,
   withRowExpansionColumn,
@@ -20,6 +22,7 @@ import {
   type CellRenderProps,
   type CellActivationTrigger,
   type ColumnSchema,
+  type GridCopyTarget,
   type GridPath,
   type GridSchema,
   type GridLevelChrome,
@@ -32,20 +35,35 @@ import {
   columnPreset,
   columnPresetWidthForSizing,
 } from "@sapporta/grid/column-preset";
-import type {
-  GridDataset,
-  GridDatasetColumn,
-  GridDatasetNode,
+import type { LinkIcon } from "@sapporta/shared/contracts";
+import {
+  gridDatasetLinkProblems,
+  type GridDataset,
+  type GridDatasetColumn,
+  type GridDatasetNode,
 } from "@sapporta/shared/grid-dataset";
 import { cn } from "@sapporta/ui/cn";
 import { gridDatasetAncestorsForPath } from "../../grid-dataset/path";
+import { catalogTableLabel } from "../../links/catalog-label";
+import {
+  isExternalHref,
+  resolveLinks,
+  type ResolvedLink,
+} from "../../links/resolve-link";
+import {
+  handleResolvedLinkClick,
+  linkRel,
+  openResolvedLink,
+} from "../../links/open-link";
+import { LinkMenuItems } from "../../links/LinkMenuItems";
 import "./ReportGrid.css";
 
 export type ReportCellLink = {
   label: string;
   href: string;
-  kind?: "drill-down" | "record" | "route" | "external";
-  icon?: "drill-up" | "drill-into" | "report" | "external";
+  /** Menu-entry icon. Defaults to `external` for hrefs that leave the app,
+   *  `drill-into` otherwise. */
+  icon?: LinkIcon;
   target?: "_self" | "_blank";
 };
 
@@ -59,6 +77,11 @@ export type ReportCellLinkContext<TInput = unknown> = {
   value: unknown;
 };
 
+export type ReportRowLinkContext<TInput = unknown> = Omit<
+  ReportCellLinkContext<TInput>,
+  "column" | "value"
+>;
+
 export type ReportCellLinkResolvers<TInput = unknown> = Record<
   string,
   {
@@ -66,15 +89,19 @@ export type ReportCellLinkResolvers<TInput = unknown> = Record<
       string,
       (context: ReportCellLinkContext<TInput>) => ReportCellLink[]
     >;
+    /** Row-level links offered in the row's context menu. */
+    row?: (context: ReportRowLinkContext<TInput>) => ReportCellLink[];
   }
 >;
 
 type ReportCellLinkCache = Map<string, ReportCellLink | null>;
 
-type ReportGridBinding = {
+type ReportGridBinding<TInput = unknown> = {
   dataset: GridDataset;
   runtime: GridRuntime;
   root: GridPath;
+  links: ReportCellLinkResolvers<TInput> | undefined;
+  input: TInput | undefined;
 };
 
 interface ReportGridProps<TInput = unknown> {
@@ -107,12 +134,18 @@ function ReportGrid<TInput = unknown>({
 
   return (
     <GridRuntimeProvider runtime={runtime}>
-      <ReportGridBody session={{ dataset, runtime, root: runtime.root.path }} />
+      <ReportGridBody
+        session={{ dataset, runtime, root: runtime.root.path, links, input }}
+      />
     </GridRuntimeProvider>
   );
 }
 
-function ReportGridBody({ session }: { session: ReportGridBinding }) {
+function ReportGridBody<TInput>({
+  session,
+}: {
+  session: ReportGridBinding<TInput>;
+}) {
   const chrome = useReportGridChrome(session.dataset.name);
 
   useLayoutEffect(() => {
@@ -120,7 +153,9 @@ function ReportGridBody({ session }: { session: ReportGridBinding }) {
   }, [session.dataset, session.runtime]);
 
   return (
-    <GridCopyContextMenu>
+    <GridCopyContextMenu
+      renderExtraItems={(target) => renderReportLinkMenuItems(session, target)}
+    >
       <div className="sapporta-report-tgrid min-w-full">
         <GridLevel path={session.root} chrome={chrome} presentation="tabular" />
       </div>
@@ -171,6 +206,16 @@ function buildReportGridModel<TInput>(
   schema: GridSchema;
   dataSource: ReturnType<typeof inMemoryGridDataSource>;
 } {
+  // Binding is the first time the framework sees an app-built dataset, so
+  // ill-formed declarative links fail loudly here — the counterpart of the
+  // boot-time check on table-declared links. Left unchecked, a bind naming
+  // a missing column would just never resolve, indistinguishable from rows
+  // that legitimately lack the value.
+  const linkProblems = gridDatasetLinkProblems(dataset);
+  if (linkProblems.length > 0) {
+    throw new Error(linkProblems.join("\n"));
+  }
+
   const levels: Record<string, LevelSchema> = {};
   const sourceLevels: Record<string, InMemoryLevelOpts> = {};
   const linkCache: ReportCellLinkCache = new Map();
@@ -337,7 +382,7 @@ function gridColumnForDatasetColumn<TInput>({
   const activatesPrimaryLink = canResolvePrimaryReportCellLink({
     links,
     levelName,
-    columnId: column.id,
+    column,
   });
   if (!activatesPrimaryLink) {
     return isExpansionControlColumn
@@ -399,7 +444,12 @@ function renderReportCell<TInput>({
   );
 }
 
-function resolvePrimaryReportCellLink<TInput>({
+/**
+ * All links for one cell. An app-supplied resolver for the column takes
+ * full control (including deliberately returning none); otherwise the
+ * dataset column's declarative `links` resolve against the node's values.
+ */
+function resolveReportCellLinks<TInput>({
   dataset,
   levelName,
   column,
@@ -417,13 +467,14 @@ function resolvePrimaryReportCellLink<TInput>({
   path: GridPath;
   row: CellRenderProps["row"];
   value: unknown;
-}): ReportCellLink | null {
+}): ReportCellLink[] {
   const node = treeNodeForRow(row);
-  if (!node) return null;
+  if (!node) return [];
 
-  const ancestors = gridDatasetAncestorsForPath(dataset, path);
-  const cellLinks =
-    links?.[levelName]?.cell?.[column.id]?.({
+  const resolver = links?.[levelName]?.cell?.[column.id];
+  if (resolver) {
+    const ancestors = gridDatasetAncestorsForPath(dataset, path);
+    return resolver({
       dataset,
       node,
       levelName,
@@ -431,21 +482,134 @@ function resolvePrimaryReportCellLink<TInput>({
       ancestors,
       column,
       value,
-    }) ?? [];
-  return cellLinks[0] ?? null;
+    });
+  }
+  return declarativeNodeLinks(column.links, node);
+}
+
+function resolvePrimaryReportCellLink<TInput>(args: {
+  dataset: GridDataset;
+  levelName: string;
+  column: GridDatasetColumn;
+  links: ReportCellLinkResolvers<TInput> | undefined;
+  input: TInput | undefined;
+  path: GridPath;
+  row: CellRenderProps["row"];
+  value: unknown;
+}): ReportCellLink | null {
+  return resolveReportCellLinks(args)[0] ?? null;
+}
+
+/**
+ * Declarative dataset links resolved against a node's `columns` values
+ * (hidden helper ID columns included). Synthetic rows — opening, closing,
+ * subtotal — never resolve declarative links: their values describe a
+ * derived aggregate, not a navigable record.
+ */
+function declarativeNodeLinks(
+  declared: GridDatasetColumn["links"],
+  node: TreeNode,
+): ResolvedLink[] {
+  if (!declared?.length || node.kind !== undefined) return [];
+  return resolveLinks(declared, {
+    values: node.columns,
+    tableLabel: catalogTableLabel,
+  });
 }
 
 function canResolvePrimaryReportCellLink<TInput>({
   links,
   levelName,
-  columnId,
+  column,
 }: {
   links: ReportCellLinkResolvers<TInput> | undefined;
   levelName: string;
-  columnId: string;
+  column: GridDatasetColumn;
 }): boolean {
   const levelLinks = links?.[levelName];
-  return Boolean(levelLinks?.cell?.[columnId]);
+  return Boolean(levelLinks?.cell?.[column.id]) || Boolean(column.links?.length);
+}
+
+/**
+ * Context-menu contributions for the targeted report cell: every link the
+ * cell resolves (not just the primary), then the row's links — an
+ * app-supplied `row` resolver when present, else the level's declarative
+ * `rowLinks`.
+ */
+function renderReportLinkMenuItems<TInput>(
+  session: ReportGridBinding<TInput>,
+  target: GridCopyTarget | null,
+): ReactNode {
+  if (!target) return null;
+
+  let row: CellRenderProps["row"] | undefined;
+  try {
+    row = session.runtime
+      .level(target.path)
+      .displayedRow(target.selection.anchor.rowId);
+  } catch {
+    return null;
+  }
+  if (!row) return null;
+  const node = treeNodeForRow(row);
+  if (!node) return null;
+
+  const edge = trailingEdge(target.path);
+  const levelName = edge
+    ? edge.childLevelName
+    : decomposePath(target.path).rootLevelName;
+  const level = session.dataset.levels[levelName];
+  if (!level) return null;
+
+  const column = level.columns.find(
+    (c) => c.id === target.selection.anchor.colId,
+  );
+  const cellLinks = column
+    ? resolveReportCellLinks({
+        dataset: session.dataset,
+        levelName,
+        column,
+        links: session.links,
+        input: session.input,
+        path: target.path,
+        row,
+        value: row.columns[column.id],
+      })
+    : [];
+
+  const rowResolver = session.links?.[levelName]?.row;
+  const rowLinks = rowResolver
+    ? rowResolver({
+        dataset: session.dataset,
+        node,
+        levelName,
+        input: session.input,
+        ancestors: gridDatasetAncestorsForPath(session.dataset, target.path),
+      })
+    : declarativeNodeLinks(level.rowLinks, node);
+
+  return (
+    <LinkMenuItems
+      cellLinks={cellLinks.map(asResolvedLink)}
+      rowLinks={rowLinks.map(asResolvedLink)}
+    />
+  );
+}
+
+/** Fills a link's optional fields with their documented defaults so menu
+ *  rendering always has an icon and a target. */
+function asResolvedLink(link: ReportCellLink | ResolvedLink): ResolvedLink {
+  const target = link.target ?? "_self";
+  return {
+    href: link.href,
+    label: link.label,
+    icon:
+      link.icon ??
+      (target === "_blank" || isExternalHref(link.href)
+        ? "external"
+        : "drill-into"),
+    target,
+  };
 }
 
 function reportCellPrimaryLinkActivation({
@@ -522,25 +686,23 @@ function ReportCellPrimaryLink({
       target={link.target}
       tabIndex={-1}
       className="sapporta-report-tgrid__primary-link"
-      rel={linkRel(link)}
+      rel={linkRel(link.target)}
       title={link.label}
       data-grid-part="report-primary-link"
+      onClick={(event) =>
+        handleResolvedLinkClick(event, {
+          href: link.href,
+          target: link.target ?? "_self",
+        })
+      }
     >
       {children}
     </a>
   );
 }
 
-function linkRel(link: ReportCellLink): string | undefined {
-  return link.target === "_blank" ? "noopener noreferrer" : undefined;
-}
-
 function openReportCellLink(link: ReportCellLink) {
-  if (link.target === "_blank") {
-    window.open(link.href, "_blank", "noopener,noreferrer");
-    return;
-  }
-  window.location.assign(link.href);
+  openResolvedLink({ href: link.href, target: link.target ?? "_self" });
 }
 
 function reportCellLinkCacheKey({

@@ -221,6 +221,48 @@ describe("GridCopyContextMenu", () => {
     );
   });
 
+  it("renders extra items with the prepared target", async () => {
+    const runtime = makeRuntime();
+    const renderExtraItems = vi.fn((target) =>
+      target
+        ? createElement("button", { type: "button" }, "Open account")
+        : null,
+    );
+    const container = await renderWithRuntime(
+      runtime,
+      renderGridCell(cashId, "account", "Cash"),
+      { renderExtraItems },
+    );
+
+    await contextMenu(container.querySelector("span"));
+
+    expect(renderExtraItems).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        path: root,
+        selection: expect.objectContaining({
+          anchor: { rowId: cashId, colId: "account" },
+        }),
+      }),
+    );
+    expect(button(container, "Open account")).toBeInstanceOf(
+      HTMLButtonElement,
+    );
+  });
+
+  it("passes a null target to extra items outside grid cells", async () => {
+    const runtime = makeRuntime();
+    const renderExtraItems = vi.fn(() => null);
+    const container = await renderWithRuntime(
+      runtime,
+      createElement("div", null, "empty surface"),
+      { renderExtraItems },
+    );
+
+    await contextMenu(container.querySelector("[data-grid-copy-menu-scope]"));
+
+    expect(renderExtraItems).toHaveBeenLastCalledWith(null);
+  });
+
   it("disables copy commands when no target is available", async () => {
     const runtime = makeRuntime();
     const container = await renderWithRuntime(
@@ -292,6 +334,11 @@ describe("GridCopyContextMenu", () => {
 async function renderWithRuntime(
   runtime: GridRuntime,
   child: ReactElement,
+  options: {
+    renderExtraItems?: Parameters<
+      typeof GridCopyContextMenu
+    >[0]["renderExtraItems"];
+  } = {},
 ): Promise<HTMLElement> {
   const container = document.createElement("div");
   document.body.append(container);
@@ -300,7 +347,10 @@ async function renderWithRuntime(
     rootClient.render(
       createElement(GridRuntimeProvider, {
         runtime,
-        children: createElement(GridCopyContextMenu, { children: child }),
+        children: createElement(GridCopyContextMenu, {
+          children: child,
+          renderExtraItems: options.renderExtraItems,
+        }),
       }),
     );
   });
