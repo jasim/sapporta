@@ -25,18 +25,7 @@ npm login
 Use the normal npm CLI login flow. For accounts that authenticate with a
 passkey, no OTP code is expected.
 
-## Workflow
-
-```bash
-pnpm changeset          # 1. select packages, bump type, summary -> .changeset/*.md
-pnpm run version        # 2. consume changesets → bump package.json, write CHANGELOG.md
-pnpm --filter @sapporta/server vendor
-pnpm install
-git add .
-git commit -m "Version packages for release"
-pnpm release            # 3. build and publish unpublished package versions
-git push                # 4. push release commit
-```
+# Details on the workflow
 
 Step 3 runs `scripts/release.mjs`. It builds the workspace, checks npm for each
 package's exact local version, skips versions that already exist, and publishes
@@ -97,3 +86,18 @@ For a first publish of `sapporta`, confirm the npm name is available or owned by
 - **patch**: bug fixes, internal refactors, docs
 - **minor**: new features, new exports, CLI commands, first release of a package
 - **major**: breaking API changes, removed exports, migration-requiring schema changes
+
+
+## Workflow
+
+```bash
+pnpm changeset          # 1. select packages, bump type, summary -> .changeset/*.md
+pnpm run version        # 2. consume changesets → bump package.json, write CHANGELOG.md
+pnpm --filter @sapporta/server vendor
+pnpm install
+git add .
+git commit -m "Version packages for release"
+pnpm release            # 3. build and publish unpublished package versions
+git push                # 4. push release commit
+```
+
