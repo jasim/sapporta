@@ -1,5 +1,14 @@
 # @sapporta/server
 
+## 0.3.1
+
+### Patch Changes
+
+- Add drill-down links to reports
+- Updated dependencies
+  - @sapporta/honest@0.3.8
+  - @sapporta/shared@0.2.1
+
 ## 0.3.0
 
 ### Minor Changes

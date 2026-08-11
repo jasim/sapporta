@@ -1,5 +1,15 @@
 # @sapporta/frontend
 
+## 0.3.1
+
+### Patch Changes
+
+- Add drill-down links to reports
+- Updated dependencies
+  - @sapporta/grid@0.3.1
+  - @sapporta/shared@0.2.1
+  - @sapporta/ui@0.2.9
+
 ## 0.3.0
 
 ### Minor Changes

@@ -1,5 +1,11 @@
 # @sapporta/ui
 
+## 0.2.9
+
+### Patch Changes
+
+- Add drill-down links to reports
+
 ## 0.2.8
 
 ### Patch Changes

@@ -1,5 +1,11 @@
 # @sapporta/honest
 
+## 0.3.8
+
+### Patch Changes
+
+- Add drill-down links to reports
+
 ## 0.3.7
 
 ### Patch Changes

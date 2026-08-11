@@ -1,5 +1,13 @@
 # sapporta
 
+## 0.2.8
+
+### Patch Changes
+
+- Add drill-down links to reports
+- Updated dependencies
+  - @sapporta/server@0.3.1
+
 ## 0.2.7
 
 ### Patch Changes
