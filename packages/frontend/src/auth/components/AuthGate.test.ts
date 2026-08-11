@@ -305,7 +305,13 @@ describe("auth pages", () => {
     await waitForText("home page");
   });
 
-  it("creates an account and navigates to email verification", async () => {
+  it("creates an account and enters the app when verification is not required", async () => {
+    // The server does not require verification: sign-up starts a session and
+    // the auth context loads even though the email is unverified.
+    const unverifiedContext = {
+      ...AUTH_CONTEXT,
+      user: { ...AUTH_CONTEXT.user, emailVerified: false },
+    };
     installFetch((request) => {
       if (request.path === "/api/meta/info") {
         return jsonResponse({ name: "Test Project", slug: "test-project" });
@@ -322,7 +328,39 @@ describe("auth pages", () => {
         return jsonResponse({ ok: true });
       }
       if (request.path === "/api/auth-context") {
-        return jsonResponse(AUTH_CONTEXT);
+        return jsonResponse(unverifiedContext);
+      }
+      return jsonResponse({ error: "Unexpected request" }, 500);
+    });
+    await renderAuthPageRoutes("/signup");
+
+    await waitForText("Sign up and create your first workspace");
+    await fillInput("Name", "Owner");
+    await fillInput("Email", "owner@example.test");
+    await fillInput("Password", "correct-horse-battery-staple");
+    await submitForm();
+
+    await waitForText("home page");
+  });
+
+  it("creates an account and navigates to email verification when it is required", async () => {
+    // The server requires verification: sign-up succeeds without starting a
+    // session, so the auth context request stays unauthenticated.
+    installFetch((request) => {
+      if (request.path === "/api/meta/info") {
+        return jsonResponse({ name: "Test Project", slug: "test-project" });
+      }
+      if (
+        request.path === "/api/auth/sign-up/email" &&
+        request.method === "POST"
+      ) {
+        return jsonResponse({ ok: true });
+      }
+      if (request.path === "/api/auth-context") {
+        return jsonResponse(
+          { error: "Authentication required", code: "unauthenticated" },
+          401,
+        );
       }
       return jsonResponse({ error: "Unexpected request" }, 500);
     });

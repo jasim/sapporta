@@ -257,7 +257,13 @@ function EmailPasswordPage({ mode }: { mode: AuthMode }) {
       }
       await reloadSession();
       if (mode === "signup") {
-        navigate("/verify-email", { replace: true, state: { email } });
+        // When the app does not require email verification, sign-up starts a
+        // session right away; without one, verification is still pending.
+        if (useAuthStore.getState().session.kind === "authenticated") {
+          navigate("/", { replace: true });
+        } else {
+          navigate("/verify-email", { replace: true, state: { email } });
+        }
         return;
       }
       if (mode === "reset") {

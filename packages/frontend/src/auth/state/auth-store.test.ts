@@ -59,6 +59,24 @@ describe("auth store", () => {
     );
   });
 
+  it("keeps unverified users signed in when the server accepts the session", async () => {
+    const unverifiedContext = {
+      ...AUTH_CONTEXT,
+      user: { ...AUTH_CONTEXT.user, emailVerified: false },
+    };
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => jsonResponse(unverifiedContext)),
+    );
+
+    await useAuthStore.getState().restoreSession();
+
+    expect(useAuthStore.getState().session).toEqual({
+      kind: "authenticated",
+      context: unverifiedContext,
+    });
+  });
+
   it("maps unauthenticated failures to guest sessions", async () => {
     vi.stubGlobal(
       "fetch",

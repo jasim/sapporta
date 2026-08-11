@@ -84,7 +84,10 @@ async function readAuthSession(): Promise<AuthSession> {
 }
 
 function sessionFromContext(context: AuthContextResponse): AuthSession {
-  if (!context.user.emailVerified) return { kind: "unverified" };
+  // The server decides whether verification blocks access: when the app
+  // requires it, the context request fails with `email_not_verified` and the
+  // session becomes "unverified". A successful response is a usable session
+  // even while `user.emailVerified` is false.
   return { kind: "authenticated", context };
 }
 
