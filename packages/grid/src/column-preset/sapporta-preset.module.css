@@ -299,7 +299,7 @@
 }
 
 .columnResizeHandle::after {
-  background: transparent;
+  background: var(--grid-column-resize-handle-color, transparent);
   bottom: 8px;
   content: "";
   position: absolute;
@@ -310,7 +310,10 @@
 
 .columnResizeHandle:hover::after,
 .columnResizeHandle[data-resizing="true"]::after {
-  background: var(--sap-border-strong, var(--sap-border));
+  background: var(
+    --grid-column-resize-handle-hover-color,
+    var(--sap-border-strong, var(--sap-border))
+  );
 }
 
 :where(.presetGrid [data-grid-part="cell"][data-cell-status="focus"]) {

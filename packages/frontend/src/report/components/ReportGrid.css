@@ -48,6 +48,20 @@
     var(--sap-report-grid-background) 90%,
     var(--sap-border-soft)
   );
+
+  /* Reports have no header menu button marking column boundaries, so keep the
+     resize handle's separator line visible even before hover. */
+  --grid-column-resize-handle-color: var(--sap-border);
+}
+
+/* The last column's handle would draw a stray line at the grid's right edge;
+   show it only while hovered or dragging. */
+.sapporta-report-tgrid
+  [data-grid-part="header-cell"]:last-child
+  [data-grid-part="column-resize-handle"]:not([data-resizing="true"]):not(
+    :hover
+  )::after {
+  background: transparent;
 }
 
 .sapporta-report-tgrid
