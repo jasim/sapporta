@@ -77,8 +77,11 @@ export const appProtectedRoutes = (
     />
 
     {/* Standard screens can use `AppPage` for the usual fixed header and
-        scrolling content area. Other screens can choose their own height and
-        scrolling behavior; `AppShell` keeps its sidebar control available.
+        scrolling content area. Its `title` also names the browser tab. Other
+        screens can choose their own height and scrolling behavior; `AppShell`
+        keeps its sidebar control available, and `usePageTitle` from
+        `@sapporta/frontend/shell` names the tab for screens without the
+        standard header.
 
         Add protected app routes here, e.g.:
         <Route

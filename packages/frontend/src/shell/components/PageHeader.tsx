@@ -1,13 +1,19 @@
 import type { ReactNode } from "react";
 import { cn } from "@sapporta/ui/cn";
 import { Kbd } from "@sapporta/ui/kbd";
+import { usePageTitle } from "../document-title";
 import "./PageHeader.css";
 
 export interface PageHeaderProps {
   /** The group this view belongs to — "Tables", "Reports", etc. */
   section?: string;
-  /** The view's own name. */
+  /** The view's own name. Also shown in the browser tab. */
   title: string;
+  /**
+   * A different browser tab title, or `false` for a header that should not
+   * name the tab — for example one embedded in a side panel.
+   */
+  documentTitle?: string | false;
   /** Mono-styled right-of-title metadata (record counts, timing, etc.). */
   subtitle?: ReactNode;
   /** Right-aligned page actions. */
@@ -24,10 +30,13 @@ export interface PageHeaderProps {
 export function PageHeader({
   section,
   title,
+  documentTitle,
   subtitle,
   actions,
   className,
 }: PageHeaderProps) {
+  usePageTitle(documentTitle ?? title);
+
   return (
     <header
       data-page-header

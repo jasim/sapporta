@@ -20,6 +20,7 @@ import { getApiBase } from "../../platform/base";
 import { useAuthStore } from "../state/auth-store";
 import { loadProjectInfo } from "../../schema-catalog/actions/metadata";
 import { useSchemaStore } from "../../schema-catalog/state/schema-store";
+import { usePageTitle } from "../../shell/document-title";
 
 type AuthMode = "login" | "signup" | "forgot" | "reset";
 type VerifyEmailLocationState = { email?: string };
@@ -327,6 +328,7 @@ function AuthFrame({
   children: ReactNode;
 }) {
   const name = useProjectName();
+  usePageTitle(title);
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-sap-bg px-4">

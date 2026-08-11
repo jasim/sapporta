@@ -73,7 +73,8 @@ vi.mock("./table-grid-pager-boundary", () => ({
   }),
 }));
 
-vi.mock("zustand", () => ({
+vi.mock("zustand", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("zustand")>()),
   useStore: () => null,
 }));
 

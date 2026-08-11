@@ -11,6 +11,7 @@ export {
   PageHeaderButton,
   type PageHeaderProps,
 } from "./shell/components/PageHeader";
+export { usePageTitle, resetPageTitles } from "./shell/document-title";
 export {
   SidebarRegion,
   type SidebarRegionProps,
