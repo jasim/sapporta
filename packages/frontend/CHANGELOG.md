@@ -1,5 +1,29 @@
 # @sapporta/frontend
 
+## 0.3.2
+
+### Patch Changes
+
+- 1595392: Let the server's email verification policy decide access after sign-up. The
+  auth store no longer treats every unverified email as a blocked session; it
+  relies on the `email_not_verified` failure the API returns when verification
+  is required. Sign-up now enters the app directly when the server started a
+  session, and shows the verify-email page only when it did not. In development,
+  where verification is not required by default, new users land in the app
+  without clicking the emailed link.
+- 7f9750c: Name the browser tab after the current screen. `PageHeader` now sets the
+  document title to "<page> – <app name>" from the same `title` it displays, so
+  tables, reports, forms, and account pages each leave a readable entry in tab
+  lists and browser history. The app name comes from the loaded project info,
+  falling back to the title in index.html. Screens without the standard header
+  can call `usePageTitle`, and a header embedded in a panel can opt out with
+  `documentTitle={false}`.
+- Add column width resize separators in reports, page titles for each page
+- Updated dependencies
+  - @sapporta/grid@0.3.2
+  - @sapporta/shared@0.2.2
+  - @sapporta/ui@0.2.10
+
 ## 0.3.1
 
 ### Patch Changes

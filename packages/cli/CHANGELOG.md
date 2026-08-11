@@ -1,5 +1,14 @@
 # sapporta
 
+## 0.2.9
+
+### Patch Changes
+
+- Add column width resize separators in reports, page titles for each page
+- Updated dependencies [7f9750c]
+- Updated dependencies
+  - @sapporta/server@0.3.2
+
 ## 0.2.8
 
 ### Patch Changes

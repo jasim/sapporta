@@ -1,5 +1,11 @@
 # @sapporta/shared
 
+## 0.2.2
+
+### Patch Changes
+
+- Add column width resize separators in reports, page titles for each page
+
 ## 0.2.1
 
 ### Patch Changes
