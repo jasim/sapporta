@@ -339,11 +339,11 @@ describe("renderScaffoldFiles", () => {
     expect(byDest.get("packages/frontend/src/PublicPage.tsx")).toContain(
       "<AppPage",
     );
-    expect(byDest.get("packages/frontend/src/App.tsx")).toContain(
-      "Other screens can choose their own height and",
+    expect(byDest.get("packages/frontend/src/App.tsx")).toMatch(
+      /Other\s+screens can choose their own height and/,
     );
-    expect(byDest.get("packages/frontend/src/App.tsx")).toContain(
-      "`AppShell` keeps its sidebar control available",
+    expect(byDest.get("packages/frontend/src/App.tsx")).toMatch(
+      /`AppShell`\s+keeps its sidebar control available/,
     );
     expect(byDest.get("packages/api/app.ts")).toContain(
       'path: "/api/public-api-sample"',
