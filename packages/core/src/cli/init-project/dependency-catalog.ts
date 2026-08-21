@@ -23,8 +23,10 @@ export type DependencyKey =
   | "shared"
   | "caslAbility"
   | "betterSqlite3"
+  | "typesBetterSqlite3"
   | "drizzle"
   | "drizzleKit"
+  | "kysely"
   | "hono"
   | "honoNodeServer"
   | "nodemailer"
@@ -191,6 +193,21 @@ export const DEPENDENCY_DEFINITIONS = [
     "%%SAPPORTA:DRIZZLE_VERSION%%",
     { browser: false, server: true },
   ),
+  // These two never run as shared code, but they are optional peers of
+  // drizzle-orm and therefore part of pnpm's peer-set resolution for it. If
+  // the generated project resolves either to a different version than the
+  // linked checkout, pnpm materializes a second drizzle-orm instance and
+  // TypeScript sees two incompatible declarations of every drizzle type.
+  coreInstalledDependency(
+    "typesBetterSqlite3",
+    "@types/better-sqlite3",
+    undefined,
+    { browser: false, server: true },
+  ),
+  coreInstalledDependency("kysely", "kysely", undefined, {
+    browser: false,
+    server: true,
+  }),
   coreInstalledDependency(
     "drizzleKit",
     "drizzle-kit",

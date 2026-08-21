@@ -417,10 +417,14 @@ describe("renderScaffoldFiles", () => {
       "node --import @sapporta/server/source-link-runtime dist/boot.js",
     );
 
+    // pnpm 10+ reads overrides from pnpm-workspace.yaml; the root
+    // package.json `pnpm` field is ignored there.
     const rootPackage = JSON.parse(byDest.get("package.json") ?? "{}") as {
       pnpm?: { overrides?: Record<string, string> };
     };
-    const overrides = rootPackage.pnpm?.overrides ?? {};
+    expect(rootPackage.pnpm?.overrides).toBeUndefined();
+    const workspaceYaml = byDest.get("pnpm-workspace.yaml") ?? "";
+    const overrides = parseWorkspaceOverrides(workspaceYaml);
     expect(Object.keys(overrides)).toEqual([
       "@sapporta/honest",
       "@sapporta/shared",
@@ -428,6 +432,8 @@ describe("renderScaffoldFiles", () => {
       "@sapporta/grid",
       "better-sqlite3",
       "drizzle-orm",
+      "@types/better-sqlite3",
+      "kysely",
       "hono",
       "@sapporta/rest-core",
       "@tanstack/react-form",
@@ -442,6 +448,8 @@ describe("renderScaffoldFiles", () => {
     for (const packageName of [
       "better-sqlite3",
       "drizzle-orm",
+      "@types/better-sqlite3",
+      "kysely",
       "hono",
       "@sapporta/rest-core",
       "@tanstack/react-form",
@@ -511,6 +519,8 @@ describe("shared runtime dependency catalog", () => {
     ).toEqual([
       "better-sqlite3",
       "drizzle-orm",
+      "@types/better-sqlite3",
+      "kysely",
       "hono",
       "@sapporta/rest-core",
       "@js-temporal/polyfill",
@@ -563,6 +573,18 @@ describe("scaffold template inventory", () => {
     ).toEqual([]);
   });
 });
+
+function parseWorkspaceOverrides(workspaceYaml: string): {
+  [packageName: string]: string;
+} {
+  const overrides: Record<string, string> = {};
+  const section = workspaceYaml.split(/^overrides:$/m)[1];
+  for (const line of (section ?? "").split("\n")) {
+    const match = /^ {2}"([^"]+)": "([^"]+)"$/.exec(line);
+    if (match) overrides[match[1]!] = match[2]!;
+  }
+  return overrides;
+}
 
 function listTemplateFiles(root: string): string[] {
   const files: string[] = [];

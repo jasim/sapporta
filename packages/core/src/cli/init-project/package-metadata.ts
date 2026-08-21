@@ -21,12 +21,7 @@ export type PackageSpec = string;
 export type PackageSpecSource = "declared" | "installed-exact" | "sapporta";
 
 export type SapportaSourcePackage =
-  | "core"
-  | "frontend"
-  | "grid"
-  | "honest"
-  | "shared"
-  | "ui";
+  "core" | "frontend" | "grid" | "honest" | "shared" | "ui";
 
 export function readPackageJson(path: string): PackageJson {
   return JSON.parse(readFileSync(path, "utf-8")) as PackageJson;
@@ -83,6 +78,12 @@ export function resolveInstalledPackageEntrypoint(
       packageName === "auth"
     ) {
       return packageRequire.resolve("auth/api");
+    }
+    if (isNodeError(error) && error.code === "MODULE_NOT_FOUND") {
+      // Types-only packages (e.g. @types/*) declare no runtime entrypoint.
+      // Their package.json still locates the installed copy; a genuinely
+      // missing package fails this resolve with the same clear error.
+      return packageRequire.resolve(`${packageName}/package.json`);
     }
     throw error;
   }

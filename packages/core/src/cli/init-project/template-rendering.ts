@@ -65,16 +65,20 @@ export function renderTemplateContent(
   return rendered;
 }
 
+/**
+ * Appends the source-link overrides to the generated pnpm-workspace.yaml.
+ * pnpm 10+ reads workspace settings from this file; overrides placed in the
+ * root package.json's `pnpm` field are silently ignored there.
+ */
 export function addPnpmOverrides(
-  rootPackageJson: string,
+  workspaceYaml: string,
   pnpmOverrides: Record<string, string>,
 ): string {
-  const pkg = JSON.parse(rootPackageJson) as {
-    pnpm?: { overrides?: Record<string, string> };
-  };
-  pkg.pnpm = pkg.pnpm ?? {};
-  pkg.pnpm.overrides = { ...(pkg.pnpm.overrides ?? {}), ...pnpmOverrides };
-  return `${JSON.stringify(pkg, null, 2)}\n`;
+  const lines = Object.entries(pnpmOverrides).map(
+    ([packageName, spec]) =>
+      `  ${JSON.stringify(packageName)}: ${JSON.stringify(spec)}`,
+  );
+  return `${workspaceYaml.trimEnd()}\n\noverrides:\n${lines.join("\n")}\n`;
 }
 
 export function findUnresolvedTokens(
@@ -115,7 +119,7 @@ export function renderScaffoldTemplates(opts: {
   return opts.templates.map((file) => {
     let content = renderTemplateContent(file.template, opts.variables);
     content = renderSourceLinkResolution(content, opts.sourceLinkMode);
-    if (file.dest === "package.json" && opts.pnpmOverrides) {
+    if (file.dest === "pnpm-workspace.yaml" && opts.pnpmOverrides) {
       content = addPnpmOverrides(content, opts.pnpmOverrides);
     }
     return {
