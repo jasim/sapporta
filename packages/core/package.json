@@ -57,6 +57,11 @@
       "sapporta:source": "./src/db/errors.ts",
       "default": "./dist/db/errors.js"
     },
+    "./testing": {
+      "types": "./dist/testing/index.d.ts",
+      "sapporta:source": "./src/testing/index.ts",
+      "default": "./dist/testing/index.js"
+    },
     "./create-project": {
       "types": "./dist/cli/init-project/create-project.d.ts",
       "sapporta:source": "./src/cli/init-project/create-project.ts",

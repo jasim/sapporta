@@ -191,8 +191,5 @@ export {
   projectPath,
 } from "./project-paths.js";
 
-// Test utilities
-export { createTestDb } from "./testing/test-utils.js";
-
 // Contract-driven API (ts-rest + Hono)
 export * from "./api/index.js";

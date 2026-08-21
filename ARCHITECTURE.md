@@ -100,6 +100,7 @@ keeping them out of the barrel keeps casual root imports lightweight.
 | `.` | Runtime surface consumed by a project's `boot.ts` and endpoint code: project loading and mounting, middleware installers, `scopedRows`, the auth mechanism (principals, abilities, row scopes), and API re-exports |
 | `./table` | Column builders and the `sapportaTable` wrapper used by schema files |
 | `./errors` | Database error types |
+| `./testing` | `createTestDb` and `createTestConnection` — in-memory SQLite databases with production PRAGMA settings for tests |
 | `./create-project` | Programmatic project creation — the engine behind `sapporta init` |
 | `./source-link-runtime` | Node module-resolution preload for source-linked development |
 | `./cli` | The `sapporta` command (side-effectful main) |
