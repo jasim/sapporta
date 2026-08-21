@@ -69,22 +69,22 @@ export type {
   TableObjectZod,
 } from "./schema/table-value-zod.js";
 export { tableApiZod } from "./api/table-api-zod.js";
-export { tableWriteZod } from "./data/table-write-zod.js";
-export { parseTableWrite } from "./data/validate.js";
+export { tableWriteZod } from "./rows/table-write-zod.js";
+export { parseTableWrite } from "./rows/validate.js";
 export type {
   TableWriteParseResult,
   ValidationErrorDetail,
-} from "./data/validate.js";
+} from "./rows/validate.js";
 
 // Save pipeline
-export { savePipeline, insertRow, updateRow } from "./data/save-pipeline.js";
+export { savePipeline, insertRow, updateRow } from "./rows/save-pipeline.js";
 
 // Row-scoped table operations
 export {
   ImmutableTableOperationError,
   RowNotFoundError,
   scopedRows,
-} from "./data/scoped-rows.js";
+} from "./rows/scoped-rows.js";
 export type {
   CountRowsByInput,
   CountRowsInput,
@@ -99,12 +99,12 @@ export type {
   ScopedRows,
   TableColumn,
   TableRow,
-} from "./data/scoped-rows.js";
-export { scanTableRows } from "./data/table-row-scan.js";
+} from "./rows/scoped-rows.js";
+export { scanTableRows } from "./rows/table-row-scan.js";
 export type {
   TableRowScanInput,
   TableRowScanOrder,
-} from "./data/table-row-scan.js";
+} from "./rows/table-row-scan.js";
 export type { GroupCount } from "@sapporta/shared";
 
 // Generated table HTTP query resolvers
@@ -146,8 +146,8 @@ export { buildSearchPredicate } from "./search/search-sql.js";
 export { schemaApi, extractSchemas, extractSchema } from "./schema/extract.js";
 
 // Row labels
-export { findRowLabelColumns, rowLabeller } from "./data/row-label.js";
-export type { RowLabeller } from "./data/row-label.js";
+export { findRowLabelColumns, rowLabeller } from "./rows/row-label.js";
+export type { RowLabeller } from "./rows/row-label.js";
 
 // Table catalog
 export { createTableCatalog } from "./schema/catalog.js";

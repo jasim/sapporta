@@ -36,7 +36,7 @@ import type {
   PageRowsInput,
   RowsQuery,
   TableColumn,
-} from "../data/scoped-rows.js";
+} from "../rows/scoped-rows.js";
 import { findPkColumn } from "../schema/pk.js";
 import type { TableDef } from "../schema/table.js";
 import { columnBySqlName } from "../schema/column.js";

@@ -21,13 +21,13 @@ import { stream } from "hono/streaming";
 import { getTableConfig } from "drizzle-orm/sqlite-core";
 import type { CountResult } from "@sapporta/shared/contracts";
 import type { TableCatalog } from "../schema/catalog.js";
-import { savePipeline, savePipelineInsertSync } from "../data/save-pipeline.js";
+import { savePipeline, savePipelineInsertSync } from "../rows/save-pipeline.js";
 import {
   ImmutableTableOperationError,
   RowNotFoundError,
   scopedRows,
-} from "../data/scoped-rows.js";
-import { cellToString, csvEscape } from "../data/csv.js";
+} from "../rows/scoped-rows.js";
+import { cellToString, csvEscape } from "../rows/csv.js";
 import { findPkColumn } from "../schema/pk.js";
 import {
   classifySqliteError,

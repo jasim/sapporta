@@ -1,6 +1,6 @@
 import { OperationError, ErrorCode } from "../errors.js";
-import { isSafeIdentifier } from "../data/sanitize.js";
-import { rejectControlChars as coreRejectControlChars } from "../data/sanitize.js";
+import { isSafeIdentifier } from "../rows/sanitize.js";
+import { rejectControlChars as coreRejectControlChars } from "../rows/sanitize.js";
 
 /**
  * Reject SQL that isn't a SELECT or WITH (CTE) statement.

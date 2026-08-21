@@ -20,12 +20,12 @@ import {
   RowScopePolicyError,
   type SapportaAuthContext,
 } from "../auth/index.js";
-import { scopedRows } from "../data/scoped-rows.js";
+import { scopedRows } from "../rows/scoped-rows.js";
 import {
   resolveRowFields,
   type ResolvedRowFields,
   UnknownRowFieldsError,
-} from "../data/row-fields.js";
+} from "../rows/row-fields.js";
 import type { SapportaAuthGuard, SapportaEnv } from "./server.js";
 import type { TableDef } from "../schema/table.js";
 import {

@@ -6,7 +6,7 @@ import type { TableCatalog } from "../schema/catalog.js";
 import type { SapportaAuthContext } from "../auth/context.js";
 import { createTestAuthContext } from "../testing/auth-context.js";
 import { createTestDb } from "../testing/test-utils.js";
-import { scopedRows } from "../data/scoped-rows.js";
+import { scopedRows } from "../rows/scoped-rows.js";
 import { buildSearchPredicate } from "./search-sql.js";
 
 const authorsTable = sqliteTable("authors", {

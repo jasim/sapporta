@@ -14,7 +14,7 @@ import { sqliteTable, integer, text } from "drizzle-orm/sqlite-core";
 import { sapportaTable } from "../schema/table.js";
 import { createRoute, listRoute, updateRoute } from "./table-api-contracts.js";
 import { tableApiZod } from "./table-api-zod.js";
-import { tableWriteZod } from "../data/table-write-zod.js";
+import { tableWriteZod } from "../rows/table-write-zod.js";
 
 const accounts = sapportaTable({
   drizzle: sqliteTable("accounts", {

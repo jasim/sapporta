@@ -5,7 +5,7 @@ import { resolveColumnKind } from "./resolve-kind.js";
 import { findPkColumn } from "./pk.js";
 import { isAutoManagedTimestampColumn, type TableDef } from "./table.js";
 import { logger } from "../db/logger.js";
-import { findRowLabelColumns } from "../data/row-label.js";
+import { findRowLabelColumns } from "../rows/row-label.js";
 import { getColumnEnumValues } from "./table-value-zod.js";
 import { defaultColumnLabel } from "@sapporta/shared";
 import {

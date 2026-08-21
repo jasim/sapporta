@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { initContract, TsRestApi } from "../../../api/index.js";
 import type { SapportaEnv } from "../../../api/server.js";
-import { scopedRows } from "../../../data/scoped-rows.js";
+import { scopedRows } from "../../../rows/scoped-rows.js";
 import { accounts } from "../schema/accounts.js";
 
 const c = initContract();
