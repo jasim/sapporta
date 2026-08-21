@@ -24,7 +24,7 @@ import {
 } from "./record-form-fields";
 import { createTableRow } from "../api/rows";
 import { tableQueryKeys } from "../query";
-import { reloadTGridRows } from "../state/tgrid-session-registry";
+import { reloadTGridRows } from "../tgrid/tgrid-session-registry";
 import { useLookupStore } from "../../lookup";
 
 export function NewRecordPage({ tableSchema }: { tableSchema: TableSchema }) {

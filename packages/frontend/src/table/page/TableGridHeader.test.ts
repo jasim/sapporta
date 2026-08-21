@@ -10,11 +10,11 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { TableSchema } from "@sapporta/shared/contracts";
 import type { TableGridActionsProps } from "../../index";
-import type { TGridSession } from "../state/tgrid-session";
+import type { TGridSession } from "../tgrid/tgrid-session";
 import { TableGridHeader } from "./TableGridHeader";
 import type { TableLevelQuery } from "./table-level-query";
 import type { TableSelection } from "./table-selection";
-import type { TGridSourceStatus } from "./tgrid-source-status";
+import type { TGridSourceStatus } from "../tgrid/tgrid-source-status";
 
 (
   globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
@@ -34,7 +34,7 @@ vi.mock("./table-selection", () => ({
   useTableSelection: hookMocks.useTableSelection,
 }));
 
-vi.mock("./tgrid-source-status", () => ({
+vi.mock("../tgrid/tgrid-source-status", () => ({
   useTGridSourceStatus: hookMocks.useTGridSourceStatus,
 }));
 

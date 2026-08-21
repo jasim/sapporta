@@ -15,24 +15,24 @@ import {
 import { columnPreset } from "@sapporta/grid/column-preset";
 import type { TableSchema } from "@sapporta/shared/contracts";
 import { cn } from "@sapporta/ui/cn";
-import { relatedRowsTableHref } from "../grid-adapter/tgrid-table-url";
+import { relatedRowsTableHref } from "./tgrid-table-url";
 import {
   resolveTGridCellLinks,
   resolveTGridRowLinks,
-} from "../grid-adapter/tgrid-cell-links";
+} from "./tgrid-cell-links";
 import { LinkMenuItems } from "../../links/LinkMenuItems";
-import type { TGridFilter } from "../grid-adapter/tgrid-filter";
-import type { TGridTableColumnMeta } from "../grid-adapter/tgrid-column-mapper";
-import { renderTGridHeaderMenu } from "../grid-adapter/tgrid-header-menu";
+import type { TGridFilter } from "./tgrid-filter";
+import type { TGridTableColumnMeta } from "./tgrid-column-mapper";
+import { renderTGridHeaderMenu } from "./tgrid-header-menu";
 import {
   withTGridSessionContext,
   type TGridSessionContext,
-} from "../grid-adapter/tgrid-cell-context";
-import type { TGridRowActivatedEvent } from "../state/tgrid-active-row";
-import type { TGridRowsByLevel } from "../grid-adapter/tgrid-types";
-import type { TGridLevelQueryState } from "../state/tgrid-level-query-state";
-import type { TGridSession } from "../state/tgrid-session";
-import type { TGridLevelInfo } from "../grid-adapter/tgrid-level-config";
+} from "./tgrid-cell-context";
+import type { TGridRowActivatedEvent } from "./tgrid-active-row";
+import type { TGridRowsByLevel } from "./tgrid-types";
+import type { TGridLevelQueryState } from "./tgrid-level-query-state";
+import type { TGridSession } from "./tgrid-session";
+import type { TGridLevelInfo } from "./tgrid-level-config";
 import "./table-card.css";
 
 export type TGridPresentation = GridPresentation;

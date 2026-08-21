@@ -10,10 +10,10 @@ import {
   type CreateTGridSessionArgs,
   type TGridLiveInputs,
   type TGridSession,
-} from "../state/tgrid-session";
-import type { TGridLevelQueryState } from "../state/tgrid-level-query-state";
+} from "./tgrid-session";
+import type { TGridLevelQueryState } from "./tgrid-level-query-state";
 import type { TGridDefinition } from "./tgrid-runtime-config";
-import type { TGridActiveRow } from "../state/tgrid-active-row";
+import type { TGridActiveRow } from "./tgrid-active-row";
 import {
   createTGridColumnsBuilder,
   type TGridColumnsBuilder,

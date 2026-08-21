@@ -8,17 +8,17 @@ import {
 } from "react";
 import { useStore } from "zustand";
 import type { TableSchema } from "@sapporta/shared/contracts";
-import { useTGridSession } from "../grid-adapter/tgrid-binding";
-import type { TGridDefinition } from "../grid-adapter/tgrid-runtime-config";
+import { useTGridSession } from "../tgrid/tgrid-binding";
+import type { TGridDefinition } from "../tgrid/tgrid-runtime-config";
 import type {
   TGridLevelId,
   TGridRowsByLevel,
-} from "../grid-adapter/tgrid-types";
+} from "../tgrid/tgrid-types";
 import type {
   TGridLoadedRowsBoundaryHandler,
   TGridSession,
-} from "../state/tgrid-session";
-import { TGrid, type ViewRelatedRowsOption } from "./TGrid";
+} from "../tgrid/tgrid-session";
+import { TGrid, type ViewRelatedRowsOption } from "../tgrid/TGrid";
 import { TableGridHeader } from "./TableGridHeader";
 import {
   TableGridPager,
@@ -33,11 +33,11 @@ import {
   useTableGridUrlState,
   type TableGridRoute,
 } from "./table-grid-url-state";
-import { useTGridLifecycle } from "./tgrid-lifecycle";
+import { useTGridLifecycle } from "../tgrid/tgrid-lifecycle";
 import {
   tableLoadErrorMessage,
   useTGridSourceStatus,
-} from "./tgrid-source-status";
+} from "../tgrid/tgrid-source-status";
 import { useTableViewPreference } from "./table-view-pref";
 import {
   resolveTableGridPresentation,

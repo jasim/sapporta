@@ -14,7 +14,7 @@ import {
 import { columnPreset } from "@sapporta/grid/column-preset";
 import type { ValueLookup } from "@sapporta/grid/lookup";
 import { startTGridLookupLoading } from "./tgrid-lookup-loading";
-import type { TGridTableColumnMeta } from "../grid-adapter/tgrid-column-mapper";
+import type { TGridTableColumnMeta } from "./tgrid-column-mapper";
 
 const ordersPath = rootPath("orders");
 const linesPath = childPath(ordersPath, "42", "orders.lines");

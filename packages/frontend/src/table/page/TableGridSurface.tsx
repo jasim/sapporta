@@ -2,7 +2,7 @@ import { forwardRef, type ReactNode } from "react";
 import { Loader2 } from "lucide-react";
 import { cn } from "@sapporta/ui/cn";
 import type { TablePageMode } from "./table-page-mode";
-import type { TGridSourceStatus } from "./tgrid-source-status";
+import type { TGridSourceStatus } from "../tgrid/tgrid-source-status";
 
 // Visual shell for table-like pages.
 // It knows how loading, page-level errors, save-error banners, content, and the

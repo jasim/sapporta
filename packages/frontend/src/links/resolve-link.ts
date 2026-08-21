@@ -4,7 +4,7 @@ import {
   type LinkTarget,
   type NavLink,
 } from "@sapporta/shared/contracts";
-import { tableFilteredByUrl } from "../table/grid-adapter/tgrid-table-url";
+import { tableFilteredByUrl } from "../table/tgrid/tgrid-table-url";
 
 /**
  * A `NavLink` resolved against one row's values: a concrete destination

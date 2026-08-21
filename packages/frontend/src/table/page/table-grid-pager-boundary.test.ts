@@ -12,7 +12,7 @@ import {
   type SourceLoadResult,
 } from "@sapporta/grid";
 import { controllerFor, cursorManagerFor } from "@sapporta/grid/advanced";
-import type { TGridSession } from "../state/tgrid-session";
+import type { TGridSession } from "../tgrid/tgrid-session";
 import {
   createTableGridPagerBoundaryController,
   focusTableGrid,

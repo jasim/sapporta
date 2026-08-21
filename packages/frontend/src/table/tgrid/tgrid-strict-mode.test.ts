@@ -6,7 +6,7 @@ import { createRoot, type Root } from "react-dom/client";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { TableSchema } from "@sapporta/shared/contracts";
-import { TGrid } from "../page/TGrid";
+import { TGrid } from "./TGrid";
 import { TablePage } from "../page/TablePage";
 import { useSchemaStore } from "../../schema-catalog/state/schema-store";
 import { defineTGrid } from "./tgrid-runtime-config";

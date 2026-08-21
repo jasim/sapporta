@@ -23,41 +23,41 @@ export {
   type ForeignKeyRecordFormFieldModel,
   type RecordFormFieldModel,
 } from "./form/record-form-fields";
-export * from "./grid-adapter/schema-tgrid";
+export * from "./tgrid/schema-tgrid";
 export {
   defineTGrid,
   type TGridDefinition,
-} from "./grid-adapter/tgrid-runtime-config";
-export * from "./grid-adapter/tgrid-cell-context";
+} from "./tgrid/tgrid-runtime-config";
+export * from "./tgrid/tgrid-cell-context";
 export type {
   TGridActiveRow,
   TGridRowActivatedEvent,
-} from "./state/tgrid-active-row";
-export * from "./grid-adapter/tgrid-column-spec";
+} from "./tgrid/tgrid-active-row";
+export * from "./tgrid/tgrid-column-spec";
 
-export * from "./grid-adapter/tgrid-filter";
-export * from "./grid-adapter/tgrid-level-config";
-export * from "./grid-adapter/tgrid-column-mapper";
+export * from "./tgrid/tgrid-filter";
+export * from "./tgrid/tgrid-level-config";
+export * from "./tgrid/tgrid-column-mapper";
 export {
   resolveTGridCellLinks,
   resolveTGridRowLinks,
   withTGridCellLinks,
-} from "./grid-adapter/tgrid-cell-links";
-export * from "./grid-adapter/tgrid-column-builder";
-export * from "./grid-adapter/tgrid-binding";
-export * from "./grid-adapter/tgrid-types";
-export * from "./grid-adapter/tgrid-table-url";
+} from "./tgrid/tgrid-cell-links";
+export * from "./tgrid/tgrid-column-builder";
+export * from "./tgrid/tgrid-binding";
+export * from "./tgrid/tgrid-types";
+export * from "./tgrid/tgrid-table-url";
 export {
   visiblePaginationItems,
   type PaginationRangeItem,
-} from "./grid-adapter/visible-pagination-items";
-export * from "./lookup/tgrid-lookup-loading";
-export { TGrid } from "./page/TGrid";
+} from "./tgrid/visible-pagination-items";
+export * from "./tgrid/tgrid-lookup-loading";
+export { TGrid } from "./tgrid/TGrid";
 export type {
   TGridPresentation,
   ViewRelatedRowsContext,
   ViewRelatedRowsOption,
-} from "./page/TGrid";
+} from "./tgrid/TGrid";
 export {
   TablePage,
   type TablePageGridOptions,
@@ -84,8 +84,8 @@ export * from "./page/table-level-query";
 export * from "./page/table-page-mode";
 export * from "./page/table-selection";
 export * from "./page/table-view-pref";
-export * from "./page/tgrid-lifecycle";
-export * from "./page/tgrid-source-status";
+export * from "./tgrid/tgrid-lifecycle";
+export * from "./tgrid/tgrid-source-status";
 export * from "./query";
 export { NewRecordRoute } from "./route/NewRecordRoute";
 export {
@@ -93,16 +93,16 @@ export {
   type TableGridOptionsByTable,
   type TableRouteProps,
 } from "./route/TableRoute";
-export * from "./state/tgrid-level-query-state";
+export * from "./tgrid/tgrid-level-query-state";
 export {
   createTGridSession,
   type CreateTGridSessionArgs,
   type TGridLoadedRowsBoundaryHandler,
   type TGridRouteQuerySeed,
   type TGridSession,
-} from "./state/tgrid-session";
+} from "./tgrid/tgrid-session";
 export {
   reloadTGridRows,
   registerTGridSession,
   unregisterTGridSession,
-} from "./state/tgrid-session-registry";
+} from "./tgrid/tgrid-session-registry";

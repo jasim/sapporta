@@ -5,8 +5,8 @@ import type { LookupForColumn } from "../../lookup";
 import type {
   TGridLevelId,
   TGridRowsByLevel,
-} from "../grid-adapter/tgrid-types";
-import type { TGridSession } from "../state/tgrid-session";
+} from "../tgrid/tgrid-types";
+import type { TGridSession } from "../tgrid/tgrid-session";
 import { requireHostQueryStore } from "./table-query-store";
 
 export type TableLevelQuery = {

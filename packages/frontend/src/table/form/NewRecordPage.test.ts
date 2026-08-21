@@ -19,7 +19,7 @@ vi.mock("../api/rows", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../api/rows")>()),
   createTableRow,
 }));
-vi.mock("../state/tgrid-session-registry", () => ({ reloadTGridRows }));
+vi.mock("../tgrid/tgrid-session-registry", () => ({ reloadTGridRows }));
 
 (
   globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }

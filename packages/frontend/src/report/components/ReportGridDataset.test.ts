@@ -8,7 +8,7 @@ import {
   ReportGridDataset,
   type ReportCellLinkContext,
   type ReportCellLinkResolvers,
-} from "./ReportGrid";
+} from "./ReportGridDataset";
 import type { GridDataset } from "@sapporta/shared/grid-dataset";
 
 (

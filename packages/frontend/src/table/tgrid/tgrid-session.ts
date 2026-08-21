@@ -22,21 +22,21 @@ import { sortOrderEqual } from "@sapporta/grid";
 import {
   compileTGridRuntimeConfig,
   type TGridDefinition,
-} from "../grid-adapter/tgrid-runtime-config";
-import type { TGridFilter } from "../grid-adapter/tgrid-filter";
+} from "./tgrid-runtime-config";
+import type { TGridFilter } from "./tgrid-filter";
 import type {
   TGridLevelConfig,
   TGridLevelInfo,
   TGridLevelsConfigMap,
-} from "../grid-adapter/tgrid-level-config";
+} from "./tgrid-level-config";
 import {
   createTGridColumnMapper,
   type TGridColumnMapper,
-} from "../grid-adapter/tgrid-column-mapper";
+} from "./tgrid-column-mapper";
 import type {
   TGridRuntimeLevel,
   TGridSessionContext,
-} from "../grid-adapter/tgrid-cell-context";
+} from "./tgrid-cell-context";
 import {
   projectTGridActiveRow,
   type TGridRowActivatedEvent,
@@ -54,7 +54,7 @@ import type {
   TGridLevelId,
   TGridRowsByLevel,
   TGridTableRow,
-} from "../grid-adapter/tgrid-types";
+} from "./tgrid-types";
 import type {
   TGridRouteQuerySeed,
   TGridLevelQueryState,

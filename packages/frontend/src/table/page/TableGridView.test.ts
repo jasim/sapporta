@@ -11,8 +11,8 @@ import {
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { TableSchema } from "@sapporta/shared/contracts";
-import type { TGridDefinition } from "../grid-adapter/tgrid-runtime-config";
-import type { TGridSession } from "../state/tgrid-session";
+import type { TGridDefinition } from "../tgrid/tgrid-runtime-config";
+import type { TGridSession } from "../tgrid/tgrid-session";
 import { TableGridView } from "./TableGridView";
 
 type RowsByLevel = {
@@ -27,7 +27,7 @@ const { sessionState } = vi.hoisted(() => ({
   },
 }));
 
-vi.mock("../grid-adapter/tgrid-binding", () => ({
+vi.mock("../tgrid/tgrid-binding", () => ({
   useTGridSession: () => sessionState.current,
 }));
 
@@ -41,11 +41,11 @@ vi.mock("./table-grid-url-state", () => ({
   }),
 }));
 
-vi.mock("./tgrid-lifecycle", () => ({
+vi.mock("../tgrid/tgrid-lifecycle", () => ({
   useTGridLifecycle: () => undefined,
 }));
 
-vi.mock("./tgrid-source-status", () => ({
+vi.mock("../tgrid/tgrid-source-status", () => ({
   tableLoadErrorMessage: () => null,
   useTGridSourceStatus: () => ({ status: "loaded" }),
 }));
@@ -91,7 +91,7 @@ vi.mock("./TableGridPager", () => ({
   TableGridPager: () => null,
 }));
 
-vi.mock("./TGrid", () => ({
+vi.mock("../tgrid/TGrid", () => ({
   TGrid: () => null,
 }));
 

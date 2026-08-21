@@ -2,11 +2,11 @@ import { useStore } from "zustand";
 import type {
   TGridLevelId,
   TGridRowsByLevel,
-} from "../grid-adapter/tgrid-types";
-import type { TGridSession } from "../state/tgrid-session";
+} from "../tgrid/tgrid-types";
+import type { TGridSession } from "../tgrid/tgrid-session";
 import { tableGridUrlForQueryState } from "./table-grid-url-state";
 import { requireHostQueryStore } from "./table-query-store";
-import { useTGridSourceStatus } from "./tgrid-source-status";
+import { useTGridSourceStatus } from "../tgrid/tgrid-source-status";
 
 export type TableLevelPager = {
   page: number;

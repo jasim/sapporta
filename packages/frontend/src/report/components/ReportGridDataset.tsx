@@ -43,7 +43,7 @@ import {
   type GridDatasetNode,
 } from "@sapporta/shared/grid-dataset";
 import { cn } from "@sapporta/ui/cn";
-import { gridDatasetAncestorsForPath } from "../../grid-dataset/path";
+import { gridDatasetAncestorsForPath } from "../grid-dataset-path";
 import { catalogTableLabel } from "../../links/catalog-label";
 import {
   isExternalHref,
@@ -56,7 +56,7 @@ import {
   openResolvedLink,
 } from "../../links/open-link";
 import { LinkMenuItems } from "../../links/LinkMenuItems";
-import "./ReportGrid.css";
+import "./ReportGridDataset.css";
 
 export type ReportCellLink = {
   label: string;
@@ -96,91 +96,13 @@ export type ReportCellLinkResolvers<TInput = unknown> = Record<
 
 type ReportCellLinkCache = Map<string, ReportCellLink | null>;
 
-type ReportGridBinding<TInput = unknown> = {
+type ReportGridDatasetBinding<TInput = unknown> = {
   dataset: GridDataset;
   runtime: GridRuntime;
   root: GridPath;
   links: ReportCellLinkResolvers<TInput> | undefined;
   input: TInput | undefined;
 };
-
-interface ReportGridProps<TInput = unknown> {
-  dataset: GridDataset;
-  links?: ReportCellLinkResolvers<TInput>;
-  input?: TInput;
-}
-
-function ReportGrid<TInput = unknown>({
-  dataset,
-  links,
-  input,
-}: ReportGridProps<TInput>) {
-  const runtime = useGridRuntimeEffect(() => {
-    const model = buildReportGridModel(dataset, links, input);
-    return createGridRuntime({
-      schema: model.schema,
-      dataSource: model.dataSource,
-      interaction: CELL_GRID_WITH_ACTIVE_ROW,
-    });
-  }, [dataset, links, input]);
-
-  if (!runtime) {
-    return (
-      <div className="sapporta-report-tgrid min-w-full text-sap-muted">
-        Loading report...
-      </div>
-    );
-  }
-
-  return (
-    <GridRuntimeProvider runtime={runtime}>
-      <ReportGridBody
-        session={{ dataset, runtime, root: runtime.root.path, links, input }}
-      />
-    </GridRuntimeProvider>
-  );
-}
-
-function ReportGridBody<TInput>({
-  session,
-}: {
-  session: ReportGridBinding<TInput>;
-}) {
-  const chrome = useReportGridChrome(session.dataset.name);
-
-  useLayoutEffect(() => {
-    expandDefaultReportRows(session.runtime, session.dataset);
-  }, [session.dataset, session.runtime]);
-
-  return (
-    <GridCopyContextMenu
-      renderExtraItems={(target) => renderReportLinkMenuItems(session, target)}
-    >
-      <div className="sapporta-report-tgrid min-w-full">
-        <GridLevel path={session.root} chrome={chrome} presentation="tabular" />
-      </div>
-    </GridCopyContextMenu>
-  );
-}
-
-function useReportGridChrome(reportName: string): GridLevelChrome {
-  return useMemo<GridLevelChrome>(() => {
-    const base = columnPreset.chrome({
-      columnSizing: {
-        storageKey: ({ levelName }) =>
-          `sapporta:report-grid-columns:${reportName}:${levelName}`,
-      },
-    });
-    return {
-      ...base,
-      levelContainerClassName: (context) =>
-        cn(
-          base.levelContainerClassName?.(context),
-          "sapporta-report-tgrid__level",
-        ),
-    };
-  }, [reportName]);
-}
 
 export interface ReportGridDatasetProps<TInput = unknown> {
   dataset: GridDataset;
@@ -193,12 +115,75 @@ export function ReportGridDataset<TInput = unknown>({
   links,
   linkContext,
 }: ReportGridDatasetProps<TInput>) {
+  const input = linkContext?.input;
+  const runtime = useGridRuntimeEffect(() => {
+    const model = buildReportGridDatasetModel(dataset, links, input);
+    return createGridRuntime({
+      schema: model.schema,
+      dataSource: model.dataSource,
+      interaction: CELL_GRID_WITH_ACTIVE_ROW,
+    });
+  }, [dataset, links, input]);
+
+  if (!runtime) {
+    return (
+      <div className="sapporta-report-grid-dataset min-w-full text-sap-muted">
+        Loading report...
+      </div>
+    );
+  }
+
   return (
-    <ReportGrid dataset={dataset} links={links} input={linkContext?.input} />
+    <GridRuntimeProvider runtime={runtime}>
+      <ReportGridDatasetBody
+        session={{ dataset, runtime, root: runtime.root.path, links, input }}
+      />
+    </GridRuntimeProvider>
   );
 }
 
-function buildReportGridModel<TInput>(
+function ReportGridDatasetBody<TInput>({
+  session,
+}: {
+  session: ReportGridDatasetBinding<TInput>;
+}) {
+  const chrome = useReportGridDatasetChrome(session.dataset.name);
+
+  useLayoutEffect(() => {
+    expandDefaultReportRows(session.runtime, session.dataset);
+  }, [session.dataset, session.runtime]);
+
+  return (
+    <GridCopyContextMenu
+      renderExtraItems={(target) => renderReportLinkMenuItems(session, target)}
+    >
+      <div className="sapporta-report-grid-dataset min-w-full">
+        <GridLevel path={session.root} chrome={chrome} presentation="tabular" />
+      </div>
+    </GridCopyContextMenu>
+  );
+}
+
+function useReportGridDatasetChrome(reportName: string): GridLevelChrome {
+  return useMemo<GridLevelChrome>(() => {
+    const base = columnPreset.chrome({
+      columnSizing: {
+        storageKey: ({ levelName }) =>
+          `sapporta:report-grid-columns:${reportName}:${levelName}`,
+      },
+    });
+    return {
+      ...base,
+      levelContainerClassName: (context) =>
+        cn(
+          base.levelContainerClassName?.(context),
+          "sapporta-report-grid-dataset__level",
+        ),
+    };
+  }, [reportName]);
+}
+
+function buildReportGridDatasetModel<TInput>(
   dataset: GridDataset,
   links: ReportCellLinkResolvers<TInput> | undefined,
   input: TInput | undefined,
@@ -434,7 +419,7 @@ function renderReportCell<TInput>({
   if (!primaryLink) return content;
   return (
     <span
-      className="sapporta-report-tgrid__linked-value"
+      className="sapporta-report-grid-dataset__linked-value"
       data-grid-part="report-linked-value"
     >
       <ReportCellPrimaryLink link={primaryLink}>
@@ -537,7 +522,7 @@ function canResolvePrimaryReportCellLink<TInput>({
  * `rowLinks`.
  */
 function renderReportLinkMenuItems<TInput>(
-  session: ReportGridBinding<TInput>,
+  session: ReportGridDatasetBinding<TInput>,
   target: GridCopyTarget | null,
 ): ReactNode {
   if (!target) return null;
@@ -685,7 +670,7 @@ function ReportCellPrimaryLink({
       href={link.href}
       target={link.target}
       tabIndex={-1}
-      className="sapporta-report-tgrid__primary-link"
+      className="sapporta-report-grid-dataset__primary-link"
       rel={linkRel(link.target)}
       title={link.label}
       data-grid-part="report-primary-link"

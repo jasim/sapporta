@@ -3,9 +3,9 @@ import type {
   TGridLevelId,
   TGridRowsByLevel,
   TGridTableRow,
-} from "../grid-adapter/tgrid-types";
-import type { TGridLevelQueryState } from "../state/tgrid-level-query-state";
-import type { TGridSession } from "../state/tgrid-session";
+} from "../tgrid/tgrid-types";
+import type { TGridLevelQueryState } from "../tgrid/tgrid-level-query-state";
+import type { TGridSession } from "../tgrid/tgrid-session";
 
 export function requireHostQueryStore<
   RowsByLevel extends TGridRowsByLevel,

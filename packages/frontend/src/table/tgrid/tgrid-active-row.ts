@@ -9,7 +9,7 @@ import type {
 import type {
   TGridLevelId,
   TGridRowsByLevel,
-} from "../grid-adapter/tgrid-types";
+} from "./tgrid-types";
 
 type TGridActiveRowForKind<
   RowsByLevel extends TGridRowsByLevel,

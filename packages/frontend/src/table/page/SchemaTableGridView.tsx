@@ -7,12 +7,12 @@ import {
   type SchemaTableGridSource,
   type SchemaTableRootRowsOptions,
   type SchemaTableRowsByLevel,
-} from "../grid-adapter/schema-tgrid";
-import type { TGridDefinition } from "../grid-adapter/tgrid-runtime-config";
+} from "../tgrid/schema-tgrid";
+import type { TGridDefinition } from "../tgrid/tgrid-runtime-config";
 import type {
   TGridLoadedRowsBoundaryHandler,
   TGridSession,
-} from "../state/tgrid-session";
+} from "../tgrid/tgrid-session";
 import type { TableGridRoute } from "./table-grid-url-state";
 import {
   TableGridView,
@@ -20,7 +20,7 @@ import {
   type TableGridActionsProps,
   type TableGridBinding,
 } from "./TableGridView";
-import type { ViewRelatedRowsOption } from "./TGrid";
+import type { ViewRelatedRowsOption } from "../tgrid/TGrid";
 
 export type SchemaTableGridViewSource = {
   table: TableSchema;

@@ -4,8 +4,8 @@ import { controllerFor, cursorManagerFor } from "@sapporta/grid/advanced";
 import type {
   TGridLevelId,
   TGridRowsByLevel,
-} from "../grid-adapter/tgrid-types";
-import type { TGridLoadedRowsBoundaryHandler } from "../state/tgrid-session";
+} from "../tgrid/tgrid-types";
+import type { TGridLoadedRowsBoundaryHandler } from "../tgrid/tgrid-session";
 import type { TablePagerDirection } from "./TablePagers";
 
 export type TableGridPagerButtonRefs = {

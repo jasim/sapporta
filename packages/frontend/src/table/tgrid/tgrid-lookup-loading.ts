@@ -1,5 +1,5 @@
-import type { TGridSession } from "../state/tgrid-session";
-import type { TGridRowsByLevel } from "../grid-adapter/tgrid-types";
+import type { TGridSession } from "./tgrid-session";
+import type { TGridRowsByLevel } from "./tgrid-types";
 import { startLoadingValueLookupEntriesForGridRows } from "@sapporta/grid/lookup";
 import { lookupCapabilities, preset } from "@sapporta/grid/column-preset";
 

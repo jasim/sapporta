@@ -17,8 +17,8 @@ import {
   createTGridSession,
   type TGridLoadedRowsBoundaryHandler,
 } from "./tgrid-session";
-import { defineTGrid } from "../grid-adapter/tgrid-runtime-config";
-import type { TableRowsClient } from "../grid-adapter/tgrid-level-config";
+import { defineTGrid } from "./tgrid-runtime-config";
+import type { TableRowsClient } from "./tgrid-level-config";
 
 vi.mock("../api/rows", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../api/rows")>();

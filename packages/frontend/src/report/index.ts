@@ -5,7 +5,7 @@ export {
   type ReportCellLinkContext,
   type ReportCellLinkResolvers,
   type ReportRowLinkContext,
-} from "./components/ReportGrid";
+} from "./components/ReportGridDataset";
 export {
   ReportSummaryStats,
   type ReportStat,

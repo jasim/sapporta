@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { ColumnSchema } from "@sapporta/shared/contracts";
 import { summarizeOperator } from "./FilterCard";
-import { parseTableSearchParams } from "../grid-adapter/tgrid-table-url";
+import { parseTableSearchParams } from "../tgrid/tgrid-table-url";
 
 const authorColumn: ColumnSchema = {
   name: "author_id",

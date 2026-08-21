@@ -34,8 +34,8 @@ import { FilterCardsBar } from "../filters/FilterCardsBar";
 import type {
   TGridLevelId,
   TGridRowsByLevel,
-} from "../grid-adapter/tgrid-types";
-import type { TGridSession } from "../state/tgrid-session";
+} from "../tgrid/tgrid-types";
+import type { TGridSession } from "../tgrid/tgrid-session";
 import { TableViewOptions, TableViewSwitch } from "./TableViewSwitch";
 import {
   CompactHeaderButton,
@@ -48,7 +48,7 @@ import type { TableViewPreference } from "./table-view-pref";
 import type { TableGridActionsProps } from "./TableGridView";
 import { useTableLevelQuery, type TableLevelQuery } from "./table-level-query";
 import { useTableSelection } from "./table-selection";
-import { useTGridSourceStatus } from "./tgrid-source-status";
+import { useTGridSourceStatus } from "../tgrid/tgrid-source-status";
 
 type TableDeleteRequest = {
   count: number;

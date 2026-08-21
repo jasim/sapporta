@@ -1,6 +1,6 @@
 import { useCallback, useState, useSyncExternalStore } from "react";
-import type { TGridRowsByLevel } from "../grid-adapter/tgrid-types";
-import type { TGridSession } from "../state/tgrid-session";
+import type { TGridRowsByLevel } from "../tgrid/tgrid-types";
+import type { TGridSession } from "../tgrid/tgrid-session";
 import {
   clearTableSelection,
   deleteSelectedTableRows,

@@ -1,6 +1,6 @@
 /* Reports are readonly analysis surfaces. The gray wash and quiet focus ring
    keep keyboard drill-down visible without making cells look edit-ready. */
-.sapporta-report-tgrid {
+.sapporta-report-grid-dataset {
   --sap-report-grid-background: color-mix(
     in oklab,
     var(--sap-surface) 35%,
@@ -22,7 +22,7 @@
 
 /* Nested report levels use the same grid preset as table pages, so carry the
    readonly report treatment through every level. */
-.sapporta-report-tgrid .sapporta-report-tgrid__level {
+.sapporta-report-grid-dataset .sapporta-report-grid-dataset__level {
   --grid-background: var(--sap-report-grid-background);
   --grid-header-background: var(--sap-report-grid-background);
   --grid-editor-background: var(--sap-report-grid-background);
@@ -56,7 +56,7 @@
 
 /* The last column's handle would draw a stray line at the grid's right edge;
    show it only while hovered or dragging. */
-.sapporta-report-tgrid
+.sapporta-report-grid-dataset
   [data-grid-part="header-cell"]:last-child
   [data-grid-part="column-resize-handle"]:not([data-resizing="true"]):not(
     :hover
@@ -64,12 +64,12 @@
   background: transparent;
 }
 
-.sapporta-report-tgrid
-  .sapporta-report-tgrid__level[data-grid-depth]:not([data-grid-depth="0"]) {
+.sapporta-report-grid-dataset
+  .sapporta-report-grid-dataset__level[data-grid-depth]:not([data-grid-depth="0"]) {
   background: var(--grid-background);
 }
 
-.sapporta-report-tgrid
+.sapporta-report-grid-dataset
   :where(
     [data-grid-part="row"][data-row-kind="footer"],
     [data-grid-part="row"][data-row-kind="rollup"],
@@ -82,25 +82,25 @@
   font-weight: 650;
 }
 
-.sapporta-report-tgrid :where([data-grid-part="row"][data-row-kind="footer"]) {
+.sapporta-report-grid-dataset :where([data-grid-part="row"][data-row-kind="footer"]) {
   border-top: 1px solid var(--sap-border);
 }
 
-.sapporta-report-tgrid
+.sapporta-report-grid-dataset
   :where([data-row-kind="footer"] [data-grid-part="cell"]) {
   color: var(--sap-fg);
 }
 
-.sapporta-report-tgrid
+.sapporta-report-grid-dataset
   :where([data-row-kind="opening"] [data-grid-part="cell"]) {
   color: var(--sap-fg-muted);
 }
 
-.sapporta-report-tgrid :where([data-grid-depth]:not([data-grid-depth="0"])) {
+.sapporta-report-grid-dataset :where([data-grid-depth]:not([data-grid-depth="0"])) {
   margin-left: 18px;
 }
 
-.sapporta-report-tgrid__linked-value {
+.sapporta-report-grid-dataset__linked-value {
   align-items: center;
   display: inline-flex;
   gap: 4px;
@@ -109,7 +109,7 @@
   vertical-align: top;
 }
 
-.sapporta-report-tgrid__primary-link {
+.sapporta-report-grid-dataset__primary-link {
   color: var(--sap-drill-down-link);
   display: inline-flex;
   max-width: 100%;
@@ -117,10 +117,10 @@
   text-decoration: none;
 }
 
-.sapporta-report-tgrid__primary-link:hover {
+.sapporta-report-grid-dataset__primary-link:hover {
   text-decoration: underline;
 }
 
-.sapporta-report-tgrid__primary-link > * {
+.sapporta-report-grid-dataset__primary-link > * {
   min-width: 0;
 }

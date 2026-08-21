@@ -1,7 +1,7 @@
 import type { SortDescriptor } from "@sapporta/grid";
 import type { TypedFilterCondition } from "@sapporta/shared/filter";
-import type { TGridFilter } from "../grid-adapter/tgrid-filter";
-import type { TGridTableRow } from "../grid-adapter/tgrid-types";
+import type { TGridFilter } from "./tgrid-filter";
+import type { TGridTableRow } from "./tgrid-types";
 
 // Query values supplied by the current route. Omitted fields keep the level's
 // configured defaults; present empty arrays/nulls intentionally clear defaults.

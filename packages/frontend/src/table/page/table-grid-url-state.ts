@@ -8,18 +8,18 @@ import {
   buildTableSearchParams,
   parseTableSearchParams,
   sanitizeSortDescriptors,
-} from "../grid-adapter/tgrid-table-url";
+} from "../tgrid/tgrid-table-url";
 import type {
   TGridLevelId,
   TGridRowsByLevel,
   TGridTableRow,
-} from "../grid-adapter/tgrid-types";
-import type { TGridLevelQueryState } from "../state/tgrid-level-query-state";
+} from "../tgrid/tgrid-types";
+import type { TGridLevelQueryState } from "../tgrid/tgrid-level-query-state";
 import type {
   CreateTGridSessionArgs,
   TGridRouteQuerySeed,
   TGridSession,
-} from "../state/tgrid-session";
+} from "../tgrid/tgrid-session";
 
 type PersistedSort = Array<{ colId: string; direction: string }>;
 

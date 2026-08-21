@@ -15,8 +15,8 @@ import {
   type GridInteractionConfig,
 } from "@sapporta/grid";
 import type { TableSchema } from "@sapporta/shared/contracts";
-import type { TGridDefinition } from "../grid-adapter/tgrid-runtime-config";
-import type { SchemaTableRowsByLevel } from "../grid-adapter/schema-tgrid";
+import type { TGridDefinition } from "../tgrid/tgrid-runtime-config";
+import type { SchemaTableRowsByLevel } from "../tgrid/schema-tgrid";
 import {
   SchemaTableGridView as PublicSchemaTableGridView,
   type TableGridActionsProps as PublicTableGridActionsProps,
@@ -25,7 +25,7 @@ import {
   type TGridSession as PublicTGridSession,
 } from "../../index";
 import type { TableGridActionsProps as TablePublicActionsProps } from "../index";
-import type { CreateTGridSessionArgs } from "../state/tgrid-session";
+import type { CreateTGridSessionArgs } from "../tgrid/tgrid-session";
 import {
   type TableGridBinding,
   type TableGridViewProps,
@@ -58,9 +58,9 @@ vi.mock("./TableGridView", async (importOriginal) => {
   };
 });
 
-vi.mock("../grid-adapter/tgrid-binding", async (importOriginal) => {
+vi.mock("../tgrid/tgrid-binding", async (importOriginal) => {
   const actual =
-    await importOriginal<typeof import("../grid-adapter/tgrid-binding")>();
+    await importOriginal<typeof import("../tgrid/tgrid-binding")>();
   return {
     ...actual,
     useTGridSession: (...args: unknown[]) => {
