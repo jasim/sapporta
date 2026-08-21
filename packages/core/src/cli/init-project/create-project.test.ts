@@ -530,8 +530,6 @@ describe("scaffold template inventory", () => {
 
     expect(
       validateTemplateInventory(templatePaths, SCAFFOLD_MANIFEST, [
-        "authz/types.ts",
-        "packages/api/mailer.ts",
         "tsconfig.json",
       ]),
     ).toEqual([]);

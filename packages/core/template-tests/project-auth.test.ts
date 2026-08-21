@@ -19,13 +19,13 @@ import {
   workspaceUserScopedAuthority,
 } from "@sapporta/server";
 import { getAuthBootstrapStatusRoute } from "@sapporta/shared/contracts";
-import type { BetterAuthSessionApi } from "../src/templates/project-auth/better-auth.js";
+import type { BetterAuthSessionApi } from "../src/templates/packages/api/project-auth/better-auth.js";
 import {
   resolveSapportaAuthContext,
   switchActiveWorkspace,
   type BetterAuthSessionPayload,
   type ResolveRequestDataAuthority,
-} from "../src/templates/project-auth/context.js";
+} from "../src/templates/packages/api/project-auth/context.js";
 import {
   rejectAnonymousByDefault,
   requireAuthContext,
@@ -34,7 +34,7 @@ import {
   requireWorkspaceOwner,
   requireWorkspaceRowsAllowed,
   resolveProjectAuthMiddleware,
-} from "../src/templates/project-auth/middleware.js";
+} from "../src/templates/packages/api/project-auth/middleware.js";
 import type {
   AppAbility,
   AppWorkspaceMembership,
@@ -43,17 +43,17 @@ import { buildAbility as buildTemplateAbility } from "../src/templates/packages/
 import {
   isEmailVerificationRequired,
   readProjectAuthEnv,
-} from "../src/templates/project-auth/env.js";
+} from "../src/templates/packages/api/project-auth/env.js";
 import {
   WorkspaceSwitchError,
   ensureActiveWorkspace,
   switchWorkspaceMembership,
-} from "../src/templates/project-auth/workspace.js";
-import { createProjectAuthRoutes } from "../src/templates/project-auth/routes.js";
+} from "../src/templates/packages/api/project-auth/workspace.js";
+import { createProjectAuthRoutes } from "../src/templates/packages/api/project-auth/routes.js";
 import {
   createAuthToken,
   listAuthTokens,
-} from "../src/templates/project-auth/auth-tokens.js";
+} from "../src/templates/packages/api/project-auth/auth-tokens.js";
 
 const emptyCatalog = createTableCatalog([]);
 

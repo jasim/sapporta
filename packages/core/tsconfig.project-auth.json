@@ -9,10 +9,9 @@
     }
   },
   "include": [
-    "src/templates/authz/**/*.ts",
     "src/templates/packages/api/authz/**/*.ts",
-    "src/templates/mailer.ts",
-    "src/templates/project-auth/**/*.ts",
+    "src/templates/packages/api/mailer.ts",
+    "src/templates/packages/api/project-auth/**/*.ts",
     "template-tests/**/*.ts"
   ],
   "references": [

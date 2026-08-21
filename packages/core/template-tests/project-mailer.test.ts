@@ -1,12 +1,12 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Transporter } from "nodemailer";
 import type Mail from "nodemailer/lib/mailer/index.js";
-import { readSmtpOptions, sendMailWith } from "../src/templates/mailer.js";
-import { readProjectAuthEnv } from "../src/templates/project-auth/env.js";
+import { readSmtpOptions, sendMailWith } from "../src/templates/packages/api/mailer.js";
+import { readProjectAuthEnv } from "../src/templates/packages/api/project-auth/env.js";
 import {
   buildPasswordResetEmail,
   buildVerificationEmail,
-} from "../src/templates/project-auth/emails.js";
+} from "../src/templates/packages/api/project-auth/emails.js";
 
 describe("project mailer template", () => {
   afterEach(() => {
