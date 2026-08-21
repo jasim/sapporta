@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { spawnSync } from "node:child_process";
 import { createInterface } from "node:readline/promises";
 import { stdin as input, stdout as output } from "node:process";
-import { ErrorCode, OperationError } from "../../introspect/types.js";
+import { ErrorCode, OperationError } from "../../errors.js";
 import {
   resolveGettingStartedEnv,
   type GettingStartedEnv,

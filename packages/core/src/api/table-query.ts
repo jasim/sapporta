@@ -41,7 +41,7 @@ import { findPkColumn } from "../schema/pk.js";
 import type { TableDef } from "../schema/table.js";
 import { columnBySqlName } from "../schema/column.js";
 import { resolveColumnKind } from "../schema/resolve-kind.js";
-import { QueryParseError } from "../db/errors.js";
+import { QueryParseError } from "../errors.js";
 import type { SearchPlan } from "../search/search-plan.js";
 import { buildSearchPredicate } from "../search/search-sql.js";
 import {

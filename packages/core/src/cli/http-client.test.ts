@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { ErrorCode, OperationError } from "../introspect/types.js";
+import { ErrorCode, OperationError } from "../errors.js";
 import { httpRequest } from "./http-client.js";
 
 describe("httpRequest", () => {

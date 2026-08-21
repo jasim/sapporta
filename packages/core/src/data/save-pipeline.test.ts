@@ -7,7 +7,7 @@ import {
 } from "drizzle-orm/sqlite-core";
 import { sapportaTable } from "../schema/table.js";
 import { savePipeline, insertRow, updateRow } from "./save-pipeline.js";
-import { ValidationError } from "../db/errors.js";
+import { ValidationError } from "../errors.js";
 import { createTestDb } from "../testing/test-utils.js";
 
 const accountsTable = sqliteTable("accounts", {

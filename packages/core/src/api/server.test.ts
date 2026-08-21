@@ -14,7 +14,7 @@ import {
   type SapportaEnv,
 } from "./server.js";
 import { normalizeHttpException } from "./http-exceptions.js";
-import { OperationError } from "../introspect/types.js";
+import { OperationError } from "../errors.js";
 
 type HonoHttpExceptionConstructor = new (
   status?: number,

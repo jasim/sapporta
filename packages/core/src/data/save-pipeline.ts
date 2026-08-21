@@ -16,7 +16,7 @@ import type { TableDef } from "../schema/table.js";
 import type { RowId } from "@sapporta/shared/row-id";
 import { findPkColumn } from "../schema/pk.js";
 import { parseTableWrite } from "./validate.js";
-import { ValidationError } from "../db/errors.js";
+import { ValidationError } from "../errors.js";
 import { resolveRowFields } from "./row-fields.js";
 
 /**

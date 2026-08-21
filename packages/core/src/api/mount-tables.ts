@@ -14,7 +14,7 @@ import type { TableCatalog } from "../schema/catalog.js";
 import type { TableDef } from "../schema/table.js";
 import type { HttpMethod, RouteHandler, TsRestApi } from "@sapporta/honest";
 import { countRoute, lookupRoute } from "@sapporta/shared/contracts";
-import { ErrorCode } from "../introspect/types.js";
+import { ErrorCode } from "../errors.js";
 import {
   createRoute,
   deleteRoute,

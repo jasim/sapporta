@@ -4,8 +4,7 @@ import type { BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
 import type Database from "better-sqlite3";
 import type { SapportaAuthContext } from "../auth/index.js";
 import { logger, requestLogger } from "../db/logger.js";
-import { classifySqliteError } from "../db/errors.js";
-import { ErrorCode, OperationError } from "../introspect/types.js";
+import { classifySqliteError, ErrorCode, OperationError } from "../errors.js";
 import {
   apiErrorResponse,
   classifiedSqliteErrorResponse,

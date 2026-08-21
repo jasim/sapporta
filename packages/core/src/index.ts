@@ -175,7 +175,7 @@ export { connectProject } from "./db/sqlite-connection.js";
 export type { ProjectDbConnection } from "./db/sqlite-connection.js";
 
 // Errors
-export { ValidationError, ActionError, QueryParseError } from "./db/errors.js";
+export { ValidationError, ActionError, QueryParseError } from "./errors.js";
 
 // Project paths
 export {

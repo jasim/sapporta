@@ -1,4 +1,4 @@
-import { ErrorCode, OperationError } from "../../introspect/types.js";
+import { ErrorCode, OperationError } from "../../errors.js";
 import { countResponseSchema } from "@sapporta/shared/contracts";
 import { z } from "zod";
 

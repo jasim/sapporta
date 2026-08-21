@@ -1,4 +1,4 @@
-import { OperationError } from "../../introspect/types.js";
+import { OperationError } from "../../errors.js";
 import {
   fetchOpenApiSpec,
   findEndpoint,

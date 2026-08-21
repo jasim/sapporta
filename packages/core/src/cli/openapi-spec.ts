@@ -7,7 +7,7 @@
  */
 
 import { httpRequest } from "./http-client.js";
-import { OperationError } from "../introspect/types.js";
+import { OperationError } from "../errors.js";
 
 export type HttpMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
 

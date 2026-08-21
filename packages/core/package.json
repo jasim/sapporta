@@ -53,9 +53,9 @@
       "default": "./dist/schema/table.js"
     },
     "./errors": {
-      "types": "./dist/db/errors.d.ts",
-      "sapporta:source": "./src/db/errors.ts",
-      "default": "./dist/db/errors.js"
+      "types": "./dist/errors.d.ts",
+      "sapporta:source": "./src/errors.ts",
+      "default": "./dist/errors.js"
     },
     "./testing": {
       "types": "./dist/testing/index.d.ts",

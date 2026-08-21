@@ -1,4 +1,4 @@
-import { ErrorCode, OperationError } from "../../introspect/types.js";
+import { ErrorCode, OperationError } from "../../errors.js";
 import { httpRequest, type HttpResult } from "../http-client.js";
 import type { HttpMethod } from "../openapi-spec.js";
 import type { CountQuery } from "@sapporta/shared/contracts";

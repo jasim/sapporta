@@ -2,7 +2,7 @@ import { existsSync, mkdtempSync, readdirSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { ErrorCode, OperationError } from "../../introspect/types.js";
+import { ErrorCode, OperationError } from "../../errors.js";
 import { createProject } from "./create-project.js";
 import {
   DEPENDENCY_CATALOG,

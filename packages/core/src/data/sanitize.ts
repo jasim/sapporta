@@ -1,4 +1,4 @@
-import { ValidationError } from "../db/errors.js";
+import { ValidationError } from "../errors.js";
 
 /**
  * Reject strings containing control characters (below ASCII 0x20)

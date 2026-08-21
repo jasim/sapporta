@@ -2,9 +2,7 @@
 // Operation result envelope — the contract between domain operations and
 // the layers that consume them (API routes, CLI output).
 //
-// These types were originally in cli-utils.ts as CliResult/CliError but have
-// nothing to do with the CLI — they're a structured result pattern used by
-// database introspection functions, SQL proxy, and other operations.
+// The error codes these envelopes carry are defined in ../errors.ts.
 // ---------------------------------------------------------------------------
 
 /**
@@ -51,56 +49,3 @@ export type OperationFailure = {
   error: string;
   code: string;
 };
-
-/**
- * Well-known error codes for structured error output.
- * Agents can match on these programmatically instead of parsing error messages.
- */
-export const ErrorCode = {
-  TABLE_NOT_FOUND: "TABLE_NOT_FOUND",
-  FORBIDDEN: "FORBIDDEN",
-  INVALID_TABLE_NAME: "INVALID_TABLE_NAME",
-  INVALID_COLUMN_NAME: "INVALID_COLUMN_NAME",
-  INVALID_JSON: "INVALID_JSON",
-  INVALID_SQL: "INVALID_SQL",
-  DANGEROUS_SQL: "DANGEROUS_SQL",
-  BAD_LIMIT: "BAD_LIMIT",
-  SELECT_ONLY: "SELECT_ONLY",
-  CONFLICT: "CONFLICT",
-  ROW_NOT_FOUND: "ROW_NOT_FOUND",
-  PROJECT_NOT_FOUND: "PROJECT_NOT_FOUND",
-  REPORT_NOT_FOUND: "REPORT_NOT_FOUND",
-  VALIDATION_FAILED: "VALIDATION_FAILED",
-  MISSING_ARGUMENT: "MISSING_ARGUMENT",
-  INIT_NPM_REGISTRY_UNAVAILABLE: "INIT_NPM_REGISTRY_UNAVAILABLE",
-  INIT_SETUP_FAILED: "INIT_SETUP_FAILED",
-  INIT_TARGET_EXISTS: "INIT_TARGET_EXISTS",
-  APP_SERVER_UNREACHABLE: "APP_SERVER_UNREACHABLE",
-  INTERNAL: "INTERNAL",
-} as const;
-
-export type ErrorCodeValue = (typeof ErrorCode)[keyof typeof ErrorCode];
-
-/**
- * Typed error that carries a machine-readable error code.
- * Operations throw these; consumers catch and convert to appropriate output.
- */
-export class OperationError extends Error {
-  constructor(
-    message: string,
-    public code: string,
-  ) {
-    super(message);
-  }
-}
-
-/**
- * SQL client interface matching the subset of postgres.js used by operations.
- * In production, a real postgres.js client is passed.
- * In tests, a PGlite adapter is injected.
- */
-export interface SqlClient {
-  unsafe: (query: string, params?: any[]) => Promise<any[]>;
-  begin: (fn: (sql: SqlClient) => Promise<any>) => Promise<any>;
-  end: () => Promise<void>;
-}

@@ -7,7 +7,7 @@ import {
   fetchOpenApiSpec,
   type OpenApiDoc,
 } from "./openapi-spec.js";
-import { OperationError } from "../introspect/types.js";
+import { OperationError } from "../errors.js";
 
 vi.mock("./http-client.js", () => ({
   httpRequest: vi.fn(),

@@ -7,7 +7,7 @@
 //   - index_info("index")  → columns in each index
 
 import type Database from "better-sqlite3";
-import type { OperationResult } from "./types.js";
+import type { OperationResult } from "./operation-result.js";
 import { assertTableExists } from "./db-helpers.js";
 import { validateTableName } from "./sql-safety.js";
 

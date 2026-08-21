@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { ErrorCode, OperationError } from "../../introspect/types.js";
+import { ErrorCode, OperationError } from "../../errors.js";
 
 export type ProgressLogger = (message: string) => void;
 

@@ -1,5 +1,5 @@
 import { Command } from "commander";
-import { OperationError } from "../../introspect/types.js";
+import { OperationError } from "../../errors.js";
 import { SapportaCliClient } from "../client/app-client.js";
 import {
   resolveCliRuntimeConfig,

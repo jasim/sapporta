@@ -6,7 +6,7 @@
 // No new PRAGMA patterns — just composition of existing primitives.
 
 import type Database from "better-sqlite3";
-import type { OperationResult } from "./types.js";
+import type { OperationResult } from "./operation-result.js";
 import { listTables } from "./list-tables.js";
 import { describeTable, type TableDescription } from "./describe.js";
 

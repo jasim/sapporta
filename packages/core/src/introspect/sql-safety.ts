@@ -1,4 +1,4 @@
-import { OperationError, ErrorCode } from "./types.js";
+import { OperationError, ErrorCode } from "../errors.js";
 import { isSafeIdentifier } from "../data/sanitize.js";
 import { rejectControlChars as coreRejectControlChars } from "../data/sanitize.js";
 

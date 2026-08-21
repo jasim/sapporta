@@ -6,7 +6,8 @@
 // names via isSafeIdentifier() before interpolating into SQL.
 
 import type Database from "better-sqlite3";
-import { ErrorCode, OperationError, type OperationResult } from "./types.js";
+import { ErrorCode, OperationError } from "../errors.js";
+import type { OperationResult } from "./operation-result.js";
 import { validateTableName, validateColumnNames } from "./sql-safety.js";
 import { assertTableExists, validatePayloadColumns } from "./db-helpers.js";
 import { assertBoundedInteger } from "@sapporta/shared/validation";

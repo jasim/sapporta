@@ -8,7 +8,7 @@ import {
 } from "node:fs";
 import { dirname, join } from "node:path";
 import { randomBytes } from "node:crypto";
-import { ErrorCode, OperationError } from "../../introspect/types.js";
+import { ErrorCode, OperationError } from "../../errors.js";
 import { ensureBetterSqlite3Loads } from "./sqlite-native-repair.js";
 import {
   errorMessage,

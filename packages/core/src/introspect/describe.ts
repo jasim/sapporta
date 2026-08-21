@@ -15,7 +15,7 @@
 //   - No UNIQUE information from table_info (requires index_list + index_info)
 
 import type Database from "better-sqlite3";
-import type { OperationResult } from "./types.js";
+import type { OperationResult } from "./operation-result.js";
 
 // ─── Raw PRAGMA result types ────────────────────────────────────────────────
 

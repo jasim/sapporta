@@ -57,7 +57,7 @@ import {
   type LookupEntry,
 } from "@sapporta/shared/contracts";
 import type { SapportaAuthContext } from "../auth/context.js";
-import { ValidationError } from "../db/errors.js";
+import { ValidationError } from "../errors.js";
 import { findPkColumn } from "../schema/pk.js";
 import { resolveColumnKind } from "../schema/resolve-kind.js";
 import type { TableDef } from "../schema/table.js";

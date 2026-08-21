@@ -27,7 +27,7 @@ import {
   timestamp,
 } from "../schema/columns.js";
 import { scopedRows } from "./scoped-rows.js";
-import { ValidationError } from "../db/errors.js";
+import { ValidationError } from "../errors.js";
 import { createTestAuthContext } from "../testing/auth-context.js";
 import { createTestDb } from "../testing/test-utils.js";
 import { parsePlainDate } from "@sapporta/shared/temporal";

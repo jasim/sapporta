@@ -1,4 +1,4 @@
-import { ErrorCode, OperationError } from "../../introspect/types.js";
+import { ErrorCode, OperationError } from "../../errors.js";
 import { formatTable } from "../format.js";
 import type { CliCommandResult } from "../commands/types.js";
 import type { OutputFormat } from "../runtime-config.js";

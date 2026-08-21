@@ -8,7 +8,7 @@
  * structured auth error.
  */
 import { isFetchNetworkError } from "@sapporta/shared/client";
-import { ErrorCode, OperationError } from "../introspect/types.js";
+import { ErrorCode, OperationError } from "../errors.js";
 
 export interface HttpResult {
   status: number;

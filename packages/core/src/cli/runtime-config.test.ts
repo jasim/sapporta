@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { OperationError } from "../introspect/types.js";
+import { OperationError } from "../errors.js";
 import { resolveCliRuntimeConfig } from "./runtime-config.js";
 
 describe("resolveCliRuntimeConfig", () => {

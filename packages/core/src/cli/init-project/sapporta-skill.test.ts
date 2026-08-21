@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { ErrorCode, OperationError } from "../../introspect/types.js";
+import { ErrorCode, OperationError } from "../../errors.js";
 import { resolveGettingStartedEnv } from "./getting-started-env.js";
 import {
   ensureSapportaSkillInstalled,

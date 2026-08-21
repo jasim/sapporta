@@ -13,17 +13,13 @@ import { extractSchemas, extractSchema } from "../schema/extract.js";
 import { dbRun } from "../introspect/run.js";
 import { dbIndexes } from "../introspect/indexes.js";
 import { dbDescribeAll } from "../introspect/describe-all.js";
-import {
-  ErrorCode,
-  OperationError,
-  type OperationResult,
-} from "../introspect/types.js";
+import { ErrorCode, OperationError, QueryParseError } from "../errors.js";
+import type { OperationResult } from "../introspect/operation-result.js";
 import { parseOptionalBoundedInteger } from "@sapporta/shared/validation";
 import {
   RowScopePolicyError,
   type SapportaAuthContext,
 } from "../auth/index.js";
-import { QueryParseError } from "../db/errors.js";
 import { scopedRows } from "../data/scoped-rows.js";
 import {
   resolveRowFields,

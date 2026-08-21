@@ -11,7 +11,7 @@
 //   - _litestream_* (Litestream replication metadata)
 
 import type Database from "better-sqlite3";
-import type { OperationResult } from "./types.js";
+import type { OperationResult } from "./operation-result.js";
 
 export interface TableInfo {
   name: string;

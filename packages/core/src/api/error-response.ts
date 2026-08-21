@@ -3,13 +3,13 @@ import type {
   ClientErrorStatusCode,
   ServerErrorStatusCode,
 } from "hono/utils/http-status";
-import type { ClassifiedSqliteError } from "../db/errors.js";
 import {
   ErrorCode,
   OperationError,
+  type ClassifiedSqliteError,
   type ErrorCodeValue,
-  type OperationResult,
-} from "../introspect/types.js";
+} from "../errors.js";
+import type { OperationResult } from "../introspect/operation-result.js";
 import { ERROR_CODE_STATUS } from "./error-codes.js";
 
 export type HttpErrorStatus = ClientErrorStatusCode | ServerErrorStatusCode;
@@ -25,7 +25,7 @@ export interface ApiErrorOptions extends ApiErrorBody {
 }
 
 export function statusForCode(code: string): HttpErrorStatus {
-  return (ERROR_CODE_STATUS[code] ?? 500) as HttpErrorStatus;
+  return (ERROR_CODE_STATUS[code as ErrorCodeValue] ?? 500) as HttpErrorStatus;
 }
 
 export function errorBody(options: ApiErrorOptions): ApiErrorBody {

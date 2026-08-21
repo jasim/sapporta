@@ -1,4 +1,4 @@
-import { ErrorCode } from "../../introspect/types.js";
+import { ErrorCode } from "../../errors.js";
 import {
   errorMessage,
   formatCommand,

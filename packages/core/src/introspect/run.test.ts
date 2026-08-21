@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import Database from "better-sqlite3";
 import { dbRun } from "./run.js";
-import { ErrorCode, OperationError } from "./types.js";
+import { ErrorCode, OperationError } from "../errors.js";
 
 describe("dbRun", () => {
   let sqlite: Database.Database;

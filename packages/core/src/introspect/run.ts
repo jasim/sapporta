@@ -15,9 +15,9 @@
 // adds PostgreSQL support, use a BEGIN READ ONLY transaction for this layer.
 
 import type Database from "better-sqlite3";
-import { classifySqliteError } from "../db/errors.js";
+import { classifySqliteError, ErrorCode, OperationError } from "../errors.js";
 import { parseOptionalBoundedInteger } from "@sapporta/shared/validation";
-import { ErrorCode, OperationError, type OperationResult } from "./types.js";
+import type { OperationResult } from "./operation-result.js";
 import { rejectDangerousSQL } from "./sql-safety.js";
 
 export interface DbRunOptions {

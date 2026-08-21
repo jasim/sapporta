@@ -8,7 +8,7 @@
 // All functions are synchronous — better-sqlite3 returns results immediately.
 
 import type Database from "better-sqlite3";
-import { OperationError, ErrorCode } from "./types.js";
+import { OperationError, ErrorCode } from "../errors.js";
 
 /**
  * Check whether a table exists in the database.

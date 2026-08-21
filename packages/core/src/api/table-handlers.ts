@@ -33,9 +33,9 @@ import {
   classifySqliteError,
   QueryParseError,
   ValidationError,
-} from "../db/errors.js";
+  ErrorCode,
+} from "../errors.js";
 import { logger } from "../db/logger.js";
-import { ErrorCode } from "../introspect/types.js";
 import {
   apiErrorResponse,
   classifiedSqliteErrorResponse,

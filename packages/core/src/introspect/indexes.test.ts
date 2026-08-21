@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import Database from "better-sqlite3";
 import { dbIndexes } from "./indexes.js";
-import { ErrorCode, OperationError } from "./types.js";
+import { ErrorCode, OperationError } from "../errors.js";
 
 describe("db indexes", () => {
   let sqlite: Database.Database;

@@ -2,7 +2,7 @@ import { describe, expect, expectTypeOf, it, vi } from "vitest";
 import { asc, desc, eq, gt, type InferSelectModel } from "drizzle-orm";
 import { integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
 import { sapportaTable } from "../schema/table.js";
-import { ValidationError } from "../db/errors.js";
+import { ValidationError } from "../errors.js";
 import { createTestAuthContext } from "../testing/auth-context.js";
 import { createTestDb } from "../testing/test-utils.js";
 import {

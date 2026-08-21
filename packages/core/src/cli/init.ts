@@ -1,5 +1,6 @@
 import { basename, resolve } from "node:path";
-import { OperationError, type OperationResult } from "../introspect/types.js";
+import { OperationError } from "../errors.js";
+import type { OperationResult } from "../introspect/operation-result.js";
 import { createProject } from "./init-project/create-project.js";
 import { ensureSapportaSkillInstalled } from "./init-project/sapporta-skill.js";
 import {

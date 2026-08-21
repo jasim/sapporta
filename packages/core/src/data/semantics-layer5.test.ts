@@ -32,7 +32,7 @@ import {
   parseCanonicalInstant,
 } from "@sapporta/shared/temporal";
 import { listRowsQuerySchema } from "@sapporta/shared/contracts";
-import { QueryParseError } from "../db/errors.js";
+import { QueryParseError } from "../errors.js";
 
 // §2 — Strict calendar validity (exercised through the boundary parse)
 describe("strict calendar validity", () => {
