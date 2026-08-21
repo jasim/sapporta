@@ -6,7 +6,7 @@ Sapporta is a **library** for building database applications with TypeScript. It
 
 Sapporta is modular and composable. The high-level features in Sapporta should be built by composing low-level primitives, which should be equally available for end users. It should be possible for end user to compose their own versions of high-level Sapporta feature using these primitives.
 
-Every part of Sapporta must be overridable, extensible, or skippable. Projects own their entry points — `boot.ts` and `main.tsx` on both backend and frontend live in the project, not in Sapporta — and `@sapporta/core` and `@sapporta/ui` export composable building blocks the project wires in itself.
+Every part of Sapporta must be overridable, extensible, or skippable. Projects own their entry points — `boot.ts` and `main.tsx` on both backend and frontend live in the project, not in Sapporta — and `@sapporta/server` on the backend and `@sapporta/frontend`, `@sapporta/grid`, and `@sapporta/ui` on the frontend export composable building blocks the project wires in itself.
 
 ## Stack
 
@@ -18,12 +18,29 @@ Every part of Sapporta must be overridable, extensible, or skippable. Projects o
 ## Monorepo Structure
 
 ```
-packages/cli/           sapporta — canonical npm CLI package that exposes the `sapporta` command
-packages/core/          @sapporta/server — server library, schema-as-code, CRUD/meta/report APIs, project scaffolding, and CLI implementation
+packages/cli/           sapporta — npx-able wrapper whose bin re-exports @sapporta/server/cli
+packages/core/          @sapporta/server — schema-as-code tables, row engine, CRUD/meta APIs, CLI, and the project scaffold templates
 packages/honest/        @sapporta/honest — Hono + ts-rest adapter for contract routing, request parsing, and OpenAPI output
-packages/shared/        @sapporta/shared — browser/server-safe contracts, shared types, filters, date helpers, and row-id utilities
-packages/ui/            @sapporta/ui — React admin UI, CRUD screens, report views, sidebar shell, and grid components
+packages/shared/        @sapporta/shared — leaf package: wire contracts, filter/query grammars, and pure helpers shared by server and browser
+packages/grid/          @sapporta/grid — backend-agnostic grid engine, column presets, and lookup primitives
+packages/frontend/      @sapporta/frontend — Sapporta-bound admin frontend: app shell, table and report pages, auth screens, boot wiring
+packages/ui/            @sapporta/ui — UI primitives (Base UI wrappers) and small React utilities
 ```
+
+Two directory names differ from their npm names: `packages/core` publishes as
+`@sapporta/server`, and `packages/cli` publishes as `sapporta`.
+
+Dependency direction between workspace packages (an arrow means "may import from"):
+
+```
+@sapporta/frontend  →  @sapporta/grid, @sapporta/ui, @sapporta/shared
+@sapporta/grid      →  @sapporta/ui, @sapporta/shared
+@sapporta/server    →  @sapporta/honest, @sapporta/shared
+sapporta (cli)      →  @sapporta/server
+```
+
+`@sapporta/shared`, `@sapporta/ui`, and `@sapporta/honest` are leaves: they
+import nothing else in the workspace.
 
 ## Programming Approach
 
