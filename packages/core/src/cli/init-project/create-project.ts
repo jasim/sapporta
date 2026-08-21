@@ -130,24 +130,72 @@ function assertCanCreateProject(project: ProjectLayout): void {
   }
 }
 
+/** The generated project reads its pnpm settings from pnpm-workspace.yaml. */
+export const MINIMUM_PNPM_MAJOR_VERSION = 11;
+
 function assertPnpmAvailable(runCommand: InitCommandRunner): void {
   // pnpm is a hard requirement - the scaffold writes a pnpm-workspace.yaml
   // and root scripts that invoke `pnpm --filter ./packages/frontend`, neither of
   // which npm understands. Fail fast before touching the filesystem so the
   // user gets a clear error instead of a half-scaffolded directory.
+  let versionOutput: string;
   try {
-    runCommand("pnpm", ["--version"], { stdio: "ignore" });
+    versionOutput = runCommand("pnpm", ["--version"], { stdio: "capture" });
   } catch (error) {
     throw new OperationError(
       [
         "pnpm is required to scaffold a Sapporta project.",
         "The generated app uses a pnpm workspace.",
-        "Install pnpm from https://pnpm.io/installation and retry the full `sapporta init` command.",
+        `Install pnpm ${MINIMUM_PNPM_MAJOR_VERSION} or later from https://pnpm.io/installation and retry the full \`sapporta init\` command.`,
         `Cause: ${errorMessage(error)}`,
       ].join("\n"),
       ErrorCode.INIT_SETUP_FAILED,
     );
   }
+  assertSupportedPnpmVersion(versionOutput);
+}
+
+/**
+ * pnpm 10 and earlier read workspace settings from the root package.json's
+ * `pnpm` field, which pnpm 11 removed. The generated project declares those
+ * settings - and, for source-linked scaffolds, its dependency overrides - only
+ * in pnpm-workspace.yaml, so an older pnpm installs a differently resolved
+ * dependency tree without reporting anything.
+ */
+function assertSupportedPnpmVersion(versionOutput: string): void {
+  const major = parsePnpmMajorVersion(versionOutput);
+  if (major === undefined) {
+    throw new OperationError(
+      [
+        `Could not read the installed pnpm version, so Sapporta cannot confirm pnpm ${MINIMUM_PNPM_MAJOR_VERSION} or later.`,
+        `\`pnpm --version\` printed: ${JSON.stringify(versionOutput)}`,
+        "Install pnpm from https://pnpm.io/installation and retry the full `sapporta init` command.",
+      ].join("\n"),
+      ErrorCode.INIT_SETUP_FAILED,
+    );
+  }
+  if (major < MINIMUM_PNPM_MAJOR_VERSION) {
+    throw new OperationError(
+      [
+        `Sapporta requires pnpm ${MINIMUM_PNPM_MAJOR_VERSION} or later; found ${versionOutput.trim()}.`,
+        "The generated project keeps its workspace settings in pnpm-workspace.yaml, which pnpm 10 and earlier ignore.",
+        `Upgrade with \`corepack use pnpm@${MINIMUM_PNPM_MAJOR_VERSION}\` or see https://pnpm.io/installation, then retry the full \`sapporta init\` command.`,
+      ].join("\n"),
+      ErrorCode.INIT_SETUP_FAILED,
+    );
+  }
+}
+
+function parsePnpmMajorVersion(versionOutput: string): number | undefined {
+  // Corepack can prepend its own notices, so read the first line that looks
+  // like a version rather than assuming the output holds nothing else.
+  for (const line of versionOutput.split("\n")) {
+    const match = /^(\d+)\.\d+\.\d+/.exec(line.trim());
+    if (match) {
+      return Number(match[1]);
+    }
+  }
+  return undefined;
 }
 
 type CreateProjectSetupOptions = {

@@ -4,7 +4,7 @@
  * These tests scaffold a real project via `sapporta init`, compile it,
  * boot a server, and exercise the full HTTP API. They require:
  *   - packages/core built (dist/ exists with JS + templates)
- *   - pnpm available
+ *   - pnpm 11 or later available
  *
  * Run with: pnpm test:e2e
  */

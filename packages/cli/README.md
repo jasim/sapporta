@@ -2,6 +2,12 @@
 
 Canonical CLI for Sapporta projects.
 
+## Requirements
+
+pnpm 11 or later, because `sapporta init` generates a pnpm workspace whose
+settings live in `pnpm-workspace.yaml`. Earlier pnpm versions read those
+settings from the root package.json and resolve a different dependency tree.
+
 ## Usage
 
 ```bash

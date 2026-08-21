@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { ErrorCode, OperationError } from "../../errors.js";
-import { createProject } from "./create-project.js";
+import { createProject, MINIMUM_PNPM_MAJOR_VERSION } from "./create-project.js";
 import {
   DEPENDENCY_CATALOG,
   sharedRuntimeDefinitions,
@@ -14,6 +14,10 @@ import { resolveOwningPackage } from "./package-metadata.js";
 import { initProjectPackagePaths } from "./paths.js";
 import { layoutForRoot, projectIdentityFromOptions } from "./project-layout.js";
 import { renderScaffoldFiles } from "./render-scaffold.js";
+import {
+  addPnpmOverrides,
+  renderScaffoldTemplates,
+} from "./template-rendering.js";
 import {
   SCAFFOLD_MANIFEST,
   validateTemplateInventory,
@@ -145,12 +149,53 @@ describe("createProject", () => {
     expect(stagingDirs(parent)).toEqual([]);
   });
 
+  it("rejects a pnpm older than the version that reads pnpm-workspace.yaml", () => {
+    const parent = makeTempDir();
+    const target = join(parent, "acme-app");
+
+    let thrown: unknown;
+    try {
+      createProject({
+        dir: target,
+        name: "acme-app",
+        runCommand: () => "10.18.0\n",
+        verifySqlite: noopSqliteVerifier,
+      });
+    } catch (error) {
+      thrown = error;
+    }
+
+    expect(thrown).toBeInstanceOf(OperationError);
+    expect((thrown as OperationError).code).toBe(ErrorCode.INIT_SETUP_FAILED);
+    expect((thrown as OperationError).message).toContain(
+      `Sapporta requires pnpm ${MINIMUM_PNPM_MAJOR_VERSION} or later; found 10.18.0.`,
+    );
+    expect(existsSync(target)).toBe(false);
+    expect(stagingDirs(parent)).toEqual([]);
+  });
+
+  it("fails when the pnpm version cannot be read", () => {
+    const parent = makeTempDir();
+    const target = join(parent, "acme-app");
+
+    expect(() =>
+      createProject({
+        dir: target,
+        name: "acme-app",
+        runCommand: () => "",
+        verifySqlite: noopSqliteVerifier,
+      }),
+    ).toThrow(/Could not read the installed pnpm version/);
+    expect(existsSync(target)).toBe(false);
+  });
+
   it("publishes the target after all setup steps succeed", () => {
     const parent = makeTempDir();
     const target = join(parent, "acme-app");
     const commands: string[] = [];
     const runCommand: InitCommandRunner = (command, args) => {
       commands.push([command, ...args].join(" "));
+      return commandOutput(command, args);
     };
 
     const result = createProject({
@@ -194,6 +239,8 @@ describe("createProject", () => {
   });
 });
 
+const SUPPORTED_PNPM_VERSION = `${MINIMUM_PNPM_MAJOR_VERSION}.9.0`;
+
 function makeTempDir(): string {
   return mkdtempSync(join(tmpdir(), "sapporta-create-project-"));
 }
@@ -208,12 +255,49 @@ function commandRunnerThatFails(
   return (command, args) => {
     const error = fail(command, args);
     if (error) throw error;
+    return commandOutput(command, args);
   };
+}
+
+/** Only `pnpm --version` is read for its output; everything else ignores it. */
+function commandOutput(command: string, args: readonly string[]): string {
+  return command === "pnpm" && args[0] === "--version"
+    ? `${SUPPORTED_PNPM_VERSION}\n`
+    : "";
 }
 
 function noopSqliteVerifier(): void {
   return;
 }
+
+describe("pnpm override rendering", () => {
+  const overrides = { "drizzle-orm": "0.45.2" };
+
+  it("fails when no scaffold file can carry the resolved overrides", () => {
+    expect(() =>
+      renderScaffoldTemplates({
+        templates: [
+          {
+            src: "package.json",
+            dest: "package.json",
+            ownership: "workspace",
+            refreshPolicy: "merge-package-json",
+            template: "{}\n",
+          },
+        ],
+        variables: {},
+        sourceLinkMode: true,
+        pnpmOverrides: overrides,
+      }),
+    ).toThrow(/no pnpm-workspace.yaml entry to write them to/);
+  });
+
+  it("fails rather than append a second overrides key", () => {
+    expect(() =>
+      addPnpmOverrides("packages:\n  - packages/*\n\noverrides:\n", overrides),
+    ).toThrow(/already declares "overrides"/);
+  });
+});
 
 describe("renderScaffoldFiles", () => {
   it("keeps same-slug projects distinct with their generated cookie ids", () => {
@@ -417,8 +501,8 @@ describe("renderScaffoldFiles", () => {
       "node --import @sapporta/server/source-link-runtime dist/boot.js",
     );
 
-    // pnpm 10+ reads overrides from pnpm-workspace.yaml; the root
-    // package.json `pnpm` field is ignored there.
+    // pnpm 11 reads overrides from pnpm-workspace.yaml and ignores the
+    // root package.json `pnpm` field entirely.
     const rootPackage = JSON.parse(byDest.get("package.json") ?? "{}") as {
       pnpm?: { overrides?: Record<string, string> };
     };

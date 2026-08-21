@@ -23,6 +23,10 @@ Sapporta is a poor fit for static sites, content-first marketing sites, or apps 
 
 ## Start a Project
 
+Requires Node.js and pnpm 11 or later — the generated project is a pnpm
+workspace and keeps its settings in `pnpm-workspace.yaml`, which earlier pnpm
+versions ignore.
+
 ```bash
 npx sapporta init my-app
 cd my-app

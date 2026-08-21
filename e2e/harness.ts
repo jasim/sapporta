@@ -187,10 +187,6 @@ type PackageJson = {
   version?: string;
   dependencies?: Record<string, string>;
   devDependencies?: Record<string, string>;
-  pnpm?: {
-    overrides?: Record<string, string>;
-    [key: string]: unknown;
-  };
   [key: string]: unknown;
 };
 
@@ -1579,6 +1575,7 @@ export async function prepareDockerReleaseProject(
   // merging same-name package IDs from stale registry copies.
   const specs = await packSapportaPackagesForProject(project);
   makeDockerfileCopyPackedSapportaPackages(project.projectDir);
+  removeSourceLinkPnpmOverrides(project.projectDir);
   writePnpmfileForPackedSapportaPackages(
     project.projectDir,
     specs.workspacePackage,
@@ -2613,6 +2610,32 @@ async function waitForDockerServer(baseUrl: string): Promise<void> {
   expect.fail(`Docker server at ${baseUrl} did not become ready`);
 }
 
+/**
+ * The generated project was scaffolded in source-link mode, so
+ * pnpm-workspace.yaml carries `link:` overrides pointing at this checkout plus
+ * exact pins for every shared runtime dependency. Both are development-time
+ * wiring: the links do not exist inside the Docker image, and the pins are not
+ * what an end user installing from the registry would get. Drop the whole
+ * overrides block so the release probe resolves the same way a real install
+ * does; .pnpmfile.cjs still redirects the transitive @sapporta/* edges to the
+ * packed tarballs.
+ */
+function removeSourceLinkPnpmOverrides(projectDir: string): void {
+  const workspaceYamlPath = join(projectDir, "pnpm-workspace.yaml");
+  const workspaceYaml = readFileSync(workspaceYamlPath, "utf-8");
+  const overridesStart = workspaceYaml.search(/^overrides:$/m);
+  if (overridesStart === -1) {
+    expect.fail(
+      `${workspaceYamlPath} has no overrides block; the source-linked scaffold should have written one.`,
+    );
+  }
+  writeFileSync(
+    workspaceYamlPath,
+    `${workspaceYaml.slice(0, overridesStart).trimEnd()}\n`,
+  );
+  expect(readFileSync(workspaceYamlPath, "utf-8")).not.toContain("link:");
+}
+
 function rewritePackageJson(
   packageJsonPath: string,
   sapportaSpecs: Record<string, string>,
@@ -2620,13 +2643,6 @@ function rewritePackageJson(
   const packageJson = readPackageJson(packageJsonPath);
   rewriteDependencySet(packageJson.dependencies, sapportaSpecs);
   rewriteDependencySet(packageJson.devDependencies, sapportaSpecs);
-
-  if (packageJson.pnpm?.overrides) {
-    for (const [packageName, spec] of Object.entries(sapportaSpecs)) {
-      packageJson.pnpm.overrides[packageName] = spec;
-    }
-  }
-
   writeFileSync(packageJsonPath, JSON.stringify(packageJson, null, 2) + "\n");
 }
 

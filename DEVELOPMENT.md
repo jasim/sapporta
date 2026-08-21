@@ -1,5 +1,11 @@
 # Development
 
+## Requirements
+
+pnpm 11 or later, for this checkout and for every project scaffolded from it.
+pnpm 11 removed the `pnpm` field in package.json, so workspace settings and
+source-link dependency overrides are only read from `pnpm-workspace.yaml`.
+
 ## Monorepo Layout
 
 See ARCHITECTURE.md for the package roster, the module index of each

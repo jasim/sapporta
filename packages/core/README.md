@@ -1,5 +1,12 @@
 # @sapporta/server
 
+## Requirements
+
+pnpm 11 or later. The generated project is a pnpm workspace and declares its
+settings in `pnpm-workspace.yaml`; pnpm 10 and earlier read them from the root
+package.json instead and would install a different dependency tree. `sapporta
+init` checks the installed version before it writes anything.
+
 ## Usage
 
 Install the canonical CLI package to create and inspect Sapporta projects:

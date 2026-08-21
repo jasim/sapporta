@@ -15,8 +15,13 @@ export function logInitDetail(progress: ProgressLogger, message: string): void {
   progress(`- ${message}`);
 }
 
-export type InitCommandStdio = "ignore" | "inherit";
+export type InitCommandStdio = "ignore" | "inherit" | "capture";
 
+/**
+ * Returns the command's stdout, which is empty for every stdio mode except
+ * "capture". Callers that only need the exit status ignore the return value;
+ * `pnpm --version` needs the text.
+ */
 export type InitCommandRunner = (
   command: string,
   args: readonly string[],
@@ -24,13 +29,16 @@ export type InitCommandRunner = (
     cwd?: string;
     stdio?: InitCommandStdio;
   },
-) => void;
+) => string;
 
 export const runInitCommand: InitCommandRunner = (command, args, options) => {
-  execFileSync(command, [...args], {
+  const stdio = options.stdio ?? "ignore";
+  const output = execFileSync(command, [...args], {
     cwd: options.cwd,
-    stdio: options.stdio ?? "ignore",
+    stdio: stdio === "capture" ? ["ignore", "pipe", "pipe"] : stdio,
+    encoding: "utf-8",
   });
+  return output ?? "";
 };
 
 export function formatCommand(

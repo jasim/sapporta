@@ -65,15 +65,23 @@ export function renderTemplateContent(
   return rendered;
 }
 
+export const PNPM_OVERRIDES_DEST = "pnpm-workspace.yaml";
+
 /**
  * Appends the source-link overrides to the generated pnpm-workspace.yaml.
- * pnpm 10+ reads workspace settings from this file; overrides placed in the
- * root package.json's `pnpm` field are silently ignored there.
+ * pnpm 11 reads workspace settings only from this file; overrides placed in
+ * the root package.json's `pnpm` field are ignored, which is how the earlier
+ * override mechanism stayed inert without reporting anything.
  */
 export function addPnpmOverrides(
   workspaceYaml: string,
   pnpmOverrides: Record<string, string>,
 ): string {
+  if (/^overrides:/m.test(workspaceYaml)) {
+    throw new Error(
+      `The ${PNPM_OVERRIDES_DEST} template already declares "overrides"; appending source-link overrides would produce a duplicate YAML key.`,
+    );
+  }
   const lines = Object.entries(pnpmOverrides).map(
     ([packageName, spec]) =>
       `  ${JSON.stringify(packageName)}: ${JSON.stringify(spec)}`,
@@ -116,11 +124,13 @@ export function renderScaffoldTemplates(opts: {
   sourceLinkMode: boolean;
   pnpmOverrides?: Record<string, string>;
 }): RenderedScaffoldFile[] {
-  return opts.templates.map((file) => {
+  let appliedPnpmOverrides = false;
+  const files = opts.templates.map((file) => {
     let content = renderTemplateContent(file.template, opts.variables);
     content = renderSourceLinkResolution(content, opts.sourceLinkMode);
-    if (file.dest === "pnpm-workspace.yaml" && opts.pnpmOverrides) {
+    if (file.dest === PNPM_OVERRIDES_DEST && opts.pnpmOverrides) {
       content = addPnpmOverrides(content, opts.pnpmOverrides);
+      appliedPnpmOverrides = true;
     }
     return {
       src: file.src,
@@ -130,6 +140,16 @@ export function renderScaffoldTemplates(opts: {
       content,
     };
   });
+  // An override set that reaches no file resolves nothing, and a source-linked
+  // project would then install a second copy of every shared dependency. Fail
+  // here rather than let the mechanism go quiet again if the manifest entry is
+  // ever renamed or removed.
+  if (opts.pnpmOverrides && !appliedPnpmOverrides) {
+    throw new Error(
+      `Scaffold overrides were resolved but the manifest has no ${PNPM_OVERRIDES_DEST} entry to write them to.`,
+    );
+  }
+  return files;
 }
 
 /**

@@ -5,6 +5,9 @@ application with a Hono API, SQLite database, and React frontend.
 
 ## Run locally
 
+Requires pnpm 11 or later; this project keeps its workspace settings in
+`pnpm-workspace.yaml`, which earlier pnpm versions ignore.
+
 ```bash
 pnpm install
 pnpm dev

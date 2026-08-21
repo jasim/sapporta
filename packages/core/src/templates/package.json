@@ -12,11 +12,5 @@
     "prebuild": "pnpm run clean",
     "build": "pnpm --filter ./packages/shared build && pnpm --filter ./packages/api build && pnpm --filter ./packages/frontend build",
     "start": "pnpm --filter ./packages/api start"
-  },
-  "pnpm": {
-    "onlyBuiltDependencies": [
-      "better-sqlite3",
-      "esbuild"
-    ]
   }
 }

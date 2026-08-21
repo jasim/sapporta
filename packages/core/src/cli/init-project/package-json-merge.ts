@@ -1,10 +1,5 @@
 export type JsonValue =
-  | string
-  | number
-  | boolean
-  | null
-  | JsonValue[]
-  | { [key: string]: JsonValue };
+  string | number | boolean | null | JsonValue[] | { [key: string]: JsonValue };
 
 export type JsonObject = { [key: string]: JsonValue };
 
@@ -34,8 +29,6 @@ export function mergePackageJson(
     }
     if (!(key in merged)) {
       merged[key] = value;
-    } else if (key === "pnpm") {
-      merged[key] = mergeNestedObject(merged[key], value);
     }
   }
 
@@ -50,26 +43,6 @@ export function mergePackageJson(
     }
   }
 
-  return merged;
-}
-
-function mergeNestedObject(
-  existing: JsonValue,
-  scaffold: JsonValue,
-): JsonValue {
-  if (!isJsonObject(existing) || !isJsonObject(scaffold)) {
-    return existing;
-  }
-  const merged: JsonObject = { ...existing };
-  for (const [key, value] of Object.entries(scaffold)) {
-    const existingValue = merged[key];
-    merged[key] =
-      isJsonObject(existingValue) && isJsonObject(value)
-        ? mergeNestedObject(existingValue, value)
-        : key in merged
-          ? existingValue
-          : value;
-  }
   return merged;
 }
 

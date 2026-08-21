@@ -81,8 +81,8 @@ export function resolveInstalledPackageEntrypoint(
     }
     if (isNodeError(error) && error.code === "MODULE_NOT_FOUND") {
       // Types-only packages (e.g. @types/*) declare no runtime entrypoint.
-      // Their package.json still locates the installed copy; a genuinely
-      // missing package fails this resolve with the same clear error.
+      // Their package.json still locates the installed copy. A genuinely
+      // missing package throws again here, naming `<package>/package.json`.
       return packageRequire.resolve(`${packageName}/package.json`);
     }
     throw error;
