@@ -1,5 +1,5 @@
 import { basename, dirname, join } from "node:path";
-import { fromProjectRoot } from "../../project-paths.js";
+import { fromProjectRoot } from "../../project/project-paths.js";
 import {
   directoriesRequiredByManifest,
   requiredRefreshPaths,

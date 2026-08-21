@@ -162,13 +162,13 @@ export {
   loadSapportaProject,
   mountOpenApi,
   mountSapportaFramework,
-} from "./load-sapporta.js";
+} from "./project/load-sapporta.js";
 export type {
   LoadSapportaProjectOptions,
   MountSapportaFrameworkOptions,
   SapportaFrameworkApi,
   SapportaProject,
-} from "./load-sapporta.js";
+} from "./project/load-sapporta.js";
 
 // SQLite connection
 export { connectProject } from "./db/sqlite-connection.js";
@@ -189,7 +189,7 @@ export {
   setProjectRoot,
   projectRoot,
   projectPath,
-} from "./project-paths.js";
+} from "./project/project-paths.js";
 
 // Contract-driven API (ts-rest + Hono)
 export * from "./api/index.js";

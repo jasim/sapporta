@@ -20,22 +20,22 @@ import {
   installFrameworkRoutePolicy,
   type SapportaAuthGuard,
   type SapportaEnv,
-} from "./api/server.js";
-import type { ProjectDbConnection } from "./db/sqlite-connection.js";
-import type { TableDef } from "./schema/table.js";
+} from "../api/server.js";
+import type { ProjectDbConnection } from "../db/sqlite-connection.js";
+import type { TableDef } from "../schema/table.js";
 import { fromApiCodeDir } from "./project-paths.js";
-import { createTableCatalog, type TableCatalog } from "./schema/catalog.js";
-import { assertSchemaDefinitions } from "./schema/check.js";
-import { loadSchemas } from "./schema/loader.js";
-import { assertMigrationsReady } from "./migrations/guard.js";
+import { createTableCatalog, type TableCatalog } from "../schema/catalog.js";
+import { assertSchemaDefinitions } from "../schema/check.js";
+import { loadSchemas } from "../schema/loader.js";
+import { assertMigrationsReady } from "../migrations/guard.js";
 import {
   TsRestApi,
   mountMeta,
   mountTables,
   makeMetaHandlers,
   makeAuthorizedTableHandlers,
-} from "./api/index.js";
-import { logger } from "./db/logger.js";
+} from "../api/index.js";
+import { logger } from "../db/logger.js";
 
 const log = logger.child({ module: "load-sapporta" });
 

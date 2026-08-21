@@ -11,7 +11,7 @@ import {
   loadSapportaProject,
   mountOpenApi,
   mountSapportaFramework,
-} from "../load-sapporta.js";
+} from "../project/load-sapporta.js";
 import {
   createAuthContext,
   assertAuthSchemaDefinitions,
