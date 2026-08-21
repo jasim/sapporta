@@ -204,7 +204,7 @@ module renders with the same grid engine.
 - **Subpath exports are the module system.** Adding a public module means
   adding an `exports` subpath and a row in the tables above. Every JS
   export carries `types`, `sapporta:source`, and `default` conditions
-  (enforced by `packages/core/src/packaging/package-exports.test.ts`); the
+  (enforced by `tests/package-exports.test.ts`); the
   `sapporta:source` condition lets development builds resolve workspace
   sources directly.
 - **Mechanism in the library, glue in the project.** Behavior belongs in a

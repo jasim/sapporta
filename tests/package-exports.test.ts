@@ -15,7 +15,7 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
 const testDir = path.dirname(fileURLToPath(import.meta.url));
-const repoRoot = path.resolve(testDir, "../../../..");
+const repoRoot = path.resolve(testDir, "..");
 
 const sapportaPackages = [
   { packageDir: "packages/core", snapshotDir: undefined },
