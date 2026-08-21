@@ -24,8 +24,7 @@ async function vendorDependencyPackageSnapshots() {
     const source = pathInRepo("packages", packageName, "package.json");
     const destination = pathInCore(
       "src",
-      "templates",
-      "dependency-package-snapshots",
+      "vendored-package-snapshots",
       packageName,
       "package.json",
     );
@@ -56,6 +55,19 @@ async function copyTemplatesToDist() {
   await cp(pathInCore("src", "templates"), pathInCore("dist", "templates"), {
     recursive: true,
   });
+}
+
+async function copyVendoredSnapshotsToDist() {
+  await rm(pathInCore("dist", "vendored-package-snapshots"), {
+    force: true,
+    recursive: true,
+  });
+  await mkdir(pathInCore("dist"), { recursive: true });
+  await cp(
+    pathInCore("src", "vendored-package-snapshots"),
+    pathInCore("dist", "vendored-package-snapshots"),
+    { recursive: true },
+  );
 }
 
 function run(command, args, label) {
@@ -107,6 +119,7 @@ async function build() {
   await cleanBuildOutput();
   await runTypeScriptBuild();
   await copyTemplatesToDist();
+  await copyVendoredSnapshotsToDist();
 }
 
 async function watch() {
@@ -114,6 +127,7 @@ async function watch() {
   await cleanBuildMetadata();
   await mkdir(pathInCore("dist"), { recursive: true });
   await copyTemplatesToDist();
+  await copyVendoredSnapshotsToDist();
   await runTypeScriptWatch();
 }
 

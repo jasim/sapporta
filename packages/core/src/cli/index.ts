@@ -16,8 +16,7 @@ function readCliPackageVersion(): string {
   const packageJsonPath = resolve(
     import.meta.dirname,
     "..",
-    "templates",
-    "dependency-package-snapshots",
+    "vendored-package-snapshots",
     "cli",
     "package.json",
   );

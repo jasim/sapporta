@@ -533,13 +533,6 @@ describe("scaffold template inventory", () => {
         "authz/types.ts",
         "packages/api/mailer.ts",
         "tsconfig.json",
-        "dependency-package-snapshots/README.md",
-        "dependency-package-snapshots/cli/package.json",
-        "dependency-package-snapshots/frontend/package.json",
-        "dependency-package-snapshots/grid/package.json",
-        "dependency-package-snapshots/honest/package.json",
-        "dependency-package-snapshots/shared/package.json",
-        "dependency-package-snapshots/ui/package.json",
       ]),
     ).toEqual([]);
   });

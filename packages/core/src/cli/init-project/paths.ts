@@ -15,7 +15,18 @@ const SAPPORTA_SOURCE_PACKAGES_DIR = "packages";
  * implementation only requires updating this one constant.
  */
 const TEMPLATES_DIR_FROM_INIT_PROJECT = ["..", "..", "templates"] as const;
-const DEPENDENCY_PACKAGE_SNAPSHOTS_DIR = "dependency-package-snapshots";
+
+/**
+ * Relative path from this init-project module directory to the vendored
+ * package.json snapshots. Not templates: these are runtime data read to
+ * resolve scaffold dependency versions and the CLI's own version. The same
+ * relative layout holds in src/ and in the published dist/.
+ */
+const VENDORED_SNAPSHOTS_DIR_FROM_INIT_PROJECT = [
+  "..",
+  "..",
+  "vendored-package-snapshots",
+] as const;
 
 /**
  * Absolute paths for assets shipped inside @sapporta/server's init-project
@@ -28,17 +39,16 @@ export function initProjectPackagePaths(
     initProjectDir,
     ...TEMPLATES_DIR_FROM_INIT_PROJECT,
   );
+  const vendoredSnapshotsDir = resolve(
+    initProjectDir,
+    ...VENDORED_SNAPSHOTS_DIR_FROM_INIT_PROJECT,
+  );
 
   return {
     templatesDir,
     templatePath: (filename: string) => join(templatesDir, filename),
     vendoredPackageJsonPath: (shortName: string) =>
-      join(
-        templatesDir,
-        DEPENDENCY_PACKAGE_SNAPSHOTS_DIR,
-        shortName,
-        "package.json",
-      ),
+      join(vendoredSnapshotsDir, shortName, "package.json"),
   };
 }
 
