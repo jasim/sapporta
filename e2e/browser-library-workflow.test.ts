@@ -179,6 +179,10 @@ async function verifyResponsiveSidebar(page: Page): Promise<void> {
     "data-sidebar-state",
     "collapsed",
   );
+  // The click leaves the pointer inside the sidebar area, and a fine pointer
+  // hovering the collapsed region intentionally keeps the surface revealed.
+  // Move onto the content area so the sidebar tucks away.
+  await page.mouse.move(700, 300);
   await playwrightExpect(surface).toBeHidden();
 
   await page.mouse.move(4, 300);

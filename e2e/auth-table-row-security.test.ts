@@ -59,8 +59,24 @@ type LookupBody = {
 };
 
 type CountBody = {
-  data: Record<string, number>;
+  data:
+    | { kind: "total"; count: number }
+    | {
+        kind: "grouped";
+        groups: { value: string | number | boolean | null; count: number }[];
+      };
 };
+
+function sortedCountGroups(
+  data: CountBody["data"],
+): { value: string | number | boolean | null; count: number }[] {
+  if (data.kind !== "grouped") {
+    throw new Error(`Expected a grouped count, got ${data.kind}`);
+  }
+  return [...data.groups].sort((a, b) =>
+    String(a.value).localeCompare(String(b.value)),
+  );
+}
 
 type TaskRow = {
   id: number;
@@ -131,7 +147,7 @@ function writeAuthMatrixSchema(projectDir: string): void {
       '    label: "Tasks",',
       '    rowScope: "workspaceGlobal",',
       '    rowLabelColumns: ["title"],',
-      '    search: { columns: ["title", "status"] },',
+      '    search: { self: ["title", "status"] },',
       "  },",
       "});",
       "",
@@ -150,7 +166,7 @@ function writeAuthMatrixSchema(projectDir: string): void {
       '    label: "Notes",',
       '    rowScope: "workspaceUserScoped",',
       '    rowLabelColumns: ["title"],',
-      '    search: { columns: ["title", "body", "category"] },',
+      '    search: { self: ["title", "body", "category"] },',
       "  },",
       "});",
       "",
@@ -167,7 +183,7 @@ function writeAuthMatrixSchema(projectDir: string): void {
       "    immutable: true,",
       '    rowScope: "systemGlobal",',
       '    rowLabelColumns: ["name"],',
-      '    search: { columns: ["code", "name"] },',
+      '    search: { self: ["code", "name"] },',
       "  },",
       "});",
       "",
@@ -588,14 +604,25 @@ describe("generated table authz and row security - end-to-end", () => {
         },
       )
     ).body.entries;
+    // Lookup metadata carries the visible fields only; ownership columns
+    // (workspace_id) must not leak through picker payloads.
     expect(taskLookup).toEqual([
-      { value: input.visibleTaskIds[0], label: "A owner alpha" },
+      {
+        value: input.visibleTaskIds[0],
+        label: "A owner alpha",
+        meta: {
+          id: input.visibleTaskIds[0],
+          title: "A owner alpha",
+          status: "todo",
+          priority: 2,
+        },
+      },
     ]);
 
     const taskCount = (
       await requestJson<CountBody>(
         server!.baseUrl,
-        "/api/tables/tasks/_count?group_by=status&ids=todo,done",
+        "/api/tables/tasks/_count?group_by=status&filter[status][in]=todo,done",
         {
           cookieFile,
           expectedSuccess: true,
@@ -603,7 +630,10 @@ describe("generated table authz and row security - end-to-end", () => {
         },
       )
     ).body.data;
-    expect(taskCount).toEqual({ done: 1, todo: 1 });
+    expect(sortedCountGroups(taskCount)).toEqual([
+      { value: "done", count: 1 },
+      { value: "todo", count: 1 },
+    ]);
 
     const taskCsv = await curlText(
       `${server!.baseUrl}/api/tables/tasks/export.csv`,
@@ -633,14 +663,24 @@ describe("generated table authz and row security - end-to-end", () => {
         },
       )
     ).body.entries;
+    // As above: no workspace_id or scoped_to_user_id in picker metadata.
     expect(noteLookup).toEqual([
-      { value: input.visibleNoteId, label: "A owner private" },
+      {
+        value: input.visibleNoteId,
+        label: "A owner private",
+        meta: {
+          id: input.visibleNoteId,
+          title: "A owner private",
+          body: "owner-only a note",
+          category: "personal",
+        },
+      },
     ]);
 
     const noteCount = (
       await requestJson<CountBody>(
         server!.baseUrl,
-        "/api/tables/notes/_count?group_by=category&ids=personal,shared,archive",
+        "/api/tables/notes/_count?group_by=category&filter[category][in]=personal,shared,archive",
         {
           cookieFile,
           expectedSuccess: true,
@@ -648,7 +688,9 @@ describe("generated table authz and row security - end-to-end", () => {
         },
       )
     ).body.data;
-    expect(noteCount).toEqual({ personal: 1 });
+    expect(sortedCountGroups(noteCount)).toEqual([
+      { value: "personal", count: 1 },
+    ]);
 
     const noteCsv = await curlText(
       `${server!.baseUrl}/api/tables/notes/export.csv`,
