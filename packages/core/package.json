@@ -108,7 +108,7 @@
     "vendor": "zx scripts/build.mjs vendor",
     "build": "zx scripts/build.mjs build",
     "build:watch": "zx scripts/build.mjs watch",
-    "typecheck": "tsc --noEmit && tsc --noEmit -p src/templates/tsconfig.json && tsc --noEmit -p tsconfig.project-auth.json"
+    "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.project-auth.json"
   },
   "dependencies": {
     "@hono/node-server": "^2.0.6",

@@ -5,13 +5,15 @@
     "rootDir": ".",
     "noEmit": true,
     "paths": {
-      "@sapporta/server": ["./src/index.ts"]
+      "@sapporta/server": ["./src/index.ts"],
+      "%%SAPPORTA:SLUG%%-shared": [
+        "./src/templates/packages/shared/src/index.ts"
+      ]
     }
   },
   "include": [
-    "src/templates/packages/api/authz/**/*.ts",
-    "src/templates/packages/api/mailer.ts",
-    "src/templates/packages/api/project-auth/**/*.ts",
+    "src/templates/packages/api/**/*.ts",
+    "src/templates/packages/shared/src/**/*.ts",
     "template-tests/**/*.ts"
   ],
   "references": [
