@@ -21,6 +21,17 @@ Types, ts-rest contracts, and pure helpers that would otherwise be re-declared o
 - I/O, database access, HTTP handlers, React components.
 - Project-specific domain code — that lives in the project's `src/app/`, not here.
 
+## Root Barrel vs Subpaths
+
+The root export (`@sapporta/shared`) barrels only pure value helpers:
+filter grammar, query params, value kinds, dates, CSV, row ids, row
+scopes, labels, counts, validation. The structural modules — `contracts`,
+`grid-dataset`, `client` — are subpath-only by design: they are imported
+deliberately at the few places that wire the API boundary, and keeping
+them out of the barrel keeps casual root imports lightweight. Do not add
+them to `src/index.ts`; do not add new grab-bag helpers as subpaths
+without also deciding which side of this line they sit on.
+
 ## Constraints
 
 - Pure TypeScript. No side effects at import time.
