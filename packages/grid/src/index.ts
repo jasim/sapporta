@@ -1,3 +1,3 @@
 import "./index.css";
 
-export * from "./grid/index";
+export * from "./core/index";

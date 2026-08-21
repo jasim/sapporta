@@ -1,5 +1,5 @@
-import type { ColumnSchema } from "../grid/types/schema";
-import type { ColId, GridPath } from "../grid/types/identity";
+import type { ColumnSchema } from "../core/types/schema";
+import type { ColId, GridPath } from "../core/types/identity";
 import { preset } from "./preset";
 import type { ColumnWidth } from "./types";
 

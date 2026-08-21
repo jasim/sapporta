@@ -1,5 +1,5 @@
-import type { ColumnSchema } from "../grid/types/schema";
-import type { ColId } from "../grid/types/identity";
+import type { ColumnSchema } from "../core/types/schema";
+import type { ColId } from "../core/types/identity";
 import {
   columnSizingTemplateColumns,
   trackForColumnWidth,

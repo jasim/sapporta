@@ -1,10 +1,10 @@
-import type { ColId } from "../grid/types/identity";
-import type { ColumnSchema } from "../grid/types/schema";
+import type { ColId } from "../core/types/identity";
+import type { ColumnSchema } from "../core/types/schema";
 import type { ColumnWidth } from "./types";
 import { column } from "./columns";
 import { Checkbox } from "@sapporta/ui";
-import { useGridRuntime } from "../grid/react/GridRuntimeProvider";
-import { useCurrentRowInteractionStatus } from "../grid/react/cells/GridRow";
+import { useGridRuntime } from "../core/react/GridRuntimeProvider";
+import { useCurrentRowInteractionStatus } from "../core/react/cells/GridRow";
 import styles from "./sapporta-preset.module.css";
 
 // Row-selection chrome belongs to ColumnPreset, not the base grid.

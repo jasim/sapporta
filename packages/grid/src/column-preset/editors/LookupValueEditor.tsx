@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Check } from "lucide-react";
-import type { CellEditorProps } from "../../grid/types/schema";
+import type { CellEditorProps } from "../../core/types/schema";
 import { Combobox, comboboxClassNames } from "@sapporta/ui";
 import { cn } from "@sapporta/ui/cn";
 import {

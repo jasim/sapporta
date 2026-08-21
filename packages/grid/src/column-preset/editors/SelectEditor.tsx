@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Check } from "lucide-react";
 import { Combobox, comboboxClassNames } from "@sapporta/ui";
 import { cn } from "@sapporta/ui/cn";
-import type { CellEditorProps } from "../../grid/types/schema";
+import type { CellEditorProps } from "../../core/types/schema";
 import { presetRuntime } from "../preset";
 
 export function SelectEditor(props: CellEditorProps) {

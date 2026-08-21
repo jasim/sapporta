@@ -1,4 +1,4 @@
-import type { ColId, GridPath, GridRuntime } from "../grid";
+import type { ColId, GridPath, GridRuntime } from "../core";
 import type { ValueLookup } from "./cache/value-lookup";
 
 export type GridValueLookupColumn = {

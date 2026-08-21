@@ -1,6 +1,6 @@
-import type { GridSelectionSummaryContext } from "../grid/react";
-import type { LevelRow } from "../grid/types/level-row";
-import type { ColumnSchema } from "../grid/types/schema";
+import type { GridSelectionSummaryContext } from "../core/react";
+import type { LevelRow } from "../core/types/level-row";
+import type { ColumnSchema } from "../core/types/schema";
 import { finiteNumericValue } from "./numeric";
 import { presetRuntime } from "./preset";
 import styles from "./sapporta-preset.module.css";

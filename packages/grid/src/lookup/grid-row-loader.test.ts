@@ -7,7 +7,7 @@ import {
   type RuntimeLevelDataSource,
   type SourceLoadResult,
   type TreeNode,
-} from "../grid";
+} from "../core";
 import { startLoadingValueLookupEntriesForGridRows } from "./grid-row-loader";
 import type { ValueLookup } from "./cache/value-lookup";
 

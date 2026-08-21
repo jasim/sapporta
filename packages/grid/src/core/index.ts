@@ -1,4 +1,4 @@
-// Public surface of the grid module.
+// Public surface of GridCore, the base grid engine.
 //
 // =====================================================================
 // What this is
@@ -6,7 +6,9 @@
 //
 // A hierarchical data grid. Flat tables and multi-level reports are both
 // first-class consumers; neither is privileged. The grid is pure-render,
-// keyboard-navigable, and cell-editable.
+// keyboard-navigable, and cell-editable. GridCore is deliberately a base:
+// unopinionated, framework-agnostic, and tied to no backend or UI kit —
+// the layers above it (ColumnPreset, TGrid) add those opinions.
 //
 // =====================================================================
 // The problem it solves
@@ -29,7 +31,7 @@
 //   import {
 //     createGridRuntime, GridRuntimeProvider, GridLevel, rootPath,
 //     inMemoryGridDataSource, useGridRuntimeEffect,
-//   } from "../grid";
+//   } from "../core";
 //
 //   const runtime = useGridRuntimeEffect(() => {
 //     return createGridRuntime({

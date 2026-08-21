@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
-import { makeRowId, rootPath } from "../grid/types/identity";
-import type { LevelRow } from "../grid/types/level-row";
+import { makeRowId, rootPath } from "../core/types/identity";
+import type { LevelRow } from "../core/types/level-row";
 import { formatCurrency, formatNumber, formatPercentage } from "./format";
 import { columnPreset } from "./columns";
 import { selectionSumForColumn } from "./SelectionSummary";

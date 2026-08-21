@@ -2,13 +2,13 @@ import { performance } from "node:perf_hooks";
 import {
   createGridRuntime,
   type GridRuntime,
-} from "../src/grid/runtime/runtime";
-import type { GridLevelRuntime } from "../src/grid/runtime/grid-level-runtime";
+} from "../src/core/runtime/runtime";
+import type { GridLevelRuntime } from "../src/core/runtime/grid-level-runtime";
 import { controllerFor, cursorManagerFor } from "../src/advanced";
-import { inMemoryGridDataSource } from "../src/grid/data-sources/memory/in-memory-grid-source";
-import { childPath } from "../src/grid/types/identity";
-import { CELL_GRID_WITH_INDEPENDENT_ROW_SELECTION } from "../src/grid/types/interaction";
-import type { RowId } from "../src/grid/types/identity";
+import { inMemoryGridDataSource } from "../src/core/data-sources/memory/in-memory-grid-source";
+import { childPath } from "../src/core/types/identity";
+import { CELL_GRID_WITH_INDEPENDENT_ROW_SELECTION } from "../src/core/types/interaction";
+import type { RowId } from "../src/core/types/identity";
 import {
   buildBenchDataset,
   type BenchDataset,

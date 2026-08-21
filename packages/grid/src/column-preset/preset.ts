@@ -1,4 +1,4 @@
-import type { CellEditorProps, ColumnSchema } from "../grid/types/schema";
+import type { CellEditorProps, ColumnSchema } from "../core/types/schema";
 import type {
   BuiltInColumnPresetKind,
   ColumnAlign,

@@ -3,9 +3,9 @@ import type {
   CellEditorProps,
   CellEditorStart,
   ColumnSchema,
-} from "../../grid/types/schema";
-import { rootPath, makeRowId } from "../../grid/types/identity";
-import type { LevelRow } from "../../grid/types/level-row";
+} from "../../core/types/schema";
+import { rootPath, makeRowId } from "../../core/types/identity";
+import type { LevelRow } from "../../core/types/level-row";
 import { initialDateEditorValue } from "./DateEditor";
 import { initialNumericEditorValue } from "./NumericEditor";
 import { initialTextEditorValue } from "./TextEditor";

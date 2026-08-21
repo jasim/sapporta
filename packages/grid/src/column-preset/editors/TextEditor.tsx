@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import type { CellEditorProps, CellEditorStart } from "../../grid/types/schema";
+import type { CellEditorProps, CellEditorStart } from "../../core/types/schema";
 import { presetRuntime } from "../preset";
 import styles from "../sapporta-preset.module.css";
 import { focusEditorInput } from "./editor-focus";

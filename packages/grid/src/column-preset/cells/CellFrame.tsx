@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import type { CellRenderProps } from "../../grid/types/schema";
+import type { CellRenderProps } from "../../core/types/schema";
 
 export function CellFrame({
   children,

@@ -1,4 +1,4 @@
-import type { CellRenderProps } from "../../grid/types/schema";
+import type { CellRenderProps } from "../../core/types/schema";
 import type { SelectPreset } from "../preset";
 import type { ColumnPresetCellRenderRuntime } from "../runtime";
 

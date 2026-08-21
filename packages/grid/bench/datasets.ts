@@ -3,10 +3,10 @@ import type {
   GridSchema,
   ColumnSchema,
   LevelSchema,
-} from "../src/grid/types/schema";
-import type { TreeNode } from "../src/grid/types/level-row";
-import type { ColId } from "../src/grid/types/identity";
-import type { InMemoryGridDataSourceOpts } from "../src/grid/data-sources/memory/in-memory-grid-source";
+} from "../src/core/types/schema";
+import type { TreeNode } from "../src/core/types/level-row";
+import type { ColId } from "../src/core/types/identity";
+import type { InMemoryGridDataSourceOpts } from "../src/core/data-sources/memory/in-memory-grid-source";
 
 export type BenchDatasetName =
   | "regular"

@@ -1,9 +1,9 @@
 import type {
   GridDataSource,
   LevelDataSource,
-} from "../src/grid/data-sources/types";
-import type { GridEvents } from "../src/grid/runtime/emitter";
-import type { GridRuntime } from "../src/grid/runtime/runtime";
+} from "../src/core/data-sources/types";
+import type { GridEvents } from "../src/core/runtime/emitter";
+import type { GridRuntime } from "../src/core/runtime/runtime";
 
 export type BenchCounters = {
   rootSourceCalls: number;

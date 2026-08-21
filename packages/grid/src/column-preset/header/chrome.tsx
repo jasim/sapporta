@@ -2,7 +2,7 @@ import type { CSSProperties } from "react";
 import {
   defaultGridLevelChrome,
   type GridLevelChrome,
-} from "../../grid/react";
+} from "../../core/react";
 import type { PresetChromeOptions } from "../types";
 import { templateColumns } from "../width";
 import {

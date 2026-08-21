@@ -7,14 +7,14 @@ import type {
   CellRenderProps,
   ColumnSchema,
   GridColumnCopyBehavior,
-} from "../grid/types/schema";
-import type { ColId, Coord, GridPath, RowKey } from "../grid/types/identity";
-import type { SortDescriptor } from "../grid/pipeline/types";
+} from "../core/types/schema";
+import type { ColId, Coord, GridPath, RowKey } from "../core/types/identity";
+import type { SortDescriptor } from "../core/pipeline/types";
 import type {
   LevelSnapshot,
   SourceLoadResult,
-} from "../grid/data-sources/types";
-import type { TreeNode } from "../grid/types/level-row";
+} from "../core/data-sources/types";
+import type { TreeNode } from "../core/types/level-row";
 import type { SearchLookup, ValueLookup } from "../lookup";
 import type { ColumnPreset } from "./preset";
 import type { ColumnSizingOptions } from "./column-sizing";

@@ -3,15 +3,15 @@
 import { act, createElement, type ReactElement } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { GridDataSource, SortDescriptor } from "../../grid";
-import { createGridRuntime, rootPath } from "../../grid";
+import type { GridDataSource, SortDescriptor } from "../../core";
+import { createGridRuntime, rootPath } from "../../core";
 import {
   hostBackedRowQuery,
   restLevelSource,
-} from "../../grid/data-sources/rest/rest-level-source";
-import { GridRuntimeProvider } from "../../grid/react/GridRuntimeProvider";
-import type { TreeNode } from "../../grid/types/level-row";
-import type { GridSchema } from "../../grid/types/schema";
+} from "../../core/data-sources/rest/rest-level-source";
+import { GridRuntimeProvider } from "../../core/react/GridRuntimeProvider";
+import type { TreeNode } from "../../core/types/level-row";
+import type { GridSchema } from "../../core/types/schema";
 import { columnPreset } from "../columns";
 import { ColumnPresetHeader } from "./ColumnPresetHeader";
 

@@ -1,5 +1,5 @@
 import { Check, X } from "lucide-react";
-import type { CellRenderProps } from "../../grid/types/schema";
+import type { CellRenderProps } from "../../core/types/schema";
 import type { BooleanPreset } from "../preset";
 import type { ColumnPresetCellRenderRuntime } from "../runtime";
 

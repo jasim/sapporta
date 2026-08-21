@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import type { CellEditorProps } from "../../grid/types/schema";
+import type { CellEditorProps } from "../../core/types/schema";
 
 export function BooleanEditor(props: CellEditorProps) {
   useEffect(() => {

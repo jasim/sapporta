@@ -3,8 +3,8 @@
 import { act, createElement } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { makeRowId, rootPath } from "../../grid/types/identity";
-import type { CellEditorProps } from "../../grid/types/schema";
+import { makeRowId, rootPath } from "../../core/types/identity";
+import type { CellEditorProps } from "../../core/types/schema";
 import { columnPreset } from "../columns";
 import { SelectEditor } from "./SelectEditor";
 

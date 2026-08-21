@@ -5,9 +5,9 @@ import {
   type ReactNode,
 } from "react";
 import { describe, expect, it } from "vitest";
-import type { LevelRow } from "../grid/types/level-row";
-import type { CellEditorProps } from "../grid/types/schema";
-import { childPath, makeRowId, rootPath } from "../grid/types/identity";
+import type { LevelRow } from "../core/types/level-row";
+import type { CellEditorProps } from "../core/types/schema";
+import { childPath, makeRowId, rootPath } from "../core/types/identity";
 import { TextCell } from "./cells/TextCell";
 import {
   CachedValueLookup,
@@ -30,7 +30,7 @@ import {
   width,
 } from "./index";
 import { presetRuntime } from "./preset";
-import { levelNameFromPath } from "../grid/react/Grid";
+import { levelNameFromPath } from "../core/react/Grid";
 
 describe("columnPreset columns", () => {
   it("identifier creates a compact readonly preset with a renderer", () => {

@@ -1,4 +1,4 @@
-import type { CellEditorProps } from "../../grid/types/schema";
+import type { CellEditorProps } from "../../core/types/schema";
 import { presetRuntime } from "../preset";
 
 export function parseForCommit(props: CellEditorProps, raw: string): unknown {

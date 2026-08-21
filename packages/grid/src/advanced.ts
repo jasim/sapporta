@@ -1,1 +1,1 @@
-export * from "./grid/advanced";
+export * from "./core/advanced";

@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import type { CellRenderProps } from "../grid/types/schema";
+import type { CellRenderProps } from "../core/types/schema";
 import type { ColumnPresetRuntime } from "./runtime";
 import type {
   BooleanPreset,

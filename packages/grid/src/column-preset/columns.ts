@@ -3,7 +3,7 @@ import type {
   ColumnSchema,
   GridColumnCopyBehavior,
   GridCopyColumn,
-} from "../grid/types/schema";
+} from "../core/types/schema";
 import { defaultsFor } from "./defaults";
 import { normalizeOptions } from "./lookup";
 import {

@@ -4,7 +4,7 @@ import type {
   CellEditGesture,
   CellEditorProps,
   CellRenderProps,
-} from "../grid/types/schema";
+} from "../core/types/schema";
 import type { ColumnAlign, ColumnPresetKind, ColumnWidth } from "./types";
 import type { ColumnPreset } from "./preset";
 import type { ColumnPresetRuntime } from "./runtime";

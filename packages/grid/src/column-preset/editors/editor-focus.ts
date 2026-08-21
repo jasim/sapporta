@@ -1,4 +1,4 @@
-import type { CellEditorStart } from "../../grid/types/schema";
+import type { CellEditorStart } from "../../core/types/schema";
 
 type EditorInputControl = HTMLInputElement | HTMLTextAreaElement;
 

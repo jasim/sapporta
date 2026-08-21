@@ -1,12 +1,12 @@
-import type { GridPath } from "../grid/types/identity";
-import { decomposePath } from "../grid/types/identity";
-import { shouldRenderEmpty } from "../grid/react/EmptyLevel";
-import { levelStatusBandModel } from "../grid/react/LevelStatusBand";
+import type { GridPath } from "../core/types/identity";
+import { decomposePath } from "../core/types/identity";
+import { shouldRenderEmpty } from "../core/react/EmptyLevel";
+import { levelStatusBandModel } from "../core/react/LevelStatusBand";
 import {
   useGridRuntime,
   useLevelSourceState,
   usePhantoms,
-} from "../grid/react/GridRuntimeProvider";
+} from "../core/react/GridRuntimeProvider";
 import styles from "./sapporta-preset.module.css";
 
 export function PresetLevelStatusBand({ path }: { path: GridPath }) {

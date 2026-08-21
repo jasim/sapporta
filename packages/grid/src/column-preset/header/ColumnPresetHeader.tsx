@@ -6,14 +6,14 @@ import {
   type ReactNode,
 } from "react";
 import { ChevronDown, ChevronUp, EllipsisVertical } from "lucide-react";
-import type { ColumnSchema, RowHeaderColumn } from "../../grid/types/schema";
-import type { GridPath } from "../../grid/types/identity";
-import { decomposePath } from "../../grid/types/identity";
-import { cycleSort } from "../../grid/sort";
+import type { ColumnSchema, RowHeaderColumn } from "../../core/types/schema";
+import type { GridPath } from "../../core/types/identity";
+import { decomposePath } from "../../core/types/identity";
+import { cycleSort } from "../../core/sort";
 import {
   useGridRuntime,
   useLevelSnapshot,
-} from "../../grid/react/GridRuntimeProvider";
+} from "../../core/react/GridRuntimeProvider";
 import { cn, Popover, PopoverContent, PopoverTrigger } from "@sapporta/ui";
 import { meta, preset, presetRuntime } from "../preset";
 import {
