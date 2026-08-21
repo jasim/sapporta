@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "zx scripts/dev.mjs",
     "check:public-declarations": "node scripts/check-public-declarations.mjs",
+    "check:module-index": "node scripts/check-module-index.mjs",
     "check:peer-compat:lock": "node scripts/check-peer-compat.mjs lock",
     "check:peer-compat:min": "node scripts/check-peer-compat.mjs minimum",
     "check:peer-compat:latest": "node scripts/check-peer-compat.mjs latest-in-range",

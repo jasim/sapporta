@@ -2,13 +2,8 @@
 
 ## Monorepo Layout
 
-```text
-packages/cli/     sapporta CLI package
-packages/core/    @sapporta/server
-packages/honest/  Hono + ts-rest adapter
-packages/shared/  browser/server-safe shared utilities
-packages/ui/      React admin UI
-```
+See ARCHITECTURE.md for the package roster, the module index of each
+package, and the dependency rules between them.
 
 ## Commands
 
@@ -18,6 +13,7 @@ pnpm build            # Build all packages
 pnpm test             # Run all tests
 pnpm test:watch       # Run tests in watch mode
 pnpm typecheck        # TypeScript type checking
+pnpm check:module-index  # ARCHITECTURE.md module tables match package exports
 ```
 
 Create a local app from the current checkout when testing library changes:
