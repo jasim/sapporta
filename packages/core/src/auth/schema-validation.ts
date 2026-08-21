@@ -124,8 +124,8 @@ export function checkAuthSchemaDefinitions(
 
 /**
  * Fails boot when any registered table violates Sapporta auth metadata rules.
- * Auth-enabled projects should call this after schemas are loaded and before
- * mounting framework APIs.
+ * `loadSapportaProject` runs this after schemas are loaded and before search
+ * plans compile, so every schema problem lands in one aggregated report.
  */
 export function assertAuthSchemaDefinitions(tables: readonly TableDef[]): void {
   const issues = checkAuthSchemaDefinitions(tables);

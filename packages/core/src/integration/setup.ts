@@ -14,7 +14,6 @@ import {
 } from "../project/load-sapporta.js";
 import {
   createAuthContext,
-  assertAuthSchemaDefinitions,
   requestDataAuthority,
   systemGlobalOnlyAuthority,
   type SapportaAuthContext,
@@ -104,7 +103,6 @@ export async function createIntegrationApp(
     apiDistDir: FIXTURES_DIR,
     conn,
   });
-  assertAuthSchemaDefinitions(sapporta.catalog.tables);
 
   installSapportaRequestContext(app, conn);
   app.use("/api/*", async (c, next) => {

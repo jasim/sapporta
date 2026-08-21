@@ -26,6 +26,7 @@ import type { TableDef } from "../schema/table.js";
 import { fromApiCodeDir } from "./project-paths.js";
 import { createTableCatalog, type TableCatalog } from "../schema/catalog.js";
 import { assertSchemaDefinitions } from "../schema/check.js";
+import { assertAuthSchemaDefinitions } from "../auth/schema-validation.js";
 import { loadSchemas } from "../schema/loader.js";
 import { assertMigrationsReady } from "../migrations/guard.js";
 import {
@@ -81,10 +82,12 @@ export interface MountSapportaFrameworkOptions {
 /**
  * Loads the Sapporta project catalog without mutating the Hono app.
  *
- * This imports compiled schema modules, validates the table definitions, builds
- * the static table catalog, and verifies the database migrations are ready for
- * the loaded tables. Auth boot should run after this so
- * `SapportaAuthContext.rowSecurity` can bind to the returned table definitions.
+ * This imports compiled schema modules, validates the table definitions —
+ * structural rules first, then the auth row-scope rules, each aggregating
+ * every issue into one report — builds the static table catalog, and verifies
+ * the database migrations are ready for the loaded tables. Auth boot should
+ * run after this so `SapportaAuthContext.rowSecurity` can bind to the
+ * returned table definitions.
  */
 export async function loadSapportaProject(
   opts: LoadSapportaProjectOptions,
@@ -95,6 +98,10 @@ export async function loadSapportaProject(
 
   const { tables } = await loadSchemas(dirs.schemaDir);
   assertSchemaDefinitions(tables);
+  // Auth validation runs before the catalog compiles search plans: the
+  // search compiler resolves the same reference metadata and would otherwise
+  // fail on the first reference problem, hiding the aggregated report.
+  assertAuthSchemaDefinitions(tables);
   const catalog = createTableCatalog(tables);
   for (const warning of catalog.searchWarnings) {
     log.warn(warning.message, {

@@ -18,7 +18,6 @@ import {
   installRequestLogging,
   installSapportaRequestContext,
   installSapportaErrorHandler,
-  assertAuthSchemaDefinitions,
   loadSapportaProject,
   mountHealth,
   mountOpenApi,
@@ -45,8 +44,9 @@ const { apiDistDir, frontendDistDir, databasePath } =
   fromProjectRoot(projectRoot);
 const conn = connectProject(databasePath);
 
-// Load the compiled table definitions. Database migrations remain a separate
-// development and deployment step.
+// Load the compiled table definitions and check the schema's structural and
+// row-access rules before accepting requests. Database migrations remain a
+// separate development and deployment step.
 const sapporta = await loadSapportaProject({
   name: "%%SAPPORTA:NAME%%",
   slug: "%%SAPPORTA:SLUG%%",
@@ -55,8 +55,6 @@ const sapporta = await loadSapportaProject({
   conn,
 });
 
-// Check the schema's row-access rules before accepting requests.
-assertAuthSchemaDefinitions(sapporta.catalog.tables);
 const projectEnv = readProjectAuthEnv();
 const mailer = createSapportaMailer(projectEnv.mail);
 
