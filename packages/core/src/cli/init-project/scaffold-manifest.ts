@@ -26,28 +26,25 @@ function refreshPolicyForOwnership(
 }
 
 function scaffoldFile(
-  path: string,
-  ownership: ScaffoldFileOwnership,
-): ScaffoldFileSpec {
-  return {
-    src: path,
-    dest: path,
-    ownership,
-    refreshPolicy: refreshPolicyForOwnership(ownership, path),
-  };
-}
-
-function scaffoldFileAt(
-  src: string,
   dest: string,
   ownership: ScaffoldFileOwnership,
 ): ScaffoldFileSpec {
   return {
-    src,
+    src: templateSrcForDest(dest),
     dest,
     ownership,
     refreshPolicy: refreshPolicyForOwnership(ownership, dest),
   };
+}
+
+/**
+ * The template tree mirrors the generated project, so a file's template
+ * source path is its destination path. The one exception is .gitignore:
+ * npm strips files named .gitignore when packing, so the template ships
+ * without the leading dot and is renamed at scaffold time.
+ */
+function templateSrcForDest(dest: string): string {
+  return dest === ".gitignore" ? "gitignore" : dest;
 }
 
 export const SCAFFOLD_MANIFEST: ScaffoldManifest = [
@@ -88,7 +85,7 @@ export const SCAFFOLD_MANIFEST: ScaffoldManifest = [
   scaffoldFile("VISUAL-DESIGN-GUIDELINES.md", "workspace"),
   scaffoldFile("CLAUDE.md", "workspace"),
   scaffoldFile("DEPLOYMENT.md", "workspace"),
-  scaffoldFileAt("gitignore", ".gitignore", "workspace"),
+  scaffoldFile(".gitignore", "workspace"),
   scaffoldFile("packages/frontend/package.json", "workspace"),
   scaffoldFile("packages/frontend/tsconfig.json", "framework"),
   scaffoldFile("packages/frontend/vite.config.ts", "framework"),
