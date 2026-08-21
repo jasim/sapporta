@@ -120,7 +120,6 @@ keeping them out of the barrel keeps casual root imports lightweight.
 | Module | Purpose |
 | --- | --- |
 | `.` | Grid engine public surface, with the stylesheet imported as a side effect |
-| `./grid` | The same engine surface without the stylesheet import |
 | `./advanced` | Runtime escape hatches: phantom-row lifecycle, cursor manager, controller internals |
 | `./column-preset` | Typed column constructors (`text`, `currency`, `date`, `foreignKey`, …), display formatting, cells and editors, header chrome, column sizing |
 | `./lookup` | Lookup value and search caches |

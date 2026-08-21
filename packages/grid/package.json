@@ -38,11 +38,6 @@
       "sapporta:source": "./src/index.ts",
       "default": "./dist/index.js"
     },
-    "./grid": {
-      "types": "./dist/grid/index.d.ts",
-      "sapporta:source": "./src/grid/index.ts",
-      "default": "./dist/grid.js"
-    },
     "./advanced": {
       "types": "./dist/advanced.d.ts",
       "sapporta:source": "./src/advanced.ts",

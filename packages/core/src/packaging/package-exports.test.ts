@@ -290,7 +290,7 @@ describe("Sapporta package exports", () => {
           import * as frontendForm from "@sapporta/frontend/form";
           import * as frontendTableQuery from "@sapporta/frontend/table/query";
           import * as grid from "@sapporta/grid";
-          import * as gridRuntime from "@sapporta/grid/grid";
+          import * as gridColumnPreset from "@sapporta/grid/column-preset";
           import * as ui from "@sapporta/ui";
           import * as uiAlertDialog from "@sapporta/ui/alert-dialog";
           import * as uiButton from "@sapporta/ui/button";
@@ -311,7 +311,7 @@ describe("Sapporta package exports", () => {
             frontendForm,
             frontendTableQuery,
             grid,
-            gridRuntime,
+            gridColumnPreset,
             ui,
             uiAlertDialog,
             uiButton,
