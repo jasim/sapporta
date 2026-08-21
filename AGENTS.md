@@ -25,7 +25,7 @@ packages/cli/           sapporta — npx-able wrapper whose bin re-exports @sapp
 packages/core/          @sapporta/server — schema-as-code tables, row engine, CRUD/meta APIs, CLI, and the project scaffold templates
 packages/honest/        @sapporta/honest — Hono + ts-rest adapter for contract routing, request parsing, and OpenAPI output
 packages/shared/        @sapporta/shared — leaf package: wire contracts, filter/query grammars, and pure helpers shared by server and browser
-packages/grid/          @sapporta/grid — backend-agnostic grid engine, column presets, and lookup primitives
+packages/grid/          @sapporta/grid — GridCore (the backend-agnostic grid engine), column presets, and lookup primitives
 packages/frontend/      @sapporta/frontend — Sapporta-bound admin frontend: app shell, table and report pages, auth screens, boot wiring
 packages/ui/            @sapporta/ui — UI primitives (Base UI wrappers) and small React utilities
 ```

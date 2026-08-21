@@ -42,7 +42,7 @@ packages/cli/           sapporta — npx-able wrapper whose bin re-exports @sapp
 packages/core/          @sapporta/server — schema-as-code tables, row engine, CRUD/meta APIs, CLI, and the project scaffold templates
 packages/honest/        @sapporta/honest — Hono + ts-rest adapter for contract routing, request parsing, and OpenAPI output
 packages/shared/        @sapporta/shared — leaf package: wire contracts, filter/query grammars, and pure helpers shared by server and browser
-packages/grid/          @sapporta/grid — backend-agnostic grid engine, column presets, and lookup primitives
+packages/grid/          @sapporta/grid — GridCore (the backend-agnostic grid engine), column presets, and lookup primitives
 packages/frontend/      @sapporta/frontend — Sapporta-bound admin frontend: app shell, table and report pages, auth screens, boot wiring
 packages/ui/            @sapporta/ui — UI primitives (Base UI wrappers) and small React utilities
 ```
@@ -120,7 +120,7 @@ keeping them out of the barrel keeps casual root imports lightweight.
 
 | Module | Purpose |
 | --- | --- |
-| `.` | Grid engine public surface, with the stylesheet imported as a side effect |
+| `.` | GridCore public surface — the base grid engine — with the stylesheet imported as a side effect |
 | `./advanced` | Runtime escape hatches: phantom-row lifecycle, cursor manager, controller internals |
 | `./column-preset` | Typed column constructors (`text`, `currency`, `date`, `foreignKey`, …), display formatting, cells and editors, header chrome, column sizing |
 | `./lookup` | Lookup value and search caches |
@@ -183,21 +183,24 @@ friendly name.
 
 The data-grid code forms three layers, from generic to Sapporta-specific:
 
-1. **Grid engine** — `packages/grid/src/grid/`. Framework-agnostic rows,
-   columns, selection, editing, and data sources. Domain features are out of
-   scope by charter (see the essay in `packages/grid/src/grid/index.ts`);
-   data attaches through `column.meta` and injected endpoint factories.
+1. **GridCore** — `packages/grid/src/core/`. The base grid engine:
+   framework-agnostic rows, columns, selection, editing, and data sources,
+   unopinionated and tied to no backend. Domain features are out of scope
+   by charter (see the essay in `packages/grid/src/core/index.ts`); data
+   attaches through `column.meta` and injected endpoint factories.
 2. **ColumnPreset** — `packages/grid/src/column-preset/`. Typed column
    constructors with formatting, cells, editors, and header chrome, built on
-   the engine's types.
-3. **TGrid** — `packages/frontend/src/table/`. The Sapporta-bound table
-   grid: compiles a `TableSchema` from `@sapporta/shared/contracts` into
-   grid schemas (`grid-adapter/`), manages sessions and query state
-   (`state/`), and renders the table pages (`page/`).
+   GridCore's types.
+3. **TGrid** — `packages/frontend/src/table/tgrid/`. The Sapporta-bound
+   table grid: compiles a `TableSchema` from `@sapporta/shared/contracts`
+   into grid schemas, and manages table sessions, query state, and the
+   bound `TGrid` view component. The rest of `packages/frontend/src/table/`
+   is the layer above it — the standard table screens (routes, page chrome,
+   filters, forms) composed on top of TGrid sessions.
 
 Reports ride a parallel path: the server produces a `GridDataset`
 (`@sapporta/shared/grid-dataset`), which `@sapporta/frontend`'s report
-module renders with the same grid engine.
+module renders on GridCore via `ReportGridDataset`.
 
 ## Conventions
 

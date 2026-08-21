@@ -135,12 +135,12 @@ npx skills add https://github.com/jasim/sapporta-skills --global
 
 ## More Docs
 
-- [Schema and Migrations](./docs/schema-and-migrations.md) - define tables and manage Drizzle migrations
-- [Auth and Row Security](./docs/auth.md) - build workspace-aware, row-safe apps
-- [CLI](./docs/cli.md) - inspect and work with running Sapporta apps from the command line
-- [Deployment](./docs/deployment.md) - build, migrate, configure, and run Sapporta apps in production
-- [Custom Table Grids](./docs/TGRID-USAGE.md) - build custom React table workflows on Sapporta table APIs
-- [BaseGrid](./docs/BASEGRID-GUIDE.md) - build a custom grid screen when table or report components do not fit
+- [Schema and Migrations](https://sapporta.com/docs/guides/model-data/schema-changes-and-migrations) - define tables and manage Drizzle migrations
+- [Auth and Row Security](https://sapporta.com/docs/reference/server/auth-and-row-security) - build workspace-aware, row-safe apps
+- [CLI](https://sapporta.com/docs/guides/discovery/use-the-sapporta-cli) - inspect and work with running Sapporta apps from the command line
+- [Deployment](https://sapporta.com/docs/guides/operations/production-builds-and-deployment) - build, migrate, configure, and run Sapporta apps in production
+- [Custom Table Grids](https://sapporta.com/docs/guides/generated-surfaces/low-level-tgrid-sessions) - build custom React table workflows on Sapporta table APIs
+- [GridCore](https://sapporta.com/grid/reference/grid-core) - build a custom grid screen when table or report components do not fit
 - [Server Package](./packages/core/README.md) - use `@sapporta/server`, `scopedRows`, and CLI-backed project commands
 - [Shared Package](./packages/shared/README.md) - use shared contracts, filters, date helpers, and client types
 - [Honest](./packages/honest/README.md) - use the Hono + ts-rest adapter directly
