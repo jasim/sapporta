@@ -24,7 +24,7 @@ const sharedOptionsPath = resolve(
 );
 const scaffoldSpecsJson = (
   await $`pnpm exec tsx --eval ${`
-    import { resolveScaffoldPackages } from "./packages/core/src/cli/init-project/create-project.ts";
+    import { resolveScaffoldPackages } from "./packages/core/src/cli/init-project/dependency-catalog.ts";
     import { initProjectPackagePaths } from "./packages/core/src/cli/init-project/paths.ts";
 
     const packages = resolveScaffoldPackages(

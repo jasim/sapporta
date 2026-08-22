@@ -266,6 +266,11 @@ export const DEPENDENCY_DEFINITIONS = [
     browser: true,
     server: true,
   }),
+  // A generated project's auth tables come from `project-auth/schema.ts`,
+  // generated for one Better Auth version, and Better Auth adds columns in
+  // minor releases. @sapporta/server therefore declares better-auth as a tilde
+  // range, which holds a generated project to the minor line that schema
+  // covers. Changing the minor means regenerating the schema with it.
   coreInstalledDependency(
     "betterAuth",
     "better-auth",

@@ -127,14 +127,14 @@
     "zod": "^4.3.6"
   },
   "devDependencies": {
-    "@better-auth/drizzle-adapter": "^1.6.21",
+    "@better-auth/drizzle-adapter": "~1.7.1",
     "@casl/ability": "^7.0.0",
     "@sapporta/honest": "workspace:^",
     "@sapporta/rest-core": "3.52.2",
     "@types/better-sqlite3": "^7.6.13",
     "@types/nodemailer": "^8.0.1",
-    "auth": "^1.6.21",
-    "better-auth": "^1.6.21",
+    "auth": "~1.7.1",
+    "better-auth": "~1.7.1",
     "better-sqlite3": "^12.11.1",
     "drizzle-orm": "^0.45.2",
     "hono": "^4.12.27",

@@ -17,6 +17,15 @@ export default defineConfig({
   },
   test: {
     globals: true,
+    server: {
+      deps: {
+        // Better Auth bundles @opentelemetry/semantic-conventions, whose ESM
+        // build imports directories rather than files. Node's ESM loader
+        // rejects those imports, so this chain is resolved by Vite instead of
+        // being externalized.
+        inline: [/better-auth/, /@opentelemetry/],
+      },
+    },
     include: [
       "packages/*/src/**/*.test.ts",
       "packages/core/template-tests/**/*.test.ts",

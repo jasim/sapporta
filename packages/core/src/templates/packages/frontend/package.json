@@ -16,7 +16,7 @@
     "@tanstack/react-form": "%%SAPPORTA:TANSTACK_REACT_FORM_VERSION%%",
     "@tanstack/react-query": "%%SAPPORTA:TANSTACK_REACT_QUERY_VERSION%%",
     "%%SAPPORTA:SLUG%%-shared": "workspace:*",
-    "better-auth": "^1.6.13",
+    "better-auth": "%%SAPPORTA:BETTER_AUTH_VERSION%%",
     "@js-temporal/polyfill": "%%SAPPORTA:TEMPORAL_VERSION%%",
     "lucide-react": "%%SAPPORTA:LUCIDE_REACT_VERSION%%",
     "react": "%%SAPPORTA:REACT_VERSION%%",

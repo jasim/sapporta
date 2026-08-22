@@ -63,6 +63,7 @@ export const SCAFFOLD_MANIFEST: ScaffoldManifest = [
   scaffoldFile("packages/api/project-auth/options.ts", "workspace"),
   scaffoldFile("packages/api/project-auth/context.ts", "framework"),
   scaffoldFile("packages/api/project-auth/auth-tokens.ts", "framework"),
+  scaffoldFile("packages/api/project-auth/auth-tokens-schema.ts", "framework"),
   scaffoldFile("packages/api/project-auth/workspace.ts", "framework"),
   scaffoldFile("packages/api/project-auth/routes.ts", "framework"),
   scaffoldFile("packages/api/project-auth/schema.ts", "framework"),
