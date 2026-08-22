@@ -18,6 +18,24 @@ APIs, auth-aware row access, and a React app shell.
 
 Prefer the project-local CLI form: `pnpm exec sapporta ...`.
 
+### Running beside other projects
+
+`sapporta init` draws each project's `SAPPORTA_API_PORT` and
+`SAPPORTA_FRONTEND_PORT` at random and writes them into `.env.development`, so
+projects rarely collide. When a port is taken anyway, `pnpm dev` names the
+setting to change: the frontend port is checked before anything starts, and
+the API reports its own as it boots. Pick a free port, put it in
+`.env.development`, and run `pnpm dev` again.
+
+Changing `SAPPORTA_FRONTEND_PORT` also means changing
+`SAPPORTA_PUBLIC_APP_URL`, which is the origin the browser loads the app from
+and is what sign-in is accepted from. It carries the frontend port only in
+development; a deployment sets it to its own domain.
+
+`pnpm exec sapporta` reads `SAPPORTA_API_PORT` from `.env.development`, so
+API-backed commands need no `--api-url`. Pass `--api-url`, or set
+`SAPPORTA_API_URL`, only to reach a different deployment.
+
 ### What the CLI can reach without an access token
 
 Against the development server started by `pnpm dev`, these read the shape of

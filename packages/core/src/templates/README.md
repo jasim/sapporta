@@ -13,7 +13,7 @@ pnpm install
 pnpm dev
 ```
 
-Open `http://localhost:5173`.
+Open `http://localhost:%%SAPPORTA:DEV_FRONTEND_PORT%%`.
 
 ## Commands
 
@@ -44,22 +44,24 @@ packages/shared/    API contracts and types shared by backend and frontend
 - `SAPPORTA_API_PORT` controls the API server port. Managed hosts may provide
   the conventional `PORT` variable instead. If both are set, they must match.
 - `SAPPORTA_FRONTEND_PORT` controls the Vite frontend server port.
-- `SAPPORTA_PUBLIC_APP_URL` must match the browser-facing app origin.
+- `SAPPORTA_PUBLIC_APP_URL` is the origin a browser loads this app from. It is
+  used for sign-in and for links in outgoing email. In development the browser
+  loads the app from Vite, so it carries `SAPPORTA_FRONTEND_PORT`; a deployment
+  sets it to its own domain, which has no relation to either port above.
 - `SAPPORTA_MAIL_TRANSPORT=stream` prints development emails to the API console.
 
-To run several Sapporta projects at the same time, assign each project a stable
-port pair and update its public app URL to match the frontend port:
+## Running beside other Sapporta projects
 
-```env
-SAPPORTA_API_PORT=3001
-SAPPORTA_FRONTEND_PORT=5174
-SAPPORTA_PUBLIC_APP_URL=http://localhost:5174
-```
+`sapporta init` drew this project's ports above at random, so several projects
+run side by side without being reconfigured. When a port is taken anyway,
+`pnpm dev` names the setting to change: it checks the frontend port before
+starting anything, and the API reports its own port as it boots. Pick a free
+port, set it here, and change `SAPPORTA_PUBLIC_APP_URL` too if the frontend
+port moved.
 
-Vite fails when the configured frontend port is occupied instead of silently
-selecting another one. API-backed CLI commands are clients of the running app;
-set `SAPPORTA_API_URL=http://localhost:3001` in the CLI process or pass
-`--api-url http://localhost:3001` when the API is not on the default port.
+`pnpm exec sapporta` reads `SAPPORTA_API_PORT` from this file, so API-backed
+commands reach this project's server without further configuration. Pass
+`--api-url`, or set `SAPPORTA_API_URL`, only to talk to some other deployment.
 
 ## Deployment
 

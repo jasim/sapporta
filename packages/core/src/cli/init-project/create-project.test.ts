@@ -361,6 +361,13 @@ describe("renderScaffoldFiles", () => {
     expect(byDest.get("AGENTS.md")).toContain("sapporta rows count");
     expect(byDest.get("AGENTS.md")).toContain("bounded grouped counts");
     expect(byDest.get("AGENTS.md")).toContain("application-owned report");
+    expect(byDest.get("AGENTS.md")).toContain(
+      "## Reading Sapporta framework source",
+    );
+    expect(byDest.get("AGENTS.md")).toContain(
+      "require.resolve('@sapporta/frontend/package.json', { paths: ['packages/frontend'] })",
+    );
+    expect(byDest.get("AGENTS.md")).toContain("node_modules/.pnpm/");
     expect(byDest.get("CLAUDE.md")).toBe(
       "Please read the instructions in AGENTS.md.\n",
     );
@@ -378,12 +385,22 @@ describe("renderScaffoldFiles", () => {
     expect(byDest.get(".env.development")).toMatch(
       /BETTER_AUTH_SECRET=[A-Za-z0-9_-]{43}/,
     );
-    expect(byDest.get(".env.development")).toContain("SAPPORTA_API_PORT=3000");
-    expect(byDest.get(".env.development")).toContain(
-      "SAPPORTA_FRONTEND_PORT=5173",
+    // Each project draws its own dev ports, so assert the shape and the one
+    // rule that binds them: the public app URL is the origin the browser loads
+    // the app from, which in development is Vite's.
+    const devEnv = byDest.get(".env.development") ?? "";
+    const frontendPort = devEnv.match(/SAPPORTA_FRONTEND_PORT=(\d+)/)?.[1];
+    expect(devEnv).toMatch(/SAPPORTA_API_PORT=3\d{3}\n/);
+    expect(frontendPort).toBeDefined();
+    expect(devEnv).toContain(
+      `SAPPORTA_PUBLIC_APP_URL=http://localhost:${frontendPort}`,
     );
-    expect(byDest.get(".env.development")).toContain(
-      "SAPPORTA_PUBLIC_APP_URL=http://localhost:5173",
+    expect(byDest.get("README.md")).toContain(
+      `Open \`http://localhost:${frontendPort}\``,
+    );
+    // Deployments bind one local port behind a proxy; that stays conventional.
+    expect(byDest.get(".env.production.example")).toContain(
+      "SAPPORTA_API_PORT=3000",
     );
     expect(byDest.has("packages/frontend/src/SapportaApp.tsx")).toBe(true);
     expect(byDest.has("packages/frontend/src/Sidebar.tsx")).toBe(false);
@@ -751,6 +768,8 @@ describe("scaffold template inventory", () => {
       "%%SAPPORTA:NAME%%",
       "%%SAPPORTA:AUTH_COOKIE_PREFIX%%",
       "%%SAPPORTA:BETTER_AUTH_DEV_SECRET%%",
+      "%%SAPPORTA:DEV_API_PORT%%",
+      "%%SAPPORTA:DEV_FRONTEND_PORT%%",
       "%%SAPPORTA:DOCS_BROWSER_URL%%",
       "%%SAPPORTA:DOCS_AGENT_URL%%",
       "%%SAPPORTA:NODE_COMMAND%%",

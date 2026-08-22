@@ -12,6 +12,7 @@ import type {
 } from "./scaffold-manifest.js";
 import { SCAFFOLD_MANIFEST } from "./scaffold-manifest.js";
 import { initProjectPackagePaths } from "./paths.js";
+import type { DevPorts } from "./dev-ports.js";
 
 export type TemplateVariables = Record<string, string>;
 
@@ -33,12 +34,19 @@ export function buildTemplateVariables(opts: {
   authCookiePrefix: string;
   betterAuthDevSecret: string;
   gettingStartedEnv: GettingStartedEnv;
+  devPorts: DevPorts;
 }): TemplateVariables {
+  const devPorts = opts.devPorts;
   const variables: TemplateVariables = {
     "%%SAPPORTA:SLUG%%": opts.project.slug,
     "%%SAPPORTA:NAME%%": opts.project.name,
     "%%SAPPORTA:AUTH_COOKIE_PREFIX%%": opts.authCookiePrefix,
     "%%SAPPORTA:BETTER_AUTH_DEV_SECRET%%": opts.betterAuthDevSecret,
+    // Development ports only. The public app URL that carries the frontend
+    // port in .env.development is a local browser origin; a deployment sets it
+    // to its own domain, unrelated to either port.
+    "%%SAPPORTA:DEV_API_PORT%%": String(devPorts.api),
+    "%%SAPPORTA:DEV_FRONTEND_PORT%%": String(devPorts.frontend),
     "%%SAPPORTA:DOCS_BROWSER_URL%%": opts.gettingStartedEnv.docsBrowserUrl,
     "%%SAPPORTA:DOCS_AGENT_URL%%": opts.gettingStartedEnv.docsAgentUrl,
     // The template treats the executable and preload as one token so every
