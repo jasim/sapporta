@@ -78,6 +78,33 @@ code has been written, not during the initial implementation.
 - Auth and permissions: start in `packages/api/authz/`. Read the auth docs before
   changing row access rules.
 
+## Reading Sapporta framework source
+
+`@sapporta/*` are installed dependencies; their published declarations carry
+every public signature and its doc comments. Resolve a package rather than
+writing or globbing a `node_modules` path, and resolve from the workspace
+package that declares it — `packages/api` for `@sapporta/server` and
+`@sapporta/honest`, `packages/frontend` for `@sapporta/frontend`,
+`@sapporta/ui`, and `@sapporta/grid`, either one for `@sapporta/shared`.
+
+```bash
+PKG=$(dirname "$(node -p "require.resolve('@sapporta/frontend/package.json', { paths: ['packages/frontend'] })")")
+rg -n "tableRecordQueryOptions" "$PKG/dist" --glob '*.d.ts'
+```
+
+- Keep `--glob '*.d.ts'`: `dist/` also holds source maps with the whole source
+  inlined.
+- The `exports` map gives import specifiers, not declaration sites; most symbols
+  are re-exported. Grep first, then read the map.
+- `frontend`, `ui`, and `grid` also ship `src/`; `server` and `shared` ship only
+  `dist/`. The `sapporta:source` entries are for framework development.
+- On `ERR_PACKAGE_PATH_NOT_EXPORTED` the install predates that export: resolve
+  the bare name and cut at `dist/` instead —
+  `node -p "require.resolve('@sapporta/frontend', { paths: ['packages/frontend'] }).replace(/\/dist\/.*/, '')"`
+- There is no `node_modules/@sapporta` at the project root, and
+  `node_modules/.pnpm/` directory names embed a peer-version hash that changes
+  on reinstall.
+
 ## Schema and migrations
 
 ```bash
