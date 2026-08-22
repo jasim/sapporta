@@ -11,6 +11,8 @@ import {
   it,
   vi,
 } from "vitest";
+import type { AuthContextResponse } from "@sapporta/shared/contracts";
+import { useAuthStore } from "../../auth/state/auth-store";
 import { useSchemaStore } from "../../schema-catalog/state/schema-store";
 import {
   SIDEBAR_DESKTOP_MEDIA_QUERY,
@@ -23,6 +25,35 @@ import { PageHeader } from "./PageHeader";
 import { SidebarRegion } from "./SidebarRegion";
 import { SidebarShell } from "./SidebarShell";
 import { SidebarToggle } from "./SidebarToggle";
+
+const AUTH_CONTEXT = {
+  user: {
+    id: "user-1",
+    name: "Owner",
+    email: "owner@example.test",
+    emailVerified: true,
+  },
+  workspace: {
+    id: "workspace-1",
+    name: "Owner's Workspace",
+    slug: "owners-workspace",
+    isOwner: true,
+  },
+  memberships: [
+    {
+      id: "member-1",
+      workspace: {
+        id: "workspace-1",
+        name: "Owner's Workspace",
+        slug: "owners-workspace",
+      },
+      role: "owner",
+      isOwner: true,
+    },
+  ],
+  role: "owner",
+  isOwner: true,
+} satisfies AuthContextResponse;
 
 let host: HTMLDivElement;
 let root: Root;
@@ -47,6 +78,7 @@ afterEach(() => {
   host.remove();
   document.body.innerHTML = "";
   useSchemaStore.getState().reset();
+  useAuthStore.getState().reset();
   vi.unstubAllGlobals();
 });
 
@@ -155,6 +187,25 @@ describe("sidebar controller and layout", () => {
       HTMLElement,
     );
     expect(toggleButton("Open sidebar")).toBeInstanceOf(HTMLButtonElement);
+  });
+
+  it("leaves navigation out until a visitor has a session", async () => {
+    installMedia({ desktop: true });
+    await renderAppShell(
+      createElement(
+        "article",
+        { "data-application-page": true },
+        "Public content",
+      ),
+      { signedIn: false },
+    );
+
+    expect(host.querySelector("[data-application-page]")).toBeInstanceOf(
+      HTMLElement,
+    );
+    expect(host.querySelector("[data-sidebar-region]")).toBeNull();
+    expect(host.querySelector('nav[aria-label="Primary"]')).toBeNull();
+    expect(host.querySelector("[data-shell-sidebar-toggle]")).toBeNull();
   });
 
   it("keeps the desktop control inside the sidebar while it is expanded", async () => {
@@ -275,8 +326,13 @@ async function renderShell(page?: ReactNode): Promise<void> {
 
 async function renderAppShell(
   page: ReactNode,
-  props?: { sidebarToggle?: ReactNode | false },
+  props?: { sidebarToggle?: ReactNode | false; signedIn?: boolean },
 ): Promise<void> {
+  if (props?.signedIn ?? true) {
+    useAuthStore.setState({
+      session: { kind: "authenticated", context: AUTH_CONTEXT },
+    });
+  }
   await act(async () => {
     root.render(
       createElement(

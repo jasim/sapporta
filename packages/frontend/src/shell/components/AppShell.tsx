@@ -2,7 +2,9 @@ import { useMemo, type ReactNode } from "react";
 import { Outlet } from "react-router-dom";
 import { AppSidebar, MobileBottomNav, NavigationRail } from "./Sidebar";
 import { Toaster } from "sonner";
+import { cn } from "@sapporta/ui/cn";
 import { useSchemaStore } from "../../schema-catalog/state/schema-store";
+import { useAuthStore } from "../../auth/state/auth-store";
 import type { TableSchema } from "@sapporta/shared/contracts";
 import { Database } from "lucide-react";
 import type { Navigation, NavigationSection } from "../navigation";
@@ -37,6 +39,9 @@ export interface AppShellProps {
  * Route content still chooses its own layout. An `AppPage` fills the available
  * height and scrolls its body, while an unwrapped application page can grow
  * naturally and let the shell scroll it.
+ *
+ * Navigation appears once a visitor has a session. A public page therefore
+ * renders on its own, without links the visitor cannot open yet.
  */
 export function AppShell({
   navigation = [],
@@ -45,6 +50,8 @@ export function AppShell({
   sidebarToggle,
 }: AppShellProps) {
   const { error, tables } = useSchemaStore();
+  const session = useAuthStore((s) => s.session);
+  const showNavigation = session.kind === "authenticated";
   const shellNavigation = useMemo(() => {
     const frameworkNavigation = showFrameworkNavigation
       ? frameworkNavigationSections({ tables })
@@ -57,6 +64,7 @@ export function AppShell({
       <AppShellLayout
         navigation={navigation}
         shellNavigation={shellNavigation}
+        showNavigation={showNavigation}
         error={error}
         sidebarToggle={sidebarToggle}
       />
@@ -67,11 +75,13 @@ export function AppShell({
 function AppShellLayout({
   navigation,
   shellNavigation,
+  showNavigation,
   error,
   sidebarToggle,
 }: {
   navigation: Navigation;
   shellNavigation: Navigation;
+  showNavigation: boolean;
   error: string | null;
   sidebarToggle?: ReactNode | false;
 }) {
@@ -79,7 +89,7 @@ function AppShellLayout({
   const shellSidebarToggle =
     sidebarToggle === undefined ? <SidebarToggle /> : sidebarToggle;
   const hasShellSidebarToggle =
-    shellSidebarToggle !== false && shellSidebarToggle != null;
+    showNavigation && shellSidebarToggle !== false && shellSidebarToggle != null;
   const showSidebarToggleInSidebar =
     hasShellSidebarToggle && sidebar.isDesktop && sidebar.desktopExpanded;
 
@@ -96,15 +106,19 @@ function AppShellLayout({
         }}
       />
       <div className="flex min-h-0 flex-1">
-        <SidebarRegion>
-          <AppSidebar
-            navigation={shellNavigation}
-            sidebarToggle={
-              showSidebarToggleInSidebar ? shellSidebarToggle : undefined
-            }
-          />
-        </SidebarRegion>
-        {!sidebar.isDesktop && <NavigationRail navigation={shellNavigation} />}
+        {showNavigation && (
+          <SidebarRegion>
+            <AppSidebar
+              navigation={shellNavigation}
+              sidebarToggle={
+                showSidebarToggleInSidebar ? shellSidebarToggle : undefined
+              }
+            />
+          </SidebarRegion>
+        )}
+        {showNavigation && !sidebar.isDesktop && (
+          <NavigationRail navigation={shellNavigation} />
+        )}
         <div data-shell-content className="relative min-w-0 flex-1">
           {hasShellSidebarToggle && !showSidebarToggleInSidebar && (
             <div
@@ -117,7 +131,10 @@ function AppShellLayout({
           )}
           <main
             data-shell-scroll-region
-            className="flex h-full min-h-0 w-full flex-col overflow-y-auto bg-sap-surface pb-[56px] md:pb-0"
+            className={cn(
+              "flex h-full min-h-0 w-full flex-col overflow-y-auto bg-sap-surface md:pb-0",
+              showNavigation && "pb-[56px]",
+            )}
           >
             {error ? (
               <AppPage
@@ -131,10 +148,12 @@ function AppShellLayout({
             )}
           </main>
         </div>
-        <MobileBottomNav
-          navigation={navigation}
-          pickerNavigation={shellNavigation}
-        />
+        {showNavigation && (
+          <MobileBottomNav
+            navigation={navigation}
+            pickerNavigation={shellNavigation}
+          />
+        )}
       </div>
     </div>
   );
