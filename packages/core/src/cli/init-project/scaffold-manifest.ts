@@ -97,7 +97,7 @@ export const SCAFFOLD_MANIFEST: ScaffoldManifest = [
   scaffoldFile("packages/frontend/src/SapportaRoutes.tsx", "framework"),
   scaffoldFile("packages/frontend/src/App.tsx", "workspace"),
   scaffoldFile("packages/frontend/src/PublicPage.tsx", "example"),
-  scaffoldFile("packages/frontend/src/Welcome.tsx", "example"),
+  scaffoldFile("packages/frontend/src/Home.tsx", "example"),
   scaffoldFile("packages/frontend/src/api.ts", "framework"),
   scaffoldFile("packages/frontend/src/app.css", "example"),
   scaffoldFile("packages/frontend/src/vite-env.d.ts", "framework"),

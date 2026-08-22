@@ -137,7 +137,7 @@ The `/api/hello` example shows the usual route shape:
 
 Because both sides import the same contract, request and response types stay in
 sync. When the app's real API calls are in place, replace the `hello` contract,
-handler, client entry, and `Welcome` screen with the app feature.
+handler, client entry, and `Home` screen with the app feature.
 
 When adding a new route file under `packages/api/app/`, mount it in
 `packages/api/app.ts`; files are not exposed automatically. Add a route to
@@ -211,7 +211,8 @@ mounted Grid.
 When designing user interfaces, follow `VISUAL-DESIGN-GUIDELINES.md`.
 
 Protected app routes live in `appProtectedRoutes`; public routes live in
-`appPublicRoutes`.
+`appPublicRoutes`. `/` opens `appHomeRoute` for signed-in users; fill
+`appPublicHomeRoute` instead when `/` should open for anyone.
 
 ## Shared package
 

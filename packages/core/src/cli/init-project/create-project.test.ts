@@ -434,7 +434,18 @@ describe("renderScaffoldFiles", () => {
     expect(byDest.get("packages/frontend/src/App.tsx")).toContain(
       "export const appProtectedRoutes",
     );
-    expect(byDest.get("packages/frontend/src/Welcome.tsx")).toContain(
+    expect(byDest.get("packages/frontend/src/App.tsx")).toContain(
+      "export const appPublicHomeRoute",
+    );
+    expect(byDest.get("packages/frontend/src/Home.tsx")).toContain(
+      "export function Home()",
+    );
+    // `/` opens a screen, so it has to render behind the gate: a home page
+    // outside it would load for visitors without a session.
+    expect(byDest.get("packages/frontend/src/SapportaApp.tsx")).toMatch(
+      /<Route element=\{<AuthGate \/>\}>\s*\{appPublicHomeRoute \? null : appHomeRoute\}/,
+    );
+    expect(byDest.get("packages/frontend/src/Home.tsx")).toContain(
       "<AppPage",
     );
     expect(byDest.get("packages/frontend/src/PublicPage.tsx")).toContain(
@@ -697,17 +708,17 @@ describe("renderScaffoldFiles", () => {
       "test-secret",
       gettingStartedEnv,
     );
-    const welcome = files.find(
-      (file) => file.dest === "packages/frontend/src/Welcome.tsx",
+    const home = files.find(
+      (file) => file.dest === "packages/frontend/src/Home.tsx",
     )?.content;
 
-    expect(welcome).toContain(
+    expect(home).toContain(
       '"http://127.0.0.1:4321/docs/getting-started/introduction/"',
     );
-    expect(welcome).toContain(
+    expect(home).toContain(
       "http://127.0.0.1:4321/docs/getting-started/introduction.md",
     );
-    expect(welcome).not.toContain("%%SAPPORTA:");
+    expect(home).not.toContain("%%SAPPORTA:");
   });
 });
 

@@ -78,9 +78,9 @@ Add realistic sample data. Keep the first version small and follow the existing 
 
 type AppIdea = (typeof appIdeas)[number];
 
-// Replace this screen with the first dashboard, workflow, or form your app
-// needs after the app has its own primary surface.
-export function Welcome() {
+// The screen at `/`. Replace it with the first dashboard, workflow, or form
+// your app should open on.
+export function Home() {
   const { tables, loaded, error, name, slug } = useSchemaStore();
   const authSession = useAuthStore((s) => s.session);
   const [selectedIdeaId, setSelectedIdeaId] = useState<AppIdea["id"]>("tasks");
@@ -134,7 +134,7 @@ ${projectReferences}`;
 
   return (
     <AppPage
-      title={viewMode === "diagnostics" ? "Project diagnostics" : "Welcome"}
+      title={viewMode === "diagnostics" ? "Project diagnostics" : "Home"}
       bodyClassName="bg-sap-bg text-sap-fg"
     >
       <div className="mx-auto max-w-[68rem] px-5 py-5 sm:px-8 sm:py-7 lg:px-10">
@@ -146,7 +146,7 @@ ${projectReferences}`;
                 size="sm"
                 onClick={() => setViewMode("onboarding")}
               >
-                Welcome
+                Home
               </Button>
               <Button
                 variant="outline"
@@ -211,7 +211,7 @@ ${projectReferences}`;
               </p>
             </header>
 
-            <main className="max-w-[58rem] py-9 sm:py-11">
+            <div className="max-w-[58rem] py-9 sm:py-11">
               <section aria-labelledby="starter-heading">
                 <h2
                   className="mb-3 text-[16px] font-[680] text-sap-soft"
@@ -304,7 +304,7 @@ ${projectReferences}`;
                   {activePrompt}
                 </pre>
               </section>
-            </main>
+            </div>
           </>
         )}
       </div>
@@ -322,7 +322,7 @@ function PageNav({ children }: { children: ReactNode }) {
         />
         <div className="text-sap-data font-[680] text-sap-soft">Sapporta</div>
       </div>
-      <nav className="flex flex-wrap gap-2" aria-label="Welcome actions">
+      <nav className="flex flex-wrap gap-2" aria-label="Home actions">
         {children}
       </nav>
     </div>

@@ -77,6 +77,19 @@ describe.sequential("generated app browser workflow - end-to-end", () => {
     page.on("pageerror", (error) => pageErrors.push(error));
 
     try {
+      // `/` is gated: an anonymous visitor never reaches the home page. The
+      // first visitor to an app without accounts continues to sign-up.
+      await page.goto("/");
+      await expectHeading(page, "Sign up and create your first workspace");
+
+      await page.goto("/public");
+      await playwrightExpect(
+        page.getByText("This page is available without signing in."),
+      ).toBeVisible();
+      await playwrightExpect(
+        page.locator("[data-sidebar-region]"),
+      ).toHaveCount(0);
+
       await page.goto("/signup");
       await expectHeading(page, "Sign up and create your first workspace");
       await page.getByLabel("Name").fill(USER.name);
@@ -95,7 +108,7 @@ describe.sequential("generated app browser workflow - end-to-end", () => {
       await playwrightExpect(
         page.getByText("Email verified. Taking you back..."),
       ).toBeVisible();
-      await page.waitForURL("**/welcome");
+      await waitForHomePage(page);
 
       await signInWithPassword(page);
       await verifyResponsiveSidebar(page);
@@ -162,12 +175,17 @@ describe.sequential("generated app browser workflow - end-to-end", () => {
 
 async function signInWithPassword(page: Page): Promise<void> {
   await page.context().clearCookies();
-  await page.goto("/login");
+  await page.goto("/");
   await expectHeading(page, "Sign in");
   await page.getByLabel("Email").fill(USER.email);
   await page.getByLabel("Password").fill(USER.password);
   await page.getByRole("button", { name: "Sign in" }).click();
-  await page.waitForURL("**/welcome");
+  await waitForHomePage(page);
+}
+
+async function waitForHomePage(page: Page): Promise<void> {
+  await page.waitForURL((url) => url.pathname === "/");
+  await expectHeading(page, "Welcome to your new Sapporta project");
 }
 
 async function verifyResponsiveSidebar(page: Page): Promise<void> {

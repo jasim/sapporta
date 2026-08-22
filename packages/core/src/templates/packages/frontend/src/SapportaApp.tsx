@@ -7,6 +7,7 @@ import {
   appHomeRoute,
   appNavigation,
   appProtectedRoutes,
+  appPublicHomeRoute,
   appPublicRoutes,
 } from "./App";
 import {
@@ -20,6 +21,10 @@ import {
  * `BootLoader` loads the session and table metadata. `AppShell` renders the
  * layout and table navigation. The route tree combines `App.tsx` with the
  * account and table pages in `SapportaRoutes.tsx`.
+ *
+ * `/` opens the home page behind `AuthGate`, so a visitor without a session
+ * goes to the sign-in page and returns to `/` afterwards. An app that opens `/`
+ * to everyone fills `appPublicHomeRoute` in `App.tsx` instead.
  */
 export interface SapportaAppProps {
   // Show table links generated from the loaded schema.
@@ -49,9 +54,10 @@ export function SapportaApp({
           </BootLoader>
         }
       >
-        {appHomeRoute}
+        {appPublicHomeRoute}
         {appPublicRoutes}
         <Route element={<AuthGate />}>
+          {appPublicHomeRoute ? null : appHomeRoute}
           {appProtectedRoutes}
           {sapportaProtectedRoutes}
         </Route>
