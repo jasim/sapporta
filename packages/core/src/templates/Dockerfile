@@ -81,9 +81,13 @@ USER node
 EXPOSE 3000
 VOLUME ["/app/data"]
 
-# The OpenAPI endpoint is mounted after framework and user routes register; a
-# successful response proves the Hono process booted and Sapporta loaded.
+# `serve()` is the last statement in boot.js, so nothing listens until the
+# schema loaded, migrations checked out, auth built, and every route mounted.
+# Any HTTP reply therefore proves the process booted; only a connection failure
+# or a 5xx means it did not. The check must not require 2xx: /health answers 401
+# under SAPPORTA_HEALTH_POLICY=authenticated and 404 under `disabled`, and both
+# are healthy processes. A 401 also proves the auth middleware is running.
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-  CMD node -e "fetch('http://127.0.0.1:' + (process.env.SAPPORTA_API_PORT || process.env.PORT || 3000) + '/api/openapi.json').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"
+  CMD node -e "fetch('http://127.0.0.1:' + (process.env.SAPPORTA_API_PORT || process.env.PORT || 3000) + '/health').then(r => process.exit(r.status >= 500 ? 1 : 0)).catch(() => process.exit(1))"
 
 CMD ["sh", "-c", "pnpm --filter ./packages/api db:migrate && node packages/api/dist/boot.js"]

@@ -2097,6 +2097,13 @@ export async function buildAndRunDockerProject(
           `SAPPORTA_REQUIRE_VERIFIED_EMAIL=${project.env.SAPPORTA_REQUIRE_VERIFIED_EMAIL ?? "false"}`,
           "-e",
           `SAPPORTA_MAIL_FROM=${project.env.SAPPORTA_MAIL_FROM ?? "Sapporta <no-reply@example.test>"}`,
+          // Run the container the way a deployment does. `.env.production.example`
+          // ships `authenticated`, so the image's own health check has to hold
+          // when /health replies 401. SAPPORTA_OPENAPI_POLICY is left unset on
+          // purpose: unset is the production default, and the contract stays
+          // behind sign-in.
+          "-e",
+          `SAPPORTA_HEALTH_POLICY=${project.env.SAPPORTA_HEALTH_POLICY ?? "authenticated"}`,
           "--name",
           `${tagPrefix}-${Date.now()}`,
           imageTag,
@@ -2112,6 +2119,38 @@ export async function buildAndRunDockerProject(
 
   await waitForDockerServer(baseUrl);
   return { baseUrl, containerId, imageTag };
+}
+
+/**
+ * Wait for Docker itself to call the container healthy.
+ *
+ * This reads the verdict of the image's own `HEALTHCHECK`, which nothing else
+ * in the suite exercises — `waitForDockerServer` polls over HTTP from the host
+ * and would pass just as happily against a container Docker considers
+ * unhealthy.
+ */
+export async function waitForDockerHealthy(
+  project: E2eProject,
+  containerId: string,
+): Promise<void> {
+  const deadline = Date.now() + 120_000;
+  let status = "unknown";
+  while (Date.now() < deadline) {
+    status = (
+      await runText(
+        "docker",
+        ["inspect", "-f", "{{.State.Health.Status}}", containerId],
+        { cwd: project.projectDir, env: project.env, timeoutMs: 30_000 },
+      )
+    ).trim();
+    if (status === "healthy") return;
+    if (status === "unhealthy") break;
+    await new Promise((resolve) => setTimeout(resolve, 1_000));
+  }
+  throw new Error(
+    `Container ${containerId} health status is "${status}", expected "healthy". ` +
+      "The image's HEALTHCHECK is failing against a server that answers HTTP.",
+  );
 }
 
 export async function cleanupDockerProject(

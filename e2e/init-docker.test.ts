@@ -4,7 +4,7 @@
  * This is opt-in because it requires a Docker daemon and performs a full image
  * build. Run with: pnpm test:e2e:docker
  */
-import { afterAll, beforeAll, describe, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
   assertFrontendRoutes,
   assertProjectHttpApi,
@@ -15,7 +15,9 @@ import {
   generateDrizzleMigration,
   prepareDockerReleaseProject,
   assertBetterSqliteLoads,
+  requestJson,
   scaffoldProject,
+  waitForDockerHealthy,
   writeTasksSchema,
   type E2eProject,
   type StartedDockerProject,
@@ -56,5 +58,32 @@ runDocker("sapporta init - Docker release", () => {
 
   it("serves the generated frontend from the production image", async () => {
     await assertFrontendRoutes(dockerProject!.baseUrl);
+  });
+
+  /**
+   * The image is run the way a deployment runs it: health credentialed, and
+   * the app contract left at its unset production default. Both answer 401 to
+   * an anonymous caller, and Docker must still call the container healthy —
+   * its probe measures whether the process is serving, and a credentialed 401
+   * is a serving process. Nothing else in the suite reads that verdict;
+   * `waitForDockerServer` polls over HTTP from the host and would pass just as
+   * happily against a container Docker considers unhealthy.
+   */
+  it("stays healthy behind the production auth posture", async () => {
+    const health = await requestJson<{ code: string }>(
+      dockerProject!.baseUrl,
+      "/health",
+      { expectedStatus: 401 },
+    );
+    expect(health.body.code).toBe("unauthenticated");
+
+    const contract = await requestJson<{ code: string }>(
+      dockerProject!.baseUrl,
+      "/api/openapi.json",
+      { expectedStatus: 401 },
+    );
+    expect(contract.body.code).toBe("unauthenticated");
+
+    await waitForDockerHealthy(project!, dockerProject!.containerId);
   });
 });

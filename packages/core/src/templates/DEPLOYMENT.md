@@ -100,8 +100,14 @@ The browser loads the SPA from `http://your-host:3000/`, and its relative `fetch
 Scaffolded projects include a production `Dockerfile` for this same-origin
 shape. It builds the shared package, API, and frontend, installs production
 dependencies, copies the built SPA into `packages/frontend/dist/`, exposes
-port `3000`, and health-checks `/api/openapi.json`. At runtime the image accepts
+port `3000`, and health-checks `/health`. At runtime the image accepts
 either `SAPPORTA_API_PORT` or the conventional `PORT` assigned by a host.
+
+The health check reports the container healthy on any reply that is not a 5xx,
+so it holds under every `SAPPORTA_HEALTH_POLICY`. It does not require `200`:
+`/health` answers `401` under `authenticated` and `404` under `disabled`, and a
+process that answers at all has completed boot, because the server starts
+listening only after the schema, migrations, auth, and every route are ready.
 
 ```bash
 docker build -t %%SAPPORTA:SLUG%% .
