@@ -68,10 +68,10 @@
       "sapporta:source": "./src/grid-dataset/index.ts",
       "default": "./dist/grid-dataset/index.js"
     },
-    "./row-id": {
-      "types": "./dist/row-id.d.ts",
-      "sapporta:source": "./src/row-id.ts",
-      "default": "./dist/row-id.js"
+    "./record-id": {
+      "types": "./dist/record-id.d.ts",
+      "sapporta:source": "./src/record-id.ts",
+      "default": "./dist/record-id.js"
     },
     "./row-scope": {
       "types": "./dist/row-scope.d.ts",

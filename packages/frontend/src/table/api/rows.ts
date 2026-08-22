@@ -6,7 +6,7 @@ import {
   encodeTypedFilters,
   type TypedFilterCondition,
 } from "@sapporta/shared/filter";
-import type { RowId } from "@sapporta/shared/row-id";
+import type { RecordId } from "@sapporta/shared/record-id";
 import {
   appendQueryParam,
   type QueryParamRecord,
@@ -71,7 +71,7 @@ export async function fetchTableRows(
 
 export async function fetchTableRow(
   tableName: string,
-  recordId: RowId,
+  recordId: RecordId,
   options: TableFetchOptions = {},
 ): Promise<SingleRow> {
   return requestTableRecord(tableName, recordId, options);
@@ -86,7 +86,7 @@ export async function createTableRow(
 
 export async function updateTableRow(
   tableName: string,
-  id: RowId,
+  id: RecordId,
   data: Row,
 ): Promise<SingleRow> {
   return uiClient.updateRow({ params: { tableName, id }, body: data });
@@ -94,7 +94,7 @@ export async function updateTableRow(
 
 export async function deleteTableRow(
   tableName: string,
-  id: RowId,
+  id: RecordId,
 ): Promise<SingleRow> {
   return uiClient.deleteRow({ params: { tableName, id } });
 }

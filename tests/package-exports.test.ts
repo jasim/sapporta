@@ -245,7 +245,7 @@ describe("Sapporta package exports", () => {
           import * as shared from "@sapporta/shared";
           import * as filters from "@sapporta/shared/filter";
           import * as contracts from "@sapporta/shared/contracts";
-          import * as rowIds from "@sapporta/shared/row-id";
+          import * as recordIds from "@sapporta/shared/record-id";
 
           const accountsDrizzle = sqliteTable("accounts", {
             id: integer("id").primaryKey(),
@@ -268,7 +268,7 @@ describe("Sapporta package exports", () => {
             TableRowScanInput,
             TableRowScanOrder,
           };
-          export { sqliteTable, shared, filters, contracts, rowIds };
+          export { sqliteTable, shared, filters, contracts, recordIds };
         `,
       });
 

@@ -36,6 +36,13 @@ export type PaginatedRows = z.output<typeof paginatedRowsSchema>;
 export const singleRowSchema = z.object({ data: rowSchema });
 export type SingleRow = z.output<typeof singleRowSchema>;
 
+/**
+ * Ids are returned as the column typed them: an INTEGER pk as a number, a TEXT
+ * or UUID pk as a string. Deliberately not normalized to string — entry values
+ * are matched against raw FK cell values through a `typeof`-tagged cache key
+ * (`lookupValueKey`, grid/lookup), so stringifying one side only would silently
+ * stop FK cells resolving. Use `toRecordId` where an id becomes an address.
+ */
 const lookupValueSchema = z.union([z.string(), z.number()]);
 
 /** FK display-value lookup entries with the source row available to renderers. */

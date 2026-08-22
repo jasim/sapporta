@@ -13,7 +13,7 @@ import { and, eq, type SQL } from "drizzle-orm";
 import type { BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
 import { getTableConfig } from "drizzle-orm/sqlite-core";
 import type { TableDef } from "../schema/table.js";
-import type { RowId } from "@sapporta/shared/row-id";
+import type { RecordId } from "@sapporta/shared/record-id";
 import { findPkColumn } from "../schema/pk.js";
 import { parseTableWrite } from "./validate.js";
 import { ValidationError } from "../errors.js";
@@ -53,7 +53,7 @@ export function insertRowSync(
 export async function updateRow(
   schema: TableDef,
   db: BetterSQLite3Database,
-  id: RowId,
+  id: RecordId,
   record: Record<string, unknown>,
   options: { updatePredicate?: SQL } = {},
 ): Promise<Record<string, unknown>> {
@@ -88,7 +88,7 @@ export async function savePipeline(
   schema: TableDef,
   db: BetterSQLite3Database,
   record: Record<string, unknown>,
-  id?: RowId,
+  id?: RecordId,
   options: { updatePredicate?: SQL } = {},
 ): Promise<Record<string, unknown>> {
   const parsed = parseForSave(schema, record, id);
@@ -112,7 +112,7 @@ export function savePipelineInsertSync(
 function parseForSave(
   schema: TableDef,
   record: Record<string, unknown>,
-  id?: RowId,
+  id?: RecordId,
 ): Record<string, unknown> {
   const result = parseTableWrite(
     schema,

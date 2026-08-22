@@ -74,7 +74,7 @@ condition are plumbing, not modules, and are not listed.
 
 | Module | Purpose |
 | --- | --- |
-| `.` | Barrel of the pure value helpers: filter grammar, query params, value kinds, temporal and date-range helpers, CSV, row ids, row scopes, labels, counts, validation |
+| `.` | Barrel of the pure value helpers: filter grammar, query params, value kinds, temporal and date-range helpers, CSV, record ids, row scopes, labels, counts, validation |
 | `./contracts` | ts-rest route definitions and Zod wire schemas for the table, meta, and auth APIs; re-exports `initContract` so consumers avoid a direct `@sapporta/rest-core` dependency |
 | `./filter` | Filter operator vocabulary shared by the server query grammar and grid filtering |
 | `./value-kind` | Classification of column values used by formatting and filtering |
@@ -82,7 +82,7 @@ condition are plumbing, not modules, and are not listed.
 | `./daterange` | Date-range model and picker key space |
 | `./csv` | CSV serialization |
 | `./grid-dataset` | Zod schema of the report-grid wire format: columns, levels, footer rows, color rules |
-| `./row-id` | Row identifier encoding and decoding |
+| `./record-id` | `RecordId` — a primary-key value in an address position (URL, query key), and `toRecordId` for crossing into one |
 | `./row-scope` | Row-scope column-name constants (`workspace_id`, `scoped_to_user_id`) |
 | `./error` | `ApiError` |
 | `./validation` | API problem shapes, bounded integers, field issues |

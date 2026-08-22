@@ -45,7 +45,7 @@ import {
   type AnySQLiteTable,
   type SQLiteColumn,
 } from "drizzle-orm/sqlite-core";
-import type { RowId } from "@sapporta/shared/row-id";
+import type { RecordId } from "@sapporta/shared/record-id";
 import {
   DEFAULT_LOOKUP_LIMIT,
   DEFAULT_PAGE,
@@ -95,7 +95,7 @@ export interface PageRowsInput extends RowsQuery {
 }
 
 export type LookupRowsByIdInput = {
-  ids: readonly RowId[];
+  ids: readonly RecordId[];
   search?: never;
   fields?: never;
   limit?: never;
@@ -140,12 +140,12 @@ export interface PageRowsResult<
 export interface ScopedRows<TTable extends AnySQLiteTable = AnySQLiteTable> {
   findMany(input: FindManyRowsInput): Promise<TableRow<TTable>[]>;
   page(input?: PageRowsInput): Promise<PageRowsResult<TTable>>;
-  get(id: RowId): Promise<TableRow<TTable>>;
+  get(id: RecordId): Promise<TableRow<TTable>>;
   create(input: readonly unknown[]): Promise<TableRow<TTable>[]>;
   create(input: Record<string, unknown>): Promise<TableRow<TTable>>;
   create(input: unknown): Promise<TableRow<TTable> | TableRow<TTable>[]>;
-  update(id: RowId, patch: unknown): Promise<TableRow<TTable>>;
-  delete(id: RowId): Promise<TableRow<TTable>>;
+  update(id: RecordId, patch: unknown): Promise<TableRow<TTable>>;
+  delete(id: RecordId): Promise<TableRow<TTable>>;
   scan(input?: RowsQuery): AsyncIterable<TableRow<TTable>>;
   lookup(input?: LookupRowsInput<TTable>): Promise<LookupEntry[]>;
   count(input?: CountRowsInput): Promise<number>;
@@ -485,8 +485,13 @@ function isUnknownArray(value: unknown): value is readonly unknown[] {
   return Array.isArray(value);
 }
 
+/**
+ * The coercion point for inbound ids: `RecordId` strings back to the pk
+ * column's kind. Single-row reads (`get`/`update`/`delete`) skip this and lean
+ * on SQLite INTEGER affinity in `eq(pk, id)` instead.
+ */
 function normalizeLookupIds(
-  ids: readonly RowId[],
+  ids: readonly RecordId[],
   table: TableDef,
   primaryKeyColumn: string,
 ): readonly (string | number)[] {

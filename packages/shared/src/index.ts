@@ -5,7 +5,7 @@ export * from "./temporal.js";
 export * from "./daterange.js";
 export * from "./daterange-picker.js";
 export * from "./csv.js";
-export * from "./row-id.js";
+export * from "./record-id.js";
 export * from "./row-scope.js";
 export * from "./labels.js";
 export * from "./count.js";

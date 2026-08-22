@@ -5,7 +5,7 @@ import {
   type UndefinedInitialDataOptions,
 } from "@tanstack/react-query";
 import type { PaginatedRows, Row } from "@sapporta/shared/contracts";
-import type { RowId } from "@sapporta/shared/row-id";
+import type { RecordId } from "@sapporta/shared/record-id";
 import type { QueryParamRecord } from "@sapporta/shared";
 import { buildTableRowsQuery, type FetchTableRowsParams } from "../api/rows";
 import {
@@ -23,7 +23,7 @@ function tableRecordsQueryKey(tableName: string) {
   return [...tableQueryKey(tableName), "records"] as const;
 }
 
-function tableRecordQueryKey(tableName: string, recordId: RowId) {
+function tableRecordQueryKey(tableName: string, recordId: RecordId) {
   return [...tableRecordsQueryKey(tableName), recordId] as const;
 }
 
@@ -66,7 +66,7 @@ export type TableRecordsPage<TRow> = Omit<PaginatedRows, "data"> & {
 
 export type TableRecordQueryArgs = {
   tableName: string;
-  recordId: RowId;
+  recordId: RecordId;
 };
 
 export type DecodedTableRecordQueryArgs<TRow> = TableRecordQueryArgs & {

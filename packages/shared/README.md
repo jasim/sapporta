@@ -75,11 +75,11 @@ import {
 
 ### Other Utilities
 
-The package also exposes helpers for value kinds, date ranges, and row IDs:
+The package also exposes helpers for value kinds, date ranges, and record IDs:
 
 ```ts
 import type { ValueKind } from "@sapporta/shared/value-kind";
-import type { RowId } from "@sapporta/shared/row-id";
+import { toRecordId, type RecordId } from "@sapporta/shared/record-id";
 import { allTime, relative, custom } from "@sapporta/shared/daterange";
 ```
 

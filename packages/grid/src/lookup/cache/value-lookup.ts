@@ -4,6 +4,7 @@ export function isLookupValue(value: unknown): value is LookupValue {
   return typeof value === "string" || typeof value === "number";
 }
 
+/** Tagged by `typeof`: a numeric id and its string form are distinct keys. */
 export function lookupValueKey(value: LookupValue): string {
   return `${typeof value}:${String(value)}`;
 }
