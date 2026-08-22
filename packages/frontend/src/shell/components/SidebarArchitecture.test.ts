@@ -270,6 +270,7 @@ async function renderShell(page?: ReactNode): Promise<void> {
       ),
     );
   });
+  await settleSidebarDrawer();
 }
 
 async function renderAppShell(
@@ -301,6 +302,15 @@ async function renderAppShell(
         ),
       ),
     );
+  });
+  await settleSidebarDrawer();
+}
+
+// `SidebarRegion` loads the compact drawer on demand, so let that module land
+// before asserting on the layout it renders.
+async function settleSidebarDrawer(): Promise<void> {
+  await act(async () => {
+    await import("./SidebarDrawer");
   });
 }
 

@@ -1,8 +1,13 @@
-import type { ReactNode } from "react";
+import { lazy, Suspense, type ReactNode } from "react";
 import { cn } from "@sapporta/ui/cn";
-import { Sheet, SheetContent, SheetTitle } from "@sapporta/ui/sheet";
 import { useSidebar } from "../sidebar-controller";
 import "./SidebarRegion.css";
+
+// Only compact screens open the sidebar as a modal sheet, so its dialog
+// implementation loads with the layout that uses it.
+const SidebarDrawer = lazy(() =>
+  import("./SidebarDrawer").then((m) => ({ default: m.SidebarDrawer })),
+);
 
 export interface SidebarRegionProps {
   children: ReactNode;
@@ -23,22 +28,9 @@ export function SidebarRegion({ children, className }: SidebarRegionProps) {
 
   if (!sidebar.isDesktop) {
     return (
-      <Sheet
-        open={sidebar.drawerOpen}
-        onOpenChange={(open) => {
-          if (!open) sidebar.closeDrawer();
-        }}
-      >
-        <SheetContent
-          id={sidebar.sidebarId}
-          side="left"
-          data-sidebar-drawer
-          className="w-[240px] max-w-none border-sap-border-soft bg-sap-sidebar p-0 text-sap-fg [&>button]:right-2 [&>button]:top-2"
-        >
-          <SheetTitle className="sr-only">Application navigation</SheetTitle>
-          {children}
-        </SheetContent>
-      </Sheet>
+      <Suspense fallback={null}>
+        <SidebarDrawer>{children}</SidebarDrawer>
+      </Suspense>
     );
   }
 

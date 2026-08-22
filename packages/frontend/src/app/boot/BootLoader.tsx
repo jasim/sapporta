@@ -1,6 +1,6 @@
 import { useEffect, type ReactNode } from "react";
 import { Loader2 } from "lucide-react";
-import { loadAdminMetadata } from "../actions/boot";
+import { loadAdminMetadata, prefetchAdminMetadata } from "../actions/boot";
 import { useAuthStore } from "../../auth/state/auth-store";
 import { useSchemaStore } from "../../schema-catalog/state/schema-store";
 
@@ -22,6 +22,7 @@ export function BootLoader({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (session.kind === "unknown") {
+      prefetchAdminMetadata();
       void restoreSession();
     }
   }, [restoreSession, session.kind]);
