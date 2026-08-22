@@ -1,5 +1,20 @@
 # sapporta
 
+## 0.2.10
+
+### Patch Changes
+
+- Improvements after comparing agentic build of sample projects
+- Updated dependencies [45e8a8a]
+- Updated dependencies [c576648]
+- Updated dependencies
+- Updated dependencies [7f49d7d]
+- Updated dependencies [3bcfd52]
+- Updated dependencies [6709057]
+- Updated dependencies [0b872d2]
+- Updated dependencies [bea3cab]
+  - @sapporta/server@0.4.0
+
 ## 0.2.9
 
 ### Patch Changes

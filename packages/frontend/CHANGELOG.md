@@ -1,5 +1,43 @@
 # @sapporta/frontend
 
+## 0.4.0
+
+### Minor Changes
+
+- 237c4bb: A navigation item is active on its own page and on the pages nested under it.
+  The check was a plain prefix match, so an item pointing at `/` looked active
+  everywhere, and an item for `/orders` also lit up on `/orders-archive`.
+- c27b34c: `AppShell` now renders navigation once a visitor has a session. A public page
+  loaded it with the signed-in sidebar, rail, and bottom bar, whose links only
+  bounce a visitor to the sign-in page.
+- aa25d57: Signing in returns to the page the visitor asked for. `AuthGate` recorded that
+  page when it sent a visitor without a session to sign in, but nothing read it
+  back: the sign-in form and `PublicOnlyGate` always continued to `/`, so a
+  deep link opened by a signed-out visitor was lost.
+
+### Patch Changes
+
+- Improvements after comparing agentic build of sample projects
+- c3d67b8: Make the TGrid layer visible as a directory and unify the report grid
+  vocabulary. `src/table/grid-adapter/`, the `tgrid-*` state files, and the
+  `TGrid` view now live together in `src/table/tgrid/`; the rest of
+  `src/table/` is the table-screen layer built on top. On the report side,
+  `ReportGrid.tsx` is now `ReportGridDataset.tsx` to match its public
+  `ReportGridDataset` export, and the one-file `src/grid-dataset/` directory
+  (which collided with `@sapporta/shared/grid-dataset`) moved into
+  `src/report/grid-dataset-path.ts`. Exports are unchanged. The only
+  observable difference: the report grid's internal CSS block was renamed
+  from `sapporta-report-tgrid*` to `sapporta-report-grid-dataset*`
+  (`data-grid-part` hooks are untouched), so any app styling against the
+  old class names must update them.
+- Updated dependencies [74ac829]
+- Updated dependencies
+- Updated dependencies [6460e61]
+- Updated dependencies [c46f748]
+  - @sapporta/ui@0.2.11
+  - @sapporta/grid@0.4.0
+  - @sapporta/shared@0.2.3
+
 ## 0.3.2
 
 ### Patch Changes

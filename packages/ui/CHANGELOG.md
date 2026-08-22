@@ -1,5 +1,16 @@
 # @sapporta/ui
 
+## 0.2.11
+
+### Patch Changes
+
+- 74ac829: Match the combobox popup width to the input it hangs from. The popup class
+  used Tailwind v3 arbitrary-value syntax (`w-[--anchor-width]`), which v4 reads
+  as a literal and compiles to `width: --anchor-width` — a declaration browsers
+  discard — so every `LookupPicker` and Base UI `Combobox` dropdown collapsed to
+  a narrow box under a full-width control.
+- Improvements after comparing agentic build of sample projects
+
 ## 0.2.10
 
 ### Patch Changes

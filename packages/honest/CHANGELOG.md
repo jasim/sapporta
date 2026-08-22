@@ -1,5 +1,11 @@
 # @sapporta/honest
 
+## 0.3.10
+
+### Patch Changes
+
+- Improvements after comparing agentic build of sample projects
+
 ## 0.3.9
 
 ### Patch Changes

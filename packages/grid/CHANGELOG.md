@@ -1,5 +1,26 @@
 # @sapporta/grid
 
+## 0.4.0
+
+### Minor Changes
+
+- 6460e61: Remove the `@sapporta/grid/grid` subpath export. It exposed the same
+  surface as the root export, differing only in the root's stylesheet side
+  effect, so the package had two names for one module. Import from
+  `@sapporta/grid` instead; the stylesheet can still be loaded separately
+  via `@sapporta/grid/index.css`.
+
+### Patch Changes
+
+- Improvements after comparing agentic build of sample projects
+- c46f748: Name the base grid engine layer GridCore and move it from `src/grid/` to
+  `src/core/` so the directory tree shows the layer stack (GridCore →
+  ColumnPreset). Internal move only: every export and subpath is unchanged.
+- Updated dependencies [74ac829]
+- Updated dependencies
+  - @sapporta/ui@0.2.11
+  - @sapporta/shared@0.2.3
+
 ## 0.3.2
 
 ### Patch Changes

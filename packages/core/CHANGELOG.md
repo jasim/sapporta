@@ -1,5 +1,108 @@
 # @sapporta/server
 
+## 0.4.0
+
+### Minor Changes
+
+- 45e8a8a: The scaffold now uses Better Auth 1.7. That release keys accounts on
+  `(issuer, accountId)` and so requires an `account.issuer` column, which the
+  generated auth schema did not carry: a new project resolved `^1.6.21` to 1.7.1
+  and every sign-up failed with `The field "issuer" does not exist in the
+"account" Drizzle schema`.
+
+  `@sapporta/server` now declares `better-auth` as a tilde range, so a generated
+  project stays on the minor line that `project-auth/schema.ts` was generated
+  for. Better Auth adds columns in minor releases, and that schema is what a
+  project's migrations are generated from.
+
+  The project's own `personalAccessToken` table moves out of the generated
+  `project-auth/schema.ts` and into `project-auth/auth-tokens-schema.ts`, which
+  `drizzle.config.ts` reads alongside it. The generated file is now regenerated
+  whole without losing the table.
+
+- c576648: `loadSapportaProject` now runs auth schema validation itself, after the
+  structural checks and before search plans compile. Previously the boot
+  template called `assertAuthSchemaDefinitions` after loading the project,
+  which was too late: search-plan compilation resolves the same reference
+  metadata and failed on the first reference problem, hiding the aggregated
+  "Auth schema validation failed" report. The generated `boot.ts` no longer
+  needs its own call; existing projects that still call
+  `assertAuthSchemaDefinitions` keep working — the check is simply redundant
+  there now.
+- 7f49d7d: Consolidate the error vocabulary into the `@sapporta/server/errors`
+  module. `ErrorCode`, `ErrorCodeValue`, and `OperationError` — previously
+  internal to an introspection types file — now live alongside
+  `ValidationError`, `QueryParseError`, and SQLite error classification in
+  the one errors module. Existing imports from `@sapporta/server/errors`
+  and the root export are unchanged; the module simply exposes the full
+  vocabulary now.
+- 3bcfd52: `/` now opens a screen behind `AuthGate`. The generated `App.tsx` exported
+  `appHomeRoute` outside the gate, and the shipped default was a redirect to
+  `/welcome`, so the gate caught anonymous visitors one hop later and nothing
+  looked wrong. A project that put a real home page in that slot — which the
+  app-building guidance asks for — served it to visitors without a session.
+
+  `appHomeRoute` now renders inside the gate and holds the home screen itself:
+  `Welcome.tsx` becomes `Home.tsx`, `/` opens it, and `/welcome` is gone, so
+  signing in lands on the home page without a redirect hop. A new
+  `appPublicHomeRoute` export takes an index route for an app that wants `/` open
+  to everyone; filling it opens `/` in place of `appHomeRoute`, so one of the two
+  owns `/` and the other is unreachable there.
+
+  A project owns `App.tsx` and keeps its own copy when it updates Sapporta, while
+  `SapportaApp.tsx` is replaced and reads both slots. To take the change, add
+  `export const appPublicHomeRoute: ReactElement | null = null;` to `App.tsx` and
+  move the home screen from a redirect into `appHomeRoute`.
+
+- 6709057: A generated project now has a `typecheck` command, and `pnpm build` runs it.
+
+  `packages/frontend` built with a bare `vite build`, which strips types with
+  esbuild and never typechecks, and the package shipped no `typecheck` script. So
+  `pnpm build` reported success on frontend code carrying real type errors, and
+  nothing in the project named a command that would find them — two separate
+  agent sessions had to construct `tsc --noEmit` themselves, then found four and
+  nine errors that a green build had hidden.
+
+  `packages/frontend` gains `typecheck: "tsc --noEmit"`. Unlike the API it needs
+  no `pretypecheck`: its tsconfig maps the workspace shared package to
+  `../shared/src`, not `../shared/dist`, so it typechecks without a prior build.
+  The root gains a `typecheck` that fans out to shared, API, and frontend.
+
+  Root `build` now runs `pnpm typecheck` first, so a type-broken frontend fails
+  the build instead of passing it, and fails before anything is emitted rather
+  than leaving a stale `packages/frontend/dist` behind. This costs a `--noEmit`
+  pass over shared and API before the emitting one; a clean scaffold builds in
+  about 11s where it took about 5s.
+
+  Existing projects are unaffected. The scaffold refresh deliberately never
+  rewrites an existing project's `scripts`, so a project generated before this
+  release picks the commands up only by hand.
+
+- 0b872d2: Move test utilities off the root export and onto a dedicated
+  `@sapporta/server/testing` subpath. `createTestDb` no longer ships on
+  the production surface of `@sapporta/server`; import it (and the newly
+  public `createTestConnection`) from `@sapporta/server/testing` instead.
+
+### Patch Changes
+
+- Improvements after comparing agentic build of sample projects
+- bea3cab: `sapporta init` now requires pnpm 11 or later and fails with a clear message on
+  older versions. The generated project keeps its workspace settings in
+  `pnpm-workspace.yaml`, which pnpm 10 and earlier ignore, and its root
+  package.json no longer carries a `pnpm` field that pnpm 11 would ignore.
+
+  Source-linked scaffolds write their dependency overrides into
+  `pnpm-workspace.yaml` as well; pnpm 11 dropped support for the `pnpm` field in
+  the root package.json, so those overrides were silently inert. The override set
+  also gains `kysely` and `@types/better-sqlite3`: both are optional peers of
+  drizzle-orm, so a version drift between the generated project and the linked
+  checkout split drizzle-orm into two package identities and every drizzle type
+  into two incompatible declarations.
+
+- Updated dependencies
+  - @sapporta/honest@0.3.10
+  - @sapporta/shared@0.2.3
+
 ## 0.3.2
 
 ### Patch Changes

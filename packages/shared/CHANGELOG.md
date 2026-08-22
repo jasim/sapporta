@@ -1,5 +1,11 @@
 # @sapporta/shared
 
+## 0.2.3
+
+### Patch Changes
+
+- Improvements after comparing agentic build of sample projects
+
 ## 0.2.2
 
 ### Patch Changes
