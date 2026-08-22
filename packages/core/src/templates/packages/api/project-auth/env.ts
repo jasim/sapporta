@@ -2,6 +2,15 @@ import type { HealthPolicy, OpenApiPolicy } from "@sapporta/server";
 import { parseBoundedInteger } from "@sapporta/shared/validation";
 
 export type Origin = string & { readonly __origin: unique symbol };
+
+/**
+ * The origin a browser loads the app from — used for sign-in trust and for
+ * links in outgoing email. A public identity, not a local address: a
+ * deployment sets it to the site's own domain, while SAPPORTA_API_PORT is
+ * merely where this process listens behind a proxy. It carries
+ * SAPPORTA_FRONTEND_PORT in development only because Vite serves the app
+ * there. Do not derive it from a port.
+ */
 export type PublicAppUrl = Origin & {
   readonly __publicAppUrl: unique symbol;
 };

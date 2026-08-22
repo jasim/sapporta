@@ -17,6 +17,12 @@ import { parseBoundedInteger } from "@sapporta/shared/validation";
 // SAPPORTA_FRONTEND_PORT as Vite's own port. strictPort keeps the trusted dev
 // origin exact.
 //
+// SAPPORTA_PUBLIC_APP_URL is a separate setting, not a restatement of these
+// ports: it is the origin the browser loads the app from, which is this Vite
+// server in development and the site's own domain in a deployment. While it
+// points at this server, its port has to match SAPPORTA_FRONTEND_PORT; keep
+// the two in step by hand rather than deriving one from the other.
+//
 // %%SAPPORTA:SLUG%%-shared is aliased to its source so HMR works without rebuilding
 // the shared package's dist/ on every edit. Backend imports the same
 // package via the pnpm symlink and reads dist/ (Node can't run TS).
