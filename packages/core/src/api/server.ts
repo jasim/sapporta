@@ -77,6 +77,32 @@ export function installExactOriginCors<E extends SapportaEnv>(
 }
 
 export type HealthPolicy = "disabled" | "public" | "authenticated";
+
+/** Path of the generated app contract, kept in one place across boot. */
+export const OPENAPI_PATH = "/api/openapi.json";
+
+/**
+ * Who may read the generated OpenAPI document at `/api/openapi.json`.
+ *
+ * The document describes the application's own routes, parameters, and
+ * schemas. It is built once from the boot-time table catalog and the
+ * registered contracts, so every caller receives the same bytes — it carries
+ * no workspace records and does not vary by principal.
+ *
+ *   - `public` — anyone who can reach the server can read the contract. The
+ *     right setting for a development server on localhost, where the same
+ *     facts are already in the project's source on the same disk. This is
+ *     what lets an agent run `sapporta endpoints list` with no credential.
+ *   - `authenticated` — the project's auth guard runs first. The default, and
+ *     the right setting for a deployed app, where the document is a useful
+ *     map for someone probing the surface from outside.
+ *   - `disabled` — the route returns 404 and the contract is not served at
+ *     all.
+ *
+ * Reading the document is not the same as calling what it describes. Every
+ * route it lists keeps its own authorization.
+ */
+export type OpenApiPolicy = "disabled" | "public" | "authenticated";
 export type SapportaAuthGuard<E extends SapportaEnv = SapportaEnv> = (
   c: Context<E>,
 ) => SapportaAuthContext;
@@ -147,9 +173,28 @@ export function installSapportaErrorHandler<E extends SapportaEnv>(
   return app;
 }
 
+export interface FrameworkRoutePolicyOptions {
+  /**
+   * Who may read `/api/openapi.json`. Defaults to `"authenticated"`, which
+   * matches the behavior of projects that do not set the policy.
+   */
+  openapi?: OpenApiPolicy;
+}
+
+/**
+ * Install route policy for the framework surfaces that are not CASL-aware.
+ *
+ * `/api/meta/*` is guarded as a prefix, with `GET /api/meta/info` carved out
+ * as public project identity. The prefix is guarded deliberately and must
+ * stay that way: `POST /api/meta/sql` runs arbitrary SQL and lives under the
+ * same prefix, so a policy applied to `/api/meta/*` rather than to a single
+ * route would open statement execution. Only `/api/openapi.json` takes a
+ * policy, and it takes one on its own path.
+ */
 export function installFrameworkRoutePolicy<E extends SapportaEnv>(
   app: Hono<E>,
   guard: SapportaAuthGuard<E>,
+  options: FrameworkRoutePolicyOptions = {},
 ): Hono<E> {
   const currentAuthOnly = async (c: Context<E>, next: () => Promise<void>) => {
     guard(c);
@@ -165,10 +210,32 @@ export function installFrameworkRoutePolicy<E extends SapportaEnv>(
     guard(c);
     return next();
   };
-  app.use("/api/openapi.json", currentAuthOnly);
+  installOpenApiPolicy(
+    app,
+    options.openapi ?? "authenticated",
+    currentAuthOnly,
+  );
   app.use("/api/meta/*", currentAuthOnlyMeta);
   return app;
 }
+
+function installOpenApiPolicy<E extends SapportaEnv>(
+  app: Hono<E>,
+  policy: OpenApiPolicy,
+  currentAuthOnly: MiddlewareLike<E>,
+): void {
+  if (policy === "public") return;
+  if (policy === "disabled") {
+    app.use(OPENAPI_PATH, async (c) => c.json({ error: "Not found" }, 404));
+    return;
+  }
+  app.use(OPENAPI_PATH, currentAuthOnly);
+}
+
+type MiddlewareLike<E extends SapportaEnv> = (
+  c: Context<E>,
+  next: () => Promise<void>,
+) => Promise<unknown>;
 
 /**
  * Install Sapporta's default middleware, health endpoint, and error handler

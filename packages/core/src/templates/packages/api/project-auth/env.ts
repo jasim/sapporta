@@ -1,4 +1,4 @@
-import type { HealthPolicy } from "@sapporta/server";
+import type { HealthPolicy, OpenApiPolicy } from "@sapporta/server";
 import { parseBoundedInteger } from "@sapporta/shared/validation";
 
 export type Origin = string & { readonly __origin: unique symbol };
@@ -13,6 +13,7 @@ export interface ProjectAuthEnv {
   trustedOrigins: Origin[];
   requireVerifiedEmail: boolean;
   healthPolicy: HealthPolicy;
+  openapiPolicy: OpenApiPolicy;
   mail: ProjectMailConfig;
 }
 
@@ -55,6 +56,7 @@ export function readProjectAuthEnv(
       nodeEnv: env.NODE_ENV,
     }),
     healthPolicy: readHealthPolicy(env.SAPPORTA_HEALTH_POLICY),
+    openapiPolicy: readOpenApiPolicy(env.SAPPORTA_OPENAPI_POLICY),
     mail: readMailConfig(env),
   };
 }
@@ -66,7 +68,7 @@ export function isEmailVerificationRequired({
   explicitRequirement: boolean | undefined;
   nodeEnv: string | undefined;
 }): boolean {
-  return explicitRequirement ?? (nodeEnv === "production");
+  return explicitRequirement ?? nodeEnv === "production";
 }
 
 function readMailConfig(env: NodeJS.ProcessEnv): ProjectMailConfig {
@@ -166,6 +168,24 @@ function readHealthPolicy(value: string | undefined): HealthPolicy {
   }
   throw new Error(
     'SAPPORTA_HEALTH_POLICY must be "public", "authenticated", or "disabled".',
+  );
+}
+
+/**
+ * Read who may fetch the generated app contract at `/api/openapi.json`.
+ *
+ * Unset means `"authenticated"`, so a deployment that says nothing keeps the
+ * contract behind sign-in. The generated `.env.development` sets `public`,
+ * which is what makes `sapporta endpoints list` work against a local dev
+ * server with no access token.
+ */
+function readOpenApiPolicy(value: string | undefined): OpenApiPolicy {
+  if (value === undefined || value === "") return "authenticated";
+  if (value === "disabled" || value === "authenticated" || value === "public") {
+    return value;
+  }
+  throw new Error(
+    'SAPPORTA_OPENAPI_POLICY must be "public", "authenticated", or "disabled".',
   );
 }
 

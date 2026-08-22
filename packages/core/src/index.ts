@@ -11,10 +11,13 @@ export {
   installSapportaDefaults,
   installSapportaErrorHandler,
   mountHealth,
+  OPENAPI_PATH,
 } from "./api/server.js";
 export type {
   ExactOriginCorsOptions,
+  FrameworkRoutePolicyOptions,
   HealthPolicy,
+  OpenApiPolicy,
   SapportaAuthGuard,
   SapportaEnv,
 } from "./api/server.js";

@@ -180,6 +180,82 @@ describe("sapporta init auth template - CORS and health policy", () => {
     expect(signedIn.body).toEqual({ status: "ok" });
   });
 
+  /**
+   * One server, both halves of the policy: the contract has to be readable
+   * without a credential, and nothing that reads data may follow it out.
+   * `POST /api/meta/sql` runs arbitrary statements under the same
+   * `/api/meta/*` prefix that already carries a public route, so it is the
+   * one that would break first. Both gates are live here — the project's
+   * anonymous gate over `/api/*` and the framework's own route policy.
+   */
+  it("serves the app contract but no data under the public policy", async () => {
+    server = await startBuiltServer(
+      project!,
+      { SAPPORTA_OPENAPI_POLICY: "public" },
+      { readyPath: "/api/meta/info" },
+    );
+
+    const contract = await requestJson<{
+      openapi: string;
+      paths: Record<string, unknown>;
+    }>(server.baseUrl, "/api/openapi.json", { expectedStatus: 200 });
+    expect(contract.body.openapi).toMatch(/^3\./);
+    expect(Object.keys(contract.body.paths).length).toBeGreaterThan(0);
+
+    const sql = await requestJson<{ code: string }>(
+      server.baseUrl,
+      "/api/meta/sql",
+      {
+        method: "POST",
+        body: { sql: "SELECT 1" },
+        expectedStatus: 401,
+        serverOutput: server.output,
+      },
+    );
+    expect(sql.body.code).toBe("unauthenticated");
+
+    const rows = await requestJson<{ code: string }>(
+      server.baseUrl,
+      "/api/tables/tasks",
+      { expectedStatus: 401, serverOutput: server.output },
+    );
+    expect(rows.body.code).toBe("unauthenticated");
+  });
+
+  it("requires a session for the app contract when no policy is set", async () => {
+    server = await startBuiltServer(
+      project!,
+      {},
+      {
+        readyPath: "/api/meta/info",
+      },
+    );
+
+    const anonymous = await requestJson<{ code: string }>(
+      server.baseUrl,
+      "/api/openapi.json",
+      { expectedStatus: 401, serverOutput: server.output },
+    );
+
+    expect(anonymous.body.code).toBe("unauthenticated");
+  });
+
+  it("does not serve the app contract when disabled", async () => {
+    server = await startBuiltServer(
+      project!,
+      { SAPPORTA_OPENAPI_POLICY: "disabled" },
+      { readyPath: "/api/meta/info" },
+    );
+
+    const contract = await requestJson<unknown>(
+      server.baseUrl,
+      "/api/openapi.json",
+      { expectedStatus: 404, serverOutput: server.output },
+    );
+
+    expect(contract.status).toBe(404);
+  });
+
   it("does not mount health when disabled", async () => {
     server = await startBuiltServer(
       project!,

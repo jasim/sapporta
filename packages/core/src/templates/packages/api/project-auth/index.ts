@@ -1,6 +1,7 @@
 import type { Context } from "hono";
 import type {
   BuildAbility,
+  OpenApiPolicy,
   ProjectDbConnection,
   SapportaAuthContext,
   SapportaEnv,
@@ -83,6 +84,63 @@ const defaultPublicRoutes = [
   { method: "GET", path: "/api/meta/info" },
 ] as const satisfies readonly PublicRoutePattern[];
 
+/**
+ * The generated app contract at `/api/openapi.json`.
+ *
+ * This route is gated twice. The framework applies `SAPPORTA_OPENAPI_POLICY`
+ * in `mountSapportaFramework`, and this anonymous gate runs first because
+ * `boot.ts` installs it over `/api/*` before the framework mounts. Only this
+ * gate rejects an anonymous caller, so it decides whether the framework's
+ * policy is ever consulted.
+ */
+const openApiRoute = {
+  method: "GET",
+  path: "/api/openapi.json",
+} as const satisfies PublicRoutePattern;
+
+/**
+ * Decide whether the anonymous gate lets a request for the contract through
+ * to the framework's own policy.
+ *
+ * Under `public` it must, so the document is served. Under `disabled` it must
+ * too, so the framework can answer 404 — the honest reply for a route the
+ * deployment chose not to serve. Held back under `disabled`, an anonymous
+ * caller would instead get 401, which says the contract is there and needs a
+ * credential that would never work.
+ *
+ * Under `authenticated` it must not: this gate is what rejects an anonymous
+ * caller. The framework's guard resolves the request's auth context and an
+ * anonymous context is still a context, so the framework alone would let the
+ * request through.
+ */
+function openApiRouteReachesFramework(policy: OpenApiPolicy): boolean {
+  return policy !== "authenticated";
+}
+
+/**
+ * List every route an anonymous caller may reach.
+ *
+ * Only the app contract is conditional, and only on `SAPPORTA_OPENAPI_POLICY`.
+ * Nothing else here reads workspace data: `/api/auth-bootstrap` reports
+ * whether the app needs its first user, `/api/meta/info` returns the project
+ * name and slug, and the contract describes this app's own routes. Routes the
+ * application chooses to publish arrive in `publicRoutes` from `app.ts`.
+ *
+ * Being reachable is not being permitted. Every handler still reads
+ * `c.get("auth")` and checks its own abilities and row security, and the
+ * contract is answered by the framework policy that this list defers to.
+ */
+export function anonymousPublicRoutes(
+  env: ProjectAuthEnv,
+  publicRoutes: readonly PublicRoutePattern[] = [],
+): readonly PublicRoutePattern[] {
+  return [
+    ...defaultPublicRoutes,
+    ...(openApiRouteReachesFramework(env.openapiPolicy) ? [openApiRoute] : []),
+    ...publicRoutes,
+  ];
+}
+
 export function createProjectAuth({
   conn,
   env,
@@ -123,7 +181,7 @@ export function createProjectAuth({
     }),
     resolveMiddleware: resolveProjectAuthMiddleware(resolveAuth),
     rejectAnonymousMiddleware: rejectAnonymousByDefault({
-      publicRoutes: [...defaultPublicRoutes, ...publicRoutes],
+      publicRoutes: anonymousPublicRoutes(env, publicRoutes),
       requireVerifiedEmail: env.requireVerifiedEmail,
     }),
     resolveAuth,

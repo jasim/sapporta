@@ -96,11 +96,15 @@ app.use("/api/*", projectAuth.resolveMiddleware);
 app.use("/api/*", projectAuth.rejectAnonymousMiddleware);
 
 // Create the standard table APIs from the loaded schema.
+// `openapiPolicy` decides who may read the generated contract at
+// /api/openapi.json. It is `public` in development so `sapporta endpoints
+// list` works with no access token, and `authenticated` when unset.
 const sapportaApi = mountSapportaFramework(app, sapporta, {
   conn,
   auth: {
     requireAuthContext: projectAuth.requireAuthContext,
   },
+  openapiPolicy: projectAuth.env.openapiPolicy,
 });
 
 // Mount the application's custom APIs under /api.

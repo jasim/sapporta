@@ -44,6 +44,7 @@ import {
   isEmailVerificationRequired,
   readProjectAuthEnv,
 } from "../src/templates/packages/api/project-auth/env.js";
+import { anonymousPublicRoutes } from "../src/templates/packages/api/project-auth/index.js";
 import {
   WorkspaceSwitchError,
   ensureActiveWorkspace,
@@ -74,6 +75,7 @@ describe("project auth template", () => {
           "http://localhost:5173, http://localhost:5174",
         SAPPORTA_REQUIRE_VERIFIED_EMAIL: "false",
         SAPPORTA_HEALTH_POLICY: "authenticated",
+        SAPPORTA_OPENAPI_POLICY: "public",
         SAPPORTA_MAIL_FROM: "Sapporta <no-reply@example.test>",
       }),
     ).toEqual({
@@ -83,6 +85,7 @@ describe("project auth template", () => {
       trustedOrigins: ["http://localhost:5173", "http://localhost:5174"],
       requireVerifiedEmail: false,
       healthPolicy: "authenticated",
+      openapiPolicy: "public",
       mail: {
         from: "Sapporta <no-reply@example.test>",
         transport: "stream",
@@ -892,6 +895,65 @@ describe("project auth template", () => {
     expect(publicResponse.status).toBe(200);
     await expect(publicResponse.json()).resolves.toEqual({ public: true });
     expect(privateResponse.status).toBe(401);
+  });
+
+  /**
+   * Pin the whole anonymous surface, not just the contract's presence in it.
+   * Exact equality is what catches a data route arriving here by accident —
+   * `/api/meta/sql` runs arbitrary statements and shares the `/api/meta/*`
+   * prefix with a route that is already public.
+   *
+   * `disabled` keeps the contract listed on purpose, so the framework can
+   * answer 404. Held back, an anonymous caller would get 401 instead, which
+   * says the contract is there and needs a credential that never works.
+   */
+  it("lists the anonymous surface for each contract policy", () => {
+    const routesFor = (policy: string | undefined) =>
+      anonymousPublicRoutes(
+        readProjectAuthEnv({
+          BETTER_AUTH_SECRET: "secret",
+          SAPPORTA_PUBLIC_APP_URL: "http://localhost:5173",
+          SAPPORTA_MAIL_FROM: "Sapporta <no-reply@example.test>",
+          ...(policy ? { SAPPORTA_OPENAPI_POLICY: policy } : {}),
+        }),
+      );
+    const base = [
+      { method: "GET", path: "/api/auth-bootstrap" },
+      { method: "GET", path: "/api/meta/info" },
+    ];
+    const contract = { method: "GET", path: "/api/openapi.json" };
+
+    expect(routesFor("public")).toEqual([...base, contract]);
+    expect(routesFor("disabled")).toEqual([...base, contract]);
+    expect(routesFor("authenticated")).toEqual(base);
+    expect(routesFor(undefined)).toEqual(base);
+  });
+
+  it("anonymous gate serves the app contract when the policy opened it", async () => {
+    const env = readProjectAuthEnv({
+      BETTER_AUTH_SECRET: "secret",
+      SAPPORTA_PUBLIC_APP_URL: "http://localhost:5173",
+      SAPPORTA_OPENAPI_POLICY: "public",
+      SAPPORTA_MAIL_FROM: "Sapporta <no-reply@example.test>",
+    });
+    const app = new Hono<SapportaEnv>();
+    app.use(
+      "/api/*",
+      resolveProjectAuthMiddleware(() => routeAnonymousContext()),
+    );
+    app.use(
+      "/api/*",
+      rejectAnonymousByDefault({ publicRoutes: anonymousPublicRoutes(env) }),
+    );
+    app.get("/api/openapi.json", (c) => c.json({ openapi: "3.1.0" }));
+    app.post("/api/meta/sql", (c) => c.json({ rows: [] }));
+
+    const contract = await app.request("/api/openapi.json");
+    const sql = await app.request("/api/meta/sql", { method: "POST" });
+
+    expect(contract.status).toBe(200);
+    await expect(contract.json()).resolves.toEqual({ openapi: "3.1.0" });
+    expect(sql.status).toBe(401);
   });
 
   it("requireVerifiedUser enforces verified email", async () => {

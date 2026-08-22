@@ -14,9 +14,35 @@ APIs, auth-aware row access, and a React app shell.
 - `pnpm build` runs `pnpm typecheck` first, then compiles the shared package,
   API, and frontend.
 - `pnpm start` runs the production server after `pnpm build`.
-- `pnpm exec sapporta endpoints list` inspects the running API.
+- `pnpm exec sapporta endpoints list` lists the routes the running API serves.
 
 Prefer the project-local CLI form: `pnpm exec sapporta ...`.
+
+### What the CLI can reach without an access token
+
+Against the development server started by `pnpm dev`, these read the shape of
+the application and need no credential:
+
+- `sapporta endpoints list` — every route, with its method and summary.
+- `sapporta endpoints show "POST /api/tables/books"` — one route's parameters,
+  request body, and response schemas.
+
+They work because `.env.development` sets `SAPPORTA_OPENAPI_POLICY=public`.
+Deployments leave that unset, which keeps the contract behind sign-in.
+
+These read or write data in a workspace, so they need an access token in
+`SAPPORTA_API_TOKEN`:
+
+- `sapporta rows list|get|count|create|update|delete`
+- `sapporta sql query|execute`
+- `sapporta tables list|show|indexes|sample`
+- `sapporta api get|post|put|delete`
+
+A token belongs to one user and one workspace, and only a signed-in person can
+create one: ask the user to open `/account/profile`, create an agent access
+token, and hand you the setup prompt. Do not ask for a token to read the
+schema or to change source files — read `packages/api/schema/` directly for
+that, or use `endpoints`.
 
 After writing a major code change or addition, use a separate sub-agent or
 coding-agent thread to read `CODING-PRINCIPLES.md`, review the written code, and

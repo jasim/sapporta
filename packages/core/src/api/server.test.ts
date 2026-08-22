@@ -11,6 +11,8 @@ import {
   installFrameworkRoutePolicy,
   mountHealth,
   installSapportaDefaults,
+  OPENAPI_PATH,
+  type OpenApiPolicy,
   type SapportaEnv,
 } from "./server.js";
 import { normalizeHttpException } from "./http-exceptions.js";
@@ -212,6 +214,60 @@ describe("framework route policy", () => {
       name: "Acme Ledger",
       slug: "acme-ledger",
     });
+  });
+});
+
+describe("openapi policy", () => {
+  /**
+   * Build an app whose guard always rejects, so reaching a handler proves the
+   * policy let the request past the guard rather than that the guard passed.
+   */
+  function appWithOpenApiPolicy(openapi: OpenApiPolicy | undefined) {
+    const app = installSapportaDefaults(new Hono<SapportaEnv>());
+    installFrameworkRoutePolicy(
+      app,
+      () => {
+        throw new HTTPException(403, {
+          res: Response.json(
+            { error: "Project guard rejected" },
+            { status: 403 },
+          ),
+        });
+      },
+      openapi ? { openapi } : {},
+    );
+    app.get(OPENAPI_PATH, (c) => c.json({ openapi: "3.1.0" }));
+    app.post("/api/meta/sql", (c) => c.json({ rows: [] }));
+    return app;
+  }
+
+  // An absent policy has to behave like `authenticated`: a deployment that
+  // says nothing keeps the contract closed.
+  it.each([
+    [undefined, 403],
+    ["authenticated" as const, 403],
+    ["public" as const, 200],
+    ["disabled" as const, 404],
+  ])("answers %s with %i", async (policy, status) => {
+    const res = await appWithOpenApiPolicy(policy).request(OPENAPI_PATH);
+
+    expect(res.status).toBe(status);
+  });
+
+  /**
+   * The contract policy must never widen its sibling routes. `POST
+   * /api/meta/sql` runs arbitrary statements and shares the `/api/meta/*`
+   * prefix, so a policy written against the prefix instead of the single
+   * contract path would open statement execution to anonymous callers.
+   */
+  it("keeps /api/meta/sql guarded under every openapi policy", async () => {
+    for (const policy of ["public", "authenticated", "disabled"] as const) {
+      const res = await appWithOpenApiPolicy(policy).request("/api/meta/sql", {
+        method: "POST",
+      });
+
+      expect(res.status).toBe(403);
+    }
   });
 });
 

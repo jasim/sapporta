@@ -18,6 +18,8 @@
 import type { Hono } from "hono";
 import {
   installFrameworkRoutePolicy,
+  OPENAPI_PATH,
+  type OpenApiPolicy,
   type SapportaAuthGuard,
   type SapportaEnv,
 } from "../api/server.js";
@@ -77,6 +79,15 @@ export interface MountSapportaFrameworkOptions {
   auth: {
     requireAuthContext: SapportaAuthGuard;
   };
+  /**
+   * Who may read `/api/openapi.json`. Defaults to `"authenticated"`.
+   *
+   * A generated project gates that route twice: this policy, and the
+   * project's own anonymous gate over `/api/*`. Setting this to `"public"`
+   * on its own is not enough — the route must also be listed as a public
+   * route for the anonymous gate. See `createProjectAuth` in the scaffold.
+   */
+  openapiPolicy?: OpenApiPolicy;
 }
 
 /**
@@ -159,7 +170,9 @@ export function mountSapportaFramework(
   const { sqlite, db } = conn;
   const { name, slug, apiDistDir, catalog } = project;
 
-  installFrameworkRoutePolicy(app, options.auth.requireAuthContext);
+  installFrameworkRoutePolicy(app, options.auth.requireAuthContext, {
+    ...(options.openapiPolicy ? { openapi: options.openapiPolicy } : {}),
+  });
 
   // Contract paths already carry the /meta and /tables prefix, so
   // mounting at /api yields the full URLs.
@@ -209,7 +222,7 @@ export function mountOpenApi(
   for (const userApi of userApis) {
     frameworkApi.extend(userApi);
   }
-  app.get("/api/openapi.json", (c) =>
+  app.get(OPENAPI_PATH, (c) =>
     c.json(
       frameworkApi.generateDocument(
         { tables: project.catalog.tables },

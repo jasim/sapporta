@@ -234,6 +234,7 @@ Fit:
 | `SAPPORTA_FRONTEND_ORIGINS`       | API host process env | yes | yes      | yes      | yes      | Extra browser origins trusted for credentialed API/auth requests.             |
 | `SAPPORTA_REQUIRE_VERIFIED_EMAIL` | API host process env | optional | optional | optional | optional | Explicit override for the environment-based email verification default.      |
 | `SAPPORTA_HEALTH_POLICY`          | API host process env | yes | optional | optional | optional | Access policy for health endpoints: `public`, `authenticated`, or `disabled`. |
+| `SAPPORTA_OPENAPI_POLICY`         | API host process env | yes | optional | optional | optional | Access policy for the app contract at `/api/openapi.json`: `public`, `authenticated`, or `disabled`. Unset means `authenticated`. |
 | `SAPPORTA_MAIL_TRANSPORT`         | API host process env | yes | yes      | yes      | yes      | Mail transport: `stream`, `smtp`, or `disabled`.                              |
 | `SAPPORTA_MAIL_FROM`              | API host process env | yes | yes      | yes      | yes      | Default sender address for Better Auth and custom app emails.                 |
 | `SMTP_URL`                        | API host process env | —   | optional | optional | optional | SMTP connection URL. Takes precedence over individual SMTP fields.            |
