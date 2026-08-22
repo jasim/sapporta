@@ -5,6 +5,7 @@ import {
   resolveCliRuntimeConfig,
   type CliRuntimeConfig,
 } from "../runtime-config.js";
+import { readProjectApiUrl } from "../project-api-url.js";
 import { renderCommandError, renderCommandResult } from "../render/output.js";
 import type { CliCommandContext, CliCommandSpec, CliProgram } from "./types.js";
 
@@ -24,7 +25,7 @@ export function createCliProgram(
     .version(version)
     .option(
       "--api-url <url>",
-      "API server URL (overrides SAPPORTA_API_URL; default: http://localhost:3000)",
+      "API server URL (overrides SAPPORTA_API_URL and the surrounding project's SAPPORTA_API_PORT; default: http://localhost:3000)",
     )
     .option(
       "--api-token <token>",
@@ -125,7 +126,12 @@ function createCommandContext(config: CliRuntimeConfig): CliCommandContext {
 
 function safeResolveRuntimeConfig(program: Command): CliRuntimeConfig {
   try {
-    return resolveCliRuntimeConfig(readRecord(program.opts()));
+    return resolveCliRuntimeConfig(
+      readRecord(program.opts()),
+      process.env,
+      process.stdout,
+      readProjectApiUrl(),
+    );
   } catch (err) {
     if (err instanceof OperationError) {
       renderCommandError(err, "table");

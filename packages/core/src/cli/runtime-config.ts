@@ -7,11 +7,12 @@ export type OutputFormat = "table" | "json";
 /**
  * Which setting chose the API URL, and which chose the token.
  *
- * A stale `SAPPORTA_API_URL` and the built-in default produce identical
- * requests, so a failure that names only the URL still leaves the user
- * guessing where it came from. The same holds for a token that was never set.
+ * A stale `SAPPORTA_API_URL`, a port read out of the surrounding project, and
+ * the built-in default produce identical requests, so a failure that names
+ * only the URL still leaves the user guessing where it came from. The same
+ * holds for a token that was never set.
  */
-export type ApiUrlSource = "flag" | "env" | "default";
+export type ApiUrlSource = "flag" | "env" | "project" | "default";
 export type ApiTokenSource = "flag" | "env" | "none";
 
 /** The deployment an API-backed command talks to, and how it was chosen. */
@@ -35,15 +36,18 @@ export interface TerminalInfo {
  *
  * Flags are explicit one-off overrides. Environment variables are the stable
  * automation interface, especially for credentials injected into an agent
- * session outside the visible command text.
+ * session outside the visible command text. `projectApiUrl` is what the
+ * surrounding project says about its own API, read at the command boundary so
+ * this function stays a decision over given values.
  */
 export function resolveCliRuntimeConfig(
   flags: Record<string, unknown>,
   env: Record<string, string | undefined> = process.env,
   terminal: TerminalInfo = process.stdout,
+  projectApiUrl?: string,
 ): CliRuntimeConfig {
   return {
-    ...resolveApiUrl(flags, env),
+    ...resolveApiUrl(flags, env, projectApiUrl),
     ...resolveApiToken(flags, env),
     output: resolveOutputFormat(flags, env, terminal),
   };
@@ -52,6 +56,7 @@ export function resolveCliRuntimeConfig(
 function resolveApiUrl(
   flags: Record<string, unknown>,
   env: Record<string, string | undefined>,
+  projectApiUrl: string | undefined,
 ): { apiUrl: string; apiUrlSource: ApiUrlSource } {
   const flagUrl = readString(flags.apiUrl);
   if (flagUrl) {
@@ -61,6 +66,11 @@ function resolveApiUrl(
   const envUrl = readString(env.SAPPORTA_API_URL);
   if (envUrl) {
     return { apiUrl: trimTrailingSlashes(envUrl), apiUrlSource: "env" };
+  }
+
+  const projectUrl = readString(projectApiUrl);
+  if (projectUrl) {
+    return { apiUrl: trimTrailingSlashes(projectUrl), apiUrlSource: "project" };
   }
 
   return { apiUrl: DEFAULT_API_URL, apiUrlSource: "default" };
