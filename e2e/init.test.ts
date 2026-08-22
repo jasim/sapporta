@@ -10,6 +10,7 @@
  */
 import { afterAll, beforeAll, describe, it } from "vitest";
 import {
+  assertSharedConstantReachedMigration,
   assertSqliteTable,
   assertBetterSqliteLoads,
   assertFrontendRoutes,
@@ -53,9 +54,11 @@ describe("sapporta init - end-to-end", () => {
     ]);
     writeProjectsSchema(project.projectDir);
     await runDrizzleMigrationCycle(project, "add_projects");
+    assertSharedConstantReachedMigration(project);
     await assertSqliteTable(project, "projects", [
       "id",
       "name",
+      "origin",
       "status",
       "workspace_id",
       "created_at",

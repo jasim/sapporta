@@ -8,10 +8,13 @@
     "prebuild": "pnpm --filter %%SAPPORTA:SLUG%%-shared build",
     "build": "tsc",
     "start": "%%SAPPORTA:NODE_COMMAND%% dist/boot.js",
+    "predb:generate": "pnpm --filter %%SAPPORTA:SLUG%%-shared build",
     "db:generate": "drizzle-kit generate",
+    "predb:generate:custom": "pnpm --filter %%SAPPORTA:SLUG%%-shared build",
     "db:generate:custom": "drizzle-kit generate --custom",
     "db:migrate": "drizzle-kit migrate",
     "db:check": "drizzle-kit check",
+    "predb:studio": "pnpm --filter %%SAPPORTA:SLUG%%-shared build",
     "db:studio": "drizzle-kit studio",
     "pretypecheck": "pnpm --filter %%SAPPORTA:SLUG%%-shared build",
     "typecheck": "tsc --noEmit"

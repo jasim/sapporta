@@ -501,6 +501,22 @@ describe("renderScaffoldFiles", () => {
     expect(apiScripts.typecheck).toBe("tsc --noEmit");
     expect(apiScripts.pretypecheck).toBe("pnpm --filter acme-app-shared build");
 
+    // Drizzle Kit reads the schema files, and a schema file may import the
+    // shared package, so every command that loads the schema builds it first.
+    // `db:migrate` and `db:check` read only drizzle.config.ts and the SQL in
+    // migrations/, so a build there would be dead weight on the common path.
+    for (const command of [
+      "db:generate",
+      "db:generate:custom",
+      "db:studio",
+    ] as const) {
+      expect(apiScripts[`pre${command}`]).toBe(
+        "pnpm --filter acme-app-shared build",
+      );
+    }
+    expect(apiScripts["predb:migrate"]).toBeUndefined();
+    expect(apiScripts["predb:check"]).toBeUndefined();
+
     const rootScripts = scriptsOf("package.json");
     expect(rootScripts.typecheck).toBe(
       "pnpm --filter ./packages/shared typecheck && " +
@@ -524,6 +540,46 @@ describe("renderScaffoldFiles", () => {
     expect(byDest.get("README.md")).toContain(
       "- `pnpm typecheck` - typecheck the shared package, API, and frontend",
     );
+  });
+
+  it("keeps the shared package loadable by the tools that read schema files", () => {
+    const project = layoutForRoot(
+      projectIdentityFromOptions({
+        dir: "/tmp/acme-app",
+        name: "Acme App",
+      }),
+    );
+    const files = renderScaffoldFiles(project, undefined);
+    const byDest = new Map(files.map((file) => [file.dest, file.content]));
+
+    // Drizzle Kit loads schema files with a CJS require, which matches neither
+    // `types` nor `import`. Without a runtime condition it cannot resolve the
+    // shared package at all and fails with ERR_PACKAGE_PATH_NOT_EXPORTED.
+    const sharedPackage = JSON.parse(
+      byDest.get("packages/shared/package.json") ?? "{}",
+    ) as { exports?: Record<string, unknown> };
+    expect(sharedPackage.exports?.["."]).toEqual({
+      types: "./dist/index.d.ts",
+      import: "./dist/index.js",
+      default: "./dist/index.js",
+    });
+
+    // A build that fails has to leave the last good dist alone. Emitting on
+    // error writes re-exports of modules it never emitted, so the next command
+    // that loads dist/ reports a missing file rather than the type error that
+    // caused it.
+    const sharedTsconfig = JSON.parse(
+      byDest.get("packages/shared/tsconfig.json") ?? "{}",
+    ) as { compilerOptions?: Record<string, unknown> };
+    expect(sharedTsconfig.compilerOptions?.noEmitOnError).toBe(true);
+
+    // Drizzle Kit honours tsconfig paths, so a mapping here would decide what
+    // `db:generate` loads at runtime. The workspace symlink and the shared
+    // package's own exports resolve the same types without that reach.
+    const apiTsconfig = JSON.parse(
+      byDest.get("packages/api/tsconfig.json") ?? "{}",
+    ) as { compilerOptions?: Record<string, unknown> };
+    expect(apiTsconfig.compilerOptions?.paths).toBeUndefined();
   });
 
   it("renders source-link dependencies, overrides, and resolver settings", () => {

@@ -313,10 +313,13 @@ function assertScaffoldedProject(
       join(project.projectDir, "packages", "api", "tsconfig.json"),
       "utf-8",
     );
-    expect(apiTsconfig).toContain(
-      '"test-project-shared": ["../shared/dist/index.d.ts"]',
-    );
+    // The API resolves the shared package through the workspace symlink, so
+    // its tsconfig carries no path mapping for it. Drizzle Kit's TypeScript
+    // loader honours tsconfig paths, and a mapping that named a file would
+    // decide what `db:generate` loads at runtime.
+    expect(apiTsconfig).not.toContain("paths");
     expect(apiTsconfig).not.toContain("../shared/src/index.ts");
+    expect(apiTsconfig).not.toContain("../shared/dist/index.d.ts");
   }
 }
 
@@ -1122,10 +1125,17 @@ export function writeProjectsSchema(projectDir: string): void {
     join(projectDir, "packages", "api", "schema", "projects.ts"),
     [
       'import { sapportaTable, timestamp, sqliteTable, text, select, integer } from "@sapporta/server/table";',
+      // A schema file may read a constant from the shared package, so this
+      // fixture does too. Drizzle Kit has to resolve the package to its
+      // compiled JavaScript: resolving it to the declarations instead still
+      // generates a migration, but every value arrives undefined and the
+      // column default silently disappears from the SQL.
+      `import { APP_NAME } from "${PROJECT_NAME}-shared";`,
       "",
       'export const projectsTable = sqliteTable("projects", {',
       '  id: integer("id").primaryKey({ autoIncrement: true }),',
       '  name: text("name").notNull(),',
+      '  origin: text("origin").notNull().default(APP_NAME),',
       '  status: select("status", ["active", "paused", "done"]).notNull(),',
       '  workspace_id: text("workspace_id").notNull(),',
       '  created_at: timestamp("created_at"),',
@@ -1257,6 +1267,30 @@ export async function buildGeneratedApiProject(
       timeoutMs: 120_000,
     }),
   );
+}
+
+/**
+ * The `projects` fixture defaults a column to a constant it imports from the
+ * shared package. That default reaches the SQL only when Drizzle Kit loads the
+ * shared package's compiled JavaScript, so a resolution regression shows up
+ * here as a migration that generates cleanly and quietly drops the default.
+ */
+export function assertSharedConstantReachedMigration(
+  project: E2eProject,
+): void {
+  const migrationsDir = join(
+    project.projectDir,
+    "packages",
+    "api",
+    "migrations",
+  );
+  const sql = listMigrationSqlFiles(project.projectDir)
+    .map((file) => readFileSync(join(migrationsDir, file), "utf-8"))
+    .join("\n");
+  expect(
+    sql,
+    "Expected APP_NAME from the shared package to reach the generated SQL",
+  ).toContain(`\`origin\` text DEFAULT '${PROJECT_NAME}' NOT NULL`);
 }
 
 export async function assertSqliteTable(

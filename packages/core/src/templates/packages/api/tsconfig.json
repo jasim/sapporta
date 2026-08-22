@@ -8,10 +8,7 @@
     "sourceMap": true,
     "strict": true,
     "esModuleInterop": true,
-    "skipLibCheck": true,
-    "paths": {
-      "%%SAPPORTA:SLUG%%-shared": ["../shared/dist/index.d.ts"]
-    }
+    "skipLibCheck": true
   },
   "include": ["*.ts", "app", "project-auth", "schema"],
   "exclude": ["dist"]
