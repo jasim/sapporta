@@ -91,13 +91,17 @@ For a first publish of `sapporta`, confirm the npm name is available or owned by
 ## Workflow
 
 ```bash
-pnpm changeset          # 1. select packages, bump type, summary -> .changeset/*.md
-pnpm run version        # 2. consume changesets → bump package.json, write CHANGELOG.md
+# 1. select packages, bump type, summary -> .changeset/*.md
+pnpm changeset          
+# 2. consume changesets → bump package.json, write CHANGELOG.md
+pnpm run version        
 pnpm --filter @sapporta/server vendor
 pnpm install
 git add .
 git commit -m "Version packages for release"
-pnpm release            # 3. build and publish unpublished package versions
-git push                # 4. push release commit
+# 3. build and publish unpublished package versions
+pnpm release            
+# 4. push release commit
+git push                
 ```
 
