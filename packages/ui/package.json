@@ -138,6 +138,7 @@
     "build:watch": "vite build --watch",
     "typecheck:watch": "tsc --noEmit --watch --preserveWatchOutput",
     "preview": "vite preview",
+    "test": "vitest run",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
@@ -163,6 +164,7 @@
     "tailwindcss": "^4.3.1",
     "typescript": "^6.0.3",
     "vite": "^8.1.0",
-    "vite-plugin-dts": "^5.0.3"
+    "vite-plugin-dts": "^5.0.3",
+    "vitest": "^4.1.9"
   }
 }
