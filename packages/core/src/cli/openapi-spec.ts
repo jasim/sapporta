@@ -1,15 +1,15 @@
 /**
- * Helpers for reading the app's OpenAPI document.
+ * Reading the app's OpenAPI document.
  *
  * `sapporta endpoints` uses these helpers to list and inspect the endpoints
- * exposed by the selected deployment. If the OpenAPI route is protected, the
- * same bearer token used for table/report commands is used here too.
+ * exposed by the selected deployment. Fetching the document is the client's
+ * job (`SapportaCliClient.openApiSpec`); everything here is pure parsing over
+ * a document already in hand.
  */
 
-import { httpRequest } from "./http-client.js";
-import { OperationError } from "../errors.js";
+import type { HttpMethod } from "./http-client.js";
 
-export type HttpMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
+export type { HttpMethod };
 
 const HTTP_METHODS: HttpMethod[] = ["GET", "POST", "PUT", "PATCH", "DELETE"];
 
@@ -44,43 +44,6 @@ export type FindResult =
   | { kind: "hit"; endpoint: EndpointDetail }
   | { kind: "ambiguous"; candidates: EndpointSummary[] }
   | { kind: "miss"; suggestions: EndpointSummary[] };
-
-/**
- * Fetch the app contract for the selected deployment.
- *
- * Non-2xx responses remain command failures. In particular, auth errors from a
- * protected OpenAPI route keep their stable server code, such as
- * `unauthenticated`, `token_expired`, or `forbidden`.
- */
-export async function fetchOpenApiSpec(
-  baseUrl: string,
-  authToken?: string,
-): Promise<OpenApiDoc> {
-  const res = await httpRequest(baseUrl, "GET", "/api/openapi.json", {
-    authToken,
-  });
-  if (res.status < 200 || res.status >= 300) {
-    throw openApiFetchError(res.status, res.data);
-  }
-  return res.data as OpenApiDoc;
-}
-
-function openApiFetchError(status: number, data: unknown): OperationError {
-  const body = readErrorBody(data);
-  return new OperationError(
-    body.error ?? `HTTP ${status} while fetching OpenAPI document`,
-    body.code ?? `HTTP_${status}`,
-  );
-}
-
-function readErrorBody(data: unknown): { error?: string; code?: string } {
-  if (typeof data !== "object" || data === null) return {};
-  const record = data as Record<string, unknown>;
-  return {
-    ...(typeof record.error === "string" ? { error: record.error } : {}),
-    ...(typeof record.code === "string" ? { code: record.code } : {}),
-  };
-}
 
 /** Flatten spec.paths into a sorted list of summaries. */
 export function listEndpoints(spec: OpenApiDoc): EndpointSummary[] {

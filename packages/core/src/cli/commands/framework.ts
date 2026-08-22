@@ -120,13 +120,7 @@ function buildCommandInput(
 }
 
 function createCommandContext(config: CliRuntimeConfig): CliCommandContext {
-  return {
-    ...config,
-    client: new SapportaCliClient({
-      apiUrl: config.apiUrl,
-      ...(config.apiToken ? { apiToken: config.apiToken } : {}),
-    }),
-  };
+  return { ...config, client: new SapportaCliClient(config) };
 }
 
 function safeResolveRuntimeConfig(program: Command): CliRuntimeConfig {

@@ -1,12 +1,8 @@
 import { ErrorCode, OperationError } from "../../errors.js";
-import { httpRequest, type HttpResult } from "../http-client.js";
-import type { HttpMethod } from "../openapi-spec.js";
+import { httpRequest, type HttpMethod } from "../http-client.js";
+import type { OpenApiDoc } from "../openapi-spec.js";
+import type { ApiTarget } from "../runtime-config.js";
 import type { CountQuery } from "@sapporta/shared/contracts";
-
-export interface SapportaCliClientOptions {
-  apiUrl: string;
-  apiToken?: string;
-}
 
 export interface RowListOptions {
   limit?: number;
@@ -43,20 +39,28 @@ export interface SqlExecuteOptions {
 }
 
 export class SapportaCliClient {
-  constructor(private readonly options: SapportaCliClientOptions) {}
+  constructor(private readonly target: ApiTarget) {}
 
+  /**
+   * Call the deployment and return the response payload.
+   *
+   * Non-2xx replies and unreachable servers arrive as `ApiRequestError`, so
+   * every method below can treat its return value as a success.
+   */
   async request(
     method: HttpMethod,
     path: string,
     opts: { body?: unknown; query?: Record<string, unknown> } = {},
   ): Promise<unknown> {
-    return this.expectSuccess(
-      await httpRequest(this.options.apiUrl, method, path, {
-        authToken: this.options.apiToken,
-        body: opts.body,
-        queryParams: opts.query ? queryObjectToParams(opts.query) : undefined,
-      }),
-    );
+    return httpRequest(this.target, method, path, {
+      body: opts.body,
+      queryParams: opts.query ? queryObjectToParams(opts.query) : undefined,
+    });
+  }
+
+  /** Fetch the app contract describing every endpoint this deployment serves. */
+  async openApiSpec(): Promise<OpenApiDoc> {
+    return (await this.request("GET", "/api/openapi.json")) as OpenApiDoc;
   }
 
   async listTables(detail: boolean): Promise<unknown> {
@@ -174,17 +178,6 @@ export class SapportaCliClient {
       },
     });
   }
-
-  private expectSuccess(result: HttpResult): unknown {
-    if (result.status >= 200 && result.status < 300) {
-      return result.data;
-    }
-    const body = readErrorBody(result.data);
-    throw new OperationError(
-      body.error ?? `HTTP ${result.status}`,
-      body.code ?? `HTTP_${result.status}`,
-    );
-  }
 }
 
 export function encodePathSegment(value: string): string {
@@ -245,14 +238,6 @@ function queryObjectToParams(
     out[key] = filterValueToString(value);
   }
   return out;
-}
-
-function readErrorBody(data: unknown): { error?: string; code?: string } {
-  if (!isRecord(data)) return {};
-  return {
-    ...(typeof data.error === "string" ? { error: data.error } : {}),
-    ...(typeof data.code === "string" ? { code: data.code } : {}),
-  };
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

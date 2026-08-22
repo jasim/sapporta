@@ -4,9 +4,25 @@ const DEFAULT_API_URL = "http://localhost:3000";
 
 export type OutputFormat = "table" | "json";
 
-export interface CliRuntimeConfig {
+/**
+ * Which setting chose the API URL, and which chose the token.
+ *
+ * A stale `SAPPORTA_API_URL` and the built-in default produce identical
+ * requests, so a failure that names only the URL still leaves the user
+ * guessing where it came from. The same holds for a token that was never set.
+ */
+export type ApiUrlSource = "flag" | "env" | "default";
+export type ApiTokenSource = "flag" | "env" | "none";
+
+/** The deployment an API-backed command talks to, and how it was chosen. */
+export interface ApiTarget {
   apiUrl: string;
+  apiUrlSource: ApiUrlSource;
   apiToken?: string;
+  apiTokenSource: ApiTokenSource;
+}
+
+export interface CliRuntimeConfig extends ApiTarget {
   output: OutputFormat;
 }
 
@@ -27,7 +43,7 @@ export function resolveCliRuntimeConfig(
   terminal: TerminalInfo = process.stdout,
 ): CliRuntimeConfig {
   return {
-    apiUrl: resolveApiUrl(flags, env),
+    ...resolveApiUrl(flags, env),
     ...resolveApiToken(flags, env),
     output: resolveOutputFormat(flags, env, terminal),
   };
@@ -36,23 +52,35 @@ export function resolveCliRuntimeConfig(
 function resolveApiUrl(
   flags: Record<string, unknown>,
   env: Record<string, string | undefined>,
-): string {
-  const apiUrl =
-    readString(flags.apiUrl) ??
-    readString(env.SAPPORTA_API_URL) ??
-    DEFAULT_API_URL;
+): { apiUrl: string; apiUrlSource: ApiUrlSource } {
+  const flagUrl = readString(flags.apiUrl);
+  if (flagUrl) {
+    return { apiUrl: trimTrailingSlashes(flagUrl), apiUrlSource: "flag" };
+  }
 
-  return apiUrl.replace(/\/+$/, "");
+  const envUrl = readString(env.SAPPORTA_API_URL);
+  if (envUrl) {
+    return { apiUrl: trimTrailingSlashes(envUrl), apiUrlSource: "env" };
+  }
+
+  return { apiUrl: DEFAULT_API_URL, apiUrlSource: "default" };
+}
+
+function trimTrailingSlashes(url: string): string {
+  return url.replace(/\/+$/, "");
 }
 
 function resolveApiToken(
   flags: Record<string, unknown>,
   env: Record<string, string | undefined>,
-): { apiToken?: string } {
-  const token =
-    readString(flags.apiToken) ?? readString(env.SAPPORTA_API_TOKEN);
+): { apiToken?: string; apiTokenSource: ApiTokenSource } {
+  const flagToken = readString(flags.apiToken);
+  if (flagToken) return { apiToken: flagToken, apiTokenSource: "flag" };
 
-  return token ? { apiToken: token } : {};
+  const envToken = readString(env.SAPPORTA_API_TOKEN);
+  if (envToken) return { apiToken: envToken, apiTokenSource: "env" };
+
+  return { apiTokenSource: "none" };
 }
 
 function resolveOutputFormat(

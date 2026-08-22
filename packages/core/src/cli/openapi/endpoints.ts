@@ -1,19 +1,17 @@
 import { OperationError } from "../../errors.js";
 import {
-  fetchOpenApiSpec,
   findEndpoint,
   listEndpoints,
   type EndpointDetail,
   type EndpointSummary,
 } from "../openapi-spec.js";
+import type { SapportaCliClient } from "../client/app-client.js";
 import type { CliCommandResult } from "../commands/types.js";
 
 export async function endpointListResult(
-  apiUrl: string,
-  apiToken: string | undefined,
+  client: SapportaCliClient,
 ): Promise<CliCommandResult> {
-  const spec = await fetchOpenApiSpec(apiUrl, apiToken);
-  const endpoints = listEndpoints(spec);
+  const endpoints = listEndpoints(await client.openApiSpec());
   return {
     data: endpoints.map(endpointSummaryRow),
     raw: endpoints,
@@ -21,12 +19,10 @@ export async function endpointListResult(
 }
 
 export async function endpointShowResult(
-  apiUrl: string,
-  apiToken: string | undefined,
+  client: SapportaCliClient,
   target: string,
 ): Promise<CliCommandResult> {
-  const spec = await fetchOpenApiSpec(apiUrl, apiToken);
-  const result = findEndpoint(spec, target);
+  const result = findEndpoint(await client.openApiSpec(), target);
 
   if (result.kind === "hit") {
     return {

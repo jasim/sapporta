@@ -1,6 +1,13 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { ErrorCode, OperationError } from "../errors.js";
-import { httpRequest } from "./http-client.js";
+import { ApiRequestError, httpRequest } from "./http-client.js";
+import type { ApiTarget } from "./runtime-config.js";
+
+const LOCAL: ApiTarget = {
+  apiUrl: "http://localhost:3000",
+  apiUrlSource: "default",
+  apiTokenSource: "none",
+};
 
 describe("httpRequest", () => {
   const originalFetch = globalThis.fetch;
@@ -10,113 +17,96 @@ describe("httpRequest", () => {
     vi.restoreAllMocks();
   });
 
-  it("parses a JSON success body and returns it unchanged", async () => {
-    globalThis.fetch = vi.fn().mockResolvedValue(
-      new Response(JSON.stringify({ ok: true, data: [{ id: 1 }] }), {
-        status: 200,
-        headers: { "Content-Type": "application/json" },
-      }),
-    );
+  // A Response body reads once, so each call needs a fresh one.
+  function respondWith(body: BodyInit | null, status = 200): void {
+    globalThis.fetch = vi
+      .fn()
+      .mockImplementation(() =>
+        Promise.resolve(new Response(body, { status })),
+      );
+  }
 
-    const result = await httpRequest(
-      "http://localhost:3000",
+  it("returns the parsed JSON payload of a success response", async () => {
+    respondWith(JSON.stringify({ ok: true, data: [{ id: 1 }] }));
+
+    await expect(httpRequest(LOCAL, "GET", "/api/ping")).resolves.toEqual({
+      ok: true,
+      data: [{ id: 1 }],
+    });
+  });
+
+  it("returns an empty object for an empty 2xx response body", async () => {
+    respondWith(null, 204);
+
+    await expect(httpRequest(LOCAL, "DELETE", "/api/thing/1")).resolves.toEqual(
+      {},
+    );
+  });
+
+  it("sends a bearer token only when the target carries one", async () => {
+    respondWith(JSON.stringify({ ok: true }));
+
+    await httpRequest(LOCAL, "GET", "/api/ping");
+    await httpRequest(
+      { ...LOCAL, apiToken: "spat_123_secret", apiTokenSource: "env" },
       "GET",
       "/api/ping",
     );
-    expect(result.status).toBe(200);
-    expect(result.data).toEqual({ ok: true, data: [{ id: 1 }] });
+
+    const headersOf = (call: number) =>
+      (vi.mocked(globalThis.fetch).mock.calls[call][1] as RequestInit).headers;
+    expect(headersOf(0)).not.toHaveProperty("Authorization");
+    expect(headersOf(1)).toHaveProperty(
+      "Authorization",
+      "Bearer spat_123_secret",
+    );
   });
 
-  it("wraps a non-JSON 500 body in a NON_JSON_RESPONSE envelope without throwing", async () => {
-    globalThis.fetch = vi.fn().mockResolvedValue(
-      new Response("Internal Server Error", {
-        status: 500,
-        headers: { "Content-Type": "text/plain" },
-      }),
-    );
+  // A leading slash on the path would make URL resolution discard the prefix
+  // and call a different deployment on the same host.
+  it("keeps a path prefix in the deployment URL", async () => {
+    respondWith(JSON.stringify({ ok: true }));
 
-    const result = await httpRequest(
-      "http://localhost:3000",
+    await httpRequest(
+      { ...LOCAL, apiUrl: "https://host/apps/acme" },
       "GET",
-      "/api/boom",
+      "/api/ping",
     );
-    expect(result.status).toBe(500);
-    expect(result.data).toEqual({
-      ok: false,
-      error: "Internal Server Error",
-      code: "NON_JSON_RESPONSE",
-    });
-  });
-
-  it("returns {} for an empty 2xx response body", async () => {
-    globalThis.fetch = vi
-      .fn()
-      .mockResolvedValue(new Response(null, { status: 204 }));
-
-    const result = await httpRequest(
-      "http://localhost:3000",
-      "DELETE",
-      "/api/thing/1",
-    );
-    expect(result.status).toBe(204);
-    expect(result.data).toEqual({});
-  });
-
-  it("sends a bearer token when authToken is provided", async () => {
-    globalThis.fetch = vi
-      .fn()
-      .mockResolvedValue(
-        new Response(JSON.stringify({ ok: true }), { status: 200 }),
-      );
-
-    await httpRequest("http://localhost:3000", "GET", "/api/ping", {
-      authToken: "spat_123_secret",
-    });
 
     expect(globalThis.fetch).toHaveBeenCalledWith(
-      new URL("http://localhost:3000/api/ping"),
-      expect.objectContaining({
-        headers: expect.objectContaining({
-          Authorization: "Bearer spat_123_secret",
-        }),
-      }),
+      new URL("https://host/apps/acme/api/ping"),
+      expect.anything(),
     );
   });
+});
 
-  it("omits authorization when no token is provided", async () => {
-    globalThis.fetch = vi
-      .fn()
-      .mockResolvedValue(
-        new Response(JSON.stringify({ ok: true }), { status: 200 }),
-      );
+describe("httpRequest failures", () => {
+  const originalFetch = globalThis.fetch;
 
-    await httpRequest("http://localhost:3000", "GET", "/api/ping");
-
-    const [, init] = vi.mocked(globalThis.fetch).mock.calls[0];
-    expect(init).toMatchObject({
-      headers: {
-        "Content-Type": "application/json",
-      },
-    });
+  afterEach(() => {
+    globalThis.fetch = originalFetch;
+    vi.restoreAllMocks();
   });
 
-  it("truncates a large non-JSON body to 500 chars with an ellipsis", async () => {
-    const big = "x".repeat(1000);
+  async function failureOf(
+    target: ApiTarget = LOCAL,
+  ): Promise<ApiRequestError> {
+    try {
+      await httpRequest(target, "GET", "/api/meta/tables");
+    } catch (err) {
+      if (err instanceof ApiRequestError) return err;
+      throw err;
+    }
+    throw new Error("Expected httpRequest to fail.");
+  }
+
+  function respondWith(body: BodyInit | null, status: number): void {
     globalThis.fetch = vi
       .fn()
-      .mockResolvedValue(new Response(big, { status: 500 }));
+      .mockResolvedValue(new Response(body, { status }));
+  }
 
-    const result = await httpRequest(
-      "http://localhost:3000",
-      "GET",
-      "/api/boom",
-    );
-    const data = result.data as { error: string; code: string };
-    expect(data.code).toBe("NON_JSON_RESPONSE");
-    expect(data.error).toBe("x".repeat(500) + "…");
-  });
-
-  it("throws a structured unreachable-server error when fetch cannot reach the app", async () => {
+  it("reports an unreachable server against an unconfirmed target", async () => {
     globalThis.fetch = vi.fn().mockRejectedValue(
       new TypeError("fetch failed", {
         cause: Object.assign(new Error("connect ECONNREFUSED"), {
@@ -125,30 +115,67 @@ describe("httpRequest", () => {
       }),
     );
 
-    try {
-      await httpRequest("http://localhost:3000", "GET", "/api/openapi.json");
-      throw new Error("Expected httpRequest to fail.");
-    } catch (err) {
-      expect(err).toBeInstanceOf(OperationError);
-      expect(err).toMatchObject({
-        code: ErrorCode.APP_SERVER_UNREACHABLE,
-        message:
-          "Unable to reach the Sapporta app server at http://localhost:3000/api/openapi.json. Check that the server is running and that this process has permission to make network requests. In sandboxed coding-agent environments, rerun with network permissions enabled.",
-      });
-    }
+    const err = await failureOf();
+
+    expect(err).toBeInstanceOf(OperationError);
+    expect(err.code).toBe(ErrorCode.APP_SERVER_UNREACHABLE);
+    expect(err.requestUrl).toBe("http://localhost:3000/api/meta/tables");
+    expect(err.targetConfirmed).toBe(false);
   });
 
-  it("includes query params in the unreachable-server URL", async () => {
-    globalThis.fetch = vi.fn().mockRejectedValue(new TypeError("fetch failed"));
-
-    await expect(
-      httpRequest("http://localhost:3000", "GET", "/api/tables/books", {
-        queryParams: { search: "Austen" },
+  // The observed failure: a command aimed at another project's server gets a
+  // reply that is correct for that server. Every deployment answers a foreign
+  // token this way, so the reply does not establish which one was reached.
+  it("leaves the target unconfirmed when the app does not recognise the caller", async () => {
+    respondWith(
+      JSON.stringify({
+        error: "Authentication required",
+        code: "unauthenticated",
       }),
-    ).rejects.toMatchObject({
-      code: ErrorCode.APP_SERVER_UNREACHABLE,
-      message:
-        "Unable to reach the Sapporta app server at http://localhost:3000/api/tables/books?search=Austen. Check that the server is running and that this process has permission to make network requests. In sandboxed coding-agent environments, rerun with network permissions enabled.",
-    });
+      401,
+    );
+
+    const err = await failureOf();
+
+    expect(err.code).toBe("unauthenticated");
+    expect(err.message).toBe("Authentication required");
+    expect(err.targetConfirmed).toBe(false);
+  });
+
+  // A code the app could only produce for itself proves the request arrived
+  // where it was aimed. That includes token_expired, which requires the server
+  // to have found the token in its own database.
+  it.each(["TABLE_NOT_FOUND", "token_expired"])(
+    "confirms the target when the app answers %s",
+    async (code) => {
+      respondWith(JSON.stringify({ error: "Nope", code }), 404);
+
+      await expect(failureOf()).resolves.toMatchObject({
+        code,
+        targetConfirmed: true,
+      });
+    },
+  );
+
+  it("leaves the target unconfirmed when the body carries no code", async () => {
+    respondWith(JSON.stringify({ error: "Bad gateway" }), 502);
+
+    const err = await failureOf();
+
+    expect(err.code).toBe("HTTP_502");
+    expect(err.message).toBe("Bad gateway");
+    expect(err.targetConfirmed).toBe(false);
+  });
+
+  // A dev server on a neighbouring port answers 200 with HTML. Treating that
+  // as a payload printed markup as a successful result.
+  it("fails on a non-JSON body instead of returning it as a payload", async () => {
+    respondWith("<!doctype html><html></html>", 200);
+
+    const err = await failureOf();
+
+    expect(err.code).toBe(ErrorCode.NON_JSON_RESPONSE);
+    expect(err.message).toContain("<!doctype html>");
+    expect(err.targetConfirmed).toBe(false);
   });
 });

@@ -1,5 +1,12 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { SapportaCliClient, whereObjectToFilterParams } from "./app-client.js";
+import type { ApiTarget } from "../runtime-config.js";
+
+const LOCAL: ApiTarget = {
+  apiUrl: "http://localhost:3000",
+  apiUrlSource: "default",
+  apiTokenSource: "none",
+};
 
 describe("SapportaCliClient", () => {
   const originalFetch = globalThis.fetch;
@@ -32,9 +39,7 @@ describe("SapportaCliClient", () => {
   it("maps tables list --detail to the full detail query", async () => {
     mockJsonResponse({ tables: [] });
 
-    await new SapportaCliClient({ apiUrl: "http://localhost:3000" }).listTables(
-      true,
-    );
+    await new SapportaCliClient(LOCAL).listTables(true);
 
     expect(lastRequestUrl().toString()).toBe(
       "http://localhost:3000/api/meta/tables?detail=full",
@@ -44,9 +49,10 @@ describe("SapportaCliClient", () => {
   it("maps table sample columns to the server fields parameter", async () => {
     mockJsonResponse([]);
 
-    await new SapportaCliClient({
-      apiUrl: "http://localhost:3000",
-    }).sampleTable("books", { limit: 10, columns: "title,author" });
+    await new SapportaCliClient(LOCAL).sampleTable("books", {
+      limit: 10,
+      columns: "title,author",
+    });
 
     expect(lastRequestUrl().toString()).toBe(
       "http://localhost:3000/api/meta/tables/books/sample?limit=10&fields=title%2Cauthor",
@@ -56,14 +62,11 @@ describe("SapportaCliClient", () => {
   it("maps row list --where to strict table filter parameters", async () => {
     mockJsonResponse({ data: [] });
 
-    await new SapportaCliClient({ apiUrl: "http://localhost:3000" }).listRows(
-      "books",
-      {
-        limit: 50,
-        sort: "-created_at,title",
-        where: { status: { eq: "active" }, id: { in: [1, 2, 3] } },
-      },
-    );
+    await new SapportaCliClient(LOCAL).listRows("books", {
+      limit: 50,
+      sort: "-created_at,title",
+      where: { status: { eq: "active" }, id: { in: [1, 2, 3] } },
+    });
 
     const url = lastRequestUrl();
     expect(url.pathname).toBe("/api/tables/books");
@@ -76,9 +79,7 @@ describe("SapportaCliClient", () => {
   it("maps row count semantics and filters to the scoped endpoint", async () => {
     mockJsonResponse({ data: [] });
 
-    await new SapportaCliClient({
-      apiUrl: "http://localhost:3000",
-    }).countRows("tasks", {
+    await new SapportaCliClient(LOCAL).countRows("tasks", {
       groupBy: "assignee_id",
       order: "desc",
       limit: 10,
@@ -100,15 +101,13 @@ describe("SapportaCliClient", () => {
 
   it("rejects an empty grouped-count column instead of sending a total", async () => {
     await expect(
-      new SapportaCliClient({
-        apiUrl: "http://localhost:3000",
-      }).countRows("tasks", { groupBy: "" }),
+      new SapportaCliClient(LOCAL).countRows("tasks", { groupBy: "" }),
     ).rejects.toMatchObject({ code: "VALIDATION_FAILED" });
   });
 
   it("maps row create and update to table POST and PUT bodies", async () => {
     mockJsonResponse({ data: { id: 1, title: "Relativity" } });
-    const client = new SapportaCliClient({ apiUrl: "http://localhost:3000" });
+    const client = new SapportaCliClient(LOCAL);
 
     await client.createRows("books", { title: "Relativity" });
     expect(lastRequestUrl().pathname).toBe("/api/tables/books");
@@ -127,7 +126,7 @@ describe("SapportaCliClient", () => {
 
   it("maps SQL query and execute to explicit read/write request bodies", async () => {
     mockJsonResponse({ data: [] });
-    const client = new SapportaCliClient({ apiUrl: "http://localhost:3000" });
+    const client = new SapportaCliClient(LOCAL);
 
     await client.sqlQuery("SELECT * FROM accounts WHERE type = ?", {
       params: ["asset"],

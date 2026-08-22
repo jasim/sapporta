@@ -1,18 +1,11 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect } from "vitest";
 import {
   listEndpoints,
   findEndpoint,
   getEndpointDetail,
   resolveRefs,
-  fetchOpenApiSpec,
   type OpenApiDoc,
 } from "./openapi-spec.js";
-import { OperationError } from "../errors.js";
-
-vi.mock("./http-client.js", () => ({
-  httpRequest: vi.fn(),
-}));
-import { httpRequest } from "./http-client.js";
 
 function makeSpec(paths: Record<string, any>, components?: any): OpenApiDoc {
   return { openapi: "3.1.0", paths, components };
@@ -325,78 +318,5 @@ describe("getEndpointDetail", () => {
 
   it("throws when operation is missing", () => {
     expect(() => getEndpointDetail(spec, "DELETE", "/things/{id}")).toThrow();
-  });
-});
-
-describe("fetchOpenApiSpec", () => {
-  it("returns the parsed JSON on success", async () => {
-    const doc = { openapi: "3.1.0", paths: {} };
-    vi.mocked(httpRequest).mockResolvedValueOnce({ status: 200, data: doc });
-    const out = await fetchOpenApiSpec("http://localhost:3000");
-    expect(out).toEqual(doc);
-  });
-
-  it("sends a bearer token when fetching the OpenAPI document", async () => {
-    const doc = { openapi: "3.1.0", paths: {} };
-    vi.mocked(httpRequest).mockResolvedValueOnce({ status: 200, data: doc });
-
-    await fetchOpenApiSpec("http://localhost:3000", "spat_token_secret");
-
-    expect(httpRequest).toHaveBeenCalledWith(
-      "http://localhost:3000",
-      "GET",
-      "/api/openapi.json",
-      { authToken: "spat_token_secret" },
-    );
-  });
-
-  it("preserves structured auth failures from protected OpenAPI", async () => {
-    vi.mocked(httpRequest).mockResolvedValueOnce({
-      status: 401,
-      data: {
-        error: "Authentication required",
-        code: "unauthenticated",
-      },
-    });
-
-    await expect(
-      fetchOpenApiSpec("http://localhost:3000"),
-    ).rejects.toMatchObject({
-      message: "Authentication required",
-      code: "unauthenticated",
-    });
-  });
-
-  it("throws an OperationError for non-2xx OpenAPI responses without a code", async () => {
-    vi.mocked(httpRequest).mockResolvedValueOnce({
-      status: 502,
-      data: { error: "Bad gateway" },
-    });
-
-    try {
-      await fetchOpenApiSpec("http://localhost:3000");
-      throw new Error("Expected OpenAPI fetch to fail.");
-    } catch (err) {
-      expect(err).toBeInstanceOf(OperationError);
-      expect(err).toMatchObject({
-        message: "Bad gateway",
-        code: "HTTP_502",
-      });
-    }
-  });
-
-  it("propagates the unreachable-server error", async () => {
-    vi.mocked(httpRequest).mockRejectedValueOnce(
-      new OperationError(
-        "Unable to reach the Sapporta app server at http://localhost:3000/api/openapi.json. Check that the server is running and that this process has permission to make network requests. In sandboxed coding-agent environments, rerun with network permissions enabled.",
-        "APP_SERVER_UNREACHABLE",
-      ),
-    );
-    await expect(
-      fetchOpenApiSpec("http://localhost:3000"),
-    ).rejects.toMatchObject({
-      code: "APP_SERVER_UNREACHABLE",
-      message: /network permissions enabled/,
-    });
   });
 });

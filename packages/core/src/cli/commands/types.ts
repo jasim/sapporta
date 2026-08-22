@@ -1,6 +1,6 @@
 import type { z } from "zod";
 import type { SapportaCliClient } from "../client/app-client.js";
-import type { OutputFormat } from "../runtime-config.js";
+import type { CliRuntimeConfig } from "../runtime-config.js";
 
 export type CliOptionKind = "string" | "boolean";
 
@@ -25,10 +25,7 @@ export interface CliCommandResult {
   raw?: unknown;
 }
 
-export interface CliCommandContext {
-  apiUrl: string;
-  apiToken?: string;
-  output: OutputFormat;
+export interface CliCommandContext extends CliRuntimeConfig {
   client: SapportaCliClient;
 }
 

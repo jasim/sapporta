@@ -6,6 +6,8 @@ describe("resolveCliRuntimeConfig", () => {
   it("uses localhost, json output, and no token by default", () => {
     expect(resolveCliRuntimeConfig({}, {}, { isTTY: false })).toEqual({
       apiUrl: "http://localhost:3000",
+      apiUrlSource: "default",
+      apiTokenSource: "none",
       output: "json",
     });
   });
@@ -13,6 +15,8 @@ describe("resolveCliRuntimeConfig", () => {
   it("defaults to table output for interactive terminals", () => {
     expect(resolveCliRuntimeConfig({}, {}, { isTTY: true })).toEqual({
       apiUrl: "http://localhost:3000",
+      apiUrlSource: "default",
+      apiTokenSource: "none",
       output: "table",
     });
   });
@@ -30,7 +34,9 @@ describe("resolveCliRuntimeConfig", () => {
       ),
     ).toEqual({
       apiUrl: "https://app.example.com",
+      apiUrlSource: "env",
       apiToken: "env-token",
+      apiTokenSource: "env",
       output: "table",
     });
   });
@@ -52,7 +58,9 @@ describe("resolveCliRuntimeConfig", () => {
       ),
     ).toEqual({
       apiUrl: "https://flag.example.com",
+      apiUrlSource: "flag",
       apiToken: "flag-token",
+      apiTokenSource: "flag",
       output: "json",
     });
   });

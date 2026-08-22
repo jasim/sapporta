@@ -69,8 +69,7 @@ export const CLI_COMMANDS: readonly CliCommandSpec[] = [
     summary: "List HTTP endpoints exposed by the selected app",
     inputSchema: z.object({}),
     examples: ["sapporta endpoints list"],
-    run: async (_input, context) =>
-      endpointListResult(context.apiUrl, context.apiToken),
+    run: async (_input, context) => endpointListResult(context.client),
   }),
   command({
     name: ["endpoints", "show"],
@@ -79,7 +78,7 @@ export const CLI_COMMANDS: readonly CliCommandSpec[] = [
     inputSchema: z.object({ endpoint: requiredString("endpoint") }),
     examples: ['sapporta endpoints show "POST /api/tables/books"'],
     run: async (input, context) =>
-      endpointShowResult(context.apiUrl, context.apiToken, input.endpoint),
+      endpointShowResult(context.client, input.endpoint),
   }),
 
   command({

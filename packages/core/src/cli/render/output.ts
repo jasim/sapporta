@@ -1,7 +1,12 @@
 import { ErrorCode, OperationError } from "../../errors.js";
 import { formatTable } from "../format.js";
+import { ApiRequestError } from "../http-client.js";
 import type { CliCommandResult } from "../commands/types.js";
-import type { OutputFormat } from "../runtime-config.js";
+import type {
+  ApiTokenSource,
+  ApiUrlSource,
+  OutputFormat,
+} from "../runtime-config.js";
 
 export function renderCommandResult(
   result: CliCommandResult,
@@ -25,18 +30,68 @@ export function renderCommandResult(
   }
 }
 
+const API_URL_SOURCES: Record<ApiUrlSource, string> = {
+  flag: "API URL from --api-url",
+  env: "API URL from SAPPORTA_API_URL",
+  default:
+    "API URL from the built-in default — set SAPPORTA_API_URL or pass --api-url",
+};
+
+const API_TOKEN_SOURCES: Record<ApiTokenSource, string> = {
+  flag: "API token from --api-token",
+  env: "API token from SAPPORTA_API_TOKEN",
+  none: "No API token sent — set SAPPORTA_API_TOKEN or pass --api-token",
+};
+
+interface FailedTarget {
+  requestUrl: string;
+  apiUrl: string;
+  apiUrlSource: ApiUrlSource;
+  apiTokenSource: ApiTokenSource;
+}
+
 export function renderCommandError(err: unknown, format: OutputFormat): never {
   const code = err instanceof OperationError ? err.code : ErrorCode.INTERNAL;
   const message = err instanceof Error ? err.message : String(err);
-  const envelope = { ok: false as const, error: message, code };
+  const target = unconfirmedTarget(err);
 
   if (format === "json") {
-    console.log(JSON.stringify(envelope));
+    console.log(
+      JSON.stringify({
+        ok: false as const,
+        error: message,
+        code,
+        ...(target ? { target } : {}),
+      }),
+    );
   } else {
     console.error(`Error: ${message}`);
+    if (target) {
+      console.error(`  Requested ${target.requestUrl}`);
+      console.error(`  ${API_URL_SOURCES[target.apiUrlSource]}`);
+      console.error(`  ${API_TOKEN_SOURCES[target.apiTokenSource]}`);
+    }
   }
 
   process.exit(err instanceof OperationError ? 1 : 2);
+}
+
+/**
+ * The deployment to name, when the failure leaves it in question.
+ *
+ * A failure the app answered for itself settles which server was reached, so
+ * repeating the URL on every such error would bury the message that matters.
+ * Only an unconfirmed target earns the extra lines.
+ */
+function unconfirmedTarget(err: unknown): FailedTarget | undefined {
+  if (!(err instanceof ApiRequestError) || err.targetConfirmed)
+    return undefined;
+  return {
+    requestUrl: err.requestUrl,
+    apiUrl: err.target.apiUrl,
+    apiUrlSource: err.target.apiUrlSource,
+    apiTokenSource: err.target.apiTokenSource,
+  };
 }
 
 function resultToJsonEnvelope(result: CliCommandResult): unknown {

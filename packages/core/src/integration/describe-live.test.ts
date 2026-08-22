@@ -14,6 +14,7 @@ import {
   endpointShowResult,
 } from "../cli/openapi/endpoints.js";
 import type { EndpointDetail } from "../cli/openapi-spec.js";
+import { SapportaCliClient } from "../cli/client/app-client.js";
 
 const BASE_URL = "http://localhost:3000";
 const originalFetch = globalThis.fetch;
@@ -37,19 +38,21 @@ afterAll(() => {
 });
 
 describe("endpoints — live server", () => {
+  const client = new SapportaCliClient({
+    apiUrl: BASE_URL,
+    apiUrlSource: "flag",
+    apiTokenSource: "none",
+  });
+
   it("endpoints list surfaces built-in and app endpoints", async () => {
-    const result = await endpointListResult(BASE_URL, undefined);
+    const result = await endpointListResult(client);
     const keys = result.data.map((row) => `${row.method} ${row.path}`);
     expect(keys.some((k) => k.includes("/api/meta/"))).toBe(true);
     expect(keys).toContain("POST /api/accounts");
   });
 
   it("endpoints show returns request body + success response schema", async () => {
-    const result = await endpointShowResult(
-      BASE_URL,
-      undefined,
-      "POST /api/accounts",
-    );
+    const result = await endpointShowResult(client, "POST /api/accounts");
     const endpoint = result.raw as EndpointDetail;
     expect(endpoint.requestBody).not.toBeNull();
     expect(endpoint.requestBody?.schema).toBeTruthy();
@@ -60,11 +63,7 @@ describe("endpoints — live server", () => {
   });
 
   it("endpoints show returns a non-trivial response schema", async () => {
-    const result = await endpointShowResult(
-      BASE_URL,
-      undefined,
-      "GET /api/meta/tables",
-    );
+    const result = await endpointShowResult(client, "GET /api/meta/tables");
     const endpoint = result.raw as EndpointDetail;
     const schema = endpoint.responses["200"]?.schema;
     expect(schema).toBeTruthy();
@@ -77,8 +76,7 @@ describe("endpoints — live server", () => {
 
   it("endpoints show returns the specialized accounts shape", async () => {
     const result = await endpointShowResult(
-      BASE_URL,
-      undefined,
+      client,
       "POST /api/tables/accounts",
     );
     const endpoint = result.raw as EndpointDetail;
@@ -92,8 +90,7 @@ describe("endpoints — live server", () => {
 
   it("endpoints show exposes count options", async () => {
     const result = await endpointShowResult(
-      BASE_URL,
-      undefined,
+      client,
       "GET /api/tables/{tableName}/_count",
     );
     const endpoint = result.raw as EndpointDetail;
