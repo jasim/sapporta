@@ -305,6 +305,53 @@ describe("auth pages", () => {
     await waitForText("home page");
   });
 
+  it("returns to the page a visitor asked for before signing in", async () => {
+    installFetch((request) => {
+      if (request.path === "/api/meta/info") {
+        return jsonResponse({ name: "Test Project", slug: "test-project" });
+      }
+      if (
+        request.path === "/api/auth/sign-in/email" &&
+        request.method === "POST"
+      ) {
+        return jsonResponse({ ok: true });
+      }
+      if (request.path === "/api/auth-context") {
+        return jsonResponse(AUTH_CONTEXT);
+      }
+      return jsonResponse({ error: "Unexpected request" }, 500);
+    });
+    useAuthStoreSetState({ session: { kind: "guest" } });
+
+    await renderRoutes(
+      "/tables/tasks",
+      createElement(Route, {
+        path: "/",
+        element: createElement(Screen, { label: "home page" }),
+      }),
+      createElement(Route, {
+        path: "/login",
+        element: createElement(LoginPage),
+      }),
+      createElement(Route, {
+        path: "/tables/tasks",
+        element: createElement(
+          AuthGate,
+          null,
+          createElement(Screen, { label: "tasks page" }),
+        ),
+      }),
+    );
+
+    await waitForText("Sign in");
+    await fillInput("Email", "owner@example.test");
+    await fillInput("Password", "correct-horse-battery-staple");
+    await submitForm();
+
+    await waitForText("tasks page");
+    expect(host.textContent).not.toContain("home page");
+  });
+
   it("creates an account and enters the app when verification is not required", async () => {
     // The server does not require verification: sign-up starts a session and
     // the auth context loads even though the email is unverified.

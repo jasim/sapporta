@@ -18,6 +18,7 @@ import { Input } from "@sapporta/ui/input";
 import { Label } from "@sapporta/ui/label";
 import { getApiBase } from "../../platform/base";
 import { useAuthStore } from "../state/auth-store";
+import { safeRedirectPath, signInRedirectPath } from "../redirect";
 import { loadProjectInfo } from "../../schema-catalog/actions/metadata";
 import { useSchemaStore } from "../../schema-catalog/state/schema-store";
 import { usePageTitle } from "../../shell/document-title";
@@ -213,6 +214,7 @@ export function VerifyEmailPage() {
 }
 
 function EmailPasswordPage({ mode }: { mode: AuthMode }) {
+  const location = useLocation();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const reloadSession = useAuthStore((s) => s.reloadSession);
@@ -272,7 +274,7 @@ function EmailPasswordPage({ mode }: { mode: AuthMode }) {
         window.setTimeout(() => navigate("/login", { replace: true }), 900);
         return;
       }
-      navigate("/", { replace: true });
+      navigate(signInRedirectPath(location.state), { replace: true });
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -365,11 +367,6 @@ function readVerifyEmailState(value: unknown): VerifyEmailLocationState {
   if (!value || typeof value !== "object") return {};
   const email = "email" in value ? value.email : undefined;
   return typeof email === "string" ? { email } : {};
-}
-
-function safeRedirectPath(value: string | null): string {
-  if (!value || !value.startsWith("/") || value.startsWith("//")) return "/";
-  return value;
 }
 
 function AuthLinks({ mode }: { mode: AuthMode }) {

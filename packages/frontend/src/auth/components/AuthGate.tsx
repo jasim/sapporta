@@ -2,6 +2,7 @@ import { useEffect, type ReactNode } from "react";
 import { Navigate, Outlet, useLocation } from "react-router-dom";
 import { Loader2 } from "lucide-react";
 import { useAuthStore } from "../state/auth-store";
+import { signInRedirectPath } from "../redirect";
 
 export function AuthGate({ children }: { children?: ReactNode }) {
   const location = useLocation();
@@ -50,7 +51,9 @@ export function PublicOnlyGate({ children }: { children: ReactNode }) {
     }
   }, [bootstrapStatus, loadBootstrapStatus, session.kind]);
 
-  if (session.kind === "authenticated") return <Navigate to="/" replace />;
+  if (session.kind === "authenticated") {
+    return <Navigate to={signInRedirectPath(location.state)} replace />;
+  }
   if (location.pathname === "/login" && !bootstrapStatus) {
     return (
       <div className="flex h-screen items-center justify-center bg-sap-bg">
