@@ -120,6 +120,49 @@ describe("project auth schema", () => {
     expect(await readAuthError(signIn)).toBeNull();
     expect(signIn.status).toBe(200);
   });
+
+  /**
+   * Signing up writes the user row and the password credential separately. A
+   * failure between the two used to leave an email address that could neither
+   * sign in nor be signed up again, with nothing in the project able to clear
+   * it. The trigger stands in for any cause of that second write failing.
+   */
+  it("leaves no half-created sign-up behind when a write fails", async () => {
+    conn = await connectAuthDb();
+    const auth = createProjectAuth(conn);
+    const credentials = {
+      name: "Grace Hopper",
+      email: "grace@example.test",
+      password: "correct-horse-battery-staple",
+    };
+    conn.sqlite.exec(`
+      CREATE TRIGGER reject_account BEFORE INSERT ON account
+      BEGIN SELECT RAISE(ABORT, 'account write failed'); END
+    `);
+
+    const failed = await auth.handler(
+      authRequest("/api/auth/sign-up/email", credentials),
+    );
+    expect(failed.ok).toBe(false);
+    expect(conn.sqlite.prepare('SELECT id FROM "user"').all()).toEqual([]);
+
+    conn.sqlite.exec("DROP TRIGGER reject_account");
+
+    const signUp = await auth.handler(
+      authRequest("/api/auth/sign-up/email", credentials),
+    );
+    expect(await readAuthError(signUp)).toBeNull();
+    expect(signUp.status).toBe(200);
+
+    const signIn = await auth.handler(
+      authRequest("/api/auth/sign-in/email", {
+        email: credentials.email,
+        password: credentials.password,
+      }),
+    );
+    expect(await readAuthError(signIn)).toBeNull();
+    expect(signIn.status).toBe(200);
+  });
 });
 
 function minorLine(version: string): string {

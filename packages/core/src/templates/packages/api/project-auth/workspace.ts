@@ -36,10 +36,26 @@ export function ensureActiveWorkspace(
     return firstMembership;
   }
 
-  const provisioned = createInitialWorkspace(conn, payload.user);
-  setActiveWorkspace(conn, payload.session.id, provisioned.organization_id);
+  const provisioned = provisionFirstWorkspace(conn, payload);
   payload.session.activeOrganizationId = provisioned.organization_id;
   return provisioned;
+}
+
+/**
+ * Creates the person's first workspace and makes it the one they are working
+ * in. The workspace, their membership of it, and the session it becomes active
+ * for are written together, so a failure part way through leaves no workspace
+ * they are not a member of.
+ */
+function provisionFirstWorkspace(
+  conn: ProjectDbConnection,
+  payload: BetterAuthSessionPayload,
+): WorkspaceMembershipRow {
+  return conn.sqlite.transaction(() => {
+    const workspace = createInitialWorkspace(conn, payload.user);
+    setActiveWorkspace(conn, payload.session.id, workspace.organization_id);
+    return workspace;
+  })();
 }
 
 export function switchWorkspaceMembership(
