@@ -130,7 +130,8 @@
       "types": "./dist/ui/hooks/useDebounce.d.ts",
       "sapporta:source": "./src/ui/hooks/useDebounce.ts",
       "default": "./dist/use-debounce.js"
-    }
+    },
+    "./package.json": "./package.json"
   },
   "scripts": {
     "dev": "vite",

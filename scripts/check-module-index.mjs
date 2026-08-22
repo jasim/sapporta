@@ -24,6 +24,16 @@ for (const dir of workspacePackageDirs()) {
 
   if (!packageJson.exports) continue;
 
+  // Node refuses any subpath an exports map does not list, so omitting
+  // "./package.json" breaks require.resolve("<pkg>/package.json") — the one
+  // manager-agnostic way to locate an installed package without guessing at
+  // node_modules layout. Every package must keep it exported.
+  if (packageJson.exports["./package.json"] !== "./package.json") {
+    failures.push(
+      `${packageJson.name}: exports must map "./package.json" to "./package.json" so the package stays resolvable`,
+    );
+  }
+
   const actual = Object.keys(packageJson.exports).filter(
     (subpath) => subpath !== "./package.json",
   );
