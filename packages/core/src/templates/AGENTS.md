@@ -7,7 +7,12 @@ APIs, auth-aware row access, and a React app shell.
 ## Commands
 
 - `pnpm dev` starts the API and frontend in watch mode.
-- `pnpm build` compiles the shared package, API, and frontend.
+- `pnpm typecheck` typechecks the shared package, API, and frontend. Run it
+  after every change. The frontend's `vite build` strips types with esbuild and
+  reports no type errors, so `typecheck` is the only check that covers frontend
+  code.
+- `pnpm build` runs `pnpm typecheck` first, then compiles the shared package,
+  API, and frontend.
 - `pnpm start` runs the production server after `pnpm build`.
 - `pnpm exec sapporta endpoints list` inspects the running API.
 

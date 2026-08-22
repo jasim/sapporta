@@ -9,8 +9,9 @@
     "dev": "node --env-file=.env.development scripts/dev.mjs",
     "dev:server": "pnpm --filter ./packages/api dev",
     "dev:ui": "pnpm --filter ./packages/frontend dev",
+    "typecheck": "pnpm --filter ./packages/shared typecheck && pnpm --filter ./packages/api typecheck && pnpm --filter ./packages/frontend typecheck",
     "prebuild": "pnpm run clean",
-    "build": "pnpm --filter ./packages/shared build && pnpm --filter ./packages/api build && pnpm --filter ./packages/frontend build",
+    "build": "pnpm run typecheck && pnpm --filter ./packages/shared build && pnpm --filter ./packages/api build && pnpm --filter ./packages/frontend build",
     "start": "pnpm --filter ./packages/api start"
   }
 }

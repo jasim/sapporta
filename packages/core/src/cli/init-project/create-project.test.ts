@@ -467,6 +467,65 @@ describe("renderScaffoldFiles", () => {
     }
   });
 
+  it("wires a typecheck command through every workspace package", () => {
+    const project = layoutForRoot(
+      projectIdentityFromOptions({
+        dir: "/tmp/acme-app",
+        name: "Acme App",
+      }),
+    );
+    const files = renderScaffoldFiles(project, undefined);
+    const byDest = new Map(files.map((file) => [file.dest, file.content]));
+    const scriptsOf = (dest: string): Record<string, string> =>
+      (
+        JSON.parse(byDest.get(dest) ?? "{}") as {
+          scripts?: Record<string, string>;
+        }
+      ).scripts ?? {};
+
+    // `vite build` strips types with esbuild and never typechecks, so the
+    // frontend needs its own tsc pass to report type errors at all. Its
+    // tsconfig maps acme-app-shared to ../shared/src, not ../shared/dist, so
+    // unlike the API this pass needs no prior shared build.
+    const frontendScripts = scriptsOf("packages/frontend/package.json");
+    expect(frontendScripts.typecheck).toBe("tsc --noEmit");
+    expect(frontendScripts.pretypecheck).toBeUndefined();
+    expect(byDest.get("packages/frontend/tsconfig.json")).toContain(
+      '"acme-app-shared": ["../shared/src/index.ts"]',
+    );
+
+    expect(scriptsOf("packages/shared/package.json").typecheck).toBe(
+      "tsc --noEmit",
+    );
+    const apiScripts = scriptsOf("packages/api/package.json");
+    expect(apiScripts.typecheck).toBe("tsc --noEmit");
+    expect(apiScripts.pretypecheck).toBe("pnpm --filter acme-app-shared build");
+
+    const rootScripts = scriptsOf("package.json");
+    expect(rootScripts.typecheck).toBe(
+      "pnpm --filter ./packages/shared typecheck && " +
+        "pnpm --filter ./packages/api typecheck && " +
+        "pnpm --filter ./packages/frontend typecheck",
+    );
+    // `pnpm build` is the signal both humans and agents trust before calling
+    // work done, so it must fail on type-broken frontend code.
+    expect(rootScripts.build).toBe(
+      "pnpm run typecheck && " +
+        "pnpm --filter ./packages/shared build && " +
+        "pnpm --filter ./packages/api build && " +
+        "pnpm --filter ./packages/frontend build",
+    );
+
+    // The generated project has to name the command, or an agent has no way
+    // to learn it exists.
+    const agents = byDest.get("AGENTS.md") ?? "";
+    expect(agents).toContain("`pnpm typecheck` typechecks the shared package");
+    expect(agents).toContain("`pnpm build` runs `pnpm typecheck` first");
+    expect(byDest.get("README.md")).toContain(
+      "- `pnpm typecheck` - typecheck the shared package, API, and frontend",
+    );
+  });
+
   it("renders source-link dependencies, overrides, and resolver settings", () => {
     const project = layoutForRoot(
       projectIdentityFromOptions({

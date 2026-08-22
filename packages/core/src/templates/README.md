@@ -18,7 +18,8 @@ Open `http://localhost:5173`.
 ## Commands
 
 - `pnpm dev` - start backend and frontend in watch mode
-- `pnpm build` - compile the shared package, API, and frontend
+- `pnpm typecheck` - typecheck the shared package, API, and frontend
+- `pnpm build` - typecheck the workspace, then compile the shared package, API, and frontend
 - `pnpm start` - run the production server after `pnpm build`
 - `pnpm exec sapporta endpoints list` - inspect the running API
 
