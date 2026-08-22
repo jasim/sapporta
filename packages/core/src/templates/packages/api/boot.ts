@@ -163,6 +163,16 @@ const server = serve({ fetch: app.fetch, port }, () => {
   console.log(`%%SAPPORTA:SLUG%% API server ready (port ${port})`);
 });
 
+// A port already taken by another process would otherwise end the run with a
+// bare EADDRINUSE stack trace, which does not say which setting to change.
+server.on("error", (error: Error) => {
+  if ((error as NodeJS.ErrnoException).code !== "EADDRINUSE") throw error;
+  console.error(
+    `Port ${port} is already in use. Set SAPPORTA_API_PORT to a free port and start again.`,
+  );
+  process.exit(1);
+});
+
 // Close SQLite cleanly when the process receives a termination signal.
 const shutdown = (signal: NodeJS.Signals) => {
   server.close();
