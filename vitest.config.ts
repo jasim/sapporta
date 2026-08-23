@@ -27,9 +27,9 @@ export default defineConfig({
       },
     },
     include: [
-      "packages/*/src/**/*.test.ts",
-      "packages/core/template-tests/**/*.test.ts",
-      "tests/**/*.test.ts",
+      "packages/*/src/**/*.test.ts?(x)",
+      "packages/core/template-tests/**/*.test.ts?(x)",
+      "tests/**/*.test.ts?(x)",
     ],
   },
 });
