@@ -70,6 +70,18 @@ with the actual `exports` maps, so a new subpath must be documented here to
 pass checks. The `./package.json` export and the `sapporta:source` build
 condition are plumbing, not modules, and are not listed.
 
+These tables name the modules; the published symbols inside them are indexed
+separately, at https://sapporta.com/api-reference/index.md. That index is
+generated in the docs repository from the declaration files of the *published*
+packages, so it follows a release rather than this working tree. After
+releasing a package that adds or removes exports, rebuild it there:
+
+```bash
+# in sapporta-homepage-app
+pnpm package-sources:update-npm && pnpm install
+pnpm generate:api-reference   # pnpm check:api-reference fails if it is stale
+```
+
 ### @sapporta/shared — packages/shared
 
 | Module | Purpose |
