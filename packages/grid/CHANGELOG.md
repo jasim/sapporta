@@ -1,5 +1,14 @@
 # @sapporta/grid
 
+## 0.4.1
+
+### Patch Changes
+
+- Improve port management of new projects
+- Updated dependencies
+  - @sapporta/shared@0.2.4
+  - @sapporta/ui@0.2.12
+
 ## 0.4.0
 
 ### Minor Changes

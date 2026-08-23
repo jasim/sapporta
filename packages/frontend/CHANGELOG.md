@@ -1,5 +1,23 @@
 # @sapporta/frontend
 
+## 0.5.0
+
+### Minor Changes
+
+- a9b70c3: The agent setup prompt copied from the account profile page now verifies a new
+  token with `api get '/api/auth-context'`, which answers with the user and
+  workspace the token acts as. It asked for `endpoints list`, which answers
+  without a credential on a local development server, so the check passed even
+  when the token was never wired into the CLI.
+
+### Patch Changes
+
+- Improve port management of new projects
+- Updated dependencies
+  - @sapporta/grid@0.4.1
+  - @sapporta/shared@0.2.4
+  - @sapporta/ui@0.2.12
+
 ## 0.4.0
 
 ### Minor Changes

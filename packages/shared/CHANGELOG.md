@@ -1,5 +1,11 @@
 # @sapporta/shared
 
+## 0.2.4
+
+### Patch Changes
+
+- Improve port management of new projects
+
 ## 0.2.3
 
 ### Patch Changes

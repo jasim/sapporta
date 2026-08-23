@@ -1,5 +1,14 @@
 # sapporta
 
+## 0.2.11
+
+### Patch Changes
+
+- Improve port management of new projects
+- Updated dependencies [306bfaa]
+- Updated dependencies
+  - @sapporta/server@0.5.0
+
 ## 0.2.10
 
 ### Patch Changes

@@ -1,5 +1,11 @@
 # @sapporta/honest
 
+## 0.3.11
+
+### Patch Changes
+
+- Improve port management of new projects
+
 ## 0.3.10
 
 ### Patch Changes

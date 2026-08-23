@@ -1,5 +1,11 @@
 # @sapporta/ui
 
+## 0.2.12
+
+### Patch Changes
+
+- Improve port management of new projects
+
 ## 0.2.11
 
 ### Patch Changes
