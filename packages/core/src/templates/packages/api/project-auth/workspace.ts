@@ -15,6 +15,49 @@ export class WorkspaceSwitchError extends Error {
   readonly status = 403;
 }
 
+/**
+ * The account facts a workspace is named and owned by.
+ *
+ * A workspace belongs to a person, not to one of their browser sessions, so
+ * this is deliberately not the session payload: a command-line script knows
+ * the account it signed in as without holding a session for it.
+ */
+export interface WorkspaceOwner {
+  id: string;
+  name?: string | null;
+  email: string;
+}
+
+/**
+ * Returns the workspace this person joined first, creating one if they have
+ * joined none yet.
+ *
+ * This answers from stored facts alone, with no session to consult, which is
+ * what a command-line script has. `ensureActiveWorkspace()` below prefers
+ * whichever workspace the session is already in and falls back to this, so the
+ * two agree for a person with one workspace and for a session that has not
+ * chosen one. They part company for a person who has more than one and has
+ * switched: the browser stays where it was, and a script still writes here.
+ */
+export function ensureWorkspaceMembership(
+  conn: ProjectDbConnection,
+  owner: WorkspaceOwner,
+): WorkspaceMembershipRow {
+  const existing = findFirstMembership(conn, owner.id);
+  if (existing) return existing;
+  // The workspace and the membership of it are written together, so a failure
+  // part way through leaves behind no workspace nobody belongs to.
+  return conn.sqlite.transaction(() => createInitialWorkspace(conn, owner))();
+}
+
+/**
+ * Returns the workspace this request is working in and remembers it on the
+ * session.
+ *
+ * A session that already names a workspace keeps it, as long as the person is
+ * still a member. Otherwise the workspace is the one they work in anyway, and
+ * it becomes the session's active one so the next request does not look again.
+ */
 export function ensureActiveWorkspace(
   conn: ProjectDbConnection,
   payload: BetterAuthSessionPayload,
@@ -25,37 +68,10 @@ export function ensureActiveWorkspace(
     if (membership) return membership;
   }
 
-  const firstMembership = findFirstMembership(conn, payload.user.id);
-  if (firstMembership) {
-    setActiveWorkspace(
-      conn,
-      payload.session.id,
-      firstMembership.organization_id,
-    );
-    payload.session.activeOrganizationId = firstMembership.organization_id;
-    return firstMembership;
-  }
-
-  const provisioned = provisionFirstWorkspace(conn, payload);
-  payload.session.activeOrganizationId = provisioned.organization_id;
-  return provisioned;
-}
-
-/**
- * Creates the person's first workspace and makes it the one they are working
- * in. The workspace, their membership of it, and the session it becomes active
- * for are written together, so a failure part way through leaves no workspace
- * they are not a member of.
- */
-function provisionFirstWorkspace(
-  conn: ProjectDbConnection,
-  payload: BetterAuthSessionPayload,
-): WorkspaceMembershipRow {
-  return conn.sqlite.transaction(() => {
-    const workspace = createInitialWorkspace(conn, payload.user);
-    setActiveWorkspace(conn, payload.session.id, workspace.organization_id);
-    return workspace;
-  })();
+  const membership = ensureWorkspaceMembership(conn, payload.user);
+  setActiveWorkspace(conn, payload.session.id, membership.organization_id);
+  payload.session.activeOrganizationId = membership.organization_id;
+  return membership;
 }
 
 export function switchWorkspaceMembership(
@@ -97,6 +113,12 @@ export function findMembership(
   );
 }
 
+/**
+ * The workspace this person joined first, or null when they have joined none.
+ *
+ * This reads; it never creates. `ensureWorkspaceMembership()` above is the one
+ * that provisions a first workspace.
+ */
 export function findFirstMembership(
   conn: ProjectDbConnection,
   userId: string,
@@ -124,12 +146,12 @@ export function findFirstMembership(
 
 export function createInitialWorkspace(
   conn: ProjectDbConnection,
-  user: BetterAuthSessionPayload["user"],
+  owner: WorkspaceOwner,
 ): WorkspaceMembershipRow {
   const now = unixTimestamp();
   const organizationId = randomUUID();
   const memberId = randomUUID();
-  const name = workspaceName(user);
+  const name = workspaceName(owner);
   const slug = uniqueWorkspaceSlug(conn, name);
 
   conn.sqlite
@@ -147,7 +169,7 @@ export function createInitialWorkspace(
       VALUES (?, ?, ?, 'owner', ?)
       `,
     )
-    .run(memberId, organizationId, user.id, now);
+    .run(memberId, organizationId, owner.id, now);
 
   return {
     member_id: memberId,
@@ -191,10 +213,10 @@ function workspaceSlugExists(conn: ProjectDbConnection, slug: string): boolean {
   return row !== undefined;
 }
 
-function workspaceName(user: BetterAuthSessionPayload["user"]): string {
-  const trimmedName = user.name?.trim();
+function workspaceName(owner: WorkspaceOwner): string {
+  const trimmedName = owner.name?.trim();
   if (trimmedName) return `${trimmedName}'s Workspace`;
-  return `${user.email.split("@")[0]}'s Workspace`;
+  return `${owner.email.split("@")[0]}'s Workspace`;
 }
 
 function slugify(value: string): string {

@@ -1,73 +1,40 @@
 /**
  * Application entry point.
  *
- * This file opens the database, loads the table schema, configures auth, and
- * mounts both Sapporta's generated APIs and the application's custom APIs on
- * Hono. It also publishes OpenAPI and serves the built frontend.
+ * `runtime.ts` opens the database, loads the table schema, and configures auth
+ * and mail. This file mounts Hono on top of that: Sapporta's generated APIs and
+ * the application's custom APIs, OpenAPI, and the built frontend.
  */
 import { relative } from "node:path";
 import { serve } from "@hono/node-server";
 import { serveStatic } from "@hono/node-server/serve-static";
 import { Hono } from "hono";
 import {
-  connectProject,
-  findProjectRootFrom,
-  fromProjectRoot,
-  setProjectRoot,
   installExactOriginCors,
   installRequestLogging,
   installSapportaRequestContext,
   installSapportaErrorHandler,
-  loadSapportaProject,
   mountHealth,
   mountOpenApi,
   mountSapportaFramework,
   TsRestApi,
   type SapportaEnv,
 } from "@sapporta/server";
-import { loadApp } from "./app.js";
-import { publicApiRoutes } from "./app.js";
-import { buildAbility } from "./authz/ability.js";
-import { resolveRequestDataAuthority } from "./authz/request-data-authority.js";
-import { createSapportaMailer } from "./mailer.js";
-import { createProjectAuth, readProjectAuthEnv } from "./project-auth/index.js";
+import { loadApp, publicApiRoutes } from "./app.js";
+import { openProjectRuntime } from "./runtime.js";
 
-// Find the project root first so the app can start from any working directory.
-const projectRoot = findProjectRootFrom(import.meta.dirname);
-if (!projectRoot) {
-  throw new Error(
-    `Could not find sapporta.json walking up from ${import.meta.dirname}`,
-  );
-}
-setProjectRoot(projectRoot);
-const { apiDistDir, frontendDistDir, databasePath } =
-  fromProjectRoot(projectRoot);
-const conn = connectProject(databasePath);
-
-// Load the compiled table definitions and check the schema's structural and
-// row-access rules before accepting requests. Database migrations remain a
-// separate development and deployment step.
-const sapporta = await loadSapportaProject({
-  name: "%%SAPPORTA:NAME%%",
-  slug: "%%SAPPORTA:SLUG%%",
-  projectRoot,
-  apiDistDir,
+// The runtime finds the project root itself, so the app starts from any
+// working directory. Database migrations remain a separate development and
+// deployment step.
+const {
   conn,
-});
-
-const projectEnv = readProjectAuthEnv();
-const mailer = createSapportaMailer(projectEnv.mail);
-
-// The application defines both allowed actions and accessible rows.
-const projectAuth = createProjectAuth({
-  conn,
+  sapporta,
   env: projectEnv,
-  catalog: sapporta.catalog,
   mailer,
-  buildAbility,
-  resolveRequestDataAuthority,
-  publicRoutes: publicApiRoutes,
-});
+  projectAuth,
+  frontendDistDir,
+  close: closeDatabase,
+} = await openProjectRuntime({ publicRoutes: publicApiRoutes });
 
 // All HTTP behavior for this app is mounted on one Hono server.
 const app = new Hono<SapportaEnv>();
@@ -176,7 +143,7 @@ server.on("error", (error: Error) => {
 // Close SQLite cleanly when the process receives a termination signal.
 const shutdown = (signal: NodeJS.Signals) => {
   server.close();
-  conn.sqlite.close();
+  closeDatabase();
   process.kill(process.pid, signal);
 };
 process.once("SIGINT", () => shutdown("SIGINT"));

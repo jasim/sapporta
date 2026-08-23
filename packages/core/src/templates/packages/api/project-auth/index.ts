@@ -59,6 +59,13 @@ export interface ProjectAuth {
   rejectAnonymousMiddleware: ReturnType<
     typeof rejectAnonymousByDefault<SapportaEnv>
   >;
+  /**
+   * Resolves the auth context for a served request, from its credentials.
+   *
+   * This is the only way a request obtains one. A command-line script builds
+   * its own in `packages/api/script-runtime.ts`, after proving the password of
+   * the account it signs in as.
+   */
   resolveAuth: (
     c: Context<SapportaEnv>,
   ) => Promise<SapportaAuthContext<AppAbility, AppWorkspaceMembership>>;
@@ -161,7 +168,6 @@ export function createProjectAuth({
       buildAbility,
       resolveRequestDataAuthority,
     });
-
   return {
     auth,
     env,
@@ -209,6 +215,7 @@ export function createProjectAuth({
 }
 
 export { createBetterAuth, type ProjectBetterAuth } from "./better-auth.js";
+export { findUserByEmail, findUserById } from "./user.js";
 export {
   membershipFromRow,
   resolvePrincipal,
@@ -262,4 +269,21 @@ export {
   type PublicRoutePattern,
   type ResolveProjectAuth,
 } from "./middleware.js";
-export * from "./workspace.js";
+/**
+ * Named one by one rather than with `export *`. What this module publishes is
+ * a security surface, so adding a function to `workspace.ts` should not
+ * publish it by accident. `sample-data.ts` is deliberately absent: `pnpm seed`
+ * imports it by path.
+ */
+export {
+  createInitialWorkspace,
+  ensureActiveWorkspace,
+  ensureWorkspaceMembership,
+  findFirstMembership,
+  findMembership,
+  setActiveWorkspace,
+  switchWorkspaceMembership,
+  WorkspaceSwitchError,
+  type WorkspaceMembershipRow,
+  type WorkspaceOwner,
+} from "./workspace.js";

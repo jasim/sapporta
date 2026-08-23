@@ -7,6 +7,7 @@ export type {
   AuthWorkspace,
   Principal,
   SapportaAuthUser,
+  UserPrincipal,
   WorkspaceMembership,
   WorkspaceRole,
 } from "./principal.js";

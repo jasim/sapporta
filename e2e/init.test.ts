@@ -8,7 +8,7 @@
  *
  * Run with: pnpm test:e2e
  */
-import { afterAll, beforeAll, describe, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
   assertSharedConstantReachedMigration,
   assertSqliteTable,
@@ -19,12 +19,21 @@ import {
   buildProject,
   cleanupProject,
   createTempProject,
+  expectAuthContext,
+  readSqliteRows,
+  requestJson,
   runDrizzleMigrationCycle,
+  runFailingProjectSeed,
+  runProjectSeed,
   scaffoldProject,
+  signInEmailUser,
   startBuiltServer,
   stopServer,
   writeProjectsSchema,
+  writeDirectAccountCreationScript,
+  writeSeedScript,
   writeTasksSchema,
+  type AuthContextBody,
   type E2eProject,
   type StartedServer,
 } from "./harness.js";
@@ -80,4 +89,77 @@ describe("sapporta init - end-to-end", () => {
   it("serves the built frontend shell for app routes", async () => {
     await assertFrontendRoutes(server!.baseUrl);
   });
+
+  it("seeds sample data with `pnpm seed`, with no server or credential", async () => {
+    writeSeedScript(project!.projectDir);
+
+    const firstRun = await runProjectSeed(project!);
+    expect(firstRun).toContain("Seeded 2 tasks.");
+
+    // The account is created by the seed run itself, so a database nobody has
+    // signed in to can still be filled.
+    const [account] = await readSqliteRows<{ email: string; verified: number }>(
+      project!,
+      "SELECT email, emailVerified AS verified FROM user WHERE email = ?",
+      ["demo@example.com"],
+    );
+    expect(account).toEqual({ email: "demo@example.com", verified: 1 });
+
+    // The rows carry the workspace stamped from that account. The seed script
+    // never writes `workspace_id`, so a value here means the write went through
+    // row security rather than around it.
+    const seeded = await readSqliteRows<{ title: string; workspace: string }>(
+      project!,
+      "SELECT title, workspace_id AS workspace FROM tasks WHERE title IN (?, ?) ORDER BY title",
+      ["Draft the brief", "Ship it"],
+    );
+    expect(seeded.map((row) => row.title)).toEqual([
+      "Draft the brief",
+      "Ship it",
+    ]);
+    const seededWorkspaces = new Set(seeded.map((row) => row.workspace));
+    expect(seededWorkspaces.size).toBe(1);
+    const [seededWorkspace] = [...seededWorkspaces];
+    expect(seededWorkspace).toMatch(/^[0-9a-f-]{36}$/);
+
+    // A script picks the first workspace its account belongs to, and a browser
+    // falls back to the same one when the session has not chosen. For a
+    // freshly seeded account those are the same workspace, and they have to be,
+    // or the seeded rows would be invisible to the account they were seeded
+    // for. The script never signs in over HTTP, so this is the assertion that
+    // keeps its shortcut honest.
+    const signedIn = await signInEmailUser(project!, server!.baseUrl, {
+      email: "demo@example.com",
+      password: "demo-password",
+    });
+    const browserContext = await requestJson<AuthContextBody>(
+      server!.baseUrl,
+      "/api/auth-context",
+      { cookieFile: signedIn.cookieFile, expectedSuccess: true },
+    );
+    expectAuthContext(browserContext.body, {
+      email: "demo@example.com",
+      workspaceId: seededWorkspace,
+    });
+
+    // Seeding twice is expected to be safe.
+    expect(await runProjectSeed(project!)).toContain("Already seeded.");
+
+    // The account is proved, not named. A seed file whose password does not
+    // match an address already in the database has to stop, or naming an
+    // existing person's address would hand the run that person's rows.
+    writeSeedScript(project!.projectDir, "not-the-demo-password");
+    const refused = await runFailingProjectSeed(project!);
+    expect(refused).toContain("Could not sign in as demo@example.com");
+
+    // The permission is checked by the function that creates the account, not
+    // by the script that usually calls it, so a caller that reaches past
+    // `openSeedRuntime()` is refused for the same reason.
+    writeDirectAccountCreationScript(project!.projectDir);
+    const refusedDirect = await runFailingProjectSeed(project!, {
+      SAPPORTA_ALLOW_SAMPLE_DATA_SEEDING: "false",
+    });
+    expect(refusedDirect).toContain("SAPPORTA_ALLOW_SAMPLE_DATA_SEEDING=true");
+    expect(refusedDirect).not.toContain("Created the account directly.");
+  }, 480_000);
 });

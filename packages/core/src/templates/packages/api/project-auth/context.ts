@@ -26,6 +26,15 @@ import {
 import { authFailure } from "./errors.js";
 import { resolveBearerTokenPrincipal, TokenAuthError } from "./auth-tokens.js";
 
+/**
+ * Decides which rows a request may touch.
+ *
+ * The request is required, not optional, and there is deliberately no second
+ * resolver that does without it. An application that narrows or widens row
+ * access per route needs the request, and a resolver that had to cope with its
+ * absence would be a resolver where forgetting the absent case quietly changes
+ * what a caller may read and write.
+ */
 export type ResolveRequestDataAuthority = (input: {
   principal: AppPrincipal;
   c: Context<SapportaEnv>;
@@ -82,15 +91,36 @@ export async function resolveSapportaAuthContext(
     input.conn,
     input.headers,
   );
-  const dataAuthority = await input.resolveRequestDataAuthority({
+  return authContextFrom({
     principal,
-    c: input.c,
+    dataAuthority: await input.resolveRequestDataAuthority({
+      principal,
+      c: input.c,
+    }),
+    buildAbility: input.buildAbility,
+    catalog: input.catalog,
   });
-  const ability = input.buildAbility({ principal, dataAuthority });
+}
+
+/**
+ * Assembles the auth context from facts that are already settled.
+ *
+ * Who the caller is and which rows they may touch are both decided before this
+ * point, by whichever route the caller arrived on. This only puts those two
+ * answers together, which is why it stays inside this file: every way of
+ * getting here goes through one of the exported functions above.
+ */
+function authContextFrom(input: {
+  principal: AppPrincipal;
+  dataAuthority: RequestDataAuthority;
+  buildAbility: BuildAbility<AppAbility, AppWorkspaceMembership>;
+  catalog: TableCatalog;
+}): SapportaAuthContext<AppAbility, AppWorkspaceMembership> {
+  const { principal, dataAuthority } = input;
   return createAuthContext({
     principal,
     dataAuthority,
-    ability,
+    ability: input.buildAbility({ principal, dataAuthority }),
     catalog: input.catalog,
   });
 }
@@ -111,15 +141,13 @@ export async function switchActiveWorkspace(
     user: userFromSessionPayload(payload),
     membership: membershipFromRow(membership),
   });
-  const dataAuthority = await input.resolveRequestDataAuthority({
+  return authContextFrom({
     principal,
-    c: input.c,
-  });
-  const ability = input.buildAbility({ principal, dataAuthority });
-  return createAuthContext({
-    principal,
-    dataAuthority,
-    ability,
+    dataAuthority: await input.resolveRequestDataAuthority({
+      principal,
+      c: input.c,
+    }),
+    buildAbility: input.buildAbility,
     catalog: input.catalog,
   });
 }

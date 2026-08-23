@@ -8,6 +8,8 @@
     "prebuild": "pnpm --filter %%SAPPORTA:SLUG%%-shared build",
     "build": "tsc",
     "start": "%%SAPPORTA:NODE_COMMAND%% dist/boot.js",
+    "preseed": "pnpm run build",
+    "seed": "%%SAPPORTA:NODE_COMMAND%% --env-file=../../.env.development dist/seed.js",
     "predb:generate": "pnpm --filter %%SAPPORTA:SLUG%%-shared build",
     "db:generate": "drizzle-kit generate",
     "predb:generate:custom": "pnpm --filter %%SAPPORTA:SLUG%%-shared build",

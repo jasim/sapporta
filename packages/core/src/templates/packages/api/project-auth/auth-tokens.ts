@@ -16,6 +16,7 @@ import type {
 } from "@sapporta/shared/contracts";
 import type { AppPrincipal, AppWorkspaceMembership } from "../authz/types.js";
 import type { ProjectAuthErrorCode } from "./errors.js";
+import { findUserById } from "./user.js";
 import { findMembership, type WorkspaceMembershipRow } from "./workspace.js";
 
 /**
@@ -40,13 +41,6 @@ interface PersonalAccessTokenRow {
   expires_at: number | null;
   last_used_at: number | null;
   revoked_at: number | null;
-}
-
-interface TokenUserRow {
-  id: string;
-  name: string | null;
-  email: string;
-  email_verified: number;
 }
 
 export class TokenAuthError extends Error {
@@ -96,14 +90,14 @@ export function resolveBearerTokenPrincipal(
     throw new TokenAuthError("token_expired");
   }
 
-  const user = readTokenUser(conn, token.user_id);
+  const user = findUserById(conn, token.user_id);
   if (!user) throw new TokenAuthError("unauthenticated");
   const membership = findMembership(conn, token.user_id, token.organization_id);
   if (!membership) throw new TokenAuthError("workspace_required");
 
   markTokenUsed(conn, token.id);
   return userPrincipal({
-    user: userFromRow(user),
+    user,
     membership: membershipFromRow(membership),
   });
 }
@@ -322,37 +316,6 @@ function readToken(
   );
 }
 
-function readTokenUser(
-  conn: ProjectDbConnection,
-  userId: string,
-): TokenUserRow | null {
-  const row = conn.sqlite
-    .prepare(
-      `
-      SELECT
-        id,
-        name,
-        email,
-        emailVerified AS email_verified
-      FROM user
-      WHERE id = ?
-      LIMIT 1
-      `,
-    )
-    .get(userId);
-  if (!isRecord(row)) return null;
-  const id = readString(row, "id");
-  const email = readString(row, "email");
-  const emailVerified = readNumber(row, "email_verified");
-  if (!id || !email || emailVerified === null) return null;
-  return {
-    id,
-    name: readNullableString(row, "name"),
-    email,
-    email_verified: emailVerified,
-  };
-}
-
 function markTokenUsed(conn: ProjectDbConnection, id: string): void {
   conn.sqlite
     .prepare("UPDATE personalAccessToken SET lastUsedAt = ? WHERE id = ?")
@@ -369,15 +332,6 @@ function serializeToken(row: PersonalAccessTokenRow): AuthToken {
     expiresAt: toNullableIso(row.expires_at),
     lastUsedAt: toNullableIso(row.last_used_at),
     revokedAt: toNullableIso(row.revoked_at),
-  };
-}
-
-function userFromRow(row: TokenUserRow): SapportaAuthUser {
-  return {
-    id: row.id,
-    name: row.name,
-    email: row.email,
-    emailVerified: row.email_verified === 1,
   };
 }
 

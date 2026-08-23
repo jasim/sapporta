@@ -14,6 +14,8 @@ APIs, auth-aware row access, and a React app shell.
 - `pnpm build` runs `pnpm typecheck` first, then compiles the shared package,
   API, and frontend.
 - `pnpm start` runs the production server after `pnpm build`.
+- `pnpm seed` fills the development database with the sample data written in
+  `packages/api/seed.ts`. See "Sample data" below.
 - `pnpm exec sapporta endpoints list` lists the routes the running API serves.
 
 Prefer the project-local CLI form: `pnpm exec sapporta ...`.
@@ -80,6 +82,70 @@ code has been written, not during the initial implementation.
 - Browser API calls: add typed clients in `packages/frontend/src/api.ts`.
 - Auth and permissions: start in `packages/api/authz/`. Read the auth docs before
   changing row access rules.
+- Sample data: write rows in `packages/api/seed.ts`, then run `pnpm seed`.
+- Any other command-line script: `openScriptRuntime()` in
+  `packages/api/script-runtime.ts`.
+
+## Sample data
+
+`pnpm seed` runs `packages/api/seed.ts` against the development database. It
+needs no running server and no access token: it opens the database on this
+machine, signs in as the sample-data account named at the top of that file, and
+writes through the app's own save path - the same validation, defaults, and row
+ownership a request from the browser gets. Apply migrations first, so the
+tables being seeded exist.
+
+Write rows by importing a table from `packages/api/schema/` and calling
+`demo.rows(table).create({ ... })`. Create parent rows first and take foreign
+keys from the returned row. Omit `id`, `created_at`, `updated_at`,
+`workspace_id`, and `scoped_to_user_id`: those are generated or stamped from
+the account.
+
+The account is created on the first run and signed in to on every run after,
+with the password written in `seed.ts`. Guard your own writes so a repeat run
+does not add the same rows twice:
+
+```ts
+if ((await demo.rows(books).count()) === 0) {
+  await demo.rows(books).create({ title: "Dune", author: "Frank Herbert" });
+}
+```
+
+Sign in as that account to see the seeded data. It lands in the first workspace
+the account belongs to, which for a fresh account is the one a browser sign-in
+creates for it.
+
+Seeding runs only where `.env.development` sets
+`SAPPORTA_ALLOW_SAMPLE_DATA_SEEDING=true` and `NODE_ENV` is not `production`.
+Never add that setting to a deployment: the password is in the source, so the
+account it creates is a live credential for any database that has it.
+
+Never seed by signing in over HTTP with a hand-written cookie jar or `fetch`
+wrapper, and never with raw SQL `INSERT`, which skips validation and ownership
+stamping.
+
+## Other command-line scripts
+
+A script that is not sample data - a nightly job, a one-off import, a
+maintenance task - uses `openScriptRuntime()` from
+`packages/api/script-runtime.ts`:
+
+```ts
+const script = await openScriptRuntime({ email, password });
+await script.rows(invoices).create({ ... });
+script.close();
+```
+
+It opens the application with no server around it and signs in as whichever
+account that address and password belong to, so the script gets exactly the
+row access that person has. It creates nothing and needs no permission
+setting: holding the password is the whole credential.
+
+Do not call it from a route, from middleware, or from anything they reach. A
+served request already carries the row access it earned, at `c.get("auth")`,
+and a route that checks a password is a route that can be asked to check
+passwords - the rate limit that protects the sign-in route counts HTTP
+requests and does not apply here.
 
 ## Reading Sapporta framework source
 

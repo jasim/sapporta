@@ -19,6 +19,7 @@ URL, `http://localhost:%%SAPPORTA:DEV_FRONTEND_PORT%%`, in a browser.
 ## Commands
 
 - `pnpm dev` - start backend and frontend in watch mode
+- `pnpm seed` - fill the development database with sample data from `packages/api/seed.ts`
 - `pnpm typecheck` - typecheck the shared package, API, and frontend
 - `pnpm build` - typecheck the workspace, then compile the shared package, API, and frontend
 - `pnpm start` - run the production server after `pnpm build`
@@ -30,6 +31,8 @@ URL, `http://localhost:%%SAPPORTA:DEV_FRONTEND_PORT%%`, in a browser.
 sapporta.json       project marker used by the Sapporta CLI
 data/               application SQLite database
 packages/api/       backend entry point, schema, migrations, and app routes
+packages/api/seed.ts  sample data for development, run with `pnpm seed`
+packages/api/script-runtime.ts  opens the app for a command-line script, with no server
 packages/frontend/  React app, routes, styles, and browser API clients
 packages/shared/    API contracts and types shared by backend and frontend
 ```

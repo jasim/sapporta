@@ -2303,6 +2303,108 @@ export async function run(
   await runText(command, args, opts);
 }
 
+/**
+ * Replace the scaffold's seed script with one that writes sample tasks.
+ *
+ * The shipped `seed.ts` deliberately writes no rows, so a test that means to
+ * check seeded data has to supply the rows itself, the way a developer fills
+ * the script in. Row writes go through `rows(tasks)`, so the assertions below
+ * are about the app's own save path, not about this file.
+ */
+export function writeSeedScript(
+  projectDir: string,
+  password = "demo-password",
+): void {
+  writeFileSync(
+    join(projectDir, "packages", "api", "seed.ts"),
+    [
+      'import { openSeedRuntime } from "./seed-runtime.js";',
+      'import { tasks } from "./schema/tasks.js";',
+      "",
+      "const DEMO_ACCOUNT = {",
+      '  name: "Demo User",',
+      '  email: "demo@example.com",',
+      `  password: ${JSON.stringify(password)},`,
+      "};",
+      "",
+      "const demo = await openSeedRuntime(DEMO_ACCOUNT);",
+      "const { rows, workspace } = demo;",
+      "",
+      "console.log(`Seeding into workspace ${workspace.id}.`);",
+      "",
+      "if ((await rows(tasks).count()) > 0) {",
+      '  console.log("Already seeded.");',
+      "  demo.close();",
+      "  process.exit(0);",
+      "}",
+      "",
+      "await rows(tasks).create([",
+      '  { title: "Draft the brief", status: "todo", priority: 1 },',
+      '  { title: "Ship it", status: "done", priority: 2 },',
+      "]);",
+      "",
+      "console.log(`Seeded ${await rows(tasks).count()} tasks.`);",
+      "demo.close();",
+      "",
+    ].join("\n"),
+  );
+}
+
+/** Run the project's `pnpm seed`, returning what it printed. */
+export async function runProjectSeed(project: E2eProject): Promise<string> {
+  return runText("pnpm", ["seed"], {
+    cwd: project.projectDir,
+    env: project.env,
+    timeoutMs: 180_000,
+  });
+}
+
+/** Run `pnpm seed` expecting it to fail, returning what it printed. */
+export async function runFailingProjectSeed(
+  project: E2eProject,
+  env: NodeJS.ProcessEnv = {},
+): Promise<string> {
+  const result = await runCommand("pnpm", ["seed"], {
+    cwd: project.projectDir,
+    env: { ...project.env, ...env },
+    timeoutMs: 180_000,
+  });
+  if (result.code === 0) {
+    throw new Error(`\`pnpm seed\` succeeded but was expected to fail\n${result.output}`);
+  }
+  return result.output;
+}
+
+/**
+ * Write a seed script that reaches past `openSeedRuntime()` for the account.
+ *
+ * Nothing ships like this. It stands in for the mistake the guard exists to
+ * catch - a caller that found `createSampleDataAccount()` and called it
+ * directly - so the test can show the permission is checked by that function
+ * and not by the script that usually calls it.
+ */
+export function writeDirectAccountCreationScript(projectDir: string): void {
+  writeFileSync(
+    join(projectDir, "packages", "api", "seed.ts"),
+    [
+      'import { openProjectRuntime } from "./runtime.js";',
+      "",
+      "const runtime = await openProjectRuntime();",
+      "try {",
+      "  await runtime.projectAuth.auth.createSampleDataAccount({",
+      '    name: "Direct",',
+      '    email: "direct@example.com",',
+      '    password: "direct-password",',
+      "  });",
+      '  console.log("Created the account directly.");',
+      "} finally {",
+      "  runtime.close();",
+      "}",
+      "",
+    ].join("\n"),
+  );
+}
+
 export async function runText(
   command: string,
   args: string[],

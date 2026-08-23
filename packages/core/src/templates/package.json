@@ -7,6 +7,7 @@
     "clean": "node scripts/clean-dist.mjs",
     "predev": "pnpm run clean && pnpm --filter ./packages/shared build",
     "dev": "node --env-file=.env.development scripts/dev.mjs",
+    "seed": "pnpm --filter ./packages/api seed",
     "dev:server": "pnpm --filter ./packages/api dev",
     "dev:ui": "pnpm --filter ./packages/frontend dev",
     "typecheck": "pnpm --filter ./packages/shared typecheck && pnpm --filter ./packages/api typecheck && pnpm --filter ./packages/frontend typecheck",

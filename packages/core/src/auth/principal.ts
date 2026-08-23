@@ -60,6 +60,11 @@ export function anonymousPrincipal<
   return { kind: "anonymous" };
 }
 
+/** The signed-in case of `Principal`, for callers who know there is a user. */
+export type UserPrincipal<
+  Membership extends WorkspaceMembership = WorkspaceMembership,
+> = Extract<Principal<Membership>, { kind: "user" }>;
+
 /**
  * Wraps already-resolved user and membership facts. This constructor does not
  * load data, choose a workspace, or grant row access.
@@ -67,7 +72,7 @@ export function anonymousPrincipal<
 export function userPrincipal<Membership extends WorkspaceMembership>(input: {
   user: SapportaAuthUser;
   membership: Membership;
-}): Principal<Membership> {
+}): UserPrincipal<Membership> {
   return {
     kind: "user",
     user: input.user,

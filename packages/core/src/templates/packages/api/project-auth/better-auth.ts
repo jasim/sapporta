@@ -1,5 +1,5 @@
 import { drizzleAdapter } from "@better-auth/drizzle-adapter";
-import type { ProjectDbConnection } from "@sapporta/server";
+import type { ProjectDbConnection, SapportaAuthUser } from "@sapporta/server";
 import {
   betterAuth,
   type BetterAuthOptions,
@@ -16,6 +16,11 @@ import {
   projectAuthCookiePrefix,
   projectAuthDrizzleAdapterConfig,
 } from "./options.js";
+import {
+  assertSampleDataSeedingAllowed,
+  markSampleDataAccountVerified,
+  type SampleDataAccount,
+} from "./sample-data.js";
 import * as authSchema from "./schema.js";
 
 /**
@@ -33,8 +38,45 @@ export interface BetterAuthSessionApi {
 }
 
 export interface ProjectBetterAuth {
+  /** Answers the sign-in, sign-up, and session routes mounted under `/api/auth`. */
   handler: (request: Request) => Promise<Response>;
   api: BetterAuthSessionApi;
+  /**
+   * Registers the sample-data account `pnpm seed` uses, and vouches for its
+   * address.
+   *
+   * Refused unless this project has granted sample-data seeding; the check is
+   * in `sample-data.ts` and runs here, not in whatever called this. Real
+   * sign-ups go through the sign-up route, which is where rate limiting,
+   * trusted origins, and the verification email apply, and none of them apply
+   * here. The password is hashed and stored by the same code that serves that
+   * route, so the account is one a person can sign in with in a browser.
+   * Throws if the address is already taken.
+   */
+  createSampleDataAccount: (
+    account: SampleDataAccount,
+  ) => Promise<SapportaAuthUser>;
+  /**
+   * Returns the account this password belongs to, or null when it does not.
+   *
+   * This is the password check the sign-in route performs, without the HTTP
+   * request around it, so a caller with no request still has to prove an
+   * address rather than assert it. What the request carried is gone with it:
+   * the rate limit in front of the sign-in route counts requests, so nothing
+   * throttles this one. Call it from a command-line script, where there is no
+   * caller to throttle and the password came from the person running the
+   * script - `script-runtime.ts` is the one caller here.
+   *
+   * Never call it from a route. A request handler already carries the row
+   * access it earned, at `c.get("auth")`, and a route that checks passwords is
+   * a route that can be asked to check passwords.
+   *
+   * A session row is written as a side effect of the check and is never read.
+   */
+  verifyEmailPasswordWithoutRateLimit: (credentials: {
+    email: string;
+    password: string;
+  }) => Promise<SapportaAuthUser | null>;
 }
 
 export interface CreateBetterAuthOptions {
@@ -91,7 +133,7 @@ export function createBetterAuth({
   env,
   mailer,
 }: CreateBetterAuthOptions): ProjectBetterAuth {
-  const auth: ProjectBetterAuth = betterAuth({
+  const auth = betterAuth({
     basePath: projectAuthBasePath,
     baseURL: env.publicAppUrl,
     secret: env.betterAuthSecret,
@@ -124,5 +166,34 @@ export function createBetterAuth({
     plugins: createProjectAuthPlugins(),
   });
 
-  return auth;
+  return {
+    handler: (request) => auth.handler(request),
+    api: auth.api,
+    createSampleDataAccount: async (account) => {
+      assertSampleDataSeedingAllowed();
+      const { user } = await auth.api.signUpEmail({ body: account });
+      markSampleDataAccountVerified(conn, user.id);
+      return {
+        id: user.id,
+        name: user.name ?? null,
+        email: user.email,
+        emailVerified: true,
+      };
+    },
+    verifyEmailPasswordWithoutRateLimit: async (credentials) => {
+      try {
+        const { user } = await auth.api.signInEmail({ body: credentials });
+        return {
+          id: user.id,
+          name: user.name ?? null,
+          email: user.email,
+          emailVerified: user.emailVerified,
+        };
+      } catch {
+        // Better Auth answers a wrong password with a thrown API error. A
+        // caller only needs to know the password did not match.
+        return null;
+      }
+    },
+  };
 }
