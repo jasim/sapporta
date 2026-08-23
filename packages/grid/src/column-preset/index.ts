@@ -6,6 +6,7 @@ export {
   currency,
   percentage,
   date,
+  timestamp,
   boolean,
   select,
   lookupValue,

@@ -72,6 +72,12 @@ export function date<TMeta = unknown>(
   return column<TMeta>({ ...options, kind: "date" });
 }
 
+export function timestamp<TMeta = unknown>(
+  options: ColumnPresetOptions<TMeta>,
+): ColumnSchema {
+  return column<TMeta>({ ...options, kind: "timestamp" });
+}
+
 export function boolean<TMeta = unknown>(
   options: ColumnPresetOptions<TMeta>,
 ): ColumnSchema {
@@ -157,6 +163,8 @@ function normalizePreset<TMeta>(
       };
     case "date":
       return { ...base, kind: "date" };
+    case "timestamp":
+      return { ...base, kind: "timestamp" };
     case "boolean":
       return { ...base, kind: "boolean" };
     case "select":
@@ -355,6 +363,7 @@ export const columnPreset = {
   currency,
   percentage,
   date,
+  timestamp,
   boolean,
   select,
   lookupValue,

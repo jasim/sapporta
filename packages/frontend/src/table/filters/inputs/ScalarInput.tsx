@@ -1,11 +1,12 @@
 import { Input } from "@sapporta/ui/input";
 import type { ScalarInputComponent, ScalarInputProps } from "./types";
+import { dateInputConditionValue, dateInputValue } from "../date-filter-value";
 
-/** Build a scalar text/number/date input. One implementation, three HTML
- *  input types — the only thing that varies between text, number, and date
- *  is `type` and the placeholder. */
+/** Build a scalar text/number input. One implementation, two HTML input
+ *  types — the only thing that varies between text and number is `type` and
+ *  the placeholder. */
 export function scalarInput(
-  type: "text" | "number" | "date",
+  type: "text" | "number",
   placeholder = "",
 ): ScalarInputComponent {
   return function ScalarInput({
@@ -28,4 +29,26 @@ export function scalarInput(
 
 export const TextInput = scalarInput("text", "Value");
 export const NumberInput = scalarInput("number", "0");
-export const DateInput = scalarInput("date");
+
+/** A calendar-date control, for `date` and `timestamp` columns alike. The
+ *  control speaks `YYYY-MM-DD` in both directions; a timestamp column stores
+ *  instants, so its values are translated on the way through. */
+export function DateInput({
+  value,
+  onChange,
+  column,
+  op,
+  autoFocus,
+}: ScalarInputProps) {
+  return (
+    <Input
+      type="date"
+      autoFocus={autoFocus}
+      value={dateInputValue(column, value)}
+      onChange={(e) =>
+        onChange(dateInputConditionValue(column, op, e.target.value))
+      }
+      className="h-sap-ctl"
+    />
+  );
+}

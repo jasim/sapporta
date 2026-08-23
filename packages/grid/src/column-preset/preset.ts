@@ -59,6 +59,8 @@ export type PercentagePreset = PresetBase & {
 
 export type DatePreset = PresetBase & { kind: "date" };
 
+export type TimestampPreset = PresetBase & { kind: "timestamp" };
+
 export type BooleanPreset = PresetBase & { kind: "boolean" };
 
 export type SelectPreset = PresetBase & {
@@ -87,6 +89,7 @@ export type ColumnPreset =
   | CurrencyPreset
   | PercentagePreset
   | DatePreset
+  | TimestampPreset
   | BooleanPreset
   | SelectPreset
   | LookupPreset

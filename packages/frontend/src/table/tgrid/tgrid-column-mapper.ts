@@ -123,8 +123,12 @@ function presetColumnFor(
     case "checkbox":
       return columnPreset.boolean(common);
     case "date":
-    case "timestamp":
       return columnPreset.date({
+        ...common,
+        edit: "none",
+      });
+    case "timestamp":
+      return columnPreset.timestamp({
         ...common,
         edit: "none",
       });

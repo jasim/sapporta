@@ -26,6 +26,7 @@ import {
   findEntryForCondition,
   findOpEntry,
   inferFilterColumnType,
+  opsForColumn,
   resolveColumnOptions,
   type FilterColumnType,
   type OpEntry,
@@ -272,10 +273,10 @@ export function ConditionEditor({
         </Field>
       )}
 
-      {type && (
+      {type && draft.column && (
         <Field label="Operator">
           <Combobox.Root<OpEntry>
-            items={catalog[type].ops}
+            items={opsForColumn(draft.column, type)}
             value={entry}
             onValueChange={(next) => {
               if (next !== null) {
@@ -342,6 +343,7 @@ export function ConditionEditor({
             value={draft.scalarValue}
             onChange={(next) => setDraft({ ...draft, scalarValue: next })}
             column={draft.column}
+            op={entry.op}
             lookup={lookup}
             options={resolved?.options}
             labels={resolved?.labels}

@@ -256,6 +256,23 @@ export const catalog: Record<FilterColumnType, ColumnTypeEntry> = {
   fk,
 };
 
+/** The operators a column offers.
+ *
+ *  The catalog is keyed by the coarse filter type, which puts `date` and
+ *  `timestamp` columns on the same entry. They part company over "on" and
+ *  "not on": those name a whole calendar day, and against a column of instants
+ *  a day is a range rather than a single value, which the condition grammar
+ *  has no way to say. A timestamp column offers the ordering operators, each
+ *  of which does have a well-defined edge of the day to sit on. */
+export function opsForColumn(
+  column: ColumnSchema,
+  type: FilterColumnType,
+): OpEntry[] {
+  const ops = catalog[type].ops;
+  if (type !== "date" || inferDisplayType(column) !== "timestamp") return ops;
+  return ops.filter((entry) => entry.op !== "eq" && entry.op !== "neq");
+}
+
 /** Look up a catalog entry by its `key`. Returns `null` if the column-type
  *  entry doesn't include it — callers fall back to `defaultKey`. */
 export function findOpEntry(

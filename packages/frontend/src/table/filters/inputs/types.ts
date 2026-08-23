@@ -1,5 +1,6 @@
 import type { LookupCapabilities, LookupValue } from "@sapporta/grid/lookup";
 import type { ColumnSchema } from "@sapporta/shared/contracts";
+import type { ScalarOp } from "@sapporta/shared/filter";
 
 export type KeyedValues = Record<string, string>;
 export type DraftListValue = string | LookupValue;
@@ -9,6 +10,9 @@ export interface ScalarInputProps {
   value: string;
   onChange: (next: string) => void;
   column: ColumnSchema;
+  /** The operator the value belongs to. A date control on a timestamp column
+   *  needs it to place a bound at the start or the end of the named day. */
+  op?: ScalarOp;
   autoFocus?: boolean;
   lookup?: LookupCapabilities;
   /** Option set for inputs that render a fixed list (unused by scalar text

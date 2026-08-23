@@ -11,6 +11,7 @@ import type {
   NumberPreset,
   PercentagePreset,
   SelectPreset,
+  TimestampPreset,
 } from "./preset";
 import { TextCell } from "./cells/TextCell";
 import { NumericCell } from "./cells/NumericCell";
@@ -43,10 +44,11 @@ function renderContent<TMeta = unknown>(
       />
     );
   }
-  if (isDatePreset(columnPreset)) {
+  if (isTemporalPreset(columnPreset)) {
     return (
       <DateCell
         {...propsWithValue(props, runtime.valueCodec.format(props.value))}
+        rawValue={props.value}
         runtime={runtime}
         preset={columnPreset}
       />
@@ -140,10 +142,7 @@ function lookupCellValue(value: unknown): {
   empty: boolean;
 } {
   if (value == null || value === "") return { value: null, empty: true };
-  if (
-    typeof value === "string" ||
-    typeof value === "number"
-  ) {
+  if (typeof value === "string" || typeof value === "number") {
     return { value, empty: false };
   }
   return { value: null, empty: false };
@@ -159,8 +158,10 @@ function isNumericPreset(
   );
 }
 
-function isDatePreset(preset: ColumnPreset): preset is DatePreset {
-  return preset.kind === "date";
+function isTemporalPreset(
+  preset: ColumnPreset,
+): preset is DatePreset | TimestampPreset {
+  return preset.kind === "date" || preset.kind === "timestamp";
 }
 
 function isBooleanPreset(preset: ColumnPreset): preset is BooleanPreset {

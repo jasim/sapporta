@@ -71,7 +71,7 @@ describe("TGridColumnMapper.columnFor", () => {
       "foreignKey",
       "select",
       "boolean",
-      "date",
+      "timestamp",
       "number",
       "currency",
       "percentage",
@@ -98,6 +98,41 @@ describe("TGridColumnMapper.columnFor", () => {
       displayType: "text",
       schema: { name: "name" },
     });
+  });
+
+  it("keeps a date column on the date preset", () => {
+    const column = mapColumn({
+      name: "issued_on",
+      label: "Issued on",
+      kind: "date",
+    });
+
+    expect(preset(column)?.kind).toBe("date");
+  });
+
+  it("gives a timestamp column room for the time it shows", () => {
+    const date = mapColumn({
+      name: "issued_on",
+      label: "Issued on",
+      kind: "date",
+    });
+    const timestamp = mapColumn({
+      name: "created_at",
+      label: "Created at",
+      kind: "timestamp",
+    });
+    const declaredSizing = {
+      name: "seen_at",
+      label: "Seen at",
+      kind: "timestamp",
+      width: 30,
+    } satisfies ColumnSchema;
+
+    expect(preset(date)?.layout.width).toBe("date");
+    expect(preset(timestamp)?.layout.width).toBe("timestamp");
+    expect(preset(mapColumn(declaredSizing))?.layout.width).toEqual(
+      tableColumnPresetWidth(declaredSizing),
+    );
   });
 
   it("makes immutable tables read-only", () => {

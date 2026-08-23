@@ -14,6 +14,7 @@ import {
   formatNumber,
   formatPercentage,
   formatText,
+  formatTimestamp,
 } from "./format";
 import { finiteNumericValue } from "./numeric";
 import { parseBoolean, parseDate, parseNumber, parseText } from "./parse";
@@ -87,6 +88,17 @@ export function defaultsFor(kind: ColumnPresetKind): KindDefaults {
         format: formatDate,
         parse: parseDate,
         editor: () => DateEditor,
+      });
+    case "timestamp":
+      // No date-picker editor: `<input type="date">` has nowhere to put the
+      // time component, so offering one would quietly drop it on commit.
+      // Text editing keeps the whole value in the editor until a timestamp
+      // editor exists.
+      return base({
+        align: "left",
+        width: "timestamp",
+        format: formatTimestamp,
+        parse: parseDate,
       });
     case "boolean":
       return base({

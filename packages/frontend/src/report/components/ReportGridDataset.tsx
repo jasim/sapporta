@@ -342,8 +342,10 @@ function gridColumnForDatasetColumn<TInput>({
     gridColumn = columnPreset.number(options);
   } else if (column.kind === "boolean") {
     gridColumn = columnPreset.boolean(options);
-  } else if (column.kind === "date" || column.kind === "timestamp") {
+  } else if (column.kind === "date") {
     gridColumn = columnPreset.date(options);
+  } else if (column.kind === "timestamp") {
+    gridColumn = columnPreset.timestamp(options);
   } else {
     gridColumn = columnPreset.text(options);
   }
@@ -512,7 +514,9 @@ function canResolvePrimaryReportCellLink<TInput>({
   column: GridDatasetColumn;
 }): boolean {
   const levelLinks = links?.[levelName];
-  return Boolean(levelLinks?.cell?.[column.id]) || Boolean(column.links?.length);
+  return (
+    Boolean(levelLinks?.cell?.[column.id]) || Boolean(column.links?.length)
+  );
 }
 
 /**

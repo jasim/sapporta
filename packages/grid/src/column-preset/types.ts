@@ -26,6 +26,7 @@ export type BuiltInColumnPresetKind =
   | "currency"
   | "percentage"
   | "date"
+  | "timestamp"
   | "boolean"
   | "select"
   | "lookupValue"
@@ -39,6 +40,7 @@ export type ColumnWidth =
   | "fill"
   | "numeric"
   | "date"
+  | "timestamp"
   | "enum"
   | "foreignKey"
   | { min?: number; ideal?: number; max?: number }

@@ -167,6 +167,8 @@ function columnWidthBounds(width: ColumnWidth | undefined): {
       return { min: 80, max: 112 };
     case "date":
       return { min: 112, max: 128 };
+    case "timestamp":
+      return { min: 144, max: 160 };
     case "enum":
       return { min: 96 };
     case "foreignKey":
@@ -193,6 +195,8 @@ export function trackForColumnWidth(width: ColumnWidth | undefined): string {
       return "minmax(80px, 112px)";
     case "date":
       return "minmax(112px, 128px)";
+    case "timestamp":
+      return "minmax(144px, 160px)";
     case "enum":
       return "minmax(96px, max-content)";
     case "foreignKey":

@@ -21,6 +21,7 @@ import { Input } from "@sapporta/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@sapporta/ui/popover";
 import type { ColumnSchema } from "@sapporta/shared/contracts";
 import { inferDisplayType } from "../model/column-types";
+import { dateInputConditionValue, dateInputValue } from "./date-filter-value";
 
 /** A date-range pair. `gte` is always the lower bound, `lte` the upper. */
 export interface DateRange {
@@ -100,8 +101,11 @@ export function DateRangeCard({
   const [open, setOpen] = useState(false);
   const { column, gte, lte } = range;
   const label = column.label;
-  const gteValue = encodeTypedValue(gte.value);
-  const lteValue = encodeTypedValue(lte.value);
+  // Both ends read as the calendar day the reader sees, on the chip and in
+  // the pickers alike. A timestamp column stores instants, so its bounds are
+  // translated at this boundary rather than shown in their stored form.
+  const gteValue = dateInputValue(column, encodeTypedValue(gte.value));
+  const lteValue = dateInputValue(column, encodeTypedValue(lte.value));
 
   function removeBoth() {
     onRemove(gte.id);
@@ -151,7 +155,11 @@ export function DateRangeCard({
                     {
                       column: column.name,
                       op: "gte",
-                      value: e.target.value,
+                      value: dateInputConditionValue(
+                        column,
+                        "gte",
+                        e.target.value,
+                      ),
                     },
                     { columns: [column] },
                     gte.id,
@@ -172,7 +180,11 @@ export function DateRangeCard({
                     {
                       column: column.name,
                       op: "lte",
-                      value: e.target.value,
+                      value: dateInputConditionValue(
+                        column,
+                        "lte",
+                        e.target.value,
+                      ),
                     },
                     { columns: [column] },
                     lte.id,
