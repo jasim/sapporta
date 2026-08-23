@@ -84,19 +84,35 @@ export function drainPendingColumnMeta(
   return map;
 }
 
+// Why the generic: `text("food_name")` returns a builder whose type includes
+// the column name — `SQLiteTextBuilderInitial<"food_name", ...>`. Which name
+// type it gets depends on how the parameter is declared here: `name: TName`
+// gives the literal `"food_name"`, `name: string` gives only `string`.
+//
+// That is problematic because `TableRow` uses those name types as the row's
+// property keys — our rows are keyed by database column name, not by the Drizzle
+// property name. A key of type `string` is not a real key. TypeScript turns it
+// into an index signature, `[x: string]: ...`, and merges into it the value
+// type of every column that has one. So with `name: string` all eight
+// factories end up in that one index signature, and `row.food_name` reads as
+// `string | number | Instant | null` instead of `string | null`.
+//
+// Once the name type is `string` the literal is gone for good, so this is the
+// one place it can be kept.
+
 // ── Numeric kinds ─────────────────────────────────────────────────────
 
-export function money(name: string) {
+export function money<TName extends string>(name: TName) {
   register(name, { kind: "number", displayFormat: "currency" });
   return real(name);
 }
 
-export function percentage(name: string) {
+export function percentage<TName extends string>(name: TName) {
   register(name, { kind: "number", displayFormat: "percentage" });
   return real(name);
 }
 
-export function number(name: string) {
+export function number<TName extends string>(name: TName) {
   register(name, { kind: "number" });
   return real(name);
 }
@@ -105,17 +121,17 @@ export function number(name: string) {
  * A text column whose allowed values are declared once on the Drizzle column.
  * Sapporta reads the same enum values for runtime validation and metadata.
  */
-export function select<const TOptions extends readonly [string, ...string[]]>(
-  name: string,
-  options: TOptions,
-) {
+export function select<
+  const TOptions extends readonly [string, ...string[]],
+  TName extends string,
+>(name: TName, options: TOptions) {
   register(name, { kind: "text" });
   return drizzleText(name, { enum: options });
 }
 
 // ── Boolean kind ──────────────────────────────────────────────────────
 
-export function bool(name: string) {
+export function bool<TName extends string>(name: TName) {
   register(name, { kind: "boolean" });
   return integer(name, { mode: "boolean" });
 }
@@ -165,7 +181,7 @@ const instantColumn = customType<{
  * and `Temporal.PlainDate` values from direct Drizzle callers. Database reads
  * return `Temporal.PlainDate`.
  */
-export function date(name: string) {
+export function date<TName extends string>(name: TName) {
   register(name, { kind: "date" });
   return plainDateColumn(name);
 }
@@ -176,14 +192,14 @@ export function date(name: string) {
  * order; the `customType` wrapper is where that invariant is enforced
  * on every write.
  */
-export function timestamp(name: string) {
+export function timestamp<TName extends string>(name: TName) {
   register(name, { kind: "timestamp" });
   return instantColumn(name);
 }
 
 // ── Text kind ─────────────────────────────────────────────────────────
 
-export function text(name: string) {
+export function text<TName extends string>(name: TName) {
   register(name, { kind: "text" });
   return drizzleText(name);
 }
