@@ -81,8 +81,8 @@ export function renderCommandError(err: unknown, format: OutputFormat): never {
  * The deployment to name, when the failure leaves it in question.
  *
  * A failure the app answered for itself settles which server was reached, so
- * repeating the URL on every such error would bury the message that matters.
- * Only an unconfirmed target earns the extra lines.
+ * repeating the URL on every such error would bury the message.
+ * Only an unconfirmed target will render any extra lines.
  */
 function unconfirmedTarget(err: unknown): FailedTarget | undefined {
   if (!(err instanceof ApiRequestError) || err.targetConfirmed)
