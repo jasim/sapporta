@@ -10,6 +10,7 @@
  *   - createRoute body         create-body union (single / array / master-with-$details)
  */
 import { describe, it, expect } from "vitest";
+import { z } from "zod";
 import { sqliteTable, integer, text } from "drizzle-orm/sqlite-core";
 import { sapportaTable } from "../schema/table.js";
 import { createRoute, listRoute, updateRoute } from "./table-api-contracts.js";
@@ -154,6 +155,67 @@ describe("createRoute body", () => {
     });
     expect(r.success).toBe(false);
   });
+});
+
+/**
+ * A child FK is routinely server-owned, so `forInsert` has already dropped it
+ * before `createRoute` omits it again. Zod 4 rejects an `.omit()` mask key the
+ * shape does not carry, and it does so from the lazy `shape` getter — the
+ * throw lands in `z.toJSONSchema`, taking down OpenAPI and every consumer of
+ * it (`/api/openapi.json`, `sapporta endpoints list|show`) while row CRUD
+ * keeps working. The matrix below pins each way the FK can leave the shape.
+ */
+describe("createRoute body — children whose FK is not API-writable", () => {
+  const childFkMetas = {
+    "reference apiSettable: false": {
+      references: { account_id: { table: "accounts", apiSettable: false } },
+    },
+    "reference apiSettable: true": {
+      references: { account_id: { table: "accounts", apiSettable: true } },
+    },
+    "reference without apiSettable": {
+      references: { account_id: { table: "accounts" } },
+    },
+    "column apiWritable: false": {
+      columns: { account_id: { apiWritable: false } },
+    },
+    "no metadata on the FK": {},
+  } as const;
+
+  for (const [label, extraMeta] of Object.entries(childFkMetas)) {
+    describe(label, () => {
+      const child = sapportaTable({
+        drizzle: txns.drizzle,
+        meta: { ...txns.meta, ...extraMeta },
+      });
+      const tables = [accountsWithChildren, child];
+      const childBody = createRoute(accountsWithChildren, tables).body;
+
+      it("renders JSON schema (OpenAPI generation)", () => {
+        expect(() =>
+          z.toJSONSchema(childBody as z.ZodType, {
+            io: "input",
+            unrepresentable: "any",
+          }),
+        ).not.toThrow();
+      });
+
+      it("parses a $details payload and rejects a row carrying the FK", () => {
+        const payload = (rows: Record<string, unknown>[]) => ({
+          name: "Cash",
+          type: "asset",
+          $details: { table: "txns", fk: "account_id", rows },
+        });
+        expect(childBody.safeParse(payload([{ amount: 100 }])).success).toBe(
+          true,
+        );
+        expect(
+          childBody.safeParse(payload([{ amount: 100, account_id: 99 }]))
+            .success,
+        ).toBe(false);
+      });
+    });
+  }
 });
 
 describe("API and save-boundary write projections", () => {

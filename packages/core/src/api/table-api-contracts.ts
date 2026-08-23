@@ -140,11 +140,21 @@ function unionOf(
     .meta({ id: componentId });
 }
 
+/**
+ * Drops the master-detail foreign key from a child's insert shape.
+ *
+ * The key is often already absent: `tableApiZod.forInsert` excludes any
+ * column the API may not write, and a server-owned FK (`apiSettable: false`
+ * on the reference, or `apiWritable: false` on the column) is exactly that.
+ * Zod 4 throws `Unrecognized key` from the lazy `shape` getter when `.omit()`
+ * names a key the object does not carry, which surfaces only during
+ * JSON-schema conversion — i.e. when OpenAPI is generated, not here.
+ */
 function omitField(
   schema: z.ZodObject<z.ZodRawShape>,
   field: string,
 ): z.ZodObject<z.ZodRawShape> {
-  return schema.omit({ [field]: true });
+  return field in schema.shape ? schema.omit({ [field]: true }) : schema;
 }
 
 function createBodyZod(
