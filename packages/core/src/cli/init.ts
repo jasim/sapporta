@@ -2,6 +2,7 @@ import { basename, resolve } from "node:path";
 import { OperationError } from "../errors.js";
 import type { OperationResult } from "../introspect/operation-result.js";
 import { createProject } from "./init-project/create-project.js";
+import { devServerSummaryLines } from "./init-project/dev-ports.js";
 import { ensureSapportaSkillInstalled } from "./init-project/sapporta-skill.js";
 import {
   logInitDetail,
@@ -51,7 +52,11 @@ export async function init(args: string[]): Promise<OperationResult> {
   }
 
   try {
-    createProject({ dir: projectDir, name: projectName, progress });
+    const { devPorts } = createProject({
+      dir: projectDir,
+      name: projectName,
+      progress,
+    });
     logInitSection(progress, "Preparing the Sapporta assistant skill");
     logInitDetail(
       progress,
@@ -72,6 +77,8 @@ export async function init(args: string[]): Promise<OperationResult> {
           "Your Sapporta project is now ready. Run:",
           `  cd ${shellQuote(projectDir)}`,
           "  pnpm dev",
+          "",
+          ...devServerSummaryLines(devPorts),
           "",
         ].join("\n"),
       },

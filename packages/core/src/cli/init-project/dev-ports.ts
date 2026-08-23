@@ -5,7 +5,7 @@ import { randomInt } from "node:crypto";
  *
  * Scaffolding every project onto one pair of ports makes the second project on
  * a machine collide with the first the moment both run `pnpm dev`. Each new
- * project draws a random pair instead. Deriving them from the project name
+ * project gets a random pair instead. Deriving them from the project name
  * would collide just as reliably, because names repeat: several people work on
  * the same project, and names like `blog` or `crm` get reused.
  *
@@ -21,8 +21,8 @@ export const DEV_FRONTEND_PORT_BASE = 5173;
 
 /**
  * Both ports move together by one offset, so a project occupies a single
- * numbered slot. Two projects collide only when they draw the same slot, where
- * drawing each port independently would let them collide on either one.
+ * numbered slot. Two projects collide only when they land on the same slot,
+ * where picking each port independently would let them collide on either one.
  *
  * 256 slots is what the windows allow: MySQL sits at 3306 and PostgreSQL at
  * 5432, both above the last slot's 3255 and 5428.
@@ -54,7 +54,7 @@ export interface DevPorts {
   frontend: number;
 }
 
-/** Draw a port pair for a new project. */
+/** Pick a random port pair for a new project. */
 export function randomDevPorts(): DevPorts {
   const slot = USABLE_SLOTS[randomInt(USABLE_SLOTS.length)];
   return {
@@ -63,5 +63,21 @@ export function randomDevPorts(): DevPorts {
   };
 }
 
-/** Exposed so tests can state what the draw is allowed to produce. */
+/** Exposed so tests can state which slots may be picked. */
 export const usableDevPortSlots: readonly number[] = USABLE_SLOTS;
+
+/**
+ * The two development servers, each line naming who uses that URL: a person
+ * opens the app in a browser, scripts and coding agents call the API.
+ *
+ * `scripts/dev.mjs` prints the same table. It repeats this text rather than
+ * importing it, to stay dependency-free; keep the two in step.
+ */
+export function devServerSummaryLines(ports: DevPorts): string[] {
+  return [
+    "Development servers for this project, on ports set in .env.development:",
+    "",
+    `  App   http://localhost:${ports.frontend}   open this in a browser`,
+    `  API   http://localhost:${ports.api}   call directly from scripts and coding agents`,
+  ];
+}

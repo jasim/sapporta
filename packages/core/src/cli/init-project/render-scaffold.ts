@@ -17,12 +17,21 @@ import {
 
 export type { RenderedScaffoldFile };
 
+/**
+ * Values generated fresh for each project instead of read from the templates.
+ * Pass one in to keep it: `createProject` passes the ports so that init can
+ * display them, and tests pass fixed values.
+ */
+export interface ScaffoldOverrides {
+  betterAuthDevSecret?: string;
+  gettingStartedEnv?: GettingStartedEnv;
+  devPorts?: DevPorts;
+}
+
 export function renderScaffoldFiles(
   project: ProjectLayout,
   devModePackageRoot: string | undefined,
-  betterAuthDevSecret: string = randomBytes(32).toString("base64url"),
-  gettingStartedEnv: GettingStartedEnv = resolveGettingStartedEnv(),
-  devPorts: DevPorts = randomDevPorts(),
+  overrides: ScaffoldOverrides = {},
 ): RenderedScaffoldFile[] {
   const initPaths = initProjectPackagePaths();
   const packages = resolveScaffoldPackages(initPaths, devModePackageRoot);
@@ -30,9 +39,11 @@ export function renderScaffoldFiles(
     project,
     packages,
     authCookiePrefix: createProjectAuthCookiePrefix(project.slug),
-    betterAuthDevSecret,
-    gettingStartedEnv,
-    devPorts,
+    betterAuthDevSecret:
+      overrides.betterAuthDevSecret ?? randomBytes(32).toString("base64url"),
+    gettingStartedEnv:
+      overrides.gettingStartedEnv ?? resolveGettingStartedEnv(),
+    devPorts: overrides.devPorts ?? randomDevPorts(),
   });
   const files = renderScaffoldTemplates({
     templates: readScaffoldTemplates(initPaths),

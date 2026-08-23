@@ -10,6 +10,7 @@ import { dirname, join } from "node:path";
 import { randomBytes } from "node:crypto";
 import { ErrorCode, OperationError } from "../../errors.js";
 import { ensureBetterSqlite3Loads } from "./sqlite-native-repair.js";
+import { randomDevPorts, type DevPorts } from "./dev-ports.js";
 import {
   errorMessage,
   formatCommand,
@@ -48,6 +49,8 @@ export interface CreateProjectOptions {
 export interface CreateProjectResult {
   dir: string;
   name: string;
+  /** The ports written into the new project's .env.development. */
+  devPorts: DevPorts;
 }
 
 /**
@@ -89,7 +92,14 @@ export function createProject(opts: CreateProjectOptions): CreateProjectResult {
     progress,
     "Resolving Sapporta package versions for the new project's package.json files",
   );
-  const files = renderScaffoldFiles(project, process.env.SAPPORTA_PACKAGE_ROOT);
+  // The ports are displayed when init finishes, so the user knows them without
+  // opening .env.development.
+  const devPorts = randomDevPorts();
+  const files = renderScaffoldFiles(
+    project,
+    process.env.SAPPORTA_PACKAGE_ROOT,
+    { devPorts },
+  );
 
   const stagingRoot = stagingRootFor(
     project.root,
@@ -110,7 +120,7 @@ export function createProject(opts: CreateProjectOptions): CreateProjectResult {
     progress,
   });
 
-  return { dir: project.root, name: project.name };
+  return { dir: project.root, name: project.name, devPorts };
 }
 
 function assertCanCreateProject(project: ProjectLayout): void {

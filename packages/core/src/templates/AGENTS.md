@@ -18,9 +18,12 @@ APIs, auth-aware row access, and a React app shell.
 
 Prefer the project-local CLI form: `pnpm exec sapporta ...`.
 
-### Running beside other projects
+### This project's ports
 
-`sapporta init` draws each project's `SAPPORTA_API_PORT` and
+`pnpm dev` prints both URLs when it starts: the App URL for a browser, and the
+API URL for direct HTTP calls. They are also in `.env.development`.
+
+`sapporta init` picks each project's `SAPPORTA_API_PORT` and
 `SAPPORTA_FRONTEND_PORT` at random and writes them into `.env.development`, so
 projects rarely collide. When a port is taken anyway, `pnpm dev` names the
 setting to change: the frontend port is checked before anything starts, and

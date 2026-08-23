@@ -205,7 +205,11 @@ describe("createProject", () => {
       verifySqlite: noopSqliteVerifier,
     });
 
-    expect(result).toEqual({ dir: target, name: "Acme App" });
+    expect(result).toMatchObject({ dir: target, name: "Acme App" });
+    // The ports `sapporta init` reports must be the ones it wrote.
+    expect(readFileSync(join(target, ".env.development"), "utf-8")).toContain(
+      `SAPPORTA_API_PORT=${result.devPorts.api}\nSAPPORTA_FRONTEND_PORT=${result.devPorts.frontend}\n`,
+    );
     expect(stagingDirs(parent)).toEqual([]);
     expect(readFileSync(join(target, "sapporta.json"), "utf-8")).toBe(
       '{\n  "name": "Acme App"\n}\n',
@@ -385,7 +389,7 @@ describe("renderScaffoldFiles", () => {
     expect(byDest.get(".env.development")).toMatch(
       /BETTER_AUTH_SECRET=[A-Za-z0-9_-]{43}/,
     );
-    // Each project draws its own dev ports, so assert the shape and the one
+    // Each project gets its own dev ports, so assert the shape and the one
     // rule that binds them: the public app URL is the origin the browser loads
     // the app from, which in development is Vite's.
     const devEnv = byDest.get(".env.development") ?? "";
@@ -396,7 +400,7 @@ describe("renderScaffoldFiles", () => {
       `SAPPORTA_PUBLIC_APP_URL=http://localhost:${frontendPort}`,
     );
     expect(byDest.get("README.md")).toContain(
-      `Open \`http://localhost:${frontendPort}\``,
+      `\`http://localhost:${frontendPort}\``,
     );
     // Deployments bind one local port behind a proxy; that stays conventional.
     expect(byDest.get(".env.production.example")).toContain(
@@ -702,12 +706,10 @@ describe("renderScaffoldFiles", () => {
     const gettingStartedEnv = resolveGettingStartedEnv({
       SAPPORTA_DOCS_ORIGIN: "http://127.0.0.1:4321",
     });
-    const files = renderScaffoldFiles(
-      project,
-      process.cwd(),
-      "test-secret",
+    const files = renderScaffoldFiles(project, process.cwd(), {
+      betterAuthDevSecret: "test-secret",
       gettingStartedEnv,
-    );
+    });
     const home = files.find(
       (file) => file.dest === "packages/frontend/src/Home.tsx",
     )?.content;

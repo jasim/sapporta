@@ -160,7 +160,7 @@ app.get("/*", serveStatic({ root: frontendDist, path: "index.html" }));
 // Start the API server.
 const port = projectEnv.apiPort;
 const server = serve({ fetch: app.fetch, port }, () => {
-  console.log(`%%SAPPORTA:SLUG%% API server ready (port ${port})`);
+  console.log(`%%SAPPORTA:SLUG%% API server ready on http://localhost:${port}`);
 });
 
 // A port already taken by another process would otherwise end the run with a

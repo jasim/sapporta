@@ -13,7 +13,8 @@ pnpm install
 pnpm dev
 ```
 
-Open `http://localhost:%%SAPPORTA:DEV_FRONTEND_PORT%%`.
+`pnpm dev` prints this project's App and API URLs when it starts. Open the App
+URL, `http://localhost:%%SAPPORTA:DEV_FRONTEND_PORT%%`, in a browser.
 
 ## Commands
 
@@ -52,7 +53,7 @@ packages/shared/    API contracts and types shared by backend and frontend
 
 ## Running beside other Sapporta projects
 
-`sapporta init` drew this project's ports above at random, so several projects
+`sapporta init` picked this project's ports above at random, so several projects
 run side by side without being reconfigured. When a port is taken anyway,
 `pnpm dev` names the setting to change: it checks the frontend port before
 starting anything, and the API reports its own port as it boots. Pick a free

@@ -9,6 +9,7 @@ import { createServer } from "node:net";
 const children = new Map();
 
 const frontendPort = readPort("SAPPORTA_FRONTEND_PORT", 5173);
+const apiPort = readPort("SAPPORTA_API_PORT", 3000);
 
 // The run ends when the first child stops on its own. This is set up before
 // any child starts: a child that exits during startup, as the API does when
@@ -101,6 +102,21 @@ for (const signal of ["SIGINT", "SIGTERM"]) {
     stopChildren(signal);
   });
 }
+
+// Printed first, so both URLs sit at the top of the run instead of arriving
+// seconds apart among the compiler and Vite output. This repeats the table
+// `@sapporta/core` builds for `sapporta init` rather than importing it, so
+// nothing has to resolve before pnpm dev can report itself.
+console.log(
+  [
+    "",
+    "Development servers for this project, on ports set in .env.development:",
+    "",
+    `  App   http://localhost:${frontendPort}   open this in a browser`,
+    `  API   http://localhost:${apiPort}   call directly from scripts and coding agents`,
+    "",
+  ].join("\n"),
+);
 
 // Only the frontend port is checked here. The API reports this failure itself:
 // boot.ts catches EADDRINUSE and names the setting to change. Vite cannot —
