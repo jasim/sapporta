@@ -28,6 +28,8 @@ export const TASK_TWO = {
   priority: 1,
 } as const;
 
+const DEV_ENV_FILE = ".env.development";
+
 export type E2eProject = {
   parentDir: string;
   projectDir: string;
@@ -47,6 +49,19 @@ export type CommandOptions = {
   cwd: string;
   env: NodeJS.ProcessEnv;
   timeoutMs: number;
+};
+
+export type CommandResult = {
+  code: number | null;
+  signal: string | null;
+  output: string;
+};
+
+export type ProjectCliOptions = {
+  apiToken?: string;
+  cwd?: string;
+  env?: NodeJS.ProcessEnv;
+  timeoutMs?: number;
 };
 
 export type StartedServer = {
@@ -2293,8 +2308,29 @@ export async function runText(
   args: string[],
   opts: CommandOptions,
 ): Promise<string> {
+  const result = await runCommand(command, args, opts);
+  if (result.code === 0) return result.output;
+  throw new Error(
+    `\`${command} ${args.join(" ")}\` exited with code ${result.code}${
+      result.signal ? ` (signal ${result.signal})` : ""
+    }\n${result.output}`,
+  );
+}
+
+/**
+ * Run a command and report how it ended instead of throwing on failure.
+ *
+ * A CLI that reports an error is exercising behavior worth asserting: its exit
+ * code and the structured payload it prints are part of what it promises. Use
+ * `runText` where only success is meaningful.
+ */
+export async function runCommand(
+  command: string,
+  args: readonly string[],
+  opts: CommandOptions,
+): Promise<CommandResult> {
   return new Promise((resolve, reject) => {
-    const child = spawn(command, args, { cwd: opts.cwd, env: opts.env });
+    const child = spawn(command, [...args], { cwd: opts.cwd, env: opts.env });
     const chunks: Buffer[] = [];
     child.stdout.on("data", (c: Buffer) => chunks.push(c));
     child.stderr.on("data", (c: Buffer) => chunks.push(c));
@@ -2315,19 +2351,72 @@ export async function runText(
     });
     child.on("exit", (code, signal) => {
       clearTimeout(timer);
-      const output = Buffer.concat(chunks).toString();
-      if (code === 0) {
-        resolve(output);
-        return;
-      }
-      reject(
-        new Error(
-          `\`${command} ${args.join(" ")}\` exited with code ${code}${
-            signal ? ` (signal ${signal})` : ""
-          }\n${output}`,
-        ),
-      );
+      resolve({
+        code,
+        signal,
+        output: Buffer.concat(chunks).toString(),
+      });
     });
+  });
+}
+
+/**
+ * Point the project's recorded development API port at a running server.
+ *
+ * `sapporta init` draws a random port per project and writes it to
+ * `.env.development`; the CLI reads that file to find the app it is running
+ * inside. The e2e harness boots each server on a free port instead, so tests
+ * that drive the CLI have to record where the server actually listens.
+ */
+export function writeProjectApiPort(
+  project: E2eProject,
+  baseUrl: string,
+): void {
+  const envFile = join(project.projectDir, DEV_ENV_FILE);
+  const contents = readFileSync(envFile, "utf-8");
+  const port = new URL(baseUrl).port;
+  expect(contents, `${envFile} does not record SAPPORTA_API_PORT`).toMatch(
+    /^SAPPORTA_API_PORT=.*$/m,
+  );
+  writeFileSync(
+    envFile,
+    contents.replace(/^SAPPORTA_API_PORT=.*$/m, `SAPPORTA_API_PORT=${port}`),
+  );
+}
+
+export function readProjectDevEnv(project: E2eProject): string {
+  return readFileSync(join(project.projectDir, DEV_ENV_FILE), "utf-8");
+}
+
+/**
+ * Run the project-local `sapporta` CLI the way the generated AGENTS.md does.
+ *
+ * `SAPPORTA_API_URL` is cleared so the API URL comes from the project's own
+ * `.env.development`, which is what a developer's terminal resolves. JSON
+ * output is requested explicitly because the format otherwise depends on
+ * whether stdout is a terminal.
+ */
+export async function runProjectCli(
+  project: E2eProject,
+  args: readonly string[],
+  opts: ProjectCliOptions = {},
+): Promise<CommandResult> {
+  const env: NodeJS.ProcessEnv = {
+    ...project.env,
+    ...opts.env,
+    SAPPORTA_OUTPUT_FORMAT: "json",
+  };
+  delete env.SAPPORTA_API_URL;
+  if (opts.apiToken === undefined) {
+    delete env.SAPPORTA_API_TOKEN;
+  } else {
+    env.SAPPORTA_API_TOKEN = opts.apiToken;
+  }
+
+  return runCommand("pnpm", ["exec", "sapporta", ...args], {
+    cwd: opts.cwd ?? project.projectDir,
+    env,
+    timeoutMs: opts.timeoutMs ?? 60_000,
   });
 }
 
