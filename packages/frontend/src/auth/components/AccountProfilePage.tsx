@@ -610,7 +610,7 @@ function createAgentSetupPrompt(apiUrl: string, apiToken: string): string {
     "If none exists, use a small private, gitignored local wrapper; do not install an environment manager just for this.",
     "Update `AGENTS.md` with the exact authenticated command agents should use, using an absolute path for a wrapper.",
     "Keep the token out of version control and handle it as a secret.",
-    `Verify the token with the read-only \`rows count\` command against any table in the app, requesting sandbox network access to \`${apiUrl}\` if needed.`,
+    `Verify the token with the read-only \`api get '/api/auth-context'\` command, which answers with the user and workspace the token acts as, requesting sandbox network access to \`${apiUrl}\` if needed.`,
   ].join(" ");
 }
 
