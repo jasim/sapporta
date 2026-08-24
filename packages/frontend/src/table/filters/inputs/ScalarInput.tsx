@@ -32,7 +32,9 @@ export const NumberInput = scalarInput("number", "0");
 
 /** A calendar-date control, for `date` and `timestamp` columns alike. The
  *  control speaks `YYYY-MM-DD` in both directions; a timestamp column stores
- *  instants, so its values are translated on the way through. */
+ *  instants, so its values are translated through the zone this page reads on
+ *  — the same zone the cells beside it are written in, so the day a reader
+ *  picks is the day they can see. */
 export function DateInput({
   value,
   onChange,

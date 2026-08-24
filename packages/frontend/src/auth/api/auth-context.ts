@@ -5,6 +5,7 @@ import type {
   CreateAuthTokenBody,
   CreateAuthTokenResponse,
   SwitchActiveWorkspaceBody,
+  UpdateWorkspaceTimeZoneBody,
 } from "@sapporta/shared/contracts";
 import { fetchApi, fetchApiJson } from "../../platform/http";
 
@@ -24,6 +25,26 @@ export async function switchActiveWorkspace(
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
+}
+
+/**
+ * Sets the calendar the active workspace keeps. Owner only.
+ *
+ * Answers with a fresh auth context, so the caller settles the new session
+ * through the same path a workspace switch settles through and the new zone is
+ * published with it.
+ */
+export async function updateWorkspaceTimeZone(
+  body: UpdateWorkspaceTimeZoneBody,
+): Promise<AuthContextResponse> {
+  return fetchApiJson<AuthContextResponse>(
+    "/auth-context/workspace/time-zone",
+    {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    },
+  );
 }
 
 export async function listAuthTokens(): Promise<AuthTokenListResponse> {

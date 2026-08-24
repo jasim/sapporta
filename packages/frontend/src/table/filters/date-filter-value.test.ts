@@ -1,5 +1,6 @@
-import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import type { ColumnSchema } from "@sapporta/shared/contracts";
+import { setAppTimeZone } from "../../platform/app-time-zone";
 import {
   encodeTypedValue,
   materializeTypedFilterCondition,
@@ -7,18 +8,11 @@ import {
 import { dateInputConditionValue, dateInputValue } from "./date-filter-value";
 import { inferFilterColumnType, opsForColumn } from "./column-catalog";
 
-// Day bounds are resolved on the reader's wall clock, so the host zone is
-// pinned rather than inherited. Asia/Kolkata is +05:30 year-round, far enough
-// east that a local day starts on the previous UTC day.
-const DISPLAY_TIME_ZONE = "Asia/Kolkata";
-
-beforeAll(() => {
-  vi.stubEnv("TZ", DISPLAY_TIME_ZONE);
-});
-
-afterAll(() => {
-  vi.unstubAllEnvs();
-});
+// Day bounds are resolved on the zone the page reads in, which boot publishes
+// before any screen renders; the test stands in for it rather than inheriting
+// the host's. Asia/Kolkata is +05:30 year-round, far enough east that a local
+// day starts on the previous UTC day.
+setAppTimeZone("Asia/Kolkata");
 
 const dateColumn = {
   name: "issued_on",

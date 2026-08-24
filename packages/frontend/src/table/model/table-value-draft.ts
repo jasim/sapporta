@@ -26,6 +26,7 @@ import {
   parseDateInputToPlainDateString,
   parseDateTimeLocalInputToCanonicalInstantString,
 } from "@sapporta/shared/temporal";
+import { appTimeZone } from "../../platform/app-time-zone";
 
 /**
  * A leaf decoder keeps "empty" separate from both a valid value and invalid
@@ -42,6 +43,13 @@ export type TablePatchValueDraftParseResult =
 /**
  * Decode one raw table-control value without applying create or patch rules.
  * The function never mutates the draft held by the control.
+ *
+ * A `timestamp` control speaks zone-less wall-clock text, so decoding it back
+ * to a stored instant is done on the zone the control was shown in: the one
+ * this page reads on, which is also the one the cell beside it was written
+ * in. Reading a value in one zone and writing it back in another would move
+ * the moment by the difference between them, and there is one published
+ * answer per page precisely so that cannot happen.
  */
 export function decodeTableValueDraft(
   column: ColumnSchema,
@@ -84,7 +92,8 @@ export function decodeTableValueDraft(
     case "timestamp":
       return decodeTemporalDraft(
         draft,
-        parseDateTimeLocalInputToCanonicalInstantString,
+        (value) =>
+          parseDateTimeLocalInputToCanonicalInstantString(value, appTimeZone()),
         "Enter a valid date and time.",
       );
     case "boolean":

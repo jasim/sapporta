@@ -15,10 +15,12 @@ import {
   projectAuthBasePath,
   projectAuthCookiePrefix,
   projectAuthDrizzleAdapterConfig,
+  projectAuthUserOptions,
 } from "./options.js";
 import {
   assertSampleDataSeedingAllowed,
   markSampleDataAccountVerified,
+  sampleDataTimeZone,
   type SampleDataAccount,
 } from "./sample-data.js";
 import * as authSchema from "./schema.js";
@@ -150,6 +152,7 @@ export function createBetterAuth({
       },
     },
     database: createProjectAuthDatabase(conn),
+    user: projectAuthUserOptions,
     emailAndPassword: createProjectAuthEmailAndPasswordOptions(
       env.requireVerifiedEmail,
       (data) => sendPasswordResetEmail(mailer, data),
@@ -171,7 +174,9 @@ export function createBetterAuth({
     api: auth.api,
     createSampleDataAccount: async (account) => {
       assertSampleDataSeedingAllowed();
-      const { user } = await auth.api.signUpEmail({ body: account });
+      const { user } = await auth.api.signUpEmail({
+        body: { ...account, timeZone: sampleDataTimeZone },
+      });
       markSampleDataAccountVerified(conn, user.id);
       return {
         id: user.id,

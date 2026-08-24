@@ -12,6 +12,11 @@ import {
   type TGridCellWriteContext,
   type TGridColumnsBuilder,
 } from "../../index";
+import { setAppTimeZone } from "../../platform/app-time-zone";
+
+// Boot publishes the workspace zone before any screen renders; these tests
+// mount the pieces directly, so they stand in for it.
+setAppTimeZone("UTC");
 
 type InvoiceRow = {
   id: string;

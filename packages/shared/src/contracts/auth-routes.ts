@@ -8,6 +8,7 @@ import {
   createAuthTokenBodySchema,
   createAuthTokenResponseSchema,
   switchActiveWorkspaceBodySchema,
+  updateWorkspaceTimeZoneBodySchema,
 } from "./auth-schema.js";
 
 const c = initContract();
@@ -53,6 +54,24 @@ export const switchActiveWorkspaceRoute = c.mutation({
     401: errorBodySchema,
     403: errorBodySchema,
     404: errorBodySchema,
+    422: errorBodySchema,
+  },
+});
+
+/**
+ * Owner-only. The zone belongs to the workspace, so changing it changes what
+ * "August 24" means for everyone in it, not just for whoever asked.
+ */
+export const updateWorkspaceTimeZoneRoute = c.mutation({
+  method: "PUT",
+  path: "/auth-context/workspace/time-zone",
+  summary: "Set the time zone the active workspace keeps its calendar in",
+  metadata: { tags: ["auth"] },
+  body: updateWorkspaceTimeZoneBodySchema,
+  responses: {
+    200: authContextResponseSchema,
+    401: errorBodySchema,
+    403: errorBodySchema,
     422: errorBodySchema,
   },
 });

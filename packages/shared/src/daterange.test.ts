@@ -11,9 +11,19 @@ import {
   serializeDateRange,
   snapshotDateRange,
 } from "./daterange.js";
-import { parsePlainDate } from "./temporal.js";
+import {
+  parseCanonicalInstant,
+  parsePlainDate,
+  parseTimeZone,
+} from "./temporal.js";
 
 const today = parsePlainDate("2025-04-15");
+const utc = parseTimeZone("UTC");
+const kolkata = parseTimeZone("Asia/Kolkata");
+const santiago = parseTimeZone("America/Santiago");
+const newYork = parseTimeZone("America/New_York");
+/** 2025-04-15 in UTC, and still 2025-04-15 in Kolkata five and a half hours on. */
+const now = parseCanonicalInstant("2025-04-15T12:00:00Z");
 
 describe("resolveDateRange", () => {
   it("all_time → unbounded both sides", () => {
@@ -167,30 +177,136 @@ describe("resolveDateRangeQueryBounds", () => {
           period_from: "2024-01-01",
           period_to: "2024-01-31",
         },
-        today,
+        utc,
+        now,
       ),
-    ).toEqual({
+    ).toMatchObject({
       state: custom(parsePlainDate("2024-01-01"), parsePlainDate("2024-01-31")),
-      from: "2024-01-01",
-      to: "2024-01-31",
+      days: { from: "2024-01-01", to: "2024-01-31" },
     });
   });
 
-  it("resolves relative query params against the supplied today", () => {
+  it("resolves relative query params against the day it is in the zone", () => {
     expect(
-      resolveDateRangeQueryBounds("period", { period_relative: "mtd" }, today),
-    ).toEqual({
+      resolveDateRangeQueryBounds(
+        "period",
+        { period_relative: "mtd" },
+        utc,
+        now,
+      ),
+    ).toMatchObject({
       state: relative("mtd"),
-      from: "2025-04-01",
-      to: "2025-04-15",
+      days: { from: "2025-04-01", to: "2025-04-15" },
     });
   });
 
-  it("returns null bounds for all time", () => {
-    expect(resolveDateRangeQueryBounds("period", {}, today)).toEqual({
+  /**
+   * The instant is the same; the day it falls on is not. This is what the
+   * removed zone-free `today` default got wrong: it read
+   * the host's `TZ`, so the same report answered differently depending on how
+   * the container was started.
+   */
+  it("reads today in the workspace zone rather than the machine's", () => {
+    const evening = parseCanonicalInstant("2025-04-15T19:00:00Z");
+    expect(
+      resolveDateRangeQueryBounds(
+        "period",
+        { period_relative: "7d" },
+        utc,
+        evening,
+      ).days.to,
+    ).toBe("2025-04-15");
+    expect(
+      resolveDateRangeQueryBounds(
+        "period",
+        { period_relative: "7d" },
+        kolkata,
+        evening,
+      ).days.to,
+    ).toBe("2025-04-16");
+  });
+
+  it("returns null bounds for all time, in both shapes", () => {
+    expect(resolveDateRangeQueryBounds("period", {}, utc, now)).toEqual({
       state: allTime(),
-      from: null,
-      to: null,
+      days: { from: null, to: null },
+      instants: { from: null, until: null },
+    });
+  });
+
+  it("bounds a custom range by the instants the days occupy in the zone", () => {
+    expect(
+      resolveDateRangeQueryBounds(
+        "period",
+        { period_from: "2024-01-01", period_to: "2024-01-31" },
+        kolkata,
+        now,
+      ),
+    ).toMatchObject({
+      state: custom(parsePlainDate("2024-01-01"), parsePlainDate("2024-01-31")),
+      instants: {
+        from: "2023-12-31T18:30:00Z",
+        until: "2024-01-31T18:30:00Z",
+      },
+    });
+  });
+
+  /**
+   * The upper bound is the start of the day after, so every instant stored on
+   * the last named day is inside the window. An inclusive plain-date bound
+   * compared against a `timestamp` column drops that day entirely, because
+   * `"2024-01-31T09:00:00Z"` sorts after `"2024-01-31"`.
+   */
+  it("includes the whole of the last named day", () => {
+    const { instants } = resolveDateRangeQueryBounds(
+      "period",
+      { period_from: "2024-01-31", period_to: "2024-01-31" },
+      utc,
+      now,
+    );
+    const until = instants.until;
+    expect(until).toBe("2024-02-01T00:00:00Z");
+    expect("2024-01-31T23:59:59Z" < until!).toBe(true);
+  });
+
+  /**
+   * `America/Santiago` leaves daylight saving on 2026-04-05, so local
+   * `2026-04-04T23:59:59` resolves an hour before the day actually ends. A
+   * closed bound built from that wall clock drops the last hour of April 4;
+   * the half-open bound is the start of April 5, which does not.
+   */
+  it("keeps the last hour of a day whose zone falls back", () => {
+    const { instants } = resolveDateRangeQueryBounds(
+      "period",
+      { period_from: "2026-04-04", period_to: "2026-04-04" },
+      santiago,
+      now,
+    );
+    const until = instants.until;
+    expect(until).toBe("2026-04-05T04:00:00Z");
+    // The moment a closed `23:59:59` bound would have stopped at, an hour
+    // before the day is over.
+    expect("2026-04-05T02:59:59Z" < until!).toBe(true);
+  });
+
+  /**
+   * `America/New_York` springs forward on 2026-03-08, so that local day has no
+   * `00:00`-to-`24:00` shape and runs 23 hours. The window is still exactly
+   * the day.
+   */
+  it("bounds a 23-hour day exactly", () => {
+    expect(
+      resolveDateRangeQueryBounds(
+        "period",
+        { period_from: "2026-03-08", period_to: "2026-03-08" },
+        newYork,
+        now,
+      ),
+    ).toMatchObject({
+      instants: {
+        from: "2026-03-08T05:00:00Z",
+        until: "2026-03-09T04:00:00Z",
+      },
     });
   });
 });

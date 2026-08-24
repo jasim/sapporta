@@ -14,6 +14,7 @@ import { createTestDb } from "../testing/test-utils.js";
 import { createRoute } from "./table-api-contracts.js";
 import { makeAuthorizedTableHandlers } from "./table-handlers.js";
 import type { SapportaEnv } from "./server.js";
+import { parseTimeZone } from "@sapporta/shared/temporal";
 
 const ordersTable = sqliteTable("orders", {
   id: integer("id").primaryKey({ autoIncrement: true }),
@@ -63,6 +64,7 @@ describe("makeAuthorizedTableHandlers", () => {
         id: "workspace-1",
         name: "Workspace One",
         slug: "workspace-one",
+        timeZone: parseTimeZone("UTC"),
       };
       const auth = createAuthContext<SapportaAbility>({
         principal: {

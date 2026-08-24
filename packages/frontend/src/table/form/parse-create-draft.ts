@@ -56,7 +56,12 @@ export type ParseCreateDraftResult =
   | { ok: true; value: Record<string, unknown> }
   | { ok: false; issues: CreateDraftIssue[] };
 
-/** Decode metadata-driven form drafts once, immediately before submission. */
+/**
+ * Decode metadata-driven form drafts once, immediately before submission.
+ *
+ * A wall clock typed into a `timestamp` field becomes an instant on the zone
+ * this page reads on, which is the zone its control was shown in.
+ */
 export function parseCreateDraft(
   table: TableSchema,
   draft: Readonly<Record<string, unknown>>,

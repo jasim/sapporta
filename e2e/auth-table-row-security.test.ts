@@ -875,6 +875,7 @@ describe("generated table authz and row security - end-to-end", () => {
       body: {
         email: credentials.email,
         password: credentials.password,
+        timeZone: "UTC",
         ...(credentials.name === undefined ? {} : { name: credentials.name }),
       },
       expectedSuccess: true,

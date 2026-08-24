@@ -5,6 +5,8 @@ import {
   type ReactNode,
 } from "react";
 import { describe, expect, it } from "vitest";
+import { parseTimeZone } from "@sapporta/shared/temporal";
+import { setDisplayTimeZone } from "./display-zone";
 import type { LevelRow } from "../core/types/level-row";
 import type { CellEditorProps } from "../core/types/schema";
 import { childPath, makeRowId, rootPath } from "../core/types/identity";
@@ -27,6 +29,7 @@ import {
   parse,
   preset,
   select,
+  timestamp,
   width,
 } from "./index";
 import { presetRuntime } from "./preset";
@@ -143,6 +146,19 @@ describe("columnPreset columns", () => {
     expect(
       copyColumns.map((copyColumn) => copyColumn.valueAt(rows[1], 1)),
     ).toEqual(["unknown", "unknown"]);
+  });
+
+  it("timestamp text reads on a wall clock while a copy keeps the stored instant", () => {
+    // The two differ by the reader's offset, which is why the copy is left to
+    // the grid's default: it carries the stored value under the column's own
+    // name, and that value says which zone it is in through its trailing `Z`.
+    setDisplayTimeZone(parseTimeZone("Asia/Kolkata"));
+    const column = timestamp({ id: "created_at", name: "Created at" });
+
+    expect(
+      presetRuntime(column)?.valueCodec.format("2026-08-23T20:30:00Z"),
+    ).toBe("2026-08-24 02:00");
+    expect(column.copy).toBeUndefined();
   });
 
   it("preset copy options replace labeled-value defaults", async () => {

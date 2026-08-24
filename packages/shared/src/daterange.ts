@@ -12,11 +12,21 @@
  * user's "Last 30 days" choice stays semantically that — not a frozen
  * pair of dates that would silently age.
  *
- * Date-granular only. Instant-granular ranges (for timestamp columns)
- * can follow as a parallel type without reshaping this one.
+ * The state a reader picks is date-granular either way; what differs is
+ * the column it is compared against, so `resolveDateRangeQueryBounds`
+ * resolves it once into both shapes — inclusive calendar days for a `date`
+ * column, and the half-open window of UTC instants those days occupy for a
+ * `timestamp` column. It takes the workspace time zone, because a calendar
+ * day is only a range of instants once a zone says which one.
  */
 
-import { Temporal, parsePlainDate, formatPlainDate } from "./temporal.js";
+import {
+  Temporal,
+  formatCanonicalInstant,
+  formatPlainDate,
+  parsePlainDate,
+  type TimeZone,
+} from "./temporal.js";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -57,12 +67,27 @@ export type ResolvedDateRange = {
   to: Temporal.PlainDate | null;
 };
 
-/** Date bounds resolved from route query params, ready for SQL/Drizzle
- *  comparisons. `null` means the bound is open on that side. */
+/**
+ * The days a reader named, in both of the shapes a column can be compared
+ * against. `null` on either side means the bound is open there.
+ *
+ * Both come from one resolution of the same days, so they cannot drift; the
+ * call site picks the pair that matches its column, and that choice is
+ * visible at the comparison rather than three lines away at the call that
+ * produced it.
+ *
+ * `days` are inclusive calendar dates, which is what a `date` column wants: a
+ * stored `"2026-08-24"` compares equal to a bound of `"2026-08-24"`.
+ *
+ * `instants` are the half-open window of UTC those days occupy, which is what
+ * a `timestamp` column wants. The upper bound is named `until` rather than
+ * `to` so that a call site cannot mistake it for an inclusive bound and write
+ * `<=`.
+ */
 export type DateRangeQueryBounds = {
   state: DateRangeState;
-  from: string | null;
-  to: string | null;
+  days: { from: string | null; to: string | null };
+  instants: { from: string | null; until: string | null };
 };
 
 // ---------------------------------------------------------------------------
@@ -239,26 +264,77 @@ export function parseDateRange(
 }
 
 /**
- * Parse a route query's daterange fields and resolve them to ISO date strings.
+ * Parse a route query's daterange fields and resolve the days a reader named.
  *
- * Route-based report handlers can pass the returned `from` and `to` values
- * directly into Drizzle predicates or SQL parameters:
+ * The result carries both shapes a column can be compared against — inclusive
+ * calendar days for a `date` column, and the half-open window of UTC instants
+ * those days occupy for a `timestamp` column:
  *
- *   const period = resolveDateRangeQueryBounds("period", request.query);
- *   // period.from / period.to are string | null
+ *   const zone = workspaceTimeZone(c.get("auth"));
+ *   const period = resolveDateRangeQueryBounds(
+ *     "period", request.query, zone, Temporal.Now.instant(),
+ *   );
+ *
+ *   WHERE (:from  IS NULL OR issued_on  >= :from)     -- period.days
+ *     AND (:to    IS NULL OR issued_on  <= :to)
+ *
+ *   WHERE (:from  IS NULL OR created_at >= :from)     -- period.instants
+ *     AND (:until IS NULL OR created_at <  :until)
+ *
+ * One function rather than one per column type, because the two differ only in
+ * what they are compared against and a caller who picked the wrong one would
+ * get a report that silently drops a day: every instant stored on the 24th
+ * begins `"2026-08-24T"`, which sorts after an inclusive bound of
+ * `"2026-08-24"`.
+ *
+ * The instant window is half-open for two reasons. A closed upper bound has to
+ * name the last representable moment, which writes the storage precision
+ * (whole seconds) into every call site, so a later move to sub-second
+ * precision would make every closed bound wrong by up to a second. And a
+ * closed bound built from a wall-clock time such as `23:59:59` loses an hour
+ * on the day a zone leaves daylight saving, because that wall clock occurs
+ * twice and the earlier of the two is an hour before the day ends. The
+ * half-open form is `[start of day N, start of day N+1)` and needs no special
+ * case for either. Both edges come from
+ * `Temporal.PlainDate.toZonedDateTime(zone)`, which returns the first instant
+ * that exists on a local day, so the window is exact on a day whose local
+ * midnight does not exist and on a day that runs 23 or 25 hours.
+ *
+ * `zone` and `now` are both required and neither has a default. Resolving
+ * `7d` or `mtd` means knowing what day it is, and that question has no
+ * zone-free answer: a defaulted `today` would read the host's `TZ`, so the
+ * same report would return different rows depending on how the container was
+ * started. Tests pass a fixed instant.
  */
 export function resolveDateRangeQueryBounds(
   paramName: string,
   params: Record<string, unknown>,
-  today: Temporal.PlainDate = Temporal.Now.plainDateISO(),
+  zone: TimeZone,
+  now: Temporal.Instant,
 ): DateRangeQueryBounds {
   const state = parseDateRange(paramName, params);
-  const { from, to } = resolveDateRange(state, today);
+  const { from, to } = resolveDateRange(state, todayIn(zone, now));
   return {
     state,
-    from: from ? formatPlainDate(from) : null,
-    to: to ? formatPlainDate(to) : null,
+    days: {
+      from: from ? formatPlainDate(from) : null,
+      to: to ? formatPlainDate(to) : null,
+    },
+    instants: {
+      from: from ? startOfDayInstant(from, zone) : null,
+      until: to ? startOfDayInstant(to.add({ days: 1 }), zone) : null,
+    },
   };
+}
+
+/** The calendar day `now` falls on in `zone`. */
+function todayIn(zone: TimeZone, now: Temporal.Instant): Temporal.PlainDate {
+  return now.toZonedDateTimeISO(zone).toPlainDate();
+}
+
+/** The first instant of `date` in `zone`, in canonical storage form. */
+function startOfDayInstant(date: Temporal.PlainDate, zone: TimeZone): string {
+  return formatCanonicalInstant(date.toZonedDateTime(zone).toInstant());
 }
 
 function stringOrEmpty(v: unknown): string {

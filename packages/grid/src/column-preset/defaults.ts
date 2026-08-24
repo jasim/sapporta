@@ -25,6 +25,7 @@ import { BooleanEditor } from "./editors/BooleanEditor";
 import { SelectEditor } from "./editors/SelectEditor";
 import { LookupValueEditor } from "./editors/LookupValueEditor";
 import { renderWithPresetRuntime } from "./render";
+import { displayTimeZone } from "./display-zone";
 
 export type KindDefaults = {
   align: ColumnAlign;
@@ -85,7 +86,7 @@ export function defaultsFor(kind: ColumnPresetKind): KindDefaults {
       return base({
         align: "left",
         width: "date",
-        format: formatDate,
+        format: (value) => formatDate(value, displayTimeZone()),
         parse: parseDate,
         editor: () => DateEditor,
       });
@@ -97,7 +98,7 @@ export function defaultsFor(kind: ColumnPresetKind): KindDefaults {
       return base({
         align: "left",
         width: "timestamp",
-        format: formatTimestamp,
+        format: (value) => formatTimestamp(value, displayTimeZone()),
         parse: parseDate,
       });
     case "boolean":

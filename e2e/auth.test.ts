@@ -59,8 +59,7 @@ type MessageBody = {
 };
 
 type AuthzPublicBody =
-  | { kind: "anonymous"; email?: undefined }
-  | { kind: "user"; email: string };
+  { kind: "anonymous"; email?: undefined } | { kind: "user"; email: string };
 
 type AuthzWorkspaceBody = {
   workspaceId: string;
@@ -1416,7 +1415,9 @@ describe.sequential("sapporta init auth template - end-to-end", () => {
     await expectRejectedAuthAttempt(
       "duplicate-signup",
       "/api/auth/sign-up/email",
-      credentials,
+      // A complete body, so the rejection is about the address already being
+      // taken rather than about a missing field.
+      { ...credentials, timeZone: "UTC" },
     );
     await expectRejectedAuthAttempt(
       "malformed-email",

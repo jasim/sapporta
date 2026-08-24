@@ -20,8 +20,8 @@ import type {
 import type { BetterAuthSessionApi } from "./better-auth.js";
 import {
   ensureActiveWorkspace,
+  membershipFromRow,
   switchWorkspaceMembership,
-  type WorkspaceMembershipRow,
 } from "./workspace.js";
 import { authFailure } from "./errors.js";
 import { resolveBearerTokenPrincipal, TokenAuthError } from "./auth-tokens.js";
@@ -187,29 +187,6 @@ export function userFromSessionPayload(
     name: payload.user.name ?? null,
     email: payload.user.email,
     emailVerified: payload.user.emailVerified,
-  };
-}
-
-/**
- * Converts the selected workspace membership into request facts.
- *
- * Roles live on the membership, not the user. The same person can be an owner
- * in one workspace and a member in another, and agent access tokens preserve
- * that distinction because each token names one workspace.
- */
-export function membershipFromRow(
-  row: WorkspaceMembershipRow,
-): AppWorkspaceMembership {
-  const role =
-    row.role === "owner" || row.role === "admin" ? "owner" : "member";
-  return {
-    id: row.member_id,
-    workspace: {
-      id: row.organization_id,
-      name: row.organization_name,
-      slug: row.organization_slug,
-    },
-    roles: [role],
   };
 }
 

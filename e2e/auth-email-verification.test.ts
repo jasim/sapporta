@@ -86,6 +86,7 @@ describe.sequential("sapporta email verification policy - end-to-end", () => {
       name: "Verification Policy User",
       email: "verification-policy@example.test",
       password: "correct-horse-battery-staple",
+      timeZone: "UTC",
     };
 
     await requestJson<unknown>(localBaseUrl, "/api/auth/sign-up/email", {

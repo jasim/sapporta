@@ -14,6 +14,7 @@ import {
   createAuthTokenRoute,
   revokeAuthTokenRoute,
   switchActiveWorkspaceRoute,
+  updateWorkspaceTimeZoneRoute,
 } from "./auth-routes.js";
 import {
   getTableRoute,
@@ -39,6 +40,7 @@ export const uiContract = c.router({
   getAuthBootstrapStatus: getAuthBootstrapStatusRoute,
   getAuthContext: getAuthContextRoute,
   switchActiveWorkspace: switchActiveWorkspaceRoute,
+  updateWorkspaceTimeZone: updateWorkspaceTimeZoneRoute,
   listAuthTokens: listAuthTokensRoute,
   createAuthToken: createAuthTokenRoute,
   revokeAuthToken: revokeAuthTokenRoute,

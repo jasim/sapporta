@@ -3,12 +3,7 @@
 // with non-JSON shapes (Map, Set, Date) convert at the boundary.
 
 type JsonValue =
-  | string
-  | number
-  | boolean
-  | null
-  | JsonValue[]
-  | { [key: string]: JsonValue };
+  string | number | boolean | null | JsonValue[] | { [key: string]: JsonValue };
 
 export function loadPref<T extends JsonValue>(key: string, fallback: T): T {
   if (typeof window === "undefined") return fallback;

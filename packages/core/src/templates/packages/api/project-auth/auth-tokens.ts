@@ -17,7 +17,7 @@ import type {
 import type { AppPrincipal, AppWorkspaceMembership } from "../authz/types.js";
 import type { ProjectAuthErrorCode } from "./errors.js";
 import { findUserById } from "./user.js";
-import { findMembership, type WorkspaceMembershipRow } from "./workspace.js";
+import { findMembership, membershipFromRow } from "./workspace.js";
 
 /**
  * Agent access tokens let non-browser clients call the same protected API that
@@ -332,22 +332,6 @@ function serializeToken(row: PersonalAccessTokenRow): AuthToken {
     expiresAt: toNullableIso(row.expires_at),
     lastUsedAt: toNullableIso(row.last_used_at),
     revokedAt: toNullableIso(row.revoked_at),
-  };
-}
-
-function membershipFromRow(
-  row: WorkspaceMembershipRow,
-): AppWorkspaceMembership {
-  const role =
-    row.role === "owner" || row.role === "admin" ? "owner" : "member";
-  return {
-    id: row.member_id,
-    workspace: {
-      id: row.organization_id,
-      name: row.organization_name,
-      slug: row.organization_slug,
-    },
-    roles: [role],
   };
 }
 

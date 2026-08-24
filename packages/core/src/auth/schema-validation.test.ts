@@ -17,6 +17,7 @@ import {
   workspaceUserScopedAuthority,
 } from "./index.js";
 import type { RequestDataAuthority } from "./request-data-authority.js";
+import { parseTimeZone } from "@sapporta/shared/temporal";
 
 const testUser = {
   id: "user-1",
@@ -28,6 +29,7 @@ const testWorkspace = {
   id: "workspace-1",
   name: "Workspace One",
   slug: "workspace-one",
+  timeZone: parseTimeZone("UTC"),
 };
 const dataAuthority: RequestDataAuthority = requestDataAuthority({
   systemGlobalOnly: systemGlobalOnlyAuthority(),

@@ -16,6 +16,7 @@ import {
 import { Button } from "@sapporta/ui/button";
 import { Input } from "@sapporta/ui/input";
 import { Label } from "@sapporta/ui/label";
+import { deviceTimeZone } from "@sapporta/shared/temporal";
 import { getApiBase } from "../../platform/base";
 import { useAuthStore } from "../state/auth-store";
 import { safeRedirectPath, signInRedirectPath } from "../redirect";
@@ -410,6 +411,14 @@ function bodyForMode(
       email: fields.email,
       password: fields.password,
       name: fields.name,
+      // The calendar the first workspace this account gets will keep. Only
+      // the browser knows which zone the person is in, and this is the one
+      // request where they say so; there is no control for it, because
+      // someone creating a workspace for themselves is almost always in the
+      // calendar they want it kept in, and an owner who is not changes it on
+      // the workspace settings screen. The server copies it onto the
+      // workspace row once and never reads it again.
+      timeZone: deviceTimeZone(),
       callbackURL: "/",
     };
   }

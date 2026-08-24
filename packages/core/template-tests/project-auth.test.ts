@@ -16,9 +16,11 @@ import {
   type SapportaAuthUser,
   type SapportaEnv,
   workspaceGlobalOnlyAuthority,
+  workspaceTimeZone,
   workspaceUserScopedAuthority,
 } from "@sapporta/server";
 import { getAuthBootstrapStatusRoute } from "@sapporta/shared/contracts";
+import { parseTimeZone } from "@sapporta/shared/temporal";
 import type { BetterAuthSessionApi } from "../src/templates/packages/api/project-auth/better-auth.js";
 import {
   resolveSapportaAuthContext,
@@ -48,9 +50,14 @@ import { anonymousPublicRoutes } from "../src/templates/packages/api/project-aut
 import {
   WorkspaceSwitchError,
   ensureActiveWorkspace,
+  findMembership,
+  membershipFromRow,
   switchWorkspaceMembership,
 } from "../src/templates/packages/api/project-auth/workspace.js";
-import { createProjectAuthRoutes } from "../src/templates/packages/api/project-auth/routes.js";
+import {
+  authContextResponse,
+  createProjectAuthRoutes,
+} from "../src/templates/packages/api/project-auth/routes.js";
 import {
   createAuthToken,
   listAuthTokens,
@@ -461,11 +468,12 @@ describe("project auth template", () => {
   });
 
   it("provisions an initial workspace when the user has no membership", () => {
-    conn = createAuthDb();
+    conn = createAuthDb({ includeUserTable: true });
     const payload = sessionPayload({
       name: "Ada Lovelace",
       activeOrganizationId: null,
     });
+    insertUser(conn, "user-1", "Ada Lovelace", "ada@example.test", true);
     insertSession(conn, "session-1", "user-1", null);
 
     const membership = ensureActiveWorkspace(conn, payload);
@@ -476,6 +484,46 @@ describe("project auth template", () => {
     expect(readSessionWorkspace(conn, "session-1")).toBe(
       membership.organization_id,
     );
+  });
+
+  /**
+   * The zone the browser sent with the sign-up request is on the account row,
+   * and the first workspace that account gets keeps it. Nothing reads it from
+   * the account again afterwards: the workspace owns its own calendar from
+   * here on.
+   */
+  it("starts the first workspace on the calendar the account signed up with", () => {
+    conn = createAuthDb({ includeUserTable: true });
+    const payload = sessionPayload({
+      name: "Ada Lovelace",
+      activeOrganizationId: null,
+    });
+    insertUser(
+      conn,
+      "user-1",
+      "Ada Lovelace",
+      "ada@example.test",
+      true,
+      "Asia/Kolkata",
+    );
+    insertSession(conn, "session-1", "user-1", null);
+
+    const membership = ensureActiveWorkspace(conn, payload);
+
+    expect(membership.organization_time_zone).toBe("Asia/Kolkata");
+    expect(membershipFromRow(membership).workspace.timeZone).toBe(
+      "Asia/Kolkata",
+    );
+  });
+
+  it("refuses a workspace whose stored zone this runtime cannot use", () => {
+    conn = createAuthDb();
+    insertWorkspace(conn, "workspace-1", "First", "first", "Mars/Olympus_Mons");
+    insertMember(conn, "member-1", "workspace-1", "user-1", "owner", 1);
+
+    const membership = findMembership(conn, "user-1", "workspace-1");
+
+    expect(() => membershipFromRow(membership!)).toThrow(/Mars\/Olympus_Mons/);
   });
 
   it("switches workspaces for a member", () => {
@@ -520,6 +568,7 @@ describe("project auth template", () => {
     conn = createAuthDb();
     const routes = createProjectAuthRoutes({
       conn,
+      resolveAuth: resolveFromWorkspaceRow(conn),
       switchActiveWorkspace: async () => {
         throw new WorkspaceSwitchError(
           "You are not a member of that workspace.",
@@ -550,6 +599,7 @@ describe("project auth template", () => {
     conn = createAuthDb();
     const routes = createProjectAuthRoutes({
       conn,
+      resolveAuth: resolveFromWorkspaceRow(conn),
       switchActiveWorkspace: async () =>
         routeAuthContext({ workspaceId: "workspace-2" }),
     });
@@ -565,10 +615,15 @@ describe("project auth template", () => {
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toMatchObject({
       user: { id: "user-1", email: "owner@example.test" },
-      workspace: { id: "workspace-1", slug: "acme" },
+      workspace: { id: "workspace-1", slug: "acme", timeZone: "UTC" },
       memberships: [
         expect.objectContaining({
-          workspace: { id: "workspace-1", name: "Acme", slug: "acme" },
+          workspace: {
+            id: "workspace-1",
+            name: "Acme",
+            slug: "acme",
+            timeZone: "UTC",
+          },
           role: "owner",
           isOwner: true,
         }),
@@ -576,10 +631,94 @@ describe("project auth template", () => {
     });
   });
 
+  /**
+   * The zone belongs to the workspace, so it is the owner who sets it, and the
+   * response carries the value that was stored rather than the one the request
+   * arrived with.
+   */
+  it("lets an owner set the workspace time zone", async () => {
+    conn = createAuthDb();
+    insertWorkspace(conn, "workspace-1", "Acme", "acme");
+    const app = authRoutesApp(
+      createProjectAuthRoutes({
+        conn,
+        resolveAuth: resolveFromWorkspaceRow(conn),
+        switchActiveWorkspace: async () => routeAuthContext(),
+      }),
+      routeWorkspaceOwnerContext(),
+    );
+
+    const response = await app.request(
+      "/api/auth-context/workspace/time-zone",
+      {
+        method: "PUT",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ timeZone: "Asia/Kolkata" }),
+      },
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      workspace: { id: "workspace-1", timeZone: "Asia/Kolkata" },
+    });
+    expect(readWorkspaceTimeZone(conn, "workspace-1")).toBe("Asia/Kolkata");
+  });
+
+  it("refuses a zone this server does not know, and stores nothing", async () => {
+    conn = createAuthDb();
+    insertWorkspace(conn, "workspace-1", "Acme", "acme");
+    const app = authRoutesApp(
+      createProjectAuthRoutes({
+        conn,
+        resolveAuth: resolveFromWorkspaceRow(conn),
+        switchActiveWorkspace: async () => routeAuthContext(),
+      }),
+      routeWorkspaceOwnerContext(),
+    );
+
+    const response = await app.request(
+      "/api/auth-context/workspace/time-zone",
+      {
+        method: "PUT",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ timeZone: "Mars/Olympus_Mons" }),
+      },
+    );
+
+    expect(response.status).toBe(422);
+    expect(readWorkspaceTimeZone(conn, "workspace-1")).toBe("UTC");
+  });
+
+  it("refuses a member who is not an owner", async () => {
+    conn = createAuthDb();
+    insertWorkspace(conn, "workspace-1", "Acme", "acme");
+    const app = authRoutesApp(
+      createProjectAuthRoutes({
+        conn,
+        resolveAuth: resolveFromWorkspaceRow(conn),
+        switchActiveWorkspace: async () => routeAuthContext(),
+      }),
+      routeWorkspaceWideContext(),
+    );
+
+    const response = await app.request(
+      "/api/auth-context/workspace/time-zone",
+      {
+        method: "PUT",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ timeZone: "Asia/Kolkata" }),
+      },
+    );
+
+    expect(response.status).toBe(403);
+    expect(readWorkspaceTimeZone(conn, "workspace-1")).toBe("UTC");
+  });
+
   it("returns public auth bootstrap status from generated routes", async () => {
     conn = createAuthDb({ includeUserTable: true });
     const routes = createProjectAuthRoutes({
       conn,
+      resolveAuth: resolveFromWorkspaceRow(conn),
       switchActiveWorkspace: async () => routeAuthContext(),
     });
     const app = new Hono<SapportaEnv>();
@@ -618,6 +757,7 @@ describe("project auth template", () => {
     insertMember(conn, "member-1", "workspace-1", "user-1", "owner", 1);
     const routes = createProjectAuthRoutes({
       conn,
+      resolveAuth: resolveFromWorkspaceRow(conn),
       switchActiveWorkspace: async () => routeAuthContext(),
     });
     const app = authRoutesApp(routes);
@@ -672,6 +812,7 @@ describe("project auth template", () => {
     insertMember(conn, "member-1", "workspace-1", "user-1", "member", 1);
     const routes = createProjectAuthRoutes({
       conn,
+      resolveAuth: resolveFromWorkspaceRow(conn),
       switchActiveWorkspace: async () => routeAuthContext(),
     });
     const app = authRoutesApp(routes, routeWorkspaceWideContext());
@@ -695,6 +836,7 @@ describe("project auth template", () => {
     });
     const routes = createProjectAuthRoutes({
       conn,
+      resolveAuth: resolveFromWorkspaceRow(conn),
       switchActiveWorkspace: async () => routeAuthContext(),
     });
     const app = authRoutesApp(
@@ -750,6 +892,7 @@ describe("project auth template", () => {
     );
     const routes = createProjectAuthRoutes({
       conn,
+      resolveAuth: resolveFromWorkspaceRow(conn),
       switchActiveWorkspace: async () => routeAuthContext(),
     });
     const app = authRoutesApp(
@@ -802,6 +945,7 @@ describe("project auth template", () => {
     );
     const routes = createProjectAuthRoutes({
       conn,
+      resolveAuth: resolveFromWorkspaceRow(conn),
       switchActiveWorkspace: async () => routeAuthContext(),
     });
     const app = authRoutesApp(routes);
@@ -827,6 +971,7 @@ describe("project auth template", () => {
     insertMember(conn, "member-1", "workspace-1", "user-1", "owner", 1);
     const routes = createProjectAuthRoutes({
       conn,
+      resolveAuth: resolveFromWorkspaceRow(conn),
       switchActiveWorkspace: async () => routeAuthContext(),
     });
     const app = authRoutesApp(routes);
@@ -1036,7 +1181,8 @@ function createAuthDb(
       slug TEXT NOT NULL,
       logo TEXT,
       createdAt INTEGER NOT NULL,
-      metadata TEXT
+      metadata TEXT,
+      timeZone TEXT NOT NULL DEFAULT 'UTC'
     );
     CREATE TABLE member (
       id TEXT PRIMARY KEY,
@@ -1052,7 +1198,8 @@ function createAuthDb(
         id TEXT PRIMARY KEY,
         name TEXT NOT NULL,
         email TEXT NOT NULL,
-        emailVerified INTEGER NOT NULL
+        emailVerified INTEGER NOT NULL,
+        timeZone TEXT NOT NULL DEFAULT 'UTC'
       );
     `);
   }
@@ -1122,12 +1269,13 @@ function insertUser(
   name: string,
   email: string,
   emailVerified: boolean,
+  timeZone = "UTC",
 ): void {
   db.sqlite
     .prepare(
-      "INSERT INTO user (id, name, email, emailVerified) VALUES (?, ?, ?, ?)",
+      "INSERT INTO user (id, name, email, emailVerified, timeZone) VALUES (?, ?, ?, ?, ?)",
     )
-    .run(id, name, email, emailVerified ? 1 : 0);
+    .run(id, name, email, emailVerified ? 1 : 0, timeZone);
 }
 
 function insertWorkspace(
@@ -1135,12 +1283,13 @@ function insertWorkspace(
   id: string,
   name: string,
   slug: string,
+  timeZone = "UTC",
 ): void {
   db.sqlite
     .prepare(
-      "INSERT INTO organization (id, name, slug, logo, createdAt, metadata) VALUES (?, ?, ?, NULL, 1, NULL)",
+      "INSERT INTO organization (id, name, slug, logo, createdAt, metadata, timeZone) VALUES (?, ?, ?, NULL, 1, NULL, ?)",
     )
-    .run(id, name, slug);
+    .run(id, name, slug, timeZone);
 }
 
 function insertMember(
@@ -1156,6 +1305,17 @@ function insertMember(
       "INSERT INTO member (id, organizationId, userId, role, createdAt) VALUES (?, ?, ?, ?, ?)",
     )
     .run(id, workspaceId, userId, role, createdAt);
+}
+
+function readWorkspaceTimeZone(
+  db: ProjectDbConnection,
+  workspaceId: string,
+): string | null {
+  const row = db.sqlite
+    .prepare("SELECT timeZone FROM organization WHERE id = ?")
+    .get(workspaceId);
+  if (!isRecord(row)) return null;
+  return typeof row.timeZone === "string" ? row.timeZone : null;
 }
 
 function readSessionWorkspace(
@@ -1213,6 +1373,19 @@ async function expectTokenFailure(
   }
 }
 
+/**
+ * Resolving a request again, as the middleware does — from the workspace row,
+ * so a route that has just written one answers from what it wrote.
+ */
+function resolveFromWorkspaceRow(
+  db: ProjectDbConnection,
+): () => Promise<SapportaAuthContext<AppAbility, AppWorkspaceMembership>> {
+  return async () =>
+    routeAuthContext({
+      timeZone: readWorkspaceTimeZone(db, "workspace-1") ?? "UTC",
+    });
+}
+
 function authRoutesApp(
   routes: ReturnType<typeof createProjectAuthRoutes>,
   auth: SapportaAuthContext<
@@ -1255,6 +1428,7 @@ function routeAuthContext(
     emailVerified?: boolean;
     workspaceId?: string;
     userId?: string;
+    timeZone?: string;
     can?: (action: string, subject: string) => boolean;
   } = {},
 ): SapportaAuthContext<AppAbility, AppWorkspaceMembership> {
@@ -1272,6 +1446,7 @@ function routeAuthContext(
     id: workspaceId,
     name: "Acme",
     slug: "acme",
+    timeZone: parseTimeZone(overrides.timeZone ?? "UTC"),
   };
 
   const principal = {
@@ -1313,6 +1488,40 @@ function routeUserPrincipal(
   return principal;
 }
 
+/** An owner, carrying the workspace-wide authority the settings route needs. */
+function routeWorkspaceOwnerContext(): SapportaAuthContext<
+  AppAbility,
+  AppWorkspaceMembership
+> {
+  const workspace = {
+    id: "workspace-1",
+    name: "Acme",
+    slug: "acme",
+    timeZone: parseTimeZone("UTC"),
+  };
+  const principal = {
+    kind: "user",
+    user: {
+      id: "user-1",
+      name: "Owner",
+      email: "owner@example.test",
+      emailVerified: true,
+    },
+    membership: {
+      id: "member-1",
+      workspace,
+      roles: ["owner"],
+    },
+  } as const;
+  const dataAuthority = workspaceDataAuthority(workspace);
+  return createAuthContext({
+    principal,
+    dataAuthority,
+    ability: { can: () => true } as unknown as AppAbility,
+    catalog: emptyCatalog,
+  });
+}
+
 function routeAnonymousContext(): SapportaAuthContext<
   AppAbility,
   AppWorkspaceMembership
@@ -1341,6 +1550,7 @@ function routeWorkspaceWideContext(): SapportaAuthContext<
     id: "workspace-1",
     name: "Acme",
     slug: "acme",
+    timeZone: parseTimeZone("UTC"),
   };
   const principal = {
     kind: "user",

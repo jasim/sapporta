@@ -21,6 +21,7 @@ import {
   type SapportaAuthContext,
   type SapportaAbility,
 } from "./index.js";
+import { parseTimeZone } from "@sapporta/shared/temporal";
 
 const testUser = {
   id: "user-1",
@@ -33,6 +34,7 @@ const testWorkspace = {
   id: "workspace-1",
   name: "Workspace One",
   slug: "workspace-one",
+  timeZone: parseTimeZone("UTC"),
 };
 
 function auth(

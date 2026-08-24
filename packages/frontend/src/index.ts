@@ -3,6 +3,7 @@ import "./index.css";
 export { getApiBase, API_ORIGIN, uiClient } from "./platform/client";
 
 export { useSchemaStore } from "./schema-catalog/state/schema-store";
+export { appTimeZone } from "./platform/app-time-zone";
 export { useThemeStore, type ThemeMode } from "./shell/state/theme-store";
 export {
   useHintsStore,
@@ -20,6 +21,7 @@ export {
 
 export { AccountProfilePage } from "./auth/components/AccountProfilePage";
 export { ChangePasswordPage } from "./auth/components/ChangePasswordPage";
+export { WorkspaceSettingsPage } from "./auth/components/WorkspaceSettingsPage";
 export {
   AuthGate,
   ForgotPasswordPage,
@@ -33,6 +35,7 @@ export {
   fetchAuthContext,
   signOut,
   switchActiveWorkspace,
+  updateWorkspaceTimeZone,
   useAuthStore,
   type AuthState,
   type AuthSession,

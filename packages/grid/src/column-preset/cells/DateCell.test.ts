@@ -2,15 +2,9 @@
 
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
-import {
-  afterAll,
-  afterEach,
-  beforeAll,
-  describe,
-  expect,
-  it,
-  vi,
-} from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
+import { parseTimeZone, type TimeZone } from "@sapporta/shared/temporal";
+import { setDisplayTimeZone } from "../display-zone";
 import { columnPreset } from "../index";
 import { makeRowId, rootPath } from "../../core/types/identity";
 import type { CellRenderProps } from "../../core/types/schema";
@@ -21,16 +15,11 @@ import type { TreeNode } from "../../core/types/level-row";
   globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
 ).IS_REACT_ACT_ENVIRONMENT = true;
 
-const DISPLAY_TIME_ZONE = "Asia/Kolkata";
+// The page names the zone it reads on, so nothing here stubs the host TZ.
+// Asia/Kolkata is +05:30 year-round: the half-hour offset catches whole-hour
+// rounding, and an evening UTC instant lands on the next calendar day.
+const DISPLAY_TIME_ZONE = parseTimeZone("Asia/Kolkata");
 const INSTANT = "2026-08-23T20:30:00Z";
-
-beforeAll(() => {
-  vi.stubEnv("TZ", DISPLAY_TIME_ZONE);
-});
-
-afterAll(() => {
-  vi.unstubAllEnvs();
-});
 
 let root: Root | null = null;
 let host: HTMLElement | null = null;
@@ -45,7 +34,9 @@ afterEach(() => {
 function renderCellFor(
   kind: "date" | "timestamp",
   value: unknown,
+  zone: TimeZone = DISPLAY_TIME_ZONE,
 ): HTMLElement {
+  setDisplayTimeZone(zone);
   const column =
     kind === "timestamp"
       ? columnPreset.timestamp({ id: "created_at", name: "Created at" })
@@ -82,10 +73,13 @@ function hover(cell: HTMLElement): void {
 }
 
 describe("DateCell", () => {
-  it("prints a timestamp on the reader's wall clock", () => {
+  it("prints a timestamp on the wall clock of the column's zone", () => {
     expect(renderCellFor("timestamp", INSTANT).textContent).toBe(
       "2026-08-24 02:00",
     );
+    expect(
+      renderCellFor("timestamp", INSTANT, parseTimeZone("UTC")).textContent,
+    ).toBe("2026-08-23 20:30");
   });
 
   it("says nothing about the seconds or the zone until asked", () => {

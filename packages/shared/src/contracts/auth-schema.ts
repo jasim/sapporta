@@ -26,6 +26,12 @@ export const authWorkspaceSummarySchema = z
     id: z.string(),
     name: z.string(),
     slug: z.string(),
+    /**
+     * The IANA zone id this workspace keeps its calendar in, such as
+     * `Asia/Kolkata`. Every date and time the browser shows is written on this
+     * clock, and every day a report groups by is a day in it.
+     */
+    timeZone: z.string(),
   })
   .meta({ id: "AuthWorkspaceSummary" });
 export type AuthWorkspaceSummary = z.output<typeof authWorkspaceSummarySchema>;
@@ -72,6 +78,26 @@ export const switchActiveWorkspaceBodySchema = z
   .meta({ id: "SwitchActiveWorkspaceBody" });
 export type SwitchActiveWorkspaceBody = z.output<
   typeof switchActiveWorkspaceBodySchema
+>;
+
+/**
+ * An IANA zone id, never a fixed offset.
+ *
+ * An offset such as `+05:30` describes one instant. A report describes a
+ * range, and a range can contain the moment where the offset changes, so no
+ * single offset describes it. An id also stays correct across a rule change:
+ * `Asia/Kolkata` means the same thing next year, whereas `+05:30` means "this
+ * number, forever", which is a different and usually unintended statement.
+ * The server checks the id against its own tz database and refuses one it
+ * cannot render.
+ */
+export const updateWorkspaceTimeZoneBodySchema = z
+  .object({
+    timeZone: z.string().min(1),
+  })
+  .meta({ id: "UpdateWorkspaceTimeZoneBody" });
+export type UpdateWorkspaceTimeZoneBody = z.output<
+  typeof updateWorkspaceTimeZoneBodySchema
 >;
 
 /**

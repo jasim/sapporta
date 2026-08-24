@@ -37,6 +37,7 @@ const AUTH_CONTEXT = {
     id: "workspace-1",
     name: "Owner's Workspace",
     slug: "owners-workspace",
+    timeZone: "UTC",
     isOwner: true,
   },
   memberships: [
@@ -46,6 +47,7 @@ const AUTH_CONTEXT = {
         id: "workspace-1",
         name: "Owner's Workspace",
         slug: "owners-workspace",
+        timeZone: "UTC",
       },
       role: "owner",
       isOwner: true,

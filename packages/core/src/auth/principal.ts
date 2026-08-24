@@ -7,6 +7,8 @@
  * public workspace page can be anonymous while still being limited to a known
  * workspace's public rows.
  */
+import type { TimeZone } from "@sapporta/shared/temporal";
+
 export type WorkspaceRole = "owner" | "member";
 
 /**
@@ -26,6 +28,20 @@ export type AuthWorkspace = {
   id: string;
   name: string;
   slug: string;
+  /**
+   * The calendar this workspace keeps.
+   *
+   * A day is a calendar day in this zone: it is what a report groups by, what
+   * a day-bounded filter resolves against, and what a timestamp is displayed
+   * on. It is a business fact in the same sense that a currency or a fiscal
+   * year start is, so it belongs to the workspace rather than to whoever is
+   * reading — two colleagues looking at one dashboard have to see the same
+   * numbers under the same date.
+   *
+   * Checked where the workspace row is read, so everything downstream holds a
+   * zone this runtime can render. Read it through `workspaceTimeZone`.
+   */
+  timeZone: TimeZone;
 };
 
 /** User facts copied from the active session provider. */

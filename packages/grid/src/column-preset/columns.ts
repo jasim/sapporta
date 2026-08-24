@@ -66,6 +66,11 @@ export function percentage<TMeta = unknown>(
   return column<TMeta>({ ...options, kind: "percentage" });
 }
 
+/**
+ * A date or timestamp column, written on the wall clock the page publishes
+ * with `setDisplayTimeZone` — see `display-zone.ts` for why the column does
+ * not carry a zone of its own.
+ */
 export function date<TMeta = unknown>(
   options: ColumnPresetOptions<TMeta>,
 ): ColumnSchema {

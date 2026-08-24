@@ -14,6 +14,7 @@ import { createTestDb } from "../testing/test-utils.js";
 import { createRoute } from "./table-api-contracts.js";
 import { makeAuthorizedTableHandlers } from "./table-handlers.js";
 import type { SapportaEnv } from "./server.js";
+import { parseTimeZone } from "@sapporta/shared/temporal";
 
 const ordersTable = sqliteTable("orders", {
   id: integer("id").primaryKey({ autoIncrement: true }),
@@ -22,7 +23,9 @@ const ordersTable = sqliteTable("orders", {
 });
 const orderLinesTable = sqliteTable("order_lines", {
   id: integer("id").primaryKey({ autoIncrement: true }),
-  order_id: integer("order_id").notNull().references(() => ordersTable.id),
+  order_id: integer("order_id")
+    .notNull()
+    .references(() => ordersTable.id),
   description: text("description").notNull(),
   workspace_id: text("workspace_id").notNull(),
 });
@@ -65,7 +68,12 @@ function buildApp(guarded: boolean) {
     );
   `);
   const catalog = createTableCatalog([orders, lines(guarded)]);
-  const workspace = { id: "workspace-1", name: "W", slug: "w" };
+  const workspace = {
+    id: "workspace-1",
+    name: "W",
+    slug: "w",
+    timeZone: parseTimeZone("UTC"),
+  };
   const auth = createAuthContext<SapportaAbility>({
     principal: {
       kind: "user",
@@ -79,7 +87,9 @@ function buildApp(guarded: boolean) {
     ability: { can: () => true },
     catalog,
   });
-  const handlers = makeAuthorizedTableHandlers(catalog, db, { guard: () => auth });
+  const handlers = makeAuthorizedTableHandlers(catalog, db, {
+    guard: () => auth,
+  });
   const createOrders = handlers.create({
     def: orders,
     route: createRoute(orders, catalog.tables),
@@ -150,12 +160,12 @@ describe("a $details row that carries the server-authored child FK", () => {
       });
 
       expect(res.status).toBe(201);
-      const master = sqlite
-        .prepare("SELECT id FROM orders")
-        .get() as { id: number };
-      expect(
-        sqlite.prepare("SELECT order_id FROM order_lines").all(),
-      ).toEqual([{ order_id: master.id }]);
+      const master = sqlite.prepare("SELECT id FROM orders").get() as {
+        id: number;
+      };
+      expect(sqlite.prepare("SELECT order_id FROM order_lines").all()).toEqual([
+        { order_id: master.id },
+      ]);
     } finally {
       sqlite.close();
     }

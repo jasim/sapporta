@@ -2,6 +2,7 @@ import {
   describeInstantForDisplay,
   formatTemporalForDisplay,
   type TemporalDisplayPrecision,
+  type TimeZone,
 } from "@sapporta/shared/temporal";
 
 import { finiteNumericValue } from "./numeric";
@@ -42,53 +43,64 @@ export function formatPercentage(value: unknown): string {
 }
 
 /**
- * Render a date or a timestamp for reading.
+ * Render a date or a timestamp for reading, on the wall clock of `zone`.
  *
  * Values reach the grid in their canonical wire shape — `2026-08-23` for a
  * date, `2026-08-23T11:08:00Z` for a timestamp — which is precise but slow to
  * read across a column. A date reads as `2026-08-23` and a timestamp as
- * `2026-08-23 16:38` on the reader's own wall clock.
+ * `2026-08-23 16:38` on the zone the caller names, the same one the filter and
+ * form codecs read in.
  *
- * Which of the two a column uses comes from the column's declared kind, not
- * from the value in the cell, so every row of a column reads the same way even
- * where the values underneath vary. The value's shape decides only how much
- * there is to show: a date has no time for `formatTimestamp` to print, and an
- * instant in a date column is reduced to the calendar day it falls on.
+ * The zone is an argument rather than something these read for themselves, so
+ * a column can be built for the zone its reader chose, and a test can pin
+ * whatever zone it needs. Which of date or timestamp a column uses comes from
+ * the column's declared kind, not the value in the cell, so every row reads
+ * the same way even where the values underneath vary. The value's shape
+ * decides only how much there is to show: a date has no time for
+ * `formatTimestamp` to print, and an instant in a date column is reduced to
+ * the calendar day it falls on in that zone.
  *
  * Text in neither canonical shape is shown exactly as it arrived, so
  * unexpected data — a report column whose SQL emits `2026-08` — stays visible
  * instead of being blanked or guessed at.
  */
-export function formatDate(value: unknown): string {
-  return formatTemporal(value, "day");
+export function formatDate(value: unknown, zone: TimeZone): string {
+  return formatTemporal(value, "day", zone);
 }
 
-export function formatTimestamp(value: unknown): string {
-  return formatTemporal(value, "minute");
+export function formatTimestamp(value: unknown, zone: TimeZone): string {
+  return formatTemporal(value, "minute", zone);
 }
 
 /**
- * The exact moment behind a timestamp cell, for a tooltip.
+ * The exact moment behind a timestamp cell, for a tooltip, in `zone`.
  *
  * Cell text stops at the minute, which is enough to scan a column and not
  * enough to tell two rows a few seconds apart from one another. This is the
  * rest of it: seconds, plus the offset that says which wall clock the cell is
- * printed on. `undefined` for anything that is not an instant.
+ * printed on — which the text itself cannot say without costing the density
+ * the format was chosen for. `undefined` for anything that is not an instant.
  */
-export function describeInstant(value: unknown): string | undefined {
+export function describeInstant(
+  value: unknown,
+  zone: TimeZone,
+): string | undefined {
   const canonical = canonicalText(value);
   if (canonical === null) return undefined;
-  return describeInstantForDisplay(canonical) ?? undefined;
+  return describeInstantForDisplay(canonical, zone) ?? undefined;
 }
 
 function formatTemporal(
   value: unknown,
   precision: TemporalDisplayPrecision,
+  zone: TimeZone,
 ): string {
   if (value === null || value === undefined || value === "") return "";
   const canonical = canonicalText(value);
   const formatted =
-    canonical === null ? null : formatTemporalForDisplay(canonical, precision);
+    canonical === null
+      ? null
+      : formatTemporalForDisplay(canonical, precision, zone);
   return formatted ?? String(value);
 }
 

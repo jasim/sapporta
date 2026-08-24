@@ -3,6 +3,7 @@ import type { CellRenderProps } from "../../core/types/schema";
 import type { DatePreset, TimestampPreset } from "../preset";
 import type { ColumnPresetCellRenderRuntime } from "../runtime";
 import { describeInstant } from "../format";
+import { displayTimeZone } from "../display-zone";
 
 /**
  * A date or timestamp cell.
@@ -10,8 +11,12 @@ import { describeInstant } from "../format";
  * The text stops at the minute so that the column stays scannable, which
  * leaves the seconds and the time zone unsaid. Both live in a tooltip, and
  * both are resolved on first hover rather than on render: describing an
- * instant costs a time-zone resolution per value, and a grid renders far more
- * cells than a reader ever points at.
+ * instant costs more than formatting one, and a grid renders far more cells
+ * than a reader ever points at.
+ *
+ * The zone is the one the page published before it rendered; it does not
+ * change while the cell is mounted, so the cell neither subscribes to it nor
+ * keys anything on it.
  */
 export function DateCell({
   value,
@@ -37,7 +42,7 @@ export function DateCell({
 
   function describeOnHover() {
     if (title !== undefined) return;
-    const text = describeInstant(rawValue);
+    const text = describeInstant(rawValue, displayTimeZone());
     if (text !== undefined) setDescribed({ value: rawValue, text });
   }
 

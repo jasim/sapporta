@@ -3,13 +3,16 @@ import type {
   AuthBootstrapStatus,
   AuthContextResponse,
   SwitchActiveWorkspaceBody,
+  UpdateWorkspaceTimeZoneBody,
 } from "@sapporta/shared/contracts";
 import {
   fetchAuthBootstrapStatus,
   fetchAuthContext,
   signOut,
   switchActiveWorkspace,
+  updateWorkspaceTimeZone,
 } from "../api/auth-context";
+import { setAppTimeZone } from "../../platform/app-time-zone";
 import { useSchemaStore } from "../../schema-catalog/state/schema-store";
 
 export type AuthSession =
@@ -28,6 +31,7 @@ export interface AuthState {
   reloadSession: () => Promise<void>;
   loadBootstrapStatus: () => Promise<void>;
   switchWorkspace: (body: SwitchActiveWorkspaceBody) => Promise<void>;
+  setWorkspaceTimeZone: (body: UpdateWorkspaceTimeZoneBody) => Promise<void>;
   logout: () => Promise<void>;
   reset: () => void;
 }
@@ -62,6 +66,17 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     useSchemaStore.getState().reset();
     set({ session: sessionFromContext(context) });
   },
+  setWorkspaceTimeZone: async (body) => {
+    const context = await updateWorkspaceTimeZone(body);
+    // Every screen on the way out was written on the previous clock, and
+    // rebuilding them in place would mean threading the zone through every
+    // path that renders a moment as a live value. Resetting the schema store
+    // closes the `BootLoader` gate instead, so each route remounts against the
+    // zone `sessionFromContext` is about to publish. This is the same handling
+    // a workspace switch gets, for the same reason.
+    useSchemaStore.getState().reset();
+    set({ session: sessionFromContext(context) });
+  },
   logout: async () => {
     await signOut();
     useSchemaStore.getState().reset();
@@ -84,6 +99,13 @@ async function readAuthSession(): Promise<AuthSession> {
 }
 
 function sessionFromContext(context: AuthContextResponse): AuthSession {
+  // The zone the active workspace keeps is published before the session is
+  // handed on, so it is in place before `BootLoader` opens and no screen can
+  // render a timestamp without one. Both ways a session settles — restoring it
+  // and switching workspaces — come through here, so switching to a workspace
+  // on a different calendar publishes the new one along with the new
+  // workspace.
+  setAppTimeZone(context.workspace.timeZone);
   // The server decides whether verification blocks access: when the app
   // requires it, the context request fails with `email_not_verified` and the
   // session becomes "unverified". A successful response is a usable session

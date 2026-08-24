@@ -9,6 +9,11 @@ import { ApiError } from "@sapporta/shared/client";
 import type { TableSchema } from "@sapporta/shared/contracts";
 import { tableQueryKeys } from "../query";
 import { NewRecordPage } from "./NewRecordPage";
+import { setAppTimeZone } from "../../platform/app-time-zone";
+
+// Boot publishes the workspace zone before any screen renders; these tests
+// mount the pieces directly, so they stand in for it.
+setAppTimeZone("UTC");
 
 const { createTableRow, reloadTGridRows } = vi.hoisted(() => ({
   createTableRow: vi.fn(),

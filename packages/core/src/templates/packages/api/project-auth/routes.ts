@@ -13,16 +13,19 @@ import {
   createAuthTokenRoute,
   revokeAuthTokenRoute,
   switchActiveWorkspaceRoute,
+  updateWorkspaceTimeZoneRoute,
   type AuthBootstrapStatus,
   type AuthContextResponse,
 } from "@sapporta/shared/contracts";
+import { isValidTimeZone } from "@sapporta/shared/temporal";
 import { authFailure } from "./errors.js";
 import {
   requireAuthContext,
   requireAuthorizedInteractiveWorkspaceUserData,
+  requireWorkspaceOwner,
   type WorkspaceUserDataAuthority,
 } from "./middleware.js";
-import { WorkspaceSwitchError } from "./workspace.js";
+import { setWorkspaceTimeZone, WorkspaceSwitchError } from "./workspace.js";
 import {
   createAuthToken,
   type AuthTokenManagementScope,
@@ -33,6 +36,12 @@ import {
 
 export interface ProjectAuthRoutesOptions {
   conn: ProjectDbConnection;
+  /** Resolves a request's auth context from its credentials, as the
+   *  middleware does. A route that changes a workspace field calls it again
+   *  to answer from the row it just wrote. */
+  resolveAuth: (
+    c: Context<SapportaEnv>,
+  ) => Promise<SapportaAuthContext<AppAbility, AppWorkspaceMembership>>;
   switchActiveWorkspace: (
     c: Context<SapportaEnv>,
     workspaceId: string,
@@ -89,6 +98,48 @@ export function createProjectAuthRoutes(options: ProjectAuthRoutesOptions) {
           body: failure.body,
         };
       }
+    },
+  );
+
+  /**
+   * Sets the calendar the active workspace keeps.
+   *
+   * Owner only, because the zone is the workspace's and not the caller's:
+   * changing it changes which day every timestamp in the application falls on,
+   * for everyone in the workspace. The response is a fresh auth context, so
+   * the browser that made the change publishes the new zone through the same
+   * path it publishes a workspace switch through.
+   */
+  api.register(
+    "updateWorkspaceTimeZone",
+    updateWorkspaceTimeZoneRoute,
+    async ({ c, request }) => {
+      const auth = requireWorkspaceOwner(c);
+      const { timeZone } = request.body;
+      // Checked against this server's own tz database, which is the one every
+      // report will group with. A name only the browser knows would store
+      // fine and then fail on the next request that read the row.
+      if (!isValidTimeZone(timeZone)) {
+        const failure = authFailure(
+          "validation_failed",
+          `${JSON.stringify(timeZone)} is not a time zone this server knows. ` +
+            `Use an IANA id such as "Asia/Kolkata" or "America/New_York".`,
+        );
+        return { status: 422, body: failure.body };
+      }
+      const workspace =
+        auth.dataAuthority.rowAuthorities.workspaceGlobalOnly.workspace;
+      setWorkspaceTimeZone(options.conn, workspace.id, timeZone);
+      // The context in hand was resolved from the workspace row before the
+      // update, so it still reads on the previous zone — and a request holds
+      // that row in more than one place, on the principal's membership and
+      // again on each row authority naming it. Resolving the request again
+      // rebuilds all of them from what was just written, which is the same
+      // path every other request takes to the same answer.
+      return {
+        status: 200,
+        body: authContextResponse(await options.resolveAuth(c)),
+      };
     },
   );
 

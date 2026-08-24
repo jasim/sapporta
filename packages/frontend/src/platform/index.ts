@@ -1,4 +1,5 @@
 export { API_ORIGIN, getApiBase } from "./base";
+export { appTimeZone, setAppTimeZone } from "./app-time-zone";
 export {
   ApiError,
   errorMessage,

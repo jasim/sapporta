@@ -160,16 +160,19 @@ export function requireWorkspaceRowsAllowed<E extends SapportaEnv>(
   };
 }
 
-export function requireWorkspaceOwner<E extends SapportaEnv>(
-  c: Context<E>,
-): SapportaAuthContext & {
+/** An owner of the active workspace, with the workspace-wide row authority. */
+export type AuthorizedWorkspaceOwnerContext = SapportaAuthContext & {
   dataAuthority: RequestDataAuthority & {
     rowAuthorities: Pick<
       Required<RequestDataAuthority["rowAuthorities"]>,
       "workspaceGlobalOnly"
     >;
   };
-} {
+};
+
+export function requireWorkspaceOwner<E extends SapportaEnv>(
+  c: Context<E>,
+): AuthorizedWorkspaceOwnerContext {
   const auth = requireWorkspaceRowsAllowed(c);
   // Owner can allow a workflow such as inviting users or changing settings, but
   // it does not widen the row boundary for user-scoped tables.

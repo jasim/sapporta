@@ -14,6 +14,10 @@ export {
   AuthAccountMenu,
   type AuthAccountMenuProps,
 } from "./components/AuthAccountMenu";
+export {
+  WorkspaceTimeZonePicker,
+  type WorkspaceTimeZonePickerProps,
+} from "./components/WorkspaceTimeZonePicker";
 export { SapportaMark } from "./components/Sidebar";
 export { SidebarShell } from "./components/SidebarShell";
 export {

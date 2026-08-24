@@ -13,6 +13,7 @@ describe("@sapporta/frontend/report public surface", () => {
     expect(report).toHaveProperty("ReportToolbar");
     expect(report).toHaveProperty("ReportRunButton");
     expect(report).toHaveProperty("ReportError");
+    expect(report).toHaveProperty("ReportTimeZoneNote");
     expect(report).toHaveProperty("ReportSummaryStats");
     expect(report).toHaveProperty("DateRangeField");
     expect(report).toHaveProperty("buildSearchParams");

@@ -15,6 +15,7 @@ export {
   ReportError,
   ReportRunButton,
   ReportScreenFrame,
+  ReportTimeZoneNote,
   ReportToolbar,
   type ReportRunButtonProps,
   type ReportScreenFrameProps,

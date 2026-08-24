@@ -22,6 +22,7 @@ import {
   workspaceGlobalOnlyAuthority,
   workspaceUserScopedAuthority,
 } from "../auth/index.js";
+import { parseTimeZone } from "@sapporta/shared/temporal";
 import { createTestDb } from "../testing/test-utils.js";
 import { installSapportaDefaults, type SapportaEnv } from "../api/server.js";
 import { TsRestApi } from "../api/index.js";
@@ -50,6 +51,7 @@ export interface TestAuthOverrides {
   userEmail?: string;
   emailVerified?: boolean;
   workspaceId?: string;
+  workspaceTimeZone?: string;
   workspaceName?: string;
   workspaceSlug?: string;
   isOwner?: boolean;
@@ -214,6 +216,7 @@ function createTestAuth(
     id: workspaceId,
     name: overrides.workspaceName ?? `Workspace ${workspaceId}`,
     slug: overrides.workspaceSlug ?? workspaceId,
+    timeZone: parseTimeZone(overrides.workspaceTimeZone ?? "UTC"),
   };
   const roles = [
     overrides.role ?? (overrides.isOwner === false ? "member" : "owner"),

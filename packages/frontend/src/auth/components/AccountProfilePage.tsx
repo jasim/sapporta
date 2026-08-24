@@ -2,6 +2,7 @@ import {
   Building2,
   CheckCircle2,
   Copy,
+  Globe,
   KeyRound,
   Mail,
   Plus,
@@ -24,6 +25,12 @@ import {
 import { Input } from "@sapporta/ui/input";
 import { Label } from "@sapporta/ui/label";
 import type { AuthToken } from "@sapporta/shared/contracts";
+import {
+  formatTemporalForDisplay,
+  formatTimeZoneOffsetLabel,
+  parseDateTimeLocalInputToCanonicalInstantString,
+} from "@sapporta/shared/temporal";
+import { appTimeZone } from "../../platform/app-time-zone";
 import {
   createAuthToken,
   listAuthTokens,
@@ -113,6 +120,23 @@ export function AccountProfilePage() {
             label="Role"
             value={formatAuthRole(context.role)}
           />
+          {/* Named here because every date on every screen is written on it,
+              and nothing else on this page says which clock that is. */}
+          <ProfileRow
+            icon={<Globe className="h-4 w-4" strokeWidth={1.7} />}
+            label="Time zone"
+            value={workspaceZoneLabel()}
+            action={
+              context.workspace.isOwner ? (
+                <Link
+                  className={buttonVariants({ variant: "outline" })}
+                  to="/workspace/settings"
+                >
+                  Change
+                </Link>
+              ) : undefined
+            }
+          />
         </section>
 
         <AccountSecurity />
@@ -185,8 +209,17 @@ function AgentAccessTokens() {
     try {
       const created = await createAuthToken({
         name,
+        // The control speaks zone-less wall-clock text, so the moment it
+        // names is settled here, on the same clock the expiry is read back
+        // on below.
         ...(expirationChoice === "date" && expiresAt
-          ? { expiresAt: new Date(expiresAt).toISOString() }
+          ? {
+              expiresAt:
+                parseDateTimeLocalInputToCanonicalInstantString(
+                  expiresAt,
+                  appTimeZone(),
+                ) ?? undefined,
+            }
           : {}),
       });
       setRawToken(created.rawToken);
@@ -614,17 +647,32 @@ function createAgentSetupPrompt(apiUrl: string, apiToken: string): string {
   ].join(" ");
 }
 
+/**
+ * The zone this workspace keeps, with the offset it is currently on:
+ * `Asia/Kolkata UTC+05:30`. An offset rather than an abbreviation, because
+ * abbreviations exist only for some zones; see `formatTimeZoneOffsetLabel`.
+ * UTC is its own offset, and a row reading "UTC UTC" says nothing the first
+ * word did not.
+ */
+function workspaceZoneLabel(): string {
+  const zone = appTimeZone();
+  const offset = formatTimeZoneOffsetLabel(zone);
+  return offset === zone ? zone : `${zone} ${offset}`;
+}
+
 function ProfileRow({
   icon,
   label,
   value,
+  action,
 }: {
   icon: ReactNode;
   label: string;
   value: string;
+  action?: ReactNode;
 }) {
   return (
-    <div className="grid min-h-[54px] grid-cols-[24px_150px_minmax(0,1fr)] items-center gap-3 border-b border-sap-border-soft py-3 last:border-b-0">
+    <div className="grid min-h-[54px] grid-cols-[24px_150px_minmax(0,1fr)_auto] items-center gap-3 border-b border-sap-border-soft py-3 last:border-b-0">
       <span className="flex h-6 w-6 items-center justify-center text-sap-subtle">
         {icon}
       </span>
@@ -632,15 +680,20 @@ function ProfileRow({
       <span className="min-w-0 truncate text-sap-body text-sap-fg">
         {value}
       </span>
+      {action}
     </div>
   );
 }
 
+/**
+ * A stored moment, on the wall clock this workspace keeps.
+ *
+ * The same zone and the same shape as a timestamp cell in a grid, so a token's
+ * expiry reads the way every other moment in the app reads. Text that is not
+ * a moment is shown as it arrived rather than guessed at.
+ */
 function formatDate(value: string): string {
-  return new Intl.DateTimeFormat(undefined, {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(new Date(value));
+  return formatTemporalForDisplay(value, "minute", appTimeZone()) ?? value;
 }
 
 function errorMessage(err: unknown): string {

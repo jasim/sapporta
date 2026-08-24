@@ -130,7 +130,16 @@ describe("/api/tables table operations", () => {
       );
       expect(exported.status).toBe(200);
       expect(exported.headers.get("content-type")).toContain("text/csv");
-      expect(await exported.text()).toContain("Alpha");
+      const body = await exported.text();
+      expect(body).toContain("Alpha");
+
+      // Headers are the column names as stored, undecorated. A timestamp
+      // column needs no zone marker on its header because every value in it
+      // already carries one: the trailing `Z` of the canonical instant the
+      // export writes, which is also the form other programs parse.
+      const header = body.split("\n")[0];
+      expect(header.split(",")).toContain("created_at");
+      expect(header).not.toContain("(UTC)");
 
       const paged = await request("/api/tables/accounts/export.csv?page=2");
       expect(paged.status).toBe(400);

@@ -17,7 +17,8 @@ const scriptArgIndex = process.argv.findIndex(
 const outputArg =
   scriptArgIndex >= 0 ? process.argv[scriptArgIndex + 1] : process.argv[2];
 const outputPath = resolve(
-  outputArg ?? "packages/core/src/templates/packages/api/project-auth/schema.ts",
+  outputArg ??
+    "packages/core/src/templates/packages/api/project-auth/schema.ts",
 );
 const sharedOptionsPath = resolve(
   "packages/core/src/templates/packages/api/project-auth/options.ts",
@@ -68,6 +69,7 @@ await writeFile(
   createProjectAuthEmailAndPasswordOptions,
   createProjectAuthPlugins,
   projectAuthDrizzleAdapterConfig,
+  projectAuthUserOptions,
 } from ${JSON.stringify(sharedOptionsUrl)};
 
 const unusedAdapterMethod = async () => {
@@ -94,6 +96,7 @@ export default {
       },
     }),
     emailAndPassword: createProjectAuthEmailAndPasswordOptions(false),
+    user: projectAuthUserOptions,
     plugins: createProjectAuthPlugins(),
   },
 };

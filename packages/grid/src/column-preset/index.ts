@@ -31,6 +31,7 @@ export type * from "./runtime";
 export type * from "./types";
 export { normalizeOptions } from "./lookup";
 export { trackForColumn, templateColumns } from "./width";
+export { setDisplayTimeZone, displayTimeZone } from "./display-zone";
 export {
   columnPresetWidthForSizing,
   type CharacterColumnSizing,

@@ -1,3 +1,8 @@
+/**
+ * CSV serialization shared by the server's table export and the grid's
+ * clipboard copy.
+ */
+
 export function csvEscape(value: string): string {
   return /[",\r\n]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value;
 }

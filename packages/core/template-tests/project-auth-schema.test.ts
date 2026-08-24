@@ -19,6 +19,7 @@ import { readProjectAuthEnv } from "../src/templates/packages/api/project-auth/e
 import {
   createProjectAuthEmailAndPasswordOptions,
   createProjectAuthPlugins,
+  projectAuthUserOptions,
 } from "../src/templates/packages/api/project-auth/options.js";
 import * as authTokensSchema from "../src/templates/packages/api/project-auth/auth-tokens-schema.js";
 import * as authSchema from "../src/templates/packages/api/project-auth/schema.js";
@@ -39,6 +40,7 @@ const authOptions = {
     false,
     async () => {},
   ),
+  user: projectAuthUserOptions,
   plugins: createProjectAuthPlugins(),
 } satisfies BetterAuthOptions;
 
@@ -103,6 +105,9 @@ describe("project auth schema", () => {
       name: "Ada Lovelace",
       email: "ada@example.test",
       password: "correct-horse-battery-staple",
+      // Required: the browser sends the zone the person is in, and the first
+      // workspace this account gets keeps it.
+      timeZone: "Asia/Kolkata",
     };
 
     const signUp = await auth.handler(
@@ -134,6 +139,7 @@ describe("project auth schema", () => {
       name: "Grace Hopper",
       email: "grace@example.test",
       password: "correct-horse-battery-staple",
+      timeZone: "UTC",
     };
     conn.sqlite.exec(`
       CREATE TRIGGER reject_account BEFORE INSERT ON account

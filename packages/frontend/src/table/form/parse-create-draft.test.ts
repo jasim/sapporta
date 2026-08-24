@@ -1,7 +1,17 @@
 import { describe, expect, it } from "vitest";
 import type { TableSchema } from "@sapporta/shared/contracts";
-import { parseDateTimeLocalInputToCanonicalInstantString } from "@sapporta/shared/temporal";
+import {
+  parseDateTimeLocalInputToCanonicalInstantString,
+  parseTimeZone,
+} from "@sapporta/shared/temporal";
+import { setAppTimeZone } from "../../platform/app-time-zone";
 import { parseCreateDraft } from "./parse-create-draft";
+
+// A timestamp draft is a wall clock, so the zone it is read on decides which
+// instant it becomes. Boot publishes that zone before any screen renders; the
+// test stands in for it rather than inheriting the host's.
+const ZONE = parseTimeZone("Asia/Kolkata");
+setAppTimeZone(ZONE);
 
 const TABLE: TableSchema = {
   name: "invoices",
@@ -119,7 +129,10 @@ describe("parseCreateDraft", () => {
         number: "INV-1",
         total: 5,
         issued_on: "2026-07-18",
-        sent_at: parseDateTimeLocalInputToCanonicalInstantString(timestamp),
+        sent_at: parseDateTimeLocalInputToCanonicalInstantString(
+          timestamp,
+          ZONE,
+        ),
       },
     });
 

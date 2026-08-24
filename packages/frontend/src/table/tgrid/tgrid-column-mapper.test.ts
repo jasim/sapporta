@@ -8,6 +8,11 @@ import {
 } from "./tgrid-column-mapper";
 import type { LookupCapabilities } from "@sapporta/grid/lookup";
 import type { LookupStore } from "../../lookup";
+import { setAppTimeZone } from "../../platform/app-time-zone";
+
+// Boot publishes the workspace zone before any screen renders; these tests
+// mount the pieces directly, so they stand in for it.
+setAppTimeZone("UTC");
 
 const valueLookup = new StaticValueLookup([{ value: "a", label: "Alpha" }]);
 const searchLookup = new StaticSearchLookup([{ value: "b", label: "Beta" }]);

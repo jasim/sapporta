@@ -25,6 +25,17 @@ export interface SampleDataAccount {
 }
 
 /**
+ * The calendar the seeded workspace keeps.
+ *
+ * A browser sending a sign-up request knows which zone the person is in; a
+ * script does not, and the machine it happens to be running on is an accident
+ * of where the seed was run rather than a fact about the sample data. So the
+ * seeded workspace keeps UTC, and a developer who wants to look at it on
+ * another clock changes it on the workspace settings screen.
+ */
+export const sampleDataTimeZone = "UTC";
+
+/**
  * Refuses unless this project has granted sample-data seeding.
  *
  * The permission has to be granted rather than merely not withheld:

@@ -26,6 +26,7 @@ export {
   createAuthTokenBodySchema,
   createAuthTokenResponseSchema,
   switchActiveWorkspaceBodySchema,
+  updateWorkspaceTimeZoneBodySchema,
   type AuthRole,
   type AuthCurrentUser,
   type AuthWorkspaceSummary,
@@ -38,6 +39,7 @@ export {
   type CreateAuthTokenBody,
   type CreateAuthTokenResponse,
   type SwitchActiveWorkspaceBody,
+  type UpdateWorkspaceTimeZoneBody,
 } from "./auth-schema.js";
 
 // ── Meta wire shapes ────────────────────────────────────────────────────────
@@ -131,6 +133,7 @@ export {
   createAuthTokenRoute,
   revokeAuthTokenRoute,
   switchActiveWorkspaceRoute,
+  updateWorkspaceTimeZoneRoute,
 } from "./auth-routes.js";
 
 export { uiContract, type UiContract } from "./ui-contract.js";

@@ -22,6 +22,7 @@ import {
 import { makeMetaHandlers } from "./meta-handlers.js";
 import { mountMeta } from "./mount-meta.js";
 import { TsRestApi } from "./index.js";
+import { parseTimeZone } from "@sapporta/shared/temporal";
 
 const camelRowsTable = sqliteTable("camel_rows", {
   id: integer("id").primaryKey({ autoIncrement: true }),
@@ -140,6 +141,7 @@ function createSampleAuth(catalog: TableCatalog): SapportaAuthContext {
     id: "workspace-1",
     name: "Workspace One",
     slug: "workspace-one",
+    timeZone: parseTimeZone("UTC"),
   };
   const user = {
     id: "user-1",

@@ -1,5 +1,6 @@
 export type { SapportaAbility, BuildAbility } from "./ability.js";
 export type { SapportaAuthContext } from "./context.js";
+export { workspaceTimeZone } from "./context.js";
 export { createAuthContext } from "./create-auth-context.js";
 export type { CreateAuthContextInput } from "./create-auth-context.js";
 export { forbidUnless } from "./forbid.js";

@@ -143,6 +143,8 @@ export type EmailUserCredentials = {
   password: string;
   name?: string;
   cookieFile?: string;
+  /** The calendar the first workspace this account gets keeps. Defaults to UTC. */
+  timeZone?: string;
 };
 
 export type EmailAuthResult<T> = {
@@ -1429,6 +1431,9 @@ export async function signUpEmailUser(
   const body = {
     email: credentials.email,
     password: credentials.password,
+    // The browser sends the zone the person is in, and the first workspace
+    // this account gets keeps it. A test has no device to ask, so it names UTC.
+    timeZone: credentials.timeZone ?? "UTC",
     ...(credentials.name === undefined ? {} : { name: credentials.name }),
   };
   await requestJson<unknown>(baseUrl, "/api/auth/sign-up/email", {
@@ -2246,7 +2251,7 @@ async function signInProjectOwner(baseUrl: string): Promise<string> {
   await curlJson<unknown>(`${baseUrl}/api/auth/sign-up/email`, {
     cookieFile,
     method: "POST",
-    body: credentials,
+    body: { ...credentials, timeZone: "UTC" },
   });
   await curlJson<unknown>(`${baseUrl}/api/auth/sign-in/email`, {
     cookieFile,
@@ -2370,7 +2375,9 @@ export async function runFailingProjectSeed(
     timeoutMs: 180_000,
   });
   if (result.code === 0) {
-    throw new Error(`\`pnpm seed\` succeeded but was expected to fail\n${result.output}`);
+    throw new Error(
+      `\`pnpm seed\` succeeded but was expected to fail\n${result.output}`,
+    );
   }
   return result.output;
 }

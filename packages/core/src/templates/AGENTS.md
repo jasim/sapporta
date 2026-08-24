@@ -300,6 +300,53 @@ other I/O in shared.
 Use Temporal for time and date work. Do not use `Date`, `dayjs`, or `date-fns`
 for parsing, arithmetic, comparison, or formatting.
 
+## Days and time zones
+
+Timestamps are stored as UTC. A day is a calendar day in the active
+workspace's time zone, which every workspace keeps as an IANA id and an owner
+changes on the workspace settings screen.
+
+Never ask the machine what time zone it is in or what day it is.
+`Temporal.Now.plainDateISO()` with no argument and `Temporal.Now.timeZoneId()`
+both read the host's `TZ`, so a report built on either returns different rows
+depending on how the container was started. A test fails the build if you call
+them.
+
+Read the zone in an API handler with `workspaceTimeZone(c.get("auth"))`, and in
+a React screen with `appTimeZone()` from `@sapporta/frontend/platform`. Pass a
+`Temporal.Instant` wherever a handler needs "now".
+
+Bound a day-ranged filter with `resolveDateRangeQueryBounds`, and group by
+local day with the `to_tz_date(column, :zone)` SQL function. The bounds come
+back in both shapes: use `period.instants` against a `timestamp` column and
+`period.days` against a `date` column.
+
+```ts
+const zone = workspaceTimeZone(c.get("auth"));
+const period = resolveDateRangeQueryBounds(
+  "period",
+  request.query,
+  zone,
+  Temporal.Now.instant(),
+);
+// ... WHERE (:from IS NULL OR created_at >= :from)   -- period.instants
+//       AND (:until IS NULL OR created_at <  :until)
+//     GROUP BY to_tz_date(created_at, :zone)
+```
+
+The instant window's upper bound is exclusive. A closed bound compared against
+a `timestamp` column drops its own last day, and one built from a wall clock
+such as `23:59:59` loses an hour on the day a zone leaves daylight saving.
+
+`to_tz_date` is supplied by the database driver, so a `sqlite3` shell does not
+have it. It costs about 6µs a row — some thirty times SQLite's own `date(col)`,
+which is what a zone database costs — so bound the range in the `WHERE` clause
+before grouping. On a database with its own zone support it becomes a one-line
+substitution, such as PostgreSQL 16's `date_trunc('day', ts, tz)`.
+
+A report whose numbers depend on the zone should name it. `ReportTimeZoneNote`
+from `@sapporta/frontend/report` renders it for the toolbar.
+
 ## More docs
 
 - Sapporta overview: https://github.com/jasim/sapporta#readme

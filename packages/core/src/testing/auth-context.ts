@@ -1,3 +1,4 @@
+import { parseTimeZone } from "@sapporta/shared/temporal";
 import { createTableCatalog } from "../schema/catalog.js";
 import type { TableDef } from "../schema/table.js";
 import {
@@ -15,6 +16,12 @@ export interface TestAuthContextOptions {
   workspaceId?: string;
   isOwner?: boolean;
   tables?: readonly TableDef[];
+  /**
+   * The calendar the test workspace keeps, as an IANA id. Defaults to `UTC`;
+   * name a zone with an offset to check that a handler reads days in the
+   * workspace's calendar rather than the machine's.
+   */
+  timeZone?: string;
 }
 
 export function createTestAuthContext(
@@ -26,6 +33,7 @@ export function createTestAuthContext(
     id: workspaceId,
     name: "Test Workspace",
     slug: workspaceId,
+    timeZone: parseTimeZone(options.timeZone ?? "UTC"),
   };
   const user = {
     id: userId,

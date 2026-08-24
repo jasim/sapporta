@@ -14,12 +14,18 @@ const AUTH_CONTEXT = {
     id: "workspace-1",
     name: "Acme",
     slug: "acme",
+    timeZone: "UTC",
     isOwner: true,
   },
   memberships: [
     {
       id: "member-1",
-      workspace: { id: "workspace-1", name: "Acme", slug: "acme" },
+      workspace: {
+        id: "workspace-1",
+        name: "Acme",
+        slug: "acme",
+        timeZone: "UTC",
+      },
       role: "owner",
       isOwner: true,
     },

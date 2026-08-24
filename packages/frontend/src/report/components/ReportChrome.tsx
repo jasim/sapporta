@@ -1,5 +1,7 @@
 import type { ReactNode } from "react";
-import { Loader2, Play } from "lucide-react";
+import { Globe, Loader2, Play } from "lucide-react";
+import { formatTimeZoneOffsetLabel } from "@sapporta/shared/temporal";
+import { appTimeZone } from "../../platform/app-time-zone";
 import { PageHeader } from "../../shell/components/PageHeader";
 import { PageFrame } from "../../shell/components/Page";
 import { cn } from "@sapporta/ui/cn";
@@ -47,6 +49,31 @@ export function ReportToolbar({ children, actions }: ReportToolbarProps) {
         <div className="flex items-center gap-2">{actions}</div>
       ) : null}
     </div>
+  );
+}
+
+/**
+ * The calendar this report's days are counted in.
+ *
+ * A report whose numbers depend on a zone has to say which zone, or two people
+ * comparing dashboards have no way to tell whether they disagree about the
+ * data or about where the day starts. Static text, not a control: the zone
+ * belongs to the workspace and is changed on the workspace settings screen.
+ * Shown even when the zone is UTC, because "UTC" is a choice like any other
+ * and its absence would read as "no zone involved".
+ */
+export function ReportTimeZoneNote() {
+  const zone = appTimeZone();
+  const offset = formatTimeZoneOffsetLabel(zone);
+  return (
+    <span
+      className="flex min-w-0 items-center gap-[6px] text-sap-data text-sap-muted"
+      title="Days are counted in the workspace's time zone."
+    >
+      <Globe className="h-[12px] w-[12px] shrink-0" strokeWidth={1.7} />
+      <span className="truncate">{zone}</span>
+      {offset !== zone && <span className="shrink-0">{offset}</span>}
+    </span>
   );
 }
 

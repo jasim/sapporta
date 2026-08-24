@@ -1,5 +1,7 @@
 import { randomUUID } from "node:crypto";
 import type { ProjectDbConnection } from "@sapporta/server";
+import { parseTimeZone, type TimeZone } from "@sapporta/shared/temporal";
+import type { AppWorkspaceMembership } from "../authz/types.js";
 import type { BetterAuthSessionPayload } from "./context.js";
 
 export interface WorkspaceMembershipRow {
@@ -8,6 +10,7 @@ export interface WorkspaceMembershipRow {
   organization_id: string;
   organization_name: string;
   organization_slug: string;
+  organization_time_zone: string;
 }
 
 export class WorkspaceSwitchError extends Error {
@@ -102,7 +105,8 @@ export function findMembership(
           member.role AS role,
           organization.id AS organization_id,
           organization.name AS organization_name,
-          organization.slug AS organization_slug
+          organization.slug AS organization_slug,
+          organization.timeZone AS organization_time_zone
         FROM member
         INNER JOIN organization ON organization.id = member.organizationId
         WHERE member.userId = ? AND member.organizationId = ?
@@ -132,7 +136,8 @@ export function findFirstMembership(
           member.role AS role,
           organization.id AS organization_id,
           organization.name AS organization_name,
-          organization.slug AS organization_slug
+          organization.slug AS organization_slug,
+          organization.timeZone AS organization_time_zone
         FROM member
         INNER JOIN organization ON organization.id = member.organizationId
         WHERE member.userId = ?
@@ -153,15 +158,16 @@ export function createInitialWorkspace(
   const memberId = randomUUID();
   const name = workspaceName(owner);
   const slug = uniqueWorkspaceSlug(conn, name);
+  const timeZone = accountTimeZone(conn, owner.id);
 
   conn.sqlite
     .prepare(
       `
-      INSERT INTO organization (id, name, slug, logo, createdAt, metadata)
-      VALUES (?, ?, ?, NULL, ?, NULL)
+      INSERT INTO organization (id, name, slug, logo, createdAt, metadata, timeZone)
+      VALUES (?, ?, ?, NULL, ?, NULL, ?)
       `,
     )
-    .run(organizationId, name, slug, now);
+    .run(organizationId, name, slug, now, timeZone);
   conn.sqlite
     .prepare(
       `
@@ -177,7 +183,79 @@ export function createInitialWorkspace(
     organization_id: organizationId,
     organization_name: name,
     organization_slug: slug,
+    organization_time_zone: timeZone,
   };
+}
+
+/**
+ * The calendar this account keeps, which the workspace it is about to get
+ * starts on.
+ *
+ * The browser sends it with the sign-up request, so it is the zone the person
+ * creating the workspace was actually in — which is almost always the calendar
+ * they want it kept in. It is a starting value and not a preference: it is
+ * copied onto the workspace row here and never consulted again, and from then
+ * on the workspace owns its own calendar and changes it on the workspace
+ * settings screen.
+ */
+function accountTimeZone(conn: ProjectDbConnection, userId: string): string {
+  const timeZone = readString(
+    requireRecord(
+      conn.sqlite
+        .prepare('SELECT timeZone FROM "user" WHERE id = ?')
+        .get(userId),
+      `No account row for user ${userId}.`,
+    ),
+    "timeZone",
+  );
+  if (!timeZone) {
+    throw new Error(`Account ${userId} has no time zone.`);
+  }
+  return timeZone;
+}
+
+/**
+ * Converts the selected workspace membership into request facts.
+ *
+ * Roles live on the membership, not the user. The same person can be an owner
+ * in one workspace and a member in another, and agent access tokens preserve
+ * that distinction because each token names one workspace.
+ *
+ * The time zone is checked here, where the row is read, so everything
+ * downstream holds a zone this runtime can render rather than a string that
+ * might not be one. A stored id this runtime cannot use — a zone renamed out
+ * from under the row by a tz database update — fails the request with the
+ * workspace and the bad value named, instead of surfacing inside a cell
+ * renderer with nowhere to report it.
+ */
+export function membershipFromRow(
+  row: WorkspaceMembershipRow,
+): AppWorkspaceMembership {
+  const role =
+    row.role === "owner" || row.role === "admin" ? "owner" : "member";
+  return {
+    id: row.member_id,
+    workspace: {
+      id: row.organization_id,
+      name: row.organization_name,
+      slug: row.organization_slug,
+      timeZone: workspaceTimeZoneFromRow(row),
+    },
+    roles: [role],
+  };
+}
+
+function workspaceTimeZoneFromRow(row: WorkspaceMembershipRow): TimeZone {
+  try {
+    return parseTimeZone(row.organization_time_zone);
+  } catch (err) {
+    throw new Error(
+      `Workspace ${row.organization_id} has a time zone this runtime cannot ` +
+        `use: ${JSON.stringify(row.organization_time_zone)}. ` +
+        `Set a current IANA id on the workspace settings screen.`,
+      { cause: err },
+    );
+  }
 }
 
 export function setActiveWorkspace(
@@ -194,6 +272,24 @@ export function setActiveWorkspace(
       `,
     )
     .run(workspaceId, unixTimestamp(), sessionId);
+}
+
+/**
+ * Changes the calendar this workspace keeps.
+ *
+ * The zone is already checked by the route that calls this, so what is stored
+ * is a zone this runtime can render. Everyone in the workspace reads on the
+ * new clock from their next page load; the value is resolved once per request
+ * and once per page, so nothing already rendered is left half-converted.
+ */
+export function setWorkspaceTimeZone(
+  conn: ProjectDbConnection,
+  workspaceId: string,
+  timeZone: TimeZone,
+): void {
+  conn.sqlite
+    .prepare("UPDATE organization SET timeZone = ? WHERE id = ?")
+    .run(timeZone, workspaceId);
 }
 
 function uniqueWorkspaceSlug(conn: ProjectDbConnection, name: string): string {
@@ -238,12 +334,14 @@ function readMembership(row: unknown): WorkspaceMembershipRow | null {
   const organizationId = readString(row, "organization_id");
   const organizationName = readString(row, "organization_name");
   const organizationSlug = readString(row, "organization_slug");
+  const organizationTimeZone = readString(row, "organization_time_zone");
   if (
     !memberId ||
     !role ||
     !organizationId ||
     !organizationName ||
-    !organizationSlug
+    !organizationSlug ||
+    !organizationTimeZone
   ) {
     return null;
   }
@@ -253,7 +351,16 @@ function readMembership(row: unknown): WorkspaceMembershipRow | null {
     organization_id: organizationId,
     organization_name: organizationName,
     organization_slug: organizationSlug,
+    organization_time_zone: organizationTimeZone,
   };
+}
+
+function requireRecord(
+  value: unknown,
+  message: string,
+): Record<string, unknown> {
+  if (!isRecord(value)) throw new Error(message);
+  return value;
 }
 
 function readString(row: Record<string, unknown>, key: string): string | null {
