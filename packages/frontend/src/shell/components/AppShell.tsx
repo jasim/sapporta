@@ -27,6 +27,11 @@ export interface AppShellProps {
    * application places `SidebarToggle` in its own persistent UI.
    */
   sidebarToggle?: ReactNode | false;
+  /**
+   * Replace what sits under the sidebar navigation, which is the account menu
+   * unless this says otherwise. `null` leaves the footer out.
+   */
+  sidebarFooter?: ReactNode;
 }
 
 /**
@@ -48,6 +53,7 @@ export function AppShell({
   showFrameworkNavigation = true,
   sidebarOptions,
   sidebarToggle,
+  sidebarFooter,
 }: AppShellProps) {
   const { error, tables } = useSchemaStore();
   const session = useAuthStore((s) => s.session);
@@ -67,6 +73,7 @@ export function AppShell({
         showNavigation={showNavigation}
         error={error}
         sidebarToggle={sidebarToggle}
+        sidebarFooter={sidebarFooter}
       />
     </SidebarProvider>
   );
@@ -78,12 +85,14 @@ function AppShellLayout({
   showNavigation,
   error,
   sidebarToggle,
+  sidebarFooter,
 }: {
   navigation: Navigation;
   shellNavigation: Navigation;
   showNavigation: boolean;
   error: string | null;
   sidebarToggle?: ReactNode | false;
+  sidebarFooter?: ReactNode;
 }) {
   const sidebar = useSidebar();
   const shellSidebarToggle =
@@ -113,6 +122,7 @@ function AppShellLayout({
               sidebarToggle={
                 showSidebarToggleInSidebar ? shellSidebarToggle : undefined
               }
+              footer={sidebarFooter}
             />
           </SidebarRegion>
         )}

@@ -20,6 +20,15 @@ export interface NavigationShellProps {
 export interface AppSidebarProps extends NavigationShellProps {
   /** An optional control shown beside the application identity. */
   sidebarToggle?: ReactNode;
+  /**
+   * What sits under the navigation. Left out, it is the account menu, which is
+   * what an app whose people have accounts to manage wants there.
+   *
+   * An app that wants something else - a demo nobody signs out of, a build
+   * stamp, a support link - passes it here rather than copying this file to
+   * change one line. `null` leaves the footer out altogether.
+   */
+  footer?: ReactNode;
 }
 
 export function SapportaMark({ size = 17 }: { size?: number }) {
@@ -125,7 +134,11 @@ export function NavItem({
  * its collapse control beside the application identity whenever the desktop
  * sidebar is expanded, so the action appears on the region it will change.
  */
-export function AppSidebar({ navigation, sidebarToggle }: AppSidebarProps) {
+export function AppSidebar({
+  navigation,
+  sidebarToggle,
+  footer,
+}: AppSidebarProps) {
   const location = useLocation();
   const sidebar = useSidebar();
 
@@ -145,7 +158,7 @@ export function AppSidebar({ navigation, sidebarToggle }: AppSidebarProps) {
           )}
         </>
       }
-      footer={<AuthAccountMenu />}
+      footer={footer === undefined ? <AuthAccountMenu /> : footer}
       onNavigate={sidebar.closeDrawer}
     >
       {navigation.map((section) => (
