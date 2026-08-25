@@ -341,16 +341,16 @@ describe("renderScaffoldFiles", () => {
     expect(byDest.get("README.md")).toContain("Uses [Sapporta]");
     expect(byDest.get("AGENTS.md")).toContain("shadcn/ui conventions");
     expect(byDest.get("AGENTS.md")).toContain(
-      "follow `VISUAL-DESIGN-GUIDELINES.md`",
+      "`VISUAL-DESIGN-GUIDELINES.md` governs how screens are designed",
     );
     expect(byDest.get("AGENTS.md")).toContain(
-      "After writing a major code change or addition",
+      "After writing a\nmajor change or addition",
     );
     expect(byDest.get("AGENTS.md")).toContain(
-      "use a separate sub-agent or\ncoding-agent thread",
+      "use a separate sub-agent or coding-agent thread",
     );
     expect(byDest.get("AGENTS.md")).toContain(
-      "must happen after the\ncode has been written",
+      "That review happens after the code is written",
     );
     expect(byDest.get("CODING-PRINCIPLES.md")).toContain("# Coding principles");
     expect(byDest.get("CODING-PRINCIPLES.md")).toContain(
@@ -359,19 +359,14 @@ describe("renderScaffoldFiles", () => {
     expect(byDest.get("VISUAL-DESIGN-GUIDELINES.md")).toContain(
       "# Compact Interface Design Guideline",
     );
-    expect(byDest.get("AGENTS.md")).toContain("The `/api/hello` example");
-    expect(byDest.get("AGENTS.md")).toContain("createSapportaMailer()");
-    expect(byDest.get("AGENTS.md")).toContain("## Analytical questions");
-    expect(byDest.get("AGENTS.md")).toContain("sapporta rows count");
-    expect(byDest.get("AGENTS.md")).toContain("bounded grouped counts");
-    expect(byDest.get("AGENTS.md")).toContain("application-owned report");
+    // AGENTS.md is a map, not a manual: every subject it names has to say
+    // where the change goes and which published document owns the rules.
+    expect(byDest.get("AGENTS.md")).toContain("The `/api/hello`");
+    expect(byDest.get("AGENTS.md")).toContain("`packages/api/mailer.ts`");
     expect(byDest.get("AGENTS.md")).toContain(
-      "## Reading Sapporta framework source",
+      "Resolve one from the workspace\n  package that declares it",
     );
-    expect(byDest.get("AGENTS.md")).toContain(
-      "require.resolve('@sapporta/frontend/package.json', { paths: ['packages/frontend'] })",
-    );
-    expect(byDest.get("AGENTS.md")).toContain("node_modules/.pnpm/");
+    expect(byDest.get("AGENTS.md")).toContain("node_modules/@sapporta");
     expect(byDest.get("CLAUDE.md")).toBe(
       "Please read the instructions in AGENTS.md.\n",
     );
@@ -567,8 +562,9 @@ describe("renderScaffoldFiles", () => {
     // The generated project has to name the command, or an agent has no way
     // to learn it exists.
     const agents = byDest.get("AGENTS.md") ?? "";
-    expect(agents).toContain("`pnpm typecheck` typechecks the shared package");
-    expect(agents).toContain("`pnpm build` runs `pnpm typecheck` first");
+    expect(agents).toContain("`pnpm typecheck`");
+    expect(agents).toContain("Typechecks shared, API, and frontend");
+    expect(agents).toContain("Runs `typecheck`, then compiles all three");
     expect(byDest.get("README.md")).toContain(
       "- `pnpm typecheck` - typecheck the shared package, API, and frontend",
     );
