@@ -1,39 +1,16 @@
 import { dirname, join } from "node:path";
 
-export type ScaffoldFileOwnership = "framework" | "example" | "workspace";
-export type RefreshPolicy = "overwrite" | "merge-package-json" | "skip";
-
 export type ScaffoldFileSpec = {
   src: string;
   dest: string;
-  ownership: ScaffoldFileOwnership;
-  refreshPolicy: RefreshPolicy;
 };
 
 export type ScaffoldManifest = readonly ScaffoldFileSpec[];
 
-function refreshPolicyForOwnership(
-  ownership: ScaffoldFileOwnership,
-  dest: string,
-): RefreshPolicy {
-  if (ownership === "workspace" && !isPackageJsonPath(dest)) {
-    return "skip";
-  }
-  if (ownership === "workspace") {
-    return "merge-package-json";
-  }
-  return "overwrite";
-}
-
-function scaffoldFile(
-  dest: string,
-  ownership: ScaffoldFileOwnership,
-): ScaffoldFileSpec {
+function scaffoldFile(dest: string): ScaffoldFileSpec {
   return {
     src: templateSrcForDest(dest),
     dest,
-    ownership,
-    refreshPolicy: refreshPolicyForOwnership(ownership, dest),
   };
 }
 
@@ -48,86 +25,74 @@ function templateSrcForDest(dest: string): string {
 }
 
 export const SCAFFOLD_MANIFEST: ScaffoldManifest = [
-  scaffoldFile("packages/api/boot.ts", "framework"),
-  scaffoldFile("packages/api/runtime.ts", "framework"),
-  scaffoldFile("packages/api/script-runtime.ts", "framework"),
-  scaffoldFile("packages/api/seed-runtime.ts", "framework"),
-  scaffoldFile("packages/api/seed.ts", "workspace"),
-  scaffoldFile("packages/api/drizzle.config.ts", "framework"),
-  scaffoldFile("packages/api/mailer.ts", "framework"),
-  scaffoldFile("packages/api/app.ts", "example"),
-  scaffoldFile("packages/api/app/hello.ts", "example"),
-  scaffoldFile("packages/api/app/public-api-sample.ts", "example"),
-  scaffoldFile("packages/api/authz/types.ts", "example"),
-  scaffoldFile("packages/api/authz/ability.ts", "example"),
-  scaffoldFile("packages/api/authz/request-data-authority.ts", "example"),
-  scaffoldFile("packages/api/project-auth/index.ts", "framework"),
-  scaffoldFile("packages/api/project-auth/better-auth.ts", "framework"),
-  scaffoldFile("packages/api/project-auth/emails.ts", "framework"),
-  scaffoldFile("packages/api/project-auth/options.ts", "workspace"),
-  scaffoldFile("packages/api/project-auth/context.ts", "framework"),
-  scaffoldFile("packages/api/project-auth/auth-tokens.ts", "framework"),
-  scaffoldFile("packages/api/project-auth/auth-tokens-schema.ts", "framework"),
-  scaffoldFile("packages/api/project-auth/sample-data.ts", "framework"),
-  scaffoldFile("packages/api/project-auth/user.ts", "framework"),
-  scaffoldFile("packages/api/project-auth/workspace.ts", "framework"),
-  scaffoldFile("packages/api/project-auth/routes.ts", "framework"),
-  scaffoldFile("packages/api/project-auth/schema.ts", "framework"),
-  scaffoldFile("packages/api/project-auth/env.ts", "framework"),
-  scaffoldFile("packages/api/project-auth/middleware.ts", "framework"),
-  scaffoldFile("packages/api/project-auth/errors.ts", "framework"),
-  scaffoldFile("packages/api/package.json", "workspace"),
-  scaffoldFile("packages/api/tsconfig.json", "framework"),
-  scaffoldFile("package.json", "workspace"),
-  scaffoldFile(".env.development", "workspace"),
-  scaffoldFile(".env.production.example", "workspace"),
-  scaffoldFile("scripts/dev.mjs", "workspace"),
-  scaffoldFile("scripts/clean-dist.mjs", "workspace"),
-  scaffoldFile("pnpm-workspace.yaml", "workspace"),
-  scaffoldFile("Dockerfile", "workspace"),
-  scaffoldFile(".dockerignore", "workspace"),
-  scaffoldFile("README.md", "workspace"),
-  scaffoldFile("AGENTS.md", "workspace"),
-  scaffoldFile("CODING-PRINCIPLES.md", "workspace"),
-  scaffoldFile("VISUAL-DESIGN-GUIDELINES.md", "workspace"),
-  scaffoldFile("CLAUDE.md", "workspace"),
-  scaffoldFile("DEPLOYMENT.md", "workspace"),
-  scaffoldFile(".gitignore", "workspace"),
-  scaffoldFile("packages/frontend/package.json", "workspace"),
-  scaffoldFile("packages/frontend/tsconfig.json", "framework"),
-  scaffoldFile("packages/frontend/vite.config.ts", "framework"),
-  scaffoldFile("packages/frontend/index.html", "framework"),
-  scaffoldFile("packages/frontend/src/main.tsx", "framework"),
-  scaffoldFile("packages/frontend/src/query-client.ts", "workspace"),
-  scaffoldFile("packages/frontend/src/SapportaApp.tsx", "framework"),
-  scaffoldFile("packages/frontend/src/SapportaRoutes.tsx", "framework"),
-  scaffoldFile("packages/frontend/src/App.tsx", "workspace"),
-  scaffoldFile("packages/frontend/src/PublicPage.tsx", "example"),
-  scaffoldFile("packages/frontend/src/Home.tsx", "example"),
-  scaffoldFile("packages/frontend/src/api.ts", "framework"),
-  scaffoldFile("packages/frontend/src/app.css", "example"),
-  scaffoldFile("packages/frontend/src/vite-env.d.ts", "framework"),
-  scaffoldFile("packages/shared/package.json", "workspace"),
-  scaffoldFile("packages/shared/tsconfig.json", "framework"),
-  scaffoldFile("packages/shared/src/index.ts", "example"),
-  scaffoldFile("packages/shared/src/contracts/index.ts", "example"),
-  scaffoldFile("packages/shared/src/contracts/hello.ts", "example"),
-  scaffoldFile("packages/shared/src/contracts/public-api-sample.ts", "example"),
-  scaffoldFile("packages/shared/AGENTS.md", "workspace"),
-  scaffoldFile("packages/shared/CLAUDE.md", "workspace"),
+  scaffoldFile("packages/api/boot.ts"),
+  scaffoldFile("packages/api/runtime.ts"),
+  scaffoldFile("packages/api/script-runtime.ts"),
+  scaffoldFile("packages/api/seed-runtime.ts"),
+  scaffoldFile("packages/api/seed.ts"),
+  scaffoldFile("packages/api/drizzle.config.ts"),
+  scaffoldFile("packages/api/mailer.ts"),
+  scaffoldFile("packages/api/app.ts"),
+  scaffoldFile("packages/api/app/hello.ts"),
+  scaffoldFile("packages/api/app/public-api-sample.ts"),
+  scaffoldFile("packages/api/authz/types.ts"),
+  scaffoldFile("packages/api/authz/ability.ts"),
+  scaffoldFile("packages/api/authz/request-data-authority.ts"),
+  scaffoldFile("packages/api/project-auth/index.ts"),
+  scaffoldFile("packages/api/project-auth/better-auth.ts"),
+  scaffoldFile("packages/api/project-auth/emails.ts"),
+  scaffoldFile("packages/api/project-auth/options.ts"),
+  scaffoldFile("packages/api/project-auth/context.ts"),
+  scaffoldFile("packages/api/project-auth/auth-tokens.ts"),
+  scaffoldFile("packages/api/project-auth/auth-tokens-schema.ts"),
+  scaffoldFile("packages/api/project-auth/sample-data.ts"),
+  scaffoldFile("packages/api/project-auth/user.ts"),
+  scaffoldFile("packages/api/project-auth/workspace.ts"),
+  scaffoldFile("packages/api/project-auth/routes.ts"),
+  scaffoldFile("packages/api/project-auth/schema.ts"),
+  scaffoldFile("packages/api/project-auth/env.ts"),
+  scaffoldFile("packages/api/project-auth/middleware.ts"),
+  scaffoldFile("packages/api/project-auth/errors.ts"),
+  scaffoldFile("packages/api/package.json"),
+  scaffoldFile("packages/api/tsconfig.json"),
+  scaffoldFile("package.json"),
+  scaffoldFile(".env.development"),
+  scaffoldFile(".env.production.example"),
+  scaffoldFile("scripts/dev.mjs"),
+  scaffoldFile("scripts/clean-dist.mjs"),
+  scaffoldFile("pnpm-workspace.yaml"),
+  scaffoldFile("Dockerfile"),
+  scaffoldFile(".dockerignore"),
+  scaffoldFile("README.md"),
+  scaffoldFile("AGENTS.md"),
+  scaffoldFile("CODING-PRINCIPLES.md"),
+  scaffoldFile("VISUAL-DESIGN-GUIDELINES.md"),
+  scaffoldFile("CLAUDE.md"),
+  scaffoldFile("DEPLOYMENT.md"),
+  scaffoldFile(".gitignore"),
+  scaffoldFile("packages/frontend/package.json"),
+  scaffoldFile("packages/frontend/tsconfig.json"),
+  scaffoldFile("packages/frontend/vite.config.ts"),
+  scaffoldFile("packages/frontend/index.html"),
+  scaffoldFile("packages/frontend/src/main.tsx"),
+  scaffoldFile("packages/frontend/src/query-client.ts"),
+  scaffoldFile("packages/frontend/src/SapportaApp.tsx"),
+  scaffoldFile("packages/frontend/src/SapportaRoutes.tsx"),
+  scaffoldFile("packages/frontend/src/App.tsx"),
+  scaffoldFile("packages/frontend/src/PublicPage.tsx"),
+  scaffoldFile("packages/frontend/src/Home.tsx"),
+  scaffoldFile("packages/frontend/src/api.ts"),
+  scaffoldFile("packages/frontend/src/app.css"),
+  scaffoldFile("packages/frontend/src/vite-env.d.ts"),
+  scaffoldFile("packages/shared/package.json"),
+  scaffoldFile("packages/shared/tsconfig.json"),
+  scaffoldFile("packages/shared/src/index.ts"),
+  scaffoldFile("packages/shared/src/contracts/index.ts"),
+  scaffoldFile("packages/shared/src/contracts/hello.ts"),
+  scaffoldFile("packages/shared/src/contracts/public-api-sample.ts"),
+  scaffoldFile("packages/shared/AGENTS.md"),
+  scaffoldFile("packages/shared/CLAUDE.md"),
 ];
-
-export function packageJsonSpecs(
-  manifest: ScaffoldManifest = SCAFFOLD_MANIFEST,
-): ScaffoldFileSpec[] {
-  return manifest.filter((file) => isPackageJsonPath(file.dest));
-}
-
-export function requiredRefreshPaths(
-  manifest: ScaffoldManifest = SCAFFOLD_MANIFEST,
-): string[] {
-  return packageJsonSpecs(manifest).map((file) => file.dest);
-}
 
 export function directoriesRequiredByManifest(
   root: string,
@@ -160,8 +125,4 @@ export function validateTemplateInventory(
     ...ignoredTemplates,
   ]);
   return templatePaths.filter((path) => !expected.has(path));
-}
-
-function isPackageJsonPath(path: string): boolean {
-  return path === "package.json" || path.endsWith("/package.json");
 }

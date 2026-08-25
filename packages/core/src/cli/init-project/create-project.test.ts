@@ -284,8 +284,6 @@ describe("pnpm override rendering", () => {
           {
             src: "package.json",
             dest: "package.json",
-            ownership: "workspace",
-            refreshPolicy: "merge-package-json",
             template: "{}\n",
           },
         ],

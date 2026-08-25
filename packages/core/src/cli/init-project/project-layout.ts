@@ -1,9 +1,6 @@
 import { basename, dirname, join } from "node:path";
 import { fromProjectRoot } from "../../project/project-paths.js";
-import {
-  directoriesRequiredByManifest,
-  requiredRefreshPaths,
-} from "./scaffold-manifest.js";
+import { directoriesRequiredByManifest } from "./scaffold-manifest.js";
 
 export type ProjectIdentity = {
   root: string;
@@ -62,10 +59,6 @@ export function layoutForRoot(identity: ProjectIdentity): ProjectLayout {
     dataDir: paths.dataDir,
     markerPath: paths.markerPath,
   };
-}
-
-export function requiredProjectPaths(): readonly string[] {
-  return ["sapporta.json", ...requiredRefreshPaths()];
 }
 
 export function scaffoldDirectoriesFor(root: string): string[] {

@@ -68,8 +68,8 @@ Prefer the project-local CLI form, `pnpm exec sapporta ...`. It reads
 - **Browser API calls** — typed clients in `packages/frontend/src/api.ts`.
   https://sapporta.com/docs/guides/app-owned-features/typed-api-clients.md
 - **Cache policy and post-mutation refresh** —
-  `packages/frontend/src/query-client.ts`; `main.tsx` is framework-owned boot
-  wiring and is not the place for application policy.
+  `packages/frontend/src/query-client.ts`; `main.tsx` is boot wiring and is not
+  the place for application policy.
   https://sapporta.com/docs/guides/app-owned-features/cached-table-reads-and-refresh.md
 - **Custom forms and validation** — `packages/frontend/src/`.
   https://sapporta.com/docs/guides/app-owned-features/custom-forms-and-validation.md

@@ -17,23 +17,18 @@ makes the rest of the layout legible.
 - Both: `@sapporta/shared` (pure TypeScript, no runtime dependencies)
 
 **How the code reaches an application.** Every line of a generated project
-arrives in one of three ways:
+arrives in one of two ways:
 
 - **Imported.** Library code the project depends on through `@sapporta/*`
   packages. All real behavior lives here.
-- **Copied, framework-owned.** Glue files written into the project by
-  `sapporta init` and overwritten by a scaffold refresh: `boot.ts`,
-  `main.tsx`, `project-auth/` (except `options.ts`), `mailer.ts`. The
-  project can read and edit them, but Sapporta considers them its own.
-- **Copied, user-owned.** Files the project author is expected to edit:
-  starter examples (`app.ts`, `authz/`, sample contracts) and workspace
-  files (`package.json`, env files, docs). A refresh never overwrites
-  workspace files.
+- **Copied.** Files `sapporta init` writes into the project: boot wiring such
+  as `boot.ts` and `main.tsx`, starter examples such as `app.ts` and `authz/`,
+  and workspace files such as `package.json` and the env files.
 
-The single source of truth for the third axis is the scaffold manifest at
-[packages/core/src/cli/init-project/scaffold-manifest.ts](packages/core/src/cli/init-project/scaffold-manifest.ts),
-where every generated file carries an ownership of `framework`, `example`,
-or `workspace`.
+The project owns every copied file and may edit any of them; Sapporta writes
+them once and never rewrites them. The scaffold manifest at
+[packages/core/src/cli/init-project/scaffold-manifest.ts](packages/core/src/cli/init-project/scaffold-manifest.ts)
+lists them.
 
 ## Packages and Layering
 

@@ -10,7 +10,6 @@
     "check:peer-compat:min": "node scripts/check-peer-compat.mjs minimum",
     "check:peer-compat:latest": "node scripts/check-peer-compat.mjs latest-in-range",
     "check:scaffold-bundle": "node scripts/scaffold-bundle-report.mjs",
-    "scaffold:refresh": "pnpm exec tsx scripts/refresh-scaffold-project.ts",
     "build": "pnpm -r --sort --if-present build",
     "typecheck": "tsc --build",
     "pretest": "zx scripts/test.mjs prepare-unit",

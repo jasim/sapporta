@@ -143,8 +143,6 @@ export function renderScaffoldTemplates(opts: {
     return {
       src: file.src,
       dest: file.dest,
-      ownership: file.ownership,
-      refreshPolicy: file.refreshPolicy,
       content,
     };
   });
