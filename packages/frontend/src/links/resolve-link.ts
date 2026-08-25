@@ -45,8 +45,7 @@ export function resolveLink(
   switch (link.kind) {
     case "table": {
       const label =
-        link.label ??
-        `Open ${context.tableLabel?.(link.table) ?? link.table}`;
+        link.label ?? `Open ${context.tableLabel?.(link.table) ?? link.table}`;
       return {
         href: tableFilteredByUrl(link.table, bound),
         label,
@@ -66,16 +65,14 @@ export function resolveLink(
       };
     }
     case "url": {
-      const substituted = substituteHrefPlaceholders(
-        link.href,
-        context.values,
-      );
+      const substituted = substituteHrefPlaceholders(link.href, context.values);
       if (substituted === null) return null;
       return {
         href: withQueryParams(substituted, bound),
         label: link.label ?? "Open link",
         icon: link.icon ?? "external",
-        target: link.target ?? (isExternalHref(substituted) ? "_blank" : "_self"),
+        target:
+          link.target ?? (isExternalHref(substituted) ? "_blank" : "_self"),
       };
     }
   }

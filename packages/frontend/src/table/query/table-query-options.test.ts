@@ -1,13 +1,6 @@
 import { QueryClient } from "@tanstack/react-query";
 import type { Row } from "@sapporta/shared/contracts";
-import {
-  afterEach,
-  describe,
-  expect,
-  expectTypeOf,
-  it,
-  vi,
-} from "vitest";
+import { afterEach, describe, expect, expectTypeOf, it, vi } from "vitest";
 import {
   tableQueryKeys,
   tableRecordQueryOptions,

@@ -2,10 +2,7 @@ import { useStore } from "zustand";
 import type { ColumnSchema } from "@sapporta/shared/contracts";
 import type { TypedFilterCondition } from "@sapporta/shared/filter";
 import type { LookupForColumn } from "../../lookup";
-import type {
-  TGridLevelId,
-  TGridRowsByLevel,
-} from "../tgrid/tgrid-types";
+import type { TGridLevelId, TGridRowsByLevel } from "../tgrid/tgrid-types";
 import type { TGridSession } from "../tgrid/tgrid-session";
 import { requireHostQueryStore } from "./table-query-store";
 

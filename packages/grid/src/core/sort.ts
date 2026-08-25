@@ -38,7 +38,9 @@ export function parseSortString(
   return out;
 }
 
-export function stringifySortOrder(order: readonly SortDescriptor[]): string | null {
+export function stringifySortOrder(
+  order: readonly SortDescriptor[],
+): string | null {
   if (order.length === 0) return null;
   return order
     .map((s) => (s.direction === "desc" ? `-${s.colId}` : s.colId))

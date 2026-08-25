@@ -380,9 +380,7 @@ describe("runtime lifecycle acceptance", () => {
     );
 
     expect(
-      runtime.rowOperations
-        .targets()
-        .map(({ row }) => rowKeyOfRowId(row.id)),
+      runtime.rowOperations.targets().map(({ row }) => rowKeyOfRowId(row.id)),
     ).toEqual(["a", "b"]);
     expect(runtime.rowOperations.selectedDataTargets()).toEqual([]);
 

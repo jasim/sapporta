@@ -12,8 +12,7 @@ export type ColumnSizingStorageKeyContext = {
 };
 
 export type ColumnSizingStorageKey =
-  | string
-  | ((context: ColumnSizingStorageKeyContext) => string | undefined);
+  string | ((context: ColumnSizingStorageKeyContext) => string | undefined);
 
 export type ColumnSizingOptions = {
   storageKey?: ColumnSizingStorageKey;
@@ -68,7 +67,9 @@ export function saveColumnSizingOverrides(
   if (!sizing.enabled || !sizing.storageKey) return;
   writeLocalStorage(
     sizing.storageKey,
-    JSON.stringify(sanitizeColumnSizingOverrides(overrides, schema, sizing.minPx)),
+    JSON.stringify(
+      sanitizeColumnSizingOverrides(overrides, schema, sizing.minPx),
+    ),
   );
 }
 
@@ -101,7 +102,8 @@ export function columnSizingTemplateColumns(
   return schema
     .map((column) => {
       const width = overrides[column.id];
-      if (width === undefined) return trackForColumnWidth(preset(column)?.layout.width);
+      if (width === undefined)
+        return trackForColumnWidth(preset(column)?.layout.width);
       return `${clampColumnPixelWidth(column, width, minPx)}px`;
     })
     .join(" ");

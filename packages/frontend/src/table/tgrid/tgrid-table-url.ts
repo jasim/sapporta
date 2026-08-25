@@ -159,9 +159,7 @@ export function normalizeForeignKeyScalarFilters(
   if (!columns) return filters;
 
   const foreignKeyColumns = new Set(
-    columns
-      .filter((column) => column.foreignKey)
-      .map((column) => column.name),
+    columns.filter((column) => column.foreignKey).map((column) => column.name),
   );
   if (foreignKeyColumns.size === 0) return filters;
 

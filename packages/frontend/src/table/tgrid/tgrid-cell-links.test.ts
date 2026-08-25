@@ -159,9 +159,7 @@ describe("withTGridCellLinks", () => {
     const container = await renderNode(
       wrapped.renderCell(renderProps(dataRow({ account_id: null }), null)),
     );
-    expect(
-      container.querySelector('a[data-grid-part="cell-link"]'),
-    ).toBeNull();
+    expect(container.querySelector('a[data-grid-part="cell-link"]')).toBeNull();
     expect(container.textContent).toContain("cell-content");
   });
 

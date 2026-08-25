@@ -10,10 +10,7 @@ import { useStore } from "zustand";
 import type { TableSchema } from "@sapporta/shared/contracts";
 import { useTGridSession } from "../tgrid/tgrid-binding";
 import type { TGridDefinition } from "../tgrid/tgrid-runtime-config";
-import type {
-  TGridLevelId,
-  TGridRowsByLevel,
-} from "../tgrid/tgrid-types";
+import type { TGridLevelId, TGridRowsByLevel } from "../tgrid/tgrid-types";
 import type {
   TGridLoadedRowsBoundaryHandler,
   TGridSession,

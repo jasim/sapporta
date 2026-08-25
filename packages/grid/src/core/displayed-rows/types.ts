@@ -45,6 +45,4 @@ export type DisplayedRowsState = {
 // the event that woke it up. This prevents "source changed" and "phantom
 // changed" from becoming two competing mini-derivations.
 export type DisplayedRowsInvalidationReason =
-  | { type: "source" }
-  | { type: "phantoms" }
-  | { type: "view" };
+  { type: "source" } | { type: "phantoms" } | { type: "view" };

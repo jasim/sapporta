@@ -114,10 +114,7 @@ function runPreparedSql(
   };
 }
 
-function runWithSqliteQueryOnly<T>(
-  sqlite: Database.Database,
-  fn: () => T,
-): T {
+function runWithSqliteQueryOnly<T>(sqlite: Database.Database, fn: () => T): T {
   const previous = readQueryOnly(sqlite);
   sqlite.pragma("query_only = ON");
   try {

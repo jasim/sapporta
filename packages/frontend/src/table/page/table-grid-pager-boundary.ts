@@ -1,10 +1,7 @@
 import type { RefObject } from "react";
 import type { GridRuntime, SourceLoadResult } from "@sapporta/grid";
 import { controllerFor, cursorManagerFor } from "@sapporta/grid/advanced";
-import type {
-  TGridLevelId,
-  TGridRowsByLevel,
-} from "../tgrid/tgrid-types";
+import type { TGridLevelId, TGridRowsByLevel } from "../tgrid/tgrid-types";
 import type { TGridLoadedRowsBoundaryHandler } from "../tgrid/tgrid-session";
 import type { TablePagerDirection } from "./TablePagers";
 

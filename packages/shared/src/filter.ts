@@ -113,12 +113,7 @@ export function wireKey(column: string, op: Operator): string {
  * TEXT shape when the value is bound to Drizzle.
  */
 export type TypedValue =
-  | string
-  | number
-  | boolean
-  | Temporal.PlainDate
-  | Temporal.Instant
-  | null;
+  string | number | boolean | Temporal.PlainDate | Temporal.Instant | null;
 
 /**
  * A column-scoped condition with a typed value. Mirrors `FilterCondition`
@@ -347,8 +342,10 @@ export function parseFilterForTable(
   filter: FilterCondition,
   table: FilterTableInput,
 ): TypedFilterCondition {
-  const [typed] = parseFilters([filter], (column) =>
-    table.columns.find((candidate) => candidate.name === column)?.kind,
+  const [typed] = parseFilters(
+    [filter],
+    (column) =>
+      table.columns.find((candidate) => candidate.name === column)?.kind,
   );
   return typed;
 }
@@ -436,9 +433,7 @@ export function encodeTypedFilters(
  *  matching codes in the server's `QueryParseError` so the server can
  *  pass them through without remapping. */
 export type FilterParseErrorCode =
-  | "unknown_filter_shape"
-  | "unknown_op"
-  | "bad_value";
+  "unknown_filter_shape" | "unknown_op" | "bad_value";
 
 /** Thrown by `decodeFilters` on a grammar violation. The UI catches
  *  `Error` at the route boundary; the server rewraps into its
@@ -581,12 +576,10 @@ export function materializeFilterCondition(
   }
 }
 
-function resolveColumnKind(
-  table: FilterTableInput,
-  column: string,
-): ValueKind {
-  const kind = table.columns.find((candidate) => candidate.name === column)
-    ?.kind;
+function resolveColumnKind(table: FilterTableInput, column: string): ValueKind {
+  const kind = table.columns.find(
+    (candidate) => candidate.name === column,
+  )?.kind;
   if (!kind) {
     throw new TypedFilterParseError(
       "unknown_column",

@@ -67,15 +67,13 @@ describe("table selection", () => {
     const removed = dataTarget(root, "10");
     const failed = dataTarget(root, "20");
     const unattempted = dataTarget(root, "30");
-    const remove = vi.fn(
-      async (): Promise<RowRemovalResult> => ({
-        kind: "partial",
-        removed: [removed],
-        failed,
-        unattempted: [unattempted],
-        error: new Error("permission denied"),
-      }),
-    );
+    const remove = vi.fn(async (): Promise<RowRemovalResult> => ({
+      kind: "partial",
+      removed: [removed],
+      failed,
+      unattempted: [unattempted],
+      error: new Error("permission denied"),
+    }));
     const session = makeSession({
       targets: [removed, failed, unattempted],
       remove,

@@ -1,8 +1,5 @@
 import { useStore } from "zustand";
-import type {
-  TGridLevelId,
-  TGridRowsByLevel,
-} from "../tgrid/tgrid-types";
+import type { TGridLevelId, TGridRowsByLevel } from "../tgrid/tgrid-types";
 import type { TGridSession } from "../tgrid/tgrid-session";
 import { tableGridUrlForQueryState } from "./table-grid-url-state";
 import { requireHostQueryStore } from "./table-query-store";

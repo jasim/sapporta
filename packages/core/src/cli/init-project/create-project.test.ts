@@ -442,9 +442,7 @@ describe("renderScaffoldFiles", () => {
     expect(byDest.get("packages/frontend/src/SapportaApp.tsx")).toMatch(
       /<Route element=\{<AuthGate \/>\}>\s*\{appPublicHomeRoute \? null : appHomeRoute\}/,
     );
-    expect(byDest.get("packages/frontend/src/Home.tsx")).toContain(
-      "<AppPage",
-    );
+    expect(byDest.get("packages/frontend/src/Home.tsx")).toContain("<AppPage");
     expect(byDest.get("packages/frontend/src/PublicPage.tsx")).toContain(
       "<AppPage",
     );

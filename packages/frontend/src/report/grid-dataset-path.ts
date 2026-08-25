@@ -1,7 +1,4 @@
-import {
-  decomposePath,
-  type GridPath,
-} from "@sapporta/grid";
+import { decomposePath, type GridPath } from "@sapporta/grid";
 import type {
   GridDataset,
   GridDatasetNode,

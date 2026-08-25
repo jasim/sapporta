@@ -21,23 +21,19 @@ const sapportaPackages = [
   { packageDir: "packages/core", snapshotDir: undefined },
   {
     packageDir: "packages/honest",
-    snapshotDir:
-      "packages/core/src/vendored-package-snapshots/honest",
+    snapshotDir: "packages/core/src/vendored-package-snapshots/honest",
   },
   {
     packageDir: "packages/shared",
-    snapshotDir:
-      "packages/core/src/vendored-package-snapshots/shared",
+    snapshotDir: "packages/core/src/vendored-package-snapshots/shared",
   },
   {
     packageDir: "packages/frontend",
-    snapshotDir:
-      "packages/core/src/vendored-package-snapshots/frontend",
+    snapshotDir: "packages/core/src/vendored-package-snapshots/frontend",
   },
   {
     packageDir: "packages/grid",
-    snapshotDir:
-      "packages/core/src/vendored-package-snapshots/grid",
+    snapshotDir: "packages/core/src/vendored-package-snapshots/grid",
   },
   {
     packageDir: "packages/ui",

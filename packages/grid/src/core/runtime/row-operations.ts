@@ -279,8 +279,7 @@ export function createRowOperations(
           target,
           order,
           depth: decomposePath(path).edges.length,
-          registeredOrder:
-            registeredOrder.get(path) ?? Number.MAX_SAFE_INTEGER,
+          registeredOrder: registeredOrder.get(path) ?? Number.MAX_SAFE_INTEGER,
           displayedOrder:
             ports.displayedRows(path).rowIndexById.get(rowId) ??
             Number.MAX_SAFE_INTEGER,

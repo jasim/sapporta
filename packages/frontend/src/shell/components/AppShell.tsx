@@ -98,7 +98,9 @@ function AppShellLayout({
   const shellSidebarToggle =
     sidebarToggle === undefined ? <SidebarToggle /> : sidebarToggle;
   const hasShellSidebarToggle =
-    showNavigation && shellSidebarToggle !== false && shellSidebarToggle != null;
+    showNavigation &&
+    shellSidebarToggle !== false &&
+    shellSidebarToggle != null;
   const showSidebarToggleInSidebar =
     hasShellSidebarToggle && sidebar.isDesktop && sidebar.desktopExpanded;
 

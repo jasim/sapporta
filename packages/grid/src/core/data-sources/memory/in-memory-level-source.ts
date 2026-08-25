@@ -354,7 +354,9 @@ function buildCore<F>(opts: InMemoryLevelSourceOpts<F>): Core<F> {
   }
 
   const query: {
-    -readonly [Key in keyof LevelQueryCapabilities]: LevelQueryCapabilities[Key];
+    -readonly [
+      Key in keyof LevelQueryCapabilities
+    ]: LevelQueryCapabilities[Key];
   } = {};
   if (opts.sortMode === "client") {
     query.sort = {

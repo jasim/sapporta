@@ -6,10 +6,7 @@ import type {
   LevelRowOfKind,
   RowActivationTrigger,
 } from "@sapporta/grid";
-import type {
-  TGridLevelId,
-  TGridRowsByLevel,
-} from "./tgrid-types";
+import type { TGridLevelId, TGridRowsByLevel } from "./tgrid-types";
 
 type TGridActiveRowForKind<
   RowsByLevel extends TGridRowsByLevel,

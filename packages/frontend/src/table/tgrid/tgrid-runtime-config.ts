@@ -238,8 +238,7 @@ export function compileTGridRuntimeConfig<
       rowsClient,
       saveCellValueByColumn: columnBuild.saveCellValueByColumn,
       sessionContext: args.sessionContext as
-        | (() => TGridSessionContext<TGridRowsByLevel, unknown>)
-        | undefined,
+        (() => TGridSessionContext<TGridRowsByLevel, unknown>) | undefined,
     });
   }
 
@@ -379,8 +378,7 @@ function makeEndpointFactory(args: {
     TGridRuntimeCellWriteHandler<TGridRowsByLevel, unknown, string>
   >;
   sessionContext:
-    | (() => TGridSessionContext<TGridRowsByLevel, unknown>)
-    | undefined;
+    (() => TGridSessionContext<TGridRowsByLevel, unknown>) | undefined;
 }): RestEndpointFactory<TGridFilter> {
   return (ctx) => {
     // Expanded child rows are always filtered to the parent row that opened them.
@@ -475,10 +473,7 @@ function makeEndpointFactory(args: {
         const columns = args.parent
           ? { ...req.node.columns, [args.parent.foreignKey]: parentRowKey }
           : { ...req.node.columns };
-        const result = await args.rowsClient.create(
-          args.table.name,
-          columns,
-        );
+        const result = await args.rowsClient.create(args.table.name, columns);
         const row = Array.isArray(result.data) ? result.data[0] : result.data;
         return tableTreeNode(row, args.levelId, args.rowKeyColumn);
       },

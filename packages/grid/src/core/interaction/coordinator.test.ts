@@ -1,8 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  createGridRuntime,
-  runtimeInternalsFor,
-} from "../runtime/runtime";
+import { createGridRuntime, runtimeInternalsFor } from "../runtime/runtime";
 import type {
   RuntimeKernel,
   LoadedRowsBoundaryEvent,

@@ -1277,11 +1277,7 @@ export function createGridRuntime(args: RuntimeArgs): GridRuntime {
     }
 
     const active = activeRowForRuntime();
-    if (
-      !active ||
-      active.level.path !== path ||
-      active.row.id !== rowId
-    ) {
+    if (!active || active.level.path !== path || active.row.id !== rowId) {
       return false;
     }
     emitter.emit("rowActivated", { activeRow: active, trigger });
@@ -1912,9 +1908,7 @@ export function createGridRuntime(args: RuntimeArgs): GridRuntime {
       if (
         sourceRegistry
           .state(path)
-          .snapshot.nodes.some(
-            (candidate) => candidate.rowKey === rowKey,
-          )
+          .snapshot.nodes.some((candidate) => candidate.rowKey === rowKey)
       ) {
         receiveSourceNotification(path);
       }

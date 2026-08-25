@@ -86,9 +86,9 @@ describe.sequential("generated app browser workflow - end-to-end", () => {
       await playwrightExpect(
         page.getByText("This page is available without signing in."),
       ).toBeVisible();
-      await playwrightExpect(
-        page.locator("[data-sidebar-region]"),
-      ).toHaveCount(0);
+      await playwrightExpect(page.locator("[data-sidebar-region]")).toHaveCount(
+        0,
+      );
 
       await page.goto("/signup");
       await expectHeading(page, "Sign up and create your first workspace");

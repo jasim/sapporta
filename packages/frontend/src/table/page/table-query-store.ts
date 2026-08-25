@@ -16,8 +16,7 @@ export function requireHostQueryStore<
   caller: string,
 ): StoreApi<TGridLevelQueryState<TGridTableRow>> {
   const store = session.levels[level].queryStore as
-    | StoreApi<TGridLevelQueryState<TGridTableRow>>
-    | undefined;
+    StoreApi<TGridLevelQueryState<TGridTableRow>> | undefined;
   if (!store) {
     throw new Error(
       `${caller}: level '${String(level)}' does not have host-owned query state`,

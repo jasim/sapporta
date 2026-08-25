@@ -65,13 +65,19 @@ describe("grid public surface", () => {
   it("represents every active-row kind through the public discriminated union", () => {
     expectTypeOf<LevelRowOfKind<"data">["kind"]>().toEqualTypeOf<"data">();
     expectTypeOf<LevelRowOfKind<"rollup">["kind"]>().toEqualTypeOf<"rollup">();
-    expectTypeOf<LevelRowOfKind<"opening">["kind"]>().toEqualTypeOf<"opening">();
-    expectTypeOf<LevelRowOfKind<"closing">["kind"]>().toEqualTypeOf<"closing">();
+    expectTypeOf<
+      LevelRowOfKind<"opening">["kind"]
+    >().toEqualTypeOf<"opening">();
+    expectTypeOf<
+      LevelRowOfKind<"closing">["kind"]
+    >().toEqualTypeOf<"closing">();
     expectTypeOf<
       LevelRowOfKind<"subtotal">["kind"]
     >().toEqualTypeOf<"subtotal">();
     expectTypeOf<LevelRowOfKind<"footer">["kind"]>().toEqualTypeOf<"footer">();
-    expectTypeOf<LevelRowOfKind<"phantom">["kind"]>().toEqualTypeOf<"phantom">();
+    expectTypeOf<
+      LevelRowOfKind<"phantom">["kind"]
+    >().toEqualTypeOf<"phantom">();
     expectTypeOf<ActiveRowFor<"data">["row"]["kind"]>().toEqualTypeOf<"data">();
     expectTypeOf<
       ActiveRowFor<"rollup">["row"]["kind"]

@@ -31,9 +31,7 @@ export function gridDatasetLinkProblems(dataset: GridDataset): string[] {
   return problems;
 }
 
-function declaredLevelLinks(
-  level: GridDatasetLevel,
-): Array<[NavLink, string]> {
+function declaredLevelLinks(level: GridDatasetLevel): Array<[NavLink, string]> {
   const links: Array<[NavLink, string]> = [];
   for (const column of level.columns) {
     for (const link of column.links ?? []) {

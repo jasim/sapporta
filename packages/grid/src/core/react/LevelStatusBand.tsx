@@ -17,9 +17,7 @@ import type { GridPath } from "../types/identity";
 import { useGridRuntime, useLevelSourceState } from "./GridRuntimeProvider";
 
 export type StatusBandModel =
-  | null
-  | { kind: "loading"; text: string }
-  | { kind: "error"; text: string };
+  null | { kind: "loading"; text: string } | { kind: "error"; text: string };
 
 // Pure decision logic. Tested directly so the component itself can stay
 // a trivial wrapper around the model + the retry callback.

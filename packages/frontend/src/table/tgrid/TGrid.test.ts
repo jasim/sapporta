@@ -22,10 +22,7 @@ import { controllerFor, cursorManagerFor } from "@sapporta/grid/advanced";
 import type { TableSchema } from "@sapporta/shared/contracts";
 import type { TableRowsClient } from "./tgrid-level-config";
 import { defineTGrid } from "./tgrid-runtime-config";
-import {
-  useTGridActiveRow,
-  useTGridSession,
-} from "./tgrid-binding";
+import { useTGridActiveRow, useTGridSession } from "./tgrid-binding";
 import { createTGridSession, type TGridSession } from "./tgrid-session";
 import { mergeTGridChrome, TGrid } from "./TGrid";
 

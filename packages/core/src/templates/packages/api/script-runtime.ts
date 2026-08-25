@@ -72,9 +72,7 @@ export interface OpenScriptRuntimeOptions {
    * creates the sample-data account. Leave this out and a script signs in or
    * stops, which is what an ordinary script should do.
    */
-  createMissingAccount?: (
-    auth: ProjectBetterAuth,
-  ) => Promise<SapportaAuthUser>;
+  createMissingAccount?: (auth: ProjectBetterAuth) => Promise<SapportaAuthUser>;
 }
 
 export interface ScriptRuntime {

@@ -19,9 +19,7 @@ export type CommandResult = Pick<
 >;
 
 export type SqliteSmokeClassification =
-  | "success"
-  | "missing-native-binding"
-  | "command-failure";
+  "success" | "missing-native-binding" | "command-failure";
 
 function runCommand(
   packageDir: string,

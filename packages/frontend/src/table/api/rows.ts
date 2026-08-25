@@ -7,10 +7,7 @@ import {
   type TypedFilterCondition,
 } from "@sapporta/shared/filter";
 import type { RecordId } from "@sapporta/shared/record-id";
-import {
-  appendQueryParam,
-  type QueryParamRecord,
-} from "@sapporta/shared";
+import { appendQueryParam, type QueryParamRecord } from "@sapporta/shared";
 import {
   requestTableRecord,
   requestTableRecordsPage,

@@ -6,10 +6,7 @@ export function clampPage(page: number, pages: number): number {
   return Math.min(Math.max(Math.trunc(page), 1), pages);
 }
 
-export function parsePageJump(
-  raw: string,
-  pages: number,
-): number | undefined {
+export function parsePageJump(raw: string, pages: number): number | undefined {
   try {
     return parseOptionalBoundedInteger(raw, {
       name: "page",

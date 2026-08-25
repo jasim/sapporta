@@ -43,10 +43,7 @@ export type RowSelection =
   | { readonly kind: "set"; readonly rowIds: ReadonlySet<RowId> };
 
 export type RowInteractionStatus =
-  | "idle"
-  | "selected"
-  | "cursor"
-  | "cursor-selected";
+  "idle" | "selected" | "cursor" | "cursor-selected";
 
 export type RowInteractionSnapshot = {
   readonly activeRowId: RowId | null;

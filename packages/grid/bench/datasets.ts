@@ -9,11 +9,7 @@ import type { ColId } from "../src/core/types/identity";
 import type { InMemoryGridDataSourceOpts } from "../src/core/data-sources/memory/in-memory-grid-source";
 
 export type BenchDatasetName =
-  | "regular"
-  | "medium"
-  | "large"
-  | "wideFlat"
-  | "deepTree";
+  "regular" | "medium" | "large" | "wideFlat" | "deepTree";
 
 export type BenchDatasetConfig = {
   name: BenchDatasetName;

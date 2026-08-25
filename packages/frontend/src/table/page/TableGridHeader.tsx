@@ -31,10 +31,7 @@ import {
   PageHeaderButton,
 } from "../../shell/components/PageHeader";
 import { FilterCardsBar } from "../filters/FilterCardsBar";
-import type {
-  TGridLevelId,
-  TGridRowsByLevel,
-} from "../tgrid/tgrid-types";
+import type { TGridLevelId, TGridRowsByLevel } from "../tgrid/tgrid-types";
 import type { TGridSession } from "../tgrid/tgrid-session";
 import { TableViewOptions, TableViewSwitch } from "./TableViewSwitch";
 import {

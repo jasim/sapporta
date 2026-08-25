@@ -2,7 +2,10 @@ import { useEffect } from "react";
 import { useStore } from "zustand";
 import type { GridControllerPublic } from "../interaction/controller";
 import type { GridEffect } from "../types/effects";
-import { findGridCellElement, findGridRowElement } from "./internal/dom-targets";
+import {
+  findGridCellElement,
+  findGridRowElement,
+} from "./internal/dom-targets";
 
 // The single `useEffect` over data in the entire grid (per path).
 //

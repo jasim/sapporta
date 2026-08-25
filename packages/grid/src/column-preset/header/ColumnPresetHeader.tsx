@@ -62,8 +62,7 @@ export function ColumnPresetHeader<TMeta = unknown, TFilter = unknown>({
   const defaultCommands: GridLevelCommands<TFilter> = {
     setSort: source.query?.sort?.set,
     setFilter: source.query?.filter?.set as
-      | GridLevelCommands<TFilter>["setFilter"]
-      | undefined,
+      GridLevelCommands<TFilter>["setFilter"] | undefined,
     refetch: source.query?.refetch,
     createRow: level.createRow,
     removeRow: level.removeRow,
@@ -265,11 +264,7 @@ function HeaderCell<TMeta = unknown, TFilter = unknown>({
                 />
               }
             >
-              <EllipsisVertical
-                aria-hidden="true"
-                size={14}
-                strokeWidth={2}
-              />
+              <EllipsisVertical aria-hidden="true" size={14} strokeWidth={2} />
             </PopoverTrigger>
             <PopoverContent
               align="end"

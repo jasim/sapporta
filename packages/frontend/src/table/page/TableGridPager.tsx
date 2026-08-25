@@ -1,7 +1,4 @@
-import type {
-  TGridLevelId,
-  TGridRowsByLevel,
-} from "../tgrid/tgrid-types";
+import type { TGridLevelId, TGridRowsByLevel } from "../tgrid/tgrid-types";
 import type { TGridSession } from "../tgrid/tgrid-session";
 import type { TablePageMode } from "./table-page-mode";
 import { useTableLevelPager } from "./table-level-pager";

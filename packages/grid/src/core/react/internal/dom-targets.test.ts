@@ -122,10 +122,7 @@ function renderGridCell({
   return { root, row, cell, content, path, rowId, colId };
 }
 
-function applyAttrs(
-  element: HTMLElement,
-  attrs: Record<string, string>,
-): void {
+function applyAttrs(element: HTMLElement, attrs: Record<string, string>): void {
   for (const [name, value] of Object.entries(attrs)) {
     element.setAttribute(name, value);
   }

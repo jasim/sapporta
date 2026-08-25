@@ -51,11 +51,7 @@ export type GridAction =
     };
 
 export type RowDirection =
-  | "up"
-  | "down"
-  | "first"
-  | "last"
-  | { readonly delta: number };
+  "up" | "down" | "first" | "last" | { readonly delta: number };
 
 // "preserve" — prefer the source colId on the target if present;
 // otherwise fall back to the target's first focusable column.

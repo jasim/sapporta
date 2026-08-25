@@ -73,10 +73,7 @@ function rootPathOf(runtime: RuntimeKernel): GridPath {
   return rootPath(runtime.schemaTopology.rootLevelName);
 }
 
-function getRow(
-  runtime: RuntimeKernel,
-  step: RowStep,
-): LevelRow | undefined {
+function getRow(runtime: RuntimeKernel, step: RowStep): LevelRow | undefined {
   return runtime.displayedRowsFor(step.path).rowById.get(step.rowId);
 }
 
@@ -90,10 +87,7 @@ function isFocusable(
   return capabilities(row.kind).focusable;
 }
 
-function isRowSelectable(
-  runtime: RuntimeKernel,
-  step: RowStep,
-): boolean {
+function isRowSelectable(runtime: RuntimeKernel, step: RowStep): boolean {
   return getRow(runtime, step)?.rowSelectable === true;
 }
 

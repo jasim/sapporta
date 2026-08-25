@@ -34,26 +34,12 @@ describe("TGrid active row public types", () => {
     expectTypeOf<ContextFor<"phantom">["values"]>().toEqualTypeOf<
       Readonly<Partial<Rows["orders"]>>
     >();
-    expectTypeOf<
-      ContextFor<"data">["kind"]
-    >().toEqualTypeOf<"data">();
-    expectTypeOf<
-      ContextFor<"rollup">["kind"]
-    >().toEqualTypeOf<"rollup">();
-    expectTypeOf<
-      ContextFor<"opening">["kind"]
-    >().toEqualTypeOf<"opening">();
-    expectTypeOf<
-      ContextFor<"closing">["kind"]
-    >().toEqualTypeOf<"closing">();
-    expectTypeOf<
-      ContextFor<"subtotal">["kind"]
-    >().toEqualTypeOf<"subtotal">();
-    expectTypeOf<
-      ContextFor<"footer">["kind"]
-    >().toEqualTypeOf<"footer">();
-    expectTypeOf<
-      ContextFor<"phantom">["kind"]
-    >().toEqualTypeOf<"phantom">();
+    expectTypeOf<ContextFor<"data">["kind"]>().toEqualTypeOf<"data">();
+    expectTypeOf<ContextFor<"rollup">["kind"]>().toEqualTypeOf<"rollup">();
+    expectTypeOf<ContextFor<"opening">["kind"]>().toEqualTypeOf<"opening">();
+    expectTypeOf<ContextFor<"closing">["kind"]>().toEqualTypeOf<"closing">();
+    expectTypeOf<ContextFor<"subtotal">["kind"]>().toEqualTypeOf<"subtotal">();
+    expectTypeOf<ContextFor<"footer">["kind"]>().toEqualTypeOf<"footer">();
+    expectTypeOf<ContextFor<"phantom">["kind"]>().toEqualTypeOf<"phantom">();
   });
 });

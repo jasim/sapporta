@@ -21,13 +21,7 @@ export type AppWorkspaceMembership = Omit<WorkspaceMembership, "roles"> & {
 export type AppPrincipal = Principal<AppWorkspaceMembership>;
 
 export type AppAction =
-  | "manage"
-  | "read"
-  | "create"
-  | "update"
-  | "delete"
-  | "export"
-  | "run";
+  "manage" | "read" | "create" | "update" | "delete" | "export" | "run";
 
 export type AppSubject = "all" | string;
 

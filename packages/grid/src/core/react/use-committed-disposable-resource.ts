@@ -14,8 +14,9 @@ type DisposableResourceEntry<TResource> = {
 export function useCommittedDisposableResource<
   TResource extends DisposableResource,
 >(create: () => TResource, deps: DependencyList): TResource | null {
-  const [entry, setEntry] =
-    useState<DisposableResourceEntry<TResource> | null>(null);
+  const [entry, setEntry] = useState<DisposableResourceEntry<TResource> | null>(
+    null,
+  );
 
   useEffect(() => {
     const resource = create();

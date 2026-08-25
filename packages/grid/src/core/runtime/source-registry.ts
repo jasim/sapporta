@@ -32,8 +32,7 @@ export type SourceRefresh = {
   readonly handle: LevelHandle;
   readonly state: LevelSourceState;
   readonly statusChanged:
-    | { readonly status: LevelStatus; readonly error?: Error }
-    | undefined;
+    { readonly status: LevelStatus; readonly error?: Error } | undefined;
 };
 
 type RowMembership = {

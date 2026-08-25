@@ -130,8 +130,7 @@ export function useTableGridUrlState<RowsByLevel extends TGridRowsByLevel>({
         sort: params.sort ?? loadSortPref(prefKey, validColIds),
       });
       const store = session.levels[levelId].queryStore as
-        | StoreApi<TGridLevelQueryState<TGridTableRow>>
-        | undefined;
+        StoreApi<TGridLevelQueryState<TGridTableRow>> | undefined;
       store?.getState().syncFromUrl(seed);
     },
     [columns, levelId, prefKey, searchParams, validColIds],

@@ -244,9 +244,7 @@ describe("GridCopyContextMenu", () => {
         }),
       }),
     );
-    expect(button(container, "Open account")).toBeInstanceOf(
-      HTMLButtonElement,
-    );
+    expect(button(container, "Open account")).toBeInstanceOf(HTMLButtonElement);
   });
 
   it("passes a null target to extra items outside grid cells", async () => {

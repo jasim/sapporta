@@ -133,8 +133,16 @@ describe("resolveLinks", () => {
   it("drops unresolvable links and deduplicates identical destinations", () => {
     const row = { customer_id: "cust-1", missing: null };
     const links: NavLink[] = [
-      { kind: "table", table: "invoices", bind: { customer_id: "customer_id" } },
-      { kind: "table", table: "invoices", bind: { customer_id: "customer_id" } },
+      {
+        kind: "table",
+        table: "invoices",
+        bind: { customer_id: "customer_id" },
+      },
+      {
+        kind: "table",
+        table: "invoices",
+        bind: { customer_id: "customer_id" },
+      },
       { kind: "table", table: "invoices", bind: { customer_id: "missing" } },
     ];
     const resolved = resolveLinks(links, { values: row });

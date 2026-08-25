@@ -82,8 +82,7 @@ export type CellActivationState = {
 };
 
 export type CellActivationDescription =
-  | string
-  | ((ctx: CellActivationContext) => CellActivationState);
+  string | ((ctx: CellActivationContext) => CellActivationState);
 
 export type CellActivationTrigger =
   | {
@@ -178,9 +177,7 @@ export type ColumnSchema = {
 };
 
 export type RowHeaderColumn<ColumnName extends string = ColId> =
-  | { readonly column: ColumnName }
-  | "empty-selectable-cell"
-  | "none";
+  { readonly column: ColumnName } | "empty-selectable-cell" | "none";
 
 export function editStartsOn(
   column: ColumnSchema,

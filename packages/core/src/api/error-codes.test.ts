@@ -10,10 +10,10 @@ import { ERROR_CODE_STATUS } from "./error-codes.js";
 
 describe("ERROR_CODE_STATUS", () => {
   it("matches the canonical map verbatim", () => {
-      expect(ERROR_CODE_STATUS).toEqual({
-        TABLE_NOT_FOUND: 404,
-        FORBIDDEN: 403,
-        INVALID_TABLE_NAME: 400,
+    expect(ERROR_CODE_STATUS).toEqual({
+      TABLE_NOT_FOUND: 404,
+      FORBIDDEN: 403,
+      INVALID_TABLE_NAME: 400,
       INVALID_COLUMN_NAME: 400,
       INVALID_JSON: 400,
       INVALID_SQL: 400,

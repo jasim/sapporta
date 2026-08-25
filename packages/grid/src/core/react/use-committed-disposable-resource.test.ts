@@ -48,18 +48,15 @@ describe("useCommittedDisposableResource", () => {
     const renders: string[] = [];
 
     function Probe({ resourceKey }: { resourceKey: string }) {
-      const resource = useCommittedDisposableResource(
-        () => {
-          nextId += 1;
-          const resource: TestResource = {
-            key: resourceKey,
-            id: nextId,
-            dispose: () => dispose(resource),
-          };
-          return resource;
-        },
-        [resourceKey],
-      );
+      const resource = useCommittedDisposableResource(() => {
+        nextId += 1;
+        const resource: TestResource = {
+          key: resourceKey,
+          id: nextId,
+          dispose: () => dispose(resource),
+        };
+        return resource;
+      }, [resourceKey]);
 
       renders.push(
         resource
