@@ -60,19 +60,19 @@ Prefer the project-local CLI form, `pnpm exec sapporta ...`. It reads
 - **Backend routes** — contract in `packages/shared/src/contracts/`, handler in
   `packages/api/app/`, mounted from `packages/api/app.ts`. The `/api/hello`
   files show the shape end to end.
-  https://sapporta.com/docs/guides/app-owned-features/custom-api-endpoints.md
+  https://sapporta.com/docs/guides/application-code/custom-api-endpoints.md
 - **Auth, abilities, row access** — `packages/api/authz/`.
   https://sapporta.com/docs/guides/security/authentication-and-abilities.md
 - **Frontend routes and navigation** — `packages/frontend/src/App.tsx`.
-  https://sapporta.com/docs/guides/app-owned-features/frontend-routes-navigation-and-layout.md
+  https://sapporta.com/docs/guides/application-code/frontend-routes-navigation-and-layout.md
 - **Browser API calls** — typed clients in `packages/frontend/src/api.ts`.
-  https://sapporta.com/docs/guides/app-owned-features/typed-api-clients.md
+  https://sapporta.com/docs/guides/application-code/typed-api-clients.md
 - **Cache policy and post-mutation refresh** —
   `packages/frontend/src/query-client.ts`; `main.tsx` is boot wiring and is not
   the place for application policy.
-  https://sapporta.com/docs/guides/app-owned-features/cached-table-reads-and-refresh.md
+  https://sapporta.com/docs/guides/application-code/cached-table-reads-and-refresh.md
 - **Custom forms and validation** — `packages/frontend/src/`.
-  https://sapporta.com/docs/guides/app-owned-features/custom-forms-and-validation.md
+  https://sapporta.com/docs/guides/application-code/custom-forms-and-validation.md
 - **Reports** — shared contract, backend route, frontend screen, navigation.
   https://sapporta.com/docs/guides/reports/route-based-reports.md
 - **Sample data** — rows in `packages/api/seed.ts`, then `pnpm seed`. Any
@@ -140,8 +140,8 @@ existing Sapporta components and local patterns to new abstractions.
 - All docs: https://sapporta.com/docs.md
 - Guides: https://sapporta.com/docs/guides.md
 - Reference: https://sapporta.com/docs/reference.md
-- Generated project layout:
-  https://sapporta.com/docs/reference/project/generated-project-layout.md
+- Project file map:
+  https://sapporta.com/docs/reference/project/project-files.md
 - Working with a coding agent:
   https://sapporta.com/docs/guides/discovery/develop-with-a-coding-agent.md
 - CLI: https://sapporta.com/docs/guides/discovery/use-the-sapporta-cli.md
