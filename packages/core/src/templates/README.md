@@ -54,19 +54,6 @@ packages/shared/    API contracts and types shared by backend and frontend
   sets it to its own domain, which has no relation to either port above.
 - `SAPPORTA_MAIL_TRANSPORT=stream` prints development emails to the API console.
 
-## Running beside other Sapporta projects
-
-`sapporta init` picked this project's ports above at random, so several projects
-run side by side without being reconfigured. When a port is taken anyway,
-`pnpm dev` names the setting to change: it checks the frontend port before
-starting anything, and the API reports its own port as it boots. Pick a free
-port, set it here, and change `SAPPORTA_PUBLIC_APP_URL` too if the frontend
-port moved.
-
-`pnpm exec sapporta` reads `SAPPORTA_API_PORT` from this file, so API-backed
-commands reach this project's server without further configuration. Pass
-`--api-url`, or set `SAPPORTA_API_URL`, only to talk to some other deployment.
-
 ## Deployment
 
 See [`DEPLOYMENT.md`](./DEPLOYMENT.md).
