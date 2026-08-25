@@ -23,7 +23,10 @@ import { openScriptRuntime, type ScriptRuntime } from "./script-runtime.js";
 
 export type { SampleDataAccount } from "./project-auth/sample-data.js";
 
-/** What `seed.ts` gets back: the workspace, `rows()`, and `close()`. */
+/**
+ * What `seed.ts` gets back: the workspace, `rows()`, `db`, `auth`, and
+ * `close()`.
+ */
 export type SeedRuntime = ScriptRuntime;
 
 /**

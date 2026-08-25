@@ -15,6 +15,7 @@
  */
 import { eq } from "drizzle-orm";
 import type { ProjectDbConnection } from "@sapporta/server";
+import { deviceTimeZone, type TimeZone } from "@sapporta/shared/temporal";
 import { user } from "./schema.js";
 
 /** The account `pnpm seed` writes its rows as, as named in `seed.ts`. */
@@ -25,15 +26,17 @@ export interface SampleDataAccount {
 }
 
 /**
- * The calendar the seeded workspace keeps.
+ * The time zone the seeded workspace starts on: this machine's.
  *
- * A browser sending a sign-up request knows which zone the person is in; a
- * script does not, and the machine it happens to be running on is an accident
- * of where the seed was run rather than a fact about the sample data. So the
- * seeded workspace keeps UTC, and a developer who wants to look at it on
- * another clock changes it on the workspace settings screen.
+ * A sign-up from a browser carries the person's zone; a seed run has no
+ * request to carry one, so it uses the machine's. Seeded timestamps and
+ * day-grouped reports then read on the clock of whoever is about to look at
+ * them. It is an ordinary workspace zone afterwards, changed on the workspace
+ * settings screen.
  */
-export const sampleDataTimeZone = "UTC";
+export function sampleDataTimeZone(): TimeZone {
+  return deviceTimeZone();
+}
 
 /**
  * Refuses unless this project has granted sample-data seeding.

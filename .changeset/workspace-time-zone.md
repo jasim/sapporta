@@ -108,9 +108,13 @@ its own. An owner changes it on the new Workspace settings screen, through
 `PUT /api/auth-context/workspace/time-zone`, which answers with a fresh auth
 context.
 
-`deviceTimeZone()` survives with exactly one caller, the sign-up request, and a
-test greps for any other reader of an ambient zone — `deviceTimeZone()`,
-`Temporal.Now.timeZoneId()`, or `Temporal.Now.plainDateISO()` with no argument.
+`deviceTimeZone()` survives with two callers, and a test greps for any other
+reader of an ambient zone — `deviceTimeZone()`, `Temporal.Now.timeZoneId()`, or
+`Temporal.Now.plainDateISO()` with no argument. The second caller is `pnpm
+seed`, which has no request to take a zone from: it reads the machine's, so the
+seeded workspace keeps the clock of the developer who is about to sign in and
+look at the rows, and a day-grouped report over sample data lands on the days
+that person would call them.
 
 A report whose numbers depend on a zone says which zone: `ReportTimeZoneNote`
 renders `Asia/Kolkata UTC+05:30` in the toolbar, including when the zone is UTC.

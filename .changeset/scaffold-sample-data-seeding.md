@@ -23,6 +23,19 @@ to borrow, and no way to act as an account whose password it does not have. It
 is still not for a route: a served request already carries the row access it
 earned, at `c.get("auth")`.
 
+What a script gets back is what a request handler works with: `rows(table)` for
+one table, and `db` and `auth` for a domain workflow, which takes the same pair
+a route passes it from `c.get("db")` and `c.get("auth")`. A nightly job that
+completes a booking therefore runs the application's own transition, deriving
+the same totals and writing the same event rows, rather than a second copy of
+it written against `rows()`.
+
+The workspace a seed run creates keeps the time zone of the machine that ran
+it. A browser sends its own zone with a sign-up request and a script has none
+to send, so it reads the machine's, and the sample timestamps read on the clock
+of the developer about to look at them. It is an ordinary workspace zone from
+then on, changed on the workspace settings screen like any other.
+
 `packages/api/seed-runtime.ts` is that same call with the sample-data account
 wired in, and the sample-data account is the one thing here that needs
 guarding, because its password is written in the source. Creating it skips what

@@ -2356,10 +2356,13 @@ export function writeSeedScript(
 }
 
 /** Run the project's `pnpm seed`, returning what it printed. */
-export async function runProjectSeed(project: E2eProject): Promise<string> {
+export async function runProjectSeed(
+  project: E2eProject,
+  env: NodeJS.ProcessEnv = {},
+): Promise<string> {
   return runText("pnpm", ["seed"], {
     cwd: project.projectDir,
-    env: project.env,
+    env: { ...project.env, ...env },
     timeoutMs: 180_000,
   });
 }

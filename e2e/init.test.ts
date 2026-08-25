@@ -93,7 +93,11 @@ describe("sapporta init - end-to-end", () => {
   it("seeds sample data with `pnpm seed`, with no server or credential", async () => {
     writeSeedScript(project!.projectDir);
 
-    const firstRun = await runProjectSeed(project!);
+    // The seeded workspace takes the machine's zone, and `TZ` is how a
+    // machine states it. The id is one the tz database has never renamed, so
+    // the assertion below is about which zone was read, not about which of its
+    // names this runtime answers with.
+    const firstRun = await runProjectSeed(project!, { TZ: "Pacific/Auckland" });
     expect(firstRun).toContain("Seeded 2 tasks.");
 
     // The account is created by the seed run itself, so a database nobody has
@@ -121,6 +125,13 @@ describe("sapporta init - end-to-end", () => {
     expect(seededWorkspaces.size).toBe(1);
     const [seededWorkspace] = [...seededWorkspaces];
     expect(seededWorkspace).toMatch(/^[0-9a-f-]{36}$/);
+
+    const [seededCalendar] = await readSqliteRows<{ zone: string }>(
+      project!,
+      "SELECT timeZone AS zone FROM organization WHERE id = ?",
+      [seededWorkspace],
+    );
+    expect(seededCalendar).toEqual({ zone: "Pacific/Auckland" });
 
     // A script picks the first workspace its account belongs to, and a browser
     // falls back to the same one when the session has not chosen. For a

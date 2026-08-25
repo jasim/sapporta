@@ -16,10 +16,9 @@ import { describe, expect, it } from "vitest";
  * on the server and `appTimeZone()` in the browser, and pass a
  * `Temporal.Instant` wherever "now" is needed.
  *
- * `deviceTimeZone()` is the one legitimate reader of an ambient zone, and it
- * has exactly one caller: the sign-up request, which sends the browser's zone
- * so that the first workspace an account creates starts on the calendar its
- * owner keeps.
+ * `deviceTimeZone()` is the one legitimate reader, and both of its callers are
+ * choosing a new workspace's first zone: sign-up sends the browser's, and a
+ * seed run has no request to take one from and uses the machine's.
  */
 
 const repoRoot = path.resolve(
@@ -51,6 +50,12 @@ const allowed = new Map<string, readonly string[]>([
   ["packages/shared/src/temporal.test.ts", ["deviceTimeZone()"]],
   // The sign-up request, which is the one place the browser's own zone is sent.
   ["packages/frontend/src/auth/components/AuthPages.tsx", ["deviceTimeZone()"]],
+  // The seed run, which has no request to take a zone from, so the seeded
+  // workspace starts on the machine's.
+  [
+    "packages/core/src/templates/packages/api/project-auth/sample-data.ts",
+    ["deviceTimeZone()"],
+  ],
   // This file names every one of them, in `forbidden` above and in the prose
   // explaining it, so it is exempt from all of them rather than from a list
   // repeated here that could fall out of step with that one.

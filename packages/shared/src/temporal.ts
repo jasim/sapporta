@@ -143,12 +143,11 @@ export type TimeZone = string & { readonly [timeZoneBrand]: true };
  * Trusted without checking: it is the runtime reporting its own setting, and
  * there is no better answer to fall back to if it were refused.
  *
- * This is the only reader of an ambient zone in the codebase, and it has one
- * caller: the sign-up request, which sends it so that the workspace the new
- * account is about to get starts on the calendar its owner keeps. Nothing
- * displays it and nothing groups by it. Everything else names the workspace
- * zone, because a workspace's calendar has to read the same to everyone
- * looking at it.
+ * The only reader of an ambient zone in the codebase, with two callers, both
+ * choosing a new workspace's first zone and neither displaying it or grouping
+ * by it: sign-up, which sends the browser's zone, and a seed run, which has no
+ * request to take one from and uses the machine's. Everywhere else names the
+ * workspace zone, so that a workspace's calendar reads the same to everyone.
  */
 export function deviceTimeZone(): TimeZone {
   return Temporal.Now.timeZoneId() as TimeZone;

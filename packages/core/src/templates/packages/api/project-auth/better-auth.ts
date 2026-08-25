@@ -175,7 +175,7 @@ export function createBetterAuth({
     createSampleDataAccount: async (account) => {
       assertSampleDataSeedingAllowed();
       const { user } = await auth.api.signUpEmail({
-        body: { ...account, timeZone: sampleDataTimeZone },
+        body: { ...account, timeZone: sampleDataTimeZone() },
       });
       markSampleDataAccountVerified(conn, user.id);
       return {

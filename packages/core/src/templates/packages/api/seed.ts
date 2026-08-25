@@ -15,6 +15,13 @@
  * your own writes the way the example below does, so a second `pnpm seed` does
  * not add the same rows again.
  *
+ * The seeded workspace takes its time zone from this machine, so seeded
+ * timestamps and day-grouped reports read on your own clock. Change it later
+ * on the workspace settings screen.
+ *
+ * To seed through a domain workflow instead of `rows()`, hand it `demo.db` and
+ * `demo.auth`. They are the same pair a route gives it.
+ *
  * For a script that is not sample data - a nightly job, a one-off import - use
  * `openScriptRuntime()` from `./script-runtime.js` and give it the address and
  * password of a real account.

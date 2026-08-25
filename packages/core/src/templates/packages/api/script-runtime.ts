@@ -8,6 +8,10 @@
  * its own. None of the HTTP plumbing is needed - a script runs on the same
  * machine as the database.
  *
+ * It hands back what a handler works with: `rows()` for one table, and `db`
+ * and `auth` for a domain workflow, which takes the same pair a route gives
+ * it. A script therefore runs the app's own logic, not a copy of it.
+ *
  * The account is proved, not named. Signing in here means holding the
  * password, exactly as it does in a browser, so there is no way to act as an
  * address whose password the caller does not have. That is what makes this
@@ -18,6 +22,7 @@
  * is a route that can be asked to check passwords - see
  * `verifyEmailPasswordWithoutRateLimit()` in `project-auth/better-auth.ts`.
  */
+import type { BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
 import type { AnySQLiteTable } from "drizzle-orm/sqlite-core";
 import {
   createAuthContext,
@@ -28,11 +33,13 @@ import {
   workspaceGlobalOnlyAuthority,
   workspaceUserScopedAuthority,
   type AuthWorkspace,
+  type SapportaAuthContext,
   type SapportaAuthUser,
   type ScopedRows,
   type TableDef,
 } from "@sapporta/server";
 import { buildAbility } from "./authz/ability.js";
+import type { AppAbility, AppWorkspaceMembership } from "./authz/types.js";
 import {
   ensureWorkspaceMembership,
   membershipFromRow,
@@ -77,6 +84,16 @@ export interface ScriptRuntime {
   rows: <TTable extends AnySQLiteTable>(
     table: TableDef<TTable>,
   ) => ScopedRows<TTable>;
+  /** The database, for a domain workflow that opens its own transaction. */
+  db: BetterSQLite3Database;
+  /**
+   * This script's row access, in the form a domain workflow expects.
+   *
+   * A workflow takes `{ db, auth }`; a route gives it `c.get("db")` and
+   * `c.get("auth")`, and a script gives it these. Call the workflow rather
+   * than repeating what it writes against `rows()`.
+   */
+  auth: SapportaAuthContext<AppAbility, AppWorkspaceMembership>;
   /** Closes the database. Call this when the script is done. */
   close: () => void;
 }
@@ -121,6 +138,8 @@ export async function openScriptRuntime(
     return {
       workspace: membership.workspace,
       rows: (table) => scopedRows(conn.db, auth, table),
+      db: conn.db,
+      auth,
       close,
     };
   } catch (error) {
