@@ -1,8 +1,8 @@
 # %%SAPPORTA:NAME%%
 
-This is Sapporta project: a pnpm workspace with a Hono API, a React frontend, and a
-shared package for contracts. Sapporta supplies schema-as-code table
-definitions, generated CRUD APIs, auth-aware row access, and a React app shell.
+This is a Sapporta-based project: a pnpm workspace with a Hono API, React frontend, 
+and a shared package for contracts. Sapporta supplies schema-as-code table definitions, 
+generated CRUD APIs, auth-aware row access, and a React app shell.
 
 `CODING-PRINCIPLES.md` - for coding style, and
 `VISUAL-DESIGN-GUIDELINES.md` for UX. After writing a
