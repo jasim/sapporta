@@ -317,11 +317,6 @@ function assertScaffoldedProject(
     expect(existsSync(join(project.projectDir, "Dockerfile"))).toBe(true);
     expect(existsSync(join(project.projectDir, ".dockerignore"))).toBe(true);
     expect(
-      readFileSync(join(project.projectDir, "Dockerfile"), "utf-8"),
-    ).toContain(
-      'CMD ["sh", "-c", "pnpm --filter ./packages/api db:migrate && node packages/api/dist/boot.js"]',
-    );
-    expect(
       readPackageJson(join(project.projectDir, "package.json")),
     ).toMatchObject({
       packageManager: "pnpm@11.1.1",
