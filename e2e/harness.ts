@@ -1728,7 +1728,10 @@ function makeDockerfileCopyPackedSapportaPackages(projectDir: string): void {
   //
   // The patch is test-only and deliberately anchored to exact Dockerfile lines:
   // if the template changes, fail here with context instead of silently building
-  // an image that falls back to registry packages or misses runtime files.
+  // an image that falls back to registry packages.
+  //
+  // Only add COPY lines here. Never patch the runtime stage or CMD: that boots
+  // an image no generated project boots, and hides the defect being patched.
   const dockerfilePath = join(projectDir, "Dockerfile");
   let dockerfile = readFileSync(dockerfilePath, "utf-8");
   const rootManifestCopy =
@@ -1744,19 +1747,6 @@ function makeDockerfileCopyPackedSapportaPackages(projectDir: string): void {
   const runtimeProjectFilesCopyWithTarballs =
     runtimeProjectFilesCopy +
     "COPY --chown=node:node .sapporta-packages ./.sapporta-packages\n";
-  const runtimeApiPackageCopy =
-    "COPY --from=build --chown=node:node /app/packages/api/package.json ./packages/api/package.json\n";
-  const runtimeApiPackageCopyWithDrizzleConfig =
-    runtimeApiPackageCopy +
-    "COPY --from=build --chown=node:node /app/packages/api/drizzle.config.ts ./packages/api/drizzle.config.ts\n";
-  const defaultRuntimeCommand =
-    'CMD ["sh", "-c", "pnpm --filter ./packages/api db:migrate && node packages/api/dist/boot.js"]';
-
-  // Avoid runtime `pnpm --filter`: with file: tarballs it may try to resolve or
-  // relink workspace state in a non-TTY container. The package-local Drizzle
-  // binary is already installed and exercises the same migration command.
-  const packedArtifactRuntimeCommand =
-    'CMD ["sh", "-c", "cd packages/api && ./node_modules/.bin/drizzle-kit migrate && node dist/boot.js"]';
 
   dockerfile = replaceAllRequired(
     dockerfile,
@@ -1784,24 +1774,6 @@ function makeDockerfileCopyPackedSapportaPackages(projectDir: string): void {
     runtimeProjectFilesCopyWithTarballs,
     {
       label: "runtime project metadata copy",
-      dockerfilePath,
-    },
-  );
-  dockerfile = replaceRequired(
-    dockerfile,
-    runtimeApiPackageCopy,
-    runtimeApiPackageCopyWithDrizzleConfig,
-    {
-      label: "runtime API package copy",
-      dockerfilePath,
-    },
-  );
-  dockerfile = replaceRequired(
-    dockerfile,
-    defaultRuntimeCommand,
-    packedArtifactRuntimeCommand,
-    {
-      label: "runtime command",
       dockerfilePath,
     },
   );

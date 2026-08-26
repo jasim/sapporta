@@ -120,7 +120,15 @@ is not needed for this Docker shape.
 
 Keep `/app/data` on a named volume or bind mount. Without that volume, SQLite
 data is tied to the container filesystem and disappears when the container is
-replaced.
+replaced. The two mount kinds do not behave the same way here — see
+[Database persistence](#database-persistence) below before choosing a bind
+mount.
+
+The runtime stage contains no package manager. The container runs the compiled
+server under `node` directly, and applies migrations with Drizzle Kit's own
+binary. If you add a step to the container's start command, write it as a `node`
+or binary invocation; a `pnpm run` would make pnpm reinstall the workspace
+inside the container on every boot.
 
 If you put nginx, Caddy, a platform router, or a load balancer in front of the
 container, proxy the public origin to the container port. That external proxy
@@ -229,27 +237,27 @@ Fit:
 
 ## Environment variables, by shape
 
-| Variable                          | Read from            | Dev | (a)      | (b)      | (c)      | Purpose                                                                       |
-| --------------------------------- | -------------------- | --- | -------- | -------- | -------- | ----------------------------------------------------------------------------- |
-| `NODE_ENV`                        | API host process env | —   | yes      | yes      | yes      | Runtime mode. `production` requires verified email by default.                |
-| `SAPPORTA_API_PORT`               | API host process env | yes | yes      | yes      | yes      | Port Hono binds to. Defaults to `3000`.                                       |
-| `PORT`                            | API host process env | —   | yes      | yes      | yes      | Hosting-platform fallback when `SAPPORTA_API_PORT` is absent.                 |
-| `SAPPORTA_FRONTEND_PORT`          | Dev process env      | yes | —        | —        | —        | Vite frontend-server port. Match it to `SAPPORTA_PUBLIC_APP_URL` in dev.      |
-| `BETTER_AUTH_SECRET`              | API host process env | yes | yes      | yes      | yes      | Better Auth signing secret. Generated only for local development.             |
-| `SAPPORTA_PUBLIC_APP_URL`         | API host process env | yes | yes      | yes      | yes      | Public app origin used for Better Auth links, callbacks, and default trust.   |
-| `SAPPORTA_FRONTEND_ORIGINS`       | API host process env | yes | yes      | yes      | yes      | Extra browser origins trusted for credentialed API/auth requests.             |
-| `SAPPORTA_REQUIRE_VERIFIED_EMAIL` | API host process env | optional | optional | optional | optional | Explicit override for the environment-based email verification default.      |
-| `SAPPORTA_HEALTH_POLICY`          | API host process env | yes | optional | optional | optional | Access policy for health endpoints: `public`, `authenticated`, or `disabled`. |
-| `SAPPORTA_OPENAPI_POLICY`         | API host process env | yes | optional | optional | optional | Access policy for the app contract at `/api/openapi.json`: `public`, `authenticated`, or `disabled`. Unset means `authenticated`. |
-| `SAPPORTA_MAIL_TRANSPORT`         | API host process env | yes | yes      | yes      | yes      | Mail transport: `stream`, `smtp`, or `disabled`.                              |
-| `SAPPORTA_MAIL_FROM`              | API host process env | yes | yes      | yes      | yes      | Default sender address for Better Auth and custom app emails.                 |
-| `SMTP_URL`                        | API host process env | —   | optional | optional | optional | SMTP connection URL. Takes precedence over individual SMTP fields.            |
-| `SMTP_HOST`                       | API host process env | —   | optional | optional | optional | SMTP host when `SMTP_URL` is not set and mail transport is `smtp`.            |
-| `SMTP_PORT`                       | API host process env | —   | optional | optional | optional | SMTP port when `SMTP_URL` is not set and mail transport is `smtp`.            |
-| `SMTP_SECURE`                     | API host process env | —   | optional | optional | optional | Whether SMTP uses TLS from connection start. Must be `true` or `false`.       |
-| `SMTP_USER`                       | API host process env | —   | optional | optional | optional | SMTP username.                                                                |
-| `SMTP_PASS`                       | API host process env | —   | optional | optional | optional | SMTP password.                                                                |
-| `VITE_API_URL`                    | Frontend build env   | —   | —        | —        | yes      | Absolute API origin inlined into the SPA bundle for split deployments.        |
+| Variable                          | Read from            | Dev      | (a)      | (b)      | (c)      | Purpose                                                                                                                           |
+| --------------------------------- | -------------------- | -------- | -------- | -------- | -------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| `NODE_ENV`                        | API host process env | —        | yes      | yes      | yes      | Runtime mode. `production` requires verified email by default.                                                                    |
+| `SAPPORTA_API_PORT`               | API host process env | yes      | yes      | yes      | yes      | Port Hono binds to. Defaults to `3000`.                                                                                           |
+| `PORT`                            | API host process env | —        | yes      | yes      | yes      | Hosting-platform fallback when `SAPPORTA_API_PORT` is absent.                                                                     |
+| `SAPPORTA_FRONTEND_PORT`          | Dev process env      | yes      | —        | —        | —        | Vite frontend-server port. Match it to `SAPPORTA_PUBLIC_APP_URL` in dev.                                                          |
+| `BETTER_AUTH_SECRET`              | API host process env | yes      | yes      | yes      | yes      | Better Auth signing secret. Generated only for local development.                                                                 |
+| `SAPPORTA_PUBLIC_APP_URL`         | API host process env | yes      | yes      | yes      | yes      | Public app origin used for Better Auth links, callbacks, and default trust.                                                       |
+| `SAPPORTA_FRONTEND_ORIGINS`       | API host process env | yes      | yes      | yes      | yes      | Extra browser origins trusted for credentialed API/auth requests.                                                                 |
+| `SAPPORTA_REQUIRE_VERIFIED_EMAIL` | API host process env | optional | optional | optional | optional | Explicit override for the environment-based email verification default.                                                           |
+| `SAPPORTA_HEALTH_POLICY`          | API host process env | yes      | optional | optional | optional | Access policy for health endpoints: `public`, `authenticated`, or `disabled`.                                                     |
+| `SAPPORTA_OPENAPI_POLICY`         | API host process env | yes      | optional | optional | optional | Access policy for the app contract at `/api/openapi.json`: `public`, `authenticated`, or `disabled`. Unset means `authenticated`. |
+| `SAPPORTA_MAIL_TRANSPORT`         | API host process env | yes      | yes      | yes      | yes      | Mail transport: `stream`, `smtp`, or `disabled`.                                                                                  |
+| `SAPPORTA_MAIL_FROM`              | API host process env | yes      | yes      | yes      | yes      | Default sender address for Better Auth and custom app emails.                                                                     |
+| `SMTP_URL`                        | API host process env | —        | optional | optional | optional | SMTP connection URL. Takes precedence over individual SMTP fields.                                                                |
+| `SMTP_HOST`                       | API host process env | —        | optional | optional | optional | SMTP host when `SMTP_URL` is not set and mail transport is `smtp`.                                                                |
+| `SMTP_PORT`                       | API host process env | —        | optional | optional | optional | SMTP port when `SMTP_URL` is not set and mail transport is `smtp`.                                                                |
+| `SMTP_SECURE`                     | API host process env | —        | optional | optional | optional | Whether SMTP uses TLS from connection start. Must be `true` or `false`.                                                           |
+| `SMTP_USER`                       | API host process env | —        | optional | optional | optional | SMTP username.                                                                                                                    |
+| `SMTP_PASS`                       | API host process env | —        | optional | optional | optional | SMTP password.                                                                                                                    |
+| `VITE_API_URL`                    | Frontend build env   | —        | —        | —        | yes      | Absolute API origin inlined into the SPA bundle for split deployments.                                                            |
 
 ### Email delivery
 
@@ -269,12 +277,42 @@ a provider-specific SDK, edit `packages/api/mailer.ts` in the generated project.
 
 `better-sqlite3` stores the database under the project's data directory (resolved by `fromProjectRoot` at boot). In production that directory **must** be on a persistent volume, or the database vanishes on every restart — the single most common deployment bug.
 
-- **Docker:** named volume or bind mount at the data directory.
+- **Docker:** named volume or bind mount at the data directory. These differ in one way that matters — see **Volume ownership** below.
 - **systemd on a VPS:** the default filesystem is already persistent; just don't place the project under `/tmp` or a tmpfs mount.
 - **Fly.io / Railway / similar:** attach a persistent volume and point the project root at it.
 
 Back up out-of-band (e.g. `sqlite3 db.sqlite .backup /backups/db-$(date +%F).sqlite`, synced to object storage); SQLite gives a consistent snapshot even while Hono is writing.
 
+#### Volume ownership
+
+**The container runs as the `node` user, which is uid 1000 in the official Node images.** The `Dockerfile` creates `/app/data` owned by that user, so a **named volume** works with no further setup: Docker seeds a fresh named volume from the image, ownership included.
+
+A **bind mount** does not work that way. The host directory replaces the image's directory outright, and the host's ownership is what the container sees. If that directory belongs to any other uid, the server cannot create `sqlite.db` and the container fails at boot. So a bind mount at `/app/data` has to be owned by uid 1000 on the host:
+
+```bash
+sudo chown -R 1000:1000 /path/on/host
+```
+
+This applies to every bind-mount-shaped volume: `docker run -v /host/path:/app/data`, a Kubernetes `hostPath`, and Dokku's persistent storage.
+
+##### Dokku
+
+Dokku's storage mounts are bind mounts, and `storage:ensure-directory` chowns to uid 32767 unless told otherwise, because that is the uid used by its buildpack builds. A Dockerfile-deployed Sapporta image needs uid 1000 instead:
+
+```bash
+dokku storage:ensure-directory --chown 1000 %%SAPPORTA:SLUG%%-data
+dokku storage:mount %%SAPPORTA:SLUG%% /var/lib/dokku/data/storage/%%SAPPORTA:SLUG%%-data:/app/data
+dokku ps:restart %%SAPPORTA:SLUG%%
+```
+
+`--chown heroku` sets the same 1000:1000 and is equally correct; the bare uid is written here because it names the number the image actually depends on. To check what an existing mount points at, and who owns it:
+
+```bash
+dokku storage:list %%SAPPORTA:SLUG%%
+```
+
 ### Graceful shutdown
 
 `packages/api/boot.ts` handles `SIGINT` and `SIGTERM`: it closes the HTTP server and the SQLite connection, then re-raises the signal so the process exits with the right status. Docker's stop signal, systemd's `ExecStop`, and `Ctrl-C` all drain in-flight requests cleanly — nothing to change.
+
+That holds under Docker only because the `Dockerfile`'s `CMD` starts the server with `exec`, which replaces the shell so that Node becomes PID 1 and receives the signal directly. A start command that leaves the shell in place instead sends the signal to the shell, which does not forward it, and the platform kills the container after its stop timeout with in-flight requests still open. Keep the `exec` if you edit `CMD`.
