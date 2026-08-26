@@ -1,5 +1,19 @@
 # sapporta
 
+## 0.2.12
+
+### Patch Changes
+
+- release
+- 40cc6a8: with timezone improvements
+- Updated dependencies
+- Updated dependencies [c819490]
+- Updated dependencies [0f70216]
+- Updated dependencies [2637cb8]
+- Updated dependencies [fea5db2]
+- Updated dependencies [40cc6a8]
+  - @sapporta/server@0.6.0
+
 ## 0.2.11
 
 ### Patch Changes

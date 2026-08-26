@@ -1,6 +1,6 @@
 {
   "name": "@sapporta/frontend",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "type": "module",
   "description": "Sapporta default admin frontend: shell, routes, table pages, report pages, and app boot wiring.",
   "keywords": [

@@ -1,5 +1,11 @@
 # @sapporta/honest
 
+## 0.3.12
+
+### Patch Changes
+
+- release
+
 ## 0.3.11
 
 ### Patch Changes

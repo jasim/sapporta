@@ -1,6 +1,6 @@
 {
   "name": "sapporta",
-  "version": "0.2.11",
+  "version": "0.2.12",
   "type": "module",
   "description": "Canonical CLI for Sapporta projects.",
   "keywords": [
