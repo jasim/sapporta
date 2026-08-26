@@ -18,3 +18,9 @@ long log lines).
 Explain the solution. Why this approach over alternatives. Note
 side effects or constraints.
 ```
+
+Do not be verbose - both in the meaning/semantics and in language. A commit
+message should say why the changes were made and what they are. But it should
+not explain the diff in great detail . Lead with the highest-level decisions
+and changes; do not describe the changes unless they have a specific reason
+that is not apparent from the code.
