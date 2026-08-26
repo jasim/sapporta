@@ -1,8 +1,8 @@
 # @sapporta/shared
 
-Types, API contracts, and pure helpers shared by `@sapporta/server` and `@sapporta/ui`.
+Types, API contracts, and pure helpers shared by `@sapporta/server` on the backend and `@sapporta/grid` and `@sapporta/frontend` in the browser.
 
-`@sapporta/shared` is the leaf package in the Sapporta monorepo. It is safe to use from browser and server code, and it must not depend on `@sapporta/server` or `@sapporta/ui`.
+`@sapporta/shared` is a leaf package in the Sapporta monorepo. It is safe to use from browser and server code, and it must not import from any other workspace package.
 
 ## Installation
 
@@ -87,12 +87,11 @@ import { allTime, relative, custom } from "@sapporta/shared/daterange";
 
 This package is intentionally pure:
 
-- No dependency on `@sapporta/server`
-- No dependency on `@sapporta/ui`
+- No dependency on any other workspace package
 - No Node-only APIs in exported contract/client modules
 - No framework-specific runtime assumptions
 
-That boundary lets Sapporta keep one source of truth for API contracts and data shapes while allowing projects to compose or replace the server and UI pieces independently.
+That boundary lets Sapporta keep one source of truth for API contracts and data shapes while allowing projects to compose or replace the server and frontend pieces independently.
 
 ## License
 

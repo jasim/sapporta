@@ -1,7 +1,7 @@
 # %%SAPPORTA:NAME%%
 
-Uses [Sapporta](https://github.com/jasim/sapporta). TypeScript database
-application with a Hono API, SQLite database, and React frontend.
+Uses [Sapporta](https://github.com/jasim/sapporta). TypeScript database application with a
+Hono API, SQLite database, and React frontend.
 
 ## Run locally
 
@@ -60,8 +60,8 @@ See [`DEPLOYMENT.md`](./DEPLOYMENT.md).
 
 ## More docs
 
-- [Sapporta overview](https://github.com/jasim/sapporta#readme)
-- [Schema and migrations](https://github.com/jasim/sapporta/blob/main/docs/schema-and-migrations.md)
-- [Auth and row security](https://github.com/jasim/sapporta/blob/main/docs/auth.md)
-- [CLI](https://github.com/jasim/sapporta/blob/main/docs/cli.md)
-- [Reports](https://github.com/jasim/sapporta/tree/main/docs/reports)
+- [Documentation](https://sapporta.com/docs)
+- [Schema and migrations](https://sapporta.com/docs/guides/model-data/schema-changes-and-migrations)
+- [Auth and row security](https://sapporta.com/docs/guides/security/workspaces-ownership-and-row-visibility)
+- [CLI](https://sapporta.com/docs/guides/discovery/use-the-sapporta-cli)
+- [Reports](https://sapporta.com/docs/guides/reports/route-based-reports)

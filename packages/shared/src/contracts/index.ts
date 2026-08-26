@@ -2,8 +2,9 @@
  * Browser- and server-safe contract surface for `@sapporta/shared`.
  *
  * Both `@sapporta/server` (handler registration via `api.register(...)`)
- * and `@sapporta/ui` / scaffolded frontends (`createApiClient(uiContract)`)
- * import their contracts and wire-shape types from here.
+ * and `@sapporta/frontend` / scaffolded frontends
+ * (`createApiClient(uiContract)`) import their contracts and wire-shape
+ * types from here.
  *
  * Anything re-exported MUST be reachable without evaluating any Node-
  * only or framework-specific module — `zod` and `@sapporta/rest-core` only.

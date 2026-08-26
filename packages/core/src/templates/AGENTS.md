@@ -1,14 +1,11 @@
 # %%SAPPORTA:NAME%%
 
-A Sapporta project: a pnpm workspace with a Hono API, a React frontend, and a
+This is Sapporta project: a pnpm workspace with a Hono API, a React frontend, and a
 shared package for contracts. Sapporta supplies schema-as-code table
 definitions, generated CRUD APIs, auth-aware row access, and a React app shell.
 
-This file is a map. It says where things live and which document owns each
-subject; the documents themselves carry the explanations, code, and rules.
-
-`CODING-PRINCIPLES.md` governs how code is organized here, and
-`VISUAL-DESIGN-GUIDELINES.md` governs how screens are designed. After writing a
+`CODING-PRINCIPLES.md` - for coding style, and
+`VISUAL-DESIGN-GUIDELINES.md` for UX. After writing a
 major change or addition, use a separate sub-agent or coding-agent thread to
 read `CODING-PRINCIPLES.md`, review the written code, and apply the principles
 to it. That review happens after the code is written, not during the initial

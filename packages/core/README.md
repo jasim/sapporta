@@ -1,402 +1,147 @@
 # @sapporta/server
 
-## Requirements
+The server half of [Sapporta](https://sapporta.com): schema-as-code tables, the
+HTTP surface generated from them, row-level security, and the `sapporta` CLI.
 
-pnpm 11 or later. The generated project is a pnpm workspace and declares its
-settings in `pnpm-workspace.yaml`; pnpm 10 and earlier read them from the root
-package.json instead and would install a different dependency tree. `sapporta
-init` checks the installed version before it writes anything.
+Full documentation is at [sapporta.com/docs](https://sapporta.com/docs).
 
-## Usage
+## Table declaration to REST APIs + Row Security
 
-Install the canonical CLI package to create and inspect Sapporta projects:
+In a Sapporta project, a table is declared once, as an ordinary Drizzle table 
+plus Sapporta metadata. This package uses them to provide the following:
+
+- **REST endpoints** for list, get, create, update, delete, lookup, scoped
+  counts, and streaming CSV export, under `/api/tables/<table>`.
+- **Row security.** Every generated read and write is bounded by the signed-in
+  user's workspace and row scope, and the same bound is available to custom
+  code through `scopedRows()`.
+- **Schema metadata** — labels, value kinds, relationships, search
+  configuration — served over `/api/meta` and consumed by the generated grids,
+  forms, and lookups in `@sapporta/frontend`.
+- **OpenAPI and CLI access.** Mounted routes are emitted as OpenAPI 3.1 and are
+  callable from `sapporta` on the command line, so a person or a coding agent
+  can inspect and drive a running app without reading its source.
+
+Custom endpoints are registered beside the generated ones and share the same
+auth context, row helpers, and OpenAPI document.
+
+## Install
+
+Most projects arrive here through the scaffold rather than a direct install:
 
 ```bash
 npx sapporta init my-app
 ```
 
-```bash
-npm install -g sapporta
-sapporta init my-app
-```
+Requires Node.js and pnpm 11 or later — a generated project keeps its workspace
+settings in `pnpm-workspace.yaml`, which earlier pnpm versions ignore, so
+`sapporta init` checks the installed version before writing anything.
 
-A Sapporta project owns its own entry point. Scaffolded projects (`sapporta init`) include a `boot.ts` that wires the framework into a Hono app and serves it directly. Run from the project root:
+Adding the package to a project by hand means supplying its peers as well —
+`@sapporta/honest` and `@sapporta/rest-core` — plus the stack a backend needs
+directly: `hono`, `drizzle-orm`, `better-sqlite3`, and `zod`. A scaffolded
+project's `packages/api/package.json` is the worked example of that dependency
+set.
 
-```bash
-pnpm dev      # backend (port 3000) + frontend dev server
-pnpm start    # production: node dist/boot.js
-```
+## The shape of the code
 
-CLI commands that hit the API use `http://localhost:3000` by default. Set `SAPPORTA_API_URL` when the app API runs elsewhere. For protected apps, expose `SAPPORTA_API_TOKEN` to the agent or session instead of passing raw tokens in command text.
-
-## Row-scoped table operations
-
-Use `scopedRows()` for ordinary custom table operations. It is the trust-boundary constructor: pass the request database handle, the authenticated Sapporta auth context, and one table definition. The returned operations all compose reads and writes through `auth.rowSecurity.forTable(table)`.
+A schema file exports the raw Drizzle table and the Sapporta wrapper:
 
 ```ts
+import {
+  integer,
+  select,
+  sqliteTable,
+  sapportaTable,
+  text,
+} from "@sapporta/server/table";
+
+export const invoicesTable = sqliteTable("invoices", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  workspace_id: text("workspace_id").notNull(),
+  reference: text("reference").notNull(),
+  status: select("status", ["draft", "paid"] as const).notNull(),
+});
+
+export const invoices = sapportaTable({
+  drizzle: invoicesTable,
+  meta: { label: "Invoices", rowLabelColumns: ["reference"] },
+});
+```
+
+That is enough for the generated endpoints and UI. A custom endpoint reads the
+same table through `scopedRows()`, which takes the request database handle, the
+authenticated auth context, and one table definition, and returns row
+operations bounded by the caller's row scope:
+
+```ts
+import { eq } from "drizzle-orm";
 import { scopedRows } from "@sapporta/server";
-import { invoices } from "../schema/invoices.js";
-
-api.register(
-  "createInvoice",
-  contract.createInvoice,
-  async ({ c, request }) => {
-    const auth = projectAuth.requireWorkspaceUser(c);
-    const rows = scopedRows(c.get("db"), auth, invoices);
-
-    const created = await rows.create(request.body);
-    return { status: 201, body: { data: created } };
-  },
-);
-```
-
-The read side uses the same expressions as an ordinary Drizzle query. The row
-scope is still added by `scopedRows()` before the query reaches SQLite.
-
-```ts
-import { desc, eq } from "drizzle-orm";
 import { invoices, invoicesTable } from "../schema/invoices.js";
 
-const rows = scopedRows(c.get("db"), auth, invoices);
-const pending = await rows.findMany({
-  where: eq(invoicesTable.status, "pending"),
-  orderBy: desc(invoicesTable.createdAt),
-  limit: 25,
-  offset: 25,
+api.register("listPaidInvoices", contract.listPaidInvoices, async ({ c }) => {
+  const auth = projectAuth.requireWorkspaceUser(c);
+  const rows = scopedRows(c.get("db"), auth, invoices);
+
+  const paid = await rows.findMany({
+    where: eq(invoicesTable.status, "paid"),
+    limit: 50,
+  });
+
+  return { status: 200, body: { data: paid } };
 });
 ```
 
-`findMany()` requires a limit from 1 to 1,000 and returns rows directly.
-Use `page()` when the response also needs the matching total and page metadata;
-it composes the same bounded selection with `count()`.
-
-Large sequential reads use one async SQLite cursor. This keeps exports and
-similar workflows from loading every matching row into memory or rerunning
-progressively slower `LIMIT`/`OFFSET` queries:
-
-```ts
-for await (const invoice of rows.scan({
-  where: eq(invoicesTable.status, "pending"),
-  orderBy: desc(invoicesTable.createdAt),
-})) {
-  // Process one visible invoice.
-}
-```
-
-Every scan applies row scope and the caller's `where` expression in one
-statement. It uses the table's default sort when `orderBy` is omitted and adds
-the primary key as a deterministic tie-breaker. The cursor holds one read
-snapshot until the scan finishes or the consumer cancels it, then releases the
-statement.
-
-`scanTableRows()` is the underlying storage primitive when a custom workflow
-needs to compose its own scope:
-
-```ts
-import { scanTableRows } from "@sapporta/server";
-
-const access = auth.rowSecurity.forTable(invoices);
-for await (const invoice of scanTableRows(c.get("db"), invoices, {
-  where: access.ownedRows(eq(invoicesTable.status, "pending")),
-})) {
-  // Process one visible invoice.
-}
-```
-
-Unlike `scopedRows().scan()`, `scanTableRows()` does not add row scope. Pass an
-appropriate predicate explicitly, or use it only for deliberately unrestricted
-storage work.
-
-Lookup inputs are typed too. IDs are values rather than comma-separated text,
-and displayed search fields are Drizzle columns rather than HTTP field names.
-ID lookup and search are separate input shapes:
-
-```ts
-await rows.lookup({
-  ids: ["12", "14", "19"],
-});
-
-await rows.lookup({
-  search: "overdue",
-  fields: [invoicesTable.id, invoicesTable.reference],
-  limit: 20,
-});
-```
-
-Search lookup defaults to 50 results and accepts at most 500. ID lookup accepts
-between 1 and 500 IDs and does not accept search fields or a result limit.
-
-`scopedRows()` exposes `count()` for scalar totals and `countBy()` for bounded
-grouped counts that must keep the same row boundary as generated reads. Both
-accept Drizzle expressions for `where`, and `countBy()` accepts the group
-column. Generated HTTP and CLI routes translate canonical filters into those
-transport-free inputs. Custom table adapters can import the named
-`resolvePageQuery`, `resolveExportQuery`, `resolveLookupQuery`, and
-`resolveCountQuery` functions directly from `@sapporta/server`. Use
-`auth.rowSecurity.forTable(table)` directly for advanced Drizzle workflows such
-as joins, transactions, multi-table state transitions, custom SQL, and
-domain-specific invariants.
-
-## Environment variables
-
-| Variable                 | Purpose                                                                                                                                  |
-| ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------- |
-| `SAPPORTA_PACKAGE_ROOT`  | Monorepo root. When set, `create-project` uses `link:` specs instead of published versions. Must be set explicitly — see DEVELOPMENT.md. |
-| `SAPPORTA_API_URL`       | Server URL for CLI commands. Default: `http://localhost:3000`.                                                                           |
-| `SAPPORTA_API_TOKEN`     | Bearer token for protected API-backed CLI commands. Preferred for agents and automation.                                                 |
-| `SAPPORTA_OUTPUT_FORMAT` | Default CLI output format: `json` or `table`.                                                                                            |
-| `SAPPORTA_API_PORT`      | Explicit app API port. Defaults to `3000` when neither port variable is set.                                                             |
-| `PORT`                   | Hosting-platform API port used when `SAPPORTA_API_PORT` is absent.                                                                       |
-| `LOG_FORMAT`             | Set to `json` for structured logging.                                                                                                    |
-| `LOG_LEVEL`              | Log level. Default: `debug`.                                                                                                             |
-
-## Sapporta Code Project Layout
-
-A Sapporta code project (created by `sapporta init`) has this structure:
-
-```
-<project_root>/
-  sapporta.json         Project marker (name, config)
-  package.json          Dependencies (installed by sapporta init)
-  data/
-    sqlite.db           SQLite database
-  packages/api/
-    schema/             Table definitions (Drizzle + Sapporta wrapper)
-    app/                App-owned API routes
-    migrations/         Drizzle SQL migrations
-```
-
-## CLI Commands
-
-The public CLI package is `sapporta`. `@sapporta/server` keeps the command implementation and also exposes a compatibility `sapporta` bin, but documentation should prefer `npx sapporta` or `npm install -g sapporta`.
-
-### CLI Architecture
-
-The CLI exposes resource-centered commands and routes all data commands through the HTTP API server. The CLI is a regular API consumer, not a privileged path.
-
-**Requires a running server** (`pnpm dev` or `pnpm start` from the project) for API-backed commands. `init` works without a server.
-
-### CLI Endpoint Discovery
-
-Use `endpoints` to discover live HTTP endpoints and their input schemas:
-
-```bash
-# List all available HTTP endpoints
-sapporta endpoints list
-
-# Get full input schema (JSON Schema) for an endpoint
-sapporta endpoints show "POST /api/meta/sql"
-sapporta endpoints show "POST /api/tables/accounts"
-```
-
-### Global Flags
-
-```bash
---output json     # Structured JSON output (auto-detected when stdout is not a TTY)
---output table    # Human-readable table output (default in terminal)
---api-url <url>   # One-off override for SAPPORTA_API_URL
---api-token <token> # One-off override for SAPPORTA_API_TOKEN
-```
-
-For API-backed data commands, set `SAPPORTA_API_URL` when the app API is not on `http://localhost:3000`. For protected apps, expose `SAPPORTA_API_TOKEN` to the agent or session. Use `--api-url` for one-off overrides; avoid passing raw tokens on the command line unless there is no safer option.
-
-### Table Definition Commands
-
-```bash
-# List all tables with schema metadata and row counts
-sapporta tables list
-sapporta tables list --detail
-
-# Show table structure (columns, types, constraints, foreign keys)
-sapporta tables show <name>
-
-# Show indexes on a table
-sapporta tables indexes <name>
-
-# Show sample rows from a table
-sapporta tables sample <name> --limit 10 --columns name,type
-```
-
-### Database Commands
-
-```bash
-# Reads return rows
-sapporta sql query "SELECT * FROM accounts"
-sapporta sql query "SELECT * FROM accounts WHERE type = ?" --params '["asset"]' --limit 50
-
-# Writes require the explicit execute command
-sapporta sql execute "UPDATE accounts SET name = ? WHERE id = ?" --params '["Cash",5]'
-sapporta sql execute "DELETE FROM accounts WHERE id = ?" --params '[5]' --dry-run
-```
-
-### Schema Migrations
-
-Sapporta projects use native Drizzle Kit migrations directly:
-
-```bash
-pnpm --filter ./packages/api db:generate --name add_accounts
-pnpm --filter ./packages/api db:migrate
-pnpm --filter ./packages/api db:check
-```
-
-Each schema file should export the raw Drizzle table and the Sapporta wrapper:
-
-```ts
-export const accountsTable = sqliteTable("accounts", { ... });
-export const accounts = sapportaTable({
-  drizzle: accountsTable,
-  meta: { label: "Accounts", rowLabelColumns: ["name"] },
-});
-```
-
-Change schema, run Drizzle Kit generate, review SQL, run Drizzle Kit migrate, start server. The server only verifies migration readiness at boot.
-
-### Row Commands (table operations)
-
-```bash
-# List rows (with filters, sort, pagination)
-sapporta rows list <table> --limit 50 --page 2 --sort "-created_at,name"
-sapporta rows list <table> --where '{"status":{"eq":"active"}}'
-
-# Count visible rows in SQL
-sapporta rows count tasks --where '{"status":{"neq":"done"}}'
-
-# Get a single row by ID
-sapporta rows get <table> <id>
-
-# Create a single row
-sapporta rows create <table> --values '{"name":"Cash","type":"asset"}'
-
-# Create multiple rows (batch)
-sapporta rows create <table> --values '[{"name":"Cash"},{"name":"Revenue"}]'
-
-# Create master + detail records atomically
-sapporta rows create orders --values '{"customer":"Alice","$details":{"table":"order_items","fk":"order_id","rows":[{"product":"Widget","quantity":3}]}}'
-
-# Update a row
-sapporta rows update <table> <id> --values '{"name":"Updated"}'
-
-# Delete a row
-sapporta rows delete <table> <id>
-```
-
-### Route-Based Reports
-
-Reports are ordinary app routes that return `GridDataset` from
-`@sapporta/shared/grid-dataset`. Use `sapporta endpoints` to inspect the route
-contract and call the route like any other endpoint.
-
-### Generic API Commands
-
-```bash
-sapporta api get /api/tables/books --query '{"limit":50}'
-sapporta api post /api/custom-route --body '{"field":"value"}'
-sapporta api put /api/custom-route/123 --body '{"field":"updated"}'
-sapporta api delete /api/custom-route/123
-```
-
-## API Target
-
-The CLI is a regular API client. API-backed commands call `http://localhost:3000` unless `SAPPORTA_API_URL` or `--api-url` selects another running app server.
-
-## API Namespaces (Per-Project)
-
-Framework routes are organized under `/api`; app-owned routes use whatever
-paths the project registers:
-
-```
-/api/meta/...                          System metadata, introspection, admin
-/api/tables/...                        Table operations on row data
-/api/<app-route>                       App-owned routes, including reports
-```
-
-Each namespace has a distinct prefix — route ordering no longer matters.
-
-### Key Route Details
-
-- **Schema introspection**: `GET /api/meta/tables` — lists all tables with structure + UI metadata
-- **Single table schema**: `GET /api/meta/tables/{name}` — one table's schema
-- **DB introspection**: `GET /api/meta/tables/{name}/indexes`, `/api/meta/tables/{name}/sample`
-- **SQL proxy**: `POST /api/meta/sql`
-- **Table operations**: `GET/POST /api/tables/{table}`, `GET/PUT/DELETE /api/tables/{table}/{id}`
-- **Lookup**: `GET /api/tables/{table}/_lookup`
-- **Count**: `GET /api/tables/{table}/_count`
-- **Route-based reports**: app-owned contracts such as `GET /api/reports/trial-balance`
-
-See [Count Queries](../../docs/count-queries.md) for filtered and grouped
-counts, result bounds, and foreign-key lookup composition.
-
-### Table Zod Boundaries
-
-Use `tableApiZod` when composing a contract for generated table API values:
-
-```ts
-import { tableApiZod } from "@sapporta/server";
-
-const insert = tableApiZod.forInsert(invoices, tables);
-const patch = tableApiZod.forPatch(invoices, tables);
-const response = z.object({ data: tableApiZod.forRow(invoices) });
-```
-
-`forInsert()` describes one caller-supplied row, not an array or a create
-envelope. Generated routes compose arrays and master-detail bodies separately.
-Columns with `apiWritable: false`, references with `apiSettable: false`,
-generated primary keys, and auth-owned scope fields are excluded.
-
-Use `tableWriteZod` for trusted values at the save boundary:
-
-```ts
-import { tableWriteZod } from "@sapporta/server";
-
-const writeZod =
-  operation === "insert"
-    ? tableWriteZod.forInsert(invoices)
-    : tableWriteZod.forPatch(invoices);
-const result = writeZod.safeParse(record);
-```
-
-These schemas include server-authored structural columns. `parseTableWrite()`
-adds application validation after structural parsing and returns the parsed,
-canonical value that is passed to Drizzle. For one column's canonical value
-behavior, use `zodForColumnValue(table, column)`; use
-`getColumnEnumValues(column)` to read the column's Drizzle enum declaration.
-
-## Core Modules
-
-- **Table definition**: `sapportaTable()` in `src/schema/table.ts` wraps Drizzle `sqliteTable` with Sapporta metadata
-- **Schema loading**: `loadSchemas()` dynamically imports all `.ts` files from a schema directory
-- **Migrations**: native Drizzle Kit `generate` and `migrate`; Sapporta only checks readiness at boot
-- **Meta API**: `mount-meta.ts` mounts schema introspection, DB introspection, and the SQL proxy
-- **Tables API**: `tables-api.ts` — parametric `/:tableName` table-operation routing with runtime table registration
-- **Selects**: declare allowed values once with `select("status", ["draft", "paid"] as const)`, or use Drizzle `text("status", { enum: [...] })` directly. The same column values drive validation, OpenAPI, and choice/combobox metadata.
-- **Imports**: `@sapporta/server/table`, `@sapporta/server/runtime`, `@sapporta/server/view`, etc. (via package.json exports)
-
-## Custom Views — Backend
-
-Views are React components defined as `.tsx` files in the project's `views/` directory. Each file exports a `meta` object (for sidebar/routing) and a default React component (the screen itself).
-
-```tsx
-// views/dashboard.tsx
-export const meta = {
-  name: "dashboard",
-  label: "Dashboard",
-  icon: "layout-dashboard", // Lucide icon name, optional
-};
-
-export default function DashboardView() {
-  return <div className="p-6">...</div>;
-}
-```
-
-**Discovery:** The backend reads only `meta` for the API; the component runs in the browser.
-
-**API endpoints:**
-
-- `GET /views` — list views with metadata
-- `GET /views/:name` — view metadata
-
-**Action labels:** Actions can have an optional `label` property for display in the UI:
-
-```ts
-action({ name: "log_meal", label: "Log Meal", input: z.object({...}), run: ... })
-```
+The `where` and `orderBy` arguments are ordinary Drizzle expressions. The row
+scope is added to them before the query reaches SQLite, so a handler cannot
+widen its own visibility by accident.
+
+Alongside `findMany()`, `scopedRows()` provides paged reads, an async cursor for
+large sequential scans, typed lookups, and scalar and grouped counts. See
+[Row-scoped data helpers](https://sapporta.com/docs/reference/server/row-scoped-data-helpers)
+for the complete surface and its bounds.
+
+## Modules
+
+Each row is a package export subpath.
+
+| Module                  | Purpose                                                                                                            |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| `.`                     | Runtime surface for `boot.ts` and endpoint code: project loading and mounting, middleware, `scopedRows`, auth      |
+| `./table`               | Column builders and the `sapportaTable` wrapper used by schema files                                               |
+| `./errors`              | Error vocabulary: `ErrorCode`, `OperationError`, validation and query-parse errors, SQLite error classification    |
+| `./testing`             | `createTestDb` and `createTestConnection` — in-memory SQLite with production PRAGMA settings                       |
+| `./create-project`      | Programmatic project creation, the engine behind `sapporta init`                                                   |
+| `./source-link-runtime` | Node module-resolution preload used when developing against Sapporta sources rather than published packages        |
+| `./cli`                 | The `sapporta` command, plus `./cli/commands`, `./cli/client`, `./cli/http-client`, `./cli/format`, `./cli/render` |
+
+For every exported symbol and its exact declaration, read the generated
+[API reference](https://sapporta.com/api-reference/index.md) rather than the
+declaration files under `node_modules` — it names the specifier to import from,
+which a file path does not.
+
+## Documentation
+
+- [Documentation](https://sapporta.com/docs) — index of guides and reference
+- [Tables, columns, and schema metadata](https://sapporta.com/docs/guides/model-data/tables-columns-and-schema-metadata) — what a declaration controls
+- [Schema changes and migrations](https://sapporta.com/docs/guides/model-data/schema-changes-and-migrations) — Drizzle Kit generate, review, migrate
+- [Auth and row security](https://sapporta.com/docs/reference/server/auth-and-row-security) — row scopes, abilities, trusted fields, guards
+- [Table endpoints](https://sapporta.com/docs/reference/http/table-endpoints) — the generated HTTP surface
+- [Custom API endpoints](https://sapporta.com/docs/guides/application-code/custom-api-endpoints) — registering a protected domain route
+- [Use the Sapporta CLI](https://sapporta.com/docs/guides/discovery/use-the-sapporta-cli) — inspecting and driving a running app
+- [Environment variables](https://sapporta.com/docs/reference/project/environment-variables) — supported server, build, and CLI settings
+
+## Contributing
+
+This package lives in the
+[Sapporta monorepo](https://github.com/jasim/sapporta). See `DEVELOPMENT.md` for
+the build and test commands, and `ARCHITECTURE.md` for the package roster, the
+module index of each package, and the dependency rules between them.
+
+Note that `src/templates/` is the project scaffold — the files `sapporta init`
+copies into a generated project. `src/vendored-package-snapshots/` holds
+package.json snapshots used to resolve scaffold dependency versions. 
+
+## License
+
+MIT

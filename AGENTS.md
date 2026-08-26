@@ -18,7 +18,8 @@ Every part of Sapporta must be overridable, extensible, or skippable. Projects o
 ## Monorepo Structure
 
 ARCHITECTURE.md is the full map: the module index of every package, the
-grid layer stack, and the scaffold ownership model. The summary:
+grid layer stack, and the two axes a generated project is organized along —
+where code runs, and whether it is imported or copied. The summary:
 
 ```
 packages/cli/           sapporta — npx-able wrapper whose bin re-exports @sapporta/server/cli

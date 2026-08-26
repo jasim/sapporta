@@ -2,9 +2,11 @@
 
 ## This is a leaf package
 
-**`@sapporta/shared` MUST NOT depend on `@sapporta/server` (`packages/core`) or `@sapporta/ui` (`packages/ui`).** It sits below both of them in the dependency graph so they can import from it without creating cycles.
+**`@sapporta/shared` MUST NOT depend on any other workspace package.** It sits at the bottom of the dependency graph so its consumers can import from it without creating cycles.
 
-Both core and ui may depend on shared. Shared depends on neither. If you find yourself wanting to import from core or ui here, the abstraction belongs on the other side of the boundary, not in this package.
+Its consumers are `@sapporta/server` (`packages/core`) on the backend, and `@sapporta/grid` and `@sapporta/frontend` in the browser. Shared depends on none of them. If you find yourself wanting to import from a consumer here, the abstraction belongs on the other side of the boundary, not in this package.
+
+`@sapporta/ui` is a separate leaf: it does not depend on shared, and shared must not depend on it either.
 
 ## What belongs here
 
@@ -35,4 +37,4 @@ without also deciding which side of this line they sit on.
 ## Constraints
 
 - Pure TypeScript. No side effects at import time.
-- `tsconfig.json` has `composite: true`; core and ui reference this package in their `tsconfig.json` `references`.
+- `tsconfig.json` has `composite: true`; its consumers reference this package in their `tsconfig.json` `references`.

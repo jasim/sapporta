@@ -59,6 +59,27 @@ for (const dir of workspacePackageDirs()) {
       );
     }
   }
+
+  // A package README may repeat the module map for readers who arrive from
+  // npm rather than the repository. That copy is not the source of truth, so
+  // it is held to the same subpath set rather than being allowed to drift.
+  const readme = readmeModules(dir);
+  if (readme === undefined) continue;
+
+  for (const subpath of actual) {
+    if (!readme.includes(subpath)) {
+      failures.push(
+        `${packageJson.name}: export "${subpath}" is missing from the "## Modules" section of packages/${dir}/README.md`,
+      );
+    }
+  }
+  for (const subpath of readme) {
+    if (!actual.includes(subpath)) {
+      failures.push(
+        `${packageJson.name}: packages/${dir}/README.md documents "${subpath}" but package.json does not export it`,
+      );
+    }
+  }
 }
 
 if (failures.length > 0) {
@@ -95,4 +116,27 @@ function documentedModules(npmName, dir) {
     if (row && row[1] !== "Module") modules.push(row[1]);
   }
   return modules;
+}
+
+// Collect every backticked subpath in the "## Modules" section of a package
+// README, wherever it sits in the row — a row may name several related
+// subpaths in its prose instead of giving each one its own line. Returns
+// undefined when the README has no such section.
+function readmeModules(dir) {
+  const path = join(root, "packages", dir, "README.md");
+  if (!existsSync(path)) return undefined;
+
+  const readme = readFileSync(path, "utf-8");
+  const start = readme.indexOf("## Modules");
+  if (start === -1) return undefined;
+
+  const rest = readme.slice(start + "## Modules".length);
+  const nextHeading = rest.search(/\n#{2,3} /);
+  const section = nextHeading === -1 ? rest : rest.slice(0, nextHeading);
+
+  const modules = new Set();
+  for (const [, token] of section.matchAll(/`([^`]+)`/g)) {
+    if (token === "." || token.startsWith("./")) modules.add(token);
+  }
+  return [...modules];
 }

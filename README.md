@@ -64,12 +64,13 @@ export const customers = sapportaTable({
   drizzle: customersTable,
   meta: {
     label: "Customers",
+    rowLabelColumns: ["name"],
     rowScope: "workspaceGlobal",
   },
 });
 ```
 
-`workspaceGlobal` means every member of the active workspace can see the row. Use `workspaceUserScoped` for records owned by one user inside a workspace, and `systemGlobal` for installation-wide reference data such as countries or tax categories.
+`rowLabelColumns` names the columns that build a row's human-readable label, used wherever another table points at this one. `workspaceGlobal` means every member of the active workspace can see the row. Use `workspaceUserScoped` for records owned by one user inside a workspace, and `systemGlobal` for installation-wide reference data such as countries or tax categories.
 
 After changing schema or creating a new one, generate and apply a migration:
 
