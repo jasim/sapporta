@@ -45,6 +45,10 @@
  * ───────────────────────────────────────────────────────────────────────── */
 
 :root {
+  /* Scrollbars, form controls, and the canvas the browser paints itself
+     follow the theme rather than staying on the light default. */
+  color-scheme: light;
+
   /* Surfaces */
   --sap-bg: #ffffff;
   --sap-surface: #ffffff;
@@ -142,6 +146,8 @@
    bright-green positives, soft-red negatives, warm-brown selection. Same structure
    as light — only values change. */
 [data-theme="dark"] {
+  color-scheme: dark;
+
   --sap-bg: #0e0f0b;
   --sap-surface: #14150f;
   --sap-sidebar: #0a0b07;

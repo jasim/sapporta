@@ -109,6 +109,7 @@ describe.sequential("generated app browser workflow - end-to-end", () => {
         page.getByText("Email verified. Taking you back..."),
       ).toBeVisible();
       await waitForHomePage(page);
+      await expectGettingStartedLink(page);
 
       await signInWithPassword(page);
       await verifyResponsiveSidebar(page);
@@ -185,7 +186,21 @@ async function signInWithPassword(page: Page): Promise<void> {
 
 async function waitForHomePage(page: Page): Promise<void> {
   await page.waitForURL((url) => url.pathname === "/");
-  await expectHeading(page, "Welcome to your new Sapporta project");
+  await expectHeading(page, "Your app is live");
+}
+
+/**
+ * The generated home screen sends a new project's author to the getting
+ * started guide, so the link has to survive scaffolding with the documentation
+ * URL filled in.
+ */
+async function expectGettingStartedLink(page: Page): Promise<void> {
+  await playwrightExpect(
+    page.getByRole("link", { name: "Read the getting started guide" }),
+  ).toHaveAttribute(
+    "href",
+    "https://sapporta.com/docs/getting-started/introduction/",
+  );
 }
 
 async function verifyResponsiveSidebar(page: Page): Promise<void> {

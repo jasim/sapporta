@@ -232,6 +232,10 @@ export function createTempProject(opts: TempProjectOptions = {}): E2eProject {
   env.BETTER_AUTH_SECRET = "sapporta-e2e-generated-project-secret";
   env.SAPPORTA_REQUIRE_VERIFIED_EMAIL = "false";
   env.SAPPORTA_MAIL_FROM = "Sapporta <no-reply@example.test>";
+  // Scaffold against the published documentation site, so the generated links
+  // are the ones a real project gets even when the developer running these
+  // tests points their shell at a local docs server.
+  delete env.SAPPORTA_DOCS_ORIGIN;
   if (opts.devMode ?? true) {
     env.SAPPORTA_PACKAGE_ROOT = MONOREPO_ROOT;
   } else {

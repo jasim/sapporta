@@ -597,6 +597,98 @@ describe("authenticated account pages", () => {
     ).toBeNull();
   });
 
+  it("opens the create-token dialog from its own URL, with expiry folded away", async () => {
+    installFetch((request) => {
+      if (request.path === "/api/auth-tokens") {
+        return jsonResponse({ tokens: [] });
+      }
+      return jsonResponse({ error: "Unexpected request" }, 500);
+    });
+    useAuthStoreSetState({
+      session: { kind: "authenticated", context: AUTH_CONTEXT },
+    });
+
+    await renderRoutes(
+      "/account/profile?token=new",
+      createElement(Route, {
+        path: "/account/profile",
+        element: createElement(AccountProfilePage),
+      }),
+    );
+
+    await waitForText("New access token");
+    expect(inputForLabel("Token name")?.value).toContain("Agent Token");
+    expect(document.body.textContent).toContain("Expiration: never expires");
+    expect(inputForLabel("Expiration date")).toBeNull();
+  });
+
+  it("leads the created-token dialog with the agent prompt", async () => {
+    const calls = installFetch((request) => {
+      if (request.path === "/api/auth-tokens" && request.method === "POST") {
+        return jsonResponse({
+          token: {
+            id: "token-1",
+            userId: "user-1",
+            organizationId: "workspace-1",
+            name: "Agent Token abcd",
+            createdAt: "2026-01-01T00:00:00.000Z",
+            expiresAt: null,
+            lastUsedAt: null,
+            revokedAt: null,
+          },
+          rawToken: "sap-raw-token-value",
+        });
+      }
+      if (request.path === "/api/auth-tokens") {
+        return jsonResponse({ tokens: [] });
+      }
+      return jsonResponse({ error: "Unexpected request" }, 500);
+    });
+    useAuthStoreSetState({
+      session: { kind: "authenticated", context: AUTH_CONTEXT },
+    });
+
+    await renderRoutes(
+      "/account/profile?token=new",
+      createElement(Route, {
+        path: "/account/profile",
+        element: createElement(AccountProfilePage),
+      }),
+    );
+
+    await waitForText("New access token");
+    await submitForm();
+
+    await waitForText("Create an empty directory");
+    expect(document.body.textContent).toContain(
+      "Paste this prompt into a coding agent opened there",
+    );
+    expect(document.body.textContent).toContain("sap-raw-token-value");
+    // A default name, and no expiry, from a dialog nobody had to fill in.
+    expect(calls.at(-1)?.body).toEqual({
+      name: expect.stringMatching(/^Agent Token /),
+    });
+
+    // The prompt and the buttons that copy it come first; the token itself
+    // sits below them. The prompt is copyable twice over: from the icon on the
+    // prompt itself and from the button under it.
+    const buttons = Array.from(
+      document.body.querySelectorAll<HTMLButtonElement>("button"),
+    );
+    const promptCopies = buttons.filter(
+      (button) =>
+        button.textContent?.trim() === "Copy prompt" ||
+        button.getAttribute("aria-label") === "Copy prompt",
+    );
+    expect(promptCopies).toHaveLength(2);
+
+    const labels = buttons.map((button) => button.textContent?.trim());
+    expect(labels.indexOf("Copy prompt")).toBeGreaterThanOrEqual(0);
+    expect(labels.indexOf("Copy prompt")).toBeLessThan(
+      labels.indexOf("Copy token"),
+    );
+  });
+
   it("rejects mismatched new passwords before sending a request", async () => {
     const calls = installFetch(() =>
       jsonResponse({ error: "Unexpected request" }, 500),
@@ -722,7 +814,7 @@ async function fillInput(label: string, value: string): Promise<void> {
 }
 
 async function submitForm(): Promise<void> {
-  const form = host.querySelector<HTMLFormElement>("form");
+  const form = document.body.querySelector<HTMLFormElement>("form");
   expect(form).not.toBeNull();
   await act(async () => {
     form!.dispatchEvent(
@@ -740,7 +832,9 @@ async function clickButton(label: string): Promise<void> {
 }
 
 function inputForLabel(labelText: string): HTMLInputElement | null {
-  const labels = Array.from(host.querySelectorAll("label"));
+  // Dialog content is portalled out of `host`, so labels are looked for on the
+  // whole document.
+  const labels = Array.from(document.body.querySelectorAll("label"));
   const label = labels.find((item) => item.textContent?.trim() === labelText);
   const id = label?.getAttribute("for");
   if (!id) return null;

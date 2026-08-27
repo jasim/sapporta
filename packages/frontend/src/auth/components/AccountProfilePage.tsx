@@ -1,6 +1,7 @@
 import {
   Building2,
   CheckCircle2,
+  ChevronRight,
   Copy,
   Globe,
   KeyRound,
@@ -11,8 +12,9 @@ import {
   UserRound,
 } from "lucide-react";
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
-import { Link } from "react-router-dom";
+import { Link, useLocation, useSearchParams } from "react-router-dom";
 import { Button, buttonVariants } from "@sapporta/ui/button";
+import { cn } from "@sapporta/ui/cn";
 import {
   Dialog,
   DialogClose,
@@ -24,7 +26,10 @@ import {
 } from "@sapporta/ui/dialog";
 import { Input } from "@sapporta/ui/input";
 import { Label } from "@sapporta/ui/label";
-import type { AuthToken } from "@sapporta/shared/contracts";
+import type {
+  AuthToken,
+  CreateAuthTokenResponse,
+} from "@sapporta/shared/contracts";
 import {
   formatTemporalForDisplay,
   formatTimeZoneOffsetLabel,
@@ -174,19 +179,25 @@ function AccountSecurity() {
 type ExpirationChoice = "never" | "date";
 const tokenNameSuffixLength = 4;
 
+/**
+ * The create-token dialog is a place of its own: `?token=new` on the profile
+ * URL opens it, so the screen can be linked to, reloaded, and closed with the
+ * browser's Back button.
+ */
+const createTokenParam = "token";
+const createTokenValue = "new";
+
 function AgentAccessTokens() {
   const [tokens, setTokens] = useState<AuthToken[]>([]);
-  const [isCreateFormOpen, setCreateFormOpen] = useState(false);
-  const [name, setName] = useState(createDefaultTokenName);
-  const [expiresAt, setExpiresAt] = useState("");
-  const [expirationChoice, setExpirationChoice] =
-    useState<ExpirationChoice>("never");
   // The raw bearer token is returned only when it is created. Keep it in this
-  // view long enough for the user to copy it into an agent or CI secret; token
-  // list responses show metadata only.
+  // view long enough for the user to hand it to an agent; token list responses
+  // show metadata only.
   const [rawToken, setRawToken] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
+  const location = useLocation();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const isCreateOpen = searchParams.get(createTokenParam) === createTokenValue;
 
   useEffect(() => {
     let cancelled = false;
@@ -202,37 +213,16 @@ function AgentAccessTokens() {
     };
   }, []);
 
-  async function submit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setPending(true);
-    setError(null);
-    try {
-      const created = await createAuthToken({
-        name,
-        // The control speaks zone-less wall-clock text, so the moment it
-        // names is settled here, on the same clock the expiry is read back
-        // on below.
-        ...(expirationChoice === "date" && expiresAt
-          ? {
-              expiresAt:
-                parseDateTimeLocalInputToCanonicalInstantString(
-                  expiresAt,
-                  appTimeZone(),
-                ) ?? undefined,
-            }
-          : {}),
-      });
-      setRawToken(created.rawToken);
-      setTokens((current) => [created.token, ...current]);
-      setName(createDefaultTokenName());
-      setExpiresAt("");
-      setExpirationChoice("never");
-      setCreateFormOpen(false);
-    } catch (err) {
-      setError(errorMessage(err));
-    } finally {
-      setPending(false);
-    }
+  function createTokenHref() {
+    const next = new URLSearchParams(searchParams);
+    next.set(createTokenParam, createTokenValue);
+    return { pathname: location.pathname, search: `?${next.toString()}` };
+  }
+
+  function closeCreate() {
+    const next = new URLSearchParams(searchParams);
+    next.delete(createTokenParam);
+    setSearchParams(next, { replace: true });
   }
 
   async function revoke(id: string) {
@@ -253,13 +243,6 @@ function AgentAccessTokens() {
     }
   }
 
-  async function copyText(value: string) {
-    if (typeof navigator === "undefined" || !navigator.clipboard) {
-      throw new Error("Clipboard is not available.");
-    }
-    await navigator.clipboard.writeText(value);
-  }
-
   return (
     <section className="mt-8">
       <header className="mb-3 flex flex-wrap items-center justify-between gap-3">
@@ -269,125 +252,31 @@ function AgentAccessTokens() {
             Agent access tokens
           </h2>
         </div>
-        {!isCreateFormOpen ? (
-          <Button
-            type="button"
-            className="bg-sap-brand text-white hover:bg-sap-brand/90"
-            onClick={() => {
-              setName(createDefaultTokenName());
-              setCreateFormOpen(true);
-            }}
-          >
-            <Plus className="h-4 w-4" strokeWidth={1.9} />
-            Create new access token
-          </Button>
-        ) : null}
+        <Link
+          className={cn(
+            buttonVariants(),
+            "bg-sap-brand text-white hover:bg-sap-brand/90",
+          )}
+          to={createTokenHref()}
+        >
+          <Plus className="h-4 w-4" strokeWidth={1.9} />
+          Create new access token
+        </Link>
       </header>
 
-      {isCreateFormOpen ? (
-        <form
-          className="grid gap-4 border-y border-sap-border-soft py-4"
-          onSubmit={submit}
-        >
-          <div className="space-y-2">
-            <Label htmlFor="agent-token-name">Token name</Label>
-            <Input
-              id="agent-token-name"
-              className="border-sap-border bg-sap-surface text-sap-fg focus-visible:ring-sap-brand"
-              value={name}
-              onChange={(event) => setName(event.target.value)}
-              required
-            />
-            <p className="text-sap-data text-sap-muted">
-              Use a name that tells you where this token will be used.
-            </p>
-          </div>
-
-          <fieldset className="space-y-3">
-            <legend className="text-sm font-medium leading-none text-sap-fg">
-              Expiration
-            </legend>
-            <p className="text-sap-data text-sap-muted">
-              Choose whether this token should expire automatically.
-            </p>
-            <label className="flex items-start gap-3 text-sap-body text-sap-fg">
-              <input
-                className="mt-[3px] h-4 w-4 accent-sap-brand"
-                type="radio"
-                name="agent-token-expiration"
-                value="never"
-                checked={expirationChoice === "never"}
-                onChange={() => setExpirationChoice("never")}
-              />
-              <span>
-                <span className="block font-medium">Never expires</span>
-                <span className="block text-sap-data text-sap-muted">
-                  Keep this token active until you revoke it.
-                </span>
-              </span>
-            </label>
-            <label className="flex items-start gap-3 text-sap-body text-sap-fg">
-              <input
-                className="mt-[3px] h-4 w-4 accent-sap-brand"
-                type="radio"
-                name="agent-token-expiration"
-                value="date"
-                checked={expirationChoice === "date"}
-                onChange={() => setExpirationChoice("date")}
-              />
-              <span>
-                <span className="block font-medium">Expires on a date</span>
-                <span className="block text-sap-data text-sap-muted">
-                  Set a specific date and time for this token to stop working.
-                </span>
-              </span>
-            </label>
-            {expirationChoice === "date" ? (
-              <div className="space-y-2 pl-7">
-                <Label htmlFor="agent-token-expires-at">Expiration date</Label>
-                <Input
-                  id="agent-token-expires-at"
-                  className="max-w-[260px] border-sap-border bg-sap-surface text-sap-fg focus-visible:ring-sap-brand"
-                  type="datetime-local"
-                  value={expiresAt}
-                  onChange={(event) => setExpiresAt(event.target.value)}
-                  required
-                />
-              </div>
-            ) : null}
-          </fieldset>
-
-          <div className="flex flex-wrap items-center gap-2">
-            <Button
-              type="submit"
-              className="bg-sap-brand text-white hover:bg-sap-brand/90"
-              disabled={
-                pending ||
-                name.trim().length === 0 ||
-                (expirationChoice === "date" && expiresAt.length === 0)
-              }
-            >
-              Create token
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              className="border-sap-border bg-sap-surface text-sap-muted hover:text-sap-fg"
-              onClick={() => {
-                setCreateFormOpen(false);
-                setError(null);
-              }}
-            >
-              Cancel
-            </Button>
-          </div>
-        </form>
-      ) : null}
+      <CreateTokenDialog
+        open={isCreateOpen}
+        onClose={closeCreate}
+        onCreated={(created) => {
+          setTokens((current) => [created.token, ...current]);
+          setRawToken(created.rawToken);
+          closeCreate();
+        }}
+      />
 
       <CreatedTokenDialog
         rawToken={rawToken}
         onClose={() => setRawToken(null)}
-        onCopy={copyText}
       />
 
       {error ? (
@@ -435,6 +324,204 @@ function AgentAccessTokens() {
   );
 }
 
+/**
+ * Name it, create it. Expiry is folded away because most tokens never get one,
+ * and a token is two clicks from here when it is left alone.
+ */
+function CreateTokenDialog({
+  open,
+  onClose,
+  onCreated,
+}: {
+  open: boolean;
+  onClose: () => void;
+  onCreated: (created: CreateAuthTokenResponse) => void;
+}) {
+  const [name, setName] = useState(createDefaultTokenName);
+  const [expirationChoice, setExpirationChoice] =
+    useState<ExpirationChoice>("never");
+  const [expiresAt, setExpiresAt] = useState("");
+  const [isExpirationOpen, setExpirationOpen] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [pending, setPending] = useState(false);
+
+  // Each visit creates a different token, so it starts on the defaults rather
+  // than on whatever the previous visit typed.
+  useEffect(() => {
+    if (!open) return;
+    setName(createDefaultTokenName());
+    setExpirationChoice("never");
+    setExpiresAt("");
+    setExpirationOpen(false);
+    setError(null);
+  }, [open]);
+
+  async function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setPending(true);
+    setError(null);
+    try {
+      const created = await createAuthToken({
+        name,
+        // The control speaks zone-less wall-clock text, so the moment it
+        // names is settled here, on the same clock the expiry is read back
+        // on in the list below.
+        ...(expirationChoice === "date" && expiresAt
+          ? {
+              expiresAt:
+                parseDateTimeLocalInputToCanonicalInstantString(
+                  expiresAt,
+                  appTimeZone(),
+                ) ?? undefined,
+            }
+          : {}),
+      });
+      onCreated(created);
+    } catch (err) {
+      setError(errorMessage(err));
+    } finally {
+      setPending(false);
+    }
+  }
+
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        if (!next) onClose();
+      }}
+    >
+      <DialogContent className="max-w-[520px] gap-0 border-sap-border bg-sap-surface p-0 text-sap-fg">
+        <form onSubmit={submit}>
+          <DialogHeader className="px-6 pb-0 pr-12 pt-6 text-left">
+            <DialogTitle className="text-[18px] font-[680]">
+              New access token
+            </DialogTitle>
+            <DialogDescription className="text-sap-body text-sap-muted">
+              Name it for where it will be used. It works until you revoke it.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="grid gap-4 px-6 py-5">
+            <div className="space-y-2">
+              <Label htmlFor="agent-token-name">Token name</Label>
+              <Input
+                id="agent-token-name"
+                className="border-sap-border bg-sap-surface text-sap-fg focus-visible:ring-sap-brand"
+                value={name}
+                onChange={(event) => setName(event.target.value)}
+                required
+              />
+            </div>
+
+            <div>
+              <button
+                className="flex items-center gap-1.5 text-sap-data text-sap-muted hover:text-sap-fg"
+                type="button"
+                aria-expanded={isExpirationOpen}
+                onClick={() => setExpirationOpen((current) => !current)}
+              >
+                <ChevronRight
+                  className={cn(
+                    "h-3.5 w-3.5 transition-transform",
+                    isExpirationOpen && "rotate-90",
+                  )}
+                  strokeWidth={1.9}
+                />
+                Expiration: {expirationSummary(expirationChoice, expiresAt)}
+              </button>
+
+              {isExpirationOpen ? (
+                <fieldset className="mt-3 space-y-3 pl-[19px]">
+                  <legend className="sr-only">Expiration</legend>
+                  <label className="flex items-center gap-3 text-sap-body text-sap-fg">
+                    <input
+                      className="h-4 w-4 accent-sap-brand"
+                      type="radio"
+                      name="agent-token-expiration"
+                      value="never"
+                      checked={expirationChoice === "never"}
+                      onChange={() => setExpirationChoice("never")}
+                    />
+                    Never expires
+                  </label>
+                  <label className="flex items-center gap-3 text-sap-body text-sap-fg">
+                    <input
+                      className="h-4 w-4 accent-sap-brand"
+                      type="radio"
+                      name="agent-token-expiration"
+                      value="date"
+                      checked={expirationChoice === "date"}
+                      onChange={() => setExpirationChoice("date")}
+                    />
+                    Expires on a date
+                  </label>
+                  {expirationChoice === "date" ? (
+                    <div className="space-y-2 pl-7">
+                      <Label htmlFor="agent-token-expires-at">
+                        Expiration date
+                      </Label>
+                      <Input
+                        id="agent-token-expires-at"
+                        className="max-w-[260px] border-sap-border bg-sap-surface text-sap-fg focus-visible:ring-sap-brand"
+                        type="datetime-local"
+                        value={expiresAt}
+                        onChange={(event) => setExpiresAt(event.target.value)}
+                        required
+                      />
+                    </div>
+                  ) : null}
+                </fieldset>
+              ) : null}
+            </div>
+
+            {error ? (
+              <p className="text-sap-data text-red-600">{error}</p>
+            ) : null}
+          </div>
+
+          <DialogFooter className="border-t border-sap-border-soft px-6 py-4">
+            <DialogClose
+              render={
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="border-sap-border bg-sap-surface text-sap-muted hover:text-sap-fg"
+                />
+              }
+            >
+              Cancel
+            </DialogClose>
+            <Button
+              type="submit"
+              className="bg-sap-brand text-white hover:bg-sap-brand/90"
+              disabled={
+                pending ||
+                name.trim().length === 0 ||
+                (expirationChoice === "date" && expiresAt.length === 0)
+              }
+            >
+              Create token
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function expirationSummary(
+  choice: ExpirationChoice,
+  expiresAt: string,
+): string {
+  if (choice === "never") return "never expires";
+  if (!expiresAt) return "pick a date";
+  return formatDate(
+    parseDateTimeLocalInputToCanonicalInstantString(expiresAt, appTimeZone()) ??
+      expiresAt,
+  );
+}
+
 function createDefaultTokenName(): string {
   return `Agent Token ${randomTokenNameSuffix()}`;
 }
@@ -445,14 +532,18 @@ function randomTokenNameSuffix(): string {
   return value.replaceAll("-", "").slice(0, tokenNameSuffixLength);
 }
 
+/**
+ * What to do with a token that was just created. Handing the prompt to an
+ * agent is the whole job, so the prompt and the button that copies it own the
+ * screen; the token itself sits underneath for anyone wiring something by
+ * hand, and this is the only time it is shown.
+ */
 function CreatedTokenDialog({
   rawToken,
   onClose,
-  onCopy,
 }: {
   rawToken: string | null;
   onClose: () => void;
-  onCopy: (value: string) => Promise<void>;
 }) {
   const [copyStatus, setCopyStatus] = useState<CopyStatus>("idle");
 
@@ -468,7 +559,7 @@ function CreatedTokenDialog({
 
   async function handleCopy(value: string, target: CopyTarget) {
     try {
-      await onCopy(value);
+      await copyToClipboard(value);
       setCopyStatus(target === "token" ? "token-copied" : "prompt-copied");
     } catch {
       setCopyStatus(target === "token" ? "token-failed" : "prompt-failed");
@@ -486,86 +577,109 @@ function CreatedTokenDialog({
         if (!open) onClose();
       }}
     >
-      <DialogContent className="max-h-[calc(100vh-2rem)] max-w-[840px] grid-rows-[auto_minmax(0,1fr)_auto] gap-0 overflow-hidden border-sap-border bg-sap-surface p-0 text-sap-fg">
-        <DialogHeader className="border-b border-sap-border-soft px-6 py-5 pr-12">
-          <div className="flex items-start gap-3 text-left">
-            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[8px] bg-sap-active-nav text-sap-brand">
-              <KeyRound className="h-[18px] w-[18px]" strokeWidth={1.8} />
-            </span>
-            <div className="min-w-0">
-              <DialogTitle className="text-[18px] font-[680]">
-                New access token created
-              </DialogTitle>
-              <DialogDescription className="mt-2 text-sap-body text-sap-muted">
-                Save the token or copy the agent setup prompt before closing.
-                The token will not be shown again.
-              </DialogDescription>
-            </div>
-          </div>
+      <DialogContent className="max-h-[calc(100vh-2rem)] max-w-[760px] grid-rows-[auto_minmax(0,1fr)_auto] gap-0 overflow-hidden border-sap-border bg-sap-surface p-0 text-sap-fg">
+        <DialogHeader className="px-6 pb-5 pr-12 pt-6 text-left">
+          <DialogTitle className="text-[18px] font-[680]">
+            Access token created
+          </DialogTitle>
         </DialogHeader>
 
-        <div className="grid min-h-0 gap-4 overflow-y-auto p-5">
-          <section className="rounded-[9px] border border-sap-border-soft p-4">
-            <div>
-              <h3 className="text-sap-body font-[650] text-sap-fg">
-                Access token
-              </h3>
-              <p className="mt-1 text-sap-data text-sap-muted">
-                Copy the token by itself if you want to configure the
-                environment manually.
-              </p>
-            </div>
-            <div className="mt-4 grid items-center gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
+        <div className="min-h-0 overflow-y-auto px-6 pb-6">
+          <ol className="grid gap-5">
+            <li className="grid grid-cols-[26px_minmax(0,1fr)] items-start gap-3">
+              <StepNumber>1</StepNumber>
+              <div className="min-w-0 pt-[3px]">
+                <h3 className="text-[17px] font-[650] leading-snug text-sap-fg">
+                  Create an empty directory
+                </h3>
+                <p className="mt-1 text-sap-data text-sap-muted">
+                  Anywhere on your machine.
+                </p>
+              </div>
+            </li>
+
+            <li className="grid grid-cols-[26px_minmax(0,1fr)] items-start gap-3">
+              <StepNumber>2</StepNumber>
+              <div className="min-w-0 pt-[3px]">
+                <h3 className="text-[17px] font-[650] leading-snug text-sap-fg">
+                  Paste this prompt into a coding agent opened there
+                </h3>
+
+                <div className="relative mt-3">
+                  <pre className="max-h-[220px] overflow-auto whitespace-pre-wrap break-words rounded-[9px] bg-sap-brand-soft p-4 pr-14 font-mono text-[12px] leading-5 text-sap-fg">
+                    {setupPrompt}
+                  </pre>
+                  {/* Where a hand goes for a block of text it means to take
+                      with it, before it reads far enough to find a button. */}
+                  <button
+                    className="absolute right-3 top-3 flex h-8 w-8 items-center justify-center rounded-[7px] border border-sap-border bg-sap-surface text-sap-muted shadow-sm hover:text-sap-fg"
+                    type="button"
+                    title="Copy prompt"
+                    aria-label="Copy prompt"
+                    onClick={() => void handleCopy(setupPrompt, "prompt")}
+                  >
+                    <Copy className="h-4 w-4" strokeWidth={1.8} />
+                  </button>
+                </div>
+
+                <div className="mt-3 flex flex-wrap items-center gap-3">
+                  <Button
+                    type="button"
+                    size="lg"
+                    className="bg-sap-brand text-white hover:bg-sap-brand/90"
+                    onClick={() => void handleCopy(setupPrompt, "prompt")}
+                  >
+                    <Copy className="h-4 w-4" strokeWidth={1.8} />
+                    Copy prompt
+                  </Button>
+                  <CopyFeedback status={copyStatus} target="prompt" />
+                </div>
+              </div>
+            </li>
+
+            <li className="grid grid-cols-[26px_minmax(0,1fr)] items-start gap-3">
+              <StepNumber>3</StepNumber>
+              <div className="min-w-0 pt-[3px]">
+                <h3 className="text-[17px] font-[650] leading-snug text-sap-fg">
+                  Ask the agent for what you need
+                </h3>
+                <p className="mt-1 text-sap-data text-sap-muted">
+                  It can query, change, and add data, and even build tools on top of the API.
+                </p>
+              </div>
+            </li>
+          </ol>
+
+          <div className="mt-7 border-t border-sap-border-soft pt-4">
+            <h3 className="text-sap-data font-medium text-sap-muted">
+              Access token
+            </h3>
+            <p className="mt-0.5 text-sap-data text-sap-subtle">
+              Already in the prompt above. It is not shown again.
+            </p>
+            <div className="mt-2 flex items-center gap-2">
               <Input
                 aria-label="New agent access token"
-                className="h-10 min-w-0 border-sap-border bg-sap-surface font-mono text-[12px] text-sap-fg"
+                className="h-8 min-w-0 flex-1 border-sap-border-soft bg-sap-surface font-mono text-[11.5px] text-sap-muted"
                 value={rawToken ?? ""}
                 readOnly
               />
               <Button
                 type="button"
-                variant="outline"
-                className="h-10 border-sap-border bg-sap-surface text-sap-fg"
+                variant="ghost"
+                size="sm"
+                className="shrink-0 text-sap-muted hover:text-sap-fg"
                 onClick={() => {
                   if (rawToken) void handleCopy(rawToken, "token");
                 }}
               >
-                <Copy className="h-4 w-4" strokeWidth={1.8} />
+                <Copy className="h-3.5 w-3.5" strokeWidth={1.8} />
                 Copy token
               </Button>
             </div>
             <CopyFeedback status={copyStatus} target="token" />
-          </section>
-
-          <section className="rounded-[9px] border border-sap-border-soft p-4">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <h3 className="text-sap-body font-[650] text-sap-fg">
-                  Set up a coding agent
-                </h3>
-                <p className="mt-1 text-sap-data text-sap-muted">
-                  Paste this prompt into an agent opened in the project
-                  directory.
-                </p>
-              </div>
-              <Button
-                type="button"
-                className="bg-sap-brand text-white hover:bg-sap-brand/90"
-                onClick={() => void handleCopy(setupPrompt, "prompt")}
-              >
-                <Copy className="h-4 w-4" strokeWidth={1.8} />
-                Copy setup prompt
-              </Button>
-            </div>
-            <pre className="mt-4 max-h-[180px] overflow-auto whitespace-pre-wrap break-words rounded-[7px] border border-sap-border-soft bg-sap-nested p-4 font-mono text-[12px] leading-5 text-sap-fg">
-              {setupPrompt}
-            </pre>
-            <div className="mt-2">
-              <CopyFeedback status={copyStatus} target="prompt" />
-            </div>
-          </section>
+          </div>
         </div>
-
         <DialogFooter className="border-t border-sap-border-soft px-6 py-4">
           <DialogClose
             render={
@@ -576,12 +690,30 @@ function CreatedTokenDialog({
               />
             }
           >
-            Close
+            Done
           </DialogClose>
         </DialogFooter>
       </DialogContent>
     </Dialog>
   );
+}
+
+function StepNumber({ children }: { children: ReactNode }) {
+  return (
+    <span
+      aria-hidden="true"
+      className="flex h-[26px] w-[26px] items-center justify-center rounded-full bg-sap-active-nav text-sap-data font-[680] text-sap-brand"
+    >
+      {children}
+    </span>
+  );
+}
+
+async function copyToClipboard(value: string): Promise<void> {
+  if (typeof navigator === "undefined" || !navigator.clipboard) {
+    throw new Error("Clipboard is not available.");
+  }
+  await navigator.clipboard.writeText(value);
 }
 
 type CopyTarget = "token" | "prompt";
@@ -600,7 +732,7 @@ function CopyFeedback({
   const message = copied
     ? target === "token"
       ? "Token copied to clipboard."
-      : "Setup prompt copied to clipboard."
+      : "Prompt copied to clipboard."
     : failed
       ? "Could not copy. Select the text and copy it manually."
       : null;
@@ -637,11 +769,11 @@ function createAgentSetupPrompt(apiUrl: string, apiToken: string): string {
   return [
     "Prepare this directory so coding agents can understand and work with the application using the Sapporta skill and authenticated CLI.",
     "Ensure the Sapporta skill is available; if not, run `npx skills add 'https://github.com/jasim/sapporta-skills' --skill sapporta`.",
-    "Ensure a project-local CLI exists; if not, run `pnpm install sapporta`.",
+    "Ensure a project-local CLI exists; if not, run `pnpm install sapporta`; if pnpm blocks unapproved build scripts, approve `esbuild` and skip `better-sqlite3` unless this directory runs a local server.",
     `Configure the CLI to access \`${apiUrl}\` using this private access token: \`${apiToken}\`.`,
     "Make `SAPPORTA_API_URL` and `SAPPORTA_API_TOKEN` available to every Sapporta command through the project's existing directory environment tooling, such as mise, direnv, or a dotenv runner.",
     "If none exists, use a small private, gitignored local wrapper; do not install an environment manager just for this.",
-    "Update `AGENTS.md` with the exact authenticated command agents should use, using an absolute path for a wrapper.",
+    "Update `AGENTS.md` with the exact authenticated command agents should use, by absolute path if it goes through a wrapper.",
     "Keep the token out of version control and handle it as a secret.",
     `Verify the token with the read-only \`api get '/api/auth-context'\` command, which answers with the user and workspace the token acts as, requesting sandbox network access to \`${apiUrl}\` if needed.`,
   ].join(" ");
