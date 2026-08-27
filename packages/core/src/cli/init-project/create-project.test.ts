@@ -643,7 +643,7 @@ describe("renderScaffoldFiles", () => {
     }
   });
 
-  it("renders configured documentation URLs into starter prompts", () => {
+  it("renders the configured documentation URL into the home screen", () => {
     const project = layoutForRoot(
       projectIdentityFromOptions({
         dir: "/tmp/acme-app",
@@ -663,9 +663,6 @@ describe("renderScaffoldFiles", () => {
 
     expect(home).toContain(
       '"http://127.0.0.1:4321/docs/getting-started/introduction/"',
-    );
-    expect(home).toContain(
-      "http://127.0.0.1:4321/docs/getting-started/introduction.md",
     );
     expect(home).not.toContain("%%SAPPORTA:");
   });
@@ -731,7 +728,6 @@ describe("scaffold template inventory", () => {
       "%%SAPPORTA:DEV_API_PORT%%",
       "%%SAPPORTA:DEV_FRONTEND_PORT%%",
       "%%SAPPORTA:DOCS_BROWSER_URL%%",
-      "%%SAPPORTA:DOCS_AGENT_URL%%",
       "%%SAPPORTA:NODE_COMMAND%%",
       "%%SAPPORTA:VITE_SOURCE_LINK_RESOLUTION%%",
       ...DEPENDENCY_CATALOG.tokenByKey.values(),

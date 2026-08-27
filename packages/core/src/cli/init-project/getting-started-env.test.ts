@@ -10,7 +10,6 @@ describe("resolveGettingStartedEnv", () => {
     expect(resolveGettingStartedEnv({})).toEqual({
       docsOrigin: DEFAULT_DOCS_ORIGIN,
       docsBrowserUrl: "https://sapporta.com/docs/getting-started/introduction/",
-      docsAgentUrl: "https://sapporta.com/docs/getting-started/introduction.md",
       skillSource: DEFAULT_SKILL_SOURCE,
     });
   });
@@ -25,8 +24,6 @@ describe("resolveGettingStartedEnv", () => {
       docsOrigin: "http://127.0.0.1:4321",
       docsBrowserUrl:
         "http://127.0.0.1:4321/docs/getting-started/introduction/",
-      docsAgentUrl:
-        "http://127.0.0.1:4321/docs/getting-started/introduction.md",
       skillSource: "/tmp/sapporta skills",
     });
   });
@@ -40,8 +37,6 @@ describe("resolveGettingStartedEnv", () => {
       docsOrigin: "https://preview.example.com",
       docsBrowserUrl:
         "https://preview.example.com/docs/getting-started/introduction/",
-      docsAgentUrl:
-        "https://preview.example.com/docs/getting-started/introduction.md",
       skillSource: DEFAULT_SKILL_SOURCE,
     });
   });

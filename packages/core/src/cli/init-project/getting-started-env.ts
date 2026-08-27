@@ -9,7 +9,6 @@ const SKILL_SOURCE = "SAPPORTA_SKILL_SOURCE";
 export type GettingStartedEnv = Readonly<{
   docsOrigin: string;
   docsBrowserUrl: string;
-  docsAgentUrl: string;
   skillSource: string;
 }>;
 
@@ -28,7 +27,6 @@ export function resolveGettingStartedEnv(
   return Object.freeze({
     docsOrigin,
     docsBrowserUrl: `${docsOrigin}/docs/getting-started/introduction/`,
-    docsAgentUrl: `${docsOrigin}/docs/getting-started/introduction.md`,
     skillSource,
   });
 }

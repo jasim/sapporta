@@ -48,7 +48,6 @@ export function buildTemplateVariables(opts: {
     "%%SAPPORTA:DEV_API_PORT%%": String(devPorts.api),
     "%%SAPPORTA:DEV_FRONTEND_PORT%%": String(devPorts.frontend),
     "%%SAPPORTA:DOCS_BROWSER_URL%%": opts.gettingStartedEnv.docsBrowserUrl,
-    "%%SAPPORTA:DOCS_AGENT_URL%%": opts.gettingStartedEnv.docsAgentUrl,
     // The template treats the executable and preload as one token so every
     // source-linked API uses the same scoped resolver. Registry output receives
     // the ordinary `node` command and never loads framework-development code.

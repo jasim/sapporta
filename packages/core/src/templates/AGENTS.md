@@ -125,7 +125,7 @@ existing Sapporta components and local patterns to new abstractions.
   Read `packages/api/schema/` directly, or use `endpoints list` and
   `endpoints show`, which need no credential against `pnpm dev`. Only `rows`,
   `sql`, `tables`, and `api` need `SAPPORTA_API_TOKEN`, and only a signed-in
-  person can create one from `/account/profile`.
+  person can create one from `/account/profile?token=new`.
   https://sapporta.com/docs/guides/security/agent-access-and-scoped-tokens.md
 - `@sapporta/*` are installed dependencies. Resolve one from the workspace
   package that declares it rather than hand-writing or globbing a
