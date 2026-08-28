@@ -90,6 +90,18 @@ export type TGridCellContext<
   activation: CellRenderActivation | null;
 };
 
+// Context a column's `renderCell` component receives. `defaultContent` is
+// what the column would have rendered without the override: the preset's own
+// cell, formatted and truncated. Render it to keep the default, wrap it to
+// decorate it, or ignore it to replace the cell outright.
+export type TGridCellRenderContext<
+  RowsByLevel extends TGridRowsByLevel,
+  AppServices,
+  LevelId extends TGridLevelId<RowsByLevel>,
+> = TGridCellContext<RowsByLevel, AppServices, LevelId> & {
+  defaultContent: ReactNode;
+};
+
 export type TGridCellActivationContext<
   RowsByLevel extends TGridRowsByLevel,
   AppServices,

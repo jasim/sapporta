@@ -12,9 +12,9 @@ import type {
   TGridRowsByLevel,
 } from "./tgrid-types";
 import type {
-  TGridCellContext,
   TGridCellEditorContext,
   TGridCellActivation,
+  TGridCellRenderContext,
   TGridCellWriteHandler,
   TGridColumnContext,
 } from "./tgrid-cell-context";
@@ -63,7 +63,7 @@ export type TableColumnOptions<
       };
   activation?: TGridCellActivation<RowsByLevel, AppServices, LevelId>;
   renderCell?: ComponentType<
-    TGridCellContext<RowsByLevel, AppServices, LevelId>
+    TGridCellRenderContext<RowsByLevel, AppServices, LevelId>
   >;
   copy?: TGridColumnCopyBehavior<
     RowsByLevel,
@@ -101,7 +101,7 @@ export type ClientColumnOptions<
       };
   activation?: TGridCellActivation<RowsByLevel, AppServices, LevelId>;
   renderCell?: ComponentType<
-    TGridCellContext<RowsByLevel, AppServices, LevelId>
+    TGridCellRenderContext<RowsByLevel, AppServices, LevelId>
   >;
   copy?: TGridColumnCopyBehavior<RowsByLevel, AppServices, LevelId, unknown>;
 };

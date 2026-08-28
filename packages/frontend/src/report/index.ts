@@ -4,6 +4,8 @@ export {
   type ReportCellLink,
   type ReportCellLinkContext,
   type ReportCellLinkResolvers,
+  type ReportCellRenderContext,
+  type ReportCellRenderers,
   type ReportRowLinkContext,
 } from "./components/ReportGridDataset";
 export {

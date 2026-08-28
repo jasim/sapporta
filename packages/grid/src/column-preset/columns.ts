@@ -252,14 +252,15 @@ function createRenderCell<TMeta>(
   options: ColumnPresetOptions<TMeta>,
   fallback: () => ColumnPresetRuntime<TMeta>,
 ) {
-  if (options.renderCell) {
-    return options.renderCell;
-  }
-
-  return (props: CellRenderProps) => {
+  const renderDefault = (props: CellRenderProps) => {
     const runtime = presetRuntime<TMeta>(props.column) ?? fallback();
     return renderWithPresetRuntime(runtime)(props);
   };
+
+  const override = options.renderCell;
+  if (!override) return renderDefault;
+  return (props: CellRenderProps) =>
+    override({ ...props, defaultContent: renderDefault(props) });
 }
 
 function resolvePresetEdit<TMeta>(

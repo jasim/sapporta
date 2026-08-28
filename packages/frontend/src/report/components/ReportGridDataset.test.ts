@@ -8,7 +8,9 @@ import {
   ReportGridDataset,
   type ReportCellLinkContext,
   type ReportCellLinkResolvers,
+  type ReportCellRenderers,
 } from "./ReportGridDataset";
+import { CellTooltip } from "@sapporta/grid/column-preset";
 import type { GridDataset } from "@sapporta/shared/grid-dataset";
 
 (
@@ -410,6 +412,48 @@ describe("ReportGridDataset", () => {
     expect(container.innerHTML).toContain('href="/tables/journals/journal-1"');
     expect(container.textContent).toContain("125.00");
     expect(container.textContent).not.toContain("$125.00");
+  });
+
+  it("renderCell overrides wrap defaultContent and keep drill-through links", async () => {
+    const dataset = accountLedgerDataset();
+
+    const links = {
+      account: {
+        cell: {
+          name: ({ node }) => [
+            {
+              label: "Open account",
+              href: `/tables/accounts/${node.columns.account_id}`,
+            },
+          ],
+        },
+      },
+    } satisfies ReportCellLinkResolvers;
+
+    const renderCell = {
+      account: {
+        name: ({ defaultContent, row }) =>
+          createElement(CellTooltip, {
+            content: String(row.columns.account_id ?? ""),
+            children: defaultContent,
+          }),
+      },
+    } satisfies ReportCellRenderers;
+
+    const container = await renderClient(
+      createElement(ReportGridDataset, { dataset, links, renderCell }),
+    );
+
+    await waitForText(container, "Cash");
+    const cell = cellByColumn(container, "name", "Cash");
+    const trigger = cell.querySelector(
+      '[data-grid-part="cell-tooltip-trigger"]',
+    );
+    expect(trigger).toBeInstanceOf(HTMLElement);
+    expect(trigger?.textContent).toContain("Cash");
+    expect(trigger?.closest("a")?.getAttribute("href")).toBe(
+      "/tables/accounts/acct-1",
+    );
   });
 
   it("renders declarative dataset column links without app resolvers", async () => {

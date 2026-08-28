@@ -41,6 +41,7 @@ import { createTGridColumnMapper } from "./tgrid-column-mapper";
 import { createTGridColumnsBuilder } from "./tgrid-column-spec";
 import type {
   TGridCellEditorContext,
+  TGridCellRenderContext,
   TGridSessionContext,
 } from "./tgrid-cell-context";
 import type { LookupStore } from "../../lookup";
@@ -1154,6 +1155,11 @@ describe("compileTGridRuntimeConfig", () => {
 
   it("uses typed column specs for ordering, client columns, and custom cell writes", async () => {
     type Services = { suffix: string };
+    function CustomerCell({
+      defaultContent,
+    }: TGridCellRenderContext<RowsByLevel, Services, "orders">) {
+      return defaultContent;
+    }
     const columns = createTGridColumnsBuilder<RowsByLevel, Services, "orders">(
       "orders",
     );
@@ -1169,6 +1175,7 @@ describe("compileTGridRuntimeConfig", () => {
           columns: [
             columns.table("customer", {
               label: "Customer Name",
+              renderCell: CustomerCell,
               saveCellValue: async (ctx) => {
                 expect(ctx.level).toBe(runtime.root);
                 return {
@@ -1252,6 +1259,44 @@ describe("compileTGridRuntimeConfig", () => {
     expect(config.gridSchema.levels.orders.columns[0].name).toBe(
       "Customer Name",
     );
+
+    const customerColumn = config.gridSchema.levels.orders.columns[0];
+    const ordersPath = rootPath("orders");
+    const renderedCell = customerColumn.renderCell({
+      value: "Acme",
+      column: customerColumn,
+      path: ordersPath,
+      row: {
+        kind: "data",
+        id: makeRowId(ordersPath, "1"),
+        rowSelectable: true,
+        columns: { id: 1, customer: "Acme" },
+        hasChildren: false,
+        source: {
+          rowKey: "1",
+          levelName: "orders",
+          columns: { id: 1, customer: "Acme" },
+        },
+      },
+      activation: null,
+    });
+    // The override element sits inside the session and cell context providers.
+    let cellElement: unknown = renderedCell;
+    while (isValidElement(cellElement) && cellElement.type !== CustomerCell) {
+      cellElement = (cellElement.props as { children?: unknown }).children;
+    }
+    expect(isValidElement(cellElement)).toBe(true);
+    const cellContext = (
+      cellElement as ReactElement<
+        TGridCellRenderContext<RowsByLevel, Services, "orders">
+      >
+    ).props;
+    expect(isValidElement(cellContext.defaultContent)).toBe(true);
+    expect(
+      isValidElement<{ value?: unknown }>(cellContext.defaultContent)
+        ? cellContext.defaultContent.props.value
+        : null,
+    ).toBe("Acme");
 
     const endpoint = config.endpointFactoriesByLevel.orders({ ancestors: [] });
     const result = await endpoint.patchCell!({

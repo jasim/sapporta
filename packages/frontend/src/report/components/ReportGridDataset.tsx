@@ -94,6 +94,47 @@ export type ReportCellLinkResolvers<TInput = unknown> = Record<
   }
 >;
 
+export type ReportCellRenderContext = CellRenderProps & {
+  dataset: GridDataset;
+  levelName: string;
+  reportColumn: GridDatasetColumn;
+  /**
+   * The cell as the column renders it on its own, formatting and truncation
+   * included. The report's drill-through link wraps the override's output
+   * afterwards, so wrapping this keeps the link either way.
+   */
+  defaultContent: ReactNode;
+};
+
+/**
+ * Cell renderers for particular report columns, keyed by level name and then
+ * by column id.
+ *
+ * Report cells carry no tooltip of their own. Wrap `defaultContent` in
+ * `CellTooltip` to add one to a column while keeping its formatting and its
+ * links.
+ *
+ * The grid runtime is rebuilt whenever this object's identity changes, so
+ * give it a stable reference: define it at module level, or under `useMemo`
+ * when the renderers need the component's props or state.
+ *
+ *     const salesCells: ReportCellRenderers = {
+ *       sales: {
+ *         region: ({ defaultContent, row }) => (
+ *           <CellTooltip content={String(row.columns.notes ?? "")}>
+ *             {defaultContent}
+ *           </CellTooltip>
+ *         ),
+ *       },
+ *     };
+ *
+ *     <ReportGridDataset dataset={dataset} renderCell={salesCells} />
+ */
+export type ReportCellRenderers = Record<
+  string,
+  Record<string, (context: ReportCellRenderContext) => ReactNode>
+>;
+
 type ReportCellLinkCache = Map<string, ReportCellLink | null>;
 
 type ReportGridDatasetBinding<TInput = unknown> = {
@@ -108,22 +149,29 @@ export interface ReportGridDatasetProps<TInput = unknown> {
   dataset: GridDataset;
   links?: ReportCellLinkResolvers<TInput>;
   linkContext?: { input: TInput };
+  renderCell?: ReportCellRenderers;
 }
 
 export function ReportGridDataset<TInput = unknown>({
   dataset,
   links,
   linkContext,
+  renderCell,
 }: ReportGridDatasetProps<TInput>) {
   const input = linkContext?.input;
   const runtime = useGridRuntimeEffect(() => {
-    const model = buildReportGridDatasetModel(dataset, links, input);
+    const model = buildReportGridDatasetModel(
+      dataset,
+      links,
+      input,
+      renderCell,
+    );
     return createGridRuntime({
       schema: model.schema,
       dataSource: model.dataSource,
       interaction: CELL_GRID_WITH_ACTIVE_ROW,
     });
-  }, [dataset, links, input]);
+  }, [dataset, links, input, renderCell]);
 
   if (!runtime) {
     return (
@@ -187,6 +235,7 @@ function buildReportGridDatasetModel<TInput>(
   dataset: GridDataset,
   links: ReportCellLinkResolvers<TInput> | undefined,
   input: TInput | undefined,
+  renderCellOverrides: ReportCellRenderers | undefined,
 ): {
   schema: GridSchema;
   dataSource: ReturnType<typeof inMemoryGridDataSource>;
@@ -220,6 +269,7 @@ function buildReportGridDatasetModel<TInput>(
         links,
         input,
         linkCache,
+        renderCellOverrides,
       }),
     );
 
@@ -308,6 +358,7 @@ function gridColumnForDatasetColumn<TInput>({
   links,
   input,
   linkCache,
+  renderCellOverrides,
 }: {
   dataset: GridDataset;
   levelName: string;
@@ -316,6 +367,7 @@ function gridColumnForDatasetColumn<TInput>({
   links: ReportCellLinkResolvers<TInput> | undefined;
   input: TInput | undefined;
   linkCache: ReportCellLinkCache;
+  renderCellOverrides: ReportCellRenderers | undefined;
 }): ColumnSchema {
   const options = {
     id: column.id,
@@ -350,8 +402,21 @@ function gridColumnForDatasetColumn<TInput>({
     gridColumn = columnPreset.text(options);
   }
 
-  const renderCell = gridColumn.renderCell;
-  const reportColumn = {
+  const presetRenderCell = gridColumn.renderCell;
+  const override = renderCellOverrides?.[levelName]?.[column.id];
+  // The override sits inside the link adornment rather than replacing it, so
+  // a column can restyle its value and keep the report's drill-through links.
+  const renderCell = override
+    ? (props: CellRenderProps) =>
+        override({
+          ...props,
+          dataset,
+          levelName,
+          reportColumn: column,
+          defaultContent: presetRenderCell(props),
+        })
+    : presetRenderCell;
+  const columnWithLinks = {
     ...gridColumn,
     renderCell: (props: CellRenderProps) =>
       renderReportCell({
@@ -373,8 +438,8 @@ function gridColumnForDatasetColumn<TInput>({
   });
   if (!activatesPrimaryLink) {
     return isExpansionControlColumn
-      ? withRowExpansionColumn(reportColumn)
-      : reportColumn;
+      ? withRowExpansionColumn(columnWithLinks)
+      : columnWithLinks;
   }
 
   const activation = reportCellPrimaryLinkActivation({
@@ -383,8 +448,8 @@ function gridColumnForDatasetColumn<TInput>({
   });
 
   return isExpansionControlColumn
-    ? withRowExpansionColumn(reportColumn, { activation })
-    : { ...reportColumn, activation };
+    ? withRowExpansionColumn(columnWithLinks, { activation })
+    : { ...columnWithLinks, activation };
 }
 
 function renderReportCell<TInput>({

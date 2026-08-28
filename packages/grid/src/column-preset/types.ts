@@ -108,6 +108,18 @@ export type PresetChromeOptions<TMeta = unknown, TFilter = unknown> = {
   ) => Partial<GridLevelCommands<TFilter>>;
 };
 
+/**
+ * Props a column's `renderCell` override receives.
+ *
+ * `defaultContent` is what the column would have rendered without the
+ * override: the preset's own cell, with its formatting and truncation.
+ * Return it unchanged to keep the default, wrap it to decorate it (for
+ * example in `CellTooltip`), or ignore it to replace the cell outright.
+ */
+export type PresetCellRenderProps = CellRenderProps & {
+  defaultContent: ReactNode;
+};
+
 export type ColumnPresetEditOption =
   | "default"
   | "none"
@@ -127,7 +139,7 @@ export type ColumnPresetOptions<TMeta = unknown> = {
   format?: (value: unknown) => string;
   parse?: (value: string, props: CellEditorProps) => unknown;
   compare?: (a: unknown, b: unknown) => number;
-  renderCell?: (props: CellRenderProps) => ReactNode;
+  renderCell?: (props: PresetCellRenderProps) => ReactNode;
   renderColumnHeader?: (props: ColumnHeaderProps<TMeta>) => ReactNode;
   renderColumnHeaderMenu?: (
     props: ColumnHeaderMenuProps<TMeta, unknown>,

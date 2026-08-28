@@ -19,8 +19,10 @@ import {
 } from "../lookup";
 import {
   foreignKey,
+  CellTooltip,
   columnPresetWidthForSizing,
   columnPreset,
+  presetCellClassNames,
   identifier,
   kind,
   lookupValue,
@@ -206,96 +208,36 @@ describe("columnPreset columns", () => {
         runtime: presetRuntime(column)!,
         column,
         path: rootPath("books"),
-        row: {
-          kind: "data",
-          id: makeRowId(rootPath("books"), "1"),
-          rowSelectable: true,
-          columns: { quote: "line 1" },
-          hasChildren: false,
-          source: {
-            rowKey: "1",
-            levelName: "books",
-            columns: { quote: "line 1" },
-          },
-        },
+        row: levelRow({ quote: "line 1" }),
         activation: null,
       });
 
-      const textSpan = findElementByClassName(rendered, "textCell");
-      expect(textSpan).not.toBeNull();
-      const className = textSpan?.props.className;
+      const className = findElementByClassName(rendered, "textCell")?.props
+        .className;
       expect(className).toEqual(expect.stringContaining("textCell"));
       expect(className).toEqual(expect.stringContaining("multiLineTextCell"));
-      expect(
-        findElementByGridPart(rendered, "text-cell-tooltip-content"),
-      ).not.toBeNull();
     }
   });
 
-  it("plain text cells keep single-line truncation and render a full-text tooltip", () => {
+  it("plain text cells keep single-line truncation", () => {
     const column = columnPreset.text({ id: "title", name: "Title" });
-    const p = preset(column);
-    if (!p || p.kind !== "text") throw new Error("expected text preset");
 
     const rendered = TextCell({
       value: "A short title",
       runtime: presetRuntime(column)!,
       column,
       path: rootPath("books"),
-      row: {
-        kind: "data",
-        id: makeRowId(rootPath("books"), "1"),
-        rowSelectable: true,
-        columns: { title: "A short title" },
-        hasChildren: false,
-        source: {
-          rowKey: "1",
-          levelName: "books",
-          columns: { title: "A short title" },
-        },
-      },
+      row: levelRow({ title: "A short title" }),
       activation: null,
     });
 
-    const textSpan = findElementByClassName(rendered, "textCell");
-    expect(textSpan).not.toBeNull();
-    const className = textSpan?.props.className;
+    const className = findElementByClassName(rendered, "textCell")?.props
+      .className;
     expect(className).toEqual(expect.stringContaining("textCell"));
     expect(className).not.toEqual(expect.stringContaining("multiLineTextCell"));
-    expect(
-      findElementByGridPart(rendered, "text-cell-tooltip-trigger"),
-    ).not.toBeNull();
-    expect(
-      findElementByGridPart(rendered, "text-cell-tooltip-content"),
-    ).not.toBeNull();
   });
 
-  it("empty text cells do not render a tooltip", () => {
-    const column = columnPreset.text({ id: "title", name: "Title" });
-
-    const rendered = TextCell({
-      value: "",
-      runtime: presetRuntime(column)!,
-      column,
-      path: rootPath("books"),
-      row: {
-        kind: "data",
-        id: makeRowId(rootPath("books"), "1"),
-        rowSelectable: true,
-        columns: { title: "" },
-        hasChildren: false,
-        source: { rowKey: "1", levelName: "books", columns: { title: "" } },
-      },
-      activation: null,
-    });
-
-    expect(findElementByClassName(rendered, "textCell")).not.toBeNull();
-    expect(
-      findElementByGridPart(rendered, "text-cell-tooltip-content"),
-    ).toBeNull();
-  });
-
-  it("identifier text cells do not render a tooltip", () => {
+  it("identifier cells render the identifier body", () => {
     const column = identifier({ id: "id", name: "ID" });
 
     const rendered = TextCell({
@@ -303,27 +245,92 @@ describe("columnPreset columns", () => {
       runtime: presetRuntime(column)!,
       column,
       path: rootPath("books"),
-      row: {
-        kind: "data",
-        id: makeRowId(rootPath("books"), "1"),
-        rowSelectable: true,
-        columns: { id: "books#1" },
-        hasChildren: false,
-        source: {
-          rowKey: "1",
-          levelName: "books",
-          columns: { id: "books#1" },
-        },
-      },
+      row: levelRow({ id: "books#1" }),
       activation: null,
     });
 
     expect(
       findElementByClassName(rendered, "identifierTextCell"),
     ).not.toBeNull();
+  });
+
+  it("preset text cells carry no tooltip of their own", () => {
+    for (const column of [
+      columnPreset.text({ id: "title", name: "Title" }),
+      identifier({ id: "id", name: "ID" }),
+    ]) {
+      const rendered = TextCell({
+        value: "books#1",
+        runtime: presetRuntime(column)!,
+        column,
+        path: rootPath("books"),
+        row: levelRow({ [column.id]: "books#1" }),
+        activation: null,
+      });
+
+      expect(
+        findElementByGridPart(rendered, "cell-tooltip-trigger"),
+      ).toBeNull();
+      expect(
+        findElementByGridPart(rendered, "cell-tooltip-content"),
+      ).toBeNull();
+    }
+  });
+
+  it("CellTooltip wraps a cell body and stands aside when there is nothing to show", () => {
+    const withContent = CellTooltip({
+      content: "The full value, spelled out",
+      className: presetCellClassNames.text,
+      children: "The full va\u2026",
+    });
+
     expect(
-      findElementByGridPart(rendered, "text-cell-tooltip-content"),
+      findElementByGridPart(withContent, "cell-tooltip-trigger"),
+    ).not.toBeNull();
+    expect(
+      findElementByGridPart(withContent, "cell-tooltip-content"),
+    ).not.toBeNull();
+
+    const withoutContent = CellTooltip({ content: "", children: "Body" });
+
+    expect(
+      findElementByGridPart(withoutContent, "cell-tooltip-trigger"),
     ).toBeNull();
+  });
+
+  it("renderCell overrides receive the preset's own cell as defaultContent", () => {
+    let seenDefault: ReactNode;
+    const column = columnPreset.text({
+      id: "title",
+      name: "Title",
+      renderCell: ({ defaultContent }) => {
+        seenDefault = defaultContent;
+        return CellTooltip({
+          content: "The full title",
+          children: defaultContent,
+        });
+      },
+    });
+
+    const rendered = column.renderCell({
+      value: "A short title",
+      column,
+      path: rootPath("books"),
+      row: levelRow({ title: "A short title" }),
+      activation: null,
+    });
+
+    expect(
+      findElementByGridPart(rendered, "cell-tooltip-trigger"),
+    ).not.toBeNull();
+    expect(isValidElement(seenDefault) ? seenDefault.type : null).toBe(
+      TextCell,
+    );
+    expect(
+      isValidElement<{ value?: unknown }>(seenDefault)
+        ? seenDefault.props.value
+        : null,
+    ).toBe("A short title");
   });
 
   it("converts character sizing hints to preset width tracks", () => {

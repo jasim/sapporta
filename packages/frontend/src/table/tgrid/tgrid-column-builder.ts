@@ -42,6 +42,7 @@ import {
   tgridCellEditorContext,
   tgridSessionContext,
   type TGridCellContext,
+  type TGridCellRenderContext,
   type TGridCellActivation,
   type TGridCellEditorContext,
   type TGridCellWriteHandler,
@@ -409,13 +410,18 @@ function typedRenderCell<
 >(
   levelId: LevelId,
   RenderCell: ComponentType<
-    TGridCellContext<RowsByLevel, AppServices, LevelId>
+    TGridCellRenderContext<RowsByLevel, AppServices, LevelId>
   >,
   column: TGridColumnContext<RowsByLevel[LevelId]>,
   sessionContext: () => TGridSessionContext<RowsByLevel, AppServices>,
 ) {
   return (props: CellRenderProps) => {
-    const context = cellContextFor(levelId, props, column, sessionContext());
+    // `column.gridColumn` is the preset-built column before the override
+    // replaced its renderCell, so this is the cell the grid would have shown.
+    const context = {
+      ...cellContextFor(levelId, props, column, sessionContext()),
+      defaultContent: column.gridColumn.renderCell(props),
+    };
     return createElement(
       tgridSessionContext.Provider,
       {

@@ -51,5 +51,11 @@ export {
   type ColumnSizingStorageKeyContext,
   type ResolvedColumnSizing,
 } from "./column-sizing";
+export {
+  TextCell,
+  presetCellClassNames,
+  type PresetCellProps,
+} from "./cells/TextCell";
+export { CellTooltip, type CellTooltipProps } from "./cells/CellTooltip";
 export { chrome } from "./header/chrome";
 export { ColumnPresetHeader } from "./header/ColumnPresetHeader";
