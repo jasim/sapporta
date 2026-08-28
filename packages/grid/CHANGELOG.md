@@ -1,5 +1,14 @@
 # @sapporta/grid
 
+## 0.5.1
+
+### Patch Changes
+
+- Release
+- Updated dependencies
+  - @sapporta/shared@0.3.1
+  - @sapporta/ui@0.2.14
+
 ## 0.5.0
 
 ### Minor Changes

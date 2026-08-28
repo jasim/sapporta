@@ -1,5 +1,15 @@
 # @sapporta/frontend
 
+## 0.6.1
+
+### Patch Changes
+
+- Release
+- Updated dependencies
+  - @sapporta/grid@0.5.1
+  - @sapporta/shared@0.3.1
+  - @sapporta/ui@0.2.14
+
 ## 0.6.0
 
 ### Minor Changes
