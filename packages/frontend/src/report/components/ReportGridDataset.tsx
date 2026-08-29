@@ -22,8 +22,10 @@ import {
   type CellRenderProps,
   type CellActivationTrigger,
   type ColumnSchema,
+  type GridChromeContext,
   type GridCopyTarget,
   type GridPath,
+  type GridPresentation,
   type GridSchema,
   type GridLevelChrome,
   type GridRuntime,
@@ -56,6 +58,10 @@ import {
   openResolvedLink,
 } from "../../links/open-link";
 import { LinkMenuItems } from "../../links/LinkMenuItems";
+import { useTablePageMode } from "../../table/page/table-page-mode";
+// The cards presentation is styled once for every sapporta-table-grid level;
+// report grids reuse it rather than declaring a report-only card layout.
+import "../../table/tgrid/table-card.css";
 import "./ReportGridDataset.css";
 
 export type ReportCellLink = {
@@ -195,7 +201,12 @@ function ReportGridDatasetBody<TInput>({
 }: {
   session: ReportGridDatasetBinding<TInput>;
 }) {
-  const chrome = useReportGridDatasetChrome(session.dataset.name);
+  // Reports carry no per-table view preference, so the container width alone
+  // picks the presentation: stacked cards on narrow screens, else tabular.
+  const { ref, mode } = useTablePageMode();
+  const presentation: GridPresentation =
+    mode === "narrowCards" ? "cards" : "tabular";
+  const chrome = useReportGridDatasetChrome(session.dataset, session.root);
 
   useLayoutEffect(() => {
     expandDefaultReportRows(session.runtime, session.dataset);
@@ -205,30 +216,71 @@ function ReportGridDatasetBody<TInput>({
     <GridCopyContextMenu
       renderExtraItems={(target) => renderReportLinkMenuItems(session, target)}
     >
-      <div className="sapporta-report-grid-dataset min-w-full">
-        <GridLevel path={session.root} chrome={chrome} presentation="tabular" />
+      <div
+        ref={ref}
+        data-table-page-mode={mode}
+        className="sapporta-report-grid-dataset min-w-full"
+      >
+        <GridLevel
+          path={session.root}
+          chrome={chrome}
+          presentation={presentation}
+        />
       </div>
     </GridCopyContextMenu>
   );
 }
 
-function useReportGridDatasetChrome(reportName: string): GridLevelChrome {
+function useReportGridDatasetChrome(
+  dataset: GridDataset,
+  root: GridPath,
+): GridLevelChrome {
   return useMemo<GridLevelChrome>(() => {
     const base = columnPreset.chrome({
       columnSizing: {
         storageKey: ({ levelName }) =>
-          `sapporta:report-grid-columns:${reportName}:${levelName}`,
+          `sapporta:report-grid-columns:${dataset.name}:${levelName}`,
       },
     });
     return {
       ...base,
+      // Cards render no column header row, so a nested level would appear as
+      // an unlabeled run of cards; its level label takes the header's place.
+      renderHeader: (context) =>
+        context.presentation === "cards"
+          ? renderReportCardsLevelHeader(dataset, context, root)
+          : base.renderHeader?.(context),
       levelContainerClassName: (context) =>
         cn(
           base.levelContainerClassName?.(context),
           "sapporta-report-grid-dataset__level",
         ),
     };
-  }, [reportName]);
+  }, [dataset, root]);
+}
+
+function renderReportCardsLevelHeader(
+  dataset: GridDataset,
+  context: GridChromeContext,
+  root: GridPath,
+): ReactNode {
+  if (context.path === root) return null;
+  const label = dataset.levels[context.levelName]?.label ?? context.levelName;
+
+  return (
+    <div
+      className="flex min-h-8 items-center border-b border-sap-border/70 px-1 pb-2 pt-1"
+      data-grid-part="cards-level-header"
+    >
+      <div
+        className="min-w-0 truncate text-[11px] font-bold uppercase tracking-sap-head text-sap-soft"
+        data-grid-part="cards-level-title"
+        title={label}
+      >
+        {label}
+      </div>
+    </div>
+  );
 }
 
 function buildReportGridDatasetModel<TInput>(
@@ -260,12 +312,20 @@ function buildReportGridDatasetModel<TInput>(
     );
     const expansionControlColumnId =
       level.childLevels.length > 0 ? (visible[0]?.id ?? null) : null;
+    // The cards presentation leads each card with a title column. A report
+    // level has no rowLabelColumns naming the row's identity, so the first
+    // visible text column — the label a report row conventionally leads
+    // with — takes the role. Levels with no text column render all-labeled
+    // fields and no heading.
+    const cardTitleColumnId =
+      visible.find((column) => column.kind === "text")?.id ?? null;
     const columns = visible.map((column) =>
       gridColumnForDatasetColumn({
         dataset,
         levelName,
         column,
         isExpansionControlColumn: column.id === expansionControlColumnId,
+        isCardTitleColumn: column.id === cardTitleColumnId,
         links,
         input,
         linkCache,
@@ -355,6 +415,7 @@ function gridColumnForDatasetColumn<TInput>({
   levelName,
   column,
   isExpansionControlColumn,
+  isCardTitleColumn,
   links,
   input,
   linkCache,
@@ -364,6 +425,7 @@ function gridColumnForDatasetColumn<TInput>({
   levelName: string;
   column: GridDatasetColumn;
   isExpansionControlColumn: boolean;
+  isCardTitleColumn: boolean;
   links: ReportCellLinkResolvers<TInput> | undefined;
   input: TInput | undefined;
   linkCache: ReportCellLinkCache;
@@ -379,7 +441,11 @@ function gridColumnForDatasetColumn<TInput>({
     zeroDisplay: column.zeroDisplay,
     strong: column.strong,
     display: column.textDisplay,
-    meta: { reportColumn: column, displayType: column.kind },
+    meta: {
+      reportColumn: column,
+      displayType: column.kind,
+      cardRole: isCardTitleColumn ? ("title" as const) : undefined,
+    },
   };
 
   let gridColumn: ColumnSchema;

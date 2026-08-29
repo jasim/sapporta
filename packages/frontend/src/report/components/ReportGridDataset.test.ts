@@ -17,10 +17,24 @@ import type { GridDataset } from "@sapporta/shared/grid-dataset";
   globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
 ).IS_REACT_ACT_ENVIRONMENT = true;
 
+// happy-dom has no layout, so the width-observing hook would measure 0 and
+// flip every test into the narrow cards mode. Pin the mode per test instead.
+const { pageModeState } = vi.hoisted(() => ({
+  pageModeState: { mode: "wide" as "wide" | "narrowCards" },
+}));
+
+vi.mock("../../table/page/table-page-mode", () => ({
+  useTablePageMode: () => ({
+    ref: { current: null },
+    mode: pageModeState.mode,
+  }),
+}));
+
 describe("ReportGridDataset", () => {
   let mounted: { root: Root; container: HTMLElement } | null = null;
 
   afterEach(async () => {
+    pageModeState.mode = "wide";
     if (mounted) {
       await act(async () => {
         mounted?.root.unmount();
@@ -1044,5 +1058,74 @@ describe("ReportGridDataset", () => {
     } finally {
       consoleError.mockRestore();
     }
+  });
+
+  it("keeps the tabular presentation on wide pages", async () => {
+    const container = await renderClient(
+      createElement(ReportGridDataset, { dataset: accountLedgerDataset() }),
+    );
+    await waitForText(container, "Cash");
+
+    const rootGrid = container.querySelector("[data-grid-path]");
+    expect(rootGrid?.getAttribute("data-grid-presentation")).toBe("tabular");
+    expect(container.querySelector('[data-grid-part="row-field"]')).toBeNull();
+  });
+
+  it("stacks rows as cards on narrow pages with the first text column as title", async () => {
+    pageModeState.mode = "narrowCards";
+    const container = await renderClient(
+      createElement(ReportGridDataset, { dataset: accountLedgerDataset() }),
+    );
+    await waitForText(container, "Cash");
+
+    expect(
+      container.querySelector('[data-table-page-mode="narrowCards"]'),
+    ).not.toBeNull();
+    const rootGrid = container.querySelector("[data-grid-path]");
+    expect(rootGrid?.getAttribute("data-grid-presentation")).toBe("cards");
+
+    // `account_id` is visually hidden, so `name` is the first visible text
+    // column and renders as the card's unlabeled heading.
+    const titleField = container.querySelector(
+      '[data-grid-part="row-field"][data-card-role="title"][data-col-id="name"]',
+    );
+    if (!(titleField instanceof HTMLElement)) {
+      throw new Error("expected a title card field for the name column");
+    }
+    expect(
+      titleField.querySelector('[data-grid-part="row-field-label"]'),
+    ).toBeNull();
+    expect(titleField.textContent).toContain("Cash");
+
+    const debitField = container.querySelector(
+      '[data-grid-part="row-field"][data-col-id="debit"]',
+    );
+    expect(debitField?.getAttribute("data-card-role")).toBeNull();
+    expect(
+      debitField
+        ?.querySelector('[data-grid-part="row-field-label"]')
+        ?.textContent?.trim(),
+    ).toBe("Debit");
+  });
+
+  it("labels nested card levels and titles their first text column", async () => {
+    pageModeState.mode = "narrowCards";
+    const container = await renderClient(
+      createElement(ReportGridDataset, { dataset: accountLedgerDataset() }),
+    );
+    await waitForText(container, "Opening balance");
+
+    const levelHeaders = container.querySelectorAll(
+      '[data-grid-part="cards-level-header"]',
+    );
+    // Only the nested entry level gets a header; the root level's identity
+    // comes from the page around the report.
+    expect(levelHeaders).toHaveLength(1);
+    expect(levelHeaders[0].textContent).toContain("entry");
+
+    const entryTitle = container.querySelector(
+      '[data-grid-part="row-field"][data-card-role="title"][data-col-id="description"]',
+    );
+    expect(entryTitle?.textContent).toContain("Opening balance");
   });
 });
