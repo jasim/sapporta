@@ -27,6 +27,26 @@
     var(--sap-surface)
   );
   --grid-cards-row-gap: 10px;
+  /* Card values read as one run of text: inline data (IDs, dates, numbers)
+     keeps its mono family but takes the body size instead of the smaller
+     tabular data size. The variable covers preset CSS; the utility-class
+     rule below covers renderers styled with the inlined Tailwind size. */
+  --text-sap-data: var(--text-sap-body);
+}
+
+/* The selection gutter's idle wash reads as a gray slab against a card; keep
+   the gutter invisible until it matters. Hover, selection, and focus paint
+   through their own variables and stay visible. The preset declares this
+   variable on the same element at class specificity, so this rule must
+   out-rank it — no :where() here. */
+.sapporta-table-grid[data-grid-presentation="cards"] {
+  --grid-row-header-background: transparent;
+}
+
+:where(.sapporta-table-grid[data-grid-presentation="cards"])
+  [data-grid-part="cell-content"]
+  .text-sap-data {
+  font-size: var(--text-sap-body);
 }
 
 :where(
@@ -48,7 +68,7 @@
 ) {
   --grid-row-base-background: var(--grid-card-background);
   --grid-cell-border-inline-end: none;
-  --grid-cell-min-height: 28px;
+  --grid-cell-min-height: 20px;
   --grid-cell-padding: 0;
   --grid-row-header-expand-padding-inline-end: 0;
 
@@ -56,6 +76,7 @@
   border-radius: 6px;
   gap: 0;
   overflow: visible;
+  padding-block: 8px 10px;
 }
 
 :where(.sapporta-table-grid[data-grid-presentation="cards"])
@@ -80,9 +101,9 @@
 ) {
   align-items: baseline;
   border-bottom: 0;
-  gap: 12px;
-  grid-template-columns: minmax(8rem, 0.18fr) minmax(0, 1fr);
-  padding: 3px 12px;
+  gap: 10px;
+  grid-template-columns: minmax(0, 8rem) minmax(0, 1fr);
+  padding: 1px 12px;
 }
 
 :where(
@@ -91,7 +112,7 @@
     )
     [data-grid-part="row-field"]
 ) {
-  padding: 2px 10px;
+  padding: 1px 10px;
 }
 
 :where(
@@ -100,44 +121,64 @@
 ) {
   color: var(--sap-muted, hsl(215 14% 45%));
   font-size: 12px;
-  font-weight: 600;
+  font-weight: 500;
   line-height: 1.45;
 }
 
-:where(
-  .sapporta-table-grid[data-grid-presentation="cards"]
-    [data-grid-part="row-field"][data-display-type="pk"],
-  .sapporta-table-grid[data-grid-presentation="cards"]
-    [data-grid-part="row-field"][data-display-type="pk"]
-    [data-grid-part="row-field-label"]
-) {
-  color: var(--sap-fg-subtle, hsl(215 14% 45%));
+/* Identifier cells are right-aligned in tabular grids. In cards, the value
+   reads like the other row fields: left in the value column, the expansion
+   chevron directly after it. These rules must out-rank grid.module.css's
+   full-width flex/width rules and the preset's right-aligned identifier
+   text, so the pk attribute stays outside :where(). */
+:where(.sapporta-table-grid[data-grid-presentation="cards"])
+  [data-grid-part="row-field"][data-display-type="pk"]
+  [data-grid-part="expand-cell"] {
+  max-width: 100%;
+  width: fit-content;
 }
 
-/* Identifier cells are right-aligned in tabular grids. In cards, the value
-   should read like the other row fields: directly after the label or expand
-   chevron, with long identifiers still constrained to the value column. */
-:where(
-  .sapporta-table-grid[data-grid-presentation="cards"]
-    [data-grid-part="row-field"][data-display-type="pk"]
-    [data-grid-part="expand-content"]
-) {
+:where(.sapporta-table-grid[data-grid-presentation="cards"])
+  [data-grid-part="row-field"][data-display-type="pk"]
+  [data-grid-part="expand-content"] {
   flex: 0 1 auto;
   max-width: 100%;
   width: fit-content;
 }
 
-:where(
-  .sapporta-table-grid[data-grid-presentation="cards"]
-    [data-grid-part="row-field"][data-display-type="pk"]
-    [data-grid-part="cell-content"]
-    > *,
-  .sapporta-table-grid[data-grid-presentation="cards"]
-    [data-grid-part="row-field"][data-display-type="pk"]
-    [data-grid-part="expand-content"]
-    > *
-) {
+:where(.sapporta-table-grid[data-grid-presentation="cards"])
+  [data-grid-part="row-field"][data-display-type="pk"]
+  :is(
+    [data-grid-part="cell-content"] > *,
+    [data-grid-part="expand-content"] > *
+  ) {
   text-align: left;
+  width: fit-content;
+}
+
+/* The row-header treatment paints the expansion affordance as a full-width
+   bar in tabular grids; a card field carries no such chrome. */
+:where(.sapporta-table-grid[data-grid-presentation="cards"])
+  [role="rowheader"]:has(
+    > [data-grid-part="cell-content"] > [data-grid-part="expand-cell"]
+  ),
+:where(.sapporta-table-grid[data-grid-presentation="cards"])
+  [role="rowheader"]
+  [data-grid-part="expand-cell"],
+:where(.sapporta-table-grid[data-grid-presentation="cards"])
+  [role="rowheader"]
+  [data-grid-part="expand-cell"]
+  > [data-grid-part="expand-content"] {
+  background: transparent;
+}
+
+/* A 28px chevron would set the field's height; in the compact card rows it
+   shrinks to the text line. */
+:where(.sapporta-table-grid[data-grid-presentation="cards"])
+  [data-grid-part="expand-chevron"],
+:where(.sapporta-table-grid[data-grid-presentation="cards"])
+  [data-grid-part="expand-placeholder"] {
+  height: 20px;
+  width: 20px;
 }
 
 :where(
@@ -245,6 +286,7 @@
   /* Hoist past earlier schema columns. Inert in narrow mode, where fields
      are placed explicitly. */
   order: -1;
+  padding-block-end: 4px;
 }
 
 :where(
@@ -276,8 +318,8 @@
   [data-grid-part="row-field"] {
   gap: 10px;
   grid-column: 1 / -1;
-  grid-template-columns: minmax(6.5rem, 0.45fr) minmax(0, 1fr);
-  padding: 2px 0;
+  grid-template-columns: minmax(0, 6.5rem) minmax(0, 1fr);
+  padding: 1px 0;
 }
 
 [data-table-page-mode="narrowCards"]
