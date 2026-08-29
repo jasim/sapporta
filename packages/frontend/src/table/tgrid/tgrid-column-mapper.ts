@@ -27,6 +27,11 @@ export type TGridTableColumnMeta = {
   /** The `title` column renders as the card's heading instead of a labeled
    *  field. Assigned after column build from the table's `rowLabelColumns`. */
   cardRole?: "title";
+  /** Whether narrow cards may skip this field when its value is empty. True
+   *  for default preset cells, whose empty value renders nothing; cleared by
+   *  the column builder when a custom renderer or the row-expansion
+   *  affordance still needs the field visible. */
+  cardHideWhenEmpty?: boolean;
 };
 
 export type TGridColumnMapper = {
@@ -98,6 +103,7 @@ function presetColumnFor(
       table: tableName,
       schema: column,
       displayType,
+      cardHideWhenEmpty: true,
     } satisfies TGridTableColumnMeta,
   };
 

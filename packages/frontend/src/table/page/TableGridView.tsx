@@ -1,8 +1,10 @@
 import {
+  useCallback,
   useEffect,
   useImperativeHandle,
   useMemo,
   useRef,
+  useState,
   type ComponentType,
   type Ref,
 } from "react";
@@ -40,6 +42,11 @@ import {
   resolveTableGridPresentation,
   useTablePageMode,
 } from "./table-page-mode";
+import {
+  RecordDetailSheet,
+  type RecordDetailTarget,
+} from "./RecordDetailSheet";
+import type { TGridRowActivatedEvent } from "../tgrid/tgrid-active-row";
 import { AppPage } from "../../shell/components/Page";
 
 // Complete table experience for the common case: create a session, bind it to
@@ -302,6 +309,28 @@ function TableGridViewWithSession<
     preference: tableView.preference,
   });
 
+  // The record detail sheet is a narrow-cards affordance: activation events
+  // fire on every layout, but only a tap on a card opens the drill-in.
+  // Wide layouts keep the spreadsheet interaction untouched.
+  const detailEnabled = mode === "narrowCards" && presentation === "cards";
+  const [detailTarget, setDetailTarget] = useState<RecordDetailTarget | null>(
+    null,
+  );
+  useEffect(() => {
+    if (!detailEnabled) setDetailTarget(null);
+  }, [detailEnabled]);
+  const closeDetail = useCallback(() => setDetailTarget(null), []);
+
+  function handleRowActivate(event: TGridRowActivatedEvent<RowsByLevel>) {
+    if (!detailEnabled) return;
+    if (event.activeRow.kind !== "data") return;
+    setDetailTarget({
+      levelId: String(event.activeRow.levelId),
+      rowId: event.activeRow.id,
+      path: event.activeRow.level.path,
+    });
+  }
+
   return (
     <TableGridSurface
       ref={ref}
@@ -343,6 +372,12 @@ function TableGridViewWithSession<
         className={gridClassName}
         viewRelatedRows={viewRelatedRows}
         presentation={presentation}
+        onRowActivate={handleRowActivate}
+      />
+      <RecordDetailSheet
+        session={session}
+        target={detailTarget}
+        onClose={closeDetail}
       />
     </TableGridSurface>
   );

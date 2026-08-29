@@ -2,7 +2,7 @@ import { createElement } from "react";
 import { describe, expect, it } from "vitest";
 import type { TableSchema } from "@sapporta/shared/contracts";
 import {
-  CELL_GRID_WITH_INDEPENDENT_ROW_SELECTION,
+  CELL_GRID_WITH_ROW_CLICK_ACTIVATION,
   ROW_PRIMARY_MASTER_DETAIL,
 } from "@sapporta/grid";
 import {
@@ -278,7 +278,7 @@ describe("TGRID-USAGE examples", () => {
     const defaultSession = createTGridSession(defaultDefinition);
     try {
       expect(defaultSession.runtime.interaction).toStrictEqual(
-        CELL_GRID_WITH_INDEPENDENT_ROW_SELECTION,
+        CELL_GRID_WITH_ROW_CLICK_ACTIVATION,
       );
     } finally {
       defaultSession.dispose();

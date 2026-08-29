@@ -38,6 +38,14 @@ export {
 } from "./sizing";
 export { parseNumericInput, type NumericInputParseResult } from "./parse";
 export {
+  formatText,
+  formatNumber,
+  formatCurrency,
+  formatPercentage,
+  formatDate,
+  formatTimestamp,
+} from "./format";
+export {
   DEFAULT_COLUMN_RESIZE_MIN_PX,
   clampColumnPixelWidth,
   columnSizingTemplateColumns,

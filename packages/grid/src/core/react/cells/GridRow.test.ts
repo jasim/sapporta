@@ -689,6 +689,86 @@ describe("GridRow cards presentation", () => {
     ).toBe("Author");
   });
 
+  it("marks empty opted-in fields so cards can skip them", async () => {
+    const emptySchema: GridSchema = {
+      ...schema,
+      levels: {
+        quotes: {
+          ...schema.levels.quotes,
+          columns: [
+            testColumn("id", "ID", { displayType: "pk" }),
+            testColumn("book_id", "Book", {
+              cardRole: "title",
+              cardHideWhenEmpty: true,
+            }),
+            testColumn("author_id", "Author", { cardHideWhenEmpty: true }),
+            testColumn("text", "Text"),
+          ],
+        },
+      },
+    };
+    const emptyTree: TreeNode[] = [
+      {
+        rowKey: "q1",
+        levelName: "quotes",
+        columns: { id: "q1", book_id: "", author_id: "", text: "" },
+      },
+      {
+        rowKey: "q2",
+        levelName: "quotes",
+        columns: {
+          id: "q2",
+          book_id: "Middlemarch",
+          author_id: "George Eliot",
+          text: "It is never too late.",
+        },
+      },
+    ];
+    mounted = await render(
+      createElement(GridRuntimeProvider, {
+        runtime: createGridRuntime({
+          schema: emptySchema,
+          dataSource: inMemoryGridDataSource({
+            schema: emptySchema,
+            tree: emptyTree,
+            levels: {
+              quotes: {
+                sortMode: "none",
+                filterMode: "none",
+                paginationMode: "none",
+              },
+            },
+          }),
+        }),
+        children: createElement(GridLevel, {
+          path: rootPath("quotes"),
+          presentation: "cards",
+        }),
+      }),
+    );
+
+    const fieldFor = (rowId: string, colId: string) =>
+      mounted?.container.querySelector(
+        `[data-row-id="${rowId}"] [data-grid-part="row-field"][data-col-id="${colId}"]`,
+      );
+
+    // Empty and opted in: marked.
+    expect(fieldFor(quoteOneId, "author_id")?.getAttribute("data-field-empty"))
+      .toBe("true");
+    // Empty without the meta opt-in: never marked.
+    expect(
+      fieldFor(quoteOneId, "text")?.getAttribute("data-field-empty"),
+    ).toBeNull();
+    // The title is the record's identity: never marked even when empty.
+    expect(
+      fieldFor(quoteOneId, "book_id")?.getAttribute("data-field-empty"),
+    ).toBeNull();
+    // A present value is never marked.
+    expect(
+      fieldFor(quoteTwoId, "author_id")?.getAttribute("data-field-empty"),
+    ).toBeNull();
+  });
+
   it("renders expandable identifier values inside the pk card field", async () => {
     mounted = await render(
       createElement(GridRuntimeProvider, {

@@ -312,6 +312,42 @@
   font-size: 12px;
 }
 
+/* A title hosting the row-expansion chevron flows through expand-content,
+   whose structural rule is single-line ellipsis. The record heading is worth
+   two lines before clamping, and the inner preset spans must give up their
+   own single-line truncation for the clamp to see line breaks. */
+[data-table-page-mode="narrowCards"]
+  :where(.sapporta-table-grid[data-grid-presentation="cards"])
+  [data-grid-part="row-field"][data-card-role="title"]
+  [data-grid-part="expand-content"] {
+  display: -webkit-box;
+  overflow: hidden;
+  text-overflow: clip;
+  white-space: normal;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+[data-table-page-mode="narrowCards"]
+  :where(.sapporta-table-grid[data-grid-presentation="cards"])
+  [data-grid-part="row-field"][data-card-role="title"]
+  [data-grid-part="expand-content"]
+  span {
+  overflow: visible;
+  text-overflow: clip;
+  white-space: normal;
+}
+
+/* The record detail sheet shows the full field list, so an empty secondary
+   field only costs density in a narrow card. Fields mark themselves empty
+   only for default preset cells — client columns and custom renderers can
+   draw content for an empty value and never carry the mark. */
+[data-table-page-mode="narrowCards"]
+  :where(.sapporta-table-grid[data-grid-presentation="cards"])
+  [data-grid-part="row-field"][data-field-empty="true"] {
+  display: none;
+}
+
 /* The selection handle is a pointer-and-keyboard affordance; phones hide the
    gutter and restore the row padding. */
 [data-table-page-mode="narrowCards"]

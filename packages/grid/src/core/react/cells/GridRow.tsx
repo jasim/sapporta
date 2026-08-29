@@ -132,7 +132,12 @@ export const GridRow = memo(function GridRow({
           />
         ) : null}
         {schema.map((col) => (
-          <RowCellSlot key={col.id} column={col} presentation={presentation}>
+          <RowCellSlot
+            key={col.id}
+            column={col}
+            value={row.columns[col.id]}
+            presentation={presentation}
+          >
             <GridDataCell
               row={row}
               column={col}
@@ -153,10 +158,12 @@ export const GridRow = memo(function GridRow({
 
 function RowCellSlot({
   column,
+  value,
   presentation,
   children,
 }: {
   column: ColumnSchema;
+  value: unknown;
   presentation: GridPresentation;
   children: ReactNode;
 }) {
@@ -165,6 +172,14 @@ function RowCellSlot({
   const cardRole = cardRoleOf(column);
   // The title is the card's heading — no label.
   const labelled = cardRole !== "title";
+  // Emptiness is marked only for columns that opted in via meta, because only
+  // the schema author knows whether an empty stored value still renders
+  // content (client columns and custom cell renderers do). The title is the
+  // record's identity and never marks itself empty.
+  const fieldEmpty =
+    labelled &&
+    cardHideWhenEmptyOf(column) &&
+    (value === null || value === undefined || value === "");
   return (
     <div
       data-grid-part="row-field"
@@ -172,6 +187,7 @@ function RowCellSlot({
       data-col-name={column.name}
       data-display-type={displayType}
       data-card-role={cardRole}
+      data-field-empty={fieldEmpty ? "true" : undefined}
     >
       {labelled ? (
         <div data-grid-part="row-field-label">{column.name}</div>
@@ -185,6 +201,11 @@ function displayTypeOf(column: ColumnSchema): string | undefined {
   if (!isRecord(column.meta)) return undefined;
   const value = column.meta.displayType;
   return typeof value === "string" ? value : undefined;
+}
+
+function cardHideWhenEmptyOf(column: ColumnSchema): boolean {
+  if (!isRecord(column.meta)) return false;
+  return column.meta.cardHideWhenEmpty === true;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

@@ -214,6 +214,22 @@ export const CELL_GRID_WITH_INDEPENDENT_ROW_SELECTION = {
 } satisfies GridInteractionConfig;
 
 /**
+ * Cell-first navigation with independent multi-row selection whose rows also
+ * emit a semantic activation on plain click. The click still places the cell
+ * cursor first, so spreadsheet behavior is unchanged; the activation event is
+ * additional context for an application that reacts to it (for example, a
+ * record detail surface on touch layouts). Enter stays reserved for cell
+ * editing, so no keyboard gesture is added.
+ */
+export const CELL_GRID_WITH_ROW_CLICK_ACTIVATION = {
+  ...CELL_GRID_WITH_INDEPENDENT_ROW_SELECTION,
+  activeRow: {
+    kind: "from-active-cell",
+    activation: { startsOn: ["click"] },
+  },
+} satisfies GridInteractionConfig;
+
+/**
  * Cell-first navigation where the active cell's row is also the single
  * operation target. The name describes a common use, but this preset renders
  * no panel.

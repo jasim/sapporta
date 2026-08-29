@@ -171,6 +171,10 @@ function testRowsClient(
   };
 }
 
+const cardHideWhenEmptyOf = (column: { meta?: unknown }) =>
+  (column.meta as { cardHideWhenEmpty?: boolean } | undefined)
+    ?.cardHideWhenEmpty;
+
 describe("compileTGridRuntimeConfig", () => {
   let mounted: { root: Root; container: HTMLElement } | null = null;
 
@@ -463,6 +467,46 @@ describe("compileTGridRuntimeConfig", () => {
         (column.meta as { cardRole?: string } | undefined)?.cardRole,
       ).toBeUndefined();
     }
+  });
+
+  it("marks default preset fields as hideable when empty in cards", () => {
+    const config = build();
+
+    // Expansion hosts keep their field visible for the disclosure chevron;
+    // every other default preset field opts into empty-value hiding.
+    const orders = config.gridSchema.levels.orders.columns;
+    expect(orders.map(cardHideWhenEmptyOf)).toEqual([false, true]);
+    const lines = config.gridSchema.levels["orders.lines"].columns;
+    expect(lines.map(cardHideWhenEmptyOf)).toEqual([false, true]);
+
+    // A non-expandable level keeps every default preset field hideable.
+    const allocations =
+      config.gridSchema.levels["orders.lines.allocations"].columns;
+    expect(allocations.map(cardHideWhenEmptyOf)).toEqual([true]);
+  });
+
+  it("never marks custom-rendered or client columns as hideable when empty", () => {
+    const columns = createTGridColumnsBuilder<OrdersOnlyRows, unknown, "orders">(
+      "orders",
+    );
+    const level = buildOrdersOnly({
+      columns: [
+        columns.table("customer", { renderCell: () => null }),
+        columns.client("status", { label: "Status", renderCell: () => "ok" }),
+        columns.remainingTable(),
+      ],
+    });
+
+    expect(level.columns.map((column) => column.id)).toEqual([
+      "customer",
+      "status",
+      "id",
+    ]);
+    expect(level.columns.map(cardHideWhenEmptyOf)).toEqual([
+      false,
+      undefined,
+      true,
+    ]);
   });
 
   it("resolves row headers from each level's final visible columns", () => {

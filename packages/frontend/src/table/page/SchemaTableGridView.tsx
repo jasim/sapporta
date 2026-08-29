@@ -140,6 +140,11 @@ function useStableInteractionOptions(
     interaction?.mode === "row-list"
       ? interaction.activeRow.keyboard.expansion
       : undefined;
+  const activeRowConfig = interaction?.activeRow;
+  const rowActivationGestures =
+    activeRowConfig && activeRowConfig.kind !== "none"
+      ? activeRowConfig.activation?.startsOn.join(",")
+      : undefined;
   const selectedRowsKind = interaction?.selectedRows.kind;
   const selectedRowsMode =
     interaction?.selectedRows.kind === "enabled"
@@ -161,6 +166,7 @@ function useStableInteractionOptions(
       activeRowKind,
       mode,
       selectedCellsKind,
+      rowActivationGestures,
       rowListArrows,
       rowListExpansion,
       rowListShiftArrows,

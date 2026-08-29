@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { TableSchema } from "@sapporta/shared/contracts";
-import { CELL_GRID_WITH_INDEPENDENT_ROW_SELECTION } from "@sapporta/grid";
+import { CELL_GRID_WITH_ROW_CLICK_ACTIVATION } from "@sapporta/grid";
 import { defineTGrid } from "./tgrid-runtime-config";
 import { buildSchemaTGridConfig, defineSchemaTGrid } from "./schema-tgrid";
 
@@ -73,7 +73,7 @@ describe("schema TGrid helpers", () => {
       definition.levels["orders.order_lines"].rowHeaderColumn,
     ).toBeUndefined();
     expect(definition.interaction).toBe(
-      CELL_GRID_WITH_INDEPENDENT_ROW_SELECTION,
+      CELL_GRID_WITH_ROW_CLICK_ACTIVATION,
     );
   });
 

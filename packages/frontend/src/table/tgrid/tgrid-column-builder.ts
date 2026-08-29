@@ -229,8 +229,10 @@ export function buildTGridColumnsForTable<
 
     // Expansion decorates the same left-most cell with disclosure behavior.
     // Apply it after row-header policy so a data-backed header stays readonly.
+    // The expansion host also carries the disclosure chevron, so cards must
+    // keep this field visible even when its value is empty.
     columns[0] = args.expandable
-      ? withRowExpansionColumn(rowHeaderReadyColumn)
+      ? withRowExpansionColumn(withoutCardEmptyHiding(rowHeaderReadyColumn))
       : rowHeaderReadyColumn;
   }
 
@@ -266,6 +268,15 @@ function markCardTitleColumn(
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
+}
+
+// An empty value under a custom renderer or the expansion affordance can still
+// render meaningful content, so cards must not skip the field.
+function withoutCardEmptyHiding(column: GridColumnSchema): GridColumnSchema {
+  if (!isRecord(column.meta) || column.meta.cardHideWhenEmpty !== true) {
+    return column;
+  }
+  return { ...column, meta: { ...column.meta, cardHideWhenEmpty: false } };
 }
 
 function tableColumnsForProjection(
@@ -362,6 +373,7 @@ function customizeTableColumn<
             columnContext,
             sessionContext,
           ),
+          meta: withoutCardEmptyHiding(gridColumn).meta,
         }
       : {}),
     ...(options.copy

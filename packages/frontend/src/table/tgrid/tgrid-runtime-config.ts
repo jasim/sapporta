@@ -11,7 +11,7 @@ import {
   type TypedFilterCondition,
 } from "@sapporta/shared/filter";
 import {
-  CELL_GRID_WITH_INDEPENDENT_ROW_SELECTION,
+  CELL_GRID_WITH_ROW_CLICK_ACTIVATION,
   childPath,
   hostBackedRowQuery,
   rootPath,
@@ -90,10 +90,12 @@ export function defineTGrid<
     definition.levels,
     "defineTGrid",
   );
+  // The default enables semantic row activation on plain click: pointer and
+  // keyboard behavior is unchanged, and narrow card layouts use the event to
+  // open the record detail sheet on tap.
   return {
     ...definition,
-    interaction:
-      definition.interaction ?? CELL_GRID_WITH_INDEPENDENT_ROW_SELECTION,
+    interaction: definition.interaction ?? CELL_GRID_WITH_ROW_CLICK_ACTIVATION,
   };
 }
 
