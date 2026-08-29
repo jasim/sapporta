@@ -65,9 +65,14 @@ import type {
 import type { RuntimeKernel } from "../runtime/runtime";
 import type { CursorManager, CursorManagerInternal } from "./cursor-manager";
 import {
+  resolveLandingColumn,
   resolveRowSelectableNavigation,
   resolveVisibleRowNavigation,
 } from "./visible-order";
+import {
+  presentationColumnOrder,
+  type GridPresentation,
+} from "../types/presentation";
 import { firstFocusableRow } from "../types/level-row-traversal";
 
 export type CoordinatorState = {
@@ -84,7 +89,13 @@ export interface GridCoordinatorVerbs {
   expand: (path: GridPath, rowId: RowId) => void;
   collapse: (path: GridPath, rowId: RowId) => void;
   toggleExpand: (path: GridPath, rowId: RowId) => void;
-  navigateCell: (fromPath: GridPath, intent: CellNavigationIntent) => void;
+  // `presentation` is call-time render state, never stored: column movement
+  // resolves against the order the caller renders.
+  navigateCell: (
+    fromPath: GridPath,
+    intent: CellNavigationIntent,
+    presentation: GridPresentation,
+  ) => void;
   navigateRow: (fromPath: GridPath, intent: RowNavigationIntent) => void;
 }
 
@@ -342,10 +353,22 @@ export function createGridCoordinator(
     return false;
   }
 
+  function navigationColumns(
+    runtime: RuntimeKernel,
+    path: GridPath,
+    presentation: GridPresentation,
+  ) {
+    return presentationColumnOrder(
+      runtime.schemaAt(path).columns,
+      presentation,
+    );
+  }
+
   function intentForCommit(
     target: Exclude<CommitTarget, "stay">,
     current: CellCursor,
     runtime: RuntimeKernel,
+    presentation: GridPresentation,
   ): CellNavigationIntent {
     switch (target) {
       case "up":
@@ -379,9 +402,9 @@ export function createGridCoordinator(
           extend: false,
         };
       case "next": {
-        const schema = runtime.schemaAt(current.path).columns;
-        const idx = schema.findIndex((c) => c.id === current.colId);
-        return idx >= 0 && idx < schema.length - 1
+        const columns = navigationColumns(runtime, current.path, presentation);
+        const idx = columns.findIndex((c) => c.id === current.colId);
+        return idx >= 0 && idx < columns.length - 1
           ? { type: "moveColumn", direction: "right", extend: false }
           : {
               type: "moveRow",
@@ -391,8 +414,8 @@ export function createGridCoordinator(
             };
       }
       case "prev": {
-        const schema = runtime.schemaAt(current.path).columns;
-        const idx = schema.findIndex((c) => c.id === current.colId);
+        const columns = navigationColumns(runtime, current.path, presentation);
+        const idx = columns.findIndex((c) => c.id === current.colId);
         return idx > 0
           ? { type: "moveColumn", direction: "left", extend: false }
           : {
@@ -415,13 +438,14 @@ export function createGridCoordinator(
     fromPath: GridPath,
     cursor: CellCursor | null,
     runtime: RuntimeKernel,
+    presentation: GridPresentation,
   ): CellCursor | null {
     if (intent.type === "focusFirstCell") {
       const first = firstFocusableRow(
         runtime.displayedRowsFor(fromPath),
         args.capabilitiesFor,
       );
-      const colId = runtime.schemaAt(fromPath).columns[0]?.id;
+      const colId = navigationColumns(runtime, fromPath, presentation)[0]?.id;
       return first && colId ? { path: fromPath, rowId: first.id, colId } : null;
     }
 
@@ -429,16 +453,17 @@ export function createGridCoordinator(
 
     if (intent.type === "commitMove") {
       return resolveMovement(
-        intentForCommit(intent.target, cursor, runtime),
+        intentForCommit(intent.target, cursor, runtime, presentation),
         fromPath,
         cursor,
         runtime,
+        presentation,
       );
     }
 
     if (intent.type === "moveColumn") {
       const nextColId = nextColForDirection(
-        runtime.schemaAt(fromPath).columns,
+        navigationColumns(runtime, fromPath, presentation),
         cursor.colId,
         intent.direction,
       );
@@ -455,7 +480,7 @@ export function createGridCoordinator(
       { path: fromPath, rowId: cursor.rowId, colId: cursor.colId },
       move.direction,
       move.colPolicy,
-      { capabilitiesFor: args.capabilitiesFor },
+      { capabilitiesFor: args.capabilitiesFor, presentation },
     );
     if (result.target) return result.target;
     // A table may show footer or subtotal rows that are not real keyboard
@@ -475,12 +500,16 @@ export function createGridCoordinator(
     ) {
       return null;
     }
-    return result.overflow === "next"
-      ? runtime.phantomBoundaryCellTarget(
-          fromPath,
-          cursor.colId,
-          move.colPolicy,
-        )
+    if (result.overflow !== "next") return null;
+    // The phantom channel mints the add-row target; the landing column is
+    // resolved here, in rendered order.
+    const landingColId = resolveLandingColumn(
+      navigationColumns(runtime, fromPath, presentation),
+      cursor.colId,
+      move.colPolicy,
+    );
+    return landingColId
+      ? runtime.phantomBoundaryCellTarget(fromPath, landingColId)
       : null;
   }
 
@@ -553,7 +582,7 @@ export function createGridCoordinator(
     }
   }
 
-  store.navigateCell = (fromPath, intent) => {
+  store.navigateCell = (fromPath, intent, presentation) => {
     const runtime = args.getRuntime();
     const cursorManager = args.getCursorManager();
     if (intent.type === "cellPressed") {
@@ -594,7 +623,13 @@ export function createGridCoordinator(
       return;
     }
     const current = cursorManager.currentCellCursor();
-    const target = resolveMovement(intent, fromPath, current, runtime);
+    const target = resolveMovement(
+      intent,
+      fromPath,
+      current,
+      runtime,
+      presentation,
+    );
     if (!target) return;
     const extend = "extend" in intent && intent.extend;
     if (extend && current && target.path === current.path) {

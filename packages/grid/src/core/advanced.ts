@@ -180,9 +180,13 @@ export function controllerFor(
       assertLevel();
       raw.activateCell(coord, trigger);
     },
-    handleCellPointer(coord: Coord, pointer: GridPointerInput) {
+    handleCellPointer(
+      coord: Coord,
+      pointer: GridPointerInput,
+      presentation: CellKeyboardPresentation,
+    ) {
       assertLevel();
-      return raw.handleCellPointer(coord, pointer);
+      return raw.handleCellPointer(coord, pointer, presentation);
     },
     handleRowPointer(rowId: RowId, pointer: GridPointerInput) {
       assertLevel();
@@ -192,9 +196,13 @@ export function controllerFor(
       assertLevel();
       raw.cancelEdit();
     },
-    commitEdit(value: unknown, commit?: CommitTarget) {
+    commitEdit(
+      value: unknown,
+      commit: CommitTarget,
+      presentation: CellKeyboardPresentation,
+    ) {
       assertLevel();
-      raw.commitEdit(value, commit);
+      raw.commitEdit(value, commit, presentation);
     },
     clearCellSelection() {
       assertLevel();
@@ -208,7 +216,7 @@ export function controllerFor(
       assertLevel();
       raw.focus();
     },
-    handleKey(event: KeyboardEvent, presentation?: CellKeyboardPresentation) {
+    handleKey(event: KeyboardEvent, presentation: CellKeyboardPresentation) {
       assertLevel();
       return raw.handleKey(event, presentation);
     },

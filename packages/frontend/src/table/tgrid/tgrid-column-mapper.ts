@@ -24,6 +24,9 @@ export type TGridTableColumnMeta = {
   table: string;
   schema: TableColumnSchema;
   displayType: DisplayType;
+  /** The `title` column renders as the card's heading instead of a labeled
+   *  field. Assigned after column build from the table's `rowLabelColumns`. */
+  cardRole?: "title";
 };
 
 export type TGridColumnMapper = {

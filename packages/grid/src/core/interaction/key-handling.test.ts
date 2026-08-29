@@ -116,6 +116,7 @@ function keyEventToCellIntent(
     displayed,
     schema,
     isCellEditable,
+    "tabular",
   );
 }
 
@@ -270,6 +271,7 @@ describe("keyEventToCellIntent", () => {
         displayed,
         cols,
         cellEditable,
+        "tabular",
       ),
     ).toEqual({ type: "toggleActiveRowSelection" });
     expect(
@@ -280,6 +282,7 @@ describe("keyEventToCellIntent", () => {
         displayed,
         cols,
         cellEditable,
+        "tabular",
       ),
     ).toEqual({
       type: "startEdit",
@@ -295,6 +298,7 @@ describe("keyEventToCellIntent", () => {
         displayed,
         cols,
         cellEditable,
+        "tabular",
       ),
     ).toBe(null);
   });
@@ -434,6 +438,7 @@ describe("keyEventToCellIntent", () => {
         displayed,
         [{ ...cols[0], edit: undefined }, cols[1]],
         cellEditable,
+        "tabular",
       ),
     ).toEqual({
       type: "activateRow",
@@ -509,6 +514,7 @@ describe("keyEventToCellIntent", () => {
         displayed,
         expansionColumns,
         () => true,
+        "tabular",
       ),
     ).toEqual({
       type: "startEdit",
@@ -523,6 +529,7 @@ describe("keyEventToCellIntent", () => {
         displayed,
         expansionColumns,
         () => false,
+        "tabular",
       ),
     ).toEqual({
       type: "activateCell",
@@ -537,6 +544,7 @@ describe("keyEventToCellIntent", () => {
         displayed,
         expansionColumns,
         () => true,
+        "tabular",
       ),
     ).toEqual({
       type: "activateCell",

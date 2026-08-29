@@ -18,11 +18,11 @@ export type PhantomRowLifecycle = {
   readonly ensureBlankForEmptyPath: (path: GridPath) => PhantomRow | null;
   // A blank add-row belongs only where a new row can be appended right now.
   readonly reconcileBlankAppendPhantoms: (path: GridPath) => void;
-  // Moving past the final cell should land on a reusable add-row when allowed.
+  // Moving past the final cell should land on a reusable add-row when
+  // allowed. `colId` is the landing column, already resolved by the caller.
   readonly boundaryCellTarget: (
     path: GridPath,
     colId: ColId,
-    colPolicy: "preserve" | "first" | "last",
   ) => CellCursor | null;
   // Row-list navigation gets the same add-row behavior without a column.
   readonly boundaryRowTarget: (
@@ -156,33 +156,13 @@ export function createPhantomRowLifecycle(
     }
   }
 
-  function colForPolicy(
-    path: GridPath,
-    currentColId: ColId,
-    policy: "preserve" | "first" | "last",
-  ): ColId | null {
-    const columns = deps.schemaAt(path).columns;
-    if (columns.length === 0) return null;
-    if (policy === "first") return columns[0].id;
-    if (policy === "last") return columns[columns.length - 1].id;
-    return columns.some((column) => column.id === currentColId)
-      ? currentColId
-      : columns[0].id;
-  }
-
-  function boundaryCellTarget(
-    path: GridPath,
-    colId: ColId,
-    colPolicy: "preserve" | "first" | "last",
-  ): CellCursor | null {
+  function boundaryCellTarget(path: GridPath, colId: ColId): CellCursor | null {
     const phantom = ensureBlankPhantom(path);
     if (!phantom) return null;
-    const targetColId = colForPolicy(path, colId, colPolicy);
-    if (!targetColId) return null;
     return {
       path,
       rowId: makeLevelRowId(path, "phantom", phantom.rowKey),
-      colId: targetColId,
+      colId,
     };
   }
 

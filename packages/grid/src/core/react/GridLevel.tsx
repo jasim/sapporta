@@ -83,21 +83,22 @@ export type GridSelectionSummaryContext = GridChromeContext & {
 export function GridLevel({
   path,
   chrome,
-  presentation = "tabular",
+  presentation,
 }: {
   path: GridPath;
   chrome?: GridLevelChrome;
-  presentation?: GridPresentation;
+  presentation: GridPresentation;
 }) {
   const runtime = useGridRuntime();
   const level = runtime.level(path);
   const internals = runtimeInternalsFor(runtime);
   const controller = internals.controllerFor(path);
   const schema = level.schema.columns;
-  const rowHeaderColumn: RowHeaderColumn =
-    runtime.interaction.mode === "cell-grid"
-      ? level.schema.rowHeaderColumn
-      : "none";
+  const rowHeaderColumn = resolveRowHeaderColumn(
+    runtime.interaction.mode,
+    level.schema.rowHeaderColumn,
+    presentation,
+  );
   const state = useLevelSourceState(path);
   const phantoms = usePhantoms(path);
   const colOrder = useMemo(() => schema.map((c) => c.id), [schema]);
@@ -157,6 +158,21 @@ export function GridLevel({
       {empty}
     </>
   );
+}
+
+// A data-backed row header is a spreadsheet affordance: in cards its tinted
+// cell would read as a full-width selected band, so it demotes to a plain
+// field. The structural checkbox gutter keeps its meaning everywhere.
+function resolveRowHeaderColumn(
+  interactionMode: "cell-grid" | "row-list",
+  rowHeaderColumn: RowHeaderColumn,
+  presentation: GridPresentation,
+): RowHeaderColumn {
+  if (interactionMode !== "cell-grid") return "none";
+  if (presentation === "cards" && typeof rowHeaderColumn === "object") {
+    return "none";
+  }
+  return rowHeaderColumn;
 }
 
 function DisplayedRowsBody({
@@ -256,10 +272,11 @@ function ChildLevelMount({
   const runtime = useGridRuntime();
   const level = runtime.level(path);
   const schema = level.schema.columns;
-  const rowHeaderColumn: RowHeaderColumn =
-    runtime.interaction.mode === "cell-grid"
-      ? level.schema.rowHeaderColumn
-      : "none";
+  const rowHeaderColumn = resolveRowHeaderColumn(
+    runtime.interaction.mode,
+    level.schema.rowHeaderColumn,
+    presentation,
+  );
   const chromeContext: GridChromeContext = {
     path,
     levelName: level.schema.name,

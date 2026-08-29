@@ -108,7 +108,7 @@ function setup({ expand = [] as string[] } = {}) {
   return rt;
 }
 
-const deps = { capabilitiesFor };
+const deps = { capabilitiesFor, presentation: "tabular" as const };
 
 function cellTarget(
   runtime: RuntimeKernel,

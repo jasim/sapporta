@@ -46,11 +46,23 @@ export function GridCopyContextMenu({
     void navigator.clipboard.writeText(csv).catch(() => {});
   }
 
+  // A phone or tablet, as opposed to a touchscreen laptop.
+  function touchIsPrimaryPointer(): boolean {
+    if (typeof window === "undefined" || !window.matchMedia) return false;
+    return window.matchMedia("(hover: none) and (pointer: coarse)").matches;
+  }
+
   return (
     <ContextMenu>
       <ContextMenuTrigger
         render={<div data-grid-copy-menu-scope="true" />}
         onContextMenu={(event) => {
+          if (touchIsPrimaryPointer()) {
+            // No copy menu on touch: its open/close race with the synthesized
+            // compat events leaves it stuck half-transparent.
+            event.preventBaseUIHandler();
+            return;
+          }
           if (!eventTargetIsWithin(event.target, event.currentTarget)) {
             // Without this check, right-clicking a dialog opened from the grid
             // also opens the grid's Copy menu. Stop only the grid menu trigger.
@@ -61,6 +73,11 @@ export function GridCopyContextMenu({
           prepareTarget(event.target);
         }}
         onTouchStart={(event) => {
+          if (touchIsPrimaryPointer()) {
+            // Suppress the long-press-to-open timer; see onContextMenu.
+            event.preventBaseUIHandler();
+            return;
+          }
           if (!eventTargetIsWithin(event.target, event.currentTarget)) {
             // A long press inside a dialog opened from the grid must not start
             // the grid's context-menu timer.

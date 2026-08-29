@@ -18,6 +18,10 @@
 // picked by the caller.
 
 import type { ColumnSchema, LevelSchema } from "../types/schema";
+import {
+  presentationColumnOrder,
+  type GridPresentation,
+} from "../types/presentation";
 import type { CellCursor, ColId, GridPath, RowId } from "../types/identity";
 import { makeRowId, rootPath, rowKeyOfRowId } from "../types/identity";
 import type { LevelRow, LevelRowKind } from "../types/level-row";
@@ -147,33 +151,31 @@ function lastFocusableStep(
 // focusability does not exist yet); the row's focusability has already
 // been confirmed by the caller. Keeping this as a named seam means a
 // future "non-focusable column" feature lands in one place.
-function firstColumn(schema: LevelSchema): ColId | null {
-  const cols = schema.columns;
+function firstColumn(cols: readonly ColumnSchema[]): ColId | null {
   return cols.length > 0 ? cols[0].id : null;
 }
 
-function lastColumn(schema: LevelSchema): ColId | null {
-  const cols = schema.columns;
+function lastColumn(cols: readonly ColumnSchema[]): ColId | null {
   return cols.length > 0 ? cols[cols.length - 1].id : null;
 }
 
-function hasColumn(schema: LevelSchema, colId: ColId): boolean {
-  for (const c of schema.columns) {
+function hasColumn(cols: readonly ColumnSchema[], colId: ColId): boolean {
+  for (const c of cols) {
     if (c.id === colId) return true;
   }
   return false;
 }
 
-function resolveColumn(
-  targetSchema: LevelSchema,
+// `columns` must be in rendered order (see `presentationColumnOrder`), so
+// "first" and "last" mean what the user sees.
+export function resolveLandingColumn(
+  columns: readonly ColumnSchema[],
   sourceColId: ColId,
   policy: ColPolicy,
 ): ColId | null {
-  if (policy === "first") return firstColumn(targetSchema);
-  if (policy === "last") return lastColumn(targetSchema);
-  return hasColumn(targetSchema, sourceColId)
-    ? sourceColId
-    : firstColumn(targetSchema);
+  if (policy === "first") return firstColumn(columns);
+  if (policy === "last") return lastColumn(columns);
+  return hasColumn(columns, sourceColId) ? sourceColId : firstColumn(columns);
 }
 
 function makeCursor(
@@ -181,9 +183,13 @@ function makeCursor(
   runtime: RuntimeKernel,
   sourceColId: ColId,
   policy: ColPolicy,
+  presentation: GridPresentation,
 ): CellCursor | null {
-  const targetSchema = runtime.schemaAt(step.path);
-  const colId = resolveColumn(targetSchema, sourceColId, policy);
+  const targetColumns = presentationColumnOrder(
+    runtime.schemaAt(step.path).columns,
+    presentation,
+  );
+  const colId = resolveLandingColumn(targetColumns, sourceColId, policy);
   if (colId === null) return null;
   return { path: step.path, rowId: step.rowId, colId };
 }
@@ -247,6 +253,8 @@ function deltaOverflow(
 
 export type NextVisibleRowDeps = {
   capabilitiesFor: CapabilitiesFn;
+  // Landings resolve their column against this presentation's rendered order.
+  presentation: GridPresentation;
 };
 
 // Cross-level row motion. The runtime and coordinator are read directly
@@ -261,7 +269,7 @@ export function resolveVisibleRowNavigation(
   colPolicy: ColPolicy,
   deps: NextVisibleRowDeps,
 ): CellRowNavigationResult {
-  const { capabilitiesFor } = deps;
+  const { capabilitiesFor, presentation } = deps;
   const steps = collect(runtime, coordinator);
   const idx = indexOfStep(steps, from.path, from.rowId);
 
@@ -293,7 +301,7 @@ export function resolveVisibleRowNavigation(
     return { target: null, overflow: null };
   }
   return {
-    target: makeCursor(target, runtime, from.colId, colPolicy),
+    target: makeCursor(target, runtime, from.colId, colPolicy, presentation),
     overflow: null,
   };
 }

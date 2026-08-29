@@ -64,6 +64,7 @@ describe("GridLevel selected-cell summary", () => {
         children: createElement(GridLevel, {
           path,
           chrome: columnPreset.chrome(),
+          presentation: "tabular",
         }),
       }),
     );

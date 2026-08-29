@@ -2,6 +2,7 @@ import { useStore } from "zustand";
 import type { MouseEvent } from "react";
 import type { GridPath } from "../../types/identity";
 import type { ColumnSchema } from "../../types/schema";
+import type { GridPresentation } from "../../types/presentation";
 import type { DisplayedRows, LevelRow } from "../../types/level-row";
 import type { CellSelectionStatus } from "../../types/selection";
 import { selectionContainsCoord } from "../../types/selection";
@@ -31,12 +32,14 @@ export function GridDataCell({
   column,
   path,
   colOrder,
+  presentation,
   rowHeader = false,
 }: {
   row: LevelRow;
   column: ColumnSchema;
   path: GridPath;
   colOrder: readonly ColId[];
+  presentation: GridPresentation;
   rowHeader?: boolean;
 }) {
   const runtime = useGridRuntime();
@@ -63,19 +66,23 @@ export function GridDataCell({
     e.preventDefault();
     const coord = { rowId: row.id, colId: column.id };
     if (rowHeader) {
-      internals.coordinator.navigateCell(path, {
-        type: "rowPressed",
-        target: row.id,
-        origin: { kind: "cell", target: coord },
-        gesture: rowSelectionGestureFromModifiers(e),
-      });
+      internals.coordinator.navigateCell(
+        path,
+        {
+          type: "rowPressed",
+          target: row.id,
+          origin: { kind: "cell", target: coord },
+          gesture: rowSelectionGestureFromModifiers(e),
+        },
+        presentation,
+      );
       return;
     }
-    internals.coordinator.navigateCell(path, {
-      type: "cellPressed",
-      target: coord,
-      extend: e.shiftKey,
-    });
+    internals.coordinator.navigateCell(
+      path,
+      { type: "cellPressed", target: coord, extend: e.shiftKey },
+      presentation,
+    );
   }
 
   function onClick(event: MouseEvent) {
@@ -85,14 +92,18 @@ export function GridDataCell({
     if (rowHeader) return;
     const coord = { rowId: row.id, colId: column.id };
     if (
-      controller.handleCellPointer(coord, {
-        gesture: "click",
-        button: event.button,
-        altKey: event.altKey,
-        ctrlKey: event.ctrlKey,
-        metaKey: event.metaKey,
-        shiftKey: event.shiftKey,
-      })
+      controller.handleCellPointer(
+        coord,
+        {
+          gesture: "click",
+          button: event.button,
+          altKey: event.altKey,
+          ctrlKey: event.ctrlKey,
+          metaKey: event.metaKey,
+          shiftKey: event.shiftKey,
+        },
+        presentation,
+      )
     ) {
       event.stopPropagation();
     }
@@ -105,14 +116,18 @@ export function GridDataCell({
     if (rowHeader) return;
     const coord = { rowId: row.id, colId: column.id };
     if (
-      controller.handleCellPointer(coord, {
-        gesture: "doubleClick",
-        button: event.button,
-        altKey: event.altKey,
-        ctrlKey: event.ctrlKey,
-        metaKey: event.metaKey,
-        shiftKey: event.shiftKey,
-      })
+      controller.handleCellPointer(
+        coord,
+        {
+          gesture: "doubleClick",
+          button: event.button,
+          altKey: event.altKey,
+          ctrlKey: event.ctrlKey,
+          metaKey: event.metaKey,
+          shiftKey: event.shiftKey,
+        },
+        presentation,
+      )
     ) {
       event.stopPropagation();
     }

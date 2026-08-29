@@ -236,14 +236,105 @@
   text-decoration: none;
 }
 
+/* The card title: the row-label column renders as the record's heading. */
+:where(
+  .sapporta-table-grid[data-grid-presentation="cards"]
+    [data-grid-part="row-field"][data-card-role="title"]
+) {
+  grid-template-columns: minmax(0, 1fr);
+  /* Hoist past earlier schema columns. Inert in narrow mode, where fields
+     are placed explicitly. */
+  order: -1;
+}
+
+:where(
+  .sapporta-table-grid[data-grid-presentation="cards"]
+    [data-grid-part="row-field"][data-card-role="title"]
+    [data-grid-part="cell-content"]
+) {
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+/* Narrow cards: title top-left, "Id · N" chip top-right, compact
+   label/value lines below. These placement rules must out-rank the
+   structural flex-column row layout in grid.module.css, so the page-mode
+   attribute stays outside :where(). */
+[data-table-page-mode="narrowCards"]
+  :where(.sapporta-table-grid[data-grid-presentation="cards"])
+  [data-grid-part="row"] {
+  align-items: baseline;
+  column-gap: 10px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  padding: 8px 12px 9px;
+}
+
+[data-table-page-mode="narrowCards"]
+  :where(.sapporta-table-grid[data-grid-presentation="cards"])
+  [data-grid-part="row-field"] {
+  gap: 10px;
+  grid-column: 1 / -1;
+  grid-template-columns: minmax(6.5rem, 0.45fr) minmax(0, 1fr);
+  padding: 2px 0;
+}
+
+[data-table-page-mode="narrowCards"]
+  :where(.sapporta-table-grid[data-grid-presentation="cards"])
+  [data-grid-part="row-field"][data-card-role="title"] {
+  grid-column: 1;
+  grid-row: 1;
+  grid-template-columns: minmax(0, 1fr);
+  padding: 0 0 3px;
+}
+
+[data-table-page-mode="narrowCards"]
+  :where(.sapporta-table-grid[data-grid-presentation="cards"])
+  [data-grid-part="row-field"][data-display-type="pk"]:not(
+    [data-card-role="title"]
+  ) {
+  align-items: baseline;
+  gap: 5px;
+  grid-column: 2;
+  grid-row: 1;
+  grid-template-columns: auto auto;
+  padding: 0;
+}
+
+[data-table-page-mode="narrowCards"]
+  :where(.sapporta-table-grid[data-grid-presentation="cards"])
+  [data-grid-part="row-field"][data-display-type="pk"]:not(
+    [data-card-role="title"]
+  )
+  [data-grid-part="cell-content"] {
+  color: var(--sap-fg-subtle, hsl(215 14% 45%));
+  font-size: 12px;
+}
+
+/* The selection handle is a pointer-and-keyboard affordance; phones hide the
+   gutter and restore the row padding. */
+[data-table-page-mode="narrowCards"]
+  :where(
+    .sapporta-table-grid[data-grid-presentation="cards"][data-row-header-kind="empty-selectable-cell"]
+  )
+  [data-grid-part="row"] {
+  padding-inline-start: 12px;
+}
+
+[data-table-page-mode="narrowCards"]
+  :where(.sapporta-table-grid[data-grid-presentation="cards"])
+  [data-grid-part="row-header-cell"] {
+  display: none;
+}
+
 :where(
   [data-table-page-mode="narrowCards"]
     .sapporta-table-grid[data-grid-presentation="cards"]
-    [data-grid-part="row-field"]
+    [data-grid-part="row-field-label"]
 ) {
-  gap: 3px;
-  grid-template-columns: 1fr;
-  padding: 5px 10px;
+  font-size: 12px;
+  font-weight: 500;
 }
 
 :where(
@@ -253,4 +344,15 @@
 ) {
   margin-left: 4px;
   padding-left: 10px;
+}
+
+/* Touch has no cell cursor: a tap must not paint the spreadsheet focus
+   ring. */
+@media (hover: none) and (pointer: coarse) {
+  [data-table-page-mode="narrowCards"]
+    :where(.sapporta-table-grid[data-grid-presentation="cards"])
+    [data-grid-part="cell"][data-cell-status="focus"] {
+    background: transparent;
+    box-shadow: none;
+  }
 }

@@ -2,6 +2,7 @@ import { createContext, memo, useContext, type ReactNode } from "react";
 import type { ColId, GridPath, RowId } from "../../types/identity";
 import type { RowInteractionStatus } from "../../types/row-selection";
 import type { ColumnSchema, RowHeaderColumn } from "../../types/schema";
+import { cardRoleOf } from "../../types/presentation";
 import { capabilitiesFor } from "../../types/capabilities";
 import { useDisplayedRow, useGridRuntime } from "../GridRuntimeProvider";
 import type { GridPresentation } from "../Grid";
@@ -40,7 +41,7 @@ export const GridRow = memo(function GridRow({
   schema,
   path,
   colOrder,
-  presentation = "tabular",
+  presentation,
   rowInteractionStatus,
   rowHeaderColumn,
 }: {
@@ -48,7 +49,7 @@ export const GridRow = memo(function GridRow({
   schema: readonly ColumnSchema[];
   path: GridPath;
   colOrder: readonly ColId[];
-  presentation?: GridPresentation;
+  presentation: GridPresentation;
   rowInteractionStatus: RowInteractionStatus;
   rowHeaderColumn: RowHeaderColumn;
 }) {
@@ -123,7 +124,12 @@ export const GridRow = memo(function GridRow({
     >
       <RowInteractionStatusProvider status={rowInteractionStatus}>
         {rowHeaderColumn === "empty-selectable-cell" ? (
-          <EmptyRowHeaderCell row={row} path={path} selected={selected} />
+          <EmptyRowHeaderCell
+            row={row}
+            path={path}
+            selected={selected}
+            presentation={presentation}
+          />
         ) : null}
         {schema.map((col) => (
           <RowCellSlot key={col.id} column={col} presentation={presentation}>
@@ -132,6 +138,7 @@ export const GridRow = memo(function GridRow({
               column={col}
               path={path}
               colOrder={colOrder}
+              presentation={presentation}
               rowHeader={
                 typeof rowHeaderColumn === "object" &&
                 rowHeaderColumn.column === col.id
@@ -155,14 +162,20 @@ function RowCellSlot({
 }) {
   if (presentation === "tabular") return children;
   const displayType = displayTypeOf(column);
+  const cardRole = cardRoleOf(column);
+  // The title is the card's heading — no label.
+  const labelled = cardRole !== "title";
   return (
     <div
       data-grid-part="row-field"
       data-col-id={column.id}
       data-col-name={column.name}
       data-display-type={displayType}
+      data-card-role={cardRole}
     >
-      <div data-grid-part="row-field-label">{column.name}</div>
+      {labelled ? (
+        <div data-grid-part="row-field-label">{column.name}</div>
+      ) : null}
       <div data-grid-part="row-field-cell">{children}</div>
     </div>
   );

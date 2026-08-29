@@ -207,6 +207,8 @@ export function buildTGridColumnsForTable<
     }
   }
 
+  markCardTitleColumn(columns, args.table);
+
   // Row-header inference is deliberately based on the completed visible list.
   // A data-backed header must be the left-most column and readonly; otherwise
   // selection gets its own structural cell. `null` and `undefined` both request
@@ -241,6 +243,29 @@ export function buildTGridColumnsForTable<
   );
 
   return { columns, rowHeaderColumn, saveCellValueByColumn };
+}
+
+// The card title is the first visible `rowLabelColumns` entry — the same
+// rule FK lookups use for row labels.
+function markCardTitleColumn(
+  columns: GridColumnSchema[],
+  table: TableSchema,
+): void {
+  for (const labelColumnName of table.rowLabelColumns) {
+    const index = columns.findIndex((column) => column.id === labelColumnName);
+    if (index === -1) continue;
+    const column = columns[index];
+    if (!isRecord(column.meta)) continue;
+    columns[index] = {
+      ...column,
+      meta: { ...column.meta, cardRole: "title" },
+    };
+    return;
+  }
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
 }
 
 function tableColumnsForProjection(

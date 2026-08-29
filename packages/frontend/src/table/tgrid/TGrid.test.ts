@@ -178,7 +178,9 @@ describe("TGrid", () => {
     document.body.append(container);
     const rootClient = createRoot(container);
     await act(async () => {
-      rootClient.render(createElement(TGrid<Rows>, { session }));
+      rootClient.render(
+        createElement(TGrid<Rows>, { session, presentation: "tabular" }),
+      );
       for (let index = 0; index < 10; index += 1) await Promise.resolve();
     });
     mounted = { root: rootClient, container };
@@ -214,7 +216,7 @@ describe("TGrid", () => {
         createElement(
           "div",
           null,
-          createElement(TGrid<Rows>, { session }),
+          createElement(TGrid<Rows>, { session, presentation: "tabular" }),
           createElement(ActiveRowName),
         ),
       );
@@ -286,6 +288,7 @@ describe("TGrid", () => {
       rootClient.render(
         createElement(TGrid<Rows>, {
           session,
+          presentation: "tabular",
           onRowActivate: firstCallback,
         }),
       );
@@ -308,6 +311,7 @@ describe("TGrid", () => {
       rootClient.render(
         createElement(TGrid<Rows>, {
           session,
+          presentation: "tabular",
           onRowActivate: latestCallback,
         }),
       );

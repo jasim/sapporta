@@ -24,10 +24,16 @@
   color: var(--sap-link, currentColor);
 }
 
-/* Reveal on row hover or when the cell holds the cursor. */
-[role="row"]:hover .tgrid-cell-link,
-[data-cell-status="cursor"] .tgrid-cell-link,
-[data-cell-status="cursor-selected"] .tgrid-cell-link,
+/* Reveal on row hover only where hover exists — on touch a tap leaves a
+   phantom hover that strands a half-visible glyph. */
+@media (hover: hover) {
+  [role="row"]:hover .tgrid-cell-link {
+    opacity: 1;
+  }
+}
+
+[data-cell-status="focus"] .tgrid-cell-link,
+[data-cell-status="in-selection"] .tgrid-cell-link,
 .tgrid-cell-link:focus-visible {
   opacity: 1;
 }

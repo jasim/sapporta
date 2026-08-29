@@ -1,6 +1,7 @@
 import { useEffect, useRef, type CSSProperties, type ReactNode } from "react";
 import { useStore } from "zustand";
 import type { ColumnSchema, RowHeaderColumn } from "../types/schema";
+import type { GridPresentation } from "../types/presentation";
 import { decomposePath, type GridPath } from "../types/identity";
 import type { GridControllerPublic } from "../interaction/controller";
 import { GridHeader } from "./GridHeader";
@@ -23,7 +24,7 @@ export type GridChromeContext = {
   rowHeaderColumn: RowHeaderColumn;
 };
 
-export type GridPresentation = "tabular" | "cards";
+export type { GridPresentation } from "../types/presentation";
 
 // Paint-only chrome wrapper. Body composition belongs to GridLevel — Grid
 // renders whatever `children` it is handed inside its container so the
@@ -62,14 +63,14 @@ export function Grid({
   renderHeader,
   levelContainerClassName,
   levelContainerStyle,
-  presentation = "tabular",
+  presentation,
   children,
 }: {
   path: GridPath;
   schema: readonly ColumnSchema[];
   rowHeaderColumn: RowHeaderColumn;
   controller: GridControllerPublic;
-  presentation?: GridPresentation;
+  presentation: GridPresentation;
   renderHeader?: (ctx: GridChromeContext) => ReactNode;
   levelContainerClassName?: (ctx: GridChromeContext) => string | undefined;
   levelContainerStyle?: (ctx: GridChromeContext) => CSSProperties | undefined;
@@ -151,6 +152,7 @@ export function Grid({
         containerRef={containerRef}
         path={path}
         schema={schema}
+        presentation={presentation}
       />
       <EffectRunner controller={controller} containerRef={containerRef} />
       <div

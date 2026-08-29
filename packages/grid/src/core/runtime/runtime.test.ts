@@ -956,7 +956,7 @@ describe("GridRuntime", () => {
     const coord = { rowId: makeRowId(rowsRoot, "a"), colId: "qty" };
     internals.cursorManager.setCellRange(rowsRoot, coord, coord);
     c.startEdit(coord, "doubleClick");
-    c.commitEdit(42);
+    c.commitEdit(42, "stay", "tabular");
     expect(handler).toHaveBeenCalledWith(
       expect.objectContaining({
         kind: "cell",
@@ -982,7 +982,7 @@ describe("GridRuntime", () => {
 
     internals.cursorManager.setCellRange(rowsRoot, aQty, bQty);
     c.startEdit(aQty, "doubleClick");
-    c.commitEdit(42);
+    c.commitEdit(42, "stay", "tabular");
 
     expect(rt.root.displayedRow(aQty.rowId)?.columns.qty).toBe(42);
     expect(rt.root.displayedRow(bQty.rowId)?.columns.qty).toBe(42);
@@ -1020,7 +1020,7 @@ describe("GridRuntime", () => {
 
     internals.cursorManager.setCellRange(rowsRoot, aName, bQty);
     c.startEdit(aQty, "doubleClick");
-    c.commitEdit(42);
+    c.commitEdit(42, "stay", "tabular");
 
     expect(rt.root.displayedRow(aQty.rowId)?.columns.qty).toBe(42);
     expect(rt.root.displayedRow(bQty.rowId)?.columns.qty).toBe(2);
@@ -1044,7 +1044,7 @@ describe("GridRuntime", () => {
     const coord = { rowId: makeRowId(rowsRoot, "a"), colId: "qty" };
 
     c.startEdit(coord, "doubleClick");
-    c.commitEdit(42);
+    c.commitEdit(42, "stay", "tabular");
 
     expect(rt.root.displayedRow(coord.rowId)?.columns.qty).toBe(42);
     expect(rt.root.displayedRow(makeRowId(rowsRoot, "b"))?.columns.qty).toBe(2);
@@ -1082,7 +1082,7 @@ describe("GridRuntime", () => {
 
     internals.cursorManager.setCellRange(rowsRoot, bQty, phantomQty);
     c.startEdit(bQty, "doubleClick");
-    c.commitEdit(42);
+    c.commitEdit(42, "stay", "tabular");
 
     expect(rt.root.displayedRow(makeRowId(rowsRoot, "a"))?.columns.qty).toBe(1);
     expect(rt.root.displayedRow(bQty.rowId)?.columns.qty).toBe(42);
@@ -1344,23 +1344,31 @@ describe("GridRuntime", () => {
     };
     internals.cursorManager.moveCellCursorTo(lastDataCursor);
 
-    internals.coordinator.navigateCell(rowsRoot, {
-      type: "moveRow",
-      direction: "down",
-      colPolicy: "preserve",
-      extend: false,
-    });
+    internals.coordinator.navigateCell(
+      rowsRoot,
+      {
+        type: "moveRow",
+        direction: "down",
+        colPolicy: "preserve",
+        extend: false,
+      },
+      "tabular",
+    );
     const firstTarget = internals.cursorManager.currentCellCursor();
     expect(firstTarget).not.toBeNull();
     expect(rt.root.displayedRow(firstTarget!.rowId)?.kind).toBe("phantom");
     expect(rt.root.drafts.get()).toHaveLength(1);
 
-    internals.coordinator.navigateCell(rowsRoot, {
-      type: "moveRow",
-      direction: "down",
-      colPolicy: "preserve",
-      extend: false,
-    });
+    internals.coordinator.navigateCell(
+      rowsRoot,
+      {
+        type: "moveRow",
+        direction: "down",
+        colPolicy: "preserve",
+        extend: false,
+      },
+      "tabular",
+    );
     expect(rt.root.drafts.get()).toHaveLength(1);
     expect(internals.cursorManager.currentCellCursor()).toEqual(firstTarget);
   });
@@ -1385,12 +1393,16 @@ describe("GridRuntime", () => {
     };
     internals.cursorManager.moveCellCursorTo(lastPageRowCursor);
 
-    internals.coordinator.navigateCell(rowsRoot, {
-      type: "moveRow",
-      direction: "down",
-      colPolicy: "preserve",
-      extend: false,
-    });
+    internals.coordinator.navigateCell(
+      rowsRoot,
+      {
+        type: "moveRow",
+        direction: "down",
+        colPolicy: "preserve",
+        extend: false,
+      },
+      "tabular",
+    );
 
     expect(rt.root.drafts.get()).toHaveLength(0);
     expect(internals.cursorManager.currentCellCursor()).toEqual(
@@ -1429,12 +1441,16 @@ describe("GridRuntime", () => {
     };
     internals.cursorManager.moveCellCursorTo(lastDataCursor);
 
-    internals.coordinator.navigateCell(rowsRoot, {
-      type: "moveRow",
-      direction: "down",
-      colPolicy: "preserve",
-      extend: false,
-    });
+    internals.coordinator.navigateCell(
+      rowsRoot,
+      {
+        type: "moveRow",
+        direction: "down",
+        colPolicy: "preserve",
+        extend: false,
+      },
+      "tabular",
+    );
 
     expect(rt.root.drafts.get()).toHaveLength(0);
     expect(onLoadedRowsBoundary).toHaveBeenCalledWith({
@@ -1619,12 +1635,16 @@ describe("GridRuntime", () => {
       colId: "qty",
     });
 
-    internals.coordinator.navigateCell(rowsRoot, {
-      type: "moveRow",
-      direction: "down",
-      colPolicy: "preserve",
-      extend: false,
-    });
+    internals.coordinator.navigateCell(
+      rowsRoot,
+      {
+        type: "moveRow",
+        direction: "down",
+        colPolicy: "preserve",
+        extend: false,
+      },
+      "tabular",
+    );
 
     expect(rt.root.drafts.get()).toHaveLength(1);
     const target = internals.cursorManager.currentCellCursor();
@@ -1682,12 +1702,16 @@ describe("GridRuntime", () => {
       rowId: makeRowId(rowsRoot, "c"),
       colId: "qty",
     });
-    internals.coordinator.navigateCell(rowsRoot, {
-      type: "moveRow",
-      direction: "down",
-      colPolicy: "preserve",
-      extend: false,
-    });
+    internals.coordinator.navigateCell(
+      rowsRoot,
+      {
+        type: "moveRow",
+        direction: "down",
+        colPolicy: "preserve",
+        extend: false,
+      },
+      "tabular",
+    );
     expect(rt.root.drafts.get()).toHaveLength(1);
 
     source.setCanAppendRow(() => false);
@@ -1801,12 +1825,16 @@ describe("GridRuntime", () => {
       rowId: makeRowId(quotesPath, "quote-2"),
       colId: "text",
     });
-    internals.coordinator.navigateCell(quotesPath, {
-      type: "moveRow",
-      direction: "down",
-      colPolicy: "preserve",
-      extend: false,
-    });
+    internals.coordinator.navigateCell(
+      quotesPath,
+      {
+        type: "moveRow",
+        direction: "down",
+        colPolicy: "preserve",
+        extend: false,
+      },
+      "tabular",
+    );
 
     expect(rt.root.drafts.get()).toHaveLength(0);
     const quotePhantoms = quotes.drafts.get();
@@ -2362,7 +2390,7 @@ describe("GridRuntime", () => {
       altKey: false,
     } as KeyboardEvent;
 
-    expect(controller.handleKey(enter)).toBe(true);
+    expect(controller.handleKey(enter, "tabular")).toBe(true);
     expect(first).toHaveBeenCalledWith({
       activeRow: rt.activeRow(),
       trigger: { kind: "keyboard", gesture: "enter" },
@@ -2371,7 +2399,7 @@ describe("GridRuntime", () => {
 
     unsubscribeFirst();
     unsubscribeSecond();
-    expect(controller.handleKey(enter)).toBe(true);
+    expect(controller.handleKey(enter, "tabular")).toBe(true);
     expect(first).toHaveBeenCalledTimes(1);
     expect(second).toHaveBeenCalledTimes(1);
   });
@@ -2403,6 +2431,7 @@ describe("GridRuntime", () => {
           metaKey: false,
           shiftKey: false,
         },
+        "tabular",
       ),
     ).toBe(true);
     expect(rt.activeRow()).toEqual(
@@ -2459,13 +2488,16 @@ describe("GridRuntime", () => {
     });
     const handled = runtimeInternalsFor(rt)
       .controllerFor(rowsRoot)
-      .handleKey({
-        key: "Enter",
-        ctrlKey: false,
-        metaKey: false,
-        shiftKey: false,
-        altKey: false,
-      } as KeyboardEvent);
+      .handleKey(
+        {
+          key: "Enter",
+          ctrlKey: false,
+          metaKey: false,
+          shiftKey: false,
+          altKey: false,
+        } as KeyboardEvent,
+        "tabular",
+      );
 
     expect(handled).toBe(true);
     expect(activated).toHaveBeenCalledWith({
@@ -2504,6 +2536,7 @@ describe("GridRuntime", () => {
           metaKey: false,
           shiftKey: false,
         },
+        "tabular",
       ),
     ).toBe(true);
     expect(controller.getState().editing?.coord).toEqual({
@@ -2514,13 +2547,16 @@ describe("GridRuntime", () => {
 
     controller.cancelEdit();
     expect(
-      controller.handleKey({
-        key: "Enter",
-        ctrlKey: false,
-        metaKey: false,
-        shiftKey: false,
-        altKey: false,
-      } as KeyboardEvent),
+      controller.handleKey(
+        {
+          key: "Enter",
+          ctrlKey: false,
+          metaKey: false,
+          shiftKey: false,
+          altKey: false,
+        } as KeyboardEvent,
+        "tabular",
+      ),
     ).toBe(true);
     expect(controller.getState().editing?.editStart).toEqual({
       trigger: "enter",
@@ -2584,13 +2620,16 @@ describe("GridRuntime", () => {
     expect(
       runtimeInternalsFor(rt)
         .controllerFor(rowsRoot)
-        .handleKey({
-          key: "Enter",
-          ctrlKey: false,
-          metaKey: false,
-          shiftKey: false,
-          altKey: false,
-        } as KeyboardEvent),
+        .handleKey(
+          {
+            key: "Enter",
+            ctrlKey: false,
+            metaKey: false,
+            shiftKey: false,
+            altKey: false,
+          } as KeyboardEvent,
+          "tabular",
+        ),
     ).toBe(true);
     expect(cellActivated).toHaveBeenCalledTimes(1);
     expect(rowActivated).not.toHaveBeenCalled();

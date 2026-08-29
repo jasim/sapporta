@@ -76,14 +76,14 @@ export function TGrid<
   className,
   style,
   viewRelatedRows,
-  presentation = "tabular",
+  presentation,
   onRowActivate,
 }: {
   session: TGridSession<RowsByLevel, AppServices>;
   className?: string;
   style?: CSSProperties;
   viewRelatedRows?: ViewRelatedRowsOption;
-  presentation?: TGridPresentation;
+  presentation: TGridPresentation;
   /** Receives configured Enter, click, or double-click row activations. */
   onRowActivate?: (event: TGridRowActivatedEvent<RowsByLevel>) => void;
 }) {

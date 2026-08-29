@@ -82,16 +82,20 @@ export interface GridControllerPublicVerbs {
   readonly handleCellPointer: (
     coord: Coord,
     pointer: GridPointerInput,
+    presentation: CellKeyboardPresentation,
   ) => boolean;
   readonly handleRowPointer: (
     rowId: RowId,
     pointer: GridPointerInput,
   ) => boolean;
   readonly cancelEdit: () => void;
-  // commitEdit closes the editor, performs the cell write, and (when
-  // `commit !== "stay"`) fires a movement intent in the requested
-  // direction so the user lands where Tab / Enter / Shift+Tab promised.
-  readonly commitEdit: (value: unknown, commit?: CommitTarget) => void;
+  // Closes the editor, writes the cell, and (when `commit !== "stay"`) moves
+  // focus in the promised direction, in `presentation`'s column order.
+  readonly commitEdit: (
+    value: unknown,
+    commit: CommitTarget,
+    presentation: CellKeyboardPresentation,
+  ) => void;
   readonly clearCellSelection: () => void;
   readonly clearRowSelection: () => void;
   // Return browser focus to this grid without changing its cursor, selection,
@@ -101,7 +105,7 @@ export interface GridControllerPublicVerbs {
   // event was consumed (caller should preventDefault), false otherwise.
   readonly handleKey: (
     e: KeyboardEvent,
-    presentation?: CellKeyboardPresentation,
+    presentation: CellKeyboardPresentation,
   ) => boolean;
   // Explicit viewport reveal. This is deliberately not part of cursor
   // placement: pointer clicks should be able to move focus without moving
@@ -158,7 +162,11 @@ export type CreateControllerArgs = {
   getSchema: () => readonly ColumnSchema[];
   /** Returns whether this path's source currently accepts writes. */
   isWritable: () => boolean;
-  onNavigateCell?: (intent: CellNavigationIntent) => void;
+  // `presentation` names the column order movement resolves against.
+  onNavigateCell?: (
+    intent: CellNavigationIntent,
+    presentation: CellKeyboardPresentation,
+  ) => void;
   onNavigateRow?: (intent: RowNavigationIntent) => void;
   clearCellRange?: (path: GridPath) => void;
   clearRowSelection?: (path: GridPath) => void;
@@ -278,7 +286,7 @@ export function createGridController(
   store.activateCell = (coord, trigger) => {
     args.activateCell?.(coord, trigger);
   };
-  store.handleCellPointer = (coord, pointer) => {
+  store.handleCellPointer = (coord, pointer, presentation) => {
     if (args.interaction.mode !== "cell-grid") return false;
     const row = args.getDisplayed().rowById.get(coord.rowId);
     const column = args.getSchema().find((c) => c.id === coord.colId);
@@ -290,12 +298,11 @@ export function createGridController(
       gesture: pointer.gesture,
     });
     if (intent) {
-      args.onNavigateCell?.({
-        type: "cellPressed",
-        target: coord,
-        extend: false,
-      });
-      return applyCellIntent(intent);
+      args.onNavigateCell?.(
+        { type: "cellPressed", target: coord, extend: false },
+        presentation,
+      );
+      return applyCellIntent(intent, presentation);
     }
     const rowIntent = pointerEventToRowIntent({
       config: args.interaction,
@@ -305,11 +312,10 @@ export function createGridController(
     if (!rowIntent || rowIntent.type !== "activateRow" || !args.activateRow) {
       return false;
     }
-    args.onNavigateCell?.({
-      type: "cellPressed",
-      target: coord,
-      extend: false,
-    });
+    args.onNavigateCell?.(
+      { type: "cellPressed", target: coord, extend: false },
+      presentation,
+    );
     return args.activateRow(rowIntent.rowId, rowIntent.trigger, coord);
   };
   store.handleRowPointer = (rowId, pointer) => {
@@ -335,7 +341,10 @@ export function createGridController(
     store.queueEffect({ type: "scrollRowIntoView", rowId });
   };
 
-  function applyCellIntent(intent: CellNavigationIntent): boolean {
+  function applyCellIntent(
+    intent: CellNavigationIntent,
+    presentation: CellKeyboardPresentation,
+  ): boolean {
     const focus = store.getState().liveCellFocus;
     switch (intent.type) {
       case "clearCellSelection": {
@@ -344,21 +353,21 @@ export function createGridController(
         // pointer selection. A standalone controller with a cursor port can
         // still clear its own path when no coordinator is attached.
         if (args.onNavigateCell) {
-          args.onNavigateCell(intent);
+          args.onNavigateCell(intent, presentation);
         } else {
           store.clearCellSelection();
         }
         return true;
       }
       case "clearRowSelection":
-        args.onNavigateCell?.(intent);
+        args.onNavigateCell?.(intent, presentation);
         return !!args.onNavigateCell;
       case "focusFirstCell": {
-        args.onNavigateCell?.(intent);
+        args.onNavigateCell?.(intent, presentation);
         return !!args.onNavigateCell;
       }
       case "toggleActiveRowSelection": {
-        args.onNavigateCell?.(intent);
+        args.onNavigateCell?.(intent, presentation);
         return !!args.onNavigateCell;
       }
       case "activateCell":
@@ -390,7 +399,7 @@ export function createGridController(
       case "commitMove":
       case "cellPressed":
       case "rowPressed":
-        args.onNavigateCell?.(intent);
+        args.onNavigateCell?.(intent, presentation);
         return !!args.onNavigateCell;
     }
     return false;
@@ -426,7 +435,7 @@ export function createGridController(
     return false;
   }
 
-  store.commitEdit = (value, commit = "stay") => {
+  store.commitEdit = (value, commit, presentation) => {
     const editing = store.getState().editing;
     if (!editing) return;
     const coord = editing.coord;
@@ -438,7 +447,7 @@ export function createGridController(
     dispatch({ type: "COMMIT_EDIT", value, commit });
     // Directional follow-up: Tab / Enter / Shift+Tab promised a focus move.
     if (commit !== "stay") {
-      applyCellIntent({ type: "commitMove", target: commit });
+      applyCellIntent({ type: "commitMove", target: commit }, presentation);
     }
   };
 
@@ -457,7 +466,7 @@ export function createGridController(
         isCellEditable,
         presentation,
       );
-      return intent ? applyCellIntent(intent) : false;
+      return intent ? applyCellIntent(intent, presentation) : false;
     }
     const intent = keyEventToRowIntent(e, args.interaction, state);
     return intent ? applyRowIntent(intent) : false;

@@ -405,11 +405,15 @@ describe("GridCoordinator", () => {
     rt.rowInteraction.selectRow(root, makeRowId(root, "Fruit"));
     rt.rowInteraction.selectRow(fruitItems, makeRowId(fruitItems, "Apple"));
 
-    rt.coordinator.navigateCell(root, {
-      type: "cellPressed",
-      target: { rowId: makeRowId(root, "Veg"), colId: "qty" },
-      extend: false,
-    });
+    rt.coordinator.navigateCell(
+      root,
+      {
+        type: "cellPressed",
+        target: { rowId: makeRowId(root, "Veg"), colId: "qty" },
+        extend: false,
+      },
+      "tabular",
+    );
 
     expect(rt.selectedRowIds(root)).toEqual([]);
     expect(rt.selectedRowIds(fruitItems)).toEqual([]);
@@ -435,15 +439,19 @@ describe("GridCoordinator", () => {
     rt.rowInteraction.selectRow(root, makeRowId(root, "Fruit"));
     rt.rowInteraction.selectRow(fruitItems, makeRowId(fruitItems, "Apple"));
 
-    rt.coordinator.navigateCell(fruitItems, {
-      type: "rowPressed",
-      target: makeRowId(fruitItems, "Banana"),
-      origin: {
-        kind: "cell",
-        target: { rowId: makeRowId(fruitItems, "Banana"), colId: "name" },
+    rt.coordinator.navigateCell(
+      fruitItems,
+      {
+        type: "rowPressed",
+        target: makeRowId(fruitItems, "Banana"),
+        origin: {
+          kind: "cell",
+          target: { rowId: makeRowId(fruitItems, "Banana"), colId: "name" },
+        },
+        gesture: "replace",
       },
-      gesture: "replace",
-    });
+      "tabular",
+    );
 
     expect(rt.controllerFor(root).getState().cellSelection).toBe(null);
     expect(rt.controllerFor(fruitItems).getState().cellSelection).toBe(null);
@@ -467,12 +475,16 @@ describe("GridCoordinator", () => {
     );
     rt.rowInteraction.selectRow(root, makeRowId(root, "Fruit"));
 
-    rt.coordinator.navigateCell(fruitItems, {
-      type: "rowPressed",
-      target: makeRowId(fruitItems, "Apple"),
-      origin: { kind: "row-control" },
-      gesture: "toggle",
-    });
+    rt.coordinator.navigateCell(
+      fruitItems,
+      {
+        type: "rowPressed",
+        target: makeRowId(fruitItems, "Apple"),
+        origin: { kind: "row-control" },
+        gesture: "toggle",
+      },
+      "tabular",
+    );
 
     expect(rt.coordinator.getState().cellCursor).toBe(null);
     expect(rt.controllerFor(root).getState().cellSelection).toBe(null);
@@ -489,13 +501,16 @@ describe("GridCoordinator", () => {
     rt.cursorManager.setCellRange(root, anchor, head);
 
     expect(
-      rt.controllerFor(root).handleKey({
-        key: " ",
-        ctrlKey: false,
-        metaKey: false,
-        shiftKey: true,
-        altKey: false,
-      } as KeyboardEvent),
+      rt.controllerFor(root).handleKey(
+        {
+          key: " ",
+          ctrlKey: false,
+          metaKey: false,
+          shiftKey: true,
+          altKey: false,
+        } as KeyboardEvent,
+        "tabular",
+      ),
     ).toBe(true);
 
     expect(rt.controllerFor(root).getState().cellSelection).toBe(null);
@@ -558,13 +573,16 @@ describe("GridCoordinator", () => {
     cellGrid.cursorManager.moveCellCursorTo(firstCell);
     cellGrid.controllerFor(root).flushEffects();
 
-    cellGrid.controllerFor(root).handleKey({
-      key: "ArrowRight",
-      ctrlKey: false,
-      metaKey: false,
-      shiftKey: false,
-      altKey: false,
-    } as KeyboardEvent);
+    cellGrid.controllerFor(root).handleKey(
+      {
+        key: "ArrowRight",
+        ctrlKey: false,
+        metaKey: false,
+        shiftKey: false,
+        altKey: false,
+      } as KeyboardEvent,
+      "tabular",
+    );
 
     expect(cellGrid.coordinator.getState().cellCursor).toEqual({
       path: root,
@@ -585,13 +603,16 @@ describe("GridCoordinator", () => {
     rowList.cursorManager.moveRowCursorTo(firstRow);
     rowList.controllerFor(root).flushEffects();
 
-    rowList.controllerFor(root).handleKey({
-      key: "ArrowDown",
-      ctrlKey: false,
-      metaKey: false,
-      shiftKey: false,
-      altKey: false,
-    } as KeyboardEvent);
+    rowList.controllerFor(root).handleKey(
+      {
+        key: "ArrowDown",
+        ctrlKey: false,
+        metaKey: false,
+        shiftKey: false,
+        altKey: false,
+      } as KeyboardEvent,
+      "tabular",
+    );
 
     expect(rowList.coordinator.getState().rowCursor).toEqual({
       path: root,
@@ -613,13 +634,16 @@ describe("GridCoordinator", () => {
     rt.cursorManager.moveCellCursorTo(first);
     rt.controllerFor(root).flushEffects();
 
-    rt.controllerFor(root).handleKey({
-      key: "ArrowDown",
-      ctrlKey: false,
-      metaKey: false,
-      shiftKey: false,
-      altKey: false,
-    } as KeyboardEvent);
+    rt.controllerFor(root).handleKey(
+      {
+        key: "ArrowDown",
+        ctrlKey: false,
+        metaKey: false,
+        shiftKey: false,
+        altKey: false,
+      } as KeyboardEvent,
+      "tabular",
+    );
     await flushMicrotasks();
 
     const second = makeRowId(root, "Veg");
@@ -644,13 +668,16 @@ describe("GridCoordinator", () => {
     rt.cursorManager.moveCellCursorTo(second);
     rt.controllerFor(root).flushEffects();
 
-    rt.controllerFor(root).handleKey({
-      key: "ArrowUp",
-      ctrlKey: false,
-      metaKey: false,
-      shiftKey: false,
-      altKey: false,
-    } as KeyboardEvent);
+    rt.controllerFor(root).handleKey(
+      {
+        key: "ArrowUp",
+        ctrlKey: false,
+        metaKey: false,
+        shiftKey: false,
+        altKey: false,
+      } as KeyboardEvent,
+      "tabular",
+    );
     await flushMicrotasks();
 
     const first = makeRowId(root, "Fruit");
@@ -674,13 +701,16 @@ describe("GridCoordinator", () => {
     });
     rt.controllerFor(duneQuotes).flushEffects();
 
-    rt.controllerFor(duneQuotes).handleKey({
-      key: "ArrowDown",
-      ctrlKey: false,
-      metaKey: false,
-      shiftKey: false,
-      altKey: false,
-    } as KeyboardEvent);
+    rt.controllerFor(duneQuotes).handleKey(
+      {
+        key: "ArrowDown",
+        ctrlKey: false,
+        metaKey: false,
+        shiftKey: false,
+        altKey: false,
+      } as KeyboardEvent,
+      "tabular",
+    );
     await flushMicrotasks();
 
     expect(rt.coordinator.getState().cellCursor).toEqual({
@@ -705,13 +735,16 @@ describe("GridCoordinator", () => {
     };
     rt.cursorManager.moveCellCursorTo(first);
 
-    rt.controllerFor(root).handleKey({
-      key: "PageDown",
-      ctrlKey: false,
-      metaKey: false,
-      shiftKey: false,
-      altKey: false,
-    } as KeyboardEvent);
+    rt.controllerFor(root).handleKey(
+      {
+        key: "PageDown",
+        ctrlKey: false,
+        metaKey: false,
+        shiftKey: false,
+        altKey: false,
+      } as KeyboardEvent,
+      "tabular",
+    );
     await flushMicrotasks();
 
     expect(rt.coordinator.getState().cellCursor).toEqual({
@@ -720,13 +753,16 @@ describe("GridCoordinator", () => {
       colId: "name",
     });
 
-    rt.controllerFor(root).handleKey({
-      key: "PageDown",
-      ctrlKey: false,
-      metaKey: false,
-      shiftKey: false,
-      altKey: false,
-    } as KeyboardEvent);
+    rt.controllerFor(root).handleKey(
+      {
+        key: "PageDown",
+        ctrlKey: false,
+        metaKey: false,
+        shiftKey: false,
+        altKey: false,
+      } as KeyboardEvent,
+      "tabular",
+    );
     await flushMicrotasks();
 
     expect(rt.coordinator.getState().cellCursor).toEqual({
@@ -755,13 +791,16 @@ describe("GridCoordinator", () => {
       colId: "name",
     });
 
-    rt.controllerFor(root).handleKey({
-      key: "PageUp",
-      ctrlKey: false,
-      metaKey: false,
-      shiftKey: false,
-      altKey: false,
-    } as KeyboardEvent);
+    rt.controllerFor(root).handleKey(
+      {
+        key: "PageUp",
+        ctrlKey: false,
+        metaKey: false,
+        shiftKey: false,
+        altKey: false,
+      } as KeyboardEvent,
+      "tabular",
+    );
     await flushMicrotasks();
 
     expect(rt.coordinator.getState().cellCursor).toEqual({
@@ -770,13 +809,16 @@ describe("GridCoordinator", () => {
       colId: "name",
     });
 
-    rt.controllerFor(root).handleKey({
-      key: "PageUp",
-      ctrlKey: false,
-      metaKey: false,
-      shiftKey: false,
-      altKey: false,
-    } as KeyboardEvent);
+    rt.controllerFor(root).handleKey(
+      {
+        key: "PageUp",
+        ctrlKey: false,
+        metaKey: false,
+        shiftKey: false,
+        altKey: false,
+      } as KeyboardEvent,
+      "tabular",
+    );
     await flushMicrotasks();
 
     expect(rt.coordinator.getState().cellCursor).toEqual({
@@ -797,13 +839,16 @@ describe("GridCoordinator", () => {
     };
     rt.cursorManager.moveCellCursorTo(first);
 
-    rt.controllerFor(root).handleKey({
-      key: "ArrowDown",
-      ctrlKey: false,
-      metaKey: false,
-      shiftKey: false,
-      altKey: false,
-    } as KeyboardEvent);
+    rt.controllerFor(root).handleKey(
+      {
+        key: "ArrowDown",
+        ctrlKey: false,
+        metaKey: false,
+        shiftKey: false,
+        altKey: false,
+      } as KeyboardEvent,
+      "tabular",
+    );
     await flushMicrotasks();
 
     expect(rt.coordinator.getState().cellCursor).toEqual({
@@ -821,13 +866,16 @@ describe("GridCoordinator", () => {
     });
     rt.controllerFor(root).flushEffects();
 
-    rt.controllerFor(root).handleKey({
-      key: "ArrowDown",
-      ctrlKey: false,
-      metaKey: false,
-      shiftKey: false,
-      altKey: false,
-    } as KeyboardEvent);
+    rt.controllerFor(root).handleKey(
+      {
+        key: "ArrowDown",
+        ctrlKey: false,
+        metaKey: false,
+        shiftKey: false,
+        altKey: false,
+      } as KeyboardEvent,
+      "tabular",
+    );
     await flushMicrotasks();
 
     const second = makeRowId(root, "Veg");
@@ -857,13 +905,16 @@ describe("GridCoordinator", () => {
       rowId: makeRowId(root, "Fruit"),
     });
 
-    rt.controllerFor(root).handleKey({
-      key: "PageDown",
-      ctrlKey: false,
-      metaKey: false,
-      shiftKey: false,
-      altKey: false,
-    } as KeyboardEvent);
+    rt.controllerFor(root).handleKey(
+      {
+        key: "PageDown",
+        ctrlKey: false,
+        metaKey: false,
+        shiftKey: false,
+        altKey: false,
+      } as KeyboardEvent,
+      "tabular",
+    );
     await flushMicrotasks();
 
     expect(rt.coordinator.getState().rowCursor).toEqual({
@@ -871,13 +922,16 @@ describe("GridCoordinator", () => {
       rowId: makeRowId(root, "Apple"),
     });
 
-    rt.controllerFor(root).handleKey({
-      key: "PageDown",
-      ctrlKey: false,
-      metaKey: false,
-      shiftKey: false,
-      altKey: false,
-    } as KeyboardEvent);
+    rt.controllerFor(root).handleKey(
+      {
+        key: "PageDown",
+        ctrlKey: false,
+        metaKey: false,
+        shiftKey: false,
+        altKey: false,
+      } as KeyboardEvent,
+      "tabular",
+    );
     await flushMicrotasks();
 
     expect(rt.coordinator.getState().rowCursor).toEqual({
@@ -904,13 +958,16 @@ describe("GridCoordinator", () => {
       rowId: makeRowId(root, "Veg"),
     });
 
-    rt.controllerFor(root).handleKey({
-      key: "PageUp",
-      ctrlKey: false,
-      metaKey: false,
-      shiftKey: false,
-      altKey: false,
-    } as KeyboardEvent);
+    rt.controllerFor(root).handleKey(
+      {
+        key: "PageUp",
+        ctrlKey: false,
+        metaKey: false,
+        shiftKey: false,
+        altKey: false,
+      } as KeyboardEvent,
+      "tabular",
+    );
     await flushMicrotasks();
 
     expect(rt.coordinator.getState().rowCursor).toEqual({
@@ -918,13 +975,16 @@ describe("GridCoordinator", () => {
       rowId: makeRowId(root, "Apple"),
     });
 
-    rt.controllerFor(root).handleKey({
-      key: "PageUp",
-      ctrlKey: false,
-      metaKey: false,
-      shiftKey: false,
-      altKey: false,
-    } as KeyboardEvent);
+    rt.controllerFor(root).handleKey(
+      {
+        key: "PageUp",
+        ctrlKey: false,
+        metaKey: false,
+        shiftKey: false,
+        altKey: false,
+      } as KeyboardEvent,
+      "tabular",
+    );
     await flushMicrotasks();
 
     expect(rt.coordinator.getState().rowCursor).toEqual({
@@ -942,13 +1002,16 @@ describe("GridCoordinator", () => {
       rowId: makeRowId(root, "Fruit"),
     });
 
-    rt.controllerFor(root).handleKey({
-      key: "ArrowDown",
-      ctrlKey: false,
-      metaKey: false,
-      shiftKey: false,
-      altKey: false,
-    } as KeyboardEvent);
+    rt.controllerFor(root).handleKey(
+      {
+        key: "ArrowDown",
+        ctrlKey: false,
+        metaKey: false,
+        shiftKey: false,
+        altKey: false,
+      } as KeyboardEvent,
+      "tabular",
+    );
     await flushMicrotasks();
 
     expect(rt.coordinator.getState().rowCursor).toEqual({
@@ -989,13 +1052,16 @@ describe("GridCoordinator", () => {
     const head = { rowId: makeRowId(root, "Fruit"), colId: "qty" as const };
     rt.cursorManager.setCellRange(root, anchor, head);
     expect(
-      rt.controllerFor(root).handleKey({
-        key: "ArrowLeft",
-        ctrlKey: false,
-        metaKey: false,
-        shiftKey: false,
-        altKey: false,
-      } as KeyboardEvent),
+      rt.controllerFor(root).handleKey(
+        {
+          key: "ArrowLeft",
+          ctrlKey: false,
+          metaKey: false,
+          shiftKey: false,
+          altKey: false,
+        } as KeyboardEvent,
+        "tabular",
+      ),
     ).toBe(true);
     expect(rt.coordinator.getState().cellCursor).toEqual({
       path: root,
@@ -1023,13 +1089,16 @@ describe("GridCoordinator", () => {
     expect(rt.controllerFor(root).getState().cellSelection).toBe(null);
 
     expect(
-      rt.controllerFor(root).handleKey({
-        key: "ArrowRight",
-        ctrlKey: false,
-        metaKey: false,
-        shiftKey: true,
-        altKey: false,
-      } as KeyboardEvent),
+      rt.controllerFor(root).handleKey(
+        {
+          key: "ArrowRight",
+          ctrlKey: false,
+          metaKey: false,
+          shiftKey: true,
+          altKey: false,
+        } as KeyboardEvent,
+        "tabular",
+      ),
     ).toBe(true);
 
     expect(rt.controllerFor(root).getState().cellSelection).toEqual({
@@ -1065,7 +1134,7 @@ describe("GridCoordinator", () => {
     focusCell(rt, root, coord);
     const controller = rt.controllerFor(root);
     controller.startEdit(coord, "doubleClick");
-    controller.commitEdit("x", "next");
+    controller.commitEdit("x", "next", "tabular");
     expect(rt.coordinator.getState().cellCursor).toEqual({
       path: root,
       rowId: makeRowId(root, "Fruit"),
@@ -1133,12 +1202,16 @@ describe("GridCoordinator", () => {
       rowId: makeRowId(fruitItems, "Banana"),
       colId: "name",
     });
-    rt.coordinator.navigateCell(fruitItems, {
-      type: "moveRow",
-      direction: "down",
-      colPolicy: "preserve",
-      extend: false,
-    });
+    rt.coordinator.navigateCell(
+      fruitItems,
+      {
+        type: "moveRow",
+        direction: "down",
+        colPolicy: "preserve",
+        extend: false,
+      },
+      "tabular",
+    );
     expect(rt.coordinator.getState().cellCursor).toEqual({
       path: root,
       rowId: makeRowId(root, "Veg"),
@@ -1157,12 +1230,16 @@ describe("GridCoordinator", () => {
       rowId: makeRowId(fruitItems, "Apple"),
       colId: "name",
     });
-    rt.coordinator.navigateCell(fruitItems, {
-      type: "moveRow",
-      direction: "up",
-      colPolicy: "preserve",
-      extend: false,
-    });
+    rt.coordinator.navigateCell(
+      fruitItems,
+      {
+        type: "moveRow",
+        direction: "up",
+        colPolicy: "preserve",
+        extend: false,
+      },
+      "tabular",
+    );
     expect(rt.coordinator.getState().cellCursor).toEqual({
       path: root,
       rowId: makeRowId(root, "Fruit"),
@@ -1178,12 +1255,16 @@ describe("GridCoordinator", () => {
       rowId: makeRowId(root, "Veg"),
       colId: "name",
     });
-    rt.coordinator.navigateCell(root, {
-      type: "moveRow",
-      direction: "up",
-      colPolicy: "preserve",
-      extend: false,
-    });
+    rt.coordinator.navigateCell(
+      root,
+      {
+        type: "moveRow",
+        direction: "up",
+        colPolicy: "preserve",
+        extend: false,
+      },
+      "tabular",
+    );
     expect(rt.coordinator.getState().cellCursor).toEqual({
       path: fruitItems,
       rowId: makeRowId(fruitItems, "Banana"),
@@ -1198,12 +1279,16 @@ describe("GridCoordinator", () => {
       rowId: makeRowId(root, "Fruit"),
       colId: "name",
     });
-    rt.coordinator.navigateCell(root, {
-      type: "moveRow",
-      direction: "down",
-      colPolicy: "preserve",
-      extend: false,
-    });
+    rt.coordinator.navigateCell(
+      root,
+      {
+        type: "moveRow",
+        direction: "down",
+        colPolicy: "preserve",
+        extend: false,
+      },
+      "tabular",
+    );
     expect(rt.coordinator.getState().cellCursor).toEqual({
       path: fruitItems,
       rowId: makeRowId(fruitItems, "Apple"),
@@ -1222,12 +1307,16 @@ describe("GridCoordinator", () => {
       rowId: makeRowId(root, "Fruit"),
       colId: "name",
     });
-    rt.coordinator.navigateCell(root, {
-      type: "moveGridEdge",
-      edge: "last",
-      colPolicy: "preserve",
-      extend: false,
-    });
+    rt.coordinator.navigateCell(
+      root,
+      {
+        type: "moveGridEdge",
+        edge: "last",
+        colPolicy: "preserve",
+        extend: false,
+      },
+      "tabular",
+    );
     expect(rt.coordinator.getState().cellCursor).toEqual({
       path: vegItems,
       rowId: makeRowId(vegItems, "Carrot"),
@@ -1242,12 +1331,16 @@ describe("GridCoordinator", () => {
       rowId: makeRowId(vegItems, "Carrot"),
       colId: "name",
     });
-    rt.coordinator.navigateCell(vegItems, {
-      type: "moveGridEdge",
-      edge: "first",
-      colPolicy: "preserve",
-      extend: false,
-    });
+    rt.coordinator.navigateCell(
+      vegItems,
+      {
+        type: "moveGridEdge",
+        edge: "first",
+        colPolicy: "preserve",
+        extend: false,
+      },
+      "tabular",
+    );
     expect(rt.coordinator.getState().cellCursor).toEqual({
       path: root,
       rowId: makeRowId(root, "Fruit"),
@@ -1264,12 +1357,16 @@ describe("GridCoordinator", () => {
       rowId: makeRowId(root, "Fruit"),
       colId: "name",
     });
-    rt.coordinator.navigateCell(root, {
-      type: "moveRowDelta",
-      delta: 3,
-      colPolicy: "preserve",
-      extend: false,
-    });
+    rt.coordinator.navigateCell(
+      root,
+      {
+        type: "moveRowDelta",
+        delta: 3,
+        colPolicy: "preserve",
+        extend: false,
+      },
+      "tabular",
+    );
     expect(rt.coordinator.getState().cellCursor).toEqual({
       path: root,
       rowId: makeRowId(root, "Veg"),
@@ -1289,12 +1386,16 @@ describe("GridCoordinator", () => {
       rowId: makeRowId(vegItems, "Carrot"),
       colId: "name",
     });
-    rt.coordinator.navigateCell(vegItems, {
-      type: "moveRow",
-      direction: "up",
-      colPolicy: "preserve",
-      extend: false,
-    });
+    rt.coordinator.navigateCell(
+      vegItems,
+      {
+        type: "moveRow",
+        direction: "up",
+        colPolicy: "preserve",
+        extend: false,
+      },
+      "tabular",
+    );
     expect(rt.coordinator.getState().cellCursor).toEqual({
       path: root,
       rowId: makeRowId(root, "Veg"),
@@ -1309,13 +1410,16 @@ describe("GridCoordinator", () => {
       colId: "name",
     });
     expect(
-      rt.controllerFor(root).handleKey({
-        key: "ArrowDown",
-        ctrlKey: false,
-        metaKey: false,
-        shiftKey: false,
-        altKey: false,
-      } as KeyboardEvent),
+      rt.controllerFor(root).handleKey(
+        {
+          key: "ArrowDown",
+          ctrlKey: false,
+          metaKey: false,
+          shiftKey: false,
+          altKey: false,
+        } as KeyboardEvent,
+        "tabular",
+      ),
     ).toBe(true);
     expect(rt.coordinator.getState().cellCursor).toEqual({
       path: fruitItems,
@@ -1337,13 +1441,16 @@ describe("GridCoordinator", () => {
     });
 
     expect(
-      rt.controllerFor(root).handleKey({
-        key: "Enter",
-        ctrlKey: false,
-        metaKey: false,
-        shiftKey: false,
-        altKey: false,
-      } as KeyboardEvent),
+      rt.controllerFor(root).handleKey(
+        {
+          key: "Enter",
+          ctrlKey: false,
+          metaKey: false,
+          shiftKey: false,
+          altKey: false,
+        } as KeyboardEvent,
+        "tabular",
+      ),
     ).toBe(true);
     expect(rt.controllerFor(root).getState().editing).toMatchObject({
       coord: { rowId: makeRowId(root, "Fruit"), colId: "name" },
@@ -1353,13 +1460,16 @@ describe("GridCoordinator", () => {
     rt.controllerFor(root).cancelEdit();
 
     expect(
-      rt.controllerFor(root).handleKey({
-        key: " ",
-        ctrlKey: false,
-        metaKey: false,
-        shiftKey: false,
-        altKey: false,
-      } as KeyboardEvent),
+      rt.controllerFor(root).handleKey(
+        {
+          key: " ",
+          ctrlKey: false,
+          metaKey: false,
+          shiftKey: false,
+          altKey: false,
+        } as KeyboardEvent,
+        "tabular",
+      ),
     ).toBe(true);
     expect(
       rt.coordinator
@@ -1376,13 +1486,16 @@ describe("GridCoordinator", () => {
       colId: "name",
     });
     expect(
-      rt.controllerFor(root).handleKey({
-        key: "ArrowUp",
-        ctrlKey: false,
-        metaKey: false,
-        shiftKey: false,
-        altKey: false,
-      } as KeyboardEvent),
+      rt.controllerFor(root).handleKey(
+        {
+          key: "ArrowUp",
+          ctrlKey: false,
+          metaKey: false,
+          shiftKey: false,
+          altKey: false,
+        } as KeyboardEvent,
+        "tabular",
+      ),
     ).toBe(true);
     expect(rt.coordinator.getState().cellCursor).toEqual({
       path: fruitItems,
@@ -1398,13 +1511,16 @@ describe("GridCoordinator", () => {
       colId: "name",
     });
     expect(
-      rt.controllerFor(fruitItems).handleKey({
-        key: "ArrowDown",
-        ctrlKey: false,
-        metaKey: false,
-        shiftKey: false,
-        altKey: false,
-      } as KeyboardEvent),
+      rt.controllerFor(fruitItems).handleKey(
+        {
+          key: "ArrowDown",
+          ctrlKey: false,
+          metaKey: false,
+          shiftKey: false,
+          altKey: false,
+        } as KeyboardEvent,
+        "tabular",
+      ),
     ).toBe(true);
     expect(rt.coordinator.getState().cellCursor).toEqual({
       path: root,
@@ -1420,13 +1536,16 @@ describe("GridCoordinator", () => {
       colId: "name",
     });
     expect(
-      rt.controllerFor(fruitItems).handleKey({
-        key: "ArrowUp",
-        ctrlKey: false,
-        metaKey: false,
-        shiftKey: false,
-        altKey: false,
-      } as KeyboardEvent),
+      rt.controllerFor(fruitItems).handleKey(
+        {
+          key: "ArrowUp",
+          ctrlKey: false,
+          metaKey: false,
+          shiftKey: false,
+          altKey: false,
+        } as KeyboardEvent,
+        "tabular",
+      ),
     ).toBe(true);
     expect(rt.coordinator.getState().cellCursor).toEqual({
       path: root,
@@ -1442,13 +1561,16 @@ describe("GridCoordinator", () => {
       colId: "qty",
     });
     expect(
-      rt.controllerFor(root).handleKey({
-        key: "Tab",
-        ctrlKey: false,
-        metaKey: false,
-        shiftKey: false,
-        altKey: false,
-      } as KeyboardEvent),
+      rt.controllerFor(root).handleKey(
+        {
+          key: "Tab",
+          ctrlKey: false,
+          metaKey: false,
+          shiftKey: false,
+          altKey: false,
+        } as KeyboardEvent,
+        "tabular",
+      ),
     ).toBe(true);
     expect(rt.coordinator.getState().cellCursor).toEqual({
       path: fruitItems,
@@ -1464,13 +1586,16 @@ describe("GridCoordinator", () => {
       colId: "name",
     });
     expect(
-      rt.controllerFor(root).handleKey({
-        key: "Tab",
-        ctrlKey: false,
-        metaKey: false,
-        shiftKey: true,
-        altKey: false,
-      } as KeyboardEvent),
+      rt.controllerFor(root).handleKey(
+        {
+          key: "Tab",
+          ctrlKey: false,
+          metaKey: false,
+          shiftKey: true,
+          altKey: false,
+        } as KeyboardEvent,
+        "tabular",
+      ),
     ).toBe(true);
     expect(rt.coordinator.getState().cellCursor).toEqual({
       path: fruitItems,

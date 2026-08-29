@@ -1,6 +1,7 @@
 import type { KeyboardEvent, MouseEvent } from "react";
 import { rowSelectionGestureFromModifiers } from "../../interaction/key-handling";
 import type { GridPath } from "../../types/identity";
+import type { GridPresentation } from "../../types/presentation";
 import type { LevelRow } from "../../types/level-row";
 import { useGridRuntime } from "../GridRuntimeProvider";
 import { runtimeInternalsFor } from "../../runtime/runtime";
@@ -9,10 +10,12 @@ export function EmptyRowHeaderCell({
   row,
   path,
   selected,
+  presentation,
 }: {
   row: LevelRow;
   path: GridPath;
   selected: boolean;
+  presentation: GridPresentation;
 }) {
   const runtime = useGridRuntime();
   const coordinator = runtimeInternalsFor(runtime).coordinator;
@@ -29,12 +32,16 @@ export function EmptyRowHeaderCell({
     event.preventDefault();
     event.stopPropagation();
     if (disabled) return;
-    coordinator.navigateCell(path, {
-      type: "rowPressed",
-      target: row.id,
-      origin: { kind: "row-control" },
-      gesture: rowSelectionGestureFromModifiers(event),
-    });
+    coordinator.navigateCell(
+      path,
+      {
+        type: "rowPressed",
+        target: row.id,
+        origin: { kind: "row-control" },
+        gesture: rowSelectionGestureFromModifiers(event),
+      },
+      presentation,
+    );
   }
 
   // Grid's native listener yields to `row-header-control` before this delegated
@@ -47,19 +54,27 @@ export function EmptyRowHeaderCell({
       event.preventDefault();
       event.stopPropagation();
       if (event.shiftKey && !disabled) {
-        coordinator.navigateCell(path, {
-          type: "rowPressed",
-          target: row.id,
-          origin: { kind: "row-control" },
-          gesture: "toggle",
-        });
+        coordinator.navigateCell(
+          path,
+          {
+            type: "rowPressed",
+            target: row.id,
+            origin: { kind: "row-control" },
+            gesture: "toggle",
+          },
+          presentation,
+        );
       }
       return;
     }
     if (event.key === "Escape") {
       event.preventDefault();
       event.stopPropagation();
-      coordinator.navigateCell(path, { type: "clearRowSelection" });
+      coordinator.navigateCell(
+        path,
+        { type: "clearRowSelection" },
+        presentation,
+      );
     }
   }
 

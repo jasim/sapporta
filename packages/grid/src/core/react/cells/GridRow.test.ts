@@ -200,6 +200,38 @@ function createQuotesRuntime(interaction?: GridInteractionConfig) {
   });
 }
 
+function createTitledQuotesRuntime(interaction?: GridInteractionConfig) {
+  const titledSchema: GridSchema = {
+    ...schema,
+    levels: {
+      quotes: {
+        ...schema.levels.quotes,
+        columns: [
+          testColumn("id", "ID", { displayType: "pk" }),
+          testColumn("book_id", "Book"),
+          testColumn("author_id", "Author"),
+          testColumn("text", "Text", { cardRole: "title" }),
+        ],
+      },
+    },
+  };
+  return createGridRuntime({
+    schema: titledSchema,
+    dataSource: inMemoryGridDataSource({
+      schema: titledSchema,
+      tree,
+      levels: {
+        quotes: {
+          sortMode: "none",
+          filterMode: "none",
+          paginationMode: "none",
+        },
+      },
+    }),
+    interaction,
+  });
+}
+
 function createExpandableIdentifierRuntime() {
   return createGridRuntime({
     schema: expandableIdentifierSchema,
@@ -410,6 +442,7 @@ describe("GridRow portal interaction boundaries", () => {
         runtime,
         children: createElement(GridLevel, {
           path: rootPath("quotes"),
+          presentation: "tabular",
         }),
       }),
     );
@@ -500,6 +533,7 @@ describe("GridRow portal interaction boundaries", () => {
           runtime,
           children: createElement(GridLevel, {
             path: rootPath("quotes"),
+            presentation: "tabular",
           }),
         }),
       );
@@ -588,6 +622,71 @@ describe("GridRow cards presentation", () => {
     expect(
       mounted.container.querySelectorAll('[role="gridcell"]'),
     ).toHaveLength(8);
+  });
+
+  it("renders the card title column without a field label", async () => {
+    const titleSchema: GridSchema = {
+      ...schema,
+      levels: {
+        quotes: {
+          ...schema.levels.quotes,
+          columns: [
+            testColumn("id", "ID", { displayType: "pk" }),
+            testColumn("book_id", "Book", { cardRole: "title" }),
+            testColumn("author_id", "Author"),
+            testColumn("text", "Text"),
+          ],
+        },
+      },
+    };
+    mounted = await render(
+      createElement(GridRuntimeProvider, {
+        runtime: createGridRuntime({
+          schema: titleSchema,
+          dataSource: inMemoryGridDataSource({
+            schema: titleSchema,
+            tree,
+            levels: {
+              quotes: {
+                sortMode: "none",
+                filterMode: "none",
+                paginationMode: "none",
+              },
+            },
+          }),
+        }),
+        children: createElement(GridLevel, {
+          path: rootPath("quotes"),
+          presentation: "cards",
+        }),
+      }),
+    );
+
+    const firstRow = mounted.container.querySelector('[data-grid-part="row"]');
+    if (!(firstRow instanceof HTMLElement)) {
+      throw new Error("expected first row");
+    }
+    const titleField = firstRow.querySelector(
+      '[data-grid-part="row-field"][data-card-role="title"]',
+    );
+    if (!(titleField instanceof HTMLElement)) {
+      throw new Error("expected title card field");
+    }
+    expect(titleField.getAttribute("data-col-id")).toBe("book_id");
+    expect(
+      titleField.querySelector('[data-grid-part="row-field-label"]'),
+    ).toBeNull();
+    expect(titleField.textContent).toContain("Moby Dick");
+
+    const authorField = firstRow.querySelector(
+      '[data-grid-part="row-field"][data-col-id="author_id"]',
+    );
+    expect(authorField?.getAttribute("data-card-role")).toBeNull();
+    expect(
+      authorField
+        ?.querySelector('[data-grid-part="row-field-label"]')
+        ?.textContent?.trim(),
+    ).toBe("Author");
   });
 
   it("renders expandable identifier values inside the pk card field", async () => {
@@ -722,6 +821,108 @@ describe("GridRow cards presentation", () => {
     expect(cursor?.colId).toBe("id");
   });
 
+  it("traverses fields in the rendered card order when a title column exists", async () => {
+    // The card leads with its title even when that column is last in schema
+    // order, so keyboard traversal must lead with it too: title, then the
+    // remaining columns in schema order, then the next card's title.
+    const runtime = createTitledQuotesRuntime();
+    mounted = await render(
+      createElement(GridRuntimeProvider, {
+        runtime,
+        children: createElement(GridLevel, {
+          path: rootPath("quotes"),
+          presentation: "cards",
+        }),
+      }),
+    );
+
+    const firstTextCell = mounted.container.querySelector(
+      `[data-row-id="${quoteOneId}"] [data-grid-part="cell"][data-col-id="text"]`,
+    );
+    const gridRoot = mounted.container.querySelector("[data-grid-path]");
+    if (
+      !(firstTextCell instanceof HTMLElement) ||
+      !(gridRoot instanceof HTMLElement)
+    ) {
+      throw new Error("expected first text cell and grid root");
+    }
+
+    await act(async () => {
+      firstTextCell.dispatchEvent(
+        new MouseEvent("mousedown", { bubbles: true, button: 0 }),
+      );
+    });
+
+    const internals = runtimeInternalsFor(runtime);
+    async function pressArrowDown() {
+      await act(async () => {
+        gridRoot!.dispatchEvent(
+          new KeyboardEvent("keydown", { bubbles: true, key: "ArrowDown" }),
+        );
+      });
+      return internals.coordinator.getState().cellCursor;
+    }
+
+    expect(await pressArrowDown()).toMatchObject({
+      rowId: quoteOneId,
+      colId: "id",
+    });
+    expect(await pressArrowDown()).toMatchObject({
+      rowId: quoteOneId,
+      colId: "book_id",
+    });
+    expect(await pressArrowDown()).toMatchObject({
+      rowId: quoteOneId,
+      colId: "author_id",
+    });
+    expect(await pressArrowDown()).toMatchObject({
+      rowId: quoteTwoId,
+      colId: "text",
+    });
+
+    await act(async () => {
+      gridRoot.dispatchEvent(
+        new KeyboardEvent("keydown", { bubbles: true, key: "ArrowUp" }),
+      );
+    });
+    expect(internals.coordinator.getState().cellCursor).toMatchObject({
+      rowId: quoteOneId,
+      colId: "author_id",
+    });
+  });
+
+  it("lands first keyboard focus on the title column in cards", async () => {
+    // With no cell focused yet, the first arrow key focuses the first cell.
+    // In cards that must be the title, not the schema-first pk.
+    const runtime = createTitledQuotesRuntime();
+    mounted = await render(
+      createElement(GridRuntimeProvider, {
+        runtime,
+        children: createElement(GridLevel, {
+          path: rootPath("quotes"),
+          presentation: "cards",
+        }),
+      }),
+    );
+
+    const gridRoot = mounted.container.querySelector("[data-grid-path]");
+    if (!(gridRoot instanceof HTMLElement)) {
+      throw new Error("expected grid root");
+    }
+
+    await act(async () => {
+      gridRoot.dispatchEvent(
+        new KeyboardEvent("keydown", { bubbles: true, key: "ArrowDown" }),
+      );
+    });
+    expect(
+      runtimeInternalsFor(runtime).coordinator.getState().cellCursor,
+    ).toMatchObject({
+      rowId: quoteOneId,
+      colId: "text",
+    });
+  });
+
   it("keeps row-list focus behavior in cards presentation", async () => {
     const runtime = createQuotesRuntime(ROW_MULTISELECT_LIST);
     mounted = await render(
@@ -765,6 +966,7 @@ describe("GridRow cards presentation", () => {
         runtime,
         children: createElement(GridLevel, {
           path: rootPath("quotes"),
+          presentation: "tabular",
         }),
       }),
     );
@@ -845,6 +1047,38 @@ describe("GridRow row headers", () => {
     ).toBe("column");
   });
 
+  it("demotes a data-backed row header to a plain cell in cards", async () => {
+    // The tinted row-header handle and its click-to-select-row gesture are
+    // tabular affordances. In cards the same column is an ordinary field:
+    // no rowheader role, and a click places the cell cursor instead of
+    // selecting the row.
+    const runtime = await renderRowHeaders(
+      { column: "id" },
+      { presentation: "cards" },
+    );
+
+    expect(mounted!.container.querySelector('[role="rowheader"]')).toBeNull();
+    const gridRoot = mounted!.container.querySelector("[data-grid-path]");
+    expect(gridRoot?.hasAttribute("data-row-header-kind")).toBe(false);
+
+    const idCell = mounted!.container.querySelector(
+      `[data-row-id="${quoteOneId}"] [data-grid-part="cell"][data-col-id="id"]`,
+    );
+    if (!(idCell instanceof HTMLElement)) throw new Error("expected id cell");
+    await act(async () => {
+      idCell.dispatchEvent(
+        new MouseEvent("mousedown", { bubbles: true, button: 0 }),
+      );
+    });
+
+    const internals = runtimeInternalsFor(runtime);
+    expect(internals.coordinator.getState().cellCursor).toMatchObject({
+      rowId: quoteOneId,
+      colId: "id",
+    });
+    expect(internals.selectedRowIds(rootPath("quotes"))).toEqual([]);
+  });
+
   it("renders an empty structural handle and blank header outside data-column identity", async () => {
     await renderRowHeaders("empty-selectable-cell");
 
@@ -891,6 +1125,7 @@ describe("GridRow row headers", () => {
         children: createElement(GridLevel, {
           path: rootPath("quotes"),
           chrome: columnPreset.chrome(),
+          presentation: "tabular",
         }),
       }),
     );
@@ -1108,6 +1343,7 @@ describe("GridRow row headers", () => {
         children: createElement(GridLevel, {
           path: rootPath("orders"),
           chrome: columnPreset.chrome(),
+          presentation: "tabular",
         }),
       }),
     );
@@ -1156,6 +1392,7 @@ describe("GridRow row headers", () => {
         children: createElement(GridLevel, {
           path: rootPath("orders"),
           chrome: columnPreset.chrome(),
+          presentation: "tabular",
         }),
       }),
     );
@@ -1226,6 +1463,7 @@ describe("GridRow row headers", () => {
         children: createElement(GridLevel, {
           path: ordersPath,
           chrome: columnPreset.chrome(),
+          presentation: "tabular",
         }),
       }),
     );

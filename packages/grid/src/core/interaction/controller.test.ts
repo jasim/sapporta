@@ -136,13 +136,16 @@ describe("GridController — verbs", () => {
       [" ", "space"],
     ] as const) {
       expect(
-        controller.handleKey({
-          key,
-          ctrlKey: false,
-          metaKey: false,
-          shiftKey: false,
-          altKey: false,
-        } as KeyboardEvent),
+        controller.handleKey(
+          {
+            key,
+            ctrlKey: false,
+            metaKey: false,
+            shiftKey: false,
+            altKey: false,
+          } as KeyboardEvent,
+          "tabular",
+        ),
       ).toBe(true);
       expect(activateCell).toHaveBeenLastCalledWith(coord, {
         kind: "keyboard",
@@ -165,26 +168,32 @@ describe("GridController — verbs", () => {
     controller.setLiveRowFocus(makeRowId(path, "r0"));
 
     expect(
-      controller.handleKey({
-        key: " ",
-        ctrlKey: false,
-        metaKey: false,
-        shiftKey: false,
-        altKey: false,
-      } as KeyboardEvent),
+      controller.handleKey(
+        {
+          key: " ",
+          ctrlKey: false,
+          metaKey: false,
+          shiftKey: false,
+          altKey: false,
+        } as KeyboardEvent,
+        "tabular",
+      ),
     ).toBe(true);
     expect(onNavigateRow).toHaveBeenLastCalledWith({
       type: "toggleActiveRowExpansion",
     });
 
     expect(
-      controller.handleKey({
-        key: "Enter",
-        ctrlKey: false,
-        metaKey: false,
-        shiftKey: false,
-        altKey: false,
-      } as KeyboardEvent),
+      controller.handleKey(
+        {
+          key: "Enter",
+          ctrlKey: false,
+          metaKey: false,
+          shiftKey: false,
+          altKey: false,
+        } as KeyboardEvent,
+        "tabular",
+      ),
     ).toBe(false);
     expect(onNavigateRow).toHaveBeenCalledTimes(1);
   });
@@ -205,13 +214,16 @@ describe("GridController — verbs", () => {
     controller.setLiveRowFocus(rowId);
 
     expect(
-      controller.handleKey({
-        key: "Enter",
-        ctrlKey: false,
-        metaKey: false,
-        shiftKey: false,
-        altKey: false,
-      } as KeyboardEvent),
+      controller.handleKey(
+        {
+          key: "Enter",
+          ctrlKey: false,
+          metaKey: false,
+          shiftKey: false,
+          altKey: false,
+        } as KeyboardEvent,
+        "tabular",
+      ),
     ).toBe(true);
     expect(activateRow).toHaveBeenCalledWith(rowId, {
       kind: "keyboard",
@@ -236,7 +248,7 @@ describe("GridController — verbs", () => {
     const writeValue = vi.fn();
     const c = makeController({ writeValue });
     c.startEdit({ rowId: makeRowId(path, "r0"), colId: "a" }, "enter");
-    c.commitEdit("after");
+    c.commitEdit("after", "stay", "tabular");
     expect(c.getState().editing).toBe(null);
     expect(writeValue).toHaveBeenCalledWith(
       { rowId: makeRowId(path, "r0"), colId: "a" },
@@ -249,7 +261,7 @@ describe("GridController — verbs", () => {
     const c = makeController({ writeValue });
     c.startEdit({ rowId: makeRowId(path, "r0"), colId: "a" }, "enter");
     c.flushEffects();
-    c.commitEdit("v");
+    c.commitEdit("v", "stay", "tabular");
     const types = c.effects.getState().map((e) => e.type);
     expect(types).toContain("focusContainer");
   });
@@ -273,22 +285,28 @@ describe("GridController — verbs", () => {
     const onNavigate = vi.fn();
     const c = makeController({ onNavigate });
     c.startEdit({ rowId: makeRowId(path, "r0"), colId: "a" }, "enter");
-    c.commitEdit("x", "next");
-    expect(onNavigate).toHaveBeenCalledWith({
-      type: "commitMove",
-      target: "next",
-    });
+    c.commitEdit("x", "next", "cards");
+    expect(onNavigate).toHaveBeenCalledWith(
+      {
+        type: "commitMove",
+        target: "next",
+      },
+      "cards",
+    );
   });
 
   it("commitEdit with commit='down' emits a commit movement intent", () => {
     const onNavigate = vi.fn();
     const c = makeController({ onNavigate });
     c.startEdit({ rowId: makeRowId(path, "r0"), colId: "a" }, "enter");
-    c.commitEdit("x", "down");
-    expect(onNavigate).toHaveBeenCalledWith({
-      type: "commitMove",
-      target: "down",
-    });
+    c.commitEdit("x", "down", "tabular");
+    expect(onNavigate).toHaveBeenCalledWith(
+      {
+        type: "commitMove",
+        target: "down",
+      },
+      "tabular",
+    );
   });
 
   it("flushEffects clears the queue", () => {

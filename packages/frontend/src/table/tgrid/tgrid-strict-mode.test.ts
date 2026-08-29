@@ -104,7 +104,10 @@ function CustomGridView() {
 
   session.runtime.root.data.state();
 
-  return createElement(TGrid<RowsByLevel>, { session });
+  return createElement(TGrid<RowsByLevel>, {
+    session,
+    presentation: "tabular",
+  });
 }
 
 function ReplaceableGridView({
@@ -118,7 +121,10 @@ function ReplaceableGridView({
 
   session.runtime.root.data.state();
 
-  return createElement(TGrid<RowsByLevel>, { session });
+  return createElement(TGrid<RowsByLevel>, {
+    session,
+    presentation: "tabular",
+  });
 }
 
 async function renderStrict(element: ReactElement): Promise<{

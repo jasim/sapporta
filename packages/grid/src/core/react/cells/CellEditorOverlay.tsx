@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useStore } from "zustand";
 import type { ColumnSchema } from "../../types/schema";
+import type { GridPresentation } from "../../types/presentation";
 import type { ControllerState } from "../../types/controller-state";
 import type { GridPath } from "../../types/identity";
 import { useGridRuntime } from "../GridRuntimeProvider";
@@ -26,10 +27,12 @@ export function CellEditorOverlay({
   containerRef,
   path,
   schema,
+  presentation,
 }: {
   containerRef: React.RefObject<HTMLDivElement | null>;
   path: GridPath;
   schema: readonly ColumnSchema[];
+  presentation: GridPresentation;
 }) {
   const runtime = useGridRuntime();
   const level = runtime.level(path);
@@ -125,7 +128,9 @@ export function CellEditorOverlay({
         column={column}
         path={path}
         anchor={containerRef.current as HTMLElement}
-        commit={(v, commit) => controller.commitEdit(v, commit)}
+        commit={(v, commit) =>
+          controller.commitEdit(v, commit ?? "stay", presentation)
+        }
         cancel={() => controller.cancelEdit()}
       />
     </div>

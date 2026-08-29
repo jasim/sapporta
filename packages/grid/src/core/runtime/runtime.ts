@@ -374,10 +374,10 @@ export type RuntimeKernel = {
     rowKey: RowKey,
     atIndex?: number,
   ) => Promise<CreateNodeResult>;
+  // `colId` is the landing column, already resolved by the coordinator.
   phantomBoundaryCellTarget: (
     path: GridPath,
     colId: ColId,
-    colPolicy: "preserve" | "first" | "last",
   ) => CellCursor | null;
   phantomBoundaryRowTarget: (path: GridPath) => RowCursor | null;
   requestLoadedRowsBoundary: (event: LoadedRowsBoundaryEvent) => boolean;
@@ -1134,8 +1134,8 @@ export function createGridRuntime(args: RuntimeArgs): GridRuntime {
       // disable writes after the controller is created, and a later valid
       // refresh can restore them; the next primary action must see that state.
       isWritable: () => sourceRegistry.isWritable(path),
-      onNavigateCell: (intent) => {
-        coordinator.navigateCell(path, intent);
+      onNavigateCell: (intent, presentation) => {
+        coordinator.navigateCell(path, intent, presentation);
       },
       onNavigateRow: (intent) => {
         coordinator.navigateRow(path, intent);

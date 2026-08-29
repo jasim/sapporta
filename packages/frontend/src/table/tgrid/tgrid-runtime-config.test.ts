@@ -432,6 +432,39 @@ describe("compileTGridRuntimeConfig", () => {
     ).toEqual(["warehouse"]);
   });
 
+  it("marks each level's first visible row-label column as the card title", () => {
+    const config = build();
+
+    const cardRoleOf = (column: { meta?: unknown }) =>
+      (column.meta as { cardRole?: string } | undefined)?.cardRole;
+
+    const orders = config.gridSchema.levels.orders.columns;
+    expect(orders.map(cardRoleOf)).toEqual([undefined, "title"]);
+
+    // Explicit level columns keep the rule: `sku` is lines' row label.
+    const lines = config.gridSchema.levels["orders.lines"].columns;
+    expect(lines.map(cardRoleOf)).toEqual([undefined, "title"]);
+
+    const allocations =
+      config.gridSchema.levels["orders.lines.allocations"].columns;
+    expect(allocations.map(cardRoleOf)).toEqual(["title"]);
+  });
+
+  it("marks no card title when the row-label columns are not visible", () => {
+    const level = buildOrdersOnly({
+      table: {
+        ...orderSchema,
+        rowLabelColumns: ["internal"],
+      },
+    });
+
+    for (const column of level.columns) {
+      expect(
+        (column.meta as { cardRole?: string } | undefined)?.cardRole,
+      ).toBeUndefined();
+    }
+  });
+
   it("resolves row headers from each level's final visible columns", () => {
     const config = build();
 

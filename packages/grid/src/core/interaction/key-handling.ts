@@ -15,6 +15,7 @@ import type {
   RowListInteractionConfig,
 } from "../types/interaction";
 import { activationStartsOn, editStartsOn } from "../types/schema";
+import type { GridPresentation } from "../types/presentation";
 
 // Keyboard parsing is intentionally split by interaction domain.
 //
@@ -29,7 +30,7 @@ import { activationStartsOn, editStartsOn } from "../types/schema";
 // make ArrowUp suddenly behave like row navigation in a spreadsheet-style grid.
 const PAGE_SIZE = 10;
 
-export type CellKeyboardPresentation = "tabular" | "cards";
+export type CellKeyboardPresentation = GridPresentation;
 export type KeyEventLike = Pick<
   KeyboardEvent,
   "key" | "ctrlKey" | "metaKey" | "shiftKey" | "altKey"
@@ -117,7 +118,7 @@ export function keyEventToCellIntent(
   displayed: DisplayedRows,
   schema: readonly ColumnSchema[],
   isCellEditable: (row: LevelRow, column: ColumnSchema) => boolean,
-  presentation: CellKeyboardPresentation = "tabular",
+  presentation: CellKeyboardPresentation,
 ): CellNavigationIntent | null {
   if (state.editing) return null;
 
