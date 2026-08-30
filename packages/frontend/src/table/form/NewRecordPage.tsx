@@ -81,8 +81,7 @@ export function NewRecordPage({ tableSchema }: { tableSchema: TableSchema }) {
   return (
     <PageFrame>
       <PageHeader
-        section={`Tables / ${tableLabel}`}
-        title="New record"
+        title={`New record in ${tableLabel}`}
         actions={
           <PageHeaderButton
             tone="ghost"

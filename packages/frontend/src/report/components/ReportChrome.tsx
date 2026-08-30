@@ -22,7 +22,6 @@ export function ReportScreenFrame({
   return (
     <PageFrame>
       <PageHeader
-        section="Reports"
         title={title}
         subtitle={subtitle}
         actions={actions}
