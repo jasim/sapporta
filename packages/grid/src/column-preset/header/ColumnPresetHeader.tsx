@@ -198,7 +198,6 @@ function HeaderCell<TMeta = unknown, TFilter = unknown>({
     e.stopPropagation();
 
     const nextWidth = clampColumnPixelWidth(
-      column.column,
       drag.startWidth + e.clientX - drag.startX,
       sizing.minPx,
     );

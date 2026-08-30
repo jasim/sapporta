@@ -54,16 +54,6 @@
   --grid-column-resize-handle-color: var(--sap-border);
 }
 
-/* The last column's handle would draw a stray line at the grid's right edge;
-   show it only while hovered or dragging. */
-.sapporta-report-grid-dataset
-  [data-grid-part="header-cell"]:last-child
-  [data-grid-part="column-resize-handle"]:not([data-resizing="true"]):not(
-    :hover
-  )::after {
-  background: transparent;
-}
-
 .sapporta-report-grid-dataset
   .sapporta-report-grid-dataset__level[data-grid-depth]:not([data-grid-depth="0"]) {
   background: var(--grid-background);

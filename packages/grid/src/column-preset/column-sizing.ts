@@ -81,15 +81,12 @@ export function sanitizeColumnSizingOverrides(
   const raw = persistedWidthsRecord(value);
   if (!raw) return {};
 
-  const columnsById = new Map<ColId, ColumnSchema>(
-    schema.map((column) => [column.id, column]),
-  );
+  const knownColumnIds = new Set<ColId>(schema.map((column) => column.id));
   const sanitized: ColumnSizingOverrides = {};
   for (const [colId, width] of Object.entries(raw)) {
-    const column = columnsById.get(colId);
-    if (!column) continue;
+    if (!knownColumnIds.has(colId)) continue;
     if (typeof width !== "number" || !Number.isFinite(width)) continue;
-    sanitized[colId] = clampColumnPixelWidth(column, width, minPx);
+    sanitized[colId] = clampColumnPixelWidth(width, minPx);
   }
   return sanitized;
 }
@@ -104,21 +101,25 @@ export function columnSizingTemplateColumns(
       const width = overrides[column.id];
       if (width === undefined)
         return trackForColumnWidth(preset(column)?.layout.width);
-      return `${clampColumnPixelWidth(column, width, minPx)}px`;
+      return `${clampColumnPixelWidth(width, minPx)}px`;
     })
     .join(" ");
 }
 
+/**
+ * A width in this map was set by dragging a column edge, so it is already the
+ * answer to how wide that column should be. The preset's `min` and `max` answer
+ * a different question - how to size a column nobody has sized - and feed
+ * `trackForColumnWidth` alone. Clamping an explicit width to them would leave a
+ * timestamp column 16px of travel between its floor and ceiling, which reads as
+ * a resize handle that does not work. Only the grid's own floor applies, so a
+ * column cannot be dragged away to nothing.
+ */
 export function clampColumnPixelWidth(
-  column: ColumnSchema,
   value: number,
   minPx = DEFAULT_COLUMN_RESIZE_MIN_PX,
 ): number {
-  const bounds = columnWidthBounds(preset(column)?.layout.width);
-  const minimum = Math.max(normalizeMinPx(minPx), bounds.min ?? 0);
-  const boundedByMin = Math.max(minimum, Math.round(value));
-  if (bounds.max === undefined || bounds.max < minimum) return boundedByMin;
-  return Math.min(bounds.max, boundedByMin);
+  return Math.max(normalizeMinPx(minPx), Math.round(value));
 }
 
 function resolveStorageKey(
@@ -143,39 +144,6 @@ function persistedWidthsRecord(value: unknown): Record<string, unknown> | null {
     return isRecord(value.widths) ? value.widths : null;
   }
   return value;
-}
-
-function columnWidthBounds(width: ColumnWidth | undefined): {
-  min?: number;
-  max?: number;
-} {
-  if (!width) return {};
-  if (typeof width === "object" && "track" in width) return {};
-  if (typeof width === "object") {
-    return {
-      min: finiteNumber(width.min),
-      max: finiteNumber(width.max),
-    };
-  }
-
-  switch (width) {
-    case "compact":
-      return { min: 48 };
-    case "content":
-      return {};
-    case "fill":
-      return { min: 0 };
-    case "numeric":
-      return { min: 80, max: 112 };
-    case "date":
-      return { min: 112, max: 128 };
-    case "timestamp":
-      return { min: 144, max: 160 };
-    case "enum":
-      return { min: 96 };
-    case "foreignKey":
-      return { min: 144, max: 220 };
-  }
 }
 
 export function trackForColumnWidth(width: ColumnWidth | undefined): string {
@@ -204,10 +172,6 @@ export function trackForColumnWidth(width: ColumnWidth | undefined): string {
     case "foreignKey":
       return "minmax(144px, 220px)";
   }
-}
-
-function finiteNumber(value: number | undefined): number | undefined {
-  return value !== undefined && Number.isFinite(value) ? value : undefined;
 }
 
 function readLocalStorage(key: string): string | null {

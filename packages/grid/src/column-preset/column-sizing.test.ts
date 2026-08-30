@@ -36,8 +36,19 @@ describe("column sizing", () => {
         schema,
       ),
     ).toEqual({
-      name: 72,
-      amount: 112,
+      // 64 is under the column's declared min and 500 is over the numeric
+      // preset's max. Both were set by hand, so both stand.
+      name: 64,
+      amount: 500,
+    });
+  });
+
+  it("floors an explicit width at the grid's resize minimum", () => {
+    expect(sanitizeColumnSizingOverrides({ name: 10 }, schema)).toEqual({
+      name: 48,
+    });
+    expect(sanitizeColumnSizingOverrides({ name: 10 }, schema, 96)).toEqual({
+      name: 96,
     });
   });
 
@@ -71,6 +82,12 @@ describe("column sizing", () => {
   it("applies pixel overrides to the template", () => {
     expect(columnSizingTemplateColumns(schema, { name: 144 })).toBe(
       "144px minmax(80px, 112px) minmax(0, 1fr)",
+    );
+  });
+
+  it("lets an override widen a column past its preset track", () => {
+    expect(columnSizingTemplateColumns(schema, { amount: 400 })).toBe(
+      "minmax(72px, 180px) 400px minmax(0, 1fr)",
     );
   });
 });

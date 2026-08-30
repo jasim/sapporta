@@ -284,6 +284,8 @@
   cursor: default;
 }
 
+/* The grab area straddles the column boundary so it can be aimed at from
+   either side of the line, which is the only part of it that paints. */
 .columnResizeHandle {
   background: transparent;
   border: 0;
@@ -291,29 +293,50 @@
   cursor: col-resize;
   padding: 0;
   position: absolute;
-  right: -4px;
+  right: calc(var(--grid-column-resize-handle-width, 12px) / -2);
   top: 0;
   touch-action: none;
-  width: 8px;
+  width: var(--grid-column-resize-handle-width, 12px);
   z-index: calc(var(--sap-z-grid-header) + 1);
 }
 
 .columnResizeHandle::after {
   background: var(--grid-column-resize-handle-color, transparent);
+  border-radius: 1px;
   bottom: 8px;
   content: "";
+  left: 50%;
   position: absolute;
-  right: 3px;
   top: 8px;
+  transform: translateX(-50%);
   width: 1px;
 }
 
-.columnResizeHandle:hover::after,
-.columnResizeHandle[data-resizing="true"]::after {
+/* Pointing anywhere at the header draws every boundary, so the columns can be
+   seen to be resizable before the pointer has found a single handle. */
+:where(.presetGrid [data-grid-part="header-row"]:hover)
+  .columnResizeHandle::after {
   background: var(
-    --grid-column-resize-handle-hover-color,
+    --grid-column-resize-handle-idle-color,
     var(--sap-border-strong, var(--sap-border))
   );
+}
+
+/* The one being aimed at reads as a control rather than a border: full height,
+   thick enough to see, and in the same accent that marks an active edit. */
+.columnResizeHandle:hover::after,
+.columnResizeHandle[data-resizing="true"]::after {
+  background: var(--grid-column-resize-handle-hover-color, var(--sap-brand));
+  bottom: 0;
+  top: 0;
+  width: 3px;
+}
+
+/* At the last column the boundary is the grid's own edge, where a standing
+   line reads as a stray border. Draw it only while it is aimed at. */
+:where(.presetGrid [data-grid-part="header-cell"]:last-child)
+  .columnResizeHandle:not(:hover):not([data-resizing="true"])::after {
+  background: transparent;
 }
 
 :where(.presetGrid [data-grid-part="cell"][data-cell-status="focus"]) {
