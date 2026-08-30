@@ -1,5 +1,11 @@
 # @sapporta/shared
 
+## 0.3.2
+
+### Patch Changes
+
+- release
+
 ## 0.3.1
 
 ### Patch Changes

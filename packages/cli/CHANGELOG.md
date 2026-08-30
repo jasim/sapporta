@@ -1,5 +1,13 @@
 # sapporta
 
+## 0.2.14
+
+### Patch Changes
+
+- release
+- Updated dependencies
+  - @sapporta/server@0.6.2
+
 ## 0.2.13
 
 ### Patch Changes

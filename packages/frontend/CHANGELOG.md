@@ -1,5 +1,158 @@
 # @sapporta/frontend
 
+## 0.7.0
+
+### Minor Changes
+
+- 6beed02: Two cards-presentation fixes for grids, and the grid presentation is now
+  a required value.
+
+  The primary-key cell no longer paints row-header chrome in cards. Standard
+  tables use the pk column as a data-backed row header, and cards kept its
+  tabular treatment: a tinted background — which in a full-width card field
+  looked identical to the selected-cell background — and a click that selected
+  the whole row while every other cell click placed the cell cursor. In cards
+  that column now renders as a plain field: no tinted band, and clicking it
+  selects the cell like any other. A selected row still shows through the
+  card-level selected background, and the structural checkbox gutter
+  ("empty-selectable-cell") keeps its meaning in every presentation. On touch,
+  tapping the Id chip no longer selects the row and surfaces the delete
+  toolbar.
+
+  Keyboard traversal in cards now follows the rendered order. A card leads
+  with its title column, but arrows and Tab walked the columns in schema
+  order, so the title — visually first — was reached last and vertical
+  movement felt shuffled. Movement now resolves against the order the active
+  presentation renders (the presentation travels with each keystroke and
+  editor commit, like a modifier key): cards traversal leads with the title
+  column before the remaining columns in schema order, and moving past the
+  last field lands on the next card's title. Tabular grids are unchanged.
+
+  The presentation is a required value everywhere it travels. It used to be
+  an optional parameter that silently fell back to `"tabular"`, so a call
+  site that forgot to pass it navigated a cards grid in the spreadsheet's
+  column order. Every boundary that carries a presentation (`handleKey`,
+  `commitEdit`, `handleCellPointer`, `navigateCell`, and the `presentation`
+  prop on `Grid`, `GridLevel`, and `TGrid`) now requires the caller to name
+  the presentation it renders, so a missing value is a type error rather
+  than a wrong default.
+
+- eebb57d: Text cells no longer show a tooltip of their own. Every non-empty text column
+  opened a popup on hover, whether or not the value was long enough to be
+  clipped, which made the tooltip noise on short columns and left no way to turn
+  it off. Whether a value is worth pointing at depends on the data in the row,
+  which the application knows and the column kind does not.
+
+  Columns that want a tooltip now ask for one, and to make that cheap,
+  `renderCell` overrides now receive `defaultContent`: the cell the column would
+  have rendered on its own, formatting and truncation included. Wrapping it
+  decorates the built-in cell instead of rebuilding it, and ignoring it replaces
+  the cell outright, as before. This holds at every layer — column-preset
+  options, TGrid column options, and the new `renderCell` prop on
+  `ReportGridDataset` (keyed by level name and then by column id), where the
+  report's drill-through links stay attached around the override's output.
+
+  ```tsx
+  columns.table("title", {
+    renderCell: ({ defaultContent, row }) => (
+      <CellTooltip content={row.summary}>{defaultContent}</CellTooltip>
+    ),
+  });
+  ```
+
+  `CellTooltip` from `@sapporta/grid/column-preset` carries the popup's sizing
+  and placement. An empty `content` renders the cell body alone, so a tooltip
+  can be shown on the rows that need one and left off elsewhere. A cell built
+  from scratch instead of from `defaultContent` can apply
+  `presetCellClassNames` to keep the built-in truncation and stay lined up with
+  the columns beside it.
+
+- eae8f32: Column resizing is findable, and a dragged width is now honoured.
+
+  The drag handle painted nothing until the pointer was already on it, so the
+  only way to find a column edge was to sweep the header and watch the cursor.
+  Pointing anywhere at the header now draws every column boundary at once, and
+  the boundary being aimed at thickens into a full-height accent bar. The grab
+  area widened from 8px to 12px, straddling the boundary so it can be reached
+  from either side, and `--grid-column-resize-handle-width` sets it per grid
+  alongside the existing `--grid-column-resize-handle-color`,
+  `--grid-column-resize-handle-idle-color`, and
+  `--grid-column-resize-handle-hover-color`.
+
+  A dragged width was also being clamped to the column preset's own `min` and
+  `max`. Those bounds answer how to size a column nobody has sized, and reusing
+  them as resize limits left a `timestamp` column 16px of travel between its
+  floor and ceiling — the handle moved and the column sprang back. An explicit
+  width now overrides them and is bounded only by the grid's own `minPx` floor
+  (48px by default, set through `columnSizing.minPx`), which keeps a column from
+  being dragged away to nothing. Automatic sizing is unchanged: the preset
+  bounds still produce each column's `minmax()` track.
+
+  `clampColumnPixelWidth` no longer takes a column as its first argument, since
+  it no longer consults the column's preset. Call it as
+  `clampColumnPixelWidth(width, minPx)`.
+
+- 5c08071: Tapping a card on a narrow table page now opens a record detail sheet: a
+  bottom sheet listing every visible field of the row as label/value lines.
+  Grid cells could already edit inline, but the cell editor overlay is a
+  pointer-and-keyboard workflow that positions poorly on a phone, and date and
+  timestamp columns had no cell editor at all — so on mobile a record could
+  neither be read in full nor edited comfortably.
+
+  Fields in the sheet edit through the same form controls as the new-record
+  form (text, number, date, timestamp, checkbox, select, and foreign-key
+  lookups), and each save flows through the grid's cell patch path, so
+  optimistic updates, custom `saveCellValue` handlers, and failure banners
+  behave exactly like inline grid edits. The sheet reads the displayed row
+  live and closes itself when the row leaves the page.
+
+  The tap arrives through a new default table interaction,
+  `CELL_GRID_WITH_ROW_CLICK_ACTIVATION`: plain click now also emits a semantic
+  row activation. Pointer and keyboard behavior is otherwise unchanged — the
+  click still places the cell cursor first — and wide layouts ignore the
+  event, so desktop tables are untouched. A TGrid definition that passes its
+  own `interaction` keeps it, as before.
+
+  Narrow cards also tightened up around the sheet: a card title that hosts the
+  row-expansion chevron may wrap to two lines before clamping instead of
+  truncating at one, and secondary fields whose value is empty are skipped
+  entirely — the sheet now shows the full field list, so an empty line in the
+  card only cost density. Only default preset cells are skipped; client
+  columns and columns with a custom `renderCell` always render, since they can
+  draw content for an empty value.
+
+- 0cea541: Report grids now render as stacked cards on narrow screens, the same
+  presentation table pages use. Below a 760px container width
+  `ReportGridDataset` switches from the tabular layout to cards; there is no
+  preference toggle — reports carry no per-table view preference, so the
+  container width alone picks the presentation.
+
+  Each level's first visible text column is stamped as the card title, and
+  since cards render no column header row, nested levels gain a small
+  uppercase level label in the header's place so a child level does not appear
+  as an unlabeled run of cards.
+
+### Patch Changes
+
+- release
+- b03210e: The grid's cards presentation is denser and typographically consistent.
+  Field rows drop the tabular 28px cell height for a compact ~22px line,
+  labels sit in a fixed-width column at a uniform weight and color, and
+  inline data values (ids, dates, numbers) take the body font size while
+  keeping their mono family. The primary-key value now reads like any other
+  field — left-aligned in the value column with the expansion chevron
+  directly after it — instead of the tabular grid's right-aligned identifier
+  treatment, and the selection gutter's idle gray wash is transparent in
+  cards, painting only on hover, selection, and focus.
+- Updated dependencies
+- Updated dependencies [6beed02]
+- Updated dependencies [eebb57d]
+- Updated dependencies [eae8f32]
+- Updated dependencies [5c08071]
+  - @sapporta/grid@0.6.0
+  - @sapporta/shared@0.3.2
+  - @sapporta/ui@0.2.15
+
 ## 0.6.1
 
 ### Patch Changes
