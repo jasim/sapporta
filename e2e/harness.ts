@@ -1946,6 +1946,9 @@ export async function startBuiltServer(
       cwd: join(project.projectDir, "packages", "api"),
       env: {
         ...project.env,
+        // A built server does not load .env.development, so it receives the
+        // directory that file names, here as an absolute path.
+        SAPPORTA_DATA_DIR: join(project.projectDir, "data"),
         ...envOverrides,
         SAPPORTA_PUBLIC_APP_URL:
           envOverrides.SAPPORTA_PUBLIC_APP_URL ?? baseUrl,
@@ -1985,6 +1988,7 @@ export async function expectBuiltServerBootFailure(
     cwd: project.projectDir,
     env: {
       ...project.env,
+      SAPPORTA_DATA_DIR: join(project.projectDir, "data"),
       ...envOverrides,
       SAPPORTA_PUBLIC_APP_URL: envOverrides.SAPPORTA_PUBLIC_APP_URL ?? baseUrl,
       SAPPORTA_REQUIRE_VERIFIED_EMAIL:

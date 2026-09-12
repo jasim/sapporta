@@ -363,6 +363,8 @@ describe("renderScaffoldFiles", () => {
     expect(devEnv).toContain(
       `SAPPORTA_PUBLIC_APP_URL=http://localhost:${frontendPort}`,
     );
+    // A relative path, so a copy of the project uses its own copy of data/.
+    expect(devEnv).toContain("SAPPORTA_DATA_DIR=data\n");
     expect(byDest.get("README.md")).toContain(
       `\`http://localhost:${frontendPort}\``,
     );
@@ -447,6 +449,19 @@ describe("renderScaffoldFiles", () => {
       "node --env-file=../../.env.development --watch dist/boot.js",
     );
     expect(apiPackage.scripts?.start).toBe("node dist/boot.js");
+    // Drizzle Kit must read SAPPORTA_DATA_DIR from the same file as `dev`, or
+    // a migration could run against a different database than the app opens.
+    for (const script of [
+      "db:generate",
+      "db:generate:custom",
+      "db:migrate",
+      "db:check",
+      "db:studio",
+    ]) {
+      expect(apiPackage.scripts?.[script], script).toMatch(
+        /^node --env-file=\.\.\/\.\.\/\.env\.development node_modules\/drizzle-kit\/bin\.cjs /,
+      );
+    }
     expect(apiPackage.scripts?.dev).not.toContain("--preserve-symlinks");
     expect(apiPackage.scripts?.start).not.toContain("--preserve-symlinks");
 

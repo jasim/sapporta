@@ -15,7 +15,6 @@ export type PackageLayout = {
 };
 
 export type ProjectMarker = {
-  dataDir: string;
   markerPath: string;
 };
 
@@ -56,7 +55,6 @@ export function layoutForRoot(identity: ProjectIdentity): ProjectLayout {
     apiDir: paths.apiDir,
     frontendDir: paths.frontendDir,
     sharedDir: paths.sharedDir,
-    dataDir: paths.dataDir,
     markerPath: paths.markerPath,
   };
 }

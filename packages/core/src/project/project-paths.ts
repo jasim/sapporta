@@ -24,6 +24,9 @@ export const WATCHABLE_SUBDIRS = ["app"] as const;
  * `apiDir` is where backend TypeScript sources live; `apiDistDir` is where
  * compiled JS lives at runtime. Frontend and shared packages sit beside the
  * API under packages/.
+ *
+ * The database location is not derived here. It comes from
+ * `SAPPORTA_DATA_DIR`; see `databasePath()` in `data-dir.ts`.
  */
 export function fromProjectRoot(projectRoot: string) {
   const apiDir = join(projectRoot, "packages", "api");
@@ -31,8 +34,6 @@ export function fromProjectRoot(projectRoot: string) {
   const frontendDir = join(projectRoot, "packages", "frontend");
   const frontendDistDir = join(frontendDir, "dist");
   const sharedDir = join(projectRoot, "packages", "shared");
-  const dataDir = join(projectRoot, "data");
-  const databasePath = join(dataDir, "sqlite.db");
   const markerPath = join(projectRoot, PROJECT_MARKER);
   return {
     apiDir,
@@ -40,8 +41,6 @@ export function fromProjectRoot(projectRoot: string) {
     frontendDir,
     frontendDistDir,
     sharedDir,
-    dataDir,
-    databasePath,
     markerPath,
   };
 }
@@ -57,11 +56,6 @@ export function fromApiCodeDir(codeDir: string) {
     schemaDir: join(codeDir, "schema"),
     appDir: join(codeDir, "app"),
   };
-}
-
-/** Derive project root from a database path (two levels up from data/sqlite.db). */
-export function projectRootFromDbPath(databasePath: string): string {
-  return dirname(dirname(databasePath));
 }
 
 /** Given a store directory and project ID, derive the database path. */

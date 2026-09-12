@@ -34,8 +34,10 @@ Shape (c) loses both; its extra configuration follows from that.
 
 `sapporta init` creates two env files:
 
-- `.env.development` — loaded by `pnpm dev` with Node's built-in `--env-file`.
-  It contains local-only values, including a generated `BETTER_AUTH_SECRET`.
+- `.env.development` — loaded by `pnpm dev`, `pnpm seed`, and the `pnpm db:*`
+  scripts with Node's built-in `--env-file`. It contains local-only values,
+  including a generated `BETTER_AUTH_SECRET` and `SAPPORTA_DATA_DIR=data`,
+  which places the development database in `data/` at the project root.
 - `.env.production.example` — placeholder production values. Copy the values
   into your deployment environment; `pnpm start` does not load development env.
 
@@ -86,9 +88,15 @@ One Hono process serves `/api/*` and the built SPA on a single
 
 ```bash
 pnpm build                 # tsc → packages/api/dist/, vite build → packages/frontend/dist/
-pnpm --filter ./packages/api db:migrate
+export SAPPORTA_DATA_DIR=/srv/%%SAPPORTA:SLUG%%/data  # an existing directory
+pnpm --filter ./packages/api exec drizzle-kit migrate
 SAPPORTA_API_PORT=3000 pnpm start  # node packages/api/dist/boot.js
 ```
+
+Run Drizzle Kit directly here, not `pnpm db:migrate`. The `pnpm db:*` scripts
+load `.env.development`, so on a server they would fail or read development
+values. Run the migration in the same environment as `pnpm start`, so both use
+the database in the same `SAPPORTA_DATA_DIR`.
 
 The browser loads the SPA from `http://your-host:3000/`, and its relative `fetch("/api/foo")` calls hit the same process.
 
@@ -228,7 +236,7 @@ Dead code in this shape (see the `serveStatic` section).
 ### 5. Deploy in two halves
 
 - **SPA:** `vite build` → `packages/frontend/dist/`. Upload to the CDN and configure an SPA fallback (`/* → /index.html`) so React Router handles deep links on hard reload.
-- **API:** `tsc` → `packages/api/dist/`. Run `node packages/api/dist/boot.js` with `SAPPORTA_API_PORT`, `BETTER_AUTH_SECRET`, `SAPPORTA_PUBLIC_APP_URL`, and any extra `SAPPORTA_FRONTEND_ORIGINS` set.
+- **API:** `tsc` → `packages/api/dist/`. Run `node packages/api/dist/boot.js` with `SAPPORTA_API_PORT`, `SAPPORTA_DATA_DIR`, `BETTER_AUTH_SECRET`, `SAPPORTA_PUBLIC_APP_URL`, and any extra `SAPPORTA_FRONTEND_ORIGINS` set.
 
 Fit:
 
@@ -244,6 +252,7 @@ Fit:
 | `PORT`                            | API host process env | —        | yes      | yes      | yes      | Hosting-platform fallback when `SAPPORTA_API_PORT` is absent.                                                                     |
 | `SAPPORTA_FRONTEND_PORT`          | Dev process env      | yes      | —        | —        | —        | Vite frontend-server port. Match it to `SAPPORTA_PUBLIC_APP_URL` in dev.                                                          |
 | `BETTER_AUTH_SECRET`              | API host process env | yes      | yes      | yes      | yes      | Better Auth signing secret. Generated only for local development.                                                                 |
+| `SAPPORTA_DATA_DIR`               | API host process env | yes      | yes      | yes      | yes      | Directory holding `sqlite.db`: absolute, or relative to the project root. No default. Drizzle Kit reads it too.                   |
 | `SAPPORTA_PUBLIC_APP_URL`         | API host process env | yes      | yes      | yes      | yes      | Public app origin used for Better Auth links, callbacks, and default trust.                                                       |
 | `SAPPORTA_FRONTEND_ORIGINS`       | API host process env | yes      | yes      | yes      | yes      | Extra browser origins trusted for credentialed API/auth requests.                                                                 |
 | `SAPPORTA_REQUIRE_VERIFIED_EMAIL` | API host process env | optional | optional | optional | optional | Explicit override for the environment-based email verification default.                                                           |
@@ -275,11 +284,13 @@ a provider-specific SDK, edit `packages/api/mailer.ts` in the generated project.
 
 ### Database persistence
 
-`better-sqlite3` stores the database under the project's data directory (resolved by `fromProjectRoot` at boot). In production that directory **must** be on a persistent volume, or the database vanishes on every restart — the single most common deployment bug.
+The SQLite database is the file `sqlite.db` in the directory named by `SAPPORTA_DATA_DIR`. The value is either an absolute path or a path relative to the project root (the directory with `sapporta.json`). A relative path is never resolved against the working directory, so `data` names the same directory for `pnpm dev`, Drizzle Kit, and the built server. The directory must already exist. The variable has no default: the server and Drizzle Kit both stop with an error when it is not set. Due to this, a process that was started without the setting stops instead of opening some other database. In production that directory **must** be on a persistent volume, or the database vanishes on every restart — the single most common deployment bug.
 
-- **Docker:** named volume or bind mount at the data directory. These differ in one way that matters — see **Volume ownership** below.
-- **systemd on a VPS:** the default filesystem is already persistent; just don't place the project under `/tmp` or a tmpfs mount.
-- **Fly.io / Railway / similar:** attach a persistent volume and point the project root at it.
+- **Docker:** the image sets `SAPPORTA_DATA_DIR=/app/data`. Use a named volume or bind mount at `/app/data`. These differ in one way that matters — see **Volume ownership** below.
+- **systemd on a VPS:** set `SAPPORTA_DATA_DIR` in the unit's environment, to a directory that is not under `/tmp` or a tmpfs mount.
+- **Fly.io / Railway / similar:** attach a persistent volume and set `SAPPORTA_DATA_DIR` to its mount path.
+
+One project can run against several databases by giving each process a different `SAPPORTA_DATA_DIR`. For example, a developer can keep sample data and real data in two directories, and a host can run one process per customer, each with its own directory. In development, change the path in `.env.development`; `pnpm dev`, `pnpm seed`, and the `pnpm db:*` scripts all read it from that file. A new project's `.env.development` uses the relative `data`, so copying the project directory also copies its database, and the copy opens its own database instead of the original's. Application code can build paths to its own files in the same directory with `dataPath()` from `@sapporta/server`, for example `dataPath("user-config", "import-presets.json")`.
 
 Back up out-of-band (e.g. `sqlite3 db.sqlite .backup /backups/db-$(date +%F).sqlite`, synced to object storage); SQLite gives a consistent snapshot even while Hono is writing.
 

@@ -6,6 +6,7 @@
     "noEmit": true,
     "paths": {
       "@sapporta/server": ["./src/index.ts"],
+      "@sapporta/server/data-dir": ["./src/project/data-dir.ts"],
       "%%SAPPORTA:SLUG%%-shared": [
         "./src/templates/packages/shared/src/index.ts"
       ]

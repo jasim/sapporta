@@ -13,7 +13,6 @@ import {
   WATCHABLE_SUBDIRS,
   fromProjectRoot,
   fromApiCodeDir,
-  projectRootFromDbPath,
   storeDbPath,
   findProjectRootFrom,
   setProjectRoot,
@@ -39,8 +38,6 @@ describe("project-paths", () => {
       frontendDir: "/tmp/myproject/packages/frontend",
       frontendDistDir: "/tmp/myproject/packages/frontend/dist",
       sharedDir: "/tmp/myproject/packages/shared",
-      dataDir: "/tmp/myproject/data",
-      databasePath: "/tmp/myproject/data/sqlite.db",
       markerPath: "/tmp/myproject/sapporta.json",
     });
   });
@@ -51,12 +48,6 @@ describe("project-paths", () => {
       schemaDir: "/tmp/myproject/packages/api/schema",
       appDir: "/tmp/myproject/packages/api/app",
     });
-  });
-
-  it("projectRootFromDbPath goes two levels up", () => {
-    expect(projectRootFromDbPath("/store/proj1/data/sqlite.db")).toBe(
-      "/store/proj1",
-    );
   });
 
   it("storeDbPath constructs multi-project database path", () => {

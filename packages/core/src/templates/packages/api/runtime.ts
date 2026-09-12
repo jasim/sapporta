@@ -9,6 +9,7 @@
  */
 import {
   connectProject,
+  databasePath,
   findProjectRootFrom,
   fromProjectRoot,
   loadSapportaProject,
@@ -75,9 +76,9 @@ export async function openProjectRuntime(
     );
   }
   setProjectRoot(projectRoot);
-  const { apiDistDir, frontendDistDir, databasePath } =
-    fromProjectRoot(projectRoot);
-  const conn = connectProject(databasePath);
+  const { apiDistDir, frontendDistDir } = fromProjectRoot(projectRoot);
+  // The database is in the directory named by SAPPORTA_DATA_DIR.
+  const conn = connectProject(databasePath());
 
   // Load the compiled table definitions and check the schema's structural and
   // row-access rules. Database migrations remain a separate step.

@@ -70,12 +70,15 @@ COPY --from=build --chown=node:node /app/packages/shared/package.json ./packages
 COPY --from=build --chown=node:node /app/packages/frontend/dist ./packages/frontend/dist
 COPY --chown=node:node sapporta.json package.json pnpm-workspace.yaml ./
 
-# Sapporta writes the SQLite database to /app/data. Mount it as a persistent
-# volume in production, and if that mount is a bind mount, own it as uid 1000 on
-# the host - a bind mount overrides the ownership set here. See DEPLOYMENT.md.
+# Sapporta writes the SQLite database to the directory in SAPPORTA_DATA_DIR,
+# which this image sets to /app/data. The migration and the server in CMD both
+# read it. Mount it as a persistent volume in production, and if that mount is a
+# bind mount, own it as uid 1000 on the host - a bind mount overrides the
+# ownership set here. See DEPLOYMENT.md.
 #
 # chown /app because WORKDIR created it as root. Not -R: that would rewrite the
 # pnpm store, which node only reads.
+ENV SAPPORTA_DATA_DIR=/app/data
 RUN chown node:node /app \
   && install -d -o node -g node /app/data
 

@@ -1,9 +1,5 @@
 import { defineConfig } from "drizzle-kit";
-import { existsSync } from "node:fs";
-import { dirname, join } from "node:path";
-
-const projectRoot = findProjectRoot(process.cwd());
-const databasePath = join(projectRoot, "data", "sqlite.db");
+import { databasePath } from "@sapporta/server/data-dir";
 
 /**
  * Drizzle reads the application and auth schemas to generate migrations.
@@ -19,20 +15,7 @@ export default defineConfig({
   ],
   out: "./migrations",
   dbCredentials: {
-    url: databasePath,
+    // The same database the app opens: sqlite.db in SAPPORTA_DATA_DIR.
+    url: databasePath(),
   },
 });
-
-function findProjectRoot(startDir: string): string {
-  let dir = startDir;
-  while (true) {
-    if (existsSync(join(dir, "sapporta.json"))) return dir;
-    const parent = dirname(dir);
-    if (parent === dir) {
-      throw new Error(
-        `Could not find sapporta.json walking up from ${startDir}`,
-      );
-    }
-    dir = parent;
-  }
-}

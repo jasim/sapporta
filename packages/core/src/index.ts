@@ -186,13 +186,13 @@ export {
   WATCHABLE_SUBDIRS,
   fromProjectRoot,
   fromApiCodeDir,
-  projectRootFromDbPath,
   storeDbPath,
   findProjectRootFrom,
   setProjectRoot,
   projectRoot,
   projectPath,
 } from "./project/project-paths.js";
+export { dataPath, databasePath } from "./project/data-dir.js";
 
 // Contract-driven API (ts-rest + Hono)
 export * from "./api/index.js";

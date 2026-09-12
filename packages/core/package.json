@@ -57,6 +57,11 @@
       "sapporta:source": "./src/errors.ts",
       "default": "./dist/errors.js"
     },
+    "./data-dir": {
+      "types": "./dist/project/data-dir.d.ts",
+      "sapporta:source": "./src/project/data-dir.ts",
+      "default": "./dist/project/data-dir.js"
+    },
     "./testing": {
       "types": "./dist/testing/index.d.ts",
       "sapporta:source": "./src/testing/index.ts",
