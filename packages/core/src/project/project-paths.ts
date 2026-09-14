@@ -9,7 +9,7 @@
  *   - fromApiCodeDir()   — given packages/api or packages/api/dist
  */
 
-import { existsSync } from "node:fs";
+import { existsSync, realpathSync } from "node:fs";
 import { join, dirname } from "node:path";
 
 /** The marker filename that identifies a Sapporta project root. */
@@ -61,11 +61,17 @@ export function fromApiCodeDir(codeDir: string) {
 // ── Project root singleton (Rails.root analogue) ─────────────────────────────
 //
 // Holds the absolute path to the current Sapporta project root for the
-// lifetime of the process. The generated `packages/api/boot.ts` calls
-// `setProjectRoot` once at boot, before any user code runs. User code
-// anywhere in the project — sub-apps under `packages/api/app/`,
-// ad-hoc scripts — then reads it via `projectRoot()` /
-// `projectPath(...)` without needing to plumb it through.
+// lifetime of the process. The generated `packages/api/runtime.ts` calls
+// `setProjectRoot` when it opens the app. User code anywhere in the project —
+// sub-apps under `packages/api/app/`, ad-hoc scripts — reads it via
+// `projectRoot()` / `projectPath(...)` / `dataPath(...)` without needing to
+// plumb it through.
+//
+// `boot.ts` imports the application's modules before it opens the runtime, so
+// code at the top of those modules runs before `setProjectRoot`. `projectRoot()`
+// therefore finds the root on its own when it is not set yet, starting from the
+// script the process was started with. That is the rule `runtime.ts` follows,
+// so both find the same root from any working directory.
 //
 // This API is single-project per process by design. Multi-project hosts
 // must not use it — the mismatch guard in `setProjectRoot` makes such
@@ -121,21 +127,49 @@ export function setProjectRoot(root: string): void {
  * use `__dirname` / `import.meta.dirname` for asset paths — at runtime they
  * resolve under `dist/`, where non-TS assets (JSON, prompts, txt) don't exist.
  *
- * If `setProjectRoot` was not called (ad-hoc scripts, tests), lazily resolves
- * by walking up from `process.cwd()` looking for `sapporta.json`. Throws if
- * neither path produces a root.
+ * If `setProjectRoot` was not called yet, for example in code at the top of a
+ * module that `boot.ts` imports, the root is found by walking up for
+ * `sapporta.json`: first from the script the process was started with, such as
+ * `packages/api/dist/boot.js` or a project's own `drizzle-kit`, and then from
+ * `process.cwd()`. The script comes first because the app starts from any
+ * working directory, including `/` under systemd. The working directory is used
+ * only when the script is outside every project, as with `node -e`. The result
+ * is kept for the rest of the process. Throws if neither walk finds a root.
  */
 export function projectRoot(): string {
   if (_projectRoot !== undefined) return _projectRoot;
-  const found = findProjectRootFrom(process.cwd());
+  const scriptDir = entryScriptDir();
+  const found =
+    (scriptDir === null ? null : findProjectRootFrom(scriptDir)) ??
+    findProjectRootFrom(process.cwd());
   if (!found) {
+    const searched =
+      scriptDir === null ? process.cwd() : `${scriptDir} or ${process.cwd()}`;
     throw new Error(
-      `projectRoot() called outside a Sapporta project: no ${PROJECT_MARKER} found walking up from ${process.cwd()}. ` +
-        `Either run from inside a project directory or call setProjectRoot() at boot.`,
+      `projectRoot() called outside a Sapporta project: no ${PROJECT_MARKER} found walking up from ${searched}. ` +
+        `Either run a script inside a project directory or call setProjectRoot() at boot.`,
     );
   }
   _projectRoot = found;
   return found;
+}
+
+/**
+ * The directory of the script this process was started with, or `null` when
+ * there is none (`node -e`, a REPL) or it cannot be read.
+ *
+ * The path is resolved through symlinks, as Node resolves `import.meta.dirname`,
+ * so the root found here is the same string that `runtime.ts` passes to
+ * `setProjectRoot`.
+ */
+function entryScriptDir(): string | null {
+  const script = process.argv[1];
+  if (!script) return null;
+  try {
+    return dirname(realpathSync(script));
+  } catch {
+    return null;
+  }
 }
 
 /**

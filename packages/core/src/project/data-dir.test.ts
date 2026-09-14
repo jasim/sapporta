@@ -1,5 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { mkdtempSync, realpathSync, rmSync } from "node:fs";
+import {
+  mkdirSync,
+  mkdtempSync,
+  realpathSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { dataPath, databasePath } from "./data-dir.js";
@@ -10,16 +16,19 @@ import {
 
 describe("data-dir", () => {
   let originalCwd: string;
+  let originalScript: string | undefined;
   let tmp: string;
 
   beforeEach(() => {
     originalCwd = process.cwd();
+    originalScript = process.argv[1];
     tmp = realpathSync(mkdtempSync(join(tmpdir(), "sapporta-data-dir-")));
     _resetProjectRootForTesting();
   });
 
   afterEach(() => {
     process.chdir(originalCwd);
+    process.argv[1] = originalScript as string;
     _resetProjectRootForTesting();
     vi.unstubAllEnvs();
     rmSync(tmp, { recursive: true, force: true });
@@ -53,6 +62,22 @@ describe("data-dir", () => {
 
     vi.stubEnv("SAPPORTA_DATA_DIR", "../sample-data");
     expect(databasePath()).toBe("/some/sample-data/sqlite.db");
+  });
+
+  it("resolves a relative SAPPORTA_DATA_DIR before the project root is set", () => {
+    // A module that boot.ts imports calls dataPath() when it loads, before
+    // runtime.ts sets the root, in a server started from outside the project.
+    const app = join(tmp, "app");
+    mkdirSync(join(app, "packages/api/dist"), { recursive: true });
+    writeFileSync(join(app, "sapporta.json"), "{}");
+    writeFileSync(join(app, "packages/api/dist/boot.js"), "");
+    process.argv[1] = join(app, "packages/api/dist/boot.js");
+    process.chdir("/");
+    vi.stubEnv("SAPPORTA_DATA_DIR", "data");
+
+    expect(dataPath("user-config", "import-presets.json")).toBe(
+      join(app, "data/user-config/import-presets.json"),
+    );
   });
 
   it("throws when SAPPORTA_DATA_DIR is unset", () => {

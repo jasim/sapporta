@@ -5,6 +5,7 @@ import {
   mkdirSync,
   rmSync,
   realpathSync,
+  symlinkSync,
 } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
@@ -53,20 +54,30 @@ describe("project-paths", () => {
 describe("projectRoot singleton", () => {
   let tmp: string;
   let originalCwd: string;
+  let originalScript: string | undefined;
 
   beforeEach(() => {
     // realpathSync resolves macOS's /var → /private/var symlink so the
     // post-chdir cwd matches what we wrote the marker into.
     tmp = realpathSync(mkdtempSync(join(tmpdir(), "sapporta-root-")));
     originalCwd = process.cwd();
+    originalScript = process.argv[1];
     _resetProjectRootForTesting();
   });
 
   afterEach(() => {
     process.chdir(originalCwd);
+    process.argv[1] = originalScript as string;
     _resetProjectRootForTesting();
     rmSync(tmp, { recursive: true, force: true });
   });
+
+  /** Writes an empty file at `path` and returns the path. */
+  function writeScript(path: string): string {
+    mkdirSync(join(path, ".."), { recursive: true });
+    writeFileSync(path, "");
+    return path;
+  }
 
   it("findProjectRootFrom finds the marker by walking up", () => {
     writeFileSync(join(tmp, "sapporta.json"), "{}");
@@ -97,16 +108,70 @@ describe("projectRoot singleton", () => {
     );
   });
 
-  it("projectRoot lazily resolves from cwd when not initialized", () => {
-    writeFileSync(join(tmp, "sapporta.json"), "{}");
+  it("projectRoot lazily resolves from the started script, from any cwd", () => {
+    // Code at the top of a module boot.ts imports runs before runtime.ts sets
+    // the root, and the server may be started from any directory.
+    const app = join(tmp, "app");
+    mkdirSync(app);
+    writeFileSync(join(app, "sapporta.json"), "{}");
+    process.argv[1] = writeScript(join(app, "packages/api/dist/boot.js"));
+    const elsewhere = join(tmp, "elsewhere");
+    mkdirSync(elsewhere);
+    process.chdir(elsewhere);
+
+    expect(projectRoot()).toBe(app);
+    // The root it finds is the one runtime.ts sets, so setting it passes.
+    expect(() => setProjectRoot(app)).not.toThrow();
+  });
+
+  it("projectRoot prefers the started script's project over the cwd's", () => {
+    const app = join(tmp, "app");
+    const other = join(tmp, "other");
+    mkdirSync(app);
+    mkdirSync(other);
+    writeFileSync(join(app, "sapporta.json"), "{}");
+    writeFileSync(join(other, "sapporta.json"), "{}");
+    process.argv[1] = writeScript(join(app, "packages/api/dist/boot.js"));
+    process.chdir(other);
+
+    expect(projectRoot()).toBe(app);
+  });
+
+  it("projectRoot resolves the started script through symlinks", () => {
+    const app = join(tmp, "app");
+    mkdirSync(app);
+    writeFileSync(join(app, "sapporta.json"), "{}");
+    const boot = writeScript(join(app, "packages/api/dist/boot.js"));
+    const link = join(tmp, "linked-app");
+    symlinkSync(app, link);
+    process.argv[1] = join(link, "packages/api/dist/boot.js");
     process.chdir(tmp);
-    expect(projectRoot()).toBe(tmp);
+
+    expect(realpathSync(process.argv[1])).toBe(boot);
+    expect(projectRoot()).toBe(app);
+  });
+
+  it("projectRoot lazily resolves from cwd when the script is outside a project", () => {
+    process.argv[1] = writeScript(join(tmp, "tools", "script.js"));
+    const project = join(tmp, "project");
+    mkdirSync(project);
+    writeFileSync(join(project, "sapporta.json"), "{}");
+    process.chdir(project);
+    expect(projectRoot()).toBe(project);
     // Subsequent calls return the cached value even if cwd changes.
     process.chdir(originalCwd);
+    expect(projectRoot()).toBe(project);
+  });
+
+  it("projectRoot lazily resolves from cwd when there is no started script", () => {
+    process.argv[1] = "";
+    writeFileSync(join(tmp, "sapporta.json"), "{}");
+    process.chdir(tmp);
     expect(projectRoot()).toBe(tmp);
   });
 
   it("projectRoot throws with a clear message when no marker is found", () => {
+    process.argv[1] = writeScript(join(tmp, "tools", "script.js"));
     process.chdir(tmp);
     expect(() => projectRoot()).toThrow(/no sapporta\.json found/);
   });

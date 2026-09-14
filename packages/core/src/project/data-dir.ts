@@ -30,7 +30,8 @@ const DATA_DIR_ENV_VAR = "SAPPORTA_DATA_DIR";
  * project root (the directory with `sapporta.json`). For example, `data`
  * means `data/` inside the project. A relative path is not resolved against
  * the working directory, because `pnpm dev`, Drizzle Kit, and a container
- * each start in a different one.
+ * each start in a different one. It can be called at the top of a module,
+ * before the app has set the project root; see `projectRoot()`.
  *
  * Throws when `SAPPORTA_DATA_DIR` is unset or empty.
  */
