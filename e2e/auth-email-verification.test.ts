@@ -6,6 +6,7 @@ import {
   buildGeneratedProject,
   cleanupProject,
   createTempProject,
+  projectDatabasePath,
   runDrizzleMigrationCycle,
   runText,
   scaffoldProject,
@@ -280,7 +281,7 @@ describe.sequential("sapporta email verification policy - end-to-end", () => {
     sql: string,
     params: readonly (string | number | boolean | null)[],
   ): Promise<void> {
-    const databasePath = join(project!.projectDir, "data", "sqlite.db");
+    const databasePath = projectDatabasePath(project!);
     const queryScript = [
       'import Database from "better-sqlite3";',
       `const db = new Database(${JSON.stringify(databasePath)});`,

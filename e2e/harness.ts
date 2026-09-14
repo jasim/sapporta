@@ -11,7 +11,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { createServer } from "node:net";
 import { expect } from "vitest";
 
@@ -254,6 +254,21 @@ export function createTempProject(opts: TempProjectOptions = {}): E2eProject {
     projectDir,
     env,
   };
+}
+
+/**
+ * The SQLite file a test project's commands open: sqlite.db in the
+ * SAPPORTA_DATA_DIR of the project's environment. A relative value is resolved
+ * against the project root, as Sapporta resolves it.
+ */
+export function projectDatabasePath(project: E2eProject): string {
+  const dataDir = project.env.SAPPORTA_DATA_DIR;
+  if (!dataDir) {
+    throw new Error(
+      `The environment of the e2e project at ${project.projectDir} does not set SAPPORTA_DATA_DIR.`,
+    );
+  }
+  return join(resolve(project.projectDir, dataDir), "sqlite.db");
 }
 
 export function cleanupProject(project: E2eProject | undefined): void {
@@ -1320,7 +1335,7 @@ export async function assertSqliteTable(
   tableName: string,
   expectedColumns: string[],
 ): Promise<void> {
-  const databasePath = join(project.projectDir, "data", "sqlite.db");
+  const databasePath = projectDatabasePath(project);
   const queryScript = [
     'import Database from "better-sqlite3";',
     `const db = new Database(${JSON.stringify(databasePath)}, { readonly: true });`,
@@ -1363,7 +1378,7 @@ export async function assertSqliteTableMissing(
   project: E2eProject,
   tableName: string,
 ): Promise<void> {
-  const databasePath = join(project.projectDir, "data", "sqlite.db");
+  const databasePath = projectDatabasePath(project);
   const queryScript = [
     'import Database from "better-sqlite3";',
     `const db = new Database(${JSON.stringify(databasePath)}, { readonly: true });`,
@@ -1524,7 +1539,7 @@ export async function readSqliteRows<T extends Record<string, unknown>>(
   sql: string,
   params: readonly SqliteValue[] = [],
 ): Promise<T[]> {
-  const databasePath = join(project.projectDir, "data", "sqlite.db");
+  const databasePath = projectDatabasePath(project);
   const queryScript = [
     'import Database from "better-sqlite3";',
     `const db = new Database(${JSON.stringify(databasePath)}, { readonly: true });`,
@@ -1557,7 +1572,7 @@ export async function runSqliteStatement(
   sql: string,
   params: readonly SqliteValue[] = [],
 ): Promise<SqliteStatementResult> {
-  const databasePath = join(project.projectDir, "data", "sqlite.db");
+  const databasePath = projectDatabasePath(project);
   const queryScript = [
     'import Database from "better-sqlite3";',
     `const db = new Database(${JSON.stringify(databasePath)});`,

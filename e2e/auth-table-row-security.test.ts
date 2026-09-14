@@ -12,6 +12,7 @@ import {
   cleanupProject,
   createTempProject,
   parseJsonOutput,
+  projectDatabasePath,
   runText,
   runDrizzleMigrationCycle,
   scaffoldProject,
@@ -932,7 +933,7 @@ describe("generated table authz and row security - end-to-end", () => {
     sql: string,
     params: readonly unknown[] = [],
   ): Promise<T[]> {
-    const databasePath = join(testProject.projectDir, "data", "sqlite.db");
+    const databasePath = projectDatabasePath(testProject);
     const queryScript = [
       'import Database from "better-sqlite3";',
       `const db = new Database(${JSON.stringify(databasePath)}, { readonly: true });`,
@@ -953,7 +954,7 @@ describe("generated table authz and row security - end-to-end", () => {
     sql: string,
     params: readonly unknown[] = [],
   ): Promise<void> {
-    const databasePath = join(testProject.projectDir, "data", "sqlite.db");
+    const databasePath = projectDatabasePath(testProject);
     const queryScript = [
       'import Database from "better-sqlite3";',
       `const db = new Database(${JSON.stringify(databasePath)});`,
