@@ -110,6 +110,7 @@ Each row is a package export subpath.
 | `.`                     | Runtime surface for `boot.ts` and endpoint code: project loading and mounting, middleware, `scopedRows`, auth      |
 | `./table`               | Column builders and the `sapportaTable` wrapper used by schema files                                               |
 | `./errors`              | Error vocabulary: `ErrorCode`, `OperationError`, validation and query-parse errors, SQLite error classification    |
+| `./data-dir`            | `databasePath()` and `dataPath()`: the SQLite file and other files in `SAPPORTA_DATA_DIR`, for `drizzle.config.ts` |
 | `./testing`             | `createTestDb` and `createTestConnection` — in-memory SQLite with production PRAGMA settings                       |
 | `./create-project`      | Programmatic project creation, the engine behind `sapporta init`                                                   |
 | `./source-link-runtime` | Node module-resolution preload used when developing against Sapporta sources rather than published packages        |
