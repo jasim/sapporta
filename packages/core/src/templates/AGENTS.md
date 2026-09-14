@@ -25,12 +25,15 @@ implementation.
 Run `pnpm typecheck` after every change. `vite build` strips types with esbuild
 and reports no type errors, so it is not a type check.
 
-A schema change generates and applies its own migration:
+A schema change generates and applies its own migration. Every `db:*` script
+reads `SAPPORTA_DATA_DIR` from the environment and stops when it is not set; it
+never loads `.env.development`. Pass the value `.env.development` records, so
+the migration changes the database `pnpm dev` opens:
 
 ```bash
-pnpm --filter ./packages/api db:generate --name add_table
-pnpm --filter ./packages/api db:migrate
-pnpm --filter ./packages/api db:check
+SAPPORTA_DATA_DIR=%%SAPPORTA:DATA_DIR%% pnpm --filter ./packages/api db:generate --name add_table
+SAPPORTA_DATA_DIR=%%SAPPORTA:DATA_DIR%% pnpm --filter ./packages/api db:migrate
+SAPPORTA_DATA_DIR=%%SAPPORTA:DATA_DIR%% pnpm --filter ./packages/api db:check
 ```
 
 Review the generated SQL before applying it. The server checks migration

@@ -12,8 +12,9 @@
  * database. For example, if `pnpm dev` runs on sample data, `pnpm db:migrate`
  * cannot quietly migrate a different database.
  *
- * This module imports only Node built-ins, because `drizzle.config.ts` imports
- * it through `@sapporta/server/data-dir` every time Drizzle Kit runs.
+ * This module and `project-paths.ts`, the only module it imports, use nothing
+ * but Node built-ins, because `drizzle.config.ts` imports it through
+ * `@sapporta/server/data-dir` every time Drizzle Kit runs.
  */
 
 import { isAbsolute, join, resolve } from "node:path";
@@ -37,7 +38,7 @@ export function dataPath(...segments: string[]): string {
   const dir = process.env[DATA_DIR_ENV_VAR];
   if (!dir) {
     throw new Error(
-      `${DATA_DIR_ENV_VAR} is not set. Set it to the directory that holds this app's sqlite.db: an absolute path, or a path relative to the project root.`,
+      `${DATA_DIR_ENV_VAR} is not set. Set it in the environment to the directory that holds this app's sqlite.db: an absolute path, or a path relative to the project root.`,
     );
   }
   const base = isAbsolute(dir) ? dir : resolve(projectRoot(), dir);

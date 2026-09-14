@@ -34,10 +34,11 @@ Shape (c) loses both; its extra configuration follows from that.
 
 `sapporta init` creates two env files:
 
-- `.env.development` — loaded by `pnpm dev`, `pnpm seed`, and the `pnpm db:*`
-  scripts with Node's built-in `--env-file`. It contains local-only values,
-  including a generated `BETTER_AUTH_SECRET` and `SAPPORTA_DATA_DIR=data`,
-  which places the development database in `data/` at the project root.
+- `.env.development` — loaded by `pnpm dev` and `pnpm seed` with Node's
+  built-in `--env-file`. It contains local-only values, including a generated
+  `BETTER_AUTH_SECRET` and `SAPPORTA_DATA_DIR=%%SAPPORTA:DATA_DIR%%`, which places the
+  development database in `data/` at the project root. The `pnpm db:*` scripts
+  do not load it; see **Database persistence**.
 - `.env.production.example` — placeholder production values. Copy the values
   into your deployment environment; `pnpm start` does not load development env.
 
@@ -89,14 +90,12 @@ One Hono process serves `/api/*` and the built SPA on a single
 ```bash
 pnpm build                 # tsc → packages/api/dist/, vite build → packages/frontend/dist/
 export SAPPORTA_DATA_DIR=/srv/%%SAPPORTA:SLUG%%/data  # an existing directory
-pnpm --filter ./packages/api exec drizzle-kit migrate
+pnpm --filter ./packages/api db:migrate
 SAPPORTA_API_PORT=3000 pnpm start  # node packages/api/dist/boot.js
 ```
 
-Run Drizzle Kit directly here, not `pnpm db:migrate`. The `pnpm db:*` scripts
-load `.env.development`, so on a server they would fail or read development
-values. Run the migration in the same environment as `pnpm start`, so both use
-the database in the same `SAPPORTA_DATA_DIR`.
+Run the migration in the same environment as `pnpm start`, so both use the
+database in the same `SAPPORTA_DATA_DIR`.
 
 The browser loads the SPA from `http://your-host:3000/`, and its relative `fetch("/api/foo")` calls hit the same process.
 
@@ -290,7 +289,7 @@ The SQLite database is the file `sqlite.db` in the directory named by `SAPPORTA_
 - **systemd on a VPS:** set `SAPPORTA_DATA_DIR` in the unit's environment, to a directory that is not under `/tmp` or a tmpfs mount.
 - **Fly.io / Railway / similar:** attach a persistent volume and set `SAPPORTA_DATA_DIR` to its mount path.
 
-One project can run against several databases by giving each process a different `SAPPORTA_DATA_DIR`. For example, a developer can keep sample data and real data in two directories, and a host can run one process per customer, each with its own directory. In development, change the path in `.env.development`; `pnpm dev`, `pnpm seed`, and the `pnpm db:*` scripts all read it from that file. A new project's `.env.development` uses the relative `data`, so copying the project directory also copies its database, and the copy opens its own database instead of the original's. Application code can build paths to its own files in the same directory with `dataPath()` from `@sapporta/server`, for example `dataPath("user-config", "import-presets.json")`.
+One project can run against several databases by giving each process a different `SAPPORTA_DATA_DIR`. For example, a developer can keep sample data and real data in two directories, and a host can run one process per customer, each with its own directory. In development, `pnpm dev` and `pnpm seed` read the path from `.env.development`. The `pnpm db:*` scripts never load that file, because the same scripts run on a server: they read `SAPPORTA_DATA_DIR` from the environment and stop when it is not set, so a forgotten setting cannot migrate the wrong database. Pass the same path to them, for example `SAPPORTA_DATA_DIR=%%SAPPORTA:DATA_DIR%% pnpm --filter ./packages/api db:migrate`, or load it with a tool such as mise or direnv. A new project's `.env.development` uses the relative `data`, so copying the project directory also copies its database, and the copy opens its own database instead of the original's. Application code can build paths to its own files in the same directory with `dataPath()` from `@sapporta/server`, for example `dataPath("user-config", "import-presets.json")`.
 
 Back up out-of-band (e.g. `sqlite3 db.sqlite .backup /backups/db-$(date +%F).sqlite`, synced to object storage); SQLite gives a consistent snapshot even while Hono is writing.
 

@@ -1,7 +1,7 @@
 import { existsSync, mkdtempSync, readdirSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { ErrorCode, OperationError } from "../../errors.js";
 import { createProject, MINIMUM_PNPM_MAJOR_VERSION } from "./create-project.js";
 import {
@@ -189,12 +189,22 @@ describe("createProject", () => {
     expect(existsSync(target)).toBe(false);
   });
 
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
   it("publishes the target after all setup steps succeed", () => {
     const parent = makeTempDir();
     const target = join(parent, "acme-app");
+    // A data directory left in the caller's shell names another app's
+    // database. Init must not migrate it.
+    vi.stubEnv("SAPPORTA_DATA_DIR", "/srv/some-other-app");
     const commands: string[] = [];
-    const runCommand: InitCommandRunner = (command, args) => {
-      commands.push([command, ...args].join(" "));
+    const dataDirByCommand = new Map<string, string | undefined>();
+    const runCommand: InitCommandRunner = (command, args, options) => {
+      const line = [command, ...args].join(" ");
+      commands.push(line);
+      dataDirByCommand.set(line, options.env?.SAPPORTA_DATA_DIR);
       return commandOutput(command, args);
     };
 
@@ -230,6 +240,18 @@ describe("createProject", () => {
       "pnpm --filter ./packages/api db:generate --name initial_auth",
     );
     expect(commands).toContain("pnpm --filter ./packages/api db:migrate");
+    // The migration runs against the directory the new .env.development names.
+    expect(readFileSync(join(target, ".env.development"), "utf-8")).toContain(
+      "\nSAPPORTA_DATA_DIR=data\n",
+    );
+    expect(
+      dataDirByCommand.get(
+        "pnpm --filter ./packages/api db:generate --name initial_auth",
+      ),
+    ).toBe("data");
+    expect(
+      dataDirByCommand.get("pnpm --filter ./packages/api db:migrate"),
+    ).toBe("data");
     const migrationApplyIndex = commands.indexOf(
       "pnpm --filter ./packages/api db:migrate",
     );
@@ -449,19 +471,17 @@ describe("renderScaffoldFiles", () => {
       "node --env-file=../../.env.development --watch dist/boot.js",
     );
     expect(apiPackage.scripts?.start).toBe("node dist/boot.js");
-    // Drizzle Kit must read SAPPORTA_DATA_DIR from the same file as `dev`, or
-    // a migration could run against a different database than the app opens.
-    for (const script of [
-      "db:generate",
-      "db:generate:custom",
-      "db:migrate",
-      "db:check",
-      "db:studio",
-    ]) {
-      expect(apiPackage.scripts?.[script], script).toMatch(
-        /^node --env-file=\.\.\/\.\.\/\.env\.development node_modules\/drizzle-kit\/bin\.cjs /,
-      );
-    }
+    // The db:* scripts run the same way in development and on a server, so
+    // they take SAPPORTA_DATA_DIR from the environment and never load
+    // .env.development. A shell without the setting stops at drizzle.config.ts
+    // instead of migrating whatever database the file names.
+    expect(apiPackage.scripts).toMatchObject({
+      "db:generate": "drizzle-kit generate",
+      "db:generate:custom": "drizzle-kit generate --custom",
+      "db:migrate": "drizzle-kit migrate",
+      "db:check": "drizzle-kit check",
+      "db:studio": "drizzle-kit studio",
+    });
     expect(apiPackage.scripts?.dev).not.toContain("--preserve-symlinks");
     expect(apiPackage.scripts?.start).not.toContain("--preserve-symlinks");
 
@@ -743,6 +763,7 @@ describe("scaffold template inventory", () => {
       "%%SAPPORTA:DEV_API_PORT%%",
       "%%SAPPORTA:DEV_FRONTEND_PORT%%",
       "%%SAPPORTA:DOCS_BROWSER_URL%%",
+      "%%SAPPORTA:DATA_DIR%%",
       "%%SAPPORTA:NODE_COMMAND%%",
       "%%SAPPORTA:VITE_SOURCE_LINK_RESOLUTION%%",
       ...DEPENDENCY_CATALOG.tokenByKey.values(),

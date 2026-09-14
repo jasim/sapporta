@@ -15,7 +15,9 @@ export default defineConfig({
   ],
   out: "./migrations",
   dbCredentials: {
-    // The same database the app opens: sqlite.db in SAPPORTA_DATA_DIR.
+    // The same database the app opens: sqlite.db in SAPPORTA_DATA_DIR. Every
+    // `pnpm db:*` command reads that setting from its environment and stops
+    // when it is not set, on a laptop and on a server alike.
     url: databasePath(),
   },
 });

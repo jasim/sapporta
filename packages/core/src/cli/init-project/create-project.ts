@@ -32,6 +32,7 @@ import {
   type ProjectLayout,
 } from "./project-layout.js";
 import { renderScaffoldFiles } from "./render-scaffold.js";
+import { NEW_PROJECT_DATA_DIR } from "./scaffold-manifest.js";
 
 export interface CreateProjectOptions {
   /** Absolute path to the project root that should be published on success. */
@@ -317,7 +318,7 @@ class CreateProjectSetup {
       step: "migration-generate",
       title: "Generating the initial auth database migration",
       details: [
-        "Running pnpm --filter ./packages/api db:generate --name initial_auth to create SQL from the generated API schema",
+        `Running SAPPORTA_DATA_DIR=${NEW_PROJECT_DATA_DIR} pnpm --filter ./packages/api db:generate --name initial_auth to create SQL from the generated API schema`,
       ],
       command: "pnpm",
       args: [
@@ -327,6 +328,7 @@ class CreateProjectSetup {
         "--name",
         "initial_auth",
       ],
+      env: newProjectDatabaseEnv(),
     });
   }
 
@@ -335,10 +337,11 @@ class CreateProjectSetup {
       step: "migration-apply",
       title: "Applying the initial auth database migration",
       details: [
-        "Running pnpm --filter ./packages/api db:migrate so the development SQLite database matches the generated schema",
+        `Running SAPPORTA_DATA_DIR=${NEW_PROJECT_DATA_DIR} pnpm --filter ./packages/api db:migrate so the development SQLite database matches the generated schema`,
       ],
       command: "pnpm",
       args: ["--filter", "./packages/api", "db:migrate"],
+      env: newProjectDatabaseEnv(),
     });
   }
 
@@ -400,6 +403,7 @@ class CreateProjectSetup {
     details: readonly string[];
     command: string;
     args: readonly string[];
+    env?: NodeJS.ProcessEnv;
   }): void {
     this.logSection({
       title: opts.title,
@@ -412,6 +416,7 @@ class CreateProjectSetup {
         this.opts.runCommand(opts.command, opts.args, {
           cwd: this.opts.stagedProject.root,
           stdio: "inherit",
+          env: opts.env,
         }),
     });
   }
@@ -496,4 +501,15 @@ function formatStep(step: InitSetupStep): string {
     case "atomic-publish":
       return "project directory publication";
   }
+}
+
+/**
+ * The environment for the Drizzle Kit commands init runs in the staged project.
+ *
+ * The `db:*` scripts take SAPPORTA_DATA_DIR from the environment alone, so init
+ * sets the value the new `.env.development` records. It replaces any value the
+ * caller's shell carries, which names some other app's database.
+ */
+function newProjectDatabaseEnv(): NodeJS.ProcessEnv {
+  return { ...process.env, SAPPORTA_DATA_DIR: NEW_PROJECT_DATA_DIR };
 }

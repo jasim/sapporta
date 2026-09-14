@@ -28,6 +28,8 @@ export type InitCommandRunner = (
   options: {
     cwd?: string;
     stdio?: InitCommandStdio;
+    /** The complete environment of the command. Defaults to this process's. */
+    env?: NodeJS.ProcessEnv;
   },
 ) => string;
 
@@ -35,6 +37,7 @@ export const runInitCommand: InitCommandRunner = (command, args, options) => {
   const stdio = options.stdio ?? "ignore";
   const output = execFileSync(command, [...args], {
     cwd: options.cwd,
+    env: options.env,
     stdio: stdio === "capture" ? ["ignore", "pipe", "pipe"] : stdio,
     encoding: "utf-8",
   });

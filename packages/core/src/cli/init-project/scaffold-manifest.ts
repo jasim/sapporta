@@ -7,6 +7,14 @@ export type ScaffoldFileSpec = {
 
 export type ScaffoldManifest = readonly ScaffoldFileSpec[];
 
+/**
+ * The data directory of a new project, as `sapporta init` writes it into
+ * `.env.development` for SAPPORTA_DATA_DIR and passes it to the migration it
+ * runs. The value is relative, so it is resolved against the project root and
+ * a copy of the project opens the copy of this directory inside it.
+ */
+export const NEW_PROJECT_DATA_DIR = "data";
+
 function scaffoldFile(dest: string): ScaffoldFileSpec {
   return {
     src: templateSrcForDest(dest),
@@ -99,7 +107,7 @@ export function directoriesRequiredByManifest(
   manifest: ScaffoldManifest = SCAFFOLD_MANIFEST,
 ): string[] {
   const dirs = new Set<string>([
-    join(root, "data"),
+    join(root, NEW_PROJECT_DATA_DIR),
     join(root, "scripts"),
     join(root, "packages/api"),
     join(root, "packages/api/app"),

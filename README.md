@@ -72,11 +72,11 @@ export const customers = sapportaTable({
 
 `rowLabelColumns` names the columns that build a row's human-readable label, used wherever another table points at this one. `workspaceGlobal` means every member of the active workspace can see the row. Use `workspaceUserScoped` for records owned by one user inside a workspace, and `systemGlobal` for installation-wide reference data such as countries or tax categories.
 
-After changing schema or creating a new one, generate and apply a migration:
+After changing schema or creating a new one, generate and apply a migration. The `db:*` scripts read the database directory from `SAPPORTA_DATA_DIR` in the environment and stop when it is not set; a new project's `.env.development` sets it to `data` for `pnpm dev`:
 
 ```bash
-pnpm --filter ./packages/api db:generate --name add_customers
-pnpm --filter ./packages/api db:migrate
+SAPPORTA_DATA_DIR=data pnpm --filter ./packages/api db:generate --name add_customers
+SAPPORTA_DATA_DIR=data pnpm --filter ./packages/api db:migrate
 ```
 
 The table is immediately available through Sapporta's table API and UI. Each table gets a grid with filtering, search, sorting, lookups, relationship navigation, exports, and keyboard-friendly data entry. Table routes and views are scoped to the logged-in user's workspace and row permissions, so you can use them directly in product workflows instead of treating them only as an internal admin surface.

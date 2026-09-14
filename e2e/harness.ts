@@ -236,6 +236,12 @@ export function createTempProject(opts: TempProjectOptions = {}): E2eProject {
   // are the ones a real project gets even when the developer running these
   // tests points their shell at a local docs server.
   delete env.SAPPORTA_DOCS_ORIGIN;
+  // The db:* scripts and a built server take the data directory from the
+  // environment alone. Name the project's own data/ here, as an absolute path,
+  // which also replaces any value in the shell of the developer running these
+  // tests: that value names a real database. `sapporta init` sets its own
+  // value for the migration it runs in the staging directory.
+  env.SAPPORTA_DATA_DIR = join(projectDir, "data");
   if (opts.devMode ?? true) {
     env.SAPPORTA_PACKAGE_ROOT = MONOREPO_ROOT;
   } else {
@@ -1946,9 +1952,6 @@ export async function startBuiltServer(
       cwd: join(project.projectDir, "packages", "api"),
       env: {
         ...project.env,
-        // A built server does not load .env.development, so it receives the
-        // directory that file names, here as an absolute path.
-        SAPPORTA_DATA_DIR: join(project.projectDir, "data"),
         ...envOverrides,
         SAPPORTA_PUBLIC_APP_URL:
           envOverrides.SAPPORTA_PUBLIC_APP_URL ?? baseUrl,
@@ -1988,7 +1991,6 @@ export async function expectBuiltServerBootFailure(
     cwd: project.projectDir,
     env: {
       ...project.env,
-      SAPPORTA_DATA_DIR: join(project.projectDir, "data"),
       ...envOverrides,
       SAPPORTA_PUBLIC_APP_URL: envOverrides.SAPPORTA_PUBLIC_APP_URL ?? baseUrl,
       SAPPORTA_REQUIRE_VERIFIED_EMAIL:

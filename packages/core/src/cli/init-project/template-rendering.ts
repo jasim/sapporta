@@ -10,7 +10,10 @@ import type {
   ScaffoldManifest,
   ScaffoldFileSpec,
 } from "./scaffold-manifest.js";
-import { SCAFFOLD_MANIFEST } from "./scaffold-manifest.js";
+import {
+  NEW_PROJECT_DATA_DIR,
+  SCAFFOLD_MANIFEST,
+} from "./scaffold-manifest.js";
 import { initProjectPackagePaths } from "./paths.js";
 import type { DevPorts } from "./dev-ports.js";
 
@@ -48,6 +51,7 @@ export function buildTemplateVariables(opts: {
     "%%SAPPORTA:DEV_API_PORT%%": String(devPorts.api),
     "%%SAPPORTA:DEV_FRONTEND_PORT%%": String(devPorts.frontend),
     "%%SAPPORTA:DOCS_BROWSER_URL%%": opts.gettingStartedEnv.docsBrowserUrl,
+    "%%SAPPORTA:DATA_DIR%%": NEW_PROJECT_DATA_DIR,
     // The template treats the executable and preload as one token so every
     // source-linked API uses the same scoped resolver. Registry output receives
     // the ordinary `node` command and never loads framework-development code.

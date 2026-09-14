@@ -24,12 +24,16 @@ migrate `data/sqlite.db` while `pnpm dev` runs on a different directory.
 `sapporta init` writes `SAPPORTA_DATA_DIR=data` into `.env.development`.
 Because the path is relative, copying a project directory also copies its
 database, and the copy opens its own database instead of the original's.
-`pnpm dev`, `pnpm seed`, and now every `pnpm db:*` script load that file, so
-all of them open the same database. To switch databases in development, change
-the path in that file. The Docker image sets `SAPPORTA_DATA_DIR=/app/data`.
-Other deployments set it in the server's environment and run
-`drizzle-kit migrate` directly in that same environment, because
-`pnpm db:migrate` loads `.env.development`.
+`pnpm dev` and `pnpm seed` load that file. The `pnpm db:*` scripts do not,
+because the same scripts run in development and on a server. They read
+`SAPPORTA_DATA_DIR` from the environment, however it got there (the shell, a
+tool such as mise or direnv, or a deployment's settings), and stop when it is
+not set. Due to this, forgetting the setting stops a migration instead of
+running it against whatever database a file names. In development, pass the
+value explicitly, for example
+`SAPPORTA_DATA_DIR=data pnpm --filter ./packages/api db:migrate`. The Docker
+image sets `SAPPORTA_DATA_DIR=/app/data`, and other deployments set it in the
+server's environment.
 
 `@sapporta/server` exports `databasePath()` and `dataPath(...segments)`.
 Application code can use `dataPath()` for its own files that belong with the
@@ -38,9 +42,15 @@ database, for example `dataPath("user-config", "import-presets.json")`.
 which has no dependencies beyond Node itself.
 
 `fromProjectRoot()` no longer returns `dataDir` or `databasePath`, and
-`projectRootFromDbPath()` is removed. An existing project makes the same
-changes as a new one: add `SAPPORTA_DATA_DIR=data` to `.env.development`, call
-`databasePath()` in `packages/api/runtime.ts` and
-`packages/api/drizzle.config.ts`, and prefix each `db:*` script in
-`packages/api/package.json` with
-`node --env-file=../../.env.development node_modules/drizzle-kit/bin.cjs`.
+`projectRootFromDbPath()` is removed.
+
+An existing project makes the same changes as a new one:
+
+- Add `SAPPORTA_DATA_DIR=data` to `.env.development`.
+- Call `databasePath()` in `packages/api/runtime.ts` and
+  `packages/api/drizzle.config.ts`.
+- Add `ENV SAPPORTA_DATA_DIR=/app/data` to the `Dockerfile` before the line
+  that creates `/app/data`. Without it, a rebuilt image stops at its migration
+  step on every start.
+- Set `SAPPORTA_DATA_DIR` in the environment of every other deployment, and
+  wherever `pnpm db:*` scripts run, including CI.
