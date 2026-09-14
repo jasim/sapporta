@@ -5,6 +5,7 @@ import { mkdtempSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { sqliteTable, integer } from "drizzle-orm/sqlite-core";
 import { readMigrationFiles } from "drizzle-orm/migrator";
+import Database from "better-sqlite3";
 import { createTestDb } from "../testing/test-utils.js";
 import { sapportaTable } from "../schema/table.js";
 import { assertMigrationsReady } from "./guard.js";
@@ -31,6 +32,27 @@ describe("assertMigrationsReady", () => {
         tables: [sampleTable],
       }),
     ).toThrow(/Pending migration:\n  0000_initial/);
+  });
+
+  it("names the database it checked", () => {
+    const projectRoot = projectWithJournal([
+      { tag: "0000_initial", when: 1760000000000 },
+    ]);
+    const databaseFile = join(projectRoot, "sqlite.db");
+    const sqlite = new Database(databaseFile);
+
+    try {
+      expect(() =>
+        assertMigrationsReady({
+          projectRoot,
+          apiDistDir: join(projectRoot, "packages/api/dist"),
+          sqlite,
+          tables: [sampleTable],
+        }),
+      ).toThrow(`Database: ${databaseFile}\n`);
+    } finally {
+      sqlite.close();
+    }
   });
 
   it("reports applied ledger entries missing from disk", () => {

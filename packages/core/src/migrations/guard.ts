@@ -77,7 +77,14 @@ export function assertMigrationsReady(options: {
   )
     return;
 
-  const lines = ["Sapporta migrations are not ready.", ""];
+  const lines = [
+    "Sapporta migrations are not ready.",
+    "",
+    // The database is named because a wrong SAPPORTA_DATA_DIR looks exactly
+    // like a database that was never migrated.
+    `Database: ${options.sqlite.name}`,
+    "",
+  ];
   if (pending.length > 0) {
     lines.push(
       pending.length === 1 ? "Pending migration:" : "Pending migrations:",

@@ -35,6 +35,10 @@ value explicitly, for example
 image sets `SAPPORTA_DATA_DIR=/app/data`, and other deployments set it in the
 server's environment.
 
+To make a wrong value visible, the server prints the path of the database it
+opened when it starts. When startup stops because migrations are not ready,
+the error names the database it checked.
+
 `@sapporta/server` exports `databasePath()` and `dataPath(...segments)`.
 Application code can use `dataPath()` for its own files that belong with the
 database, for example `dataPath("user-config", "import-presets.json")`.
@@ -48,7 +52,8 @@ An existing project makes the same changes as a new one:
 
 - Add `SAPPORTA_DATA_DIR=data` to `.env.development`.
 - Call `databasePath()` in `packages/api/runtime.ts` and
-  `packages/api/drizzle.config.ts`.
+  `packages/api/drizzle.config.ts`, and print `databasePath` from
+  `packages/api/boot.ts` when the server is ready.
 - Add `ENV SAPPORTA_DATA_DIR=/app/data` to the `Dockerfile` before the line
   that creates `/app/data`. Without it, a rebuilt image stops at its migration
   step on every start.

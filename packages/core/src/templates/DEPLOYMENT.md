@@ -95,7 +95,8 @@ SAPPORTA_API_PORT=3000 pnpm start  # node packages/api/dist/boot.js
 ```
 
 Run the migration in the same environment as `pnpm start`, so both use the
-database in the same `SAPPORTA_DATA_DIR`.
+database in the same `SAPPORTA_DATA_DIR`. The server prints the path of the
+database it opened when it starts.
 
 The browser loads the SPA from `http://your-host:3000/`, and its relative `fetch("/api/foo")` calls hit the same process.
 

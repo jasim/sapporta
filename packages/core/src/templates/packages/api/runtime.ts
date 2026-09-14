@@ -50,6 +50,8 @@ export interface OpenProjectRuntimeOptions {
 export interface ProjectRuntime {
   projectRoot: string;
   frontendDistDir: string;
+  /** The SQLite file that `conn` opened: sqlite.db in SAPPORTA_DATA_DIR. */
+  databasePath: string;
   conn: ProjectDbConnection;
   sapporta: SapportaProject;
   env: ProjectAuthEnv;
@@ -78,7 +80,8 @@ export async function openProjectRuntime(
   setProjectRoot(projectRoot);
   const { apiDistDir, frontendDistDir } = fromProjectRoot(projectRoot);
   // The database is in the directory named by SAPPORTA_DATA_DIR.
-  const conn = connectProject(databasePath());
+  const databaseFile = databasePath();
+  const conn = connectProject(databaseFile);
 
   // Load the compiled table definitions and check the schema's structural and
   // row-access rules. Database migrations remain a separate step.
@@ -111,6 +114,7 @@ export async function openProjectRuntime(
   return {
     projectRoot,
     frontendDistDir,
+    databasePath: databaseFile,
     conn,
     sapporta,
     env,

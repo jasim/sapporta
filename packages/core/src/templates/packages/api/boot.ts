@@ -33,6 +33,7 @@ const {
   mailer,
   projectAuth,
   frontendDistDir,
+  databasePath,
   close: closeDatabase,
 } = await openProjectRuntime({ publicRoutes: publicApiRoutes });
 
@@ -128,6 +129,9 @@ app.get("/*", serveStatic({ root: frontendDist, path: "index.html" }));
 const port = projectEnv.apiPort;
 const server = serve({ fetch: app.fetch, port }, () => {
   console.log(`%%SAPPORTA:SLUG%% API server ready on http://localhost:${port}`);
+  // SAPPORTA_DATA_DIR can come from a file, a tool, or the shell, so name the
+  // database this server opened.
+  console.log(`Database: ${databasePath}`);
 });
 
 // A port already taken by another process would otherwise end the run with a
