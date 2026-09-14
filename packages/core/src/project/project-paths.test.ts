@@ -13,7 +13,6 @@ import {
   WATCHABLE_SUBDIRS,
   fromProjectRoot,
   fromApiCodeDir,
-  storeDbPath,
   findProjectRootFrom,
   setProjectRoot,
   projectRoot,
@@ -48,10 +47,6 @@ describe("project-paths", () => {
       schemaDir: "/tmp/myproject/packages/api/schema",
       appDir: "/tmp/myproject/packages/api/app",
     });
-  });
-
-  it("storeDbPath constructs multi-project database path", () => {
-    expect(storeDbPath("/store", "proj1")).toBe("/store/proj1/data/sqlite.db");
   });
 });
 

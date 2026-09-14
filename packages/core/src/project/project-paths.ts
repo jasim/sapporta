@@ -58,11 +58,6 @@ export function fromApiCodeDir(codeDir: string) {
   };
 }
 
-/** Given a store directory and project ID, derive the database path. */
-export function storeDbPath(storeDir: string, projectId: string): string {
-  return join(storeDir, projectId, "data", "sqlite.db");
-}
-
 // ── Project root singleton (Rails.root analogue) ─────────────────────────────
 //
 // Holds the absolute path to the current Sapporta project root for the

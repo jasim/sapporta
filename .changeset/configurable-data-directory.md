@@ -46,7 +46,9 @@ database, for example `dataPath("user-config", "import-presets.json")`.
 which has no dependencies beyond Node itself.
 
 `fromProjectRoot()` no longer returns `dataDir` or `databasePath`, and
-`projectRootFromDbPath()` is removed.
+`projectRootFromDbPath()` and `storeDbPath()` are removed. `storeDbPath()`
+built `<store>/<project>/data/sqlite.db`, a location the data directory no
+longer follows.
 
 An existing project makes the same changes as a new one:
 

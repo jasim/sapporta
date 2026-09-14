@@ -186,7 +186,6 @@ export {
   WATCHABLE_SUBDIRS,
   fromProjectRoot,
   fromApiCodeDir,
-  storeDbPath,
   findProjectRootFrom,
   setProjectRoot,
   projectRoot,
