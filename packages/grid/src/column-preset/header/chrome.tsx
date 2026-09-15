@@ -46,7 +46,11 @@ export function chrome<TMeta = unknown, TFilter = unknown>(
       });
       const overrides = loadColumnSizingOverrides(sizing, schema);
       return {
-        "--grid-template-columns": templateColumns(schema, overrides),
+        "--grid-template-columns": templateColumns(
+          schema,
+          overrides,
+          sizing.minWidths,
+        ),
       } as CSSProperties;
     },
   };

@@ -90,4 +90,22 @@ describe("column sizing", () => {
       "minmax(72px, 180px) 400px minmax(0, 1fr)",
     );
   });
+
+  it("raises a named width's floor, lifting its ceiling when needed", () => {
+    expect(
+      columnPreset.templateColumns(schema, undefined, { numeric: 128 }),
+    ).toBe("minmax(72px, 180px) minmax(128px, 128px) minmax(0, 1fr)");
+    expect(
+      columnSizingTemplateColumns(schema, { name: 144 }, undefined, {
+        numeric: 96,
+        fill: 200,
+      }),
+    ).toBe("144px minmax(96px, 112px) minmax(200px, 1fr)");
+  });
+
+  it("keeps a named width's own floor when the raised floor is lower", () => {
+    expect(
+      columnPreset.templateColumns(schema, undefined, { numeric: 40 }),
+    ).toBe("minmax(72px, 180px) minmax(80px, 112px) minmax(0, 1fr)");
+  });
 });

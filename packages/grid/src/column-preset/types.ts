@@ -46,6 +46,17 @@ export type ColumnWidth =
   | { min?: number; ideal?: number; max?: number }
   | { track: string };
 
+export type NamedColumnWidth = Extract<ColumnWidth, string>;
+
+/**
+ * Pixel floors for the named widths, keyed by name. The named tracks are
+ * sized for a 12px monospace digit; an app that sets its data in a larger
+ * face raises the floors it needs (`numeric` covers number, currency and
+ * percentage columns). A floor above a named width's ceiling lifts the
+ * ceiling with it.
+ */
+export type ColumnWidthMinimums = Partial<Record<NamedColumnWidth, number>>;
+
 export type NumberColorRule = "positive" | "negative" | "signed";
 export type ZeroDisplay = "blank" | "dot";
 export type ColumnAlign = "left" | "right" | "center";

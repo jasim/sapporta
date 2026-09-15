@@ -50,9 +50,22 @@ export function ColumnPresetSelectionSummary({
             key={column.id}
           >
             {text !== undefined ? (
-              <div className={styles.selectionSummaryContent}>
-                <span className={styles.selectionSummaryLabel}>Sum</span>
-                <span className={styles.selectionSummaryValue}>{text}</span>
+              <div
+                className={styles.selectionSummaryContent}
+                data-grid-part="selection-summary-content"
+              >
+                <span
+                  className={styles.selectionSummaryLabel}
+                  data-grid-part="selection-summary-label"
+                >
+                  Sum
+                </span>
+                <span
+                  className={styles.selectionSummaryValue}
+                  data-grid-part="selection-summary-value"
+                >
+                  {text}
+                </span>
               </div>
             ) : null}
           </div>

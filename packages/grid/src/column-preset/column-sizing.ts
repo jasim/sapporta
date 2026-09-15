@@ -1,7 +1,11 @@
 import type { ColumnSchema } from "../core/types/schema";
 import type { ColId, GridPath } from "../core/types/identity";
 import { preset } from "./preset";
-import type { ColumnWidth } from "./types";
+import type {
+  ColumnWidth,
+  ColumnWidthMinimums,
+  NamedColumnWidth,
+} from "./types";
 
 export const DEFAULT_COLUMN_RESIZE_MIN_PX = 48;
 
@@ -17,13 +21,17 @@ export type ColumnSizingStorageKey =
 export type ColumnSizingOptions = {
   storageKey?: ColumnSizingStorageKey;
   enabled?: boolean;
+  /** The narrowest a column can be dragged to. */
   minPx?: number;
+  /** Floors for the named default widths of columns nobody has sized. */
+  minWidths?: ColumnWidthMinimums;
 };
 
 export type ResolvedColumnSizing = {
   enabled: boolean;
   storageKey?: string;
   minPx: number;
+  minWidths: ColumnWidthMinimums;
 };
 
 export type ColumnSizingOverrides = Record<ColId, number>;
@@ -38,6 +46,7 @@ export function resolveColumnSizing(
     enabled: options?.enabled ?? storageKey !== undefined,
     storageKey,
     minPx,
+    minWidths: options?.minWidths ?? {},
   };
 }
 
@@ -95,12 +104,13 @@ export function columnSizingTemplateColumns(
   schema: readonly ColumnSchema[],
   overrides: ColumnSizingOverrides,
   minPx = DEFAULT_COLUMN_RESIZE_MIN_PX,
+  minWidths?: ColumnWidthMinimums,
 ): string {
   return schema
     .map((column) => {
       const width = overrides[column.id];
       if (width === undefined)
-        return trackForColumnWidth(preset(column)?.layout.width);
+        return trackForColumnWidth(preset(column)?.layout.width, minWidths);
       return `${clampColumnPixelWidth(width, minPx)}px`;
     })
     .join(" ");
@@ -146,7 +156,29 @@ function persistedWidthsRecord(value: unknown): Record<string, unknown> | null {
   return value;
 }
 
-export function trackForColumnWidth(width: ColumnWidth | undefined): string {
+/**
+ * The track each named width resolves to: a pixel floor and either a pixel
+ * ceiling or a keyword. `content` has no floor of its own, so it stays a bare
+ * `max-content` unless an app gives it one.
+ */
+const NAMED_WIDTH_TRACKS: Record<
+  NamedColumnWidth,
+  { min: number | null; max: number | "max-content" | "1fr" }
+> = {
+  compact: { min: 48, max: "max-content" },
+  content: { min: null, max: "max-content" },
+  fill: { min: 0, max: "1fr" },
+  numeric: { min: 80, max: 112 },
+  date: { min: 112, max: 128 },
+  timestamp: { min: 144, max: 160 },
+  enum: { min: 96, max: "max-content" },
+  foreignKey: { min: 144, max: 220 },
+};
+
+export function trackForColumnWidth(
+  width: ColumnWidth | undefined,
+  minWidths?: ColumnWidthMinimums,
+): string {
   if (!width) return "minmax(0, 1fr)";
   if (typeof width === "object" && "track" in width) return width.track;
   if (typeof width === "object") {
@@ -154,24 +186,17 @@ export function trackForColumnWidth(width: ColumnWidth | undefined): string {
     const max = width.max ?? width.ideal;
     return `minmax(${min}px, ${max === undefined ? "1fr" : `${max}px`})`;
   }
-  switch (width) {
-    case "compact":
-      return "minmax(48px, max-content)";
-    case "content":
-      return "max-content";
-    case "fill":
-      return "minmax(0, 1fr)";
-    case "numeric":
-      return "minmax(80px, 112px)";
-    case "date":
-      return "minmax(112px, 128px)";
-    case "timestamp":
-      return "minmax(144px, 160px)";
-    case "enum":
-      return "minmax(96px, max-content)";
-    case "foreignKey":
-      return "minmax(144px, 220px)";
-  }
+  const track = NAMED_WIDTH_TRACKS[width];
+  const floor = minWidths?.[width];
+  const min =
+    floor === undefined || !Number.isFinite(floor)
+      ? track.min
+      : Math.max(track.min ?? 0, Math.round(floor));
+  const max =
+    typeof track.max === "number" ? Math.max(track.max, min ?? 0) : track.max;
+  const maxTrack = typeof max === "number" ? `${max}px` : max;
+  if (min === null) return maxTrack;
+  return `minmax(${min === 0 ? "0" : `${min}px`}, ${maxTrack})`;
 }
 
 function readLocalStorage(key: string): string | null {

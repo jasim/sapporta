@@ -24,6 +24,7 @@ import {
   saveColumnSizingOverrides,
   type ColumnSizingOptions,
   type ColumnSizingOverrides,
+  type ResolvedColumnSizing,
 } from "../column-sizing";
 import styles from "../sapporta-preset.module.css";
 import type {
@@ -205,12 +206,7 @@ function HeaderCell<TMeta = unknown, TFilter = unknown>({
       ...drag.overrides,
       [column.column.id]: nextWidth,
     };
-    applyColumnSizingToElement(
-      drag.root,
-      level.schema,
-      drag.overrides,
-      sizing.minPx,
-    );
+    applyColumnSizingToElement(drag.root, level.schema, drag.overrides, sizing);
   }
 
   function finishResize(e: PointerEvent<HTMLButtonElement>) {
@@ -309,11 +305,16 @@ function applyColumnSizingToElement(
   root: HTMLElement,
   schema: readonly ColumnSchema[],
   overrides: ColumnSizingOverrides,
-  minPx: number,
+  sizing: ResolvedColumnSizing,
 ) {
   root.style.setProperty(
     "--grid-template-columns",
-    columnSizingTemplateColumns(schema, overrides, minPx),
+    columnSizingTemplateColumns(
+      schema,
+      overrides,
+      sizing.minPx,
+      sizing.minWidths,
+    ),
   );
 }
 

@@ -1,10 +1,25 @@
+/* The preset declares its --grid-* values on the level element, so a value an
+   app wants to tune is read through a --sap-grid-* variable it can set on
+   :root (or any ancestor). The names mirror the --grid-* names they feed:
+
+     --sap-grid-cell-padding                    0 10px
+     --sap-grid-header-font-weight              760
+     --sap-grid-header-letter-spacing           var(--tracking-sap-head)
+     --sap-grid-header-cell-padding             0 10px
+     --sap-grid-row-header-column-width         40px
+     --sap-grid-nested-row-header-column-width  30px  (levels below the root)
+     --sap-grid-nested-cell-min-height          31px  (levels below the root)
+     --sap-grid-nested-indent                   58px  (the first nested level)
+     --sap-grid-nested-indent-deep              46px  (every level below that)
+
+   Everything else stays a --grid-* value set per level by the app's own CSS. */
 .presetGrid {
   --grid-font-size: var(--text-sap-body);
   --grid-background: var(--sap-surface);
   --grid-row-border-block-end: 1px solid var(--sap-border-soft);
   --grid-cell-border-inline-end: 0;
   --grid-cell-min-height: var(--height-sap-row);
-  --grid-cell-padding: 0 10px;
+  --grid-cell-padding: var(--sap-grid-cell-padding, 0 10px);
   --grid-cell-focus-ring-width: 0;
   --grid-cell-active-focus-background: var(--sap-selection);
   --grid-cell-active-focus-ring-color: transparent;
@@ -21,15 +36,18 @@
   --grid-header-background: var(--sap-surface);
   --grid-header-color: var(--sap-fg-muted);
   --grid-header-font-size: var(--text-sap-label);
-  --grid-header-font-weight: 760;
-  --grid-header-letter-spacing: var(--tracking-sap-head);
+  --grid-header-font-weight: var(--sap-grid-header-font-weight, 760);
+  --grid-header-letter-spacing: var(
+    --sap-grid-header-letter-spacing,
+    var(--tracking-sap-head)
+  );
   --grid-header-min-height: var(--height-sap-header);
   --grid-header-cell-gap: 4px;
-  --grid-header-cell-padding: 0 10px;
+  --grid-header-cell-padding: var(--sap-grid-header-cell-padding, 0 10px);
   --grid-header-cursor: pointer;
   --grid-phantom-row-background: var(--sap-surface);
   --grid-editor-background: var(--sap-surface);
-  --grid-row-header-column-width: 40px;
+  --grid-row-header-column-width: var(--sap-grid-row-header-column-width, 40px);
   --grid-row-header-background: color-mix(
     in oklab,
     var(--sap-row-hover) 78%,
@@ -408,8 +426,7 @@
 :where(
   .presetGrid
     [role="rowheader"]:has(
-      > [data-grid-part="cell-content"]
-        > [data-grid-part="expand-cell"]
+      > [data-grid-part="cell-content"] > [data-grid-part="expand-cell"]
     )
 ) {
   background: var(--grid-background, var(--sap-surface));
@@ -418,19 +435,14 @@
 :where(
   .presetGrid
     [role="rowheader"]:has(
-      > [data-grid-part="cell-content"]
-        > [data-grid-part="expand-cell"]
+      > [data-grid-part="cell-content"] > [data-grid-part="expand-cell"]
     )
     > [data-grid-part="cell-content"]
 ) {
   padding: 0;
 }
 
-:where(
-  .presetGrid
-    [role="rowheader"]
-    [data-grid-part="expand-cell"]
-) {
+:where(.presetGrid [role="rowheader"] [data-grid-part="expand-cell"]) {
   align-self: stretch;
   background: var(--grid-background, var(--sap-surface));
   box-sizing: border-box;
@@ -473,7 +485,7 @@
   align-items: center;
   background: transparent;
   border: 0;
-  border-radius: var(--radius-sm);
+  border-radius: var(--sap-radius-sm);
   color: var(--sap-fg-subtle);
   cursor: pointer;
   display: inline-flex;
@@ -504,8 +516,8 @@
 .cellPopover {
   background: var(--sap-surface);
   border: 1px solid var(--sap-border);
-  border-radius: var(--radius);
-  box-shadow: 0 8px 24px rgb(0 0 0 / 0.12);
+  border-radius: var(--sap-radius-lg);
+  box-shadow: var(--sap-shadow-elevated);
   color: var(--sap-fg);
   font-size: var(--text-sap-body);
   font-weight: 400;
@@ -526,7 +538,7 @@
   align-items: center;
   background: var(--grid-expand-chevron-background);
   border: 0;
-  border-radius: var(--radius-sm);
+  border-radius: var(--sap-radius-sm);
   color: var(--sap-fg-subtle);
   cursor: pointer;
   display: inline-flex;
@@ -616,7 +628,7 @@
   align-items: center;
   background: var(--sap-surface);
   border: 1px solid var(--sap-border);
-  border-radius: var(--radius-sm);
+  border-radius: var(--sap-radius-sm);
   color: var(--sap-fg-subtle);
   display: inline-flex;
   height: 24px;
@@ -665,7 +677,7 @@
 
 .levelStatus[data-grid-depth="1"],
 .levelEmpty[data-grid-depth="1"] {
-  margin-inline-start: 58px;
+  margin-inline-start: var(--sap-grid-nested-indent, 58px);
 }
 
 .levelStatus[data-grid-depth]:not([data-grid-depth="0"]):not(
@@ -674,7 +686,7 @@
 .levelEmpty[data-grid-depth]:not([data-grid-depth="0"]):not(
     [data-grid-depth="1"]
   ) {
-  margin-inline-start: 46px;
+  margin-inline-start: var(--sap-grid-nested-indent-deep, 46px);
 }
 
 .levelStatus[data-grid-depth]:not([data-grid-depth="0"]),
@@ -702,7 +714,7 @@
   background: var(--sap-surface);
   border: 1px solid
     color-mix(in oklab, var(--sap-negative) 28%, var(--sap-border));
-  border-radius: var(--radius-sm);
+  border-radius: var(--sap-radius-sm);
   color: var(--sap-negative);
   cursor: pointer;
   display: inline-flex;
@@ -720,8 +732,11 @@
 }
 
 .presetGrid[data-grid-depth]:not([data-grid-depth="0"]) {
-  --grid-cell-min-height: 31px;
-  --grid-row-header-column-width: 30px;
+  --grid-cell-min-height: var(--sap-grid-nested-cell-min-height, 31px);
+  --grid-row-header-column-width: var(
+    --sap-grid-nested-row-header-column-width,
+    30px
+  );
 
   background: var(--sap-nested-bg);
   padding-block-end: 14px;
@@ -730,13 +745,13 @@
 }
 
 .presetGrid[data-grid-depth="1"] {
-  margin-inline-start: 58px;
+  margin-inline-start: var(--sap-grid-nested-indent, 58px);
 }
 
 .presetGrid[data-grid-depth]:not([data-grid-depth="0"]):not(
     [data-grid-depth="1"]
   ) {
-  margin-inline-start: 46px;
+  margin-inline-start: var(--sap-grid-nested-indent-deep, 46px);
 }
 
 .headerContent {

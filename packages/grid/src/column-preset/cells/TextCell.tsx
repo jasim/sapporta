@@ -42,5 +42,9 @@ export function TextCell({
   runtime,
   preset = runtime.preset,
 }: PresetCellProps<string>) {
-  return <span className={textCellClassName(preset)}>{value}</span>;
+  return (
+    <span className={textCellClassName(preset)} data-grid-part="text-cell">
+      {value}
+    </span>
+  );
 }

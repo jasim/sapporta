@@ -29,7 +29,12 @@ export function PresetLevelStatusBand({ path }: { path: GridPath }) {
         role="status"
         aria-live="polite"
       >
-        <span className={styles.levelStatusText}>{model.text}</span>
+        <span
+          className={styles.levelStatusText}
+          data-grid-part="level-status-text"
+        >
+          {model.text}
+        </span>
       </div>
     );
   }
@@ -43,7 +48,12 @@ export function PresetLevelStatusBand({ path }: { path: GridPath }) {
       data-grid-status="error"
       role="alert"
     >
-      <span className={styles.levelStatusText}>{model.text}</span>
+      <span
+        className={styles.levelStatusText}
+        data-grid-part="level-status-text"
+      >
+        {model.text}
+      </span>
       <button
         className={styles.levelStatusRetry}
         type="button"

@@ -112,7 +112,7 @@ export function LookupValueEditor(props: CellEditorProps) {
             data-grid-part="editor-input"
           />
         </Combobox.InputGroup>
-        <div className="absolute left-0 top-full z-[var(--sap-z-popover)] mt-1 min-w-full overflow-hidden rounded-md border border-sap-border bg-sap-surface shadow-lg">
+        <div className="absolute left-0 top-full z-[var(--sap-z-popover)] mt-1 min-w-full overflow-hidden rounded-lg border border-sap-border bg-sap-surface shadow-sap-elevated">
           <Combobox.Empty className={comboboxClassNames.empty}>
             No results.
           </Combobox.Empty>
