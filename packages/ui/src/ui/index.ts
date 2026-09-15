@@ -60,4 +60,4 @@ export { Combobox, comboboxClassNames } from "./styles/combobox";
 export { Kbd } from "./composite/kbd";
 export { ParamPill, type ParamPillProps } from "./composite/param-pill";
 export { useDebounce } from "./hooks/useDebounce";
-export { cn } from "./utils/cn";
+export { cn, extendCn, type ClassMergeScales } from "./utils/cn";

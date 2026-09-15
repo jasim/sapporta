@@ -79,10 +79,14 @@
   --sap-drill-down-link-soft: rgb(31 111 176 / 0.12);
   --sap-loading-indicator-bar: #2f6f9f;
 
-  /* Numeric emphasis (any deltas / gains-losses / data accents) */
+  /* Numeric emphasis (any deltas / gains-losses / data accents). `negative`
+     also paints errors and destructive actions; an app whose negative
+     figures are not problems (money out in a ledger) sets
+     `--sap-numeric-negative` on its own. */
   --sap-positive: #1a4d2e;
   --sap-warning: #8a5a00;
   --sap-negative: #8b2f2f;
+  --sap-numeric-negative: var(--sap-negative);
 
   /* Nav chrome */
   --sap-active-nav-bg: #ededed;
@@ -101,11 +105,17 @@
     var(--sap-brand) 58% 100%
   );
 
-  /* Radii */
-  --radius: 6px;
-  --radius-sm: 3px;
-  --radius-lg: 8px;
-  --radius-xl: 10px;
+  /* Radii. The `--sap-radius-*` values are the ones to override; the
+     unprefixed `--radius*` names are the shadcn-compat aliases and the
+     `rounded-*` utilities read the same values through @theme below. */
+  --sap-radius: 6px;
+  --sap-radius-sm: 3px;
+  --sap-radius-lg: 8px;
+  --sap-radius-xl: 10px;
+  --radius: var(--sap-radius);
+  --radius-sm: var(--sap-radius-sm);
+  --radius-lg: var(--sap-radius-lg);
+  --radius-xl: var(--sap-radius-xl);
 
   /* ── shadcn-compat aliases ───────────────────────────────────────────── */
   --background: var(--sap-bg);
@@ -120,10 +130,11 @@
   --secondary-foreground: var(--sap-fg);
   --muted: var(--sap-nested-bg);
   --muted-foreground: var(--sap-fg-muted);
-  --accent: var(--sap-active-nav-bg); /* shadcn bg-accent → hover wash  */
+  --accent: var(--sap-row-hover); /* shadcn bg-accent → hover wash  */
   --accent-foreground: var(--sap-fg);
   --destructive: var(--sap-negative);
   --destructive-foreground: var(--sap-bg);
+  --border: var(--sap-border);
   --input: var(--sap-border);
   --ring: var(--sap-brand);
   --sidebar-foreground: var(--sap-fg);
@@ -235,6 +246,7 @@
   --color-sap-positive: var(--sap-positive);
   --color-sap-warning: var(--sap-warning);
   --color-sap-negative: var(--sap-negative);
+  --color-sap-numeric-negative: var(--sap-numeric-negative);
 
   --color-sap-active-nav: var(--sap-active-nav-bg);
   --color-sap-nav-count: var(--sap-nav-count-bg);
@@ -260,6 +272,7 @@
   --color-accent-foreground: var(--accent-foreground);
   --color-destructive: var(--destructive);
   --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
   --color-sidebar-foreground: var(--sidebar-foreground);
@@ -268,10 +281,10 @@
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
 
   /* Radii */
-  --radius-sm: var(--radius-sm);
-  --radius-md: var(--radius);
-  --radius-lg: var(--radius-lg);
-  --radius-xl: var(--radius-xl);
+  --radius-sm: var(--sap-radius-sm);
+  --radius-md: var(--sap-radius);
+  --radius-lg: var(--sap-radius-lg);
+  --radius-xl: var(--sap-radius-xl);
 
   /* ── Typography scale ────────────────────────────────────────────────
    * Ten tiers, matching the target's measured sizes. Names describe the
@@ -332,6 +345,19 @@ body {
 
 * {
   box-sizing: border-box;
+}
+
+/* Tailwind's preflight sets `border-color: currentColor`, so a `border`
+   utility without a colour draws in the text colour. Layered like preflight
+   itself, so an app's own base rules still win. */
+@layer base {
+  *,
+  ::after,
+  ::before,
+  ::backdrop,
+  ::file-selector-button {
+    border-color: var(--border);
+  }
 }
 
 /* Monospace for tabular data. `tnum` lines up digit columns. */
