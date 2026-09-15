@@ -329,6 +329,7 @@ describe("TGrid", () => {
           metaKey: false,
           shiftKey: false,
         },
+        "tabular",
       );
     let firstHandled = false;
     let secondHandled = false;

@@ -160,7 +160,7 @@ describe("table grid pager boundary controller", () => {
     cursors.moveCellCursorTo(origin);
     controller.flushEffects();
 
-    controller.handleKey(key("ArrowDown"));
+    controller.handleKey(key("ArrowDown"), "tabular");
 
     expect(document.activeElement).toBe(next);
     expect(cursors.currentCellCursor()).toEqual(origin);
@@ -194,7 +194,7 @@ describe("table grid pager boundary controller", () => {
     };
     cursors.moveCellCursorTo(origin);
 
-    controllerFor(runtime, path).handleKey(key("PageUp"));
+    controllerFor(runtime, path).handleKey(key("PageUp"), "tabular");
 
     expect(document.activeElement).toBe(previous);
     expect(boundary.onPagerButtonActivate("before")).toBe(true);
@@ -221,7 +221,7 @@ describe("table grid pager boundary controller", () => {
     cursors.moveCellCursorTo(origin);
     controller.flushEffects();
 
-    controller.handleKey(key("ArrowDown"));
+    controller.handleKey(key("ArrowDown"), "tabular");
 
     expect(document.activeElement).toBe(next);
     boundary.onPagerBoundaryExit();
@@ -244,7 +244,7 @@ describe("table grid pager boundary controller", () => {
     };
     cursors.moveCellCursorTo(origin);
 
-    controllerFor(runtime, path).handleKey(key("PageDown"));
+    controllerFor(runtime, path).handleKey(key("PageDown"), "tabular");
     boundary.onPagerBoundaryExit();
     await Promise.resolve();
 

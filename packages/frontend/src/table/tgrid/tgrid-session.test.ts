@@ -159,7 +159,7 @@ describe("TGridSession", () => {
       expect(activeRowChanged).toHaveBeenCalledTimes(1);
 
       const controller = controllerFor(session.runtime, path);
-      expect(controller.handleKey(keyEvent("Enter"))).toBe(true);
+      expect(controller.handleKey(keyEvent("Enter"), "tabular")).toBe(true);
       expect(onRowActivate).toHaveBeenCalledWith({
         activeRow: expect.objectContaining({
           kind: "data",
@@ -485,7 +485,7 @@ describe("TGridSession", () => {
         colId: "customer",
       });
 
-      controller.handleKey(keyEvent("ArrowDown"));
+      controller.handleKey(keyEvent("ArrowDown"), "tabular");
       await flush();
 
       expect(session.getQueryState().page).toBe(2);
@@ -552,7 +552,10 @@ describe("TGridSession", () => {
         colId: "customer",
       });
 
-      controllerFor(session.runtime, path).handleKey(keyEvent("ArrowDown"));
+      controllerFor(session.runtime, path).handleKey(
+        keyEvent("ArrowDown"),
+        "tabular",
+      );
       await flush();
 
       expect(session.getQueryState().page).toBe(1);
@@ -615,7 +618,7 @@ describe("TGridSession", () => {
         colId: "customer",
       });
 
-      controller.handleKey(keyEvent("ArrowUp"));
+      controller.handleKey(keyEvent("ArrowUp"), "tabular");
       await flush();
 
       expect(fetch.mock.calls.map(([req]) => req.page)).toEqual([1]);
@@ -675,7 +678,7 @@ describe("TGridSession", () => {
         colId: "customer",
       });
 
-      controller.handleKey(keyEvent("PageDown"));
+      controller.handleKey(keyEvent("PageDown"), "tabular");
       await flush();
 
       expect(session.getQueryState().page).toBe(1);
@@ -686,7 +689,7 @@ describe("TGridSession", () => {
         colId: "customer",
       });
 
-      controller.handleKey(keyEvent("PageDown"));
+      controller.handleKey(keyEvent("PageDown"), "tabular");
       await flush();
 
       expect(session.getQueryState().page).toBe(2);
@@ -757,13 +760,13 @@ describe("TGridSession", () => {
         colId: "customer",
       });
 
-      controller.handleKey(keyEvent("ArrowDown"));
+      controller.handleKey(keyEvent("ArrowDown"), "tabular");
       await flush();
 
       expect(session.getQueryState().page).toBe(2);
       expect(rowsClient.fetch).toHaveBeenCalledTimes(2);
 
-      controller.handleKey(keyEvent("ArrowDown"));
+      controller.handleKey(keyEvent("ArrowDown"), "tabular");
       await flush();
 
       expect(session.getQueryState().page).toBe(2);
@@ -790,7 +793,7 @@ describe("TGridSession", () => {
         colId: "customer",
       });
 
-      controller.handleKey(keyEvent("ArrowDown"));
+      controller.handleKey(keyEvent("ArrowDown"), "tabular");
       await flush();
 
       expect(session.getQueryState().page).toBe(3);
