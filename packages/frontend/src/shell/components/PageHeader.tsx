@@ -2,7 +2,6 @@ import type { ReactNode } from "react";
 import { cn } from "@sapporta/ui/cn";
 import { Kbd } from "@sapporta/ui/kbd";
 import { usePageTitle } from "../document-title";
-import "./PageHeader.css";
 
 export interface PageHeaderProps {
   /** The group this view belongs to — "Tables", "Reports", etc. */
@@ -23,9 +22,13 @@ export interface PageHeaderProps {
 
 /**
  * The standard header for a bounded page. It stays in place because the
- * adjacent `PageBody` scrolls; it does not rely on sticky positioning. When
- * the default shell control is present, the shell adds enough leading room so
- * the control and title do not overlap.
+ * adjacent `PageBody` scrolls; it does not rely on sticky positioning.
+ *
+ * A shell that places a control over the content's top-left corner (the
+ * collapsed-sidebar toggle in `AppShell`) sets `--sap-page-header-inset` to
+ * that control's width on the scroll region, and the header adds it to its
+ * leading padding so the title is not covered. `AppShell` does this; an app
+ * that renders its own shell does the same.
  */
 export function PageHeader({
   section,
@@ -41,7 +44,7 @@ export function PageHeader({
     <header
       data-page-header
       className={cn(
-        "z-[var(--sap-z-shell-sticky)] flex h-sap-topbar shrink-0 items-center gap-2 border-b border-sap-border-soft bg-sap-surface/90 px-3 sm:px-5",
+        "z-[var(--sap-z-shell-sticky)] flex h-sap-topbar shrink-0 items-center gap-2 border-b border-sap-border-soft bg-sap-surface/90 pl-[calc(var(--sap-page-header-inset,0px)+0.75rem)] pr-3 sm:pl-[calc(var(--sap-page-header-inset,0px)+1.25rem)] sm:pr-5",
         className,
       )}
     >
@@ -56,9 +59,11 @@ export function PageHeader({
             </span>
           </>
         )}
-        <h1 className="truncate text-[15px] font-[720] text-sap-fg">{title}</h1>
+        <h1 className="truncate text-sap-body font-bold text-sap-fg">
+          {title}
+        </h1>
         {subtitle && (
-          <span className="mono hidden shrink-0 text-[11.5px] text-sap-muted sm:inline">
+          <span className="mono hidden shrink-0 text-sap-menu text-sap-muted sm:inline">
             {subtitle}
           </span>
         )}

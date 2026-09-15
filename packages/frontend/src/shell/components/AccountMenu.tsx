@@ -96,6 +96,7 @@ export function AccountMenu({
   const trigger = renderTrigger ? (
     withTriggerProps(
       renderTrigger({ displayName, initials, secondaryLabel, open }),
+      open,
       () => setOpen((current) => !current),
     )
   ) : (
@@ -292,10 +293,14 @@ type TriggerElementProps = {
   onClick?: (event: MouseEvent<HTMLElement>) => void;
 };
 
-function withTriggerProps(trigger: ReactElement, onClick: () => void) {
+function withTriggerProps(
+  trigger: ReactElement,
+  open: boolean,
+  onClick: () => void,
+) {
   const typedTrigger = trigger as ReactElement<TriggerElementProps>;
   return cloneElement(typedTrigger, {
-    "aria-expanded": true,
+    "aria-expanded": open,
     onClick: (event: MouseEvent<HTMLElement>) => {
       const currentProps = typedTrigger.props;
       currentProps.onClick?.(event);

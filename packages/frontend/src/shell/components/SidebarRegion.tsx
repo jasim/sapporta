@@ -16,7 +16,8 @@ export interface SidebarRegionProps {
 
 /**
  * Presents the same application navigation in two useful forms. On desktop,
- * the expanded sidebar takes its usual width. Collapsing it returns that width
+ * the expanded sidebar takes the width of what it holds (`SidebarShell` is
+ * 240px; an app's own sidebar sets its own). Collapsing it returns that width
  * to the page; a fine pointer can still reveal the sidebar temporarily from
  * the left edge without moving the content.
  *
@@ -41,7 +42,7 @@ export function SidebarRegion({ children, className }: SidebarRegionProps) {
       data-sidebar-state={sidebar.desktopExpanded ? "expanded" : "collapsed"}
       className={cn(
         "relative h-full shrink-0",
-        sidebar.desktopExpanded ? "w-[240px]" : "z-[var(--sap-z-popover)] w-0",
+        sidebar.desktopExpanded ? "w-auto" : "z-[var(--sap-z-popover)] w-0",
         className,
       )}
     >
@@ -56,7 +57,7 @@ export function SidebarRegion({ children, className }: SidebarRegionProps) {
       <div
         data-sidebar-surface
         className={cn(
-          "inset-y-0 left-0 h-full w-[240px]",
+          "inset-y-0 left-0 h-full w-auto",
           sidebar.desktopExpanded && "static",
           !sidebar.desktopExpanded &&
             "absolute z-[var(--sap-z-popover)] shadow-lg",

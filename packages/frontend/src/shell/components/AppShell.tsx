@@ -40,7 +40,12 @@ export interface AppShellProps {
  * render a particular header. On desktop, the collapse control sits with the
  * expanded navigation; once collapsed, its expand control moves to the
  * content's top-left. Compact screens keep the opener there for the drawer.
- * `PageHeader` leaves room only while that content-side control is present.
+ * While that content-side control is present, the scroll region carries
+ * `--sap-page-header-inset`, and `PageHeader` leaves that much room for it.
+ *
+ * Toasts from Sapporta's screens need the `Toaster` this shell renders; an app
+ * that composes its own shell renders the `Toaster` exported beside this
+ * component.
  *
  * Route content still chooses its own layout. An `AppPage` fills the available
  * height and scrolls its body, while an unwrapped application page can grow
@@ -148,6 +153,9 @@ function AppShellLayout({
             className={cn(
               "flex h-full min-h-0 w-full flex-col overflow-y-auto bg-sap-surface md:pb-0",
               showNavigation && "pb-[56px]",
+              hasShellSidebarToggle &&
+                !showSidebarToggleInSidebar &&
+                "[--sap-page-header-inset:3rem]",
             )}
           >
             {error ? (

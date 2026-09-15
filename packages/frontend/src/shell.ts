@@ -61,3 +61,13 @@ export {
   useThemeStore,
   type ThemeMode,
 } from "./shell/state/theme-store";
+/**
+ * The toast outlet Sapporta's screens post to. `AppShell` renders one; an app
+ * that composes its own shell renders this same export once, near the root,
+ * or toasts from the workspace settings and password screens never appear.
+ *
+ * Render it above `BootLoader`. A workspace switch or a time zone change
+ * resets the schema store, and the gate remounts everything under it; a
+ * toast posted at that moment needs an outlet that stayed mounted.
+ */
+export { Toaster, type ToasterProps } from "sonner";

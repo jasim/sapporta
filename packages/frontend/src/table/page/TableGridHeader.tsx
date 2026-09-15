@@ -288,7 +288,9 @@ function NarrowCardTableHeader<
       data-page-header
       className="z-[var(--sap-z-shell-sticky)] shrink-0 border-b border-sap-border-soft bg-sap-surface/95"
     >
-      <div className="flex flex-col gap-2 px-3 py-2">
+      {/* Leading room for the shell's content-side sidebar toggle, the same
+          contract PageHeader follows. */}
+      <div className="flex flex-col gap-2 py-2 pl-[calc(var(--sap-page-header-inset,0px)+0.75rem)] pr-3">
         <div className="flex min-w-0 items-center gap-2">
           <div className="min-w-0 flex-1">
             <h1

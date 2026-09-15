@@ -1,4 +1,5 @@
 export { AppShell, type AppShellProps } from "./components/AppShell";
+export { Toaster, type ToasterProps } from "sonner";
 export {
   AccountMenu,
   formatAuthRole,

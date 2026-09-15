@@ -94,7 +94,9 @@ describe("sidebar controller and layout", () => {
     const toggle = toggleButton("Collapse sidebar");
 
     expect(region.dataset.sidebarState).toBe("expanded");
-    expect(region.className).toContain("w-[240px]");
+    // The region takes the width of what it holds; the shell sets 240px.
+    expect(region.className).not.toMatch(/\bw-\[/);
+    expect(mountedSidebar.className).toContain("w-[240px]");
     expect(sidebarSurface().className).toContain("static");
     expect(toggle.className).toContain("size-10");
     expect(toggle.getAttribute("aria-controls")).toBe(region.id);
@@ -105,7 +107,7 @@ describe("sidebar controller and layout", () => {
     expect(sidebar()).toBe(mountedSidebar);
     expect(region.dataset.sidebarState).toBe("collapsed");
     expect(region.className).toContain("w-0");
-    expect(region.className).not.toContain("w-[240px]");
+    expect(region.className).not.toContain("w-auto");
     expect(sidebarSurface().className).toContain("absolute");
     expect(host.querySelector("[data-sidebar-hover-edge]")).toBeInstanceOf(
       HTMLElement,
