@@ -33,13 +33,13 @@ export function NumericCell({
   } else if (display.colorRule === "positive") {
     toneClass = `${base} font-medium text-sap-positive`;
   } else if (display.colorRule === "negative") {
-    toneClass = `${base} font-medium text-sap-negative`;
+    toneClass = `${base} font-medium text-sap-numeric-negative`;
   } else if (display.colorRule === "signed") {
     toneClass =
       value > 0
         ? `${base} font-medium text-sap-positive`
         : value < 0
-          ? `${base} font-medium text-sap-negative`
+          ? `${base} font-medium text-sap-numeric-negative`
           : base;
   } else {
     toneClass = `${base} font-medium`;
