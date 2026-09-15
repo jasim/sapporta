@@ -53,7 +53,7 @@ export function ParamPill({
       type={isInteractive ? "button" : undefined}
       onClick={onClick}
       className={cn(
-        "inline-flex items-stretch h-sap-bar rounded-[5px] overflow-hidden border bg-sap-surface text-sap-data",
+        "inline-flex items-stretch h-sap-bar rounded-md overflow-hidden border bg-sap-surface text-sap-data",
         borderColor,
         isInteractive &&
           "hover:bg-sap-row-hover transition-colors cursor-pointer",

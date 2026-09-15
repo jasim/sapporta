@@ -40,7 +40,7 @@ const SheetContent = React.forwardRef<
     <DialogPrimitive.Popup
       ref={ref}
       className={cn(
-        "fixed z-[var(--sap-z-modal-content)] gap-4 bg-background p-6 shadow-lg transition-[opacity,transform] ease-in-out data-ending-style:duration-300 data-starting-style:duration-500 data-starting-style:opacity-0 data-ending-style:opacity-0",
+        "fixed z-[var(--sap-z-modal-content)] gap-4 bg-background p-6 shadow-sap-elevated transition-[opacity,transform] ease-in-out data-ending-style:duration-300 data-starting-style:duration-500 data-starting-style:opacity-0 data-ending-style:opacity-0",
         side === "top" &&
           "inset-x-0 top-0 border-b data-starting-style:-translate-y-full data-ending-style:-translate-y-full",
         side === "bottom" &&
@@ -83,7 +83,7 @@ const SheetTitle = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <DialogPrimitive.Title
     ref={ref}
-    className={cn("text-lg font-semibold text-foreground", className)}
+    className={cn("text-sap-display font-semibold text-foreground", className)}
     {...props}
   />
 ));
@@ -95,7 +95,7 @@ const SheetDescription = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <DialogPrimitive.Description
     ref={ref}
-    className={cn("text-sm text-muted-foreground", className)}
+    className={cn("text-sap-body text-muted-foreground", className)}
     {...props}
   />
 ));

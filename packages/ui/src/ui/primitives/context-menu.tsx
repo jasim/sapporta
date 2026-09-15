@@ -22,7 +22,7 @@ const ContextMenuSubTrigger = React.forwardRef<
     ref={ref}
     render={render}
     className={cn(
-      "flex cursor-default select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none data-highlighted:bg-accent data-highlighted:text-accent-foreground data-popup-open:bg-accent data-popup-open:text-accent-foreground data-disabled:pointer-events-none data-disabled:opacity-50",
+      "flex cursor-default select-none items-center rounded-sm px-2 py-1.5 text-sap-menu outline-none data-highlighted:bg-accent data-highlighted:text-accent-foreground data-popup-open:bg-accent data-popup-open:text-accent-foreground data-disabled:pointer-events-none data-disabled:opacity-50",
       inset && "pl-8",
       className,
     )}
@@ -68,7 +68,7 @@ const ContextMenuContent = React.forwardRef<
         <ContextMenuPrimitive.Popup
           ref={ref}
           className={cn(
-            "z-[var(--sap-z-popover)] min-w-36 overflow-hidden rounded-md border bg-popover p-1 text-popover-foreground shadow-md outline-none transition-[opacity,transform] data-starting-style:opacity-0 data-ending-style:opacity-0 data-starting-style:scale-95 data-ending-style:scale-95 data-[side=bottom]:data-starting-style:-translate-y-2 data-[side=bottom]:data-ending-style:-translate-y-2 data-[side=left]:data-starting-style:translate-x-2 data-[side=left]:data-ending-style:translate-x-2 data-[side=right]:data-starting-style:-translate-x-2 data-[side=right]:data-ending-style:-translate-x-2 data-[side=top]:data-starting-style:translate-y-2 data-[side=top]:data-ending-style:translate-y-2",
+            "z-[var(--sap-z-popover)] min-w-36 overflow-hidden rounded-lg border bg-popover p-1 text-popover-foreground shadow-sap-elevated outline-none transition-[opacity,transform] data-starting-style:opacity-0 data-ending-style:opacity-0 data-starting-style:scale-95 data-ending-style:scale-95 data-[side=bottom]:data-starting-style:-translate-y-2 data-[side=bottom]:data-ending-style:-translate-y-2 data-[side=left]:data-starting-style:translate-x-2 data-[side=left]:data-ending-style:translate-x-2 data-[side=right]:data-starting-style:-translate-x-2 data-[side=right]:data-ending-style:-translate-x-2 data-[side=top]:data-starting-style:translate-y-2 data-[side=top]:data-ending-style:translate-y-2",
             className,
           )}
           {...props}
@@ -87,7 +87,7 @@ const ContextMenuItem = React.forwardRef<HTMLElement, ContextMenuItemProps>(
       ref={ref}
       render={render}
       className={cn(
-        "relative flex cursor-default select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none data-highlighted:bg-accent data-highlighted:text-accent-foreground data-disabled:pointer-events-none data-disabled:opacity-50",
+        "relative flex cursor-default select-none items-center rounded-sm px-2 py-1.5 text-sap-menu outline-none data-highlighted:bg-accent data-highlighted:text-accent-foreground data-disabled:pointer-events-none data-disabled:opacity-50",
         inset && "pl-8",
         className,
       )}
@@ -119,7 +119,7 @@ const ContextMenuLabel = React.forwardRef<
     ref={ref}
     render={render}
     className={cn(
-      "px-2 py-1.5 text-sm font-semibold text-foreground",
+      "px-2 py-1.5 text-sap-label font-semibold text-foreground",
       inset && "pl-8",
       className,
     )}

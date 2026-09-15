@@ -97,6 +97,11 @@
   --sap-kbd-inverted-bg: rgba(255, 255, 255, 0.15);
   --sap-proj-chip-kbd-bg: #f7f6f3;
 
+  /* The one shadow for floating layers: popovers, menus, dialogs, sheets,
+     tooltips. Surfaces in the page flow carry no shadow. */
+  --sap-shadow-elevated:
+    0 8px 24px rgb(0 0 0 / 0.12), 0 1px 2px rgb(0 0 0 / 0.08);
+
   /* Project switcher */
   --sap-proj-bg: #ffffff;
   --sap-proj-grad: linear-gradient(
@@ -195,6 +200,8 @@
   --sap-kbd-bg: #1a1b13;
   --sap-kbd-inverted-bg: rgba(0, 0, 0, 0.15);
   --sap-proj-chip-kbd-bg: #1a1b13;
+  --sap-shadow-elevated:
+    0 8px 24px rgb(0 0 0 / 0.5), 0 1px 2px rgb(0 0 0 / 0.4);
 
   --sap-proj-bg: #14150f;
   --sap-proj-grad: linear-gradient(135deg, var(--sap-fg), var(--sap-brand));
@@ -252,8 +259,12 @@
   --color-sap-nav-count: var(--sap-nav-count-bg);
 
   --color-sap-kbd: var(--sap-kbd-bg);
+  --color-sap-kbd-inverted: var(--sap-kbd-inverted-bg);
   --color-sap-proj-chip-kbd: var(--sap-proj-chip-kbd-bg);
   --color-sap-proj: var(--sap-proj-bg);
+
+  /* Elevation → `shadow-sap-elevated` */
+  --shadow-sap-elevated: var(--sap-shadow-elevated);
 
   /* Shadcn-compat → utility classes (keeps bg-primary, bg-muted, etc. working) */
   --color-background: var(--background);
