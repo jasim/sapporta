@@ -15,7 +15,7 @@
   flex: 0 0 auto;
   display: inline-flex;
   align-items: center;
-  color: var(--sap-subtle, currentColor);
+  color: var(--sap-fg-subtle);
   opacity: 0;
   transition: opacity 80ms ease-in;
 }

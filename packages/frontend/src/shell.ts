@@ -56,3 +56,8 @@ export {
   type NavigationItem,
   type NavigationSection,
 } from "./shell/navigation";
+export {
+  useDocumentTheme,
+  useThemeStore,
+  type ThemeMode,
+} from "./shell/state/theme-store";

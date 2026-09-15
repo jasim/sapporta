@@ -1,7 +1,8 @@
 /* Editable table pages should read like white working documents. The stronger
    focus ring makes keyboard position feel edit-ready and distinct from report
-   drill focus. */
-:where(.sapporta-table-grid--editable) {
+   drill focus. The preset declares the same variables on the same element at
+   class specificity, so this rule needs two classes to out-rank it. */
+.sapporta-table-grid.sapporta-table-grid--editable {
   --grid-background: var(--sap-surface);
   --grid-header-background: var(--sap-surface);
   --grid-editor-background: var(--sap-surface);
@@ -23,7 +24,7 @@
 :where(.sapporta-table-grid[data-grid-presentation="cards"]) {
   --grid-card-background: color-mix(
     in oklab,
-    var(--sap-surface-muted) 36%,
+    var(--sap-nested-bg) 36%,
     var(--sap-surface)
   );
   --grid-cards-row-gap: 10px;
@@ -119,7 +120,7 @@
   .sapporta-table-grid[data-grid-presentation="cards"]
     [data-grid-part="row-field-label"]
 ) {
-  color: var(--sap-muted, hsl(215 14% 45%));
+  color: var(--sap-fg-muted);
   font-size: 12px;
   font-weight: 500;
   line-height: 1.45;

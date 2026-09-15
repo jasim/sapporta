@@ -49,7 +49,7 @@ export function ReportSummaryStats({ stats }: ReportSummaryStatsProps) {
               s.tone === "positive"
                 ? "text-sap-positive"
                 : s.tone === "negative"
-                  ? "text-sap-negative"
+                  ? "text-sap-numeric-negative"
                   : s.tone === "brand"
                     ? "text-sap-brand"
                     : s.tone === "muted"

@@ -285,7 +285,7 @@ function RecordFieldEditor({
   if (!form) return null;
   return (
     <div
-      className="flex flex-col gap-3 border-b border-sap-border-soft bg-sap-surface-muted/40 px-4 py-3"
+      className="flex flex-col gap-3 border-b border-sap-border-soft bg-sap-nested/40 px-4 py-3"
       data-record-detail-field={field.column.id}
       data-record-detail-editing="true"
     >

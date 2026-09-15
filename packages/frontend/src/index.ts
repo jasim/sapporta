@@ -4,7 +4,11 @@ export { getApiBase, API_ORIGIN, uiClient } from "./platform/client";
 
 export { useSchemaStore } from "./schema-catalog/state/schema-store";
 export { appTimeZone } from "./platform/app-time-zone";
-export { useThemeStore, type ThemeMode } from "./shell/state/theme-store";
+export {
+  useDocumentTheme,
+  useThemeStore,
+  type ThemeMode,
+} from "./shell/state/theme-store";
 export {
   useHintsStore,
   useKeyHints,

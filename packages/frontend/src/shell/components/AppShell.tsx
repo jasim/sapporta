@@ -16,6 +16,7 @@ import {
 import { SidebarRegion } from "./SidebarRegion";
 import { SidebarToggle } from "./SidebarToggle";
 import { AppPage } from "./Page";
+import { useDocumentTheme } from "../state/theme-store";
 
 export interface AppShellProps {
   navigation?: Navigation;
@@ -55,6 +56,7 @@ export function AppShell({
   sidebarToggle,
   sidebarFooter,
 }: AppShellProps) {
+  useDocumentTheme();
   const { error, tables } = useSchemaStore();
   const session = useAuthStore((s) => s.session);
   const showNavigation = session.kind === "authenticated";

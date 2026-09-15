@@ -60,4 +60,8 @@ export {
   type NavigationSection,
 } from "./navigation";
 export { useHintsStore, useKeyHints, type KeyHint } from "./state/hints-store";
-export { useThemeStore, type ThemeMode } from "./state/theme-store";
+export {
+  useDocumentTheme,
+  useThemeStore,
+  type ThemeMode,
+} from "./state/theme-store";
