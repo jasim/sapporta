@@ -318,6 +318,12 @@
   z-index: calc(var(--sap-z-grid-header) + 1);
 }
 
+/* The last column's handle stays inside the grid, so a grid that fills its
+   container doesn't scroll sideways by half a handle. */
+[data-grid-part="header-cell"]:last-child > .columnResizeHandle {
+  right: 0;
+}
+
 .columnResizeHandle::after {
   background: var(--grid-column-resize-handle-color, transparent);
   border-radius: 1px;
