@@ -74,7 +74,7 @@
   --grid-row-header-expand-padding-inline-end: 0;
 
   border: 0;
-  border-radius: 6px;
+  border-radius: var(--sap-radius);
   gap: 0;
   overflow: visible;
   padding-block: 8px 10px;
@@ -121,7 +121,7 @@
     [data-grid-part="row-field-label"]
 ) {
   color: var(--sap-fg-muted);
-  font-size: 12px;
+  font-size: var(--text-sap-data);
   font-weight: 500;
   line-height: 1.45;
 }
@@ -295,7 +295,7 @@
     [data-grid-part="row-field"][data-card-role="title"]
     [data-grid-part="cell-content"]
 ) {
-  font-size: 15px;
+  font-size: var(--text-sap-mark);
   font-weight: 600;
   line-height: 1.35;
 }
@@ -352,7 +352,7 @@
   )
   [data-grid-part="cell-content"] {
   color: var(--sap-fg-subtle, hsl(215 14% 45%));
-  font-size: 12px;
+  font-size: var(--text-sap-data);
 }
 
 /* A title hosting the row-expansion chevron flows through expand-content,
@@ -412,7 +412,7 @@
     .sapporta-table-grid[data-grid-presentation="cards"]
     [data-grid-part="row-field-label"]
 ) {
-  font-size: 12px;
+  font-size: var(--text-sap-data);
   font-weight: 500;
 }
 

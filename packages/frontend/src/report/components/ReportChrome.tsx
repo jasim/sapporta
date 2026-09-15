@@ -21,11 +21,7 @@ export function ReportScreenFrame({
 }: ReportScreenFrameProps) {
   return (
     <PageFrame>
-      <PageHeader
-        title={title}
-        subtitle={subtitle}
-        actions={actions}
-      />
+      <PageHeader title={title} subtitle={subtitle} actions={actions} />
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
         {children}
       </div>
@@ -93,7 +89,7 @@ export function ReportRunButton({
       onClick={onClick}
       disabled={disabled || loading}
       className={cn(
-        "inline-flex h-sap-ctl items-center gap-[6px] rounded-[5px] bg-primary px-[10px] text-sap-emph font-medium text-primary-foreground hover:bg-primary/90",
+        "inline-flex h-sap-ctl items-center gap-[6px] rounded-md bg-primary px-[10px] text-sap-emph font-medium text-primary-foreground hover:bg-primary/90",
         "disabled:opacity-60",
       )}
     >

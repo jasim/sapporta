@@ -27,7 +27,7 @@ export function TagInput({ values, onChange, autoFocus }: TagListInputProps) {
 
   return (
     <div
-      className="flex flex-wrap items-center gap-[4px] min-h-sap-ctl px-[6px] py-[3px] rounded-[5px] border border-sap-border bg-sap-surface focus-within:border-sap-brand"
+      className="flex flex-wrap items-center gap-[4px] min-h-sap-ctl px-[6px] py-[3px] rounded-md border border-sap-border bg-sap-surface focus-within:border-sap-brand"
       onClick={() => inputRef.current?.focus()}
     >
       {values.map((value, i) => {
@@ -35,7 +35,7 @@ export function TagInput({ values, onChange, autoFocus }: TagListInputProps) {
         return (
           <span
             key={`${label}-${i}`}
-            className="inline-flex items-center gap-[4px] h-[18px] px-[6px] rounded-[3px] bg-sap-chip text-sap-fg text-sap-emph"
+            className="inline-flex items-center gap-[4px] h-[18px] px-[6px] rounded-sm bg-sap-chip text-sap-fg text-sap-emph"
           >
             {label}
             <button

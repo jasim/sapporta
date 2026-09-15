@@ -225,7 +225,7 @@ export function ConditionEditor({
               render={
                 <button
                   type="button"
-                  className="h-sap-ctl flex items-center justify-between gap-[6px] px-[10px] rounded-[5px] border border-sap-border bg-sap-surface text-sap-fg text-left hover:bg-sap-row-hover"
+                  className="h-sap-ctl flex items-center justify-between gap-[6px] px-[10px] rounded-md border border-sap-border bg-sap-surface text-sap-emph text-sap-fg text-left hover:bg-sap-row-hover"
                 />
               }
             >
@@ -244,7 +244,7 @@ export function ConditionEditor({
                     placeholder="Search…"
                     className={cn(
                       comboboxClassNames.input,
-                      "h-9 w-full border-b py-3",
+                      "h-sap-ctl w-full border-b",
                     )}
                   />
                   <Combobox.Empty className={comboboxClassNames.empty}>
@@ -388,7 +388,7 @@ export function ConditionEditor({
         <button
           type="button"
           onClick={onCancel}
-          className="h-sap-ctl px-[10px] rounded-[5px] border border-sap-border bg-sap-surface text-sap-fg text-sap-emph hover:bg-sap-row-hover"
+          className="h-sap-ctl px-[10px] rounded-md border border-sap-border bg-sap-surface text-sap-fg text-sap-emph hover:bg-sap-row-hover"
         >
           Cancel
         </button>
@@ -396,7 +396,7 @@ export function ConditionEditor({
           type="button"
           onClick={handleApply}
           disabled={!canApply}
-          className="h-sap-ctl px-[10px] rounded-[5px] bg-primary text-primary-foreground text-sap-emph font-medium hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
+          className="h-sap-ctl px-[10px] rounded-md bg-primary text-primary-foreground text-sap-emph font-medium hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
         >
           Apply
         </button>

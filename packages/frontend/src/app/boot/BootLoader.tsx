@@ -31,21 +31,21 @@ export function BootLoader({ children }: { children: ReactNode }) {
     return (
       <div className="flex items-center justify-center h-screen bg-sap-bg">
         <div className="max-w-lg text-center space-y-4">
-          <div className="text-lg font-medium text-sap-negative">
+          <div className="text-sap-display font-medium text-sap-negative">
             Could not load the app schema
           </div>
-          <p className="text-sm text-sap-muted">
+          <p className="text-sap-body text-sap-muted">
             We asked the server for{" "}
-            <code className="text-xs bg-sap-nested px-1 py-0.5 rounded mono">
+            <code className="text-sap-meta bg-sap-nested px-1 py-0.5 rounded-sm mono">
               GET /api/meta/tables
             </code>{" "}
             and it returned an error.
           </p>
-          <pre className="text-sm text-left bg-sap-nested rounded-md p-3 whitespace-pre-wrap break-words mono">
+          <pre className="text-sap-body text-left bg-sap-nested rounded-md p-3 whitespace-pre-wrap break-words mono">
             {error}
           </pre>
           <button
-            className="px-4 py-2 text-sm rounded-md bg-primary text-primary-foreground hover:bg-primary/90"
+            className="h-sap-ctl px-4 text-sap-emph rounded-md bg-primary text-primary-foreground hover:bg-primary/90"
             onClick={() => {
               useSchemaStore.getState().reset();
             }}
@@ -66,7 +66,7 @@ export function BootLoader({ children }: { children: ReactNode }) {
       <div className="flex items-center justify-center h-screen bg-sap-bg">
         <div className="text-center space-y-3">
           <Loader2 className="h-6 w-6 animate-spin text-sap-muted mx-auto" />
-          <p className="text-sm text-sap-muted">Loading your app</p>
+          <p className="text-sap-body text-sap-muted">Loading your app</p>
         </div>
       </div>
     );

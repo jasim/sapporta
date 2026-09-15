@@ -200,7 +200,7 @@ describe("TableGridHeader", () => {
     await rerenderHeader("narrowCards");
 
     const deleteButton = buttonWithText("Delete 2 rows");
-    expect(deleteButton.className).toContain("h-10");
+    expect(deleteButton.className).toContain("h-sap-ctl");
     expect(
       document.body.querySelector('button[aria-label="New record"]'),
     ).toBeNull();

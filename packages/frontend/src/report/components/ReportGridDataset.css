@@ -55,7 +55,9 @@
 }
 
 .sapporta-report-grid-dataset
-  .sapporta-report-grid-dataset__level[data-grid-depth]:not([data-grid-depth="0"]) {
+  .sapporta-report-grid-dataset__level[data-grid-depth]:not(
+    [data-grid-depth="0"]
+  ) {
   background: var(--grid-background);
 }
 
@@ -72,7 +74,8 @@
   font-weight: 650;
 }
 
-.sapporta-report-grid-dataset :where([data-grid-part="row"][data-row-kind="footer"]) {
+.sapporta-report-grid-dataset
+  :where([data-grid-part="row"][data-row-kind="footer"]) {
   border-top: 1px solid var(--sap-border);
 }
 
@@ -86,8 +89,9 @@
   color: var(--sap-fg-muted);
 }
 
-.sapporta-report-grid-dataset :where([data-grid-depth]:not([data-grid-depth="0"])) {
-  margin-left: 18px;
+.sapporta-report-grid-dataset
+  :where([data-grid-depth]:not([data-grid-depth="0"])) {
+  margin-left: var(--sap-report-grid-nested-indent, 18px);
 }
 
 .sapporta-report-grid-dataset__linked-value {

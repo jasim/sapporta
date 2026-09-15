@@ -114,7 +114,7 @@ export function DateRangeCard({
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
-      <div className="inline-flex h-sap-ctl max-w-full items-stretch overflow-hidden rounded-[5px] border border-sap-border">
+      <div className="inline-flex h-sap-ctl max-w-full items-stretch overflow-hidden rounded-md border border-sap-border">
         <PopoverTrigger
           render={
             <button
@@ -141,7 +141,7 @@ export function DateRangeCard({
       <PopoverContent
         align="start"
         sideOffset={4}
-        className="p-[12px] w-[280px]"
+        className="w-[280px] rounded-xl p-[12px] shadow-sap-elevated"
       >
         <div className="flex flex-col gap-[10px]">
           <FieldLabel label="From">

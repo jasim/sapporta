@@ -75,7 +75,7 @@ export function HeaderFilterPopover({
       <PopoverContent
         align="start"
         sideOffset={4}
-        className="p-1 w-[240px] border-sap-border bg-sap-surface"
+        className="w-[240px] rounded-lg border-sap-border bg-sap-surface p-1 shadow-sap-elevated"
       >
         <HeaderFilterMenuContent
           column={column}
@@ -211,7 +211,7 @@ export function HeaderFilterMenuContent({
           render={
             <button
               type="button"
-              className="w-full flex items-center gap-2 px-[10px] py-[5px] text-sap-data rounded-[3px] hover:bg-sap-row-hover text-left text-sap-emph"
+              className="w-full flex items-center gap-2 px-[10px] py-[5px] text-sap-emph rounded-sm hover:bg-sap-row-hover text-left"
             />
           }
         >
@@ -221,7 +221,7 @@ export function HeaderFilterMenuContent({
         <PopoverContent
           align="start"
           sideOffset={4}
-          className="p-0 w-auto border-sap-border bg-sap-surface"
+          className="w-auto rounded-xl border-sap-border bg-sap-surface p-0 shadow-sap-elevated"
         >
           <ConditionEditor
             columns={columns}
@@ -264,7 +264,7 @@ function MenuRow({
     <button
       type="button"
       onClick={onClick}
-      className="w-full flex items-center gap-2 px-[10px] py-[5px] text-sap-data rounded-[3px] hover:bg-sap-row-hover text-left text-sap-emph"
+      className="w-full flex items-center gap-2 px-[10px] py-[5px] text-sap-emph rounded-sm hover:bg-sap-row-hover text-left"
     >
       <span className="text-sap-subtle">{icon}</span>
       <span className="flex-1">{children}</span>

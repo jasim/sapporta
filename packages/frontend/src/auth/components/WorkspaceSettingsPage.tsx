@@ -55,11 +55,11 @@ export function WorkspaceSettingsPage() {
         </Link>
 
         <div className="mb-7 flex items-center gap-3">
-          <span className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-[7px] bg-sap-active-nav text-sap-brand">
+          <span className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-md bg-sap-active-nav text-sap-brand">
             <Building2 className="size-5" strokeWidth={1.7} />
           </span>
           <div className="min-w-0">
-            <h2 className="truncate text-[22px] font-[680] leading-tight text-sap-fg">
+            <h2 className="truncate text-sap-display font-[680] leading-tight text-sap-fg">
               {context.workspace.name}
             </h2>
             <p className="mt-1 truncate text-sap-body text-sap-muted">
@@ -94,7 +94,7 @@ function WorkspaceCalendar({ canEdit }: { canEdit: boolean }) {
     <section className="mt-8">
       <header className="mb-3 flex items-center gap-2">
         <Globe className="size-4 text-sap-subtle" strokeWidth={1.7} />
-        <h2 className="text-[17px] font-[680] text-sap-fg">Time zone</h2>
+        <h2 className="text-sap-display font-[680] text-sap-fg">Time zone</h2>
       </header>
       <div className="flex min-h-[70px] flex-wrap items-center justify-between gap-4 border-y border-sap-border-soft py-3">
         <div className="min-w-0">

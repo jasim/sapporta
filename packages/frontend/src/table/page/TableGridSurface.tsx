@@ -70,7 +70,7 @@ export const TableGridSurface = forwardRef<
       {errorBanner && (
         <div
           role="alert"
-          className="flex items-start gap-3 border-b border-sap-negative/30 bg-sap-negative/10 px-4 py-2 text-sm text-sap-negative"
+          className="flex items-start gap-3 border-b border-sap-negative/30 bg-sap-negative/10 px-4 py-2 text-sap-body text-sap-negative"
         >
           <pre className="flex-1 whitespace-pre-wrap font-sans">
             {errorBanner}

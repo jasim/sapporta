@@ -294,7 +294,7 @@ function NarrowCardTableHeader<
         <div className="flex min-w-0 items-center gap-2">
           <div className="min-w-0 flex-1">
             <h1
-              className="flex min-w-0 items-baseline gap-1.5 text-[16px] font-[720] leading-5 text-sap-fg"
+              className="flex min-w-0 items-baseline gap-1.5 text-sap-body font-bold leading-5 text-sap-fg"
               aria-label={`${tableLabel}, ${formatRecordCount(totalCount)}`}
             >
               <span className="min-w-0 truncate">{tableLabel}</span>
@@ -302,7 +302,7 @@ function NarrowCardTableHeader<
                 &middot;
               </span>
               <span
-                className="mono shrink-0 text-[12px] font-[650] text-sap-muted"
+                className="mono shrink-0 text-sap-data font-[650] text-sap-muted"
                 aria-hidden="true"
               >
                 {totalCount.toLocaleString()}
@@ -314,7 +314,7 @@ function NarrowCardTableHeader<
               tone="danger"
               icon={<Trash2 className="h-4 w-4 shrink-0" />}
               onClick={deleteControl.onRequest}
-              className="h-10 shrink-0"
+              className="shrink-0"
             >
               {deleteRowsLabel(deleteControl.count)}
             </CompactHeaderButton>
@@ -327,7 +327,7 @@ function NarrowCardTableHeader<
                   tone="primary"
                   icon={<Plus className="h-4 w-4 shrink-0" />}
                   onClick={onNewRecord}
-                  className="h-10 min-w-10 shrink-0 px-0"
+                  className="shrink-0 px-0"
                 />
               )}
               <CompactHeaderButton
@@ -335,7 +335,7 @@ function NarrowCardTableHeader<
                 title="More actions"
                 icon={<MoreHorizontal className="h-4 w-4" />}
                 onClick={() => setActionsOpen(true)}
-                className="h-10 min-w-10 shrink-0 px-0"
+                className="shrink-0 px-0"
               />
             </>
           )}
@@ -356,7 +356,7 @@ function NarrowCardTableHeader<
               <CompactHeaderButton
                 icon={<ListFilter className="h-4 w-4 shrink-0" />}
                 onClick={() => setFiltersOpen(true)}
-                className="h-10 shrink-0"
+                className="shrink-0"
               >
                 {filterLabel}
               </CompactHeaderButton>
@@ -368,10 +368,10 @@ function NarrowCardTableHeader<
       <Sheet open={actionsOpen} onOpenChange={setActionsOpen}>
         <SheetContent
           side="bottom"
-          className="max-h-[75vh] rounded-t-[8px] border-sap-border bg-sap-surface p-4"
+          className="max-h-[75vh] rounded-t-xl border-sap-border bg-sap-surface p-4 shadow-sap-elevated"
         >
           <SheetHeader className="text-left">
-            <SheetTitle className="text-[16px] text-sap-fg">
+            <SheetTitle className="text-sap-body text-sap-fg">
               Table actions
             </SheetTitle>
             <SheetDescription className="text-sap-muted">
@@ -422,10 +422,12 @@ function NarrowCardTableHeader<
       <Sheet open={filtersOpen} onOpenChange={setFiltersOpen}>
         <SheetContent
           side="bottom"
-          className="max-h-[82vh] overflow-auto rounded-t-[8px] border-sap-border bg-sap-surface p-0"
+          className="max-h-[82vh] overflow-auto rounded-t-xl border-sap-border bg-sap-surface p-0 shadow-sap-elevated"
         >
           <SheetHeader className="px-4 pb-2 pt-4 text-left">
-            <SheetTitle className="text-[16px] text-sap-fg">Filters</SheetTitle>
+            <SheetTitle className="text-sap-body text-sap-fg">
+              Filters
+            </SheetTitle>
             <SheetDescription className="text-sap-muted">
               {tableLabel}
             </SheetDescription>

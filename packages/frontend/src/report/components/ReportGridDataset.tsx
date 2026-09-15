@@ -36,6 +36,7 @@ import {
 import {
   columnPreset,
   columnPresetWidthForSizing,
+  type ColumnSizingOptions,
 } from "@sapporta/grid/column-preset";
 import type { LinkIcon } from "@sapporta/shared/contracts";
 import {
@@ -151,11 +152,24 @@ type ReportGridDatasetBinding<TInput = unknown> = {
   input: TInput | undefined;
 };
 
+/**
+ * Column sizing preferences for a report grid. The storage key that remembers
+ * dragged widths is the report's own; everything else passes through, so an
+ * app that sets its data in a larger face can raise the named width floors:
+ *
+ *     <ReportGridDataset columnSizing={{ minWidths: { numeric: 128 } }} ... />
+ *
+ * Give the object a stable reference (module level, or `useMemo`) — the grid
+ * chrome is rebuilt whenever its identity changes.
+ */
+export type ReportGridColumnSizing = Omit<ColumnSizingOptions, "storageKey">;
+
 export interface ReportGridDatasetProps<TInput = unknown> {
   dataset: GridDataset;
   links?: ReportCellLinkResolvers<TInput>;
   linkContext?: { input: TInput };
   renderCell?: ReportCellRenderers;
+  columnSizing?: ReportGridColumnSizing;
 }
 
 export function ReportGridDataset<TInput = unknown>({
@@ -163,6 +177,7 @@ export function ReportGridDataset<TInput = unknown>({
   links,
   linkContext,
   renderCell,
+  columnSizing,
 }: ReportGridDatasetProps<TInput>) {
   const input = linkContext?.input;
   const runtime = useGridRuntimeEffect(() => {
@@ -191,6 +206,7 @@ export function ReportGridDataset<TInput = unknown>({
     <GridRuntimeProvider runtime={runtime}>
       <ReportGridDatasetBody
         session={{ dataset, runtime, root: runtime.root.path, links, input }}
+        columnSizing={columnSizing}
       />
     </GridRuntimeProvider>
   );
@@ -198,15 +214,21 @@ export function ReportGridDataset<TInput = unknown>({
 
 function ReportGridDatasetBody<TInput>({
   session,
+  columnSizing,
 }: {
   session: ReportGridDatasetBinding<TInput>;
+  columnSizing: ReportGridColumnSizing | undefined;
 }) {
   // Reports carry no per-table view preference, so the container width alone
   // picks the presentation: stacked cards on narrow screens, else tabular.
   const { ref, mode } = useTablePageMode();
   const presentation: GridPresentation =
     mode === "narrowCards" ? "cards" : "tabular";
-  const chrome = useReportGridDatasetChrome(session.dataset, session.root);
+  const chrome = useReportGridDatasetChrome(
+    session.dataset,
+    session.root,
+    columnSizing,
+  );
 
   useLayoutEffect(() => {
     expandDefaultReportRows(session.runtime, session.dataset);
@@ -234,10 +256,12 @@ function ReportGridDatasetBody<TInput>({
 function useReportGridDatasetChrome(
   dataset: GridDataset,
   root: GridPath,
+  columnSizing: ReportGridColumnSizing | undefined,
 ): GridLevelChrome {
   return useMemo<GridLevelChrome>(() => {
     const base = columnPreset.chrome({
       columnSizing: {
+        ...columnSizing,
         storageKey: ({ levelName }) =>
           `sapporta:report-grid-columns:${dataset.name}:${levelName}`,
       },
@@ -256,7 +280,7 @@ function useReportGridDatasetChrome(
           "sapporta-report-grid-dataset__level",
         ),
     };
-  }, [dataset, root]);
+  }, [columnSizing, dataset, root]);
 }
 
 function renderReportCardsLevelHeader(
@@ -269,11 +293,11 @@ function renderReportCardsLevelHeader(
 
   return (
     <div
-      className="flex min-h-8 items-center border-b border-sap-border/70 px-1 pb-2 pt-1"
+      className="flex min-h-sap-ctl items-center border-b border-sap-border/70 px-1 pb-2 pt-1"
       data-grid-part="cards-level-header"
     >
       <div
-        className="min-w-0 truncate text-[11px] font-bold uppercase tracking-sap-head text-sap-soft"
+        className="min-w-0 truncate text-sap-meta font-bold uppercase tracking-sap-head text-sap-soft"
         data-grid-part="cards-level-title"
         title={label}
       >

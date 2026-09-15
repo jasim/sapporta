@@ -157,30 +157,35 @@ export function VerifyEmailPage() {
 
   return (
     <AuthFrame title="Verify your email">
-      <p className="text-sm text-sap-muted">
+      <p className="text-sap-body text-sap-muted">
         {token
           ? "Confirming your email address."
           : "Check your inbox for a verification link. The link will sign you in, so you can close this tab."}
       </p>
-      {message && <div className="text-sm text-sap-positive">{message}</div>}
-      {error && <div className="text-sm text-sap-negative">{error}</div>}
+      {message && (
+        <div className="text-sap-body text-sap-positive">{message}</div>
+      )}
+      {error && <div className="text-sap-body text-sap-negative">{error}</div>}
       {!token && !isResend && (
         <div className="flex flex-col gap-3">
           <Link
-            className="text-sm"
+            className="text-sap-body text-sap-link hover:underline"
             to="/verify-email?resend=1"
             state={{ email }}
           >
             Didn't get a verification email?
           </Link>
-          <Link className="text-sm" to="/login">
+          <Link
+            className="text-sap-body text-sap-link hover:underline"
+            to="/login"
+          >
             Back to sign in
           </Link>
         </div>
       )}
       {!token && isResend && (
         <>
-          <p className="text-sm text-sap-muted">
+          <p className="text-sap-body text-sap-muted">
             Enter your email and we'll send another verification link.
           </p>
           <form onSubmit={resend} className="space-y-4">
@@ -196,7 +201,11 @@ export function VerifyEmailPage() {
               {submitting ? "Sending..." : "Resend verification email"}
             </Button>
           </form>
-          <Link className="text-sm" to="/verify-email" state={{ email }}>
+          <Link
+            className="text-sap-body text-sap-link hover:underline"
+            to="/verify-email"
+            state={{ email }}
+          >
             Back
           </Link>
         </>
@@ -204,7 +213,7 @@ export function VerifyEmailPage() {
       {!token && import.meta.env.DEV && (
         <div
           role="note"
-          className="rounded-lg border border-sap-warning/40 bg-sap-warning/10 p-3 text-sm font-medium text-sap-warning"
+          className="rounded-lg border border-sap-warning/40 bg-sap-warning/10 p-3 text-sap-body font-medium text-sap-warning"
         >
           Development mode: Check the development server logs for the email
           verification link.
@@ -285,7 +294,7 @@ function EmailPasswordPage({ mode }: { mode: AuthMode }) {
 
   return (
     <AuthFrame title={content.title}>
-      <p className="text-sm text-sap-muted">{content.intro}</p>
+      <p className="text-sap-body text-sap-muted">{content.intro}</p>
       <form onSubmit={submit} className="space-y-4">
         {mode === "signup" && (
           <Field label="Name">
@@ -312,8 +321,12 @@ function EmailPasswordPage({ mode }: { mode: AuthMode }) {
             />
           </Field>
         )}
-        {message && <div className="text-sm text-sap-positive">{message}</div>}
-        {error && <div className="text-sm text-sap-negative">{error}</div>}
+        {message && (
+          <div className="text-sap-body text-sap-positive">{message}</div>
+        )}
+        {error && (
+          <div className="text-sap-body text-sap-negative">{error}</div>
+        )}
         <Button type="submit" disabled={submitting}>
           {submitting ? content.submitting : content.submit}
         </Button>
@@ -337,8 +350,12 @@ function AuthFrame({
     <div className="flex min-h-screen items-center justify-center bg-sap-bg px-4">
       <div className="w-full max-w-[360px] space-y-5">
         <div className="space-y-1">
-          <div className="text-sm font-medium text-sap-muted">{name ?? ""}</div>
-          <h1 className="text-xl font-semibold text-sap-fg">{title}</h1>
+          <div className="text-sap-body font-medium text-sap-muted">
+            {name ?? ""}
+          </div>
+          <h1 className="text-sap-display font-semibold text-sap-fg">
+            {title}
+          </h1>
         </div>
         {children}
       </div>
@@ -373,15 +390,21 @@ function readVerifyEmailState(value: unknown): VerifyEmailLocationState {
 function AuthLinks({ mode }: { mode: AuthMode }) {
   if (mode === "login") {
     return (
-      <div className="flex justify-between text-sm">
-        <Link to="/signup">Create account</Link>
-        <Link to="/forgot-password">Reset password</Link>
+      <div className="flex justify-between text-sap-body">
+        <Link className="text-sap-link hover:underline" to="/signup">
+          Create account
+        </Link>
+        <Link className="text-sap-link hover:underline" to="/forgot-password">
+          Reset password
+        </Link>
       </div>
     );
   }
   return (
-    <div className="text-sm">
-      <Link to="/login">Back to sign in</Link>
+    <div className="text-sap-body">
+      <Link className="text-sap-link hover:underline" to="/login">
+        Back to sign in
+      </Link>
     </div>
   );
 }

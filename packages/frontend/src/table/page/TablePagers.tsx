@@ -107,7 +107,7 @@ export function NumberedTablePager({
             handlePagerBoundaryKey(event, "before", onPagerArrowKey)
           }
           onBlur={onPagerBoundaryExit}
-          className="flex h-11 min-w-[84px] shrink-0 items-center justify-center gap-[5px] rounded-[6px] border border-sap-border-soft bg-sap-surface px-[12px] text-sap-emph text-sap-soft hover:bg-sap-row-hover hover:text-sap-fg focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-40"
+          className="flex h-sap-ctl min-w-[84px] shrink-0 items-center justify-center gap-[5px] rounded-md border border-sap-border-soft bg-sap-surface px-[12px] text-sap-emph text-sap-soft hover:bg-sap-row-hover hover:text-sap-fg focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-40"
           aria-label="Previous page"
         >
           <ChevronLeft className="h-4 w-4" />
@@ -128,7 +128,7 @@ export function NumberedTablePager({
             onBlur={commitPageJump}
             inputMode="numeric"
             aria-label={`Page number, 1 through ${pages}`}
-            className="mono h-9 w-[64px] rounded-[5px] border border-sap-border bg-sap-surface px-[9px] text-center text-sap-meta text-sap-fg shadow-[inset_0_0_0_1px_var(--sap-border-soft)] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+            className="mono h-sap-ctl w-[64px] rounded-md border border-sap-border bg-sap-surface px-[9px] text-center text-sap-meta text-sap-fg shadow-[inset_0_0_0_1px_var(--sap-border-soft)] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
           />
           <span>of {pages}</span>
         </form>
@@ -144,7 +144,7 @@ export function NumberedTablePager({
             handlePagerBoundaryKey(event, "after", onPagerArrowKey)
           }
           onBlur={onPagerBoundaryExit}
-          className="flex h-11 min-w-[84px] shrink-0 items-center justify-center gap-[5px] rounded-[6px] border border-sap-border-soft bg-sap-surface px-[12px] text-sap-emph text-sap-soft hover:bg-sap-row-hover hover:text-sap-fg focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-40"
+          className="flex h-sap-ctl min-w-[84px] shrink-0 items-center justify-center gap-[5px] rounded-md border border-sap-border-soft bg-sap-surface px-[12px] text-sap-emph text-sap-soft hover:bg-sap-row-hover hover:text-sap-fg focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-40"
           aria-label="Next page"
         >
           <span>Next</span>
@@ -158,7 +158,7 @@ export function NumberedTablePager({
             return (
               <li
                 key={`ellipsis-${index}`}
-                className="mono flex h-9 items-center justify-center rounded-[5px] px-[10px] text-sap-meta text-sap-muted"
+                className="mono flex h-sap-ctl items-center justify-center rounded-md px-[10px] text-sap-meta text-sap-muted"
                 style={pageSlotStyle}
                 aria-hidden="true"
               >
@@ -169,7 +169,7 @@ export function NumberedTablePager({
 
           const isCurrent = item === safePage;
           const className = [
-            "mono flex h-9 min-w-9 items-center justify-center rounded-[5px] px-[10px] text-sap-meta focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
+            "mono flex h-sap-ctl min-w-(--height-sap-ctl) items-center justify-center rounded-md px-[10px] text-sap-meta focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
             isCurrent
               ? "border border-sap-border-strong bg-sap-surface text-sap-fg"
               : "text-sap-muted hover:bg-sap-row-hover hover:text-sap-fg",
@@ -255,7 +255,7 @@ export function CompactTablePager({
   return (
     <nav
       aria-label="Table pages"
-      className="grid min-h-[44px] shrink-0 grid-cols-[40px_minmax(0,1fr)_40px] items-center gap-1.5 border-t border-sap-border bg-sap-surface px-2 py-0.5"
+      className="grid min-h-[44px] shrink-0 grid-cols-[var(--height-sap-ctl)_minmax(0,1fr)_var(--height-sap-ctl)] items-center gap-1.5 border-t border-sap-border bg-sap-surface px-2 py-0.5"
     >
       <button
         ref={previousButtonRef}
@@ -266,7 +266,7 @@ export function CompactTablePager({
           handlePagerBoundaryKey(event, "before", onPagerArrowKey)
         }
         onBlur={onPagerBoundaryExit}
-        className="flex h-10 w-10 items-center justify-center rounded-[6px] border border-sap-border-soft bg-sap-surface text-sap-soft hover:bg-sap-row-hover hover:text-sap-fg focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-40"
+        className="flex h-sap-ctl w-(--height-sap-ctl) items-center justify-center rounded-md border border-sap-border-soft bg-sap-surface text-sap-soft hover:bg-sap-row-hover hover:text-sap-fg focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-40"
         aria-label="Previous page"
       >
         <ChevronLeft className="h-4 w-4" />
@@ -287,7 +287,7 @@ export function CompactTablePager({
           onBlur={commitPageJump}
           inputMode="numeric"
           aria-label={`Page number, 1 through ${pages}`}
-          className="mono h-9 w-[58px] rounded-[5px] border border-sap-border bg-sap-surface px-2 text-center text-sap-meta text-sap-fg shadow-[inset_0_0_0_1px_var(--sap-border-soft)] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+          className="mono h-sap-ctl w-[58px] rounded-md border border-sap-border bg-sap-surface px-2 text-center text-sap-meta text-sap-fg shadow-[inset_0_0_0_1px_var(--sap-border-soft)] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
         />
         <span className="whitespace-nowrap">of {pages}</span>
       </form>
@@ -301,7 +301,7 @@ export function CompactTablePager({
           handlePagerBoundaryKey(event, "after", onPagerArrowKey)
         }
         onBlur={onPagerBoundaryExit}
-        className="flex h-10 w-10 items-center justify-center rounded-[6px] border border-sap-border-soft bg-sap-surface text-sap-soft hover:bg-sap-row-hover hover:text-sap-fg focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-40"
+        className="flex h-sap-ctl w-(--height-sap-ctl) items-center justify-center rounded-md border border-sap-border-soft bg-sap-surface text-sap-soft hover:bg-sap-row-hover hover:text-sap-fg focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-40"
         aria-label="Next page"
       >
         <ChevronRight className="h-4 w-4" />

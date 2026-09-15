@@ -100,7 +100,7 @@ export function NavItem({
       aria-current={active ? "page" : undefined}
       className={cn(
         "group flex items-center rounded-lg text-sap-body text-sap-soft no-underline transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-sap-sidebar",
-        compact ? "size-10 justify-center" : "h-9 gap-2.5 px-2.5",
+        compact ? "size-10 justify-center" : "h-sap-ctl gap-2.5 px-2.5",
         active
           ? "bg-sap-active-nav"
           : "hover:bg-sap-row-hover hover:text-sap-fg",
@@ -307,7 +307,7 @@ export function NavigationPicker({
         <div
           className={cn(
             panelClass,
-            "z-[var(--sap-z-popover)] max-h-[360px] overflow-y-auto rounded-lg border border-sap-border bg-popover p-1.5 text-sap-body text-popover-foreground shadow-lg",
+            "z-[var(--sap-z-popover)] max-h-[360px] overflow-y-auto rounded-lg border border-sap-border bg-popover p-1.5 text-sap-body text-popover-foreground shadow-sap-elevated",
           )}
         >
           {options.map((option) => (

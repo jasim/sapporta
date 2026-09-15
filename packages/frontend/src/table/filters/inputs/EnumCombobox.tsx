@@ -56,7 +56,7 @@ export function EnumCombobox({
           }}
         />
       </Combobox.Chips>
-      <div className="max-h-[220px] overflow-y-auto rounded-[5px] border border-sap-border bg-sap-surface">
+      <div className="max-h-[220px] overflow-y-auto rounded-md border border-sap-border bg-sap-surface">
         <Combobox.Empty className={comboboxClassNames.empty}>
           No matches
         </Combobox.Empty>

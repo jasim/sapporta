@@ -126,7 +126,7 @@ export function NewRecordPage({ tableSchema }: { tableSchema: TableSchema }) {
               return (
                 <>
                   {serverErrorMessage && (
-                    <div className="text-sm text-sap-negative bg-sap-negative/10 rounded-[6px] p-3">
+                    <div className="text-sap-body text-sap-negative bg-sap-negative/10 rounded-md p-3">
                       {serverErrorMessage}
                     </div>
                   )}

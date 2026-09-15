@@ -118,7 +118,7 @@ function AppShellLayout({
         richColors
         toastOptions={{
           classNames: {
-            toast: "text-[17px]",
+            toast: "text-sap-body",
             title: "font-semibold",
           },
         }}

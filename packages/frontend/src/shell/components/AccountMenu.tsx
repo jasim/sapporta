@@ -122,7 +122,7 @@ export function AccountMenu({
         />
       )}
       {open && (
-        <div className="absolute bottom-0 left-full z-[var(--sap-z-popover)] ml-2 w-[260px] rounded-md border border-sap-border bg-popover p-0 text-sap-body text-popover-foreground shadow-md outline-none">
+        <div className="absolute bottom-0 left-full z-[var(--sap-z-popover)] ml-2 w-[260px] rounded-lg border border-sap-border bg-popover p-0 text-sap-body text-popover-foreground shadow-sap-elevated outline-none">
           <div className="border-b border-sap-border-soft px-3 py-3">
             <div className="flex items-center gap-2">
               <AccountAvatar initials={initials} />
@@ -158,7 +158,7 @@ export function AccountMenu({
                   aria-busy={pendingActionId === action.id}
                   onClick={() => void runAction(action)}
                   className={cx(
-                    "flex w-full items-center gap-2 rounded-[5px] px-2 py-[7px] text-left text-sap-data disabled:cursor-not-allowed disabled:opacity-60",
+                    "flex w-full items-center gap-2 rounded-md px-2 py-[7px] text-left text-sap-data disabled:cursor-not-allowed disabled:opacity-60",
                     action.variant === "danger"
                       ? "text-sap-negative hover:bg-sap-negative/10"
                       : "text-sap-soft hover:bg-sap-row-hover hover:text-sap-fg",
@@ -250,7 +250,7 @@ function DefaultAccountMenuTrigger({
       aria-expanded={open}
       onClick={onClick}
       className={cx(
-        "inline-flex h-auto w-full items-center justify-start gap-2 rounded-[6px] px-2 py-[7px] text-left text-sap-soft hover:bg-sap-row-hover",
+        "inline-flex h-auto w-full items-center justify-start gap-2 rounded-md px-2 py-[7px] text-left text-sap-soft hover:bg-sap-row-hover",
         className,
       )}
     >
@@ -274,7 +274,7 @@ function DefaultAccountMenuTrigger({
 
 function AccountAvatar({ initials }: { initials: string }) {
   return (
-    <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-[6px] bg-sap-active-nav text-sap-label font-bold text-sap-brand">
+    <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-sap-active-nav text-sap-label font-bold text-sap-brand">
       {initials === "?" ? (
         <UserRound aria-hidden="true" className="h-[14px] w-[14px]" />
       ) : (

@@ -82,7 +82,7 @@ export function FilterCardsBar({
           render={
             <button
               type="button"
-              className="inline-flex items-center gap-[4px] h-sap-ctl px-[10px] rounded-[6px] border border-sap-border-soft text-sap-muted hover:text-sap-fg hover:bg-sap-row-hover text-sap-data font-semibold"
+              className="inline-flex items-center gap-[4px] h-sap-ctl px-[10px] rounded-md border border-sap-border-soft text-sap-muted hover:text-sap-fg hover:bg-sap-row-hover text-sap-data font-semibold"
             />
           }
         >
@@ -92,7 +92,7 @@ export function FilterCardsBar({
         <PopoverContent
           align="start"
           sideOffset={4}
-          className="p-0 w-auto border-sap-border bg-sap-surface"
+          className="w-auto rounded-xl border-sap-border bg-sap-surface p-0 shadow-sap-elevated"
         >
           <ConditionEditor
             columns={filterableColumns}

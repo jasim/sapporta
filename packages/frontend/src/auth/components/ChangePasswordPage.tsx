@@ -77,7 +77,7 @@ export function ChangePasswordPage() {
         </Link>
 
         <div className="mb-7 flex items-start gap-3">
-          <span className="inline-flex size-12 shrink-0 items-center justify-center rounded-[7px] bg-sap-active-nav text-sap-brand">
+          <span className="inline-flex size-12 shrink-0 items-center justify-center rounded-md bg-sap-active-nav text-sap-brand">
             <KeyRound className="size-5" strokeWidth={1.7} />
           </span>
           <div className="min-w-0">

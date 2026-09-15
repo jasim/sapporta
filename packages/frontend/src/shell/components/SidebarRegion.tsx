@@ -60,7 +60,7 @@ export function SidebarRegion({ children, className }: SidebarRegionProps) {
           "inset-y-0 left-0 h-full w-auto",
           sidebar.desktopExpanded && "static",
           !sidebar.desktopExpanded &&
-            "absolute z-[var(--sap-z-popover)] shadow-lg",
+            "absolute z-[var(--sap-z-popover)] shadow-sap-elevated",
         )}
       >
         {children}

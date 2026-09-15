@@ -27,7 +27,7 @@ export function FormField({ field, value, issue, onChange }: FormFieldProps) {
 
   return (
     <div className="flex flex-col gap-2" data-invalid={invalid || undefined}>
-      <Label htmlFor={id} className="text-sm font-medium">
+      <Label htmlFor={id} className="text-sap-body font-medium">
         {column.label}
         {column.notNull && !column.hasDefault && (
           <span className="text-destructive ml-1">*</span>
@@ -161,12 +161,13 @@ export function FormField({ field, value, issue, onChange }: FormFieldProps) {
 
       {field.kind === "text" &&
         (column.textDisplay ? (
+          // Mirrors the @sapporta/ui/input class list, minus the fixed height.
           <textarea
             id={id}
             value={value != null ? String(value) : ""}
             onChange={(e) => onChange(e.target.value)}
             {...accessibilityProps}
-            className="flex min-h-24 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+            className="flex min-h-sap-ctl w-full rounded-md border border-input bg-transparent px-3 py-2 text-sap-emph transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
           />
         ) : (
           <Input
@@ -178,7 +179,7 @@ export function FormField({ field, value, issue, onChange }: FormFieldProps) {
           />
         ))}
       {issue && (
-        <p id={errorId} className="text-sm text-destructive">
+        <p id={errorId} className="text-sap-body text-destructive">
           {issue}
         </p>
       )}

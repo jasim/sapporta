@@ -33,14 +33,14 @@ export function TableViewSwitch({
       <PopoverTrigger
         aria-label="Open table view options"
         title="View options"
-        className="inline-flex h-sap-ctl w-[30px] items-center justify-center rounded-[6px] border border-sap-border bg-sap-surface text-sap-soft hover:bg-sap-row-hover hover:text-sap-fg"
+        className="inline-flex h-sap-ctl w-(--height-sap-ctl) items-center justify-center rounded-md border border-sap-border bg-sap-surface text-sap-soft hover:bg-sap-row-hover hover:text-sap-fg"
       >
         <PanelsTopLeft className="h-[12px] w-[12px]" />
       </PopoverTrigger>
       <PopoverContent
         align="end"
         sideOffset={6}
-        className="w-[220px] border-sap-border bg-sap-surface p-1 text-sap-body"
+        className="w-[220px] rounded-lg border-sap-border bg-sap-surface p-1 text-sap-body shadow-sap-elevated"
       >
         <TableViewOptions value={value} onChange={selectView} />
       </PopoverContent>
@@ -74,7 +74,7 @@ export function TableViewOptions({
               role="menuitemradio"
               aria-checked={active}
               className={cn(
-                "flex w-full items-center gap-2 rounded-[5px] px-2 py-[7px] text-left text-sap-data text-sap-soft hover:bg-sap-row-hover hover:text-sap-fg",
+                "flex w-full items-center gap-2 rounded-md px-2 py-[7px] text-left text-sap-data text-sap-soft hover:bg-sap-row-hover hover:text-sap-fg",
                 active && "text-sap-fg",
               )}
               onClick={() => onChange(option.value)}

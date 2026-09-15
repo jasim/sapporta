@@ -12,7 +12,10 @@ import {
   type GridRuntime,
   type LevelRow,
 } from "@sapporta/grid";
-import { columnPreset } from "@sapporta/grid/column-preset";
+import {
+  columnPreset,
+  type ColumnSizingOptions,
+} from "@sapporta/grid/column-preset";
 import type { TableSchema } from "@sapporta/shared/contracts";
 import { cn } from "@sapporta/ui/cn";
 import { relatedRowsTableHref } from "./tgrid-table-url";
@@ -36,6 +39,18 @@ import type { TGridLevelInfo } from "./tgrid-level-config";
 import "./table-card.css";
 
 export type TGridPresentation = GridPresentation;
+
+/**
+ * Column sizing preferences for a table grid. The storage key that remembers
+ * dragged widths is the grid's own; everything else passes through, so an
+ * app that sets its data in a larger face can raise the named width floors:
+ *
+ *     <TGrid columnSizing={{ minWidths: { numeric: 128 } }} ... />
+ *
+ * Give the object a stable reference (module level, or `useMemo`) — the grid
+ * chrome is rebuilt whenever its identity changes.
+ */
+export type TGridColumnSizing = Omit<ColumnSizingOptions, "storageKey">;
 
 export type ViewRelatedRowsOption =
   | boolean
@@ -77,6 +92,7 @@ export function TGrid<
   style,
   viewRelatedRows,
   presentation,
+  columnSizing,
   onRowActivate,
 }: {
   session: TGridSession<RowsByLevel, AppServices>;
@@ -84,6 +100,7 @@ export function TGrid<
   style?: CSSProperties;
   viewRelatedRows?: ViewRelatedRowsOption;
   presentation: TGridPresentation;
+  columnSizing?: TGridColumnSizing;
   /** Receives configured Enter, click, or double-click row activations. */
   onRowActivate?: (event: TGridRowActivatedEvent<RowsByLevel>) => void;
 }) {
@@ -97,6 +114,7 @@ export function TGrid<
     const presetChrome = columnPreset.chrome<TGridTableColumnMeta, TGridFilter>(
       {
         columnSizing: {
+          ...columnSizing,
           storageKey: ({ levelName }) =>
             `sapporta:grid-columns:${session.rootTableName}:${levelName}`,
         },
@@ -127,7 +145,7 @@ export function TGrid<
       session: sessionContext,
       viewRelatedRows,
     });
-  }, [className, root, sessionContext, style, viewRelatedRows]);
+  }, [className, columnSizing, root, sessionContext, style, viewRelatedRows]);
 
   useEffect(() => {
     if (!observesRowActivation) return;
@@ -220,11 +238,11 @@ function renderCardsLevelHeader(
 
   return (
     <div
-      className="relative flex min-h-8 items-center justify-between gap-3 border-b border-sap-border/70 px-1 pb-2 pt-1"
+      className="relative flex min-h-sap-ctl items-center justify-between gap-3 border-b border-sap-border/70 px-1 pb-2 pt-1"
       data-grid-part="cards-level-header"
     >
       <div
-        className="min-w-0 truncate text-[11px] font-bold uppercase tracking-sap-head text-sap-soft"
+        className="min-w-0 truncate text-sap-meta font-bold uppercase tracking-sap-head text-sap-soft"
         data-grid-part="cards-level-title"
         title={ctx.levelName}
       >
@@ -281,7 +299,7 @@ function RelatedRowsIconLink({
       aria-label={ariaLabel}
       title={ariaLabel}
       className={cn(
-        "inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-[6px] border border-sap-border bg-sap-surface text-sap-soft shadow-sm hover:bg-sap-row-hover hover:text-sap-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sap-focus-ring",
+        "inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-sap-border bg-sap-surface text-sap-soft hover:bg-sap-row-hover hover:text-sap-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sap-focus-ring",
         className,
       )}
       data-grid-part={dataGridPart}

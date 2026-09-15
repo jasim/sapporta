@@ -111,7 +111,7 @@ export function PageHeaderButton({
         : "bg-sap-surface text-sap-soft hover:bg-sap-row-hover border border-sap-border";
 
   const cls = cn(
-    "inline-flex items-center gap-[6px] h-sap-ctl px-[10px] rounded-[6px] text-sap-emph font-[650] whitespace-nowrap disabled:pointer-events-none disabled:opacity-40",
+    "inline-flex items-center gap-[6px] h-sap-ctl px-[10px] rounded-md text-sap-emph font-[650] whitespace-nowrap disabled:pointer-events-none disabled:opacity-40",
     toneCls,
   );
 

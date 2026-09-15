@@ -147,11 +147,11 @@ export function RecordDetailSheet<
     >
       <SheetContent
         side="bottom"
-        className="max-h-[85vh] overflow-y-auto rounded-t-[8px] border-sap-border bg-sap-surface p-0"
+        className="max-h-[85vh] overflow-y-auto rounded-t-xl border-sap-border bg-sap-surface p-0 shadow-sap-elevated"
         data-grid-part="record-detail-sheet"
       >
         <SheetHeader className="border-b border-sap-border-soft px-4 pb-3 pt-4 text-left">
-          <SheetTitle className="text-[16px] leading-snug text-sap-fg">
+          <SheetTitle className="text-sap-body leading-snug text-sap-fg">
             {title ?? tableLabel}
           </SheetTitle>
           <SheetDescription className="text-sap-muted">
@@ -220,12 +220,12 @@ function RecordFieldLine({
 }) {
   const content = (
     <>
-      <div className="w-[7.25rem] shrink-0 pt-px text-[12px] font-medium leading-[1.5] text-sap-muted">
+      <div className="w-[7.25rem] shrink-0 pt-px text-sap-data font-medium leading-[1.5] text-sap-muted">
         {field.column.name}
       </div>
       <div
         className={cn(
-          "min-w-0 flex-1 break-words text-[14px] leading-[1.45] text-sap-fg",
+          "min-w-0 flex-1 break-words text-sap-body leading-[1.45] text-sap-fg",
           isMonoRecordField(field.meta) && "mono",
         )}
       >

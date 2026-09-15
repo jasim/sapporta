@@ -41,8 +41,8 @@ export function SearchInput({
   return (
     <div
       className={cn(
-        "relative flex items-center rounded-[6px] border border-sap-border bg-sap-surface pl-[30px] pr-[10px]",
-        compact ? "h-10 w-full" : "h-sap-ctl w-[260px]",
+        "relative flex h-sap-ctl items-center rounded-md border border-sap-border bg-sap-surface pl-[30px] pr-[10px]",
+        compact ? "w-full" : "w-[260px]",
       )}
     >
       <Search className="absolute left-[10px] h-3.5 w-3.5 text-sap-subtle" />
@@ -119,7 +119,7 @@ function compactHeaderButtonClassName(
         : "border-sap-border bg-sap-surface text-sap-soft hover:bg-sap-row-hover hover:text-sap-fg";
 
   return cn(
-    "inline-flex h-11 min-w-11 max-w-full items-center justify-center gap-2 rounded-[6px] border px-3 text-sap-emph font-[650] whitespace-nowrap disabled:pointer-events-none disabled:opacity-40",
+    "inline-flex h-sap-ctl min-w-(--height-sap-ctl) max-w-full items-center justify-center gap-2 rounded-md border px-3 text-sap-emph font-[650] whitespace-nowrap disabled:pointer-events-none disabled:opacity-40",
     toneClass,
     className,
   );

@@ -85,7 +85,7 @@ export function DateRangeField({
         <Combobox.InputGroup
           className={cn(
             comboboxClassNames.inputGroup,
-            "h-sap-ctl w-[150px] rounded-[5px] text-sap-emph",
+            "h-sap-ctl w-[150px] rounded-md text-sap-emph",
           )}
         >
           <Combobox.Input
@@ -139,7 +139,7 @@ export function DateRangeField({
             onChange={(e) => handleBoundChange("start", e.target.value)}
             aria-label="Custom range start"
             aria-invalid={error ? true : undefined}
-            className="h-sap-ctl w-[140px] text-sap-emph rounded-[5px] mono"
+            className="h-sap-ctl w-[140px] text-sap-emph rounded-md mono"
           />
           <span className="text-sap-subtle">→</span>
           <Input
@@ -148,7 +148,7 @@ export function DateRangeField({
             onChange={(e) => handleBoundChange("end", e.target.value)}
             aria-label="Custom range end"
             aria-invalid={error ? true : undefined}
-            className="h-sap-ctl w-[140px] text-sap-emph rounded-[5px] mono"
+            className="h-sap-ctl w-[140px] text-sap-emph rounded-md mono"
           />
         </>
       )}

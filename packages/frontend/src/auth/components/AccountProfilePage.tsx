@@ -83,11 +83,11 @@ export function AccountProfilePage() {
     <AppPage title="Account profile">
       <div className="mx-auto w-full max-w-[760px] px-6 py-8">
         <div className="mb-7 flex items-center gap-3">
-          <span className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-[7px] bg-sap-active-nav text-sap-body font-bold text-sap-brand">
+          <span className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-md bg-sap-active-nav text-sap-body font-bold text-sap-brand">
             {initials}
           </span>
           <div className="min-w-0">
-            <h2 className="truncate text-[22px] font-[680] leading-tight text-sap-fg">
+            <h2 className="truncate text-sap-display font-[680] leading-tight text-sap-fg">
               {displayName}
             </h2>
             <p className="mt-1 truncate text-sap-body text-sap-muted">
@@ -156,7 +156,7 @@ function AccountSecurity() {
     <section className="mt-8">
       <header className="mb-3 flex items-center gap-2">
         <KeyRound className="size-4 text-sap-subtle" strokeWidth={1.7} />
-        <h2 className="text-[17px] font-[680] text-sap-fg">Security</h2>
+        <h2 className="text-sap-display font-[680] text-sap-fg">Security</h2>
       </header>
       <div className="flex min-h-[70px] flex-wrap items-center justify-between gap-4 border-y border-sap-border-soft py-3">
         <div className="min-w-0">
@@ -248,14 +248,14 @@ function AgentAccessTokens() {
       <header className="mb-3 flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           <KeyRound className="h-4 w-4 text-sap-subtle" strokeWidth={1.7} />
-          <h2 className="text-[17px] font-[680] text-sap-fg">
+          <h2 className="text-sap-display font-[680] text-sap-fg">
             Agent access tokens
           </h2>
         </div>
         <Link
           className={cn(
             buttonVariants(),
-            "bg-sap-brand text-white hover:bg-sap-brand/90",
+            "bg-primary text-primary-foreground hover:bg-primary/90",
           )}
           to={createTokenHref()}
         >
@@ -280,7 +280,7 @@ function AgentAccessTokens() {
       />
 
       {error ? (
-        <p className="mt-3 text-sap-data text-red-600">{error}</p>
+        <p className="mt-3 text-sap-data text-sap-negative">{error}</p>
       ) : null}
 
       <div className="mt-4 border-y border-sap-border-soft">
@@ -289,7 +289,7 @@ function AgentAccessTokens() {
         ) : (
           tokens.map((token) => (
             <div
-              className="grid min-h-[54px] grid-cols-[minmax(0,1fr)_120px_36px] items-center gap-3 border-b border-sap-border-soft py-3 last:border-b-0"
+              className="grid min-h-[54px] grid-cols-[minmax(0,1fr)_120px_var(--height-sap-ctl)] items-center gap-3 border-b border-sap-border-soft py-3 last:border-b-0"
               key={token.id}
             >
               <div className="min-w-0">
@@ -308,7 +308,7 @@ function AgentAccessTokens() {
                 {token.lastUsedAt ? formatDate(token.lastUsedAt) : "Never used"}
               </div>
               <button
-                className="flex h-9 w-9 items-center justify-center rounded-[7px] border border-sap-border bg-sap-surface text-sap-muted hover:text-red-600 disabled:opacity-50"
+                className="flex h-sap-ctl w-(--height-sap-ctl) items-center justify-center rounded-md border border-sap-border bg-sap-surface text-sap-muted hover:text-sap-negative disabled:opacity-50"
                 type="button"
                 title="Revoke token"
                 disabled={pending || token.revokedAt !== null}
@@ -394,7 +394,7 @@ function CreateTokenDialog({
       <DialogContent className="max-w-[520px] gap-0 border-sap-border bg-sap-surface p-0 text-sap-fg">
         <form onSubmit={submit}>
           <DialogHeader className="px-6 pb-0 pr-12 pt-6 text-left">
-            <DialogTitle className="text-[18px] font-[680]">
+            <DialogTitle className="text-sap-display font-[680]">
               New access token
             </DialogTitle>
             <DialogDescription className="text-sap-body text-sap-muted">
@@ -476,7 +476,7 @@ function CreateTokenDialog({
             </div>
 
             {error ? (
-              <p className="text-sap-data text-red-600">{error}</p>
+              <p className="text-sap-data text-sap-negative">{error}</p>
             ) : null}
           </div>
 
@@ -494,7 +494,7 @@ function CreateTokenDialog({
             </DialogClose>
             <Button
               type="submit"
-              className="bg-sap-brand text-white hover:bg-sap-brand/90"
+              className="bg-primary text-primary-foreground hover:bg-primary/90"
               disabled={
                 pending ||
                 name.trim().length === 0 ||
@@ -579,7 +579,7 @@ function CreatedTokenDialog({
     >
       <DialogContent className="max-h-[calc(100vh-2rem)] max-w-[760px] grid-rows-[auto_minmax(0,1fr)_auto] gap-0 overflow-hidden border-sap-border bg-sap-surface p-0 text-sap-fg">
         <DialogHeader className="px-6 pb-5 pr-12 pt-6 text-left">
-          <DialogTitle className="text-[18px] font-[680]">
+          <DialogTitle className="text-sap-display font-[680]">
             Access token created
           </DialogTitle>
         </DialogHeader>
@@ -589,7 +589,7 @@ function CreatedTokenDialog({
             <li className="grid grid-cols-[26px_minmax(0,1fr)] items-start gap-3">
               <StepNumber>1</StepNumber>
               <div className="min-w-0 pt-[3px]">
-                <h3 className="text-[17px] font-[650] leading-snug text-sap-fg">
+                <h3 className="text-sap-display font-[650] leading-snug text-sap-fg">
                   Create an empty directory
                 </h3>
                 <p className="mt-1 text-sap-data text-sap-muted">
@@ -601,18 +601,18 @@ function CreatedTokenDialog({
             <li className="grid grid-cols-[26px_minmax(0,1fr)] items-start gap-3">
               <StepNumber>2</StepNumber>
               <div className="min-w-0 pt-[3px]">
-                <h3 className="text-[17px] font-[650] leading-snug text-sap-fg">
+                <h3 className="text-sap-display font-[650] leading-snug text-sap-fg">
                   Paste this prompt into a coding agent opened there
                 </h3>
 
                 <div className="relative mt-3">
-                  <pre className="max-h-[220px] overflow-auto whitespace-pre-wrap break-words rounded-[9px] bg-sap-brand-soft p-4 pr-14 font-mono text-[12px] leading-5 text-sap-fg">
+                  <pre className="max-h-[220px] overflow-auto whitespace-pre-wrap break-words rounded-lg bg-sap-brand-soft p-4 pr-14 font-mono text-sap-data leading-5 text-sap-fg">
                     {setupPrompt}
                   </pre>
                   {/* Where a hand goes for a block of text it means to take
                       with it, before it reads far enough to find a button. */}
                   <button
-                    className="absolute right-3 top-3 flex h-8 w-8 items-center justify-center rounded-[7px] border border-sap-border bg-sap-surface text-sap-muted shadow-sm hover:text-sap-fg"
+                    className="absolute right-3 top-3 flex h-sap-ctl w-(--height-sap-ctl) items-center justify-center rounded-md border border-sap-border bg-sap-surface text-sap-muted hover:text-sap-fg"
                     type="button"
                     title="Copy prompt"
                     aria-label="Copy prompt"
@@ -626,7 +626,7 @@ function CreatedTokenDialog({
                   <Button
                     type="button"
                     size="lg"
-                    className="bg-sap-brand text-white hover:bg-sap-brand/90"
+                    className="bg-primary text-primary-foreground hover:bg-primary/90"
                     onClick={() => void handleCopy(setupPrompt, "prompt")}
                   >
                     <Copy className="h-4 w-4" strokeWidth={1.8} />
@@ -640,11 +640,12 @@ function CreatedTokenDialog({
             <li className="grid grid-cols-[26px_minmax(0,1fr)] items-start gap-3">
               <StepNumber>3</StepNumber>
               <div className="min-w-0 pt-[3px]">
-                <h3 className="text-[17px] font-[650] leading-snug text-sap-fg">
+                <h3 className="text-sap-display font-[650] leading-snug text-sap-fg">
                   Ask the agent for what you need
                 </h3>
                 <p className="mt-1 text-sap-data text-sap-muted">
-                  It can query, change, and add data, and even build tools on top of the API.
+                  It can query, change, and add data, and even build tools on
+                  top of the API.
                 </p>
               </div>
             </li>
@@ -660,7 +661,7 @@ function CreatedTokenDialog({
             <div className="mt-2 flex items-center gap-2">
               <Input
                 aria-label="New agent access token"
-                className="h-8 min-w-0 flex-1 border-sap-border-soft bg-sap-surface font-mono text-[11.5px] text-sap-muted"
+                className="h-sap-ctl min-w-0 flex-1 border-sap-border-soft bg-sap-surface font-mono text-sap-menu text-sap-muted"
                 value={rawToken ?? ""}
                 readOnly
               />
@@ -744,7 +745,7 @@ function CopyFeedback({
           className={
             copied
               ? "text-sap-data text-sap-brand"
-              : "text-sap-data text-red-600"
+              : "text-sap-data text-sap-negative"
           }
           role="status"
           aria-live="polite"

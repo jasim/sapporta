@@ -109,7 +109,7 @@ function ZoneChoice({
       type="button"
       onClick={onSelect}
       aria-pressed={selected}
-      className="flex items-center gap-2 rounded-[4px] px-[8px] py-[5px] text-left hover:bg-sap-row-hover"
+      className="flex items-center gap-2 rounded-sm px-[8px] py-[5px] text-left hover:bg-sap-row-hover"
     >
       <span className="font-medium text-sap-fg">{label}</span>
       <span className="min-w-0 flex-1 truncate text-sap-data text-sap-muted">
@@ -153,13 +153,13 @@ function ZoneSearch({
         placeholder="Search zones…"
         className={cn(
           comboboxClassNames.input,
-          "h-sap-ctl w-full rounded-[4px] border border-sap-border px-[8px]",
+          "h-sap-ctl w-full rounded-md border border-sap-border px-[8px]",
         )}
         onKeyDown={(event) => {
           if (event.key === "Enter") event.stopPropagation();
         }}
       />
-      <div className="max-h-[220px] overflow-y-auto rounded-[4px] border border-sap-border bg-sap-surface">
+      <div className="max-h-[220px] overflow-y-auto rounded-sm border border-sap-border bg-sap-surface">
         <Combobox.Empty className={comboboxClassNames.empty}>
           No matching zone
         </Combobox.Empty>
@@ -168,7 +168,7 @@ function ZoneSearch({
             <Combobox.Item
               key={zone.id}
               value={zone}
-              className="flex w-full items-center gap-2 rounded-[4px] px-[8px] py-[4px] outline-none data-highlighted:bg-sap-row-hover"
+              className="flex w-full items-center gap-2 rounded-sm px-[8px] py-[4px] outline-none data-highlighted:bg-sap-row-hover"
             >
               <span className="min-w-0 flex-1 truncate text-sap-fg">
                 {zone.id}

@@ -53,7 +53,7 @@ export function FilterCard({
               <button
                 type="button"
                 className={
-                  "flex min-w-0 max-w-full items-center gap-[6px] border-b bg-transparent px-0 pb-[2px] text-[17px] leading-[1.25] font-[620] text-sap-fg hover:border-sap-muted " +
+                  "flex min-w-0 max-w-full items-center gap-[6px] border-b bg-transparent px-0 pb-[2px] text-sap-body leading-[1.25] font-[620] text-sap-fg hover:border-sap-muted " +
                   (error ? "border-sap-negative" : "border-sap-border-strong")
                 }
               />
@@ -71,7 +71,7 @@ export function FilterCard({
             type="button"
             aria-label={`Remove ${label} filter`}
             onClick={() => onRemove(condition.id)}
-            className="flex h-6 w-6 shrink-0 items-center justify-center rounded-[4px] bg-transparent text-sap-subtle hover:bg-sap-row-hover hover:text-sap-soft"
+            className="flex h-6 w-6 shrink-0 items-center justify-center rounded-sm bg-transparent text-sap-subtle hover:bg-sap-row-hover hover:text-sap-soft"
           >
             <X className="h-[11px] w-[11px]" />
           </button>
@@ -82,7 +82,11 @@ export function FilterCard({
           </span>
         )}
       </div>
-      <PopoverContent align="start" sideOffset={4} className="p-0">
+      <PopoverContent
+        align="start"
+        sideOffset={4}
+        className="rounded-xl p-0 shadow-sap-elevated"
+      >
         <ConditionEditor
           columns={columns}
           lockedColumn={column}

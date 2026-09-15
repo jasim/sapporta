@@ -37,7 +37,7 @@ export function CellFilterAction({
           <button
             type="button"
             aria-label={`Filter by ${column.label}`}
-            className="flex items-center justify-center h-6 w-6 rounded border border-sap-border bg-sap-surface text-sap-subtle hover:text-sap-fg hover:bg-sap-row-hover shadow-sm"
+            className="flex items-center justify-center h-6 w-6 rounded-sm border border-sap-border bg-sap-surface text-sap-subtle hover:text-sap-fg hover:bg-sap-row-hover"
             onClick={(e) => e.stopPropagation()}
           />
         }
@@ -47,7 +47,7 @@ export function CellFilterAction({
       <PopoverContent
         align="end"
         sideOffset={4}
-        className="p-0 w-auto border-sap-border bg-sap-surface"
+        className="w-auto rounded-xl border-sap-border bg-sap-surface p-0 shadow-sap-elevated"
       >
         <ConditionEditor
           columns={columns}
