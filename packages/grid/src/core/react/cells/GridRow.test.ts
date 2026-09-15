@@ -753,8 +753,9 @@ describe("GridRow cards presentation", () => {
       );
 
     // Empty and opted in: marked.
-    expect(fieldFor(quoteOneId, "author_id")?.getAttribute("data-field-empty"))
-      .toBe("true");
+    expect(
+      fieldFor(quoteOneId, "author_id")?.getAttribute("data-field-empty"),
+    ).toBe("true");
     // Empty without the meta opt-in: never marked.
     expect(
       fieldFor(quoteOneId, "text")?.getAttribute("data-field-empty"),
@@ -802,11 +803,14 @@ describe("GridRow cards presentation", () => {
     const expandContent = pkField.querySelector(
       '[data-grid-part="expand-content"]',
     );
-    const expandChevron = pkField.querySelector(
-      '[data-grid-part="expand-chevron"]',
+    // The level has no child levels, so the chevron's slot is an empty
+    // placeholder rather than a button.
+    const expandPlaceholder = pkField.querySelector(
+      '[data-grid-part="expand-placeholder"]',
     );
     expect(expandCell?.firstElementChild).toBe(expandContent);
-    expect(expandCell?.lastElementChild).toBe(expandChevron);
+    expect(expandPlaceholder).toBeInstanceOf(HTMLElement);
+    expect(expandCell?.lastElementChild).toBe(expandPlaceholder);
   });
 
   it("does not render tabular column headers in cards presentation", async () => {

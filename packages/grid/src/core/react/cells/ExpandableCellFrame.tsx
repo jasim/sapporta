@@ -58,17 +58,20 @@ export function ExpandableCellFrame({
     () => level.isExpanded(rowId),
   );
   const enabled = activation?.availability.kind === "enabled";
-  const expansionControl = activation ? (
-    <CellActivationButton activation={activation} gridPart="expand-chevron">
-      {isExpanded ? (
-        <ChevronDown aria-hidden="true" size={14} strokeWidth={1.75} />
-      ) : (
-        <ChevronRight aria-hidden="true" size={14} strokeWidth={1.75} />
-      )}
-    </CellActivationButton>
-  ) : (
-    <span data-grid-part="expand-placeholder" />
-  );
+  // A row that can never expand (a footer, an opening balance) keeps the
+  // chevron's space but not its button, so it doesn't look expandable.
+  const expansionControl =
+    activation && enabled ? (
+      <CellActivationButton activation={activation} gridPart="expand-chevron">
+        {isExpanded ? (
+          <ChevronDown aria-hidden="true" size={14} strokeWidth={1.75} />
+        ) : (
+          <ChevronRight aria-hidden="true" size={14} strokeWidth={1.75} />
+        )}
+      </CellActivationButton>
+    ) : (
+      <span data-grid-part="expand-placeholder" />
+    );
   const content = <span data-grid-part="expand-content">{children}</span>;
 
   return (

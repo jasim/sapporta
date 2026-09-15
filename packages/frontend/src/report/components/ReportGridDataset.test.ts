@@ -872,7 +872,7 @@ describe("ReportGridDataset", () => {
     }
   });
 
-  it("keeps expansion frame state and disabled affordances from the base wrapper", async () => {
+  it("keeps expansion frame state from the base wrapper, with no chevron on rows that can't expand", async () => {
     const dataset = accountLedgerDataset({
       defaultCollapsed: true,
       includeSubtotal: true,
@@ -896,11 +896,10 @@ describe("ReportGridDataset", () => {
     ).toBeInstanceOf(HTMLButtonElement);
 
     const subtotalCell = cellByColumn(container, "name", "Total");
-    const disabledButton = subtotalCell.querySelector(
-      'button[aria-label="Row"]',
-    );
-    expect(disabledButton).toBeInstanceOf(HTMLButtonElement);
-    expect((disabledButton as HTMLButtonElement | null)?.disabled).toBe(true);
+    expect(subtotalCell.querySelector("button")).toBeNull();
+    expect(
+      subtotalCell.querySelector('[data-grid-part="expand-placeholder"]'),
+    ).toBeInstanceOf(HTMLElement);
     expect(
       subtotalCell
         .querySelector('[data-grid-part="expand-cell"]')
