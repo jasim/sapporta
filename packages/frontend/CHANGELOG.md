@@ -1,5 +1,78 @@
 # @sapporta/frontend
 
+## 0.8.0
+
+### Minor Changes
+
+- 92766b2: An app can now compose its own shell from the sidebar primitives without
+  inheriting `AppShell`'s assumptions:
+
+  - `SidebarRegion` and `SidebarDrawer` take the width of what they hold
+    instead of a fixed 240px. `SidebarShell` is still 240px, so the standard
+    shell looks the same; an app's own sidebar sets its own width.
+  - `Toaster` is exported from `@sapporta/frontend/shell`. Sapporta's screens
+    post toasts to the `sonner` instance this package bundles, so an app-owned
+    shell renders this export once; a `Toaster` from the app's own copy of
+    `sonner` would never show them. Render it above `BootLoader`: a workspace
+    switch or a time zone change resets the schema store, the gate remounts
+    everything under it, and a toast posted then needs an outlet that stayed
+    mounted. (The standard `AppShell` sits under the gate in generated apps,
+    so its Toaster misses those two toasts; a later change moves it.)
+  - `PageHeader` no longer depends on the shell's DOM order to keep clear of
+    the content-side sidebar toggle. A shell sets `--sap-page-header-inset` on
+    its scroll region while that control is present, and the header adds it to
+    its leading padding. `AppShell` does this.
+  - `PageHeader`'s title and subtitle use the `sap-body` and `sap-menu` tiers
+    instead of fixed pixel sizes, so a larger type scale reaches them.
+  - A custom `AccountMenu` trigger now reports `aria-expanded` from the menu's
+    state; it was always `true`.
+
+- 4de4cf9: The table page, filters, forms, report chrome, auth and account screens, the
+  boot loader and the shell components take their sizes from the token tiers
+  instead of fixed pixels, so an app that redeclares the tiers reaches them.
+  Pagers, search fields, filter cards, condition editors, date inputs and the
+  Retry button are `h-sap-ctl` controls with `rounded-md`; popovers, menus,
+  bottom sheets and the record detail sheet use `rounded-lg`/`rounded-xl` and
+  `shadow-sap-elevated`; headings sit on `sap-display`, body text on
+  `sap-body`, helper text on `sap-meta`. `text-red-600` became
+  `text-sap-negative`, `bg-sap-brand text-white` became
+  `bg-primary text-primary-foreground`, and sign-in links are styled.
+
+  `TGrid` and `ReportGridDataset` accept `columnSizing`, including the grid's
+  new `minWidths`, so an app can widen numeric and timestamp columns. The table
+  card's label, title and radius, and the report grid's nested indent
+  (`--sap-report-grid-nested-indent`), read tokens.
+
+- 5e77fd9: Importing `@sapporta/frontend/shell` no longer switches the document to the
+  dark palette. Until now the theme store set `data-theme` on `<html>` as soon as
+  its module loaded, so an app that imported `SidebarProvider` for its own shell
+  got the dark palette whenever the visitor's system preferred it, with no way
+  to opt out.
+
+  `useDocumentTheme()` now does that work while a component is mounted.
+  `AppShell` calls it, so apps on the standard shell see no change. An app with
+  its own shell calls it to support the dark palette, or leaves it out to stay
+  light. `useThemeStore.getState().forceMode("light")` pins a mode: `toggle`
+  and `setMode` then change nothing until `forceMode(null)`.
+
+  Also in this change: the undefined `--sap-surface-muted`, `--sap-muted` and
+  `--sap-subtle` are replaced with `--sap-nested-bg`, `--sap-fg-muted` and
+  `--sap-fg-subtle` in the table card and cell-link styles, and the editable
+  grid's focus ring rule now out-ranks the preset's, so it applies.
+  `ReportSummaryStats` paints its `negative` tone with `--sap-numeric-negative`.
+
+### Patch Changes
+
+- Release
+- Updated dependencies [d72e71a]
+- Updated dependencies
+- Updated dependencies [fa399dc]
+- Updated dependencies [e905f48]
+- Updated dependencies [b45d182]
+  - @sapporta/ui@0.3.0
+  - @sapporta/grid@0.7.0
+  - @sapporta/shared@0.3.3
+
 ## 0.7.0
 
 ### Minor Changes
