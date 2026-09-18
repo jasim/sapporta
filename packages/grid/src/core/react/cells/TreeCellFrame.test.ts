@@ -5,8 +5,8 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, describe, expect, it } from "vitest";
 import { inMemoryGridDataSource } from "../../data-sources/memory/in-memory-grid-source";
 import { createGridRuntime } from "../../runtime/runtime";
-import { makeRowId, rootPath } from "../../types/identity";
-import type { TreeNode } from "../../types/level-row";
+import { makeLevelRowId, makeRowId, rootPath } from "../../types/identity";
+import type { FooterRow, TreeNode } from "../../types/level-row";
 import type { ColumnSchema, GridSchema } from "../../types/schema";
 import { GridLevel } from "../GridLevel";
 import { GridRuntimeProvider } from "../GridRuntimeProvider";
@@ -76,7 +76,7 @@ async function render(element: ReactElement) {
   return container;
 }
 
-function treeRuntime() {
+function treeRuntime(footerRows?: readonly FooterRow[]) {
   return createGridRuntime({
     schema,
     dataSource: inMemoryGridDataSource({
@@ -87,14 +87,18 @@ function treeRuntime() {
           sortMode: "none",
           filterMode: "none",
           paginationMode: "none",
+          footerRows,
         },
       },
     }),
   });
 }
 
-async function renderTree(presentation: "tabular" | "cards" = "tabular") {
-  const runtime = treeRuntime();
+async function renderTree(
+  presentation: "tabular" | "cards" = "tabular",
+  footerRows?: readonly FooterRow[],
+) {
+  const runtime = treeRuntime(footerRows);
   const container = await render(
     createElement(GridRuntimeProvider, {
       runtime,
@@ -150,6 +154,22 @@ describe("tree rendering", () => {
     expect(
       (indent as HTMLElement).style.getPropertyValue("--grid-tree-depth"),
     ).toBe("1");
+  });
+
+  it("draws a footer row at top level without a chevron", async () => {
+    const { container } = await renderTree("tabular", [
+      { rowKey: "total", columns: { name: "Total" } },
+    ]);
+    const footer = container.querySelector(
+      `[data-row-id="${makeLevelRowId(path, "footer", "total")}"]`,
+    );
+    if (!(footer instanceof HTMLElement)) throw new Error("no footer row");
+    expect(footer.querySelector('[data-grid-part="tree-chevron"]')).toBeNull();
+    expect(
+      footer
+        .querySelector('[data-grid-part="tree-cell"]')
+        ?.getAttribute("data-tree-depth"),
+    ).toBe("0");
   });
 
   it("describes the tree to assistive technology", async () => {

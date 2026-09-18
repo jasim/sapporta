@@ -583,6 +583,37 @@ describe("tree levels", () => {
       ]);
     });
 
+    it("keeps footer rows below the tree when sorted or collapsed", async () => {
+      const rt = createTreeRuntime({
+        levelOpts: {
+          footerRows: [{ rowKey: "total", columns: { name: "Total" } }],
+        },
+      });
+      const footer = `footer:${makeLevelRowId(path, "footer", "total")}`;
+      await rt.root.data.query!.sort!.set([
+        { colId: "name", direction: "desc" },
+      ]);
+      expect(displayedKeys(rt.root.displayedRows().rows)).toEqual([
+        "7",
+        "4",
+        "5",
+        "6",
+        "1",
+        "3",
+        "2",
+        footer,
+      ]);
+      treeOf(rt).collapse(id("4"));
+      expect(displayedKeys(rt.root.displayedRows().rows)).toEqual([
+        "7",
+        "4",
+        "1",
+        "3",
+        "2",
+        footer,
+      ]);
+    });
+
     it("prunes toggles for rows that left the snapshot", async () => {
       const rt = createTreeRuntime();
       treeOf(rt).collapse(id("1"));
