@@ -108,7 +108,7 @@ keeping them out of the barrel keeps casual root imports lightweight.
 | `./table` | Column builders and the `sapportaTable` wrapper used by schema files |
 | `./errors` | The error vocabulary: `ErrorCode`, `OperationError`, validation and query-parse error classes, SQLite error classification |
 | `./data-dir` | `databasePath()` and `dataPath()`, which locate files in `SAPPORTA_DATA_DIR`; Node built-ins only, so `drizzle.config.ts` can import it |
-| `./testing` | `createTestDb` and `createTestConnection` — in-memory SQLite databases with production PRAGMA settings for tests |
+| `./testing` | `createTestDb` and `createTestConnection` — in-memory SQLite databases with production PRAGMA settings for tests; `createTestAuthContext` — a real auth context, row security included, for a workspace/user-scoped member |
 | `./create-project` | Programmatic project creation — the engine behind `sapporta init` |
 | `./source-link-runtime` | Node module-resolution preload for source-linked development |
 | `./cli` | The `sapporta` command (side-effectful main) |
