@@ -67,11 +67,32 @@ export const gridDatasetNodeSchema: z.ZodType<GridDatasetNode> = z.lazy(() =>
   }),
 );
 
+/**
+ * Rows of one level that refer to each other, such as accounts with a
+ * `parent_id`, shown as one tree under the level's header.
+ */
+export const gridDatasetLevelTreeSchema = z.object({
+  /** Column of the level holding the parent row's `rowKey`. `null`,
+   *  `undefined`, and `""` mark a top-level row. Values are compared with
+   *  row keys as strings. The column may be visually hidden. */
+  parentColumn: z.string(),
+  /** Visible column that shows the hierarchy. Default: the first visible
+   *  text column, else the first visible column. */
+  column: z.string().optional(),
+});
+export type GridDatasetLevelTree = z.output<typeof gridDatasetLevelTreeSchema>;
+
 export const gridDatasetLevelSchema = z.object({
   label: z.string().optional(),
   columns: z.array(gridDatasetColumnSchema),
   childLevels: z.array(z.string()),
+  /** Rows of this level start collapsed. On a tree level, every tree row
+   *  starts collapsed. */
   defaultCollapsed: z.boolean().optional(),
+  /** Shows the level's rows as one tree. A tree level declares no
+   *  `childLevels`, and its nodes are one flat list in which each node names
+   *  its parent through `tree.parentColumn`. */
+  tree: gridDatasetLevelTreeSchema.optional(),
   /** Declarative row-level links for this level (related data, drill-into).
    *  Resolvable links appear in the row's right-click context menu. */
   rowLinks: z.array(navLinkSchema).optional(),

@@ -73,6 +73,36 @@ import {
 } from "@sapporta/shared/temporal";
 ```
 
+### Grid Datasets
+
+`@sapporta/shared/grid-dataset` contains `GridDataset`, the rows a report
+returns for a grid to show. A dataset has levels, nodes, and footer rows.
+
+A level can show rows that name a parent row of the same level as one tree.
+For example, each account names its parent account in `parent_id`. The
+level's nodes are one flat list, and `tree.parentColumn` names the column that
+holds the parent row's `rowKey`:
+
+```ts
+import type { GridDatasetLevel } from "@sapporta/shared/grid-dataset";
+
+const account: GridDatasetLevel = {
+  columns: [
+    { id: "parent_id", label: "Parent", kind: "text", visuallyHidden: true },
+    { id: "name", label: "Account", kind: "text" },
+    { id: "amount", label: "Amount", kind: "number" },
+  ],
+  childLevels: [],
+  tree: { parentColumn: "parent_id" },
+};
+```
+
+A tree level declares no child levels. `gridDatasetTreeProblems(dataset)`
+returns one message for each tree level that names a parent column the level
+does not have, or names a tree column that is not visible.
+`gridDatasetLinkProblems(dataset)` checks the columns that declarative links
+read.
+
 ### Other Utilities
 
 The package also exposes helpers for value kinds, date ranges, and record IDs:
