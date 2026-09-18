@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { valueKindSchema } from "./value-kind-schema.js";
+import { treeMatchContextSchema } from "./table-schema.js";
 
 /**
  * Wire shapes for `/meta/*` introspection responses.
@@ -127,6 +128,43 @@ export const childSchemaSchema = z.object({
 });
 export type ChildSchema = z.output<typeof childSchemaSchema>;
 
+/**
+ * A table whose rows form a tree through a self-referencing column, such as
+ * accounts with `parent_id`. All fields are resolved by the server.
+ */
+export const tableTreeSchema = z.object({
+  /** Nullable column holding the parent row's primary key. */
+  parentColumn: z.string(),
+  /** Column that shows the hierarchy. */
+  column: z.string(),
+  /** Whether rows start expanded. */
+  defaultExpanded: z.boolean(),
+  /** What a filter or search keeps besides the matching rows. */
+  matchContext: treeMatchContextSchema,
+});
+export type TableTree = z.output<typeof tableTreeSchema>;
+
+/** A table tree as declared, before defaults: only `parentColumn` is required. */
+export type TableTreeInput = Pick<TableTree, "parentColumn"> &
+  Partial<Omit<TableTree, "parentColumn">>;
+
+/**
+ * Fills the defaults of a table tree: the first row-label column shows the
+ * hierarchy, rows start expanded, and a filter or search keeps each match's
+ * ancestors and descendants.
+ */
+export function resolveTableTree(
+  tree: TableTreeInput,
+  rowLabelColumns: readonly string[],
+): TableTree {
+  return {
+    parentColumn: tree.parentColumn,
+    column: tree.column ?? rowLabelColumns[0],
+    defaultExpanded: tree.defaultExpanded ?? true,
+    matchContext: tree.matchContext ?? "ancestors-and-descendants",
+  };
+}
+
 export const tableSchemaSchema = z.object({
   name: z.string(),
   label: z.string(),
@@ -137,6 +175,7 @@ export const tableSchemaSchema = z.object({
   rowLabelColumns: z.array(z.string()).nonempty(),
   rowCount: z.number().optional(),
   searchable: z.boolean(),
+  tree: tableTreeSchema.optional(),
 });
 export type TableSchema = z.output<typeof tableSchemaSchema>;
 

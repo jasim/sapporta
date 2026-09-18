@@ -19,11 +19,35 @@ import type { QueryParamValue } from "../query-params.js";
 export const rowSchema = z.record(z.string(), z.unknown());
 export type Row = z.output<typeof rowSchema>;
 
+/**
+ * What a filtered or searched tree table keeps besides the matching rows (see
+ * `TableSchema.tree`).
+ *
+ * - `"ancestors"`: each match's ancestors, so the match shows in place.
+ * - `"ancestors-and-descendants"`: the ancestors, and every descendant of a
+ *   match, so a matching parent shows its whole subtree.
+ */
+export const treeMatchContextSchema = z.enum([
+  "ancestors",
+  "ancestors-and-descendants",
+]);
+export type TreeMatchContext = z.output<typeof treeMatchContextSchema>;
+
+/** Present on a tree list response when a filter or search was applied. */
+export const listTreeMetaSchema = z.object({
+  /** Rows that matched the filter and search themselves. */
+  matchCount: z.number(),
+  /** Ancestors returned only because a descendant matched. */
+  contextIds: z.array(z.string()),
+});
+export type ListTreeMeta = z.output<typeof listTreeMetaSchema>;
+
 export const listMetaSchema = z.object({
   total: z.number(),
   page: z.number(),
   limit: z.number(),
   pages: z.number(),
+  tree: listTreeMetaSchema.optional(),
 });
 export type ListMeta = z.output<typeof listMetaSchema>;
 
@@ -84,10 +108,26 @@ export const exportRowsQuerySchema = z
   .catchall(filterQueryValueSchema);
 export type ExportRowsQuery = z.output<typeof exportRowsQuerySchema>;
 
-/** Query shape for the paged row-listing endpoint. */
+/**
+ * Query shape for the paged row-listing endpoint.
+ *
+ * Besides `filter[col][op]` keys, a list read accepts `fixed[col][op]` keys in
+ * the same grammar (see `FilterNamespace`). Every returned row satisfies the
+ * fixed conditions. `filter` and `q` select the matching rows among them. On
+ * a flat read the two only combine. On a tree read they differ: the ancestors
+ * and descendants returned around each match must also satisfy the fixed
+ * conditions. For example, a page that lists only unarchived accounts sends
+ * `fixed[archived][eq]=false`, so a search never brings back an archived
+ * child of a matching account.
+ */
 export const listRowsQuerySchema = z
   .object({
     ...rowSelectionQueryShape,
+    /** On a tree table, return each row that matches `filter` and `q` with
+     *  its ancestors (and, for `ancestors-and-descendants`, its descendants).
+     *  Without a filter or search, every row that satisfies the fixed
+     *  conditions is returned. */
+    tree: treeMatchContextSchema.optional(),
     page: z.coerce
       .number<string>()
       .int()

@@ -6,6 +6,9 @@
  *
  *     filter[col][op]=value
  *
+ * The same grammar can also be written under a second key prefix, as
+ * `fixed[col][op]=value` (see `FilterNamespace`).
+ *
  * `in`/`nin` pass comma-separated values. `is` carries the literal string
  * "null" or "notnull". Everything else is a single string.
  *
@@ -96,9 +99,21 @@ export type FilterDraftCondition =
   | { column: string; op: ListOp; values: readonly FilterDraftValue[] }
   | { column: string; op: NullOp; polarity: Polarity };
 
-/** Wire-format key for a column+op pair: `filter[col][op]`. */
-export function wireKey(column: string, op: Operator): string {
-  return `filter[${column}][${op}]`;
+/**
+ * The query-string prefix a list of conditions is written under:
+ * `filter[col][op]` or `fixed[col][op]`. The grammar is the same under both
+ * prefixes, so one query string can carry two separate lists. An endpoint
+ * that reads both lists decides what each one means.
+ */
+export type FilterNamespace = "filter" | "fixed";
+
+/** Wire-format key for a column+op pair, such as `filter[col][op]`. */
+export function wireKey(
+  column: string,
+  op: Operator,
+  namespace: FilterNamespace = "filter",
+): string {
+  return `${namespace}[${column}][${op}]`;
 }
 
 // ── Typed layer ──────────────────────────────────────────────────────────
@@ -414,10 +429,14 @@ export function encodeFilterValue(cond: FilterCondition): string {
  */
 export function encodeFilters(
   filters: readonly FilterCondition[],
+  namespace: FilterNamespace = "filter",
 ): URLSearchParams {
   const params = new URLSearchParams();
   for (const cond of filters) {
-    params.append(wireKey(cond.column, cond.op), encodeFilterValue(cond));
+    params.append(
+      wireKey(cond.column, cond.op, namespace),
+      encodeFilterValue(cond),
+    );
   }
   return params;
 }
@@ -425,8 +444,9 @@ export function encodeFilters(
 /** Edge adapter for URL/API calls that already carry typed conditions. */
 export function encodeTypedFilters(
   filters: readonly TypedFilterCondition[],
+  namespace: FilterNamespace = "filter",
 ): URLSearchParams {
-  return encodeFilters(filters.map(encodeTypedCondition));
+  return encodeFilters(filters.map(encodeTypedCondition), namespace);
 }
 
 /** Closed taxonomy of grammar-level parse failures. These mirror the
@@ -447,14 +467,17 @@ export class FilterParseError extends Error {
   }
 }
 
-const FILTER_PREFIX = "filter[";
-const FILTER_KEY_RE = /^filter\[([^\]]+)\]\[([^\]]+)\]$/;
+const FILTER_KEY_RE: Readonly<Record<FilterNamespace, RegExp>> = {
+  filter: /^filter\[([^\]]+)\]\[([^\]]+)\]$/,
+  fixed: /^fixed\[([^\]]+)\]\[([^\]]+)\]$/,
+};
 
 /**
  * Parse filter entries out of a query-string source into a list of
- * conditions. Non-filter params are silently ignored. Any key that begins
- * with `filter[` but doesn't match the two-bracket shape is a grammar
- * error, not a silent skip — typos shouldn't widen the result set.
+ * conditions. Only keys in `namespace` are read; other params are silently
+ * ignored. Any key that begins with `filter[` (or `fixed[`) but doesn't match
+ * the two-bracket shape is a grammar error, not a silent skip — typos
+ * shouldn't widen the result set.
  *
  * Accepts either `URLSearchParams` (browser side) or the lossless query
  * record used at the server boundary. Repeated record values are decoded as
@@ -462,15 +485,17 @@ const FILTER_KEY_RE = /^filter\[([^\]]+)\]\[([^\]]+)\]$/;
  */
 export function decodeFilters(
   source: URLSearchParams | Readonly<QueryParamRecord>,
+  namespace: FilterNamespace = "filter",
 ): FilterCondition[] {
+  const prefix = `${namespace}[`;
   const out: FilterCondition[] = [];
-  for (const [key, value] of filterQueryEntries(source)) {
-    if (!key.startsWith(FILTER_PREFIX)) continue;
-    const m = FILTER_KEY_RE.exec(key);
+  for (const [key, value] of filterQueryEntries(source, prefix)) {
+    if (!key.startsWith(prefix)) continue;
+    const m = FILTER_KEY_RE[namespace].exec(key);
     if (!m) {
       throw new FilterParseError(
         "unknown_filter_shape",
-        `Filter ${JSON.stringify(key)} must use filter[col][op]=value syntax`,
+        `Filter ${JSON.stringify(key)} must use ${namespace}[col][op]=value syntax`,
       );
     }
     const [, column, op] = m;
@@ -480,13 +505,14 @@ export function decodeFilters(
         `Unknown filter operator "${op}" on column "${column}"`,
       );
     }
-    out.push(parseCondition(column, op, value));
+    out.push(parseCondition(column, op, value, namespace));
   }
   return out;
 }
 
 function* filterQueryEntries(
   source: URLSearchParams | Readonly<QueryParamRecord>,
+  prefix: string,
 ): IterableIterator<[string, string]> {
   if (source instanceof URLSearchParams) {
     yield* source;
@@ -498,7 +524,7 @@ function* filterQueryEntries(
       yield [key, value];
       continue;
     }
-    if (value.length === 0 && key.startsWith(FILTER_PREFIX)) {
+    if (value.length === 0 && key.startsWith(prefix)) {
       throw new FilterParseError(
         "bad_value",
         `Filter ${JSON.stringify(key)} requires at least one value`,
@@ -512,20 +538,21 @@ function parseCondition(
   column: string,
   op: Operator,
   raw: string,
+  namespace: FilterNamespace,
 ): FilterCondition {
   const id = mintFilterId(column, op);
   if (isListOp(op)) {
     if (raw === "") {
       throw new FilterParseError(
         "bad_value",
-        `filter[${column}][${op}] requires at least one value`,
+        `${wireKey(column, op, namespace)} requires at least one value`,
       );
     }
     const values = raw.split(",");
     if (values.some((v) => v === "")) {
       throw new FilterParseError(
         "bad_value",
-        `filter[${column}][${op}] has an empty item in CSV list`,
+        `${wireKey(column, op, namespace)} has an empty item in CSV list`,
       );
     }
     return { id, column, op, values };
@@ -534,7 +561,7 @@ function parseCondition(
     if (raw !== "null" && raw !== "notnull") {
       throw new FilterParseError(
         "bad_value",
-        `filter[${column}][is] must be "null" or "notnull", got ${JSON.stringify(raw)}`,
+        `${wireKey(column, op, namespace)} must be "null" or "notnull", got ${JSON.stringify(raw)}`,
       );
     }
     return { id, column, op, polarity: raw };

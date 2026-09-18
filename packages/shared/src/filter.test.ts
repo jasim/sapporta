@@ -397,6 +397,30 @@ describe("encodeFilters → decodeFilters → parseFilters round-trip", () => {
     ]);
   });
 
+  it("keeps the fixed and filter namespaces apart", () => {
+    const params = encodeFilters(
+      [{ id: "a", column: "archived", op: "eq", value: "false" }],
+      "fixed",
+    );
+    for (const [key, value] of encodeFilters([
+      { id: "b", column: "name", op: "contains", value: "tax" },
+    ])) {
+      params.append(key, value);
+    }
+    expect(params.toString()).toBe(
+      "fixed%5Barchived%5D%5Beq%5D=false&filter%5Bname%5D%5Bcontains%5D=tax",
+    );
+    expect(decodeFilters(params, "fixed")).toMatchObject([
+      { column: "archived", op: "eq", value: "false" },
+    ]);
+    expect(decodeFilters(params)).toMatchObject([
+      { column: "name", op: "contains", value: "tax" },
+    ]);
+    expect(() =>
+      decodeFilters({ "fixed[archived]": "false" }, "fixed"),
+    ).toThrow(/fixed\[col\]\[op\]=value/);
+  });
+
   it("preserves wildcard characters through URL encoding (contains)", () => {
     // User-supplied `%` must survive the URL round-trip as a literal — the
     // LIKE-escape step happens downstream in buildFilterSql.

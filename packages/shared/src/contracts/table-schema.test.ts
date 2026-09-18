@@ -11,6 +11,7 @@ import {
   MAX_LOOKUP_LIMIT,
   MAX_PAGE,
   MAX_PAGE_SIZE,
+  listMetaSchema,
   listRowsQuerySchema,
   type ListRowsQuery,
 } from "./table-schema.js";
@@ -165,5 +166,15 @@ describe("table query contracts", () => {
 
   it("rejects repeated singleton fields", () => {
     expect(() => listRowsQuerySchema.parse({ page: ["1", "2"] })).toThrow();
+  });
+
+  it("keeps tree results in the list metadata", () => {
+    const meta = { total: 3, page: 1, limit: 1000, pages: 1 };
+    const tree = { matchCount: 1, contextIds: ["4", "5"] };
+    expect(listMetaSchema.parse({ ...meta, tree }).tree).toEqual(tree);
+    expect(listMetaSchema.parse(meta).tree).toBeUndefined();
+    expect(
+      listRowsQuerySchema.parse({ tree: "ancestors", "filter[name][eq]": "x" }),
+    ).toMatchObject({ tree: "ancestors", "filter[name][eq]": "x" });
   });
 });
