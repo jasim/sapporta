@@ -5,10 +5,12 @@ import type {
   TableSchema,
 } from "@sapporta/shared/contracts";
 import {
-  eqCondition,
-  parseFilterForTable,
+  mintFilterId,
+  parseFilterValue,
   parseFiltersForTable,
+  serializeTypedValue,
   type TypedFilterCondition,
+  type TypedValue,
 } from "@sapporta/shared/filter";
 import {
   CELL_GRID_WITH_ROW_CLICK_ACTIVATION,
@@ -383,9 +385,10 @@ function makeEndpointFactory(args: {
     (() => TGridSessionContext<TGridRowsByLevel, unknown>) | undefined;
 }): RestEndpointFactory<TGridFilter> {
   return (ctx) => {
-    // Expanded child rows are always filtered to the parent row that opened them.
-    const parentRowKey = args.parent
-      ? parentKeyFor(args.levelId, args.parent.parentLevelId, ctx.ancestors)
+    // Expanded child rows belong to the parent row that opened them. A fetch
+    // filters on the parent's key, and a new child row is saved with it.
+    const parentKey = args.parent
+      ? parentKeyFor(args.levelId, args.parent, args.table, ctx.ancestors)
       : null;
     // A REST level receives two independent pieces:
     //
@@ -404,11 +407,14 @@ function makeEndpointFactory(args: {
         : sourceOwnedRowQuery<TGridFilter>(
             initialSourceOwnedQuery(args.queryConfig, args.parent, args.table),
           );
-    const parentConstraint = args.parent
-      ? parseFilterForTable(
-          eqCondition(args.parent.foreignKey, String(parentRowKey)),
-          args.table,
-        )
+    const parentConstraint: TypedFilterCondition | null = parentKey
+      ? {
+          id: mintFilterId(parentKey.column.name, "eq"),
+          column: parentKey.column.name,
+          op: "eq",
+          kind: parentKey.column.kind,
+          value: parentKey.value,
+        }
       : null;
     const buildRowsRequest = buildTGridRowsRequest({
       fixedFilters: parseFiltersForTable(
@@ -472,8 +478,11 @@ function makeEndpointFactory(args: {
       },
       insertNode: async (req) => {
         // Creating a child row should attach it to the expanded parent row.
-        const columns = args.parent
-          ? { ...req.node.columns, [args.parent.foreignKey]: parentRowKey }
+        const columns = parentKey
+          ? {
+              ...req.node.columns,
+              [parentKey.column.name]: serializeTypedValue(parentKey.value),
+            }
           : { ...req.node.columns };
         const result = await args.rowsClient.create(args.table.name, columns);
         const row = Array.isArray(result.data) ? result.data[0] : result.data;
@@ -607,23 +616,40 @@ function tableTreeNode(
   };
 }
 
+// The key of the parent row that opened a child level, typed for the child's
+// foreign key column.
+//
+// The ancestor chain holds the parent's row key as a string, such as "7". The
+// foreign key column holds the same key as the child table types it, such as
+// the number 7, and the server rejects a string for a number column. The key
+// is therefore parsed here, under the column's kind, and both the parent-row
+// filter and a new child row use the parsed value.
 function parentKeyFor(
   levelId: string,
-  parentLevelId: string,
+  parent: { parentLevelId: string; foreignKey: TableColumnName },
+  table: TableSchema,
   ancestors: Parameters<RestEndpointFactory<TGridFilter>>[0]["ancestors"],
-): string {
-  const parent = ancestors[ancestors.length - 1];
-  if (!parent) {
+): { column: TableColumnSchema; value: TypedValue } {
+  const parentRow = ancestors[ancestors.length - 1];
+  if (!parentRow) {
     throw new Error(
       `compileTGridRuntimeConfig: child level '${levelId}' requires a parent ancestor`,
     );
   }
-  if (parent.levelName !== parentLevelId) {
+  if (parentRow.levelName !== parent.parentLevelId) {
     throw new Error(
-      `compileTGridRuntimeConfig: child level '${levelId}' expected parent level '${parentLevelId}', got '${parent.levelName}'`,
+      `compileTGridRuntimeConfig: child level '${levelId}' expected parent level '${parent.parentLevelId}', got '${parentRow.levelName}'`,
     );
   }
-  return parent.rowKey;
+  const column = table.columns.find(
+    (candidate) => candidate.name === parent.foreignKey,
+  );
+  if (!column) {
+    throw new Error(
+      `compileTGridRuntimeConfig: child level '${levelId}' foreign key '${parent.foreignKey}' is not a column of table '${table.name}'`,
+    );
+  }
+  return { column, value: parseFilterValue(column.kind, parentRow.rowKey) };
 }
 
 function pathForEndpoint(

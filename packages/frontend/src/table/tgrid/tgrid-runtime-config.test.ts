@@ -26,8 +26,9 @@ import {
   CELL_GRID_WITH_INDEPENDENT_ROW_SELECTION,
   ExpandableCellFrame,
   inMemoryGridDataSource,
+  restGridDataSource,
 } from "@sapporta/grid";
-import { makeRowId, rootPath } from "@sapporta/grid";
+import { childPath, makeRowId, rootPath } from "@sapporta/grid";
 import { preset } from "@sapporta/grid/column-preset";
 import {
   StaticSearchLookup,
@@ -1221,13 +1222,50 @@ describe("compileTGridRuntimeConfig", () => {
 
     expect(create).toHaveBeenCalledWith("lines", {
       sku: "A",
-      order_id: "7",
+      order_id: 7,
     });
     expect(inserted).toEqual({
       rowKey: "99",
       levelName: "orders.lines",
-      columns: { id: 99, sku: "A", order_id: "7" },
+      columns: { id: 99, sku: "A", order_id: 7 },
     });
+  });
+
+  it("a draft committed under an expanded parent saves the parent's key as the foreign key column types it", async () => {
+    // The row key "7" comes from the fetched order's number id. The server
+    // rejects `order_id: "7"` because `order_id` is a number column.
+    const fetch = vi.fn<TableRowsClient["fetch"]>(async ({ tableName }) => {
+      const data = tableName === "orders" ? [{ id: 7, customer: "ACME" }] : [];
+      return {
+        data,
+        meta: { total: data.length, page: 1, limit: 25, pages: 1 },
+      };
+    });
+    const create = vi.fn(async (_table: string, data: Row) => ({
+      data: { id: 99, ...data },
+    }));
+    const config = build({ fetch, create });
+    const runtime = createGridRuntime({
+      schema: config.gridSchema,
+      interaction: CELL_GRID_WITH_INDEPENDENT_ROW_SELECTION,
+      dataSource: restGridDataSource({
+        schema: config.gridSchema,
+        endpoints: config.endpointFactoriesByLevel,
+      }),
+    });
+    await vi.waitFor(() =>
+      expect(runtime.root.data.state().status).toBe("ready"),
+    );
+
+    const ordersPath = rootPath("orders");
+    runtime.root.expand(makeRowId(ordersPath, "7"));
+    const lines = runtime.level(childPath(ordersPath, "7", "orders.lines"));
+    await vi.waitFor(() => expect(lines.data.state().status).toBe("ready"));
+    lines.drafts.add("draft-line", { sku: "A" });
+    await lines.drafts.commit("draft-line");
+
+    expect(create).toHaveBeenCalledWith("lines", { sku: "A", order_id: 7 });
+    runtime.dispose();
   });
 
   it("uses typed column specs for ordering, client columns, and custom cell writes", async () => {
