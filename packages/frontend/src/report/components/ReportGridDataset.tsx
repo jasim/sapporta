@@ -13,9 +13,12 @@ import {
   rootPath,
   rowExpansionActivation,
   trailingEdge,
+  treeExpansionActivation,
   treeNodeForRow,
   useGridRuntimeEffect,
+  validateLevelTree,
   withRowExpansionColumn,
+  withTreeColumn,
   type CellActivation,
   type CellActivationContext,
   type CellActivationGesture,
@@ -41,6 +44,8 @@ import {
 import type { LinkIcon } from "@sapporta/shared/contracts";
 import {
   gridDatasetLinkProblems,
+  gridDatasetTreeColumn,
+  gridDatasetTreeProblems,
   type GridDataset,
   type GridDatasetColumn,
   type GridDatasetNode,
@@ -79,6 +84,12 @@ export type ReportCellLinkContext<TInput = unknown> = {
   node: TreeNode;
   levelName: string;
   input: TInput | undefined;
+  /**
+   * The rows this row is nested under through `childLevels`, outermost
+   * first. On a tree level, the row's tree parents are rows of the same
+   * level and are not included; read the parent's `rowKey` from the level's
+   * `tree.parentColumn` value in `node.columns`.
+   */
   ancestors: GridDatasetNode[];
   column: GridDatasetColumn;
   value: unknown;
@@ -317,13 +328,17 @@ function buildReportGridDatasetModel<TInput>(
   dataSource: ReturnType<typeof inMemoryGridDataSource>;
 } {
   // Binding is the first time the framework sees an app-built dataset, so
-  // ill-formed declarative links fail loudly here — the counterpart of the
-  // boot-time check on table-declared links. Left unchecked, a bind naming
-  // a missing column would just never resolve, indistinguishable from rows
-  // that legitimately lack the value.
-  const linkProblems = gridDatasetLinkProblems(dataset);
-  if (linkProblems.length > 0) {
-    throw new Error(linkProblems.join("\n"));
+  // ill-formed declarative links and tree columns fail loudly here — the
+  // counterpart of the boot-time check on table-declared links. Left
+  // unchecked, a bind naming a missing column would just never resolve,
+  // indistinguishable from rows that legitimately lack the value, and a
+  // misnamed parent column would show a tree as a flat list.
+  const problems = [
+    ...gridDatasetLinkProblems(dataset),
+    ...gridDatasetTreeProblems(dataset),
+  ];
+  if (problems.length > 0) {
+    throw new Error(problems.join("\n"));
   }
 
   const levels: Record<string, LevelSchema> = {};
@@ -334,21 +349,32 @@ function buildReportGridDatasetModel<TInput>(
     const visible = level.columns.filter(
       (column) => column.visuallyHidden !== true,
     );
-    const expansionControlColumnId =
-      level.childLevels.length > 0 ? (visible[0]?.id ?? null) : null;
+    // A tree level shows its hierarchy in the tree column. Any other level
+    // with child levels puts their expand control in its first column.
+    const treeColumnId = gridDatasetTreeColumn(level);
+    const expansion =
+      treeColumnId !== null
+        ? { columnId: treeColumnId, control: TREE_EXPANSION }
+        : level.childLevels.length > 0 && visible[0]
+          ? { columnId: visible[0].id, control: CHILD_LEVEL_EXPANSION }
+          : null;
     // The cards presentation leads each card with a title column. A report
-    // level has no rowLabelColumns naming the row's identity, so the first
-    // visible text column — the label a report row conventionally leads
-    // with — takes the role. Levels with no text column render all-labeled
-    // fields and no heading.
+    // level has no rowLabelColumns naming the row's identity. On a tree
+    // level, the tree column is the title, so a tree card indents its
+    // title. On any other level, the first visible text column — the label
+    // a report row conventionally leads with — is the title, and a level
+    // with no text column renders all-labeled fields and no heading.
     const cardTitleColumnId =
-      visible.find((column) => column.kind === "text")?.id ?? null;
+      treeColumnId ??
+      visible.find((column) => column.kind === "text")?.id ??
+      null;
     const columns = visible.map((column) =>
       gridColumnForDatasetColumn({
         dataset,
         levelName,
         column,
-        isExpansionControlColumn: column.id === expansionControlColumnId,
+        expansionControl:
+          column.id === expansion?.columnId ? expansion.control : null,
         isCardTitleColumn: column.id === cardTitleColumnId,
         links,
         input,
@@ -365,7 +391,22 @@ function buildReportGridDatasetModel<TInput>(
         defaultCollapsed: level.defaultCollapsed,
       },
       childLevels: [...level.childLevels],
+      ...(level.tree
+        ? {
+            tree: {
+              parentKeyField: level.tree.parentColumn,
+              defaultExpanded: level.defaultCollapsed !== true,
+            },
+          }
+        : {}),
     };
+    // The grid rejects a tree level that also declares child levels. Check
+    // here so the error names the dataset.
+    validateLevelTree(
+      levelName,
+      levels[levelName],
+      `Dataset "${dataset.name}"`,
+    );
     sourceLevels[levelName] = {
       sortMode: "client",
       filterMode: "none",
@@ -434,11 +475,36 @@ function expandNodesAtPath({
   }
 }
 
+/**
+ * The expand control a report column draws: on a level with child levels it
+ * opens a row's nested grids, and on a tree level it shows a tree row's
+ * children. Either way, Space and the chevron toggle the row.
+ */
+type ReportExpansionControl = {
+  /** Wraps the column so it draws the expand control. */
+  readonly wrapColumn: (
+    column: ColumnSchema,
+    options?: { activation?: CellActivation },
+  ) => ColumnSchema;
+  /** The cell action that expands and collapses the row. */
+  readonly activation: () => CellActivation;
+};
+
+const CHILD_LEVEL_EXPANSION: ReportExpansionControl = {
+  wrapColumn: withRowExpansionColumn,
+  activation: rowExpansionActivation,
+};
+
+const TREE_EXPANSION: ReportExpansionControl = {
+  wrapColumn: withTreeColumn,
+  activation: treeExpansionActivation,
+};
+
 function gridColumnForDatasetColumn<TInput>({
   dataset,
   levelName,
   column,
-  isExpansionControlColumn,
+  expansionControl,
   isCardTitleColumn,
   links,
   input,
@@ -448,7 +514,7 @@ function gridColumnForDatasetColumn<TInput>({
   dataset: GridDataset;
   levelName: string;
   column: GridDatasetColumn;
-  isExpansionControlColumn: boolean;
+  expansionControl: ReportExpansionControl | null;
   isCardTitleColumn: boolean;
   links: ReportCellLinkResolvers<TInput> | undefined;
   input: TInput | undefined;
@@ -527,18 +593,18 @@ function gridColumnForDatasetColumn<TInput>({
     column,
   });
   if (!activatesPrimaryLink) {
-    return isExpansionControlColumn
-      ? withRowExpansionColumn(columnWithLinks)
+    return expansionControl
+      ? expansionControl.wrapColumn(columnWithLinks)
       : columnWithLinks;
   }
 
   const activation = reportCellPrimaryLinkActivation({
-    activatesExpansion: isExpansionControlColumn,
+    expansion: expansionControl?.activation() ?? null,
     linkCache,
   });
 
-  return isExpansionControlColumn
-    ? withRowExpansionColumn(columnWithLinks, { activation })
+  return expansionControl
+    ? expansionControl.wrapColumn(columnWithLinks, { activation })
     : { ...columnWithLinks, activation };
 }
 
@@ -756,31 +822,32 @@ function asResolvedLink(link: ReportCellLink | ResolvedLink): ResolvedLink {
   };
 }
 
+/**
+ * Enter opens the cell's primary link. In the column that draws a row's
+ * expand control, Space and the chevron run `expansion` instead, and Enter
+ * runs it on a row whose cell resolves no link.
+ */
 function reportCellPrimaryLinkActivation({
-  activatesExpansion,
+  expansion,
   linkCache,
 }: {
-  activatesExpansion: boolean;
+  expansion: CellActivation | null;
   linkCache: ReportCellLinkCache;
 }): CellActivation {
   const startsOn: CellActivationGesture[] = ["enter"];
-  if (activatesExpansion) startsOn.push("space");
-
-  const expansionActivation = activatesExpansion
-    ? rowExpansionActivation({ startsOn: ["space"] })
-    : null;
+  if (expansion) startsOn.push("space");
 
   return {
     startsOn,
     describe: (context) => {
-      if (expansionActivation && isReportExpansionTrigger(context.trigger)) {
-        return describeCellActivation(expansionActivation, context);
+      if (expansion && isReportExpansionTrigger(context.trigger)) {
+        return describeCellActivation(expansion, context);
       }
 
       const link = primaryCellActivationLink(linkCache, context);
       if (link) return { label: link.label, availability: { kind: "enabled" } };
-      if (expansionActivation) {
-        return describeCellActivation(expansionActivation, context);
+      if (expansion) {
+        return describeCellActivation(expansion, context);
       }
       return {
         label: "Open link",
@@ -791,8 +858,8 @@ function reportCellPrimaryLinkActivation({
       };
     },
     run: (context) => {
-      if (expansionActivation && isReportExpansionTrigger(context.trigger)) {
-        expansionActivation.run(context);
+      if (expansion && isReportExpansionTrigger(context.trigger)) {
+        expansion.run(context);
         return;
       }
 
@@ -801,7 +868,7 @@ function reportCellPrimaryLinkActivation({
         openReportCellLink(link);
         return;
       }
-      expansionActivation?.run(context);
+      expansion?.run(context);
     },
   } satisfies CellActivation;
 }

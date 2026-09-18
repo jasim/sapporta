@@ -102,3 +102,77 @@ function OrdersGrid({ session }: { session: TGridSession<OrdersRows> }) {
 `TGridSession.activeRow()` and `TGridSession.subscribeActiveRow()` provide the
 same typed state outside React. `TGridSession.onRowActivate()` provides the
 framework-neutral row-activation event adapter.
+
+## Report trees
+
+`ReportGridDataset` from `@sapporta/frontend/report` shows a `GridDataset`
+level that declares `tree` as one tree under one header. For example, an
+expense report can show accounts that name their parent account in
+`parent_id`:
+
+```tsx
+import { ReportGridDataset } from "@sapporta/frontend/report";
+import type { GridDataset } from "@sapporta/shared/grid-dataset";
+
+const expenses: GridDataset = {
+  name: "expense-breakdown",
+  label: "Expense breakdown",
+  rootLevel: "account",
+  levels: {
+    account: {
+      columns: [
+        {
+          id: "parent_id",
+          label: "Parent",
+          kind: "number",
+          visuallyHidden: true,
+        },
+        { id: "name", label: "Account", kind: "text" },
+        {
+          id: "amount",
+          label: "Amount",
+          kind: "number",
+          displayFormat: "currency",
+        },
+      ],
+      childLevels: [],
+      tree: { parentColumn: "parent_id" },
+    },
+  },
+  nodes: [
+    {
+      rowKey: "1",
+      levelName: "account",
+      columns: { parent_id: null, name: "Office", amount: 400 },
+    },
+    {
+      rowKey: "2",
+      levelName: "account",
+      columns: { parent_id: 1, name: "Rent", amount: 300 },
+    },
+    {
+      rowKey: "3",
+      levelName: "account",
+      columns: { parent_id: 1, name: "Supplies", amount: 100 },
+    },
+  ],
+  footerRows: [
+    { rowKey: "total", columns: { name: "Total expenses", amount: 400 } },
+  ],
+};
+
+export function ExpenseBreakdown() {
+  return <ReportGridDataset dataset={expenses} />;
+}
+```
+
+Each row is indented by its depth in the tree column, which is the first
+visible text column unless `tree.column` names another one. A row with
+children has a chevron. Enter opens the cell's link, and Space or the chevron
+expands or collapses the row. Rows start expanded; `defaultCollapsed: true` on
+the level starts them collapsed. The renderer does not add up amounts, so the
+dataset carries each parent row's total.
+
+`ReportCellLinkContext.ancestors` holds the rows of enclosing levels only. A
+link resolver on a tree row reads its parent's key from the row's own
+`parent_id` value.
