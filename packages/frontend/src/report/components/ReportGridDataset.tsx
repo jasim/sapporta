@@ -387,9 +387,7 @@ function buildReportGridDatasetModel<TInput>(
       name: level.label ?? levelName,
       columns,
       rowHeaderColumn: "none",
-      options: {
-        defaultCollapsed: level.defaultCollapsed,
-      },
+      options: {},
       childLevels: [...level.childLevels],
       ...(level.tree
         ? {

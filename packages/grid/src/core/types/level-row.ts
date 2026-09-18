@@ -50,7 +50,6 @@ export type PhantomRowsConfig =
     };
 
 export type LevelOptions = {
-  readonly defaultCollapsed?: boolean;
   readonly allowPhantoms?: boolean;
 };
 
