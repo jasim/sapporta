@@ -12,6 +12,18 @@ export type TGridRouteQuerySeed = Partial<{
   search: string | null;
 }>;
 
+// Tree levels only: what the last load returned.
+export type TGridTreeResult = {
+  // Rows that matched the search or filters themselves; `null` when neither
+  // is active.
+  matchCount: number | null;
+  // Rows the last load returned.
+  loadedRowCount: number;
+  // The table has more rows than one load returns, so the tree may be
+  // missing rows.
+  truncated: boolean;
+};
+
 export type TGridLevelQueryState<
   RowShape extends TGridTableRow = TGridTableRow,
 > = {
@@ -22,6 +34,8 @@ export type TGridLevelQueryState<
   page: number;
   pageSize: number;
   totalCount: number | null;
+  // `null` until a tree level loads, and always `null` for a flat level.
+  treeResult: TGridTreeResult | null;
   errorBanner: string | null;
 
   // Source-facing setters. These mutate query state and return whether the
@@ -32,6 +46,7 @@ export type TGridLevelQueryState<
   setFilterState: (filter: TGridFilter | undefined) => "changed" | "unchanged";
   setPageState: (page: number, pageSize: number) => "changed" | "unchanged";
   setTotalCount: (totalCount: number | null) => void;
+  setTreeResult: (result: TGridTreeResult | null) => void;
 
   // UI-facing commands for root-level table controls. These commands route
   // through the source and then sync application-visible state such as the URL.

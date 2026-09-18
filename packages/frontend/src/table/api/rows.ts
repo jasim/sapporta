@@ -1,5 +1,10 @@
 import { uiClient } from "../../platform/client";
-import type { PaginatedRows, Row, SingleRow } from "@sapporta/shared/contracts";
+import type {
+  PaginatedRows,
+  Row,
+  SingleRow,
+  TreeMatchContext,
+} from "@sapporta/shared/contracts";
 import { stringifySortOrder } from "@sapporta/grid";
 import type { SortDescriptor } from "@sapporta/grid";
 import {
@@ -23,6 +28,15 @@ export interface FetchTableRowsParams {
   sort?: SortDescriptor[];
   filters?: readonly TypedFilterCondition[];
   search?: string;
+  // Conditions every returned row satisfies, such as a child level's parent
+  // key or a page's fixed filters. `filters` and `search` select the matches
+  // among those rows; on a tree read, the ancestors and descendants kept
+  // around the matches must satisfy them too.
+  fixed?: readonly TypedFilterCondition[];
+  // On a tree table, return each match with its ancestors (and, for
+  // "ancestors-and-descendants", its descendants). The response then carries
+  // `meta.tree` when a filter or search selected matches.
+  tree?: TreeMatchContext;
 }
 
 export type TableRowsSelectionParams = Pick<
@@ -48,13 +62,20 @@ export function buildTableSelectionQuery(
   return out;
 }
 
-/** Add pagination to a table selection for the paged rows endpoint. */
+/** Add the fixed conditions, pagination, and tree mode to a table selection
+ *  for the paged rows endpoint. */
 export function buildTableRowsQuery(
   params: Omit<FetchTableRowsParams, "tableName">,
 ): QueryParamRecord {
   const out = buildTableSelectionQuery(params);
+  if (params.fixed) {
+    for (const [key, value] of encodeTypedFilters(params.fixed, "fixed")) {
+      appendQueryParam(out, key, value);
+    }
+  }
   if (params.page) out.page = String(params.page);
   if (params.limit) out.limit = String(params.limit);
+  if (params.tree) out.tree = params.tree;
   return out;
 }
 

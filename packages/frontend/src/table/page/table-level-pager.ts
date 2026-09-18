@@ -24,9 +24,14 @@ export function useTableLevelPager<
   const status = useTGridSourceStatus(session);
   const page = useStore(store, (state) => state.page);
   const pageSize = useStore(store, (state) => state.pageSize);
+  // A level that reads all its rows has one page, even when the table holds
+  // more rows than one read returns.
+  const readsAllRows = session.levelInfoById[level].pagination === "all";
   const pages =
     status.totalCount > 0
-      ? Math.max(1, Math.ceil(status.totalCount / pageSize))
+      ? readsAllRows
+        ? 1
+        : Math.max(1, Math.ceil(status.totalCount / pageSize))
       : 0;
 
   return {

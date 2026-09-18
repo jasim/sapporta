@@ -4,6 +4,7 @@ import type { LevelSnapshot, LevelSourceState } from "@sapporta/grid";
 import { ApiError } from "@sapporta/shared/client";
 import type { TGridRowsByLevel } from "./tgrid-types";
 import type { TGridSession } from "./tgrid-session";
+import type { TGridTreeResult } from "./tgrid-level-query-state";
 
 // Small status snapshot for page chrome.
 // It is intentionally separate from row rendering so a loading spinner,
@@ -13,6 +14,9 @@ export type TGridSourceStatus = {
   status: LevelSourceState["status"];
   error: unknown;
   totalCount: number;
+  // Tree levels only: the matches of an active search or filter, and whether
+  // the tree is missing rows. `null` for a flat level or before a load.
+  treeResult: TGridTreeResult | null;
 };
 
 export function useTGridSourceStateField<
@@ -57,7 +61,8 @@ export function useTGridSourceStatus<
     session.queryStore,
     (state) => state.totalCount ?? 0,
   );
-  return { status, error, totalCount };
+  const treeResult = useStore(session.queryStore, (state) => state.treeResult);
+  return { status, error, totalCount, treeResult };
 }
 
 // Turn a failed row request into text that can be shown near the table.

@@ -1,5 +1,9 @@
 import type { RowHeaderColumn, SortDescriptor } from "@sapporta/grid";
-import type { ChildSchema, TableSchema } from "@sapporta/shared/contracts";
+import type {
+  ChildSchema,
+  TableSchema,
+  TableTree,
+} from "@sapporta/shared/contracts";
 import type { FilterCondition } from "@sapporta/shared/filter";
 import type {
   fetchTableRows,
@@ -46,7 +50,26 @@ export type TGridLevelInfo = {
     foreignKey: TableColumnName;
   };
   childSchemas: ChildSchema[];
+  // Same-table parent/child rows shown as a tree, or `null` for a flat level.
+  // `column` is the column that shows the hierarchy on this level.
+  tree: TableTree | null;
+  // How the level reads its rows. Pagers and URL state follow it.
+  pagination: TGridLevelPagination;
 };
+
+// How a level reads its rows.
+// - `"pages"`: one page at a time, the page its query names.
+// - `"all"`: every row in one request, whatever page its query names. A tree
+//   level reads this way so it can build the whole tree.
+export type TGridLevelPagination = "pages" | "all";
+
+// Same-table parent/child rows for one level, such as accounts with a
+// `parent_id`. Leave it out to follow the table's declared `tree`; pass
+// `false` to show a tree table as a flat list (for example, inside a picker);
+// pass an object to override single fields. A table without a declared tree
+// can opt in by naming `parentColumn`, but a search then returns only the
+// matching rows, because the server walks only declared trees.
+export type TGridLevelTreeConfig = false | Partial<TableTree>;
 
 // Row transport for one level.
 // Override this when a table-like view should read or save rows through a
@@ -83,6 +106,8 @@ export type TGridLevelConfig<
   };
   query?: TGridLevelQueryConfig;
   rowsClient?: TableRowsClient;
+  // A tree level loads all its rows at once and declares no `childLevels`.
+  tree?: TGridLevelTreeConfig;
 };
 
 // Complete table graph keyed by level id.

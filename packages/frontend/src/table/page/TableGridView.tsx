@@ -12,6 +12,7 @@ import { useStore } from "zustand";
 import type { TableSchema } from "@sapporta/shared/contracts";
 import { useTGridSession } from "../tgrid/tgrid-binding";
 import type { TGridDefinition } from "../tgrid/tgrid-runtime-config";
+import { TableTreeNotice } from "./TableTreeNotice";
 import type { TGridLevelId, TGridRowsByLevel } from "../tgrid/tgrid-types";
 import type {
   TGridLoadedRowsBoundaryHandler,
@@ -367,6 +368,11 @@ function TableGridViewWithSession<
       }
       className={className}
     >
+      {rootRowsLoadState.treeResult?.truncated ? (
+        <TableTreeNotice
+          loadedRowCount={rootRowsLoadState.treeResult.loadedRowCount}
+        />
+      ) : null}
       <TGrid
         session={session}
         className={gridClassName}

@@ -37,6 +37,7 @@ import { TableViewOptions, TableViewSwitch } from "./TableViewSwitch";
 import {
   CompactHeaderButton,
   CompactHeaderLink,
+  formatMatchCount,
   formatRecordCount,
   SearchInput,
 } from "./TableHeaderControls";
@@ -55,6 +56,14 @@ type TableDeleteRequest = {
 type TableDeleteControl = {
   count: number;
   onRequest: () => void;
+};
+
+// The number shown beside the table title. A searched or filtered tree shows
+// its matches: the other rows it returns are only the matches' ancestors and
+// subtrees.
+type TableHeaderCount = {
+  value: number;
+  label: string;
 };
 
 export function TableGridHeader<
@@ -82,7 +91,14 @@ export function TableGridHeader<
   const query = useTableLevelQuery(session, level);
   const selection = useTableSelection(session);
   const status = useTGridSourceStatus(session);
-  const totalCount = status.totalCount;
+  const matchCount = status.treeResult?.matchCount ?? null;
+  const count: TableHeaderCount =
+    matchCount === null
+      ? {
+          value: status.totalCount,
+          label: formatRecordCount(status.totalCount),
+        }
+      : { value: matchCount, label: formatMatchCount(matchCount) };
   const [deleteRequest, setDeleteRequest] = useState<TableDeleteRequest | null>(
     null,
   );
@@ -105,7 +121,7 @@ export function TableGridHeader<
     mode === "narrowCards" ? (
       <NarrowCardTableHeader
         table={table}
-        totalCount={totalCount}
+        count={count}
         query={query}
         exportUrl={session.csvExportUrl(level)}
         viewPreference={viewPreference}
@@ -119,7 +135,7 @@ export function TableGridHeader<
     ) : (
       <WideTableHeader
         table={table}
-        totalCount={totalCount}
+        count={count}
         query={query}
         exportUrl={session.csvExportUrl(level)}
         viewPreference={viewPreference}
@@ -150,7 +166,7 @@ function WideTableHeader<
   AppServices = unknown,
 >({
   table,
-  totalCount,
+  count,
   query,
   exportUrl,
   viewPreference,
@@ -162,7 +178,7 @@ function WideTableHeader<
   level,
 }: {
   table: TableSchema;
-  totalCount: number;
+  count: TableHeaderCount;
   query: TableLevelQuery;
   exportUrl: string;
   viewPreference: TableViewPreference;
@@ -179,7 +195,7 @@ function WideTableHeader<
     <>
       <PageHeader
         title={tableLabel}
-        subtitle={formatRecordCount(totalCount)}
+        subtitle={count.label}
         actions={
           <>
             <TableViewSwitch
@@ -247,7 +263,7 @@ function NarrowCardTableHeader<
   AppServices = unknown,
 >({
   table,
-  totalCount,
+  count,
   query,
   exportUrl,
   viewPreference,
@@ -259,7 +275,7 @@ function NarrowCardTableHeader<
   level,
 }: {
   table: TableSchema;
-  totalCount: number;
+  count: TableHeaderCount;
   query: TableLevelQuery;
   exportUrl: string;
   viewPreference: TableViewPreference;
@@ -295,7 +311,7 @@ function NarrowCardTableHeader<
           <div className="min-w-0 flex-1">
             <h1
               className="flex min-w-0 items-baseline gap-1.5 text-sap-body font-bold leading-5 text-sap-fg"
-              aria-label={`${tableLabel}, ${formatRecordCount(totalCount)}`}
+              aria-label={`${tableLabel}, ${count.label}`}
             >
               <span className="min-w-0 truncate">{tableLabel}</span>
               <span className="shrink-0 text-sap-muted" aria-hidden="true">
@@ -305,7 +321,7 @@ function NarrowCardTableHeader<
                 className="mono shrink-0 text-sap-data font-[650] text-sap-muted"
                 aria-hidden="true"
               >
-                {totalCount.toLocaleString()}
+                {count.value.toLocaleString()}
               </span>
             </h1>
           </div>

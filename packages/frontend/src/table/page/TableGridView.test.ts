@@ -111,6 +111,7 @@ const table: TableSchema = {
 
 const definition = {
   rootLevel: "orders",
+  levels: { orders: { table, childLevels: [] } },
 } as unknown as TGridDefinition<RowsByLevel>;
 
 const route = {

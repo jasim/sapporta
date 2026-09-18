@@ -97,7 +97,9 @@ export function buildTableGridGraphFromSchema(args: {
 
     // Child levels are named by their route through the table tree. The name is
     // stable enough for custom column definitions to target a specific level.
-    for (const child of table.children ?? []) {
+    // A tree table expands rows into their child rows of the same table, so
+    // its `children` stay row links instead of becoming child levels.
+    for (const child of table.tree ? [] : (table.children ?? [])) {
       const childLevelId = `${levelId}.${child.table}`;
       childRelations.push({
         childTable: child,

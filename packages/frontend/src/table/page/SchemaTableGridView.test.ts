@@ -399,6 +399,7 @@ describe("SchemaTableGridView", () => {
       );
     const definition = {
       rootLevel: "orders",
+      levels: { orders: { table: ordersTable, childLevels: [] } },
     } as unknown as TGridDefinition<SchemaTableRowsByLevel>;
     const ActualTableGridView = actual.TableGridView<SchemaTableRowsByLevel>;
 
@@ -456,6 +457,7 @@ describe("SchemaTableGridView", () => {
       );
     const definition = {
       rootLevel: "orders",
+      levels: { orders: { table: ordersTable, childLevels: [] } },
     } as unknown as TGridDefinition<SchemaTableRowsByLevel>;
     const onLoadedRowsBoundary = vi.fn(() => false as const);
     const ActualTableGridView = actual.TableGridView<SchemaTableRowsByLevel>;

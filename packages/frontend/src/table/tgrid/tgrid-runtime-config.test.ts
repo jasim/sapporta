@@ -939,13 +939,14 @@ describe("compileTGridRuntimeConfig", () => {
       page: 1,
       limit: 10,
       sort: [{ colId: "line_no", direction: "asc" }],
-      filters: [
+      fixed: [
         expect.objectContaining({
           column: "order_id",
           op: "eq",
           value: 7,
         }),
       ],
+      filters: [],
       search: undefined,
     });
   });
@@ -1005,7 +1006,8 @@ describe("compileTGridRuntimeConfig", () => {
 
     expect(fetch).toHaveBeenCalledWith(
       expect.objectContaining({
-        filters: [typedFixedFilter, typedUserFilter],
+        fixed: [typedFixedFilter],
+        filters: [typedUserFilter],
       }),
     );
   });

@@ -27,8 +27,10 @@ import type { TGridFilter } from "./tgrid-filter";
 import type {
   TGridLevelConfig,
   TGridLevelInfo,
+  TGridLevelPagination,
   TGridLevelsConfigMap,
 } from "./tgrid-level-config";
+import { tgridPageWindow } from "./tgrid-page-window";
 import {
   createTGridColumnMapper,
   type TGridColumnMapper,
@@ -231,22 +233,6 @@ class DefaultTGridSession<
     this.lookupForColumn = (column) => this.lookups.foreignKey(column);
     this.columnMapper = createTGridColumnMapper({ lookups: this.lookups });
 
-    // Levels with visible table controls need query stores so filters, search,
-    // paging, export links, and row fetches all use the same state.
-    for (const [levelId, level] of Object.entries(definition.levels) as Array<
-      [TGridLevelId<RowsByLevel>, TGridLevelConfig<RowsByLevel, AppServices>]
-    >) {
-      if (
-        (level.query?.owner ??
-          (levelId === definition.rootLevel ? "host" : "source")) === "host"
-      ) {
-        this.queryStoresByLevel.set(
-          levelId,
-          this.createQueryStore(levelId, level),
-        );
-      }
-    }
-
     const runtimeConfig = compileTGridRuntimeConfig({
       rootLevel: definition.rootLevel,
       levels: definition.levels,
@@ -257,8 +243,32 @@ class DefaultTGridSession<
           .get(levelId)
           ?.getState()
           .setTotalCount(totalCount),
+      recordTreeResult: (levelId, result) =>
+        this.queryStoresByLevel.get(levelId)?.getState().setTreeResult(result),
       sessionContext: this.currentSessionContext,
     });
+
+    // Levels with visible table controls need query stores so filters, search,
+    // paging, export links, and row fetches all use the same state. The stores
+    // exist before the runtime, whose sources read them. Each store holds its
+    // level to the page window the compiled level reads.
+    for (const [levelId, level] of Object.entries(definition.levels) as Array<
+      [TGridLevelId<RowsByLevel>, TGridLevelConfig<RowsByLevel, AppServices>]
+    >) {
+      if (
+        (level.query?.owner ??
+          (levelId === definition.rootLevel ? "host" : "source")) === "host"
+      ) {
+        this.queryStoresByLevel.set(
+          levelId,
+          this.createQueryStore(
+            levelId,
+            level,
+            runtimeConfig.levelInfoById[levelId].pagination,
+          ),
+        );
+      }
+    }
 
     const dataSource = restGridDataSource<TGridFilter>({
       schema: runtimeConfig.gridSchema,
@@ -538,11 +548,13 @@ class DefaultTGridSession<
   private createQueryStore<LevelId extends TGridLevelId<RowsByLevel>>(
     levelId: LevelId,
     level: TGridLevelConfig<RowsByLevel, AppServices, LevelId>,
+    pagination: TGridLevelPagination,
   ): StoreApi<TGridLevelQueryState<TGridTableRow>> {
     const initial = initialQueryState(
       level.query,
       this.routeQuerySeed(levelId),
       level.table,
+      pagination,
     );
 
     return createStore<TGridLevelQueryState<TGridTableRow>>()((set, get) => ({
@@ -553,6 +565,7 @@ class DefaultTGridSession<
       page: initial.page,
       pageSize: initial.pageSize,
       totalCount: null,
+      treeResult: null,
       errorBanner: null,
 
       // Passive state setters are the only setters called from REST
@@ -578,7 +591,11 @@ class DefaultTGridSession<
         set({ filters: nextFilters, search: nextSearch, page: 1 });
         return "changed";
       },
-      setPageState: (page, pageSize) => {
+      setPageState: (requestedPage, requestedPageSize) => {
+        const { page, pageSize } = tgridPageWindow(pagination, {
+          page: requestedPage,
+          pageSize: requestedPageSize,
+        });
         const cur = get();
         if (cur.page === page && cur.pageSize === pageSize) {
           return "unchanged";
@@ -589,6 +606,20 @@ class DefaultTGridSession<
       setTotalCount: (totalCount) => {
         if (get().totalCount === totalCount) return;
         set({ totalCount });
+      },
+      setTreeResult: (treeResult) => {
+        const current = get().treeResult;
+        if (
+          current === treeResult ||
+          (current !== null &&
+            treeResult !== null &&
+            current.matchCount === treeResult.matchCount &&
+            current.loadedRowCount === treeResult.loadedRowCount &&
+            current.truncated === treeResult.truncated)
+        ) {
+          return;
+        }
+        set({ treeResult });
       },
 
       setSort: (sort) => {
@@ -688,7 +719,12 @@ class DefaultTGridSession<
       syncFromUrl: (seed) => {
         // Browser back/forward restores the table from the URL without pushing a
         // new history entry. Direct table-control changes update the URL instead.
-        const next = initialQueryState(level.query, seed, level.table);
+        const next = initialQueryState(
+          level.query,
+          seed,
+          level.table,
+          pagination,
+        );
         const cur = get();
         const patch: Partial<TGridLevelQueryState<TGridTableRow>> = {};
         if (cur.page !== next.page) patch.page = next.page;
@@ -802,6 +838,7 @@ function initialQueryState(
   query: TGridLevelConfig<TGridRowsByLevel>["query"] | undefined,
   seed: TGridRouteQuerySeed | undefined,
   table: TableSchema,
+  pagination: TGridLevelPagination,
 ): Pick<
   TGridLevelQueryState<TGridTableRow>,
   "sort" | "filters" | "search" | "page" | "pageSize"
@@ -817,8 +854,10 @@ function initialQueryState(
     search: normalizeSearch(
       seed && "search" in seed ? (seed.search ?? null) : query?.initialSearch,
     ),
-    page: seed?.page ?? query?.initialPage ?? 1,
-    pageSize: defaultPageSize(query?.pageSize),
+    ...tgridPageWindow(pagination, {
+      page: seed?.page ?? query?.initialPage ?? 1,
+      pageSize: defaultPageSize(query?.pageSize),
+    }),
   };
 }
 

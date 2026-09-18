@@ -13,6 +13,10 @@ export function formatRecordCount(totalCount: number): string {
   return `${totalCount} record${totalCount === 1 ? "" : "s"}`;
 }
 
+export function formatMatchCount(matchCount: number): string {
+  return `${matchCount} match${matchCount === 1 ? "" : "es"}`;
+}
+
 export function SearchInput({
   value,
   onChange,

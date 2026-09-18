@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, type CSSProperties } from "react";
-import { Table2 } from "lucide-react";
+import { ListTree, Table2 } from "lucide-react";
 import {
   trailingEdge,
   GridCopyContextMenu,
@@ -9,9 +9,15 @@ import {
   type GridCopyTarget,
   type GridLevelChrome,
   type GridPresentation,
+  type GridLevelRuntime,
   type GridRuntime,
   type LevelRow,
 } from "@sapporta/grid";
+import { controllerFor, cursorManagerFor } from "@sapporta/grid/advanced";
+import {
+  ContextMenuItem,
+  ContextMenuSeparator,
+} from "@sapporta/ui/context-menu";
 import {
   columnPreset,
   type ColumnSizingOptions,
@@ -157,9 +163,12 @@ export function TGrid<
   return (
     <GridRuntimeProvider runtime={runtime}>
       <GridCopyContextMenu
-        renderExtraItems={(target) =>
-          renderTGridLinkMenuItems(sessionContext, runtime, target)
-        }
+        renderExtraItems={(target) => (
+          <>
+            {renderTGridTreeMenuItems(sessionContext, runtime, target)}
+            {renderTGridLinkMenuItems(sessionContext, runtime, target)}
+          </>
+        )}
       >
         {withTGridSessionContext(
           sessionContext as unknown as TGridSessionContext<
@@ -369,6 +378,58 @@ function resolveRelatedRowsLink(
 function compactLevelName(levelName: string): string {
   const dot = levelName.lastIndexOf(".");
   return dot >= 0 ? levelName.slice(dot + 1) : levelName;
+}
+
+/**
+ * "Add child row" for a writable tree level: it adds a draft row under the
+ * row the menu opened on, with the parent column filled in, and opens the
+ * tree column's editor in the draft. Leaving the draft saves it like any new
+ * row; leaving it untouched removes it.
+ */
+function renderTGridTreeMenuItems(
+  session: TGridRenderableSessionContext,
+  runtime: GridRuntime,
+  target: GridCopyTarget | null,
+) {
+  if (!target) return null;
+  let level: GridLevelRuntime;
+  let row: LevelRow | undefined;
+  try {
+    level = runtime.level(target.path);
+    row = level.displayedRow(target.selection.anchor.rowId);
+  } catch {
+    return null;
+  }
+  const tree = session.levelInfoById[level.schema.name]?.tree;
+  if (!tree || !level.tree || row?.kind !== "data") return null;
+  if (!level.data.canWrite || !level.schema.options.allowPhantoms) return null;
+  const parent = row;
+  const treeColumn = tree.column;
+
+  function addChildRow(): void {
+    if (!level.tree) return;
+    const draftId = level.tree.addChild(parent.id);
+    if (runtime.interaction.mode !== "cell-grid") return;
+    cursorManagerFor(runtime).moveCellCursorTo({
+      path: level.path,
+      rowId: draftId,
+      colId: treeColumn,
+    });
+    controllerFor(runtime, level.path).startEdit(
+      { rowId: draftId, colId: treeColumn },
+      "enter",
+    );
+  }
+
+  return (
+    <>
+      <ContextMenuSeparator />
+      <ContextMenuItem onClick={addChildRow}>
+        <ListTree aria-hidden="true" className="mr-2 h-3.5 w-3.5" />
+        Add child row
+      </ContextMenuItem>
+    </>
+  );
 }
 
 /**

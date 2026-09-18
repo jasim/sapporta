@@ -105,6 +105,7 @@ beforeEach(() => {
     status: "ready",
     error: undefined,
     totalCount: 3,
+    treeResult: null,
   });
   actionPropsSpy.mockClear();
   viewPreferenceChange.mockClear();
@@ -127,6 +128,18 @@ afterEach(async () => {
 });
 
 describe("TableGridHeader", () => {
+  it("counts the matches of a searched tree", async () => {
+    hookMocks.useTGridSourceStatus.mockReturnValue({
+      status: "ready",
+      error: undefined,
+      totalCount: 3,
+      treeResult: { matchCount: 1, loadedRowCount: 3, truncated: false },
+    });
+    mounted = await renderHeader("wide");
+    expect(document.body.textContent).toContain("1 match");
+    expect(document.body.textContent).not.toContain("3 records");
+  });
+
   it("hides the search control when the table is not searchable", async () => {
     hookMocks.useTableLevelQuery.mockReturnValue({
       ...query,

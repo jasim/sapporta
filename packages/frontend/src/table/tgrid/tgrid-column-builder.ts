@@ -15,7 +15,7 @@ import type {
   RowKey,
 } from "@sapporta/grid";
 import { validateLevelRowHeaderColumn } from "@sapporta/grid";
-import { withRowExpansionColumn } from "@sapporta/grid";
+import { withRowExpansionColumn, withTreeColumn } from "@sapporta/grid";
 import { columnPreset, type ColumnWidth } from "@sapporta/grid/column-preset";
 import type {
   ColumnSchema as TableColumnSchema,
@@ -53,6 +53,8 @@ import {
 export type TGridColumnBuildResult = {
   columns: GridColumnSchema[];
   rowHeaderColumn: RowHeaderColumn;
+  // The column that carries tree indentation, or `null` for a flat level.
+  treeColumnId: ColId | null;
   saveCellValueByColumn: ReadonlyMap<
     ColId,
     TGridRuntimeCellWriteHandler<TGridRowsByLevel, unknown, string>
@@ -98,6 +100,8 @@ export type TGridColumnBuildArgs<
   rowHeaderColumn?: RowHeaderColumn | null;
   immutable: boolean;
   expandable: boolean;
+  // Tree levels only: the column that should show the hierarchy.
+  treeColumn?: TableColumnName | null;
   columnMapper: TGridColumnMapper;
   sessionContext: () => TGridSessionContext<RowsByLevel, AppServices>;
 };
@@ -236,6 +240,19 @@ export function buildTGridColumnsForTable<
       : rowHeaderReadyColumn;
   }
 
+  // A tree level shows its hierarchy in one column: the declared one when it
+  // is visible, else the card title, else the first column. The card title is
+  // the first visible row-label column, so cards indent their titles.
+  const treeColumnIndex =
+    args.treeColumn === undefined || args.treeColumn === null
+      ? -1
+      : treeColumnIndexFor(columns, args.treeColumn);
+  if (treeColumnIndex >= 0) {
+    columns[treeColumnIndex] = withTreeColumn(
+      withoutCardEmptyHiding(columns[treeColumnIndex]),
+    );
+  }
+
   // Report invalid explicit row-header choices with the level name and final
   // visible columns, so the application can correct the declaration directly.
   validateLevelRowHeaderColumn(
@@ -244,7 +261,25 @@ export function buildTGridColumnsForTable<
     "buildTGridColumnsForTable",
   );
 
-  return { columns, rowHeaderColumn, saveCellValueByColumn };
+  return {
+    columns,
+    rowHeaderColumn,
+    treeColumnId: treeColumnIndex >= 0 ? columns[treeColumnIndex].id : null,
+    saveCellValueByColumn,
+  };
+}
+
+function treeColumnIndexFor(
+  columns: readonly GridColumnSchema[],
+  declared: TableColumnName,
+): number {
+  const declaredIndex = columns.findIndex((column) => column.id === declared);
+  if (declaredIndex >= 0) return declaredIndex;
+  const titleIndex = columns.findIndex(
+    (column) => isRecord(column.meta) && column.meta.cardRole === "title",
+  );
+  if (titleIndex >= 0) return titleIndex;
+  return columns.length > 0 ? 0 : -1;
 }
 
 // The card title is the first visible `rowLabelColumns` entry — the same

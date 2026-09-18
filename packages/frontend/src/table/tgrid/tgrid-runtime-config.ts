@@ -1,8 +1,11 @@
-import type {
-  ChildSchema,
-  ColumnSchema as TableColumnSchema,
-  Row,
-  TableSchema,
+import {
+  resolveTableTree,
+  type ChildSchema,
+  type ColumnSchema as TableColumnSchema,
+  type Row,
+  type TableSchema,
+  type TableTree,
+  type TreeMatchContext,
 } from "@sapporta/shared/contracts";
 import {
   mintFilterId,
@@ -18,6 +21,7 @@ import {
   hostBackedRowQuery,
   rootPath,
   sourceOwnedRowQuery,
+  validateLevelTree,
   type GridInteractionConfig,
   type PhantomRowsConfig,
 } from "@sapporta/grid";
@@ -61,13 +65,16 @@ import {
 } from "./tgrid-column-builder";
 import type { TGridSessionContext } from "./tgrid-cell-context";
 import type { TGridFilter } from "./tgrid-filter";
+import type { TGridTreeResult } from "./tgrid-level-query-state";
 import type {
   TGridLevelQueryConfig,
   TGridLevelInfo,
+  TGridLevelPagination,
   TableRowsClient,
   TGridLevelConfig,
   TGridLevelsConfigMap,
 } from "./tgrid-level-config";
+import { tgridPageWindow } from "./tgrid-page-window";
 
 export type TGridDefinition<
   RowsByLevel extends TGridRowsByLevel = TGridRowsByLevel,
@@ -116,6 +123,10 @@ type CompileTGridRuntimeConfigArgs<
     levelId: TGridLevelId<RowsByLevel>,
     totalCount: number | null,
   ) => void;
+  recordTreeResult?: (
+    levelId: TGridLevelId<RowsByLevel>,
+    result: TGridTreeResult,
+  ) => void;
   sessionContext?: () => TGridSessionContext<RowsByLevel, AppServices>;
 };
 
@@ -160,6 +171,10 @@ export function compileTGridRuntimeConfig<
     const table = config.table;
     const pkCol = primaryKeyOf(table, levelId);
     const childSchemas = table.children ?? [];
+    const tree = resolveLevelTree(levelId, config, "compileTGridRuntimeConfig");
+    // A tree level reads every row at once so the whole tree can be built.
+    // Query state, row requests, pagers, and URL state all follow this value.
+    const pagination: TGridLevelPagination = tree ? "all" : "pages";
 
     const parent = config.parent
       ? {
@@ -177,6 +192,7 @@ export function compileTGridRuntimeConfig<
       rowHeaderColumn: config.rowHeaderColumn,
       immutable: table.immutable ?? false,
       expandable: config.childLevels.length > 0,
+      treeColumn: tree?.column ?? null,
       columnMapper: args.columnMapper,
       sessionContext: args.sessionContext ?? missingTGridSessionContext,
     });
@@ -187,6 +203,17 @@ export function compileTGridRuntimeConfig<
       rowHeaderColumn: columnBuild.rowHeaderColumn,
       options: { allowPhantoms: !(table.immutable ?? false) },
       childLevels: [...config.childLevels],
+      ...(tree
+        ? {
+            tree: {
+              parentKeyField: tree.parentColumn,
+              // A child draft stores its parent's primary key as the table
+              // types it, such as a number, like the rows the server returns.
+              parentKeyValue: (parent: TreeNode) => parent.columns[pkCol.name],
+              defaultExpanded: tree.defaultExpanded,
+            },
+          }
+        : {}),
     };
 
     levelInfoById[levelId] = {
@@ -201,6 +228,12 @@ export function compileTGridRuntimeConfig<
           }
         : {}),
       childSchemas,
+      // The column that `withTreeColumn` wrapped. It differs from the declared
+      // column when the declared column is not shown on this level.
+      tree: tree
+        ? { ...tree, column: columnBuild.treeColumnId ?? tree.column }
+        : null,
+      pagination,
     };
 
     // The root level normally follows visible table controls. Child levels use
@@ -233,12 +266,21 @@ export function compileTGridRuntimeConfig<
           }
         : undefined,
       queryConfig,
+      pagination,
       rowQueryState:
         queryConfig.owner === "host"
           ? () => args.hostRowQueryState?.(levelId)
           : undefined,
       recordTotalCount: (totalCount) =>
         args.recordTotalCount?.(levelId, totalCount),
+      tree: tree
+        ? {
+            matchContext: tree.matchContext,
+            // The server walks only a tree the table itself declares.
+            serverWalk: table.tree?.parentColumn === tree.parentColumn,
+            recordResult: (result) => args.recordTreeResult?.(levelId, result),
+          }
+        : null,
       rowsClient,
       saveCellValueByColumn: columnBuild.saveCellValueByColumn,
       sessionContext: args.sessionContext as
@@ -305,7 +347,51 @@ function validateTGridDefinition<
     }
 
     primaryKeyOf(config.table, levelId);
+    resolveLevelTree(levelId, config, label);
   }
+}
+
+// The tree a level shows: the table's declared `tree`, the level's overrides
+// on top of it, or none. The grid's own rules for tree levels are checked here
+// too, so a bad declaration is reported by `defineTGrid`.
+function resolveLevelTree<RowsByLevel extends TGridRowsByLevel, AppServices>(
+  levelId: TGridLevelId<RowsByLevel>,
+  config: TGridLevelConfig<RowsByLevel, AppServices, TGridLevelId<RowsByLevel>>,
+  label: string,
+): TableTree | null {
+  const table = config.table;
+  const declared = table.tree;
+  if (config.tree === false) return null;
+  if (config.tree === undefined && !declared) return null;
+  const override = config.tree ?? {};
+  const parentColumn = override.parentColumn ?? declared?.parentColumn;
+  if (!parentColumn) {
+    throw new Error(
+      `${label}: level '${String(levelId)}' tree needs a parentColumn, because table '${table.name}' declares no tree`,
+    );
+  }
+  if (!table.columns.some((column) => column.name === parentColumn)) {
+    throw new Error(
+      `${label}: level '${String(levelId)}' tree parentColumn '${parentColumn}' is not a column of table '${table.name}'`,
+    );
+  }
+  validateLevelTree(
+    String(levelId),
+    {
+      tree: { parentKeyField: parentColumn },
+      childLevels: config.childLevels.map(String),
+    },
+    label,
+  );
+  return resolveTableTree(
+    {
+      parentColumn,
+      column: override.column ?? declared?.column,
+      defaultExpanded: override.defaultExpanded ?? declared?.defaultExpanded,
+      matchContext: override.matchContext ?? declared?.matchContext,
+    },
+    table.rowLabelColumns,
+  );
 }
 
 function resolveColumns<
@@ -374,8 +460,14 @@ function makeEndpointFactory(args: {
     defaultSort: SortDescriptor[];
   };
   queryConfig: TGridLevelQueryConfig;
+  pagination: TGridLevelPagination;
   rowQueryState?: () => RowQueryState<TGridFilter> | undefined;
   recordTotalCount?: (totalCount: number | null) => void;
+  tree: {
+    matchContext: TreeMatchContext;
+    serverWalk: boolean;
+    recordResult: (result: TGridTreeResult) => void;
+  } | null;
   rowsClient: TableRowsClient;
   saveCellValueByColumn: ReadonlyMap<
     ColId,
@@ -394,18 +486,28 @@ function makeEndpointFactory(args: {
     //
     // - `rowQuery` stores the mutable page, sort, filter, and search values a
     //   user can change.
-    // - `buildRowsRequest` adds the context that is always true for this level,
-    //   such as parent-row constraints and fixed filters.
+    // - `fixed` holds the conditions that are always true for this level: the
+    //   parent-row constraint and the fixed filters. Every fetch sends them as
+    //   the request's fixed conditions, apart from the user's filters and
+    //   search.
     //
     // This split keeps application-visible query state small and reusable. CSV
     // export, URL state, table controls, and row loading read the same mutable
     // query state, while child-table constraints stay attached to the expanded
-    // source instance that owns them.
+    // source instance that owns them. Sending the fixed conditions apart also
+    // lets the server tell the conditions that bound a tree walk from those
+    // that select its matches, so a tree search keeps only ancestors and
+    // descendants that satisfy the fixed conditions.
     const rowQuery =
       args.queryConfig.owner === "host"
         ? requireHostRowQuery(args.levelId, args.rowQueryState)
         : sourceOwnedRowQuery<TGridFilter>(
-            initialSourceOwnedQuery(args.queryConfig, args.parent, args.table),
+            initialSourceOwnedQuery(
+              args.queryConfig,
+              args.parent,
+              args.table,
+              args.pagination,
+            ),
           );
     const parentConstraint: TypedFilterCondition | null = parentKey
       ? {
@@ -416,29 +518,39 @@ function makeEndpointFactory(args: {
           value: parentKey.value,
         }
       : null;
-    const buildRowsRequest = buildTGridRowsRequest({
-      fixedFilters: parseFiltersForTable(
-        args.queryConfig.fixedFilters ?? [],
-        args.table,
-      ),
-      parentConstraint,
-    });
+    const fixed = [
+      ...(parentConstraint ? [parentConstraint] : []),
+      ...parseFiltersForTable(args.queryConfig.fixedFilters ?? [], args.table),
+    ];
     return {
       rowQuery,
-      buildRowsRequest,
+      buildRowsRequest: buildTGridRowsRequest(args.pagination),
       fetchPage: async (req) => {
         const res = await args.rowsClient.fetch({
           tableName: args.table.name,
           page: req.page,
           limit: req.pageSize,
           sort: req.sort ? [...req.sort] : undefined,
+          fixed,
           filters: req.filter?.conditions ?? [],
           search: req.filter?.search ?? undefined,
+          // A user filter or search on a tree keeps each match's ancestors,
+          // so the match shows in place. The server walks the tree only when
+          // the request has a filter or search.
+          ...(args.tree?.serverWalk ? { tree: args.tree.matchContext } : {}),
         } satisfies FetchTableRowsParams);
         args.recordTotalCount?.(res.meta.total);
+        args.tree?.recordResult({
+          matchCount: res.meta.tree?.matchCount ?? null,
+          loadedRowCount: res.data.length,
+          truncated: res.meta.total > res.data.length,
+        });
         return {
           nodes: buildTableTreeNodes(res.data, args.levelId, args.rowKeyColumn),
           totalCount: res.meta.total,
+          ...(res.meta.tree
+            ? { treeContextRowKeys: res.meta.tree.contextIds }
+            : {}),
         };
       },
       patchCell: async (req) => {
@@ -528,10 +640,13 @@ function initialSourceOwnedQuery(
       }
     | undefined,
   table: TableSchema,
+  pagination: TGridLevelPagination,
 ) {
   return {
-    page: queryConfig.initialPage ?? 1,
-    pageSize: defaultPageSize(queryConfig.pageSize),
+    ...tgridPageWindow(pagination, {
+      page: queryConfig.initialPage ?? 1,
+      pageSize: defaultPageSize(queryConfig.pageSize),
+    }),
     sort: [...(queryConfig.initialSort ?? parent?.defaultSort ?? [])],
     filter: {
       conditions: parseFiltersForTable(queryConfig.initialFilters ?? [], table),
@@ -540,26 +655,22 @@ function initialSourceOwnedQuery(
   };
 }
 
-function buildTGridRowsRequest(args: {
-  fixedFilters: readonly TypedFilterCondition[];
-  parentConstraint: TypedFilterCondition | null;
-}): BuildRowsRequest<TGridFilter> {
-  // Request building is sampled for loading states, retry state, snapshots, and
-  // fetch calls. The order below makes constraints visible in a stable way:
-  // parent constraint first, fixed page constraints next, then user filters.
-  // User controls do not mutate parent or fixed constraints; they only mutate
-  // the row query that is passed into this function.
-  const parentFilters = args.parentConstraint ? [args.parentConstraint] : [];
+function buildTGridRowsRequest(
+  pagination: TGridLevelPagination,
+): BuildRowsRequest<TGridFilter> {
+  // Request building is sampled for loading states, retry state, and fetch
+  // calls. The request's filter is the user's own filter and search; the
+  // level's fixed conditions are added by `fetchPage`. Host query state is
+  // already held to the level's page window; a source-owned query is not, so
+  // the request applies the window too.
   return (query) => ({
-    page: query.page,
-    pageSize: query.pageSize,
+    ...tgridPageWindow(pagination, {
+      page: query.page,
+      pageSize: query.pageSize,
+    }),
     sort: query.sort ? [...query.sort] : [],
     filter: {
-      conditions: [
-        ...parentFilters,
-        ...args.fixedFilters,
-        ...(query.filter?.conditions ?? []),
-      ],
+      conditions: [...(query.filter?.conditions ?? [])],
       search: query.filter?.search ?? null,
     },
   });
