@@ -209,8 +209,14 @@ function resolveHttpListQuery(
   tableDef: TableDef,
 ) {
   const catalog = createTableCatalog([tableDef]);
-  return resolvePageQuery(listRowsQuerySchema.parse(query), tableDef, {
-    auth: createTestAuthContext({ tables: [tableDef] }),
-    searchPlan: catalog.searchPlanFor(tableDef.sqlName),
-  });
+  const resolved = resolvePageQuery(
+    listRowsQuerySchema.parse(query),
+    tableDef,
+    {
+      auth: createTestAuthContext({ tables: [tableDef] }),
+      searchPlan: catalog.searchPlanFor(tableDef.sqlName),
+    },
+  );
+  if (resolved.kind !== "rows") throw new Error("Expected a rows read.");
+  return resolved.input;
 }

@@ -87,11 +87,30 @@ export function makeAuthorizedTableHandlers<E extends SapportaEnv>(
         const auth = authorizeTableAction(c, guard(c), "read", def);
         const rows = scopedRows(db, auth, def);
         try {
-          const input = resolvePageQuery(request.query, def, {
+          const query = resolvePageQuery(request.query, def, {
             auth,
             searchPlan: catalog.searchPlanFor(def.sqlName),
           });
-          return c.json(await rows.page(input), 200);
+          if (query.kind === "rows") {
+            return c.json(await rows.page(query.input), 200);
+          }
+          // A tree read with a filter or search pages over each match with its
+          // ancestors (and descendants), and reports which rows are context.
+          const match = await rows.treeMatch(query.treeMatch);
+          const result = await rows.page({ ...query.page, where: match.where });
+          return c.json(
+            {
+              data: result.data,
+              meta: {
+                ...result.meta,
+                tree: {
+                  matchCount: match.matchCount,
+                  contextIds: match.contextIds,
+                },
+              },
+            },
+            200,
+          );
         } catch (err) {
           return tableReadErrorResponse(c, err);
         }

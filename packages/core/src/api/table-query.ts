@@ -36,6 +36,7 @@ import type {
   PageRowsInput,
   RowsQuery,
   TableColumn,
+  TreeMatchInput,
 } from "../rows/scoped-rows.js";
 import { findPkColumn } from "../schema/pk.js";
 import type { TableDef } from "../schema/table.js";
@@ -50,6 +51,7 @@ import {
   serializeTypedValue,
   FilterParseError,
   TypedFilterParseError,
+  type FilterNamespace,
   type TypedFilterCondition,
   type TypedValue,
 } from "@sapporta/shared/filter";
@@ -69,7 +71,26 @@ export type ResolvedCountQuery<TTable extends AnySQLiteTable = AnySQLiteTable> =
       input: CountRowsByInput<TTable>;
     };
 
-const PAGE_QUERY_KEYS = new Set(["page", "limit", "sort", "q"]);
+/**
+ * A resolved list read.
+ *
+ * - `"rows"`: page over the rows that satisfy the fixed conditions, the
+ *   filters, and the search.
+ * - `"treeMatch"`: a tree read with a filter or search. Resolve `treeMatch`
+ *   with `scopedRows().treeMatch()`, then page over the `where` it returns.
+ */
+export type ResolvedPageQuery =
+  | {
+      kind: "rows";
+      input: PageRowsInput;
+    }
+  | {
+      kind: "treeMatch";
+      treeMatch: TreeMatchInput;
+      page: Omit<PageRowsInput, "where">;
+    };
+
+const PAGE_QUERY_KEYS = new Set(["page", "limit", "sort", "q", "tree"]);
 const EXPORT_QUERY_KEYS = new Set(["sort", "q"]);
 const COUNT_QUERY_KEYS = new Set(["group_by", "order", "limit"]);
 
@@ -81,7 +102,8 @@ const COUNT_QUERY_KEYS = new Set(["group_by", "order", "limit"]);
  * on the server-only concerns: column existence, SQL emission, and
  * pagination and root search policy.
  *
- * Filter grammar (from shared):
+ * Filter grammar (from shared), read from `filter[col][op]=value` keys and,
+ * on list reads, from `fixed[col][op]=value` keys:
  *   eq, neq                         equality / inequality
  *   gt, gte, lt, lte                ordinal
  *   in, nin                         CSV membership (e.g. in=1,2,3)
@@ -96,14 +118,24 @@ const COUNT_QUERY_KEYS = new Set(["group_by", "order", "limit"]);
  *   sort=col,-col2                  leading `-` is descending
  *   page=N, limit=M                 numeric bounds are enforced by the shared
  *                                   HTTP contract
+ *   tree=ancestors                  on a table with `meta.tree`, return each
+ *   tree=ancestors-and-descendants  filter or search match with its ancestors
+ *                                   (and its descendants); list reads only
+ *
+ * Fixed conditions (list reads only):
+ *   fixed[col][op]=value            a condition every returned row satisfies.
+ *                                   `filter` and `q` pick the matches; `fixed`
+ *                                   also bounds the ancestors and descendants
+ *                                   a `tree` read returns around them
  *
  * Errors (QueryParseError → HTTP 400):
  *   unknown_filter_shape            filter[col] without [op], etc.
  *   unknown_op                      op not in the supported set
  *   bad_value                       is={other}, in=/nin= empty or empty-item
- *   unknown_column                  filter or sort names a column not on
- *                                   the table
+ *   unknown_column                  filter, fixed, or sort names a column
+ *                                   not on the table
  *   no_search_config                q set on a table with search: false
+ *   no_tree_config                  tree set on a table without meta.tree
  *
  * Silent-ignore is rejected as a class: typos like filter[naration]=foo
  * return 400, not "all rows".
@@ -112,16 +144,49 @@ export function resolvePageQuery<TTable extends AnySQLiteTable>(
   query: ListRowsQuery,
   table: TableDef<TTable>,
   options: ResolveRowsQueryOptions,
-): PageRowsInput {
-  const filters = extractFilterParams(query, PAGE_QUERY_KEYS, "list");
-  const where = parseTableFilters(filters, table);
+): ResolvedPageQuery {
+  const filters = extractFilterParams(query, PAGE_QUERY_KEYS, "list", [
+    "filter",
+    "fixed",
+  ]);
+  const fixed = parseTableFilters(filters, table, "fixed");
   const searchTerm = parseSearchTerm(query.q, table);
-  return {
-    where: resolveSearchWhere(where, searchTerm, table, options),
+  const match = resolveSearchWhere(
+    parseTableFilters(filters, table),
+    searchTerm,
+    table,
+    options,
+  );
+  const matchContext = parseTreeMode(query.tree, table);
+  const page = {
     orderBy: parseSortClauses(query.sort, table),
     page: query.page,
     limit: query.limit,
   };
+  // Without a filter or search, every row that satisfies `fixed` is a match,
+  // so a tree read returns the same rows as a flat read.
+  if (matchContext && match) {
+    return {
+      kind: "treeMatch",
+      treeMatch: { fixed, match, matchContext },
+      page,
+    };
+  }
+  return { kind: "rows", input: { ...page, where: and(fixed, match) } };
+}
+
+function parseTreeMode(
+  mode: ListRowsQuery["tree"],
+  table: TableDef,
+): ListRowsQuery["tree"] {
+  if (mode === undefined) return undefined;
+  if (!table.meta.tree) {
+    throw new QueryParseError(
+      "no_tree_config",
+      `Table \`${table.sqlName}\` does not declare meta.tree`,
+    );
+  }
+  return mode;
 }
 
 export function resolveExportQuery<TTable extends AnySQLiteTable>(
@@ -212,16 +277,22 @@ function resolveSearchWhere(
   );
 }
 
+/**
+ * Collect the condition keys of a query, such as `filter[col][op]`, and reject
+ * any other key the surface does not name. A read accepts only the namespaces
+ * it lists, so `fixed[...]` on an export is an unknown parameter.
+ */
 function extractFilterParams(
   query: Record<string, unknown>,
   allowedKeys: ReadonlySet<string>,
   surface: string,
+  namespaces: readonly FilterNamespace[] = ["filter"],
 ): QueryParamRecord {
   const filters: QueryParamRecord = {};
   for (const [key, value] of Object.entries(query)) {
     if (value === undefined) continue;
     if (allowedKeys.has(key)) continue;
-    if (!key.startsWith("filter[")) {
+    if (!namespaces.some((namespace) => key.startsWith(`${namespace}[`))) {
       throw new QueryParseError(
         "bad_value",
         `Unknown ${surface} query parameter ${JSON.stringify(key)}.`,
@@ -246,7 +317,8 @@ function extractFilterParams(
 }
 
 /**
- * Parse only the canonical `filter[col][op]=value` grammar.
+ * Parse only the canonical `filter[col][op]=value` grammar, or the same
+ * grammar under the `fixed` namespace.
  *
  * List and count reads share this boundary so a filter cannot be accepted
  * by one surface and silently ignored or interpreted differently by another.
@@ -254,9 +326,10 @@ function extractFilterParams(
 function parseTableFilters(
   params: Readonly<QueryParamRecord>,
   schema: TableDef,
+  namespace: FilterNamespace = "filter",
 ): SQL | undefined {
   const conditions: SQL[] = [];
-  const rawConditions = parseFilterConditions(params);
+  const rawConditions = parseFilterConditions(params, namespace);
   const typedConditions = parseFilterConditionsTyped(rawConditions, schema);
   for (const cond of typedConditions) {
     const col = findColumn(schema, cond.column)!;
@@ -270,9 +343,10 @@ function parseTableFilters(
  *  the mapping is mechanical. */
 function parseFilterConditions(
   params: Readonly<QueryParamRecord>,
+  namespace: FilterNamespace,
 ): ReturnType<typeof decodeFilters> {
   try {
-    return decodeFilters(params);
+    return decodeFilters(params, namespace);
   } catch (err) {
     if (err instanceof FilterParseError) {
       throw new QueryParseError(err.code, err.message);

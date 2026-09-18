@@ -1,5 +1,8 @@
 import { z } from "zod";
-import { countQuerySchema } from "@sapporta/shared/contracts";
+import {
+  countQuerySchema,
+  treeMatchContextSchema,
+} from "@sapporta/shared/contracts";
 import { init } from "../init.js";
 import {
   endpointListResult,
@@ -270,6 +273,20 @@ export const CLI_COMMANDS: readonly CliCommandSpec[] = [
         description: "JSON filter object",
         kind: "string",
       },
+      {
+        name: "fixed",
+        flag: "--fixed <json>",
+        description:
+          "JSON filter object that every returned row satisfies, including the ancestors and descendants --tree adds",
+        kind: "string",
+      },
+      {
+        name: "tree",
+        flag: "--tree <mode>",
+        description:
+          'On a tree table, return each match with its "ancestors" or its "ancestors-and-descendants"',
+        kind: "string",
+      },
     ],
     inputSchema: z.object({
       table: requiredString("table"),
@@ -278,10 +295,14 @@ export const CLI_COMMANDS: readonly CliCommandSpec[] = [
       sort: z.string().optional(),
       q: z.string().optional(),
       where: optionalJsonObject("where"),
+      fixed: optionalJsonObject("fixed"),
+      tree: treeMatchContextSchema.optional(),
     }),
     examples: [
       'sapporta rows list books --limit 50 --sort "-created_at,title"',
       'sapporta rows list books --where \'{"status":{"eq":"active"}}\'',
+      "sapporta rows list accounts --q taxes --tree ancestors-and-descendants",
+      'sapporta rows list accounts --q taxes --tree ancestors --fixed \'{"archived":{"eq":false}}\'',
     ],
     run: async (input, context) =>
       resultFromResponse(
@@ -291,6 +312,8 @@ export const CLI_COMMANDS: readonly CliCommandSpec[] = [
           sort: input.sort,
           q: input.q,
           where: input.where,
+          fixed: input.fixed,
+          tree: input.tree,
         }),
         readDataRows,
       ),

@@ -2,7 +2,8 @@ import { ErrorCode, OperationError } from "../../errors.js";
 import { httpRequest, type HttpMethod } from "../http-client.js";
 import type { OpenApiDoc } from "../openapi-spec.js";
 import type { ApiTarget } from "../runtime-config.js";
-import type { CountQuery } from "@sapporta/shared/contracts";
+import type { CountQuery, TreeMatchContext } from "@sapporta/shared/contracts";
+import type { FilterNamespace } from "@sapporta/shared/filter";
 
 export interface RowListOptions {
   limit?: number;
@@ -10,6 +11,8 @@ export interface RowListOptions {
   sort?: string;
   q?: string;
   where?: Record<string, unknown>;
+  fixed?: Record<string, unknown>;
+  tree?: TreeMatchContext;
 }
 
 interface CountRowsBaseOptions {
@@ -190,12 +193,15 @@ function rowListQuery(opts: RowListOptions): Record<string, unknown> {
     ...(opts.page !== undefined ? { page: opts.page } : {}),
     ...(opts.sort ? { sort: opts.sort } : {}),
     ...(opts.q ? { q: opts.q } : {}),
+    ...(opts.tree ? { tree: opts.tree } : {}),
     ...whereObjectToFilterParams(opts.where),
+    ...whereObjectToFilterParams(opts.fixed, "fixed"),
   };
 }
 
 export function whereObjectToFilterParams(
   where: Record<string, unknown> | undefined,
+  namespace: FilterNamespace = "filter",
 ): Record<string, string> {
   if (!where) return {};
   const query: Record<string, string> = {};
@@ -207,7 +213,8 @@ export function whereObjectToFilterParams(
       );
     }
     for (const [operator, value] of Object.entries(clause)) {
-      query[`filter[${column}][${operator}]`] = filterValueToString(value);
+      query[`${namespace}[${column}][${operator}]`] =
+        filterValueToString(value);
     }
   }
   return query;

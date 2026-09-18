@@ -4,10 +4,12 @@ import {
   text,
   integer,
   SQLiteSyncDialect,
+  type AnySQLiteColumn,
 } from "drizzle-orm/sqlite-core";
 import type { SQL } from "drizzle-orm";
 import {
   countQuerySchema,
+  exportRowsQuerySchema,
   listRowsQuerySchema,
   lookupQuerySchema,
 } from "@sapporta/shared/contracts";
@@ -70,10 +72,12 @@ function parseQuery(
   limit: number;
 } {
   const catalog = createTableCatalog([table]);
-  const resolved = resolvePageQuery(listRowsQuerySchema.parse(params), table, {
+  const query = resolvePageQuery(listRowsQuerySchema.parse(params), table, {
     auth: createTestAuthContext({ tables: [table] }),
     searchPlan: catalog.searchPlanFor(table.sqlName),
   });
+  if (query.kind !== "rows") throw new Error("Expected a rows read.");
+  const resolved = query.input;
   return {
     where: resolved.where as SQL | undefined,
     orderBy: resolved.orderBy as SQL[],
@@ -390,6 +394,121 @@ describe("resolvePageQuery()", () => {
         expect.objectContaining({ code: "no_search_config" }),
       );
     });
+  });
+});
+
+describe("resolvePageQuery() tree option", () => {
+  const nodesTable = sqliteTable("nodes", {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    name: text("name").notNull(),
+    parent_id: integer("parent_id").references(
+      (): AnySQLiteColumn => nodesTable.id,
+    ),
+  });
+  const nodes = sapportaTable({
+    drizzle: nodesTable,
+    meta: { rowLabelColumns: ["name"], tree: { parentColumn: "parent_id" } },
+  });
+
+  function resolveTree(params: QueryParamRecord, table: TableDef) {
+    const catalog = createTableCatalog([table]);
+    return resolvePageQuery(listRowsQuerySchema.parse(params), table, {
+      auth: createTestAuthContext({ tables: [table] }),
+      searchPlan: catalog.searchPlanFor(table.sqlName),
+    });
+  }
+
+  it("resolves a tree read with a filter or search to a tree match", () => {
+    const resolved = resolveTree(
+      { tree: "ancestors", "filter[name][eq]": "x", sort: "-name", limit: "5" },
+      nodes,
+    );
+    expect(resolved.kind).toBe("treeMatch");
+    if (resolved.kind !== "treeMatch") return;
+    expect(resolved.treeMatch.matchContext).toBe("ancestors");
+    expect(compile(resolved.treeMatch.match).params).toEqual(["x"]);
+    expect(resolved.page).toMatchObject({ page: 1, limit: 5 });
+    expect(resolved.page.orderBy).toHaveLength(1);
+  });
+
+  it("resolves a tree read without a filter or search to a rows read", () => {
+    const resolved = resolveTree(
+      { tree: "ancestors", "fixed[parent_id][eq]": "7" },
+      nodes,
+    );
+    expect(resolved.kind).toBe("rows");
+    if (resolved.kind !== "rows") return;
+    expect(compile(resolved.input.where)).toEqual({
+      sql: '"nodes"."parent_id" = ?',
+      params: [7],
+    });
+    expect(resolveTree({}, nodes).kind).toBe("rows");
+  });
+
+  it("rejects tree on a table without meta.tree", () => {
+    expect(() => resolveTree({ tree: "ancestors" }, orders)).toThrow(
+      expect.objectContaining({ code: "no_tree_config" }),
+    );
+  });
+
+  it("rejects an unknown match context at the HTTP boundary", () => {
+    expect(listRowsQuerySchema.safeParse({ tree: "subtree" }).success).toBe(
+      false,
+    );
+  });
+
+  it("keeps fixed conditions apart from the filters and search", () => {
+    const resolved = resolveTree(
+      {
+        "fixed[parent_id][eq]": "7",
+        "filter[name][contains]": "tax",
+        tree: "ancestors",
+      },
+      nodes,
+    );
+    if (resolved.kind !== "treeMatch") throw new Error("Expected a match.");
+    expect(compile(resolved.treeMatch.fixed)).toEqual({
+      sql: '"nodes"."parent_id" = ?',
+      params: [7],
+    });
+    expect(compile(resolved.treeMatch.match).params).toEqual(["%tax%"]);
+  });
+
+  it("combines fixed conditions with the filters on a flat read", () => {
+    const resolved = resolveTree(
+      { "fixed[parent_id][eq]": "7", "filter[name][contains]": "tax" },
+      nodes,
+    );
+    if (resolved.kind !== "rows") throw new Error("Expected a rows read.");
+    expect(compile(resolved.input.where).params).toEqual([7, "%tax%"]);
+  });
+
+  it("validates fixed conditions against the table", () => {
+    expect(() => resolveTree({ "fixed[missing][eq]": "1" }, nodes)).toThrow(
+      expect.objectContaining({ code: "unknown_column" }),
+    );
+    expect(() => resolveTree({ "fixed[name]": "x" }, nodes)).toThrow(
+      expect.objectContaining({ code: "unknown_filter_shape" }),
+    );
+    expect(() =>
+      resolveCountQuery(
+        countQuerySchema.parse({ "fixed[name][eq]": "x" }),
+        nodes,
+      ),
+    ).toThrow(expect.objectContaining({ code: "bad_value" }));
+  });
+
+  it("rejects tree on exports", () => {
+    expect(() =>
+      resolveExportQuery(
+        exportRowsQuerySchema.parse({ tree: "ancestors" }),
+        nodes,
+        {
+          auth: createTestAuthContext({ tables: [nodes] }),
+          searchPlan: createTableCatalog([nodes]).searchPlanFor("nodes"),
+        },
+      ),
+    ).toThrow(expect.objectContaining({ code: "bad_value" }));
   });
 });
 

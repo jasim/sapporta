@@ -192,6 +192,7 @@ export function extractSchemas(defs: readonly TableDef[]): TableSchema[] {
       ...(rowLinks.length > 0 ? { rowLinks } : {}),
       rowLabelColumns,
       searchable: schema.meta.search !== false,
+      ...(schema.meta.tree ? { tree: { ...schema.meta.tree } } : {}),
     };
   });
 }

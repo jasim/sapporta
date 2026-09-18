@@ -102,6 +102,8 @@ export type {
   ScopedRows,
   TableColumn,
   TableRow,
+  TreeMatch,
+  TreeMatchInput,
 } from "./rows/scoped-rows.js";
 export { scanTableRows } from "./rows/table-row-scan.js";
 export type {
@@ -119,6 +121,7 @@ export {
 } from "./api/table-query.js";
 export type {
   ResolvedCountQuery,
+  ResolvedPageQuery,
   ResolveRowsQueryOptions,
 } from "./api/table-query.js";
 

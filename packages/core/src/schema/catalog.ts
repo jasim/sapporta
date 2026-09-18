@@ -1,4 +1,5 @@
 import type { TableDef } from "./table.js";
+import { assertTableTrees } from "./tree-check.js";
 import {
   compileSearchPlans,
   type SearchPlan,
@@ -30,6 +31,7 @@ export function createTableCatalog(tables: readonly TableDef[]): TableCatalog {
     }
     byName.set(def.sqlName, def);
   }
+  assertTableTrees(orderedTables);
   const compiledSearch = compileSearchPlans(orderedTables);
 
   return {

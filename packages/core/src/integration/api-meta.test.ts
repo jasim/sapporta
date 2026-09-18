@@ -21,8 +21,9 @@ describe("/api/meta", () => {
 
       const body = await res.json();
       expect(body.tables).toBeDefined();
-      // 5 fixture schemas: accounts, agents, articles, audit_log, journal_entries
-      expect(body.tables).toHaveLength(5);
+      // 6 fixture schemas: accounts, agents, articles, audit_log, categories,
+      // journal_entries
+      expect(body.tables).toHaveLength(6);
 
       const names = body.tables.map((t: any) => t.name).sort();
       expect(names).toEqual([
@@ -30,6 +31,7 @@ describe("/api/meta", () => {
         "agents",
         "articles",
         "audit_log",
+        "categories",
         "journal_entries",
       ]);
 

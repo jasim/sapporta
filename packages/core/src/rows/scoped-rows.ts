@@ -31,6 +31,7 @@
  */
 
 import {
+  and,
   asc,
   eq,
   inArray,
@@ -45,7 +46,7 @@ import {
   type AnySQLiteTable,
   type SQLiteColumn,
 } from "drizzle-orm/sqlite-core";
-import type { RecordId } from "@sapporta/shared/record-id";
+import { toRecordId, type RecordId } from "@sapporta/shared/record-id";
 import {
   DEFAULT_LOOKUP_LIMIT,
   DEFAULT_PAGE,
@@ -67,6 +68,7 @@ import { resolveRowFields } from "./row-fields.js";
 import type { GroupCount } from "@sapporta/shared";
 import { countTableRows, countTableRowsBy } from "./count-rows.js";
 import { scanTableRows } from "./table-row-scan.js";
+import { treeMatchPredicates, type TreeMatchInput } from "./tree-rows.js";
 
 export type TableColumn<TTable extends AnySQLiteTable = AnySQLiteTable> =
   TTable["_"]["columns"][keyof TTable["_"]["columns"]];
@@ -92,6 +94,22 @@ export interface FindManyRowsInput extends RowsQuery {
 export interface PageRowsInput extends RowsQuery {
   page?: number;
   limit?: number;
+}
+
+export type { TreeMatchInput } from "./tree-rows.js";
+
+/** The rows a tree match selects, and what the match found. */
+export interface TreeMatch {
+  /**
+   * The matches, their ancestors, and for `"ancestors-and-descendants"` their
+   * descendants. Pass it as the `where` of `page`, `findMany`, `scan`, or
+   * `count`.
+   */
+  where: SQL;
+  /** Rows that satisfy `match` and `fixed` themselves. */
+  matchCount: number;
+  /** Ancestors that `where` keeps only because a descendant matched. */
+  contextIds: RecordId[];
 }
 
 export type LookupRowsByIdInput = {
@@ -140,6 +158,7 @@ export interface PageRowsResult<
 export interface ScopedRows<TTable extends AnySQLiteTable = AnySQLiteTable> {
   findMany(input: FindManyRowsInput): Promise<TableRow<TTable>[]>;
   page(input?: PageRowsInput): Promise<PageRowsResult<TTable>>;
+  treeMatch(input: TreeMatchInput): Promise<TreeMatch>;
   get(id: RecordId): Promise<TableRow<TTable>>;
   create(input: readonly unknown[]): Promise<TableRow<TTable>[]>;
   create(input: Record<string, unknown>): Promise<TableRow<TTable>>;
@@ -267,6 +286,29 @@ export function scopedRows<TTable extends AnySQLiteTable>(
           limit,
           pages: Math.ceil(total / limit),
         },
+      };
+    },
+
+    async treeMatch(input) {
+      // On a table with `meta.tree`, select each row that matches, with its
+      // ancestors (and its descendants), walking only through rows that
+      // satisfy `fixed` and that this request may see.
+      const tree = table.meta.tree;
+      if (!tree) {
+        throw new Error(
+          `Table "${table.sqlName}" does not declare meta.tree, so its rows cannot be matched as a tree.`,
+        );
+      }
+      const predicates = treeMatchPredicates(table, tree, auth, input);
+      const matchCount = await count({ where: and(input.fixed, input.match) });
+      const context = (await db
+        .select({ id: pk.drizzlePk })
+        .from(table.drizzle)
+        .where(access.ownedRows(predicates.context))) as { id: unknown }[];
+      return {
+        where: predicates.rows,
+        matchCount,
+        contextIds: context.map((row) => toRecordId(row.id as string | number)),
       };
     },
 

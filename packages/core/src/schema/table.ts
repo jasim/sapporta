@@ -14,7 +14,12 @@ import type {
   ColumnMeta as FactoryColumnMeta,
   ValueKind,
 } from "@sapporta/shared/value-kind";
-import type { NavLink } from "@sapporta/shared/contracts";
+import {
+  resolveTableTree,
+  type NavLink,
+  type TableTree,
+  type TreeMatchContext,
+} from "@sapporta/shared/contracts";
 import {
   isSystemManagedScopeFieldName,
   type ReferenceRule,
@@ -59,6 +64,30 @@ export interface ChildMeta {
   /** Width hint in approximate character count (same as ColumnMeta.width) */
   width?: number;
 }
+
+/**
+ * Declares that the rows of a table form a tree: each row may name a parent
+ * row of the same table, such as an account's `parent_id`. The table page then
+ * shows the rows as one list, with the hierarchy in one indented column, and
+ * a search shows each match under its ancestors.
+ */
+export interface TreeMetaInput {
+  /** Nullable column that is a foreign key to this table's primary key. */
+  parentColumn: string;
+  /** Column that shows the hierarchy. Defaults to the first row label column. */
+  column?: string;
+  /** Whether rows start expanded. Defaults to `true`. */
+  defaultExpanded?: boolean;
+  /**
+   * What a search or filter keeps besides the matching rows. Defaults to
+   * `"ancestors-and-descendants"`: each match's ancestors and its whole
+   * subtree. `"ancestors"` keeps only the ancestors.
+   */
+  matchContext?: TreeMatchContext;
+}
+
+/** `TreeMetaInput` with its defaults resolved. */
+export type TreeMeta = TableTree;
 
 /** Per-column metadata for display and behavior */
 export interface ColumnMeta {
@@ -156,9 +185,12 @@ export interface SapportaMeta {
    * visible application columns by default.
    */
   search: NormalizedTableSearch;
+  /** Same-table parent/child rows. Absent for an ordinary flat table. */
+  tree?: TreeMeta;
 }
 
 type SapportaMetaDefaultedField =
+  | "tree"
   | "label"
   | "immutable"
   | "rowScope"
@@ -184,6 +216,8 @@ export type SapportaTableInputMeta = Omit<
   columns?: Record<string, ColumnMeta>;
   /** Defaults to `"allColumns"`. Use `false` to disable table search. */
   search?: TableSearch;
+  /** Rows of this table form a tree through a self-referencing column. */
+  tree?: TreeMetaInput;
   /**
    * Defaults to `workspaceUserScoped`, the strictest row boundary. Use
    * `workspaceGlobal` or `systemGlobal` only for data that intentionally has a
@@ -297,10 +331,11 @@ export function isAutoManagedTimestampColumn(name: string): boolean {
 
 function normalizeSapportaMeta(
   sqlName: string,
-  columnNames: readonly string[],
+  tableColumns: readonly { name: string; notNull: boolean }[],
   input: SapportaTableInputMeta,
   factoryColumns: ReadonlyMap<string, FactoryColumnMeta>,
 ): SapportaMeta {
+  const columnNames = tableColumns.map((column) => column.name);
   if (input.rowLabelColumns.length === 0) {
     throw new Error(
       `Table "${sqlName}" must declare at least one row label column.`,
@@ -337,8 +372,14 @@ function normalizeSapportaMeta(
     columns[name] = meta;
   }
 
+  const { tree: treeInput, ...rest } = input;
+  const tree = treeInput
+    ? normalizeTreeMeta(sqlName, tableColumns, treeInput, input, columns)
+    : undefined;
+
   return {
-    ...input,
+    ...rest,
+    ...(tree ? { tree } : {}),
     label: input.label ?? sqlName,
     immutable: input.immutable ?? false,
     rowScope: input.rowScope ?? "workspaceUserScoped",
@@ -348,6 +389,48 @@ function normalizeSapportaMeta(
     columns,
     search: normalizeTableSearch(input.search),
   };
+}
+
+// Table-local checks. Whether `parentColumn` is a foreign key to this table's
+// primary key needs the other tables, so the catalog checks it at boot.
+function normalizeTreeMeta(
+  sqlName: string,
+  tableColumns: readonly { name: string; notNull: boolean }[],
+  tree: TreeMetaInput,
+  input: SapportaTableInputMeta,
+  columns: Record<string, ColumnMeta>,
+): TreeMeta {
+  const parent = tableColumns.find(
+    (column) => column.name === tree.parentColumn,
+  );
+  if (!parent) {
+    throw new Error(
+      `Table "${sqlName}" tree.parentColumn names unknown column "${tree.parentColumn}".`,
+    );
+  }
+  if (parent.notNull) {
+    throw new Error(
+      `Table "${sqlName}" tree.parentColumn "${tree.parentColumn}" must be nullable, so top-level rows can have no parent.`,
+    );
+  }
+  const resolved = resolveTableTree(tree, input.rowLabelColumns);
+  const column = resolved.column;
+  if (!tableColumns.some((candidate) => candidate.name === column)) {
+    throw new Error(
+      `Table "${sqlName}" tree.column names unknown column "${column}".`,
+    );
+  }
+  if (columns[column]?.visuallyHidden === true) {
+    throw new Error(
+      `Table "${sqlName}" tree.column "${column}" is hidden, so it cannot show the hierarchy.`,
+    );
+  }
+  if (input.children?.some((child) => child.table === sqlName)) {
+    throw new Error(
+      `Table "${sqlName}" declares a tree and also lists itself in meta.children. Remove the self-referencing child.`,
+    );
+  }
+  return resolved;
 }
 
 /**
@@ -391,7 +474,7 @@ export function sapportaTable<TTable extends AnySQLiteTable>(
     sqlName: config.name,
     meta: normalizeSapportaMeta(
       config.name,
-      columnNames,
+      config.columns,
       options.meta,
       drained,
     ),

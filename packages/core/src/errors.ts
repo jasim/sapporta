@@ -151,7 +151,8 @@ export type QueryParseErrorCode =
   | "op_not_applicable"
   | "bad_limit"
   | "bad_page"
-  | "no_search_config";
+  | "no_search_config"
+  | "no_tree_config";
 
 export class QueryParseError extends Error {
   public readonly code: QueryParseErrorCode;

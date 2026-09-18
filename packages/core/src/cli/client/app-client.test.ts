@@ -76,6 +76,22 @@ describe("SapportaCliClient", () => {
     expect(url.searchParams.get("filter[id][in]")).toBe("1,2,3");
   });
 
+  it("maps row list --fixed to fixed parameters beside the filters", async () => {
+    mockJsonResponse({ data: [] });
+
+    await new SapportaCliClient(LOCAL).listRows("accounts", {
+      q: "taxes",
+      tree: "ancestors",
+      where: { name: { contains: "tax" } },
+      fixed: { archived: { eq: false } },
+    });
+
+    const url = lastRequestUrl();
+    expect(url.searchParams.get("tree")).toBe("ancestors");
+    expect(url.searchParams.get("filter[name][contains]")).toBe("tax");
+    expect(url.searchParams.get("fixed[archived][eq]")).toBe("false");
+  });
+
   it("maps row count semantics and filters to the scoped endpoint", async () => {
     mockJsonResponse({ data: [] });
 
