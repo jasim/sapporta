@@ -95,6 +95,7 @@ export function Grid({
   const className = levelContainerClassName?.(chromeContext);
   const style = levelContainerStyle?.(chromeContext);
   const depth = decomposePath(path).edges.length;
+  const isTreeLevel = runtime.schemaAt(path).tree !== undefined;
 
   useEffect(() => {
     const node = containerRef.current;
@@ -135,7 +136,7 @@ export function Grid({
       ref={containerRef}
       className={cn(styles.root, className)}
       tabIndex={0}
-      role="grid"
+      role={isTreeLevel ? "treegrid" : "grid"}
       {...gridRootIdentityAttrs(path)}
       data-grid-presentation={presentation}
       data-grid-depth={depth}

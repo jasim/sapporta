@@ -5,7 +5,7 @@ export {
   type LoadedRowsBoundaryEvent,
   type RuntimeArgs,
 } from "./runtime";
-export type { GridLevelRuntime } from "./grid-level-runtime";
+export type { GridLevelRuntime, GridLevelTree } from "./grid-level-runtime";
 export type { RowOperationTarget, RowRemovalResult } from "./row-operations";
 export type { GridActiveRow } from "./grid-active-row";
 export type {

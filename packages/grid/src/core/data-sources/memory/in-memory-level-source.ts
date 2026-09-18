@@ -25,6 +25,9 @@
 //     not exposed as a generic grid command.
 //   - `sortMode: 'none'` / `filterMode: 'none'` means the source does not
 //     expose that query capability.
+//   - With `tree`, a client filter keeps each match's ancestors (and, by
+//     default, its descendants) and publishes the ancestors that do not match
+//     as `treeContextRowKeys`. Sorting orders siblings at every depth.
 //
 // Aggregation: when an `aggregator` is supplied, it runs after
 // sort/filter/window and its rollup payloads are merged into `node.rollup`
@@ -39,7 +42,11 @@
 // Input rows are structurally snapshotted on ingress so external mutation of
 // nodes, columns, children, or footers cannot alter published source state.
 
-import type { ColId, RowKey } from "../../types/identity";
+import {
+  rowKeyListsEqual,
+  type ColId,
+  type RowKey,
+} from "../../types/identity";
 import type { ColumnSchema } from "../../types/schema";
 import type { FooterRow, TreeNode } from "../../types/level-row";
 import type { RowPredicate, SortDescriptor } from "../../pipeline/types";
@@ -60,8 +67,10 @@ import type {
 } from "../types";
 import {
   filterSourceNodes,
+  filterTreeSourceNodes,
   sliceSourceNodes,
   sortSourceNodes,
+  type TreeMatchContext,
 } from "../query-shaping";
 import {
   createStructuralSnapshotCache,
@@ -102,6 +111,13 @@ export type InMemoryLevelSourceOpts<F = unknown> = {
   // when `'none'`. Construction throws when this combination is wired
   // wrong, surfacing the contract at the boundary.
   compileFilter?: (filter: F | undefined) => RowPredicate | undefined;
+  // The rows form a tree through this parent-key field (see
+  // `LevelSchema.tree`). A client filter then keeps matches in context.
+  tree?: {
+    readonly parentKeyField: string;
+    // Default "ancestors-and-descendants".
+    readonly matchContext?: TreeMatchContext;
+  };
 };
 
 type Core<F> = {
@@ -197,14 +213,26 @@ function buildCore<F>(opts: InMemoryLevelSourceOpts<F>): Core<F> {
   // recompute can reuse them when content didn't actually change.
   let lastNodes: readonly TreeNode[] | null = null;
   let lastFooterRows: readonly FooterRow[] | undefined = undefined;
+  let lastContextRowKeys: readonly RowKey[] | undefined = undefined;
 
   function recompute(): void {
     let pipelineNodes: readonly TreeNode[] = baseNodes;
 
     let predicate: RowPredicate | undefined;
+    let contextRowKeys: readonly RowKey[] | undefined;
     if (opts.filterMode === "client" && filter !== undefined) {
       predicate = opts.compileFilter!(filter);
-      pipelineNodes = filterSourceNodes(pipelineNodes, predicate);
+      if (opts.tree && predicate) {
+        const filtered = filterTreeSourceNodes(
+          pipelineNodes,
+          predicate,
+          opts.tree,
+        );
+        pipelineNodes = filtered.nodes;
+        contextRowKeys = filtered.contextRowKeys;
+      } else {
+        pipelineNodes = filterSourceNodes(pipelineNodes, predicate);
+      }
     }
 
     if (opts.sortMode === "client") {
@@ -265,16 +293,27 @@ function buildCore<F>(opts: InMemoryLevelSourceOpts<F>): Core<F> {
     const finalFooters = footerRowsEqual(lastFooterRows, immutableFooterRows)
       ? lastFooterRows
       : immutableFooterRows;
+    const finalContextRowKeys =
+      contextRowKeys && contextRowKeys.length > 0
+        ? rowKeyListsEqual(lastContextRowKeys, contextRowKeys)
+          ? lastContextRowKeys
+          : Object.freeze([...contextRowKeys])
+        : undefined;
 
-    const snapshot: LevelSnapshot = finalFooters
-      ? Object.freeze({ nodes: finalNodes, footerRows: finalFooters })
-      : Object.freeze({ nodes: finalNodes });
+    const snapshot: LevelSnapshot = Object.freeze({
+      nodes: finalNodes,
+      ...(finalFooters ? { footerRows: finalFooters } : {}),
+      ...(finalContextRowKeys
+        ? { treeContextRowKeys: finalContextRowKeys }
+        : {}),
+    });
 
     cachedSnapshot = snapshot;
     cachedState = Object.freeze({ status: "ready", snapshot });
     cachedRowKeyToBaseIdx = rowKeyToBaseIdx;
     lastNodes = finalNodes;
     lastFooterRows = finalFooters;
+    lastContextRowKeys = finalContextRowKeys;
   }
 
   function ensureFresh(): void {

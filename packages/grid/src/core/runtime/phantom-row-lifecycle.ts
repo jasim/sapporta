@@ -12,6 +12,7 @@ import {
 import type { LevelDataSource } from "../data-sources/types";
 import type { LevelSchema } from "../types/schema";
 import type { PhantomRow, PhantomRowsConfig } from "../types/level-row";
+import { treeParentKey } from "../types/tree";
 
 export type PhantomRowLifecycle = {
   // Empty writable levels should still offer a place to add the first row.
@@ -46,6 +47,14 @@ export type PhantomRowLifecycle = {
   ) => void;
   // Apps can decide what "blank" means for their own columns.
   readonly isBlank: (columns: Readonly<Record<ColId, unknown>>) => boolean;
+  // `isBlank` for a draft at `path`. In a tree level the parent-key field is
+  // ignored, so a child draft nobody typed into is still blank.
+  readonly isBlankDraft: (
+    path: GridPath,
+    columns: Readonly<Record<ColId, unknown>>,
+  ) => boolean;
+  // A draft row key that is free at `path`.
+  readonly nextDraftRowKey: (path: GridPath) => RowKey;
 };
 
 export type PhantomRowLifecycleDeps = {
@@ -68,6 +77,18 @@ export type PhantomRowLifecycleDeps = {
   ) => void;
   readonly commitPhantomRow: (path: GridPath, rowKey: RowKey) => void;
 };
+
+// Drafts of a tree level that name a parent are children added under a row.
+// They are not the level's append row: blank-row reuse and append eligibility
+// ignore them, and leaving one blank removes it.
+function treeParentKeyOf(
+  schema: LevelSchema,
+  columns: Readonly<Record<ColId, unknown>>,
+): RowKey | null {
+  return schema.tree
+    ? treeParentKey(columns[schema.tree.parentKeyField])
+    : null;
+}
 
 export function createPhantomRowLifecycle(
   deps: PhantomRowLifecycleDeps,
@@ -93,12 +114,31 @@ export function createPhantomRowLifecycle(
     return deps.schemaAt(path).options.allowPhantoms === true;
   }
 
+  function isBlankDraft(
+    path: GridPath,
+    columns: Readonly<Record<ColId, unknown>>,
+  ): boolean {
+    const tree = deps.schemaAt(path).tree;
+    if (!tree || !(tree.parentKeyField in columns)) return isBlank(columns);
+    const rest = { ...columns };
+    delete rest[tree.parentKeyField];
+    return isBlank(rest);
+  }
+
+  function isAppendDraft(path: GridPath, row: PhantomRow): boolean {
+    return treeParentKeyOf(deps.schemaAt(path), row.columns) === null;
+  }
+
   function blankEditingPhantom(path: GridPath): PhantomRow | null {
     return (
       deps
         .getPhantoms(path)
-        .find((row) => row.state.kind === "editing" && isBlank(row.columns)) ??
-      null
+        .find(
+          (row) =>
+            row.state.kind === "editing" &&
+            isAppendDraft(path, row) &&
+            isBlank(row.columns),
+        ) ?? null
     );
   }
 
@@ -116,6 +156,10 @@ export function createPhantomRowLifecycle(
     };
     deps.addPhantom(path, phantom);
     return phantom;
+  }
+
+  function nextDraftRowKey(path: GridPath): RowKey {
+    return makeRowKey(path, deps.getPhantoms(path));
   }
 
   function makeRowKey(path: GridPath, existing: readonly PhantomRow[]): RowKey {
@@ -150,7 +194,11 @@ export function createPhantomRowLifecycle(
     // saved or failed through the normal leave-and-commit path, not deleted
     // because the surrounding source moved out of append position.
     for (const phantom of deps.getPhantoms(path)) {
-      if (phantom.state.kind === "editing" && isBlank(phantom.columns)) {
+      if (
+        phantom.state.kind === "editing" &&
+        isAppendDraft(path, phantom) &&
+        isBlank(phantom.columns)
+      ) {
         deps.removePhantom(path, phantom.rowKey);
       }
     }
@@ -190,7 +238,14 @@ export function createPhantomRowLifecycle(
       .find((row) => row.rowKey === phantomKey);
     if (!phantom) return;
     if (phantom.state.kind !== "editing") return;
-    if (isBlank(phantom.columns)) return;
+    if (isBlankDraft(previous.path, phantom.columns)) {
+      // An untouched child draft was an abandoned "add child"; the append
+      // row stays so the level keeps a place to add rows.
+      if (!isAppendDraft(previous.path, phantom)) {
+        deps.removePhantom(previous.path, phantomKey);
+      }
+      return;
+    }
     deps.commitPhantomRow(previous.path, phantomKey);
   }
 
@@ -222,6 +277,8 @@ export function createPhantomRowLifecycle(
     onRowCursorChanging: onCursorChanging,
     setPhantomCell,
     isBlank,
+    isBlankDraft,
+    nextDraftRowKey,
   };
 }
 

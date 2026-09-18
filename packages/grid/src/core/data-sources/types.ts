@@ -26,6 +26,10 @@ export type LevelSnapshot = {
   readonly nodes: readonly TreeNode[];
   // Server-supplied or source-computed aggregates for this level.
   readonly footerRows?: readonly FooterRow[];
+  // Tree levels (`LevelSchema.tree`) only: rows present only because a
+  // descendant matched the source's filter. The grid styles them as context;
+  // it still does not filter.
+  readonly treeContextRowKeys?: readonly RowKey[];
 };
 
 export type LevelSourceState =
@@ -241,6 +245,8 @@ export type FetchPageResponse = {
   readonly nodes: readonly TreeNode[];
   readonly totalCount?: number;
   readonly footerRows?: readonly FooterRow[];
+  // See `LevelSnapshot.treeContextRowKeys`.
+  readonly treeContextRowKeys?: readonly RowKey[];
 };
 
 export type PatchCellRequest = {

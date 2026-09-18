@@ -54,6 +54,24 @@ export type LevelOptions = {
   readonly allowPhantoms?: boolean;
 };
 
+// Where a row sits in a tree level (`LevelSchema.tree`). Counts describe the
+// source snapshot plus drafts, not only the rows currently displayed: a
+// collapsed parent still reports its children.
+export type TreeRowFacts = {
+  // 0 = top level.
+  readonly depth: number;
+  // `null` at top level, including rows whose parent is missing.
+  readonly parentId: RowId | null;
+  readonly childCount: number;
+  // Always `false` for a row without children.
+  readonly expanded: boolean;
+  // 1-based position among the row's siblings.
+  readonly positionInSet: number;
+  readonly setSize: number;
+  // Present only because a descendant matched the source's filter.
+  readonly context: boolean;
+};
+
 export type TreeNode = {
   readonly rowKey: RowKey;
   readonly levelName: string;
@@ -77,6 +95,8 @@ export type LevelRow =
       readonly columns: Readonly<Record<ColId, unknown>>;
       readonly hasChildren: boolean;
       readonly source: TreeNode;
+      // Present only in a tree level.
+      readonly tree?: TreeRowFacts;
     }
   | {
       readonly kind: "rollup";
@@ -119,6 +139,8 @@ export type LevelRow =
       readonly rowSelectable: boolean;
       readonly columns: Readonly<Record<ColId, unknown>>;
       readonly source: PhantomRow;
+      // Present only in a tree level.
+      readonly tree?: TreeRowFacts;
     };
 
 export type LevelRowOfKind<Kind extends LevelRowKind> = Extract<
@@ -157,6 +179,11 @@ export function isFooterRow(row: LevelRow): row is FooterLevelRow {
 
 export function footerSourceForRow(row: LevelRow): FooterRow | null {
   return isFooterRow(row) ? row.source : null;
+}
+
+/** The tree facts of a row in a tree level, `undefined` in any other level. */
+export function treeFactsOf(row: LevelRow): TreeRowFacts | undefined {
+  return row.kind === "data" || row.kind === "phantom" ? row.tree : undefined;
 }
 
 export type DisplayedRowRef = {

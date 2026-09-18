@@ -87,8 +87,12 @@ export function snapshotLevelSnapshot(
   const footerRows = snapshot.footerRows
     ? snapshotFooterRows(snapshot.footerRows, cache)
     : undefined;
+  const treeContextRowKeys = snapshot.treeContextRowKeys
+    ? Object.freeze([...snapshot.treeContextRowKeys])
+    : undefined;
   return Object.freeze({
     nodes,
     ...(footerRows ? { footerRows } : {}),
+    ...(treeContextRowKeys ? { treeContextRowKeys } : {}),
   });
 }

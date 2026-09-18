@@ -2,12 +2,15 @@ import type { PhantomChannel } from "../data-sources/types";
 import {
   createDisplayedRowsStore,
   deriveDisplayedRowsState,
+  type DisplayedRowsInput,
   type DisplayedRowsInvalidationReason,
+  type DisplayedRowsState,
   type DisplayedRowsStore,
   type DisplayedRowsViewState,
 } from "../displayed-rows";
-import type { LevelSourceState } from "../data-sources/types";
-import type { GridPath, RowId } from "../types/identity";
+import type { LevelSnapshot, LevelSourceState } from "../data-sources/types";
+import type { TreeStructure } from "../types/tree";
+import { rowKeyOfRowId, type GridPath, type RowId } from "../types/identity";
 import type {
   DisplayedRows,
   DisplayedRowSequence,
@@ -25,6 +28,7 @@ export function createDisplayedRowsRuntime(args: {
   readonly assertLive: () => void;
   readonly sourceState: (path: GridPath) => LevelSourceState;
   readonly schemaAt: (path: GridPath) => LevelSchema;
+  readonly viewStateAt: (path: GridPath) => DisplayedRowsViewState;
   readonly beforeNotify: (path: GridPath) => void;
   readonly onFault: (error: unknown) => void;
   readonly onObserverError?: (error: unknown) => void;
@@ -34,7 +38,9 @@ export function createDisplayedRowsRuntime(args: {
   // resource after construction or observer cleanup failures.
   const stores = new Map<GridPath, DisplayedRowsStore>();
   const phantomUnsubscribes = new Map<GridPath, () => void>();
-  const emptyViewState: DisplayedRowsViewState = {};
+  // The last source snapshot whose parent loop was reported, per path. A loop
+  // is reported once per snapshot, not on every expand or draft edit.
+  const reportedLoopSnapshots = new Map<GridPath, LevelSnapshot>();
 
   function storeFor(path: GridPath): DisplayedRowsStore {
     let store = stores.get(path);
@@ -46,9 +52,13 @@ export function createDisplayedRowsRuntime(args: {
         schema: args.schemaAt(path),
         sourceSnapshot: args.sourceState(path).snapshot,
         phantomRows: args.phantoms.get(path),
-        viewState: emptyViewState,
+        viewState: args.viewStateAt(path),
       }),
-      deriveDisplayedRowsState,
+      deriveDisplayedRowsState: (input, previous) => {
+        const state = deriveDisplayedRowsState(input, previous);
+        reportTreeLoop(input, state);
+        return state;
+      },
       beforeNotify: () => args.beforeNotify(path),
       onObserverError: args.onObserverError,
     });
@@ -66,6 +76,23 @@ export function createDisplayedRowsRuntime(args: {
     return store;
   }
 
+  function reportTreeLoop(
+    input: DisplayedRowsInput,
+    state: DisplayedRowsState,
+  ): void {
+    const loopRowIds = state.tree?.loopRowIds ?? [];
+    if (loopRowIds.length === 0) return;
+    if (reportedLoopSnapshots.get(input.path) === input.sourceSnapshot) return;
+    reportedLoopSnapshots.set(input.path, input.sourceSnapshot);
+    const rowKeys = loopRowIds.map((rowId) => `"${rowKeyOfRowId(rowId)}"`);
+    reportObserverError(
+      new Error(
+        `Grid tree at path "${input.path}": the parent keys of rows ${rowKeys.join(", ")} form a loop. Those rows are shown at top level.`,
+      ),
+      args.onObserverError,
+    );
+  }
+
   function rows(path: GridPath): DisplayedRows {
     args.assertLive();
     return storeFor(path).getDisplayedRows();
@@ -79,6 +106,11 @@ export function createDisplayedRowsRuntime(args: {
   function row(path: GridPath, rowId: RowId): LevelRow | undefined {
     args.assertLive();
     return storeFor(path).getDisplayedRow(rowId);
+  }
+
+  function tree(path: GridPath): TreeStructure | null {
+    args.assertLive();
+    return storeFor(path).getTreeStructure();
   }
 
   function subscribeSequence(path: GridPath, listener: () => void) {
@@ -108,6 +140,7 @@ export function createDisplayedRowsRuntime(args: {
     const store = stores.get(path);
     if (store) cleanup(() => store.dispose());
     stores.delete(path);
+    reportedLoopSnapshots.delete(path);
   }
 
   function dispose(): void {
@@ -129,6 +162,7 @@ export function createDisplayedRowsRuntime(args: {
     rows,
     sequence,
     row,
+    tree,
     subscribeRows,
     subscribeSequence,
     subscribeRow,

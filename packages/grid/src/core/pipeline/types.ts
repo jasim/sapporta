@@ -1,5 +1,10 @@
 import type { ColId, RowKey } from "../types/identity";
-import type { FooterRow, PhantomRow, TreeNode } from "../types/level-row";
+import type {
+  FooterRow,
+  PhantomRow,
+  TreeNode,
+  TreeRowFacts,
+} from "../types/level-row";
 
 // ProtoRow is the intermediate shape carried through pipeline stages.
 // It mirrors LevelRow but carries `rowKey` instead of the final `id: RowId`;
@@ -11,6 +16,7 @@ export type ProtoRow =
       readonly columns: Readonly<Record<ColId, unknown>>;
       readonly hasChildren: boolean;
       readonly source: TreeNode;
+      readonly tree?: TreeRowFacts;
     }
   | {
       readonly kind: "rollup";
@@ -47,6 +53,7 @@ export type ProtoRow =
       readonly rowKey: RowKey;
       readonly columns: Readonly<Record<ColId, unknown>>;
       readonly source: PhantomRow;
+      readonly tree?: TreeRowFacts;
     };
 
 // Sort is the only per-column concern the grid takes a position on: a

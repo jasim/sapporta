@@ -729,6 +729,64 @@ export function createGridCoordinator(
     return null;
   }
 
+  // Row-list keys in a tree level follow the WAI-ARIA treegrid pattern:
+  // Right expands a collapsed parent and otherwise moves to its first child,
+  // Left collapses an expanded parent and otherwise moves to the parent, and
+  // Space toggles. A leaf does nothing on Right or Space.
+  function applyTreeRowIntent(
+    runtime: RuntimeKernel,
+    cursorManager: CursorManager,
+    active: RowCursor,
+    type: "expandActiveRow" | "collapseActiveRow" | "toggleActiveRowExpansion",
+  ): void {
+    const tree = runtime.treeExpansion;
+    const { path, rowId } = active;
+    const hasChildren = tree.hasChildren(path, rowId);
+    const expanded = tree.isExpanded(path, rowId);
+    if (type === "toggleActiveRowExpansion") {
+      if (hasChildren) tree.toggle(path, rowId);
+      return;
+    }
+    if (type === "expandActiveRow") {
+      if (!hasChildren) return;
+      if (!expanded) {
+        tree.expand(path, rowId);
+        return;
+      }
+      moveRowCursorWithinTree(
+        runtime,
+        cursorManager,
+        path,
+        tree.childrenOf(path, rowId)[0] ?? null,
+      );
+      return;
+    }
+    if (expanded) {
+      tree.collapse(path, rowId);
+      return;
+    }
+    moveRowCursorWithinTree(
+      runtime,
+      cursorManager,
+      path,
+      tree.parentOf(path, rowId),
+    );
+  }
+
+  function moveRowCursorWithinTree(
+    runtime: RuntimeKernel,
+    cursorManager: CursorManager,
+    path: GridPath,
+    target: RowId | null,
+  ): void {
+    if (!target) return;
+    if (!runtime.displayedRowsFor(path).rowById.get(target)?.rowSelectable) {
+      return;
+    }
+    cursorManager.moveRowCursorTo({ path, rowId: target });
+    runtime.controllerFor(path).revealRow(target);
+  }
+
   store.navigateRow = (fromPath, intent) => {
     const runtime = args.getRuntime();
     const cursorManager = args.getCursorManager();
@@ -739,6 +797,10 @@ export function createGridCoordinator(
     ) {
       const active = runtime.activeRowFor(fromPath);
       if (!active) return;
+      if (runtime.schemaAt(active.path).tree !== undefined) {
+        applyTreeRowIntent(runtime, cursorManager, active, intent.type);
+        return;
+      }
       if (runtime.schemaAt(active.path).childLevels.length === 0) return;
       const expanded =
         store.getState().expansion.get(active.path)?.has(active.rowId) ?? false;

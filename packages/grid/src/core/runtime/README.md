@@ -123,6 +123,22 @@ Source snapshots contain source-backed nodes and optional footers. Draft rows
 live in a separate phantom channel. The displayed-row store combines those
 inputs with the level schema and derives the complete row read model.
 
+A tree level (`LevelSchema.tree`) adds one more input: tree expansion. It is
+view state held per path, apart from the coordinator's `expansion` map, which
+records rows whose child levels are mounted. A tree row is expanded when it has
+children and `defaultExpanded` differs from whether the user toggled it, so
+rows that load later follow the default. Changing tree expansion re-derives the
+path's displayed rows with a `view` reason. The `withTree` stage turns the flat
+source rows into depth-first rows with `row.tree` facts and leaves out rows
+under a collapsed ancestor. After a collapse, a cursor on a hidden row moves to
+the nearest displayed ancestor, and a cell range is clamped the same way.
+
+Each new source snapshot also updates tree expansion before the rows are
+derived. Toggles for rows that left the snapshot are dropped. A snapshot with
+`treeContextRowKeys` is a filtered result. When a filtered result holds a
+different set of rows than the snapshot before it, every context row is
+expanded, so each match of a new filter is visible.
+
 The store exposes three subscription levels because the consumers have
 different work to do:
 
@@ -328,6 +344,8 @@ readable. Dynamic reads and commands fail after that level registration ends.
 - `grid-level-runtime.ts` creates the path-bound public API and tracks its
   subscriptions.
 - `displayed-rows.ts` owns one displayed-row store per path.
+- `tree-expansion.ts` owns tree-level expansion state and its source-driven
+  rules.
 - `interaction-runtime.ts` owns controllers and memoized interaction
   projections per path.
 - `mutations.ts` is the source write boundary.

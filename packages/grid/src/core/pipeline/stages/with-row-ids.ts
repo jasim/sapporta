@@ -22,6 +22,7 @@ export function withRowIds(rows: ProtoRow[], path: GridPath): LevelRow[] {
           columns: r.columns,
           hasChildren: r.hasChildren,
           source: r.source,
+          ...(r.tree ? { tree: r.tree } : {}),
         };
         break;
       case "rollup":
@@ -60,6 +61,7 @@ export function withRowIds(rows: ProtoRow[], path: GridPath): LevelRow[] {
           rowSelectable,
           columns: r.columns,
           source: r.source,
+          ...(r.tree ? { tree: r.tree } : {}),
         };
         break;
     }

@@ -99,8 +99,9 @@ export type BuildRowsRequest<F = unknown> = (
 
 // Source-owned query storage is the small in-source state container used by
 // embedded grids and child levels that do not expose table controls. It stores
-// only mutable user query values. Fixed constraints belong in
-// `buildRowsRequest`, where every fetch and every snapshot can see them.
+// only mutable user query values. Constraints that are fixed for the level,
+// such as a parent-row filter, belong to the endpoint: in `buildRowsRequest`
+// or in the `fetchPage` closure.
 export function sourceOwnedRowQuery<F = unknown>(
   initial: RowQuery<F>,
 ): RowQueryState<F> {
@@ -193,10 +194,11 @@ export function restLevelSource<F = unknown>(
   const structuralSnapshots = createStructuralSnapshotCache();
   let nodes: readonly TreeNode[] = Object.freeze([]);
   let footerRows: readonly FooterRow[] | undefined;
+  let treeContextRowKeys: readonly RowKey[] | undefined;
   let totalCount: number | undefined;
   // `displayRequest` is the effective request that describes the visible
-  // request. It includes host query values plus fixed filters, parent
-  // constraints, and defaults injected by `buildRowsRequest`.
+  // request. It includes host query values plus whatever `buildRowsRequest`
+  // adds, such as fixed filters, parent constraints, and defaults.
   let displayRequest: FetchPageRequest<F> | undefined;
 
   let cachedSnapshot: LevelSnapshot | null = null;
@@ -220,9 +222,11 @@ export function restLevelSource<F = unknown>(
   let disposed = false;
 
   function buildSnapshot(): LevelSnapshot {
-    return footerRows
-      ? Object.freeze({ nodes, footerRows })
-      : Object.freeze({ nodes });
+    return Object.freeze({
+      nodes,
+      ...(footerRows ? { footerRows } : {}),
+      ...(treeContextRowKeys ? { treeContextRowKeys } : {}),
+    });
   }
 
   function snapshot(): LevelSnapshot {
@@ -444,6 +448,9 @@ export function restLevelSource<F = unknown>(
           nodes = snapshotTreeNodes(fetchedNodes, structuralSnapshots);
           footerRows = res.footerRows
             ? snapshotFooterRows(res.footerRows, structuralSnapshots)
+            : undefined;
+          treeContextRowKeys = res.treeContextRowKeys
+            ? Object.freeze([...res.treeContextRowKeys])
             : undefined;
           totalCount = res.totalCount;
           const readyState = publishReady();

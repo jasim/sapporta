@@ -67,6 +67,11 @@ describe("ColumnSchema helpers", () => {
             isExpanded: () => false,
             toggle: () => {},
           },
+          treeExpansion: {
+            canToggle: () => false,
+            isExpanded: () => false,
+            toggle: () => {},
+          },
         },
       }),
     ).toEqual({

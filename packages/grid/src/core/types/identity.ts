@@ -292,6 +292,17 @@ export function coordsEqual(a: Coord, b: Coord): boolean {
   return a.rowId === b.rowId && a.colId === b.colId;
 }
 
+/** Compares two optional row-key lists element by element. */
+export function rowKeyListsEqual(
+  a: readonly RowKey[] | undefined,
+  b: readonly RowKey[] | undefined,
+): boolean {
+  if (a === b) return true;
+  if (!a || !b || a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false;
+  return true;
+}
+
 // The canonical location of the live focus across the whole grid. There is
 // at most one. Owned by the cursor manager; the coordinator stores it and the
 // controller for `path` mirrors `(rowId, colId)` as `liveCellFocus`.

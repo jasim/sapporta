@@ -52,6 +52,7 @@ function state(rows: LevelRow[]): DisplayedRowsState {
   return {
     displayedRows,
     displayedRowSequence: buildDisplayedRowSequence(displayedRows.rows),
+    tree: null,
   };
 }
 
@@ -92,10 +93,12 @@ describe("createDisplayedRowsStore", () => {
     const first: DisplayedRowsState = {
       displayedRows: displayed([rowA]),
       displayedRowSequence: sequence,
+      tree: null,
     };
     const second: DisplayedRowsState = {
       displayedRows: displayed([rowA2]),
       displayedRowSequence: sequence,
+      tree: null,
     };
     const store = createDisplayedRowsStore({
       readInput: input,
@@ -131,10 +134,12 @@ describe("createDisplayedRowsStore", () => {
     const first: DisplayedRowsState = {
       displayedRows: displayed([rowA]),
       displayedRowSequence: sequence,
+      tree: null,
     };
     const second: DisplayedRowsState = {
       displayedRows: displayed([rowA2]),
       displayedRowSequence: sequence,
+      tree: null,
     };
     const store = createDisplayedRowsStore({
       readInput: input,

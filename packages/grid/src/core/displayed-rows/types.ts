@@ -6,13 +6,17 @@ import type {
   PhantomRow,
 } from "../types/level-row";
 import type { LevelSchema } from "../types/schema";
+import type { TreeExpansionView, TreeStructure } from "../types/tree";
 
-// Reserved for body-owned UI state that changes what rows exist or where
-// they appear, but that is not source data and not transient interaction
-// state. Today no such state exists. Keeping the type explicit makes the
-// boundary visible: selection/focus/editing belong to the controller, while
-// only row-shape inputs belong in `DisplayedRowsInput`.
-export type DisplayedRowsViewState = Record<string, never>;
+// Body-owned UI state that changes what rows exist or where they appear, but
+// that is not source data and not transient interaction state. Keeping the
+// type explicit makes the boundary visible: selection/focus/editing belong to
+// the controller, while only row-shape inputs belong in `DisplayedRowsInput`.
+export type DisplayedRowsViewState = {
+  // Tree levels only: which rows are expanded. Collapsing a row removes its
+  // descendants from the displayed rows.
+  readonly treeExpansion?: TreeExpansionView;
+};
 
 // The complete recipe for one path's renderable body rows.
 //
@@ -38,6 +42,8 @@ export type DisplayedRowsInput = {
 export type DisplayedRowsState = {
   readonly displayedRows: DisplayedRows;
   readonly displayedRowSequence: DisplayedRowSequence;
+  // Tree levels only: the whole tree, rows hidden by collapse included.
+  readonly tree: TreeStructure | null;
 };
 
 // A reason is intentionally diagnostic, not semantic input. The store always

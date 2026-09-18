@@ -20,6 +20,42 @@ import type { LevelSchema } from "../types/schema";
 import type { RowOperationTarget } from "./row-operations";
 
 /**
+ * Expansion and structure of a tree level (`LevelSchema.tree`), whose rows
+ * form a tree through a parent-key field.
+ */
+export type GridLevelTree = {
+  /** Reads whether a row with children is expanded. A leaf reads `false`. */
+  isExpanded(rowId: RowId): boolean;
+  /** Shows a row's children. A leaf is left unchanged. */
+  expand(rowId: RowId): void;
+  /** Hides a row's descendants and moves a cursor out of them. */
+  collapse(rowId: RowId): void;
+  /** Applies `expand` or `collapse` from the row's current state. */
+  toggle(rowId: RowId): void;
+  /** Expands every row, including rows that load later. */
+  expandAll(): void;
+  /** Collapses every row, including rows that load later. */
+  collapseAll(): void;
+  /** Expands every ancestor of a row so that the row is displayed. */
+  reveal(rowId: RowId): void;
+  /** Reads a row's parent, or `null` for a top-level row. */
+  parentOf(rowId: RowId): RowId | null;
+  /** Reads a row's children in display order, including hidden ones. */
+  childrenOf(rowId: RowId): readonly RowId[];
+  /**
+   * Adds a draft row under a data row and reveals it. The draft's parent-key
+   * field holds the parent's row key unless `columns` supplies a value.
+   * Returns the draft's row id.
+   */
+  addChild(
+    parentRowId: RowId,
+    columns?: Readonly<Record<ColId, unknown>>,
+  ): RowId;
+  /** Observes expansion changes on this level. */
+  subscribe(listener: () => void): () => void;
+};
+
+/**
  * The public runtime for one registered grid path.
  *
  * Static fields remain readable after the level is unregistered. Dynamic
@@ -113,6 +149,12 @@ export type GridLevelRuntime = {
   /** Applies `expand` or `collapse` from the current expansion state. */
   toggleExpand(rowId: RowId): void;
 
+  /**
+   * Same-level tree rows. `null` unless the level declares `tree`. The
+   * `isExpanded`/`expand` family above concerns child levels instead.
+   */
+  readonly tree: GridLevelTree | null;
+
   /** Writes one data cell, or one draft cell when the row is a draft. */
   writeCell(coord: Coord, value: unknown): void;
   /** Sends one source-owned batch and emits one committed-mutation event. */
@@ -144,9 +186,10 @@ export type GridLevelRuntime = {
 /** Package-private construction ports. */
 export type GridLevelRuntimePorts = Omit<
   GridLevelRuntime,
-  "path" | "schema" | "data" | "drafts"
+  "path" | "schema" | "data" | "drafts" | "tree"
 > & {
   readonly drafts: GridLevelRuntime["drafts"];
+  readonly tree: GridLevelTree | null;
 };
 
 const disposersByLevel = new WeakMap<GridLevelRuntime, () => void>();
@@ -241,6 +284,7 @@ export function createGridLevelRuntime(args: {
   }
 
   const drafts = args.ports.drafts;
+  const tree = args.ports.tree;
   const level = Object.freeze({
     path: args.path,
     schema: args.schema,
@@ -286,6 +330,21 @@ export function createGridLevelRuntime(args: {
       setCell: command(drafts.setCell),
       commit: asyncCommand(drafts.commit),
     }),
+    tree: tree
+      ? Object.freeze({
+          isExpanded: command(tree.isExpanded),
+          expand: command(tree.expand),
+          collapse: command(tree.collapse),
+          toggle: command(tree.toggle),
+          expandAll: command(tree.expandAll),
+          collapseAll: command(tree.collapseAll),
+          reveal: command(tree.reveal),
+          parentOf: command(tree.parentOf),
+          childrenOf: command(tree.childrenOf),
+          addChild: command(tree.addChild),
+          subscribe: subscription(tree.subscribe),
+        })
+      : null,
   });
   disposersByLevel.set(level, () => {
     for (const unsubscribe of Array.from(subscriptions)) unsubscribe();

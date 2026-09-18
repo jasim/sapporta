@@ -390,6 +390,7 @@ export {
   createGridRuntime,
   type GridActiveRow,
   type GridLevelRuntime,
+  type GridLevelTree,
   type GridRowActivatedEvent,
   type GridRuntime,
   type RowOperationTarget,
@@ -425,6 +426,10 @@ export {
   ExpandableCellFrame,
   rowExpansionActivation,
   withRowExpansionColumn,
+  TreeCellFrame,
+  treeExpansionActivation,
+  withTreeColumn,
+  type TreeColumnOptions,
   type GridChromeContext,
   type GridStatusContext,
   type GridEmptyContext,
@@ -440,7 +445,7 @@ export {
   type GridCopyTarget,
 } from "./copy";
 
-export { validateLevelRowHeaderColumn } from "./schema";
+export { validateLevelRowHeaderColumn, validateLevelTree } from "./schema";
 
 export {
   hostBackedRowQuery,
@@ -448,6 +453,7 @@ export {
   restGridDataSource,
   sourceOwnedRowQuery,
   filterSourceNodes,
+  filterTreeSourceNodes,
   sortSourceNodes,
   sliceSourceNodes,
 } from "./data-sources";
@@ -478,6 +484,8 @@ export type {
   RowQuery,
   RowQueryChange,
   RowQueryState,
+  TreeFilterResult,
+  TreeMatchContext,
 } from "./data-sources";
 
 export type {
@@ -511,8 +519,10 @@ export type {
   CellEditorProps,
   RowHeaderColumn,
   LevelSchema,
+  LevelTreeConfig,
   GridSchema,
   TreeNode,
+  TreeRowFacts,
   LevelOptions,
   LevelRow,
   LevelRowKind,

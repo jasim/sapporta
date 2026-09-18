@@ -28,7 +28,10 @@ export function createDraftRuntime(args: {
     colId: ColId,
     value: unknown,
   ) => void;
-  readonly isBlank: (columns: Readonly<Record<ColId, unknown>>) => boolean;
+  readonly isBlank: (
+    path: GridPath,
+    columns: Readonly<Record<ColId, unknown>>,
+  ) => boolean;
   readonly emit: <E extends keyof GridEvents>(
     event: E,
     payload: GridEvents[E],
@@ -101,7 +104,7 @@ export function createDraftRuntime(args: {
           `GridRuntime.commitPhantomRow: phantom with rowKey "${rowKey}" at path "${path}" is already saving.`,
         );
       }
-      if (args.isBlank(phantom.columns)) {
+      if (args.isBlank(path, phantom.columns)) {
         throw new Error(
           `GridRuntime.commitPhantomRow: phantom with rowKey "${rowKey}" at path "${path}" is blank.`,
         );

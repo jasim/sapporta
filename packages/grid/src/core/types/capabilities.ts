@@ -4,9 +4,11 @@
 // keyboard handler, selection logic, and edit-start code, every check
 // goes through `capabilitiesFor(kind)`. Navigation skips non-focusable
 // rows; edit-start blocks on non-editable; cell range selection uses
-// `selectable`; row operation selection uses `rowSelectable`; expand chevron
-// renders iff `canExpand && row.hasChildren`. There is no other branching on
-// `kind` in the interaction layer.
+// `selectable`; row operation selection uses `rowSelectable`; the child-level
+// expand chevron renders iff the level declares child levels and the row
+// kind `canExpand`. (Tree levels decide their chevron from
+// `row.tree.childCount` instead.) There is no other branching on `kind` in
+// the interaction layer.
 //
 // `selectable` and `rowSelectable` are intentionally separate. A subtotal can
 // participate in a visual cell range but should not be a target for row

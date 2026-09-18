@@ -45,7 +45,7 @@
 import type { ComponentType, ReactNode } from "react";
 import type { CommitTarget } from "./action";
 import type { ColId, Coord, GridPath, RowId } from "./identity";
-import type { LevelOptions, LevelRow } from "./level-row";
+import type { LevelOptions, LevelRow, TreeNode } from "./level-row";
 
 export type CellEditGesture = "enter" | "type" | "doubleClick";
 export type NonTypedCellEditGesture = Exclude<CellEditGesture, "type">;
@@ -102,6 +102,15 @@ export type CellActivationColumnContext = {
 
 export type CellActionApi = {
   readonly rowExpansion: {
+    canToggle: (target: { path: GridPath; row: LevelRow }) => boolean;
+    isExpanded: (target: { path: GridPath; rowId: RowId }) => boolean;
+    toggle: (target: { path: GridPath; rowId: RowId }) => void;
+  };
+  /**
+   * Expansion of same-level tree rows (see `LevelSchema.tree`). A row can
+   * toggle only in a tree level and only while it has children.
+   */
+  readonly treeExpansion: {
     canToggle: (target: { path: GridPath; row: LevelRow }) => boolean;
     isExpanded: (target: { path: GridPath; rowId: RowId }) => boolean;
     toggle: (target: { path: GridPath; rowId: RowId }) => void;
@@ -206,6 +215,35 @@ export function describeCellActivation(
   return activation.describe(context);
 }
 
+/**
+ * Same-level parent/child rows: the rows of one level form a tree through a
+ * parent-key field, and render as one list under one header.
+ *
+ * Example: accounts whose `parent_id` column holds the row key of their
+ * parent account. The grid derives depth, visibility, and expansion from the
+ * flat rows a source delivers; the source keeps its sort and filter duties.
+ * The column wrapped with `withTreeColumn` draws the indentation and the
+ * expand control.
+ */
+export type LevelTreeConfig = {
+  /**
+   * Field in `TreeNode.columns` holding the parent's row key. `null`,
+   * `undefined`, and `""` mark a top-level row. The value is compared with
+   * row keys as `String(value)`.
+   */
+  readonly parentKeyField: string;
+  /**
+   * The value `addChild` writes into a new child's `parentKeyField`, read
+   * from the parent row. Supply it when the field holds a typed key, such as
+   * a number for an integer id, so a draft child stores the same value as
+   * the rows the source delivers. `String` of the value must equal the
+   * parent's row key. Default: the parent's row key.
+   */
+  readonly parentKeyValue?: (parent: TreeNode) => unknown;
+  /** Whether rows start expanded. Default `true`. */
+  readonly defaultExpanded?: boolean;
+};
+
 // Level/grid schema — static shape of a grid, separate from data.
 //
 // `GridSchema` is produced once by the host and passed to `createGridRuntime`.
@@ -219,6 +257,11 @@ export type LevelSchema = {
   // Names of child levels that hang off rows of this level. Order = render
   // order. A leaf level declares no children.
   readonly childLevels: readonly string[];
+  /**
+   * Same-level parent/child rows. A tree level declares no `childLevels`, so
+   * a row's expand control has one meaning.
+   */
+  readonly tree?: LevelTreeConfig;
 };
 
 export type GridSchema = {

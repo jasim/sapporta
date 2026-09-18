@@ -101,6 +101,82 @@ lines.writeCell({ rowId: lineId, colId: "quantity" }, 2);
 `runtime.registeredLevels()` returns every registered level, including retained
 collapsed levels. `runtime.subscribeLevels()` reports changes to that set.
 
+## Tree levels
+
+A tree level shows rows of one level that refer to each other, such as
+accounts with a `parent_id` column. All rows share one header and one set of
+columns. The hierarchy is shown only in the tree column: each row is indented
+by its depth, and a row with children has a chevron that expands or collapses
+it. This is different from `childLevels`, where an expanded row opens a nested
+grid of another level with its own header.
+
+A level becomes a tree level when it declares `tree`. `parentKeyField` names
+the field of `TreeNode.columns` that holds the parent's row key. A `null`,
+`undefined`, or `""` value marks a top-level row. `withTreeColumn` makes a
+column the tree column: it adds the indentation and the chevron.
+
+```ts
+import { withTreeColumn, type GridSchema } from "@sapporta/grid";
+
+const schema = {
+  rootLevel: "accounts",
+  levels: {
+    accounts: {
+      name: "accounts",
+      rowHeaderColumn: "none",
+      columns: [
+        withTreeColumn({
+          id: "name",
+          name: "Account",
+          renderCell: ({ value }) => String(value ?? ""),
+        }),
+      ],
+      options: {},
+      childLevels: [],
+      tree: { parentKeyField: "parent_id" },
+    },
+  },
+} satisfies GridSchema;
+```
+
+The source still delivers a flat list, already sorted and filtered. The grid
+builds the tree from that list, so a sort orders the siblings at every depth.
+Rows start expanded unless `tree.defaultExpanded` is `false`. A row whose
+parent is not in the list is shown at top level, and a parent loop is cut and
+reported through `onObserverError`.
+
+`level.tree` expands and collapses rows, reads parents and children, and adds
+a draft child under a row with `addChild`. The draft's parent-key field is
+filled in, so committing the draft creates the row under that parent.
+Collapsing a row moves the cursor out of the hidden rows, and hidden rows
+leave the row selection. The `treeExpansionChanged` event reports each
+expansion change.
+
+`addChild` fills the parent-key field with the parent's row key, which is a
+string. When the field holds a typed key, such as a number, set
+`tree.parentKeyValue` to read that value from the parent row:
+
+```ts
+tree: {
+  parentKeyField: "parent_id",
+  parentKeyValue: (parent) => parent.columns.id,
+},
+```
+
+A tree level declares no `childLevels`. Call `validateLevelTree` to check a
+level's tree declaration before you create a runtime.
+
+In a row list with `activeRow.keyboard.expansion: "enabled"`, Right expands a
+row or moves to its first child, Left collapses a row or moves to its parent,
+and Space toggles. In a cell grid, Space on the tree column toggles.
+
+A filtered tree must stay connected. The in-memory source keeps each match's
+ancestors, and by default each match's descendants
+(`treeMatchContext: "ancestors"` keeps only the ancestors). A custom source
+lists ancestors that do not match themselves in
+`LevelSnapshot.treeContextRowKeys`. Those rows are marked with
+`data-tree-context` and `row.tree.context`, so they can be styled as context.
+
 ## State and events
 
 The runtime exposes identity-stable snapshots with matching invalidation

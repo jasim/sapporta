@@ -50,4 +50,10 @@ export {
   rowExpansionActivation,
   withRowExpansionColumn,
 } from "./cells/ExpandableCellFrame";
+export {
+  TreeCellFrame,
+  treeExpansionActivation,
+  withTreeColumn,
+  type TreeColumnOptions,
+} from "./cells/TreeCellFrame";
 export { CellEditorOverlay } from "./cells/CellEditorOverlay";

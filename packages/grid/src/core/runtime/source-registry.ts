@@ -1,4 +1,8 @@
-import type { GridPath, RowKey } from "../types/identity";
+import {
+  rowKeyListsEqual,
+  type GridPath,
+  type RowKey,
+} from "../types/identity";
 import type { TreeNode } from "../types/level-row";
 import {
   createObserverList,
@@ -72,6 +76,9 @@ export function createSourceRegistry(args: {
   readonly runOperation: <T>(operation: () => Promise<T>) => Promise<T>;
   readonly onRefresh: (refresh: SourceRefresh) => void;
   readonly onReconcile: (handle: LevelHandle, event: ReconcileEvent) => void;
+  // Level-specific node rules, such as the row shapes a tree level accepts.
+  // A violation is treated like a row-identity failure.
+  readonly validateNodes?: (path: GridPath, nodes: readonly TreeNode[]) => void;
   readonly onObserverError?: (error: unknown) => void;
 }) {
   // `entries` contains only current registrations. `entriesByHandle` also
@@ -84,6 +91,7 @@ export function createSourceRegistry(args: {
     readonly TreeNode[],
     {
       readonly footerRows: LevelSnapshot["footerRows"];
+      readonly treeContextRowKeys: LevelSnapshot["treeContextRowKeys"];
       readonly snapshot: LevelSnapshot;
     }
   >();
@@ -139,7 +147,11 @@ export function createSourceRegistry(args: {
     const existing = adaptedSourceSnapshots.get(snapshot);
     if (existing) return existing;
     const byNodes = adaptedSnapshotsByNodes.get(snapshot.nodes);
-    if (byNodes && byNodes.footerRows === snapshot.footerRows) {
+    if (
+      byNodes &&
+      byNodes.footerRows === snapshot.footerRows &&
+      rowKeyListsEqual(byNodes.treeContextRowKeys, snapshot.treeContextRowKeys)
+    ) {
       adaptedSourceSnapshots.set(snapshot, byNodes.snapshot);
       return byNodes.snapshot;
     }
@@ -147,6 +159,7 @@ export function createSourceRegistry(args: {
     adaptedSourceSnapshots.set(snapshot, adapted);
     adaptedSnapshotsByNodes.set(snapshot.nodes, {
       footerRows: snapshot.footerRows,
+      treeContextRowKeys: snapshot.treeContextRowKeys,
       snapshot: adapted,
     });
     return adapted;
@@ -156,6 +169,7 @@ export function createSourceRegistry(args: {
     try {
       const adapted = snapshotSourceState(next, adaptSnapshot);
       assertUniqueNodeKeys(adapted.snapshot.nodes, entry.path);
+      args.validateNodes?.(entry.path, adapted.snapshot.nodes);
       if ("previous" in adapted) {
         assertUniqueNodeKeys(adapted.previous.nodes, entry.path);
       }

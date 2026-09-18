@@ -209,3 +209,40 @@
 :where(.root) [data-grid-part="expand-content"] > * {
   max-width: 100%;
 }
+
+/* Tree levels: the tree column indents by depth and keeps a chevron-sized
+ * slot on every row, so content at the same depth lines up whether or not a
+ * row has children. */
+:where(.root) [data-grid-part="tree-cell"] {
+  align-items: center;
+  box-sizing: border-box;
+  display: inline-flex;
+  gap: var(--grid-tree-gap, 2px);
+  max-width: 100%;
+  min-width: 0;
+  overflow: hidden;
+  padding-inline-start: calc(
+    var(--grid-tree-depth, 0) * var(--grid-tree-indent, 16px)
+  );
+  white-space: nowrap;
+  width: 100%;
+}
+
+:where(.root) [data-grid-part="tree-chevron"],
+:where(.root) [data-grid-part="tree-placeholder"] {
+  flex: 0 0 auto;
+  height: var(--grid-tree-chevron-size, 20px);
+  width: var(--grid-tree-chevron-size, 20px);
+}
+
+:where(.root) [data-grid-part="tree-content"] {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+:where(.root) [data-grid-part="tree-content"] > * {
+  max-width: 100%;
+}

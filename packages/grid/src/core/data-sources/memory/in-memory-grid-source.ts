@@ -29,12 +29,16 @@ import {
   type InMemoryLevelSourceOpts,
 } from "./in-memory-level-source";
 import type { GridDataSource, LevelDataSource } from "../types";
+import type { TreeMatchContext } from "../query-shaping";
 
 export type InMemoryLevelOpts<F = unknown> = Omit<
   InMemoryLevelSourceOpts<F>,
-  "initialNodes" | "columns" | "options"
+  "initialNodes" | "columns" | "options" | "tree"
 > & {
   readonly?: boolean;
+  // For a tree level (`LevelSchema.tree`): what a client filter keeps
+  // besides matches. Default "ancestors-and-descendants".
+  treeMatchContext?: TreeMatchContext;
 };
 
 export type InMemoryGridDataSourceOpts<F = unknown> = {
@@ -76,12 +80,24 @@ export function inMemoryGridDataSource<F = unknown>(
         `inMemoryGridDataSource: opts.levels has no entry for level '${levelName}'`,
       );
     }
-    const { readonly: readonlySource, ...sourceOpts } = levelOpts;
+    const {
+      readonly: readonlySource,
+      treeMatchContext,
+      ...sourceOpts
+    } = levelOpts;
     const args = {
       initialNodes,
       columns: levelSchema.columns,
       ...sourceOpts,
       footerRows: footerRows ?? sourceOpts.footerRows,
+      ...(levelSchema.tree
+        ? {
+            tree: {
+              parentKeyField: levelSchema.tree.parentKeyField,
+              ...(treeMatchContext ? { matchContext: treeMatchContext } : {}),
+            },
+          }
+        : {}),
     };
     const src = readonlySource
       ? inMemoryReadonlyLevelSource<F>(args)

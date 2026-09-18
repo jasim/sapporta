@@ -23,7 +23,7 @@
 // rows or the active row can change `selectedRows()`, `selectedRowIds()`, or
 // `rowInteractionSnapshot()` without producing a stored-selection event.
 
-import type { Coord, GridPath, RowKey } from "../types/identity";
+import type { Coord, GridPath, RowId, RowKey } from "../types/identity";
 import type { LevelStatus, ReconcileEvent } from "../data-sources/types";
 import type { TreeNode } from "../types/level-row";
 import type { CellSelectionState } from "../types/selection";
@@ -115,6 +115,14 @@ export type GridEvents = {
     readonly coord: Coord;
     readonly trigger: CellActivationTrigger;
     readonly error: unknown;
+  };
+  // A row of a tree level (`LevelSchema.tree`) was expanded or collapsed.
+  // `rowId` is `null` when every row changed at once (`expandAll` or
+  // `collapseAll`). Hosts that persist expansion listen to this.
+  treeExpansionChanged: {
+    readonly path: GridPath;
+    readonly rowId: RowId | null;
+    readonly expanded: boolean;
   };
 };
 

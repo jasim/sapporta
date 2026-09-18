@@ -19,6 +19,8 @@
 //     of itself.
 //   - No diamond: a child level name cannot be declared by two parents.
 //   - The rootLevel must exist in `schema.levels`.
+//   - A tree level (`LevelSchema.tree`) names a parent-key field and
+//     declares no `childLevels`, so an expand control has one meaning.
 //
 // `childLevels` order is semantically significant: it determines the render order
 // of child levels under an expanded row.
@@ -49,6 +51,7 @@ export function buildSchemaTopology(schema: GridSchema): SchemaTopology {
 
   for (const name of levelNames) {
     validateLevelColumns(name, schema.levels[name]);
+    validateLevelTree(name, schema.levels[name]);
   }
 
   // Invert `level.childLevels`: build child → parent. Detect duplicate
@@ -165,6 +168,27 @@ export function validateLevelRowHeaderColumn(
   if (column.edit) {
     throw new Error(
       `${label}: level "${levelName}" rowHeaderColumn requested column "${requested}", but it is editable; row-header columns must be readonly (left-most column: "${leftMost}"; available columns: ${available})`,
+    );
+  }
+}
+
+// Hosts that build a level schema can call this before creating a runtime,
+// so a bad tree declaration is reported where it was made.
+export function validateLevelTree(
+  levelName: string,
+  level: Pick<LevelSchema, "tree" | "childLevels">,
+  label = "SchemaTopology",
+): void {
+  const tree = level.tree;
+  if (!tree) return;
+  if (typeof tree.parentKeyField !== "string" || tree.parentKeyField === "") {
+    throw new Error(
+      `${label}: tree level "${levelName}" must name a parentKeyField`,
+    );
+  }
+  if (level.childLevels.length > 0) {
+    throw new Error(
+      `${label}: tree level "${levelName}" cannot also declare child levels (${level.childLevels.join(", ")})`,
     );
   }
 }

@@ -24,8 +24,11 @@ export type {
 
 export {
   filterSourceNodes,
+  filterTreeSourceNodes,
   sortSourceNodes,
   sliceSourceNodes,
+  type TreeFilterResult,
+  type TreeMatchContext,
 } from "./query-shaping";
 
 export type { AncestorEntry, AncestorChain } from "./rest/ancestor";

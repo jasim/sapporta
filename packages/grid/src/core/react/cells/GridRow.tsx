@@ -4,6 +4,7 @@ import type { RowInteractionStatus } from "../../types/row-selection";
 import type { ColumnSchema, RowHeaderColumn } from "../../types/schema";
 import { cardRoleOf } from "../../types/presentation";
 import { capabilitiesFor } from "../../types/capabilities";
+import { treeFactsOf } from "../../types/level-row";
 import { useDisplayedRow, useGridRuntime } from "../GridRuntimeProvider";
 import type { GridPresentation } from "../Grid";
 import {
@@ -59,6 +60,7 @@ export const GridRow = memo(function GridRow({
   const row = useDisplayedRow(path, rowId);
   const { active, selected } =
     rowChromeStateFromInteractionStatus(rowInteractionStatus);
+  const tree = treeFactsOf(row);
 
   return (
     <div
@@ -73,6 +75,12 @@ export const GridRow = memo(function GridRow({
       data-row-interaction-status={rowInteractionStatus}
       data-row-selectable={String(capabilitiesFor(row.kind).rowSelectable)}
       data-has-row-header={rowHeaderColumn !== "none" ? "true" : undefined}
+      data-tree-depth={tree?.depth}
+      data-tree-context={tree?.context ? "true" : undefined}
+      aria-level={tree ? tree.depth + 1 : undefined}
+      aria-expanded={tree && tree.childCount > 0 ? tree.expanded : undefined}
+      aria-setsize={tree?.setSize}
+      aria-posinset={tree?.positionInSet}
       aria-selected={selected ? true : undefined}
       role="row"
       onMouseDown={(event) => {

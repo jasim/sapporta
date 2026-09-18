@@ -9,6 +9,7 @@ import type {
   DisplayedRowsInvalidationReason,
   DisplayedRowsState,
 } from "./types";
+import type { TreeStructure } from "../types/tree";
 import {
   createObserverList,
   type ObserverErrorReporter,
@@ -29,6 +30,8 @@ export type DisplayedRowsStore = {
   getDisplayedRows(): DisplayedRows;
   getDisplayedRowSequence(): DisplayedRowSequence;
   getDisplayedRow(rowId: RowId): LevelRow | undefined;
+  /** Tree levels only: the whole tree, including rows hidden by collapse. */
+  getTreeStructure(): TreeStructure | null;
   invalidateDisplayedRows(reason: DisplayedRowsInvalidationReason): void;
   /**
    * Observes the complete displayed-row value.
@@ -84,6 +87,9 @@ export function createDisplayedRowsStore(
     },
     getDisplayedRow(rowId) {
       return current.displayedRows.rowById.get(rowId);
+    },
+    getTreeStructure() {
+      return current.tree;
     },
     invalidateDisplayedRows(_reason) {
       if (disposed) return;

@@ -129,6 +129,12 @@
   opacity: 0.72;
 }
 
+/* Tree levels: a row present only as the ancestor of a filter match reads as
+   context, not as a result. */
+:where(.presetGrid [data-grid-part="row"][data-tree-context="true"]) {
+  color: var(--grid-tree-context-color, var(--sap-fg-muted));
+}
+
 :where(.presetGrid [data-row-phantom-state="failed"]) {
   --grid-row-base-background: color-mix(
     in oklab,
@@ -563,6 +569,35 @@
   .presetGrid
     [data-grid-part="cell"][data-cell-status="focus"]
     [data-grid-part="expand-chevron"]
+) {
+  background: var(--sap-row-hover);
+  color: var(--sap-fg);
+}
+
+:where(.presetGrid [data-grid-part="tree-cell"]) {
+  --grid-tree-indent: var(--sap-grid-tree-indent, 18px);
+}
+
+:where(.presetGrid [data-grid-part="tree-chevron"]) {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  border-radius: var(--sap-radius-sm);
+  color: var(--sap-fg-subtle);
+  cursor: pointer;
+  display: inline-flex;
+  justify-content: center;
+  padding: 0;
+  transition:
+    background 120ms ease,
+    color 120ms ease;
+}
+
+:where(
+  .presetGrid [data-grid-part="tree-chevron"]:hover,
+  .presetGrid
+    [data-grid-part="cell"][data-cell-status="focus"]
+    [data-grid-part="tree-chevron"]
 ) {
   background: var(--sap-row-hover);
   color: var(--sap-fg);

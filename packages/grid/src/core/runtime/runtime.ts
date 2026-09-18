@@ -86,6 +86,8 @@ import {
   childPath as makeChildPath,
   cursorEqual,
   decomposePath,
+  kindOfRowId,
+  makeLevelRowId,
   makeRowId,
   pathOfRowId,
   phantomKeyFromDisplayedRowId,
@@ -140,6 +142,7 @@ import type {
   LevelSchema,
 } from "../types/schema";
 import { describeCellActivation } from "../types/schema";
+import { treeAncestors } from "../types/tree";
 import {
   createObserverList,
   reportObserverError,
@@ -192,6 +195,10 @@ import {
 } from "./source-registry";
 import { createDisplayedRowsRuntime } from "./displayed-rows";
 import {
+  createTreeExpansionRuntime,
+  type TreeExpansionRuntime,
+} from "./tree-expansion";
+import {
   createLoadedBoundaryRuntime,
   type LoadedRowsBoundaryEvent,
 } from "./loaded-boundary";
@@ -204,6 +211,7 @@ import {
   createGridLevelRuntime,
   disposeGridLevelRuntime,
   type GridLevelRuntime,
+  type GridLevelTree,
 } from "./grid-level-runtime";
 import { createGridActiveRow, type GridActiveRow } from "./grid-active-row";
 export type { GridActiveRow } from "./grid-active-row";
@@ -323,6 +331,18 @@ export type RuntimeKernel = {
     path: GridPath,
     reason: DisplayedRowsInvalidationReason,
   ) => void;
+  // Same-level tree rows (`LevelSchema.tree`). Every method is a no-op or
+  // empty read on a path that is not a tree level.
+  treeExpansion: Pick<
+    TreeExpansionRuntime,
+    | "hasChildren"
+    | "isExpanded"
+    | "expand"
+    | "collapse"
+    | "toggle"
+    | "parentOf"
+    | "childrenOf"
+  >;
   sourceStateFor: (path: GridPath) => LevelSourceState;
   controllerFor: (path: GridPath) => GridControllerPublic;
   cellActivationFor: (
@@ -574,6 +594,8 @@ export function createGridRuntime(args: RuntimeArgs): GridRuntime {
       if (!shutdownRequested)
         emitter.emit("cellReconciled", { path: handle.path, event });
     },
+    validateNodes: (path, nodes) =>
+      assertTreeLevelNodes(schemaForPath(path), path, nodes),
     onObserverError: args.onObserverError,
   });
 
@@ -583,13 +605,31 @@ export function createGridRuntime(args: RuntimeArgs): GridRuntime {
   // registered source, phantoms from the author-state channel, and body view
   // state. Components consume cached projections from this store; they do not
   // assemble or memoize row data in render.
+  // Tree expansion and displayed rows read each other: derivation needs the
+  // expansion view, and expansion commands need the derived tree structure.
+  // The binding is late so each can be constructed first.
+  let treeExpansion: TreeExpansionRuntime;
   const displayedRowsRuntime = createDisplayedRowsRuntime({
     phantoms,
     assertLive,
     sourceState: sourceRegistry.state,
     schemaAt: schemaForPath,
+    viewStateAt: (path) => treeExpansion.viewState(path),
     beforeNotify: reconcileRowSelection,
     onFault: faultRuntime,
+    onObserverError: args.onObserverError,
+  });
+  treeExpansion = createTreeExpansionRuntime({
+    schemaAt: schemaForPath,
+    treeStructure: displayedRowsRuntime.tree,
+    invalidate: (path) => invalidateDisplayedRows(path, { type: "view" }),
+    afterChange: (path) => keepCursorInDisplayedTree(path),
+    announce: (path, changes) => {
+      if (shutdownRequested) return;
+      for (const change of changes) {
+        emitter.emit("treeExpansionChanged", { path, ...change });
+      }
+    },
     onObserverError: args.onObserverError,
   });
   const mutations = createMutationRuntime({
@@ -616,7 +656,7 @@ export function createGridRuntime(args: RuntimeArgs): GridRuntime {
     createRow: mutations.createRow,
     setLifecycleCell: (path, rowKey, colId, value) =>
       phantomLifecycle.setPhantomCell(path, rowKey, colId, value),
-    isBlank: phantomLifecycle.isBlank,
+    isBlank: phantomLifecycle.isBlankDraft,
     emit: emitter.emit,
     isDisposed: () => shutdownRequested,
   });
@@ -683,7 +723,9 @@ export function createGridRuntime(args: RuntimeArgs): GridRuntime {
     if (shutdownRequested) return;
     phantomLifecycle.reconcileBlankAppendPhantoms(path);
     phantomLifecycle.ensureBlankForEmptyPath(path);
+    const treeChanges = treeExpansion.reconcileSnapshot(path, state.snapshot);
     invalidateDisplayedRows(path, { type: "source" });
+    treeExpansion.announceSnapshotChanges(path, treeChanges);
     resolvePendingLoadedRowsBoundary(path);
     if (statusChanged) {
       emitter.emit("levelStatusChanged", {
@@ -1189,7 +1231,102 @@ export function createGridRuntime(args: RuntimeArgs): GridRuntime {
           coordinator.toggleExpand(path, rowId);
         },
       },
+      treeExpansion: {
+        canToggle: ({ path, row }) =>
+          schemaForPath(path).tree !== undefined &&
+          row.kind === "data" &&
+          (row.tree?.childCount ?? 0) > 0,
+        isExpanded: ({ path, rowId }) => treeExpansion.isExpanded(path, rowId),
+        toggle: ({ path, rowId }) => treeExpansion.toggle(path, rowId),
+      },
     };
+  }
+
+  function isTreeLevel(path: GridPath): boolean {
+    return schemaForPath(path).tree !== undefined;
+  }
+
+  // Collapsing a tree row hides its descendants. A cursor on a hidden row
+  // moves to the nearest displayed ancestor (the same column in a cell grid),
+  // and a cell range that reaches into hidden rows is clamped the same way.
+  // Row selection needs no step here: normalization drops hidden rows.
+  function keepCursorInDisplayedTree(path: GridPath): void {
+    const structure = displayedRowsRuntime.tree(path);
+    if (!structure) return;
+    const displayed = displayedRowsFor(path);
+    const nearestDisplayed = (rowId: RowId): RowId | null =>
+      [rowId, ...treeAncestors(structure, rowId)].find((id) =>
+        displayed.rowById.has(id),
+      ) ?? null;
+
+    if (interaction.mode === "row-list") {
+      const cursor = cursorManager.currentRowCursor();
+      if (cursor?.path !== path || displayed.rowById.has(cursor.rowId)) return;
+      const rowId = nearestDisplayed(cursor.rowId);
+      if (rowId) cursorManager.applyRowCursor({ path, rowId });
+      return;
+    }
+
+    const cursor = cursorManager.currentCellCursor();
+    if (cursor?.path === path && !displayed.rowById.has(cursor.rowId)) {
+      const rowId = nearestDisplayed(cursor.rowId);
+      if (rowId) cursorManager.applyCellCursor({ ...cursor, rowId });
+    }
+    const controller = controllerCursorPortFor(path);
+    const range = controller.getState().cellSelection;
+    if (!range) return;
+    const anchorRowId = nearestDisplayed(range.anchor.rowId);
+    const headRowId = nearestDisplayed(range.head.rowId);
+    if (!anchorRowId || !headRowId) return;
+    if (anchorRowId === range.anchor.rowId && headRowId === range.head.rowId) {
+      return;
+    }
+    controller.setCellSelection({
+      anchor: { ...range.anchor, rowId: anchorRowId },
+      head: { ...range.head, rowId: headRowId },
+    });
+  }
+
+  function addTreeChild(
+    path: GridPath,
+    parentRowId: RowId,
+    columns: Readonly<Record<ColId, unknown>> = {},
+  ): RowId {
+    const tree = schemaForPath(path).tree;
+    if (!tree) {
+      throw new Error(`GridRuntime: path "${path}" is not a tree level.`);
+    }
+    if (
+      kindOfRowId(parentRowId) !== "data" ||
+      !displayedRowsRuntime.tree(path)?.parentById.has(parentRowId)
+    ) {
+      throw new Error(
+        `GridRuntime.tree.addChild: no data row "${parentRowId}" at path "${path}".`,
+      );
+    }
+    const parentRowKey = rowKeyOfRowId(parentRowId);
+    let parentKey: unknown = parentRowKey;
+    if (tree.parentKeyValue) {
+      // The parent may be hidden under a collapsed ancestor, so it is read
+      // from the source snapshot rather than from the displayed rows.
+      const parent = sourceStateFor(path).snapshot.nodes.find(
+        (node) => node.rowKey === parentRowKey,
+      );
+      if (parent) parentKey = tree.parentKeyValue(parent);
+      if (String(parentKey) !== parentRowKey) {
+        throw new Error(
+          `GridRuntime.tree.addChild: tree.parentKeyValue returned ${JSON.stringify(parentKey)} for row "${parentRowKey}" at path "${path}"; it must equal the row key as a string.`,
+        );
+      }
+    }
+    const rowKey = phantomLifecycle.nextDraftRowKey(path);
+    drafts.add(path, rowKey, {
+      [tree.parentKeyField]: parentKey,
+      ...columns,
+    });
+    const rowId = makeLevelRowId(path, "phantom", rowKey);
+    treeExpansion.reveal(path, rowId);
+    return rowId;
   }
 
   function activateCell(
@@ -1810,6 +1947,7 @@ export function createGridRuntime(args: RuntimeArgs): GridRuntime {
           commit: (rowKey: RowKey, atIndex?: number) =>
             commitPhantomRow(path, rowKey, atIndex),
         }),
+        tree: isTreeLevel(path) ? treeLevelPorts(path) : null,
       },
     });
     sourceRegistry.addCleanup(registration, () =>
@@ -1817,6 +1955,59 @@ export function createGridRuntime(args: RuntimeArgs): GridRuntime {
     );
     levelsByPath.set(path, level);
     return level;
+  }
+
+  function treeLevelPorts(path: GridPath): GridLevelTree {
+    const guardRow = (rowId: RowId) => {
+      assertLevelLive(path);
+      assertRowIdAtPath(path, rowId);
+    };
+    return {
+      isExpanded: (rowId) => {
+        guardRow(rowId);
+        return treeExpansion.isExpanded(path, rowId);
+      },
+      expand: (rowId) => {
+        guardRow(rowId);
+        treeExpansion.expand(path, rowId);
+      },
+      collapse: (rowId) => {
+        guardRow(rowId);
+        treeExpansion.collapse(path, rowId);
+      },
+      toggle: (rowId) => {
+        guardRow(rowId);
+        treeExpansion.toggle(path, rowId);
+      },
+      expandAll: () => {
+        assertLevelLive(path);
+        treeExpansion.expandAll(path);
+      },
+      collapseAll: () => {
+        assertLevelLive(path);
+        treeExpansion.collapseAll(path);
+      },
+      reveal: (rowId) => {
+        guardRow(rowId);
+        treeExpansion.reveal(path, rowId);
+      },
+      parentOf: (rowId) => {
+        guardRow(rowId);
+        return treeExpansion.parentOf(path, rowId);
+      },
+      childrenOf: (rowId) => {
+        guardRow(rowId);
+        return treeExpansion.childrenOf(path, rowId);
+      },
+      addChild: (parentRowId, columns) => {
+        guardRow(parentRowId);
+        return addTreeChild(path, parentRowId, columns);
+      },
+      subscribe: (listener) => {
+        assertLevelLive(path);
+        return treeExpansion.subscribe(path, isolateObserver(listener));
+      },
+    };
   }
 
   function isolateObserver<Args extends readonly unknown[]>(
@@ -2100,6 +2291,7 @@ export function createGridRuntime(args: RuntimeArgs): GridRuntime {
     if (level) cleanupSafely(() => disposeGridLevelRuntime(level));
     interactionRuntime.unregister(path);
     displayedRowsRuntime.unregister(path);
+    treeExpansion.unregister(path);
     cleanupSafely(() => disposePhantomPath(phantoms, path));
     sourceRegistry.disposeHandle(handle);
     phantomLifecycleSources.delete(path);
@@ -2130,6 +2322,7 @@ export function createGridRuntime(args: RuntimeArgs): GridRuntime {
     emitter.clear();
     registryListeners.clear();
     displayedRowsRuntime.dispose();
+    treeExpansion.dispose();
     interactionRuntime.dispose();
     cleanupSafely(unsubscribeCursorRevision);
     loadedBoundaryRuntime?.dispose();
@@ -2173,6 +2366,7 @@ export function createGridRuntime(args: RuntimeArgs): GridRuntime {
     subscribeDisplayedRowSequence,
     subscribeDisplayedRow,
     invalidateDisplayedRows,
+    treeExpansion,
     sourceStateFor,
     controllerFor,
     cellActivationFor,
@@ -2249,6 +2443,29 @@ function assertRowHeaderInteractionCompatibility(
   }
 }
 
+// A tree level shows data rows as a tree. Structural rows and rollups have no
+// place in it yet, so a source that sends them is refused like a source with
+// broken row identity.
+function assertTreeLevelNodes(
+  schema: LevelSchema,
+  path: GridPath,
+  nodes: readonly TreeNode[],
+): void {
+  if (!schema.tree) return;
+  for (const node of nodes) {
+    if (node.kind) {
+      throw new Error(
+        `GridRuntime: tree level "${schema.name}" at path "${path}" cannot show "${node.kind}" rows (row "${node.rowKey}").`,
+      );
+    }
+    if (node.rollup) {
+      throw new Error(
+        `GridRuntime: tree level "${schema.name}" at path "${path}" cannot show rollup values (row "${node.rowKey}").`,
+      );
+    }
+  }
+}
+
 function isPromiseLike(value: unknown): value is PromiseLike<unknown> {
   return (
     typeof value === "object" &&
@@ -2305,6 +2522,7 @@ function snapshotGridSchema(schema: GridSchema): GridSchema {
       rowHeaderColumn,
       options: Object.freeze({ ...level.options }),
       childLevels: Object.freeze([...level.childLevels]),
+      ...(level.tree ? { tree: Object.freeze({ ...level.tree }) } : {}),
     });
   }
   return Object.freeze({

@@ -47,6 +47,7 @@ export type {
   CellEditorProps,
   RowHeaderColumn,
   LevelSchema,
+  LevelTreeConfig,
   GridSchema,
 } from "./schema";
 export {
@@ -58,6 +59,7 @@ export {
 
 export type {
   TreeNode,
+  TreeRowFacts,
   LevelOptions,
   LevelRow,
   LevelRowKind,
