@@ -11,7 +11,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { delimiter, join, resolve, sep } from "node:path";
 import { createServer } from "node:net";
 import { expect } from "vitest";
 
@@ -29,6 +29,15 @@ export const TASK_TWO = {
 } as const;
 
 const DEV_ENV_FILE = ".env.development";
+
+/**
+ * Where a generated project provides the `sapporta` bin, relative to its
+ * root. `pnpm exec` searches the current project's `node_modules/.bin` and
+ * then PATH; it never walks up to an ancestor `node_modules`. The root form
+ * the generated docs give, `pnpm exec sapporta ...`, therefore works only
+ * while the root package declares the CLI.
+ */
+const PROJECT_CLI_BIN = join("node_modules", ".bin", "sapporta");
 
 export type E2eProject = {
   parentDir: string;
@@ -339,6 +348,10 @@ function assertScaffoldedProject(
   expect(existsSync(join(project.projectDir, "packages", "shared"))).toBe(true);
 
   if (assertions.strictTemplateChecks) {
+    expect(
+      existsSync(join(project.projectDir, PROJECT_CLI_BIN)),
+      `${project.projectDir} does not provide ${PROJECT_CLI_BIN}, so \`pnpm exec sapporta\` at the project root resolves the CLI from outside the project or not at all.`,
+    ).toBe(true);
     expect(existsSync(join(project.projectDir, "Dockerfile"))).toBe(true);
     expect(existsSync(join(project.projectDir, ".dockerignore"))).toBe(true);
     expect(
@@ -2493,6 +2506,27 @@ export function readProjectDevEnv(project: E2eProject): string {
 }
 
 /**
+ * `path` without the directories outside `projectDir` that hold a `sapporta`
+ * executable.
+ *
+ * These tests inherit the developer's PATH. A globally installed CLI there
+ * answers `pnpm exec sapporta` whatever the generated project ships, which
+ * hides a scaffold that no longer provides its own. Removing those directories
+ * leaves the project's CLI as the only one these runs can reach.
+ */
+function pathWithoutOutsideCli(path: string, projectDir: string): string {
+  const inProject = `${resolve(projectDir)}${sep}`;
+  return path
+    .split(delimiter)
+    .filter(
+      (dir) =>
+        resolve(dir).startsWith(inProject) ||
+        !existsSync(join(dir, "sapporta")),
+    )
+    .join(delimiter);
+}
+
+/**
  * Run the project-local `sapporta` CLI the way the generated AGENTS.md does.
  *
  * `SAPPORTA_API_URL` is cleared so the API URL comes from the project's own
@@ -2515,6 +2549,9 @@ export async function runProjectCli(
     delete env.SAPPORTA_API_TOKEN;
   } else {
     env.SAPPORTA_API_TOKEN = opts.apiToken;
+  }
+  if (env.PATH !== undefined) {
+    env.PATH = pathWithoutOutsideCli(env.PATH, project.projectDir);
   }
 
   return runCommand("pnpm", ["exec", "sapporta", ...args], {
