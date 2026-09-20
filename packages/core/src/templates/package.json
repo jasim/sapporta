@@ -14,5 +14,8 @@
     "prebuild": "pnpm run clean",
     "build": "pnpm run typecheck && pnpm --filter ./packages/shared build && pnpm --filter ./packages/api build && pnpm --filter ./packages/frontend build",
     "start": "pnpm --filter ./packages/api start"
+  },
+  "devDependencies": {
+    "@sapporta/server": "%%SAPPORTA:CORE_SPEC%%"
   }
 }

@@ -556,6 +556,34 @@ describe("renderScaffoldFiles", () => {
     );
   });
 
+  it("gives the project root the sapporta bin the docs tell agents to run", () => {
+    const project = layoutForRoot(
+      projectIdentityFromOptions({
+        dir: "/tmp/acme-app",
+        name: "Acme App",
+      }),
+    );
+    const files = renderScaffoldFiles(project, undefined);
+    const byDest = new Map(files.map((file) => [file.dest, file.content]));
+    const dependenciesOf = (dest: string): Record<string, string> => {
+      const packageJson = JSON.parse(byDest.get(dest) ?? "{}") as {
+        dependencies?: Record<string, string>;
+        devDependencies?: Record<string, string>;
+      };
+      return { ...packageJson.dependencies, ...packageJson.devDependencies };
+    };
+
+    // `pnpm exec` searches the current package only, so the root form the
+    // generated docs give works only while the root declares the package that
+    // carries the bin. Pinning it to the spec packages/api already resolves
+    // keeps one CLI and one server version in the project.
+    const rootSpec = dependenciesOf("package.json")["@sapporta/server"];
+    expect(rootSpec).toBe(
+      dependenciesOf("packages/api/package.json")["@sapporta/server"],
+    );
+    expect(rootSpec).toBeDefined();
+  });
+
   it("keeps the shared package loadable by the tools that read schema files", () => {
     const project = layoutForRoot(
       projectIdentityFromOptions({
