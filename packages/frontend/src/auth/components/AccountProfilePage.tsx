@@ -770,11 +770,13 @@ function createAgentSetupPrompt(apiUrl: string, apiToken: string): string {
   return [
     "Prepare this directory so coding agents can understand and work with the application using the Sapporta skill and authenticated CLI.",
     "Ensure the Sapporta skill is available; if not, run `npx skills add 'https://github.com/jasim/sapporta-skills' --skill sapporta`.",
-    "Ensure a project-local CLI exists; if not, run `pnpm install sapporta`; if pnpm blocks unapproved build scripts, approve `esbuild` and skip `better-sqlite3` unless this directory runs a local server.",
+    "Read the project's agent docs, such as `AGENTS.md` and the files it refers to, for an authenticated Sapporta command they already give; if they give one, set up for that command, including where it expects the token, and do not edit the docs.",
+    "Use the CLI the project already has: a package in this directory or its workspace that depends on `sapporta` or `@sapporta/server` provides the `sapporta` bin, which `pnpm exec` finds only from inside that package, for example `pnpm --filter ./packages/api exec sapporta --version`; if the bin is missing because dependencies are not installed, run `pnpm install`.",
+    "Only if no package provides the CLI, run `pnpm install sapporta`; if pnpm blocks unapproved build scripts, approve `esbuild` and skip `better-sqlite3` unless this directory runs a local server.",
     `Configure the CLI to access \`${apiUrl}\` using this private access token: \`${apiToken}\`.`,
-    "Make `SAPPORTA_API_URL` and `SAPPORTA_API_TOKEN` available to every Sapporta command through the project's existing directory environment tooling, such as mise, direnv, or a dotenv runner.",
+    "Unless the docs say where the token goes, make `SAPPORTA_API_URL` and `SAPPORTA_API_TOKEN` available to every Sapporta command through the project's existing directory environment tooling, such as mise, direnv, or a dotenv runner.",
     "If none exists, use a small private, gitignored local wrapper; do not install an environment manager just for this.",
-    "Update `AGENTS.md` with the exact authenticated command agents should use, by absolute path if it goes through a wrapper.",
+    "If the docs give no authenticated command, add the exact command agents should use to `AGENTS.md`, by absolute path if it goes through a wrapper.",
     "Keep the token out of version control and handle it as a secret.",
     `Verify the token with the read-only \`api get '/api/auth-context'\` command, which answers with the user and workspace the token acts as, requesting sandbox network access to \`${apiUrl}\` if needed.`,
   ].join(" ");
