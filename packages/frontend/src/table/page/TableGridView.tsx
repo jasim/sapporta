@@ -19,7 +19,10 @@ import type {
   TGridSession,
 } from "../tgrid/tgrid-session";
 import { TGrid, type ViewRelatedRowsOption } from "../tgrid/TGrid";
-import { TableGridHeader } from "./TableGridHeader";
+import {
+  TableGridHeader,
+  type TableGridHeaderVariant,
+} from "./TableGridHeader";
 import {
   TableGridPager,
   type TableGridPagerButtonRefs,
@@ -92,6 +95,11 @@ export type TableGridViewProps<
     AppServices
   >;
   viewRelatedRows?: ViewRelatedRowsOption;
+  /**
+   * `toolbar` drops the table's title and count, for a grid inside a page
+   * that names it already. Defaults to `page`.
+   */
+  header?: TableGridHeaderVariant;
   className?: string;
   gridClassName?: string;
 };
@@ -99,7 +107,10 @@ export type TableGridViewProps<
 export type UseTableGridArgs<
   RowsByLevel extends TGridRowsByLevel,
   AppServices = unknown,
-> = Omit<TableGridViewProps<RowsByLevel, AppServices>, "sessionRef">;
+> = Omit<
+  TableGridViewProps<RowsByLevel, AppServices>,
+  "sessionRef" | "header"
+>;
 
 export type TableGridBinding<
   RowsByLevel extends TGridRowsByLevel,
@@ -194,6 +205,7 @@ export function TableGridView<
   sessionRef,
   onLoadedRowsBoundary,
   viewRelatedRows,
+  header,
   className,
   gridClassName,
 }: TableGridViewProps<RowsByLevel, AppServices>) {
@@ -251,6 +263,7 @@ export function TableGridView<
       actions={tableGrid.actions}
       sessionRef={sessionRef}
       viewRelatedRows={tableGrid.viewRelatedRows}
+      header={header}
       className={tableGrid.className}
       gridClassName={tableGrid.gridClassName}
       pagerButtonRefs={pagerButtonRefs}
@@ -273,6 +286,7 @@ function TableGridViewWithSession<
   actions,
   sessionRef,
   viewRelatedRows,
+  header,
   className,
   gridClassName,
   pagerButtonRefs,
@@ -286,6 +300,7 @@ function TableGridViewWithSession<
   actions?: ComponentType<TableGridActionsProps<RowsByLevel, AppServices>>;
   sessionRef?: Ref<TGridSession<RowsByLevel, AppServices>>;
   viewRelatedRows?: ViewRelatedRowsOption;
+  header?: TableGridHeaderVariant;
   className?: string;
   gridClassName?: string;
   pagerButtonRefs: TableGridPagerButtonRefs;
@@ -353,6 +368,7 @@ function TableGridViewWithSession<
           onViewPreferenceChange={tableView.setPreference}
           onNewRecord={onNewRecord}
           actions={actions}
+          variant={header}
         />
       }
       footer={

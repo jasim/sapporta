@@ -78,6 +78,7 @@ export {
   type TableGridViewProps,
   type UseTableGridArgs,
 } from "./page/TableGridView";
+export type { TableGridHeaderVariant } from "./page/TableGridHeader";
 export * from "./page/table-grid-url-state";
 export * from "./page/table-level-pager";
 export * from "./page/table-level-query";

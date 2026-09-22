@@ -11,7 +11,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { TableSchema } from "@sapporta/shared/contracts";
 import type { TableGridActionsProps } from "../../index";
 import type { TGridSession } from "../tgrid/tgrid-session";
-import { TableGridHeader } from "./TableGridHeader";
+import {
+  TableGridHeader,
+  type TableGridHeaderVariant,
+} from "./TableGridHeader";
 import type { TableLevelQuery } from "./table-level-query";
 import type { TableSelection } from "./table-selection";
 import type { TGridSourceStatus } from "../tgrid/tgrid-source-status";
@@ -234,6 +237,40 @@ describe("TableGridHeader", () => {
     ).toBeInstanceOf(HTMLButtonElement);
   });
 
+  it("keeps the wide toolbar to one bar of filters and controls, without the title", async () => {
+    mounted = await renderHeader("wide", ordersTable, TestActions, "toolbar");
+    const toolbar = document.body.querySelector("[data-page-header]");
+
+    expect(document.body.querySelector("h1")).toBeNull();
+    expect(document.body.textContent).not.toContain("3 records");
+    expect(toolbar?.contains(buttonWithText("Add filter"))).toBe(true);
+    expect(toolbar?.contains(searchInput())).toBe(true);
+    expect(toolbar?.contains(buttonWithText("Reload 1 visible row"))).toBe(
+      true,
+    );
+    expect(
+      toolbar?.querySelector('a[aria-label="Export"][download]'),
+    ).toBeInstanceOf(HTMLAnchorElement);
+  });
+
+  it("puts the narrow toolbar's actions on the search row, without the title", async () => {
+    mounted = await renderHeader(
+      "narrowCards",
+      ordersTable,
+      undefined,
+      "toolbar",
+    );
+
+    expect(document.body.querySelector("h1")).toBeNull();
+    const more = document.body.querySelector(
+      'button[aria-label="Open table actions"]',
+    );
+    expect(more?.parentElement).toBe(
+      buttonWithText("Filter").parentElement,
+    );
+    expect(more?.parentElement?.contains(searchInput())).toBe(true);
+  });
+
   it("never shows delete controls for immutable tables", async () => {
     hookMocks.useTableSelection.mockReturnValue(
       rowsSelection(
@@ -419,12 +456,13 @@ async function renderHeader(
   mode: "wide" | "narrowCards",
   table: TableSchema = ordersTable,
   actions?: ComponentType<TableGridActionsProps<TestRows>>,
+  variant?: TableGridHeaderVariant,
 ): Promise<{ root: Root; container: HTMLDivElement }> {
   const container = document.createElement("div");
   document.body.append(container);
   const root = createRoot(container);
   await act(async () => {
-    root.render(headerElement(mode, table, actions));
+    root.render(headerElement(mode, table, actions, variant));
   });
   return { root, container };
 }
@@ -443,6 +481,7 @@ function headerElement(
   mode: "wide" | "narrowCards",
   table: TableSchema,
   actions?: ComponentType<TableGridActionsProps<TestRows>>,
+  variant?: TableGridHeaderVariant,
 ): ReactElement {
   return createElement(TableGridHeader<TestRows>, {
     mode,
@@ -453,6 +492,7 @@ function headerElement(
     onViewPreferenceChange: viewPreferenceChange,
     onNewRecord: vi.fn(),
     actions,
+    variant,
   });
 }
 

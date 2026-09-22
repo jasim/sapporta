@@ -66,6 +66,15 @@ type TableHeaderCount = {
   label: string;
 };
 
+/**
+ * How a table grid's header presents itself. `page` is the table page's own
+ * header: the table's title and count, its controls, and a filter bar under
+ * them. `toolbar` is for a grid embedded in a page that has its own title: one
+ * row of filters and controls, without the title, the count or the browser
+ * tab title.
+ */
+export type TableGridHeaderVariant = "page" | "toolbar";
+
 export function TableGridHeader<
   RowsByLevel extends TGridRowsByLevel,
   AppServices = unknown,
@@ -78,6 +87,7 @@ export function TableGridHeader<
   onViewPreferenceChange,
   onNewRecord,
   actions: Actions,
+  variant = "page",
 }: {
   mode: TablePageMode;
   session: TGridSession<RowsByLevel, AppServices>;
@@ -87,6 +97,7 @@ export function TableGridHeader<
   onViewPreferenceChange: (view: TableViewPreference) => void;
   onNewRecord?: () => void;
   actions?: ComponentType<TableGridActionsProps<RowsByLevel, AppServices>>;
+  variant?: TableGridHeaderVariant;
 }) {
   const query = useTableLevelQuery(session, level);
   const selection = useTableSelection(session);
@@ -122,6 +133,19 @@ export function TableGridHeader<
       <NarrowCardTableHeader
         table={table}
         count={count}
+        query={query}
+        exportUrl={session.csvExportUrl(level)}
+        viewPreference={viewPreference}
+        onViewPreferenceChange={onViewPreferenceChange}
+        deleteControl={deleteControl}
+        onNewRecord={onNewRecord}
+        actions={Actions}
+        session={session}
+        level={level}
+        showTitle={variant === "page"}
+      />
+    ) : variant === "toolbar" ? (
+      <WideTableToolbar
         query={query}
         exportUrl={session.csvExportUrl(level)}
         viewPreference={viewPreference}
@@ -258,6 +282,101 @@ function WideTableHeader<
   );
 }
 
+/**
+ * The `toolbar` variant on a wide layout: the filter cards lead, and the
+ * controls follow on the same row. It wraps onto a second row only when both
+ * do not fit.
+ */
+function WideTableToolbar<
+  RowsByLevel extends TGridRowsByLevel,
+  AppServices = unknown,
+>({
+  query,
+  exportUrl,
+  viewPreference,
+  onViewPreferenceChange,
+  deleteControl,
+  onNewRecord,
+  actions: Actions,
+  session,
+  level,
+}: {
+  query: TableLevelQuery;
+  exportUrl: string;
+  viewPreference: TableViewPreference;
+  onViewPreferenceChange: (view: TableViewPreference) => void;
+  deleteControl?: TableDeleteControl;
+  onNewRecord?: () => void;
+  actions?: ComponentType<TableGridActionsProps<RowsByLevel, AppServices>>;
+  session: TGridSession<RowsByLevel, AppServices>;
+  level: TGridLevelId<RowsByLevel>;
+}) {
+  return (
+    <div
+      data-page-header
+      className="z-[var(--sap-z-shell-sticky)] flex shrink-0 flex-wrap items-center gap-2 border-b border-sap-border-soft bg-sap-surface py-2 pl-[calc(var(--sap-page-header-inset,0px)+0.75rem)] pr-3 sm:pl-[calc(var(--sap-page-header-inset,0px)+1.25rem)] sm:pr-5"
+    >
+      <FilterCardsBar
+        columns={[...query.columns]}
+        filters={[...query.filters]}
+        lookupForColumn={query.lookupForColumn}
+        onAdd={query.addFilter}
+        onUpdate={query.updateFilter}
+        onRemove={query.removeFilter}
+        className="min-w-0 flex-1 gap-2 bg-transparent p-0"
+      />
+      <div className="ml-auto flex flex-wrap items-center gap-2">
+        {Actions && (
+          <Actions session={session} level={level} surface="toolbar" />
+        )}
+        {query.searchable && (
+          <SearchInput value={query.search} onChange={query.setSearch} />
+        )}
+        {query.hasSort && (
+          <PageHeaderButton
+            tone="ghost"
+            icon={<X className="h-[12px] w-[12px]" />}
+            onClick={query.clearSort}
+          >
+            Clear sort
+          </PageHeaderButton>
+        )}
+        {deleteControl && (
+          <PageHeaderButton
+            tone="danger"
+            icon={<Trash2 className="h-[12px] w-[12px]" />}
+            onClick={deleteControl.onRequest}
+          >
+            {deleteRowsLabel(deleteControl.count)}
+          </PageHeaderButton>
+        )}
+        {onNewRecord && (
+          <PageHeaderButton
+            tone="primary"
+            icon={<Plus className="h-[12px] w-[12px]" />}
+            onClick={onNewRecord}
+          >
+            New record
+          </PageHeaderButton>
+        )}
+        <TableViewSwitch
+          value={viewPreference}
+          onChange={onViewPreferenceChange}
+        />
+        <a
+          href={exportUrl}
+          download
+          aria-label="Export"
+          title="Export"
+          className="inline-flex h-sap-ctl w-(--height-sap-ctl) items-center justify-center rounded-md border border-sap-border bg-sap-surface text-sap-soft hover:bg-sap-row-hover hover:text-sap-fg"
+        >
+          <Download className="h-[12px] w-[12px]" />
+        </a>
+      </div>
+    </div>
+  );
+}
+
 function NarrowCardTableHeader<
   RowsByLevel extends TGridRowsByLevel,
   AppServices = unknown,
@@ -273,6 +392,7 @@ function NarrowCardTableHeader<
   actions: Actions,
   session,
   level,
+  showTitle,
 }: {
   table: TableSchema;
   count: TableHeaderCount;
@@ -285,6 +405,8 @@ function NarrowCardTableHeader<
   actions?: ComponentType<TableGridActionsProps<RowsByLevel, AppServices>>;
   session: TGridSession<RowsByLevel, AppServices>;
   level: TGridLevelId<RowsByLevel>;
+  /** Without the title, the header is one row: search, filters, actions. */
+  showTitle: boolean;
 }) {
   const [actionsOpen, setActionsOpen] = useState(false);
   const [filtersOpen, setFiltersOpen] = useState(false);
@@ -298,6 +420,36 @@ function NarrowCardTableHeader<
       : `${query.activeFilterCount} filter${
           query.activeFilterCount === 1 ? "" : "s"
         }`;
+  const trailing = deleteControl ? (
+    <CompactHeaderButton
+      tone="danger"
+      icon={<Trash2 className="h-4 w-4 shrink-0" />}
+      onClick={deleteControl.onRequest}
+      className="shrink-0"
+    >
+      {deleteRowsLabel(deleteControl.count)}
+    </CompactHeaderButton>
+  ) : (
+    <>
+      {onNewRecord && (
+        <CompactHeaderButton
+          aria-label="New record"
+          title="New record"
+          tone="primary"
+          icon={<Plus className="h-4 w-4 shrink-0" />}
+          onClick={onNewRecord}
+          className="shrink-0 px-0"
+        />
+      )}
+      <CompactHeaderButton
+        aria-label="Open table actions"
+        title="More actions"
+        icon={<MoreHorizontal className="h-4 w-4" />}
+        onClick={() => setActionsOpen(true)}
+        className="shrink-0 px-0"
+      />
+    </>
+  );
 
   return (
     <div
@@ -307,59 +459,32 @@ function NarrowCardTableHeader<
       {/* Leading room for the shell's content-side sidebar toggle, the same
           contract PageHeader follows. */}
       <div className="flex flex-col gap-2 py-2 pl-[calc(var(--sap-page-header-inset,0px)+0.75rem)] pr-3">
-        <div className="flex min-w-0 items-center gap-2">
-          <div className="min-w-0 flex-1">
-            <h1
-              className="flex min-w-0 items-baseline gap-1.5 text-sap-body font-bold leading-5 text-sap-fg"
-              aria-label={`${tableLabel}, ${count.label}`}
-            >
-              <span className="min-w-0 truncate">{tableLabel}</span>
-              <span className="shrink-0 text-sap-muted" aria-hidden="true">
-                &middot;
-              </span>
-              <span
-                className="mono shrink-0 text-sap-data font-[650] text-sap-muted"
-                aria-hidden="true"
-              >
-                {count.value.toLocaleString()}
-              </span>
-            </h1>
-          </div>
-          {deleteControl ? (
-            <CompactHeaderButton
-              tone="danger"
-              icon={<Trash2 className="h-4 w-4 shrink-0" />}
-              onClick={deleteControl.onRequest}
-              className="shrink-0"
-            >
-              {deleteRowsLabel(deleteControl.count)}
-            </CompactHeaderButton>
-          ) : (
-            <>
-              {onNewRecord && (
-                <CompactHeaderButton
-                  aria-label="New record"
-                  title="New record"
-                  tone="primary"
-                  icon={<Plus className="h-4 w-4 shrink-0" />}
-                  onClick={onNewRecord}
-                  className="shrink-0 px-0"
-                />
-              )}
-              <CompactHeaderButton
-                aria-label="Open table actions"
-                title="More actions"
-                icon={<MoreHorizontal className="h-4 w-4" />}
-                onClick={() => setActionsOpen(true)}
-                className="shrink-0 px-0"
-              />
-            </>
-          )}
-        </div>
-
-        {(query.searchable || canFilter) && (
+        {showTitle && (
           <div className="flex min-w-0 items-center gap-2">
-            {query.searchable && (
+            <div className="min-w-0 flex-1">
+              <h1
+                className="flex min-w-0 items-baseline gap-1.5 text-sap-body font-bold leading-5 text-sap-fg"
+                aria-label={`${tableLabel}, ${count.label}`}
+              >
+                <span className="min-w-0 truncate">{tableLabel}</span>
+                <span className="shrink-0 text-sap-muted" aria-hidden="true">
+                  &middot;
+                </span>
+                <span
+                  className="mono shrink-0 text-sap-data font-[650] text-sap-muted"
+                  aria-hidden="true"
+                >
+                  {count.value.toLocaleString()}
+                </span>
+              </h1>
+            </div>
+            {trailing}
+          </div>
+        )}
+
+        {(query.searchable || canFilter || !showTitle) && (
+          <div className="flex min-w-0 items-center gap-2">
+            {query.searchable ? (
               <div className="min-w-0 flex-1">
                 <SearchInput
                   value={query.search}
@@ -367,6 +492,8 @@ function NarrowCardTableHeader<
                   compact
                 />
               </div>
+            ) : (
+              <div className="flex-1" />
             )}
             {canFilter && (
               <CompactHeaderButton
@@ -377,6 +504,7 @@ function NarrowCardTableHeader<
                 {filterLabel}
               </CompactHeaderButton>
             )}
+            {!showTitle && trailing}
           </div>
         )}
       </div>

@@ -21,6 +21,7 @@ import {
   type TableGridActionsProps,
   type TableGridBinding,
 } from "./TableGridView";
+import type { TableGridHeaderVariant } from "./TableGridHeader";
 import type { ViewRelatedRowsOption } from "../tgrid/TGrid";
 
 export type SchemaTableGridViewSource = {
@@ -47,6 +48,11 @@ export type SchemaTableGridViewProps = {
   hiddenColumns?: readonly TableColumnName[];
   /** Tune row expansion, row loading, interaction, controls, and styling. */
   viewRelatedRows?: ViewRelatedRowsOption;
+  /**
+   * `toolbar` drops the table's title and count, for a grid inside a page
+   * that names it already. Defaults to `page`.
+   */
+  header?: TableGridHeaderVariant;
   rootRows?: SchemaTableRootRowsOptions;
   relatedRows?: SchemaTableRelatedRowsOptions;
   interaction?: GridInteractionConfig;
@@ -57,7 +63,7 @@ export type SchemaTableGridViewProps = {
 
 export type UseSchemaTableGridArgs = Omit<
   SchemaTableGridViewProps,
-  "sessionRef"
+  "sessionRef" | "header"
 >;
 
 const schemaTableGridDefaultRootRows: SchemaTableRootRowsOptions = {
@@ -199,6 +205,7 @@ export function SchemaTableGridView({
   onLoadedRowsBoundary,
   hiddenColumns,
   viewRelatedRows,
+  header,
   rootRows,
   relatedRows,
   interaction,
@@ -226,6 +233,7 @@ export function SchemaTableGridView({
       sessionRef={sessionRef}
       onLoadedRowsBoundary={onLoadedRowsBoundary}
       viewRelatedRows={viewRelatedRows}
+      header={header}
       className={className}
       gridClassName={gridClassName}
     />
