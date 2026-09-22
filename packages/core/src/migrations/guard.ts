@@ -1,6 +1,8 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import type Database from "better-sqlite3";
+import { drizzle } from "drizzle-orm/better-sqlite3";
+import { migrate } from "drizzle-orm/better-sqlite3/migrator";
 import { readMigrationFiles } from "drizzle-orm/migrator";
 import type { MigrationMeta } from "drizzle-orm/migrator";
 import type { TableDef } from "../schema/table.js";
@@ -21,54 +23,105 @@ type LedgerRow = {
   created_at: number | string | null;
 };
 
+/** A migration file on disk that the database's ledger does not list. */
+export type PendingMigration = {
+  /** The migration's name in Drizzle's journal, such as `0003_add_notes`. */
+  tag: string;
+  /** The journal's `when` timestamp, which is how the ledger identifies it. */
+  folderMillis: number;
+};
+
+/**
+ * The migrations in `migrationsDir` that have not been applied to `sqlite`,
+ * oldest first. `migrationsDir` is a directory written by `drizzle-kit
+ * generate`: SQL files beside `meta/_journal.json`.
+ */
+export function pendingMigrations(
+  sqlite: Database.Database,
+  migrationsDir: string,
+): PendingMigration[] {
+  return readMigrationState(sqlite, migrationsDir).pending;
+}
+
+/**
+ * Apply the pending migrations in `migrationsDir` to `sqlite` and return the
+ * ones that were applied. This runs drizzle-orm's own `migrate()`, so an app
+ * can migrate its database at startup from its own code.
+ *
+ * `migrate()` applies only the migrations dated after the latest one in the
+ * ledger, and it applies them in one transaction: all of them or, on an
+ * error, none. A pending migration dated at or before the latest applied one,
+ * such as one merged in from another branch, would be skipped without an
+ * error. This function therefore refuses to migrate when it finds one.
+ */
+export function applyMigrations(
+  sqlite: Database.Database,
+  migrationsDir: string,
+): PendingMigration[] {
+  const pending = pendingMigrations(sqlite, migrationsDir);
+  if (pending.length === 0) return [];
+
+  const latestApplied = Math.max(
+    ...readLedger(sqlite).map((row) => normalizeCreatedAt(row.created_at) ?? 0),
+  );
+  const outOfOrder = pending.filter(
+    (migration) => migration.folderMillis <= latestApplied,
+  );
+  if (outOfOrder.length > 0) {
+    throw migrationError([
+      "Migrations are dated before the latest applied migration.",
+      "",
+      "Drizzle applies only migrations dated after the latest one in the ledger,",
+      "so it would skip these:",
+      ...outOfOrder.map((migration) => `  ${migration.tag}`),
+      "",
+      `Migrations: ${migrationsDir}`,
+    ]);
+  }
+
+  migrate(drizzle(sqlite), { migrationsFolder: migrationsDir });
+  return pending;
+}
+
 export function assertMigrationsReady(options: {
   projectRoot: string;
   apiDistDir: string;
   sqlite: Database.Database;
   tables: readonly TableDef[];
+  /**
+   * Absolute path to the directory holding the Drizzle migrations. Defaults
+   * to `packages/api/migrations` under `projectRoot`.
+   */
+  migrationsDir?: string;
 }): void {
   if (options.tables.length === 0) return;
 
-  const migrationsDir = join(
-    options.projectRoot,
-    "packages",
-    "api",
-    "migrations",
-  );
+  const migrationsDir =
+    options.migrationsDir ??
+    join(options.projectRoot, "packages", "api", "migrations");
+  // The commands below belong to the default project layout. An app that
+  // names its own directory also migrates its own way.
+  const usesDefaultDir = options.migrationsDir === undefined;
   if (!existsSync(migrationsDir)) {
     throw migrationError([
       "Migration directory is missing.",
       "",
       `Expected: ${migrationsDir}`,
-      "",
-      "Run:",
-      "  pnpm --filter ./packages/api db:generate --name init",
-      "  pnpm --filter ./packages/api db:migrate",
+      ...(usesDefaultDir
+        ? [
+            "",
+            "Run:",
+            "  pnpm --filter ./packages/api db:generate --name init",
+            "  pnpm --filter ./packages/api db:migrate",
+          ]
+        : []),
     ]);
   }
 
-  const diskMigrations = readDrizzleMigrationFiles(migrationsDir);
-  const journalTags = readJournalTags(migrationsDir);
-  const diskByWhen = new Map(
-    diskMigrations.map((migration) => [migration.folderMillis, migration]),
+  const { pending, missingOnDisk, changedOnDisk } = readMigrationState(
+    options.sqlite,
+    migrationsDir,
   );
-  const applied = readLedger(options.sqlite);
-  const appliedTimes = new Set(
-    applied.map((row) => normalizeCreatedAt(row.created_at)),
-  );
-  const pending = diskMigrations.filter(
-    (migration) => !appliedTimes.has(migration.folderMillis),
-  );
-  const missingOnDisk = applied.filter((row) => {
-    const createdAt = normalizeCreatedAt(row.created_at);
-    return createdAt !== null && !diskByWhen.has(createdAt);
-  });
-  const changedOnDisk = applied.filter((row) => {
-    const createdAt = normalizeCreatedAt(row.created_at);
-    if (createdAt === null) return false;
-    const diskMigration = diskByWhen.get(createdAt);
-    return diskMigration !== undefined && diskMigration.hash !== row.hash;
-  });
 
   if (
     pending.length === 0 &&
@@ -90,9 +143,7 @@ export function assertMigrationsReady(options: {
       pending.length === 1 ? "Pending migration:" : "Pending migrations:",
     );
     for (const migration of pending) {
-      lines.push(
-        `  ${journalTags.get(migration.folderMillis) ?? migration.folderMillis}`,
-      );
+      lines.push(`  ${migration.tag}`);
     }
     lines.push("");
   }
@@ -118,8 +169,51 @@ export function assertMigrationsReady(options: {
     }
     lines.push("");
   }
-  lines.push("Run:", "  pnpm --filter ./packages/api db:migrate");
+  if (usesDefaultDir) {
+    lines.push("Run:", "  pnpm --filter ./packages/api db:migrate");
+  } else {
+    lines.push(`Migrations: ${migrationsDir}`);
+  }
   throw migrationError(lines);
+}
+
+/** Compare the migration files on disk with the database's ledger. */
+function readMigrationState(
+  sqlite: Database.Database,
+  migrationsDir: string,
+): {
+  pending: PendingMigration[];
+  missingOnDisk: LedgerRow[];
+  changedOnDisk: LedgerRow[];
+} {
+  const diskMigrations = readDrizzleMigrationFiles(migrationsDir);
+  const journalTags = readJournalTags(migrationsDir);
+  const diskByWhen = new Map(
+    diskMigrations.map((migration) => [migration.folderMillis, migration]),
+  );
+  const applied = readLedger(sqlite);
+  const appliedTimes = new Set(
+    applied.map((row) => normalizeCreatedAt(row.created_at)),
+  );
+  const pending = diskMigrations
+    .filter((migration) => !appliedTimes.has(migration.folderMillis))
+    .map((migration) => ({
+      tag:
+        journalTags.get(migration.folderMillis) ??
+        String(migration.folderMillis),
+      folderMillis: migration.folderMillis,
+    }));
+  const missingOnDisk = applied.filter((row) => {
+    const createdAt = normalizeCreatedAt(row.created_at);
+    return createdAt !== null && !diskByWhen.has(createdAt);
+  });
+  const changedOnDisk = applied.filter((row) => {
+    const createdAt = normalizeCreatedAt(row.created_at);
+    if (createdAt === null) return false;
+    const diskMigration = diskByWhen.get(createdAt);
+    return diskMigration !== undefined && diskMigration.hash !== row.hash;
+  });
+  return { pending, missingOnDisk, changedOnDisk };
 }
 
 function readDrizzleMigrationFiles(migrationsDir: string): MigrationMeta[] {

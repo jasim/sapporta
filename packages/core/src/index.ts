@@ -60,7 +60,12 @@ export {
 export type { SchemaIssue } from "./schema/check.js";
 
 // Migration readiness
-export { assertMigrationsReady } from "./migrations/guard.js";
+export {
+  assertMigrationsReady,
+  pendingMigrations,
+  applyMigrations,
+} from "./migrations/guard.js";
+export type { PendingMigration } from "./migrations/guard.js";
 
 // Canonical table API, save-boundary, and column-value Zod
 export {

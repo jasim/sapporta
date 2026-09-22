@@ -54,6 +54,11 @@ export interface LoadSapportaProjectOptions {
    * runtime; `tsc --watch` keeps it fresh during development.
    */
   apiDistDir: string;
+  /**
+   * Absolute path to the directory holding the Drizzle migrations. Defaults
+   * to `packages/api/migrations` under `projectRoot`.
+   */
+  migrationsDir?: string;
   conn: ProjectDbConnection;
 }
 
@@ -126,6 +131,7 @@ export async function loadSapportaProject(
     apiDistDir,
     sqlite,
     tables: catalog.tables,
+    migrationsDir: opts.migrationsDir,
   });
 
   return {
