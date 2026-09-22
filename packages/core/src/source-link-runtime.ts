@@ -72,7 +72,7 @@ function findApplicationPackageJson(): string {
     const parent = dirname(current);
     if (parent === current || current === parse(current).root) {
       throw new Error(
-        `Could not find the generated API package.json from ${entryPath}.`,
+        `Could not find the application package.json from ${entryPath}.`,
       );
     }
     current = parent;

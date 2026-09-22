@@ -1,3 +1,8 @@
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { createServer } from "node:http";
+import type { AddressInfo } from "node:net";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Command } from "commander";
 import { z } from "zod";
@@ -212,5 +217,66 @@ describe("CLI command context credentials", () => {
       apiUrl: "https://flag.example.com",
       apiToken: "flag-token",
     });
+  });
+});
+
+describe("endpoints list from a flat project", () => {
+  // A flat project has one package.json and no packages/ directory. The CLI
+  // finds the API through the port in the root's .env.development.
+  it("reads the running app's endpoints", async () => {
+    delete process.env.SAPPORTA_API_URL;
+    delete process.env.SAPPORTA_API_TOKEN;
+
+    const requested: string[] = [];
+    const server = createServer((req, res) => {
+      requested.push(req.url ?? "");
+      res.setHeader("content-type", "application/json");
+      res.end(
+        JSON.stringify({
+          openapi: "3.1.0",
+          info: { title: "flat-app", version: "0.0.0" },
+          paths: {
+            "/api/sample": {
+              get: { summary: "List samples", responses: {} },
+            },
+          },
+        }),
+      );
+    });
+    await new Promise<void>((resolve) =>
+      server.listen(0, "localhost", resolve),
+    );
+    const { port } = server.address() as AddressInfo;
+
+    const root = mkdtempSync(join(tmpdir(), "sapporta-flat-project-"));
+    writeFileSync(join(root, "sapporta.json"), "{}");
+    writeFileSync(
+      join(root, "package.json"),
+      JSON.stringify({ name: "flat-app" }),
+    );
+    writeFileSync(
+      join(root, ".env.development"),
+      `SAPPORTA_API_PORT=${port}\n`,
+    );
+    vi.spyOn(process, "cwd").mockReturnValue(root);
+    const log = vi.spyOn(console, "log").mockImplementation(() => undefined);
+
+    try {
+      const program = createCliProgram("0.0.0-test", CLI_COMMANDS);
+      await program.parseAsync([
+        "node",
+        "sapporta",
+        "--output",
+        "json",
+        "endpoints",
+        "list",
+      ]);
+    } finally {
+      await new Promise((resolve) => server.close(resolve));
+      rmSync(root, { force: true, recursive: true });
+    }
+
+    expect(requested).toEqual(["/api/openapi.json"]);
+    expect(log.mock.calls.flat().join("\n")).toContain("/api/sample");
   });
 });
