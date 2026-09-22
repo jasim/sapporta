@@ -42,6 +42,18 @@ export interface AccountMenuProps {
   onLogout?: () => void | Promise<void>;
   footer?: ReactNode;
   triggerAriaLabel?: string;
+  /**
+   * Show only the avatar in the standard trigger, as a collapsed sidebar rail
+   * does. A trigger from `renderTrigger` decides its own appearance.
+   */
+  compact?: boolean;
+  /**
+   * Runs when a chosen action succeeds and the menu closes. A sidebar passes
+   * `closeTemporary` from `useSidebar()`, so choosing Profile or Workspace
+   * settings puts the sidebar away as choosing a destination does. A failed
+   * action keeps the menu open with its message, and does not run this.
+   */
+  onActionComplete?: () => void;
   renderTrigger?: (props: AccountMenuTriggerRenderProps) => ReactElement;
 }
 
@@ -51,6 +63,8 @@ export function AccountMenu({
   onLogout,
   footer,
   triggerAriaLabel,
+  compact = false,
+  onActionComplete,
   renderTrigger,
 }: AccountMenuProps) {
   const [open, setOpen] = useState(false);
@@ -85,6 +99,7 @@ export function AccountMenu({
     try {
       await action.onSelect();
       setOpen(false);
+      onActionComplete?.();
     } catch (err) {
       console.error("Account menu action failed", err);
       setActionError(errorMessage(err));
@@ -106,6 +121,7 @@ export function AccountMenu({
       secondaryLabel={secondaryLabel}
       open={open}
       ariaLabel={triggerAriaLabel}
+      compact={compact}
       onClick={() => setOpen((current) => !current)}
     />
   );
@@ -231,6 +247,7 @@ export function formatAuthRole(role: AuthRole): string {
 interface DefaultAccountMenuTriggerProps extends AccountMenuTriggerRenderProps {
   ariaLabel?: string;
   className?: string;
+  compact: boolean;
   onClick: () => void;
 }
 
@@ -241,8 +258,11 @@ function DefaultAccountMenuTrigger({
   open,
   ariaLabel,
   className,
+  compact,
   onClick,
 }: DefaultAccountMenuTriggerProps) {
+  // The compact trigger keeps the full trigger's height and leading padding,
+  // so the avatar stays in place when a sidebar rail opens to full width.
   return (
     <button
       type="button"
@@ -250,12 +270,12 @@ function DefaultAccountMenuTrigger({
       aria-expanded={open}
       onClick={onClick}
       className={cx(
-        "inline-flex h-auto w-full items-center justify-start gap-2 rounded-md px-2 py-[7px] text-left text-sap-soft hover:bg-sap-row-hover",
+        "inline-flex h-auto w-full items-center justify-start gap-2 rounded-md px-1.5 py-[7px] text-left text-sap-soft hover:bg-sap-row-hover",
         className,
       )}
     >
       <AccountAvatar initials={initials} />
-      <span className="min-w-0 flex-1">
+      <span className={compact ? "invisible min-w-0 flex-1" : "min-w-0 flex-1"}>
         <span className="block truncate text-sap-body font-[650] text-sap-fg">
           {displayName}
         </span>
@@ -263,11 +283,13 @@ function DefaultAccountMenuTrigger({
           {secondaryLabel}
         </span>
       </span>
-      <ChevronRight
-        aria-hidden="true"
-        className="h-[13px] w-[13px] shrink-0 text-sap-subtle"
-        strokeWidth={1.7}
-      />
+      {!compact && (
+        <ChevronRight
+          aria-hidden="true"
+          className="h-[13px] w-[13px] shrink-0 text-sap-subtle"
+          strokeWidth={1.7}
+        />
+      )}
     </button>
   );
 }

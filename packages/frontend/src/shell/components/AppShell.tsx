@@ -37,10 +37,11 @@ export interface AppShellProps {
 
 /**
  * The standard shell keeps navigation reachable without asking each route to
- * render a particular header. On desktop, the collapse control sits with the
- * expanded navigation; once collapsed, its expand control moves to the
- * content's top-left. Compact screens keep the opener there for the drawer.
- * While that content-side control is present, the scroll region carries
+ * render a particular header. On desktop, the sidebar control is the first
+ * thing in the sidebar header, both while the sidebar is expanded and while it
+ * is collapsed to its rail, so it stays in one place on screen. Compact screens
+ * have no rail, so the control that opens the drawer sits over the content's
+ * top-left. While it is there, the scroll region carries
  * `--sap-page-header-inset`, and `PageHeader` leaves that much room for it.
  *
  * Toasts from Sapporta's screens need the `Toaster` this shell renders; an app
@@ -108,8 +109,7 @@ function AppShellLayout({
     showNavigation &&
     shellSidebarToggle !== false &&
     shellSidebarToggle != null;
-  const showSidebarToggleInSidebar =
-    hasShellSidebarToggle && sidebar.isDesktop && sidebar.desktopExpanded;
+  const showSidebarToggleInSidebar = hasShellSidebarToggle && sidebar.isDesktop;
 
   return (
     <div className="flex h-screen flex-col overflow-hidden">

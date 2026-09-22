@@ -66,41 +66,60 @@ function SidebarHeader() {
 
 export function NavSection({
   label,
+  labelHidden = false,
   children,
 }: {
   label: ReactNode;
+  /** Keep the label's space but not its text, as the collapsed rail does. */
+  labelHidden?: boolean;
   children: ReactNode;
 }) {
   return (
     <section className="flex flex-col gap-1 pt-4 first:pt-0">
-      <div className="flex items-center justify-between px-2 text-sap-label font-bold uppercase tracking-sap-section text-sap-subtle">
-        <span>{label}</span>
+      <div
+        className={cn(
+          "flex items-center justify-between px-2.5 text-sap-label font-bold uppercase tracking-sap-section text-sap-subtle",
+          labelHidden && "invisible",
+        )}
+      >
+        <span className="truncate">{label}</span>
       </div>
       <div className="flex flex-col gap-0.5">{children}</div>
     </section>
   );
 }
 
+/**
+ * How a navigation link is drawn:
+ * - `row`: icon and label, as in the expanded sidebar.
+ * - `icon-row`: the same row with its label hidden from view, as in the
+ *   collapsed rail. The icon stays where it is in `row`, so it does not move
+ *   when the sidebar opens over the page.
+ * - `square`: a 40px icon button named by a tooltip, as in `NavigationRail`.
+ */
+export type NavItemVariant = "row" | "icon-row" | "square";
+
 export function NavItem({
   item,
   active,
-  compact = false,
+  variant = "row",
 }: {
   item: NavigationItem;
   active: boolean;
-  compact?: boolean;
+  variant?: NavItemVariant;
 }) {
   const Icon = item.icon;
+  const square = variant === "square";
 
   return (
     <Link
       to={item.to}
-      title={compact ? item.label : undefined}
-      aria-label={compact ? item.label : undefined}
+      title={square ? item.label : undefined}
+      aria-label={square ? item.label : undefined}
       aria-current={active ? "page" : undefined}
       className={cn(
         "group flex items-center rounded-lg text-sap-body text-sap-soft no-underline transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-sap-sidebar",
-        compact ? "size-10 justify-center" : "h-sap-ctl gap-2.5 px-2.5",
+        square ? "size-10 justify-center" : "h-sap-ctl gap-2.5 px-3",
         active
           ? "bg-sap-active-nav"
           : "hover:bg-sap-row-hover hover:text-sap-fg",
@@ -109,20 +128,27 @@ export function NavItem({
       <span
         className={cn(
           "inline-flex shrink-0 items-center justify-center text-sap-subtle transition-colors group-hover:text-sap-muted",
-          compact ? "size-5" : "size-4",
+          square ? "size-5" : "size-4",
         )}
       >
         {Icon ? (
           <Icon
-            className={compact ? "size-[17px]" : "size-[15px]"}
+            className={square ? "size-[17px]" : "size-[15px]"}
             strokeWidth={1.7}
           />
         ) : (
           <span className="size-1.5 rounded-full bg-current" />
         )}
       </span>
-      {!compact && (
-        <span className="min-w-0 flex-1 truncate">{item.label}</span>
+      {!square && (
+        <span
+          className={cn(
+            "min-w-0 flex-1 truncate",
+            variant === "icon-row" && "sr-only",
+          )}
+        >
+          {item.label}
+        </span>
       )}
     </Link>
   );
@@ -130,9 +156,16 @@ export function NavItem({
 
 /**
  * Sapporta's standard full navigation. Selecting an item also dismisses the
- * compact drawer, while desktop navigation remains in place. `AppShell` puts
- * its collapse control beside the application identity whenever the desktop
- * sidebar is expanded, so the action appears on the region it will change.
+ * compact drawer, while desktop navigation remains in place.
+ *
+ * On desktop, `AppShell` passes its sidebar control in for both the expanded
+ * sidebar and the collapsed rail. The control comes first in the header, so
+ * it stays in the same place on screen whichever way the sidebar is shown.
+ * In the rail, the header shows only that control, and each item shows only
+ * its icon.
+ *
+ * Choosing a destination, or an item in the account menu, closes the sidebar
+ * that hovering opened, so the page is not left under it.
  */
 export function AppSidebar({
   navigation,
@@ -144,30 +177,53 @@ export function AppSidebar({
 
   return (
     <SidebarShell
+      rail={sidebar.rail}
       header={
         <>
-          <SidebarHeader />
           {sidebarToggle && (
             <div
               data-shell-sidebar-toggle
               data-sidebar-toggle-location="sidebar"
-              className="ml-auto flex shrink-0"
+              className="flex shrink-0"
             >
               {sidebarToggle}
             </div>
           )}
+          {!sidebar.rail ? (
+            <SidebarHeader />
+          ) : (
+            !sidebarToggle && (
+              <span className="flex size-10 items-center justify-center">
+                <SapportaMark size={24} />
+              </span>
+            )
+          )}
         </>
       }
-      footer={footer === undefined ? <AuthAccountMenu /> : footer}
-      onNavigate={sidebar.closeDrawer}
+      footer={
+        footer === undefined ? (
+          <AuthAccountMenu
+            compact={sidebar.rail}
+            onActionComplete={sidebar.closeTemporary}
+          />
+        ) : (
+          footer
+        )
+      }
+      onNavigate={sidebar.closeTemporary}
     >
       {navigation.map((section) => (
-        <NavSection key={section.label} label={section.label}>
+        <NavSection
+          key={section.label}
+          label={section.label}
+          labelHidden={sidebar.rail}
+        >
           {section.items.map((item) => (
             <NavItem
               key={item.to}
               item={item}
               active={isNavigationItemActive(item, location)}
+              variant={sidebar.rail ? "icon-row" : "row"}
             />
           ))}
         </NavSection>
@@ -200,7 +256,7 @@ export function NavigationRail({ navigation }: NavigationShellProps) {
             key={item.to}
             item={item}
             active={isNavigationItemActive(item, location)}
-            compact
+            variant="square"
           />
         ))}
       </nav>

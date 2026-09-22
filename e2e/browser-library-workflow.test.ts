@@ -205,25 +205,30 @@ async function expectGettingStartedLink(page: Page): Promise<void> {
 
 async function verifyResponsiveSidebar(page: Page): Promise<void> {
   const region = page.locator("[data-sidebar-region]");
-  const surface = page.locator("[data-sidebar-surface]");
+  const collapse = page.getByRole("button", { name: "Collapse sidebar" });
+  const collapseBox = await collapse.boundingBox();
 
-  await page.getByRole("button", { name: "Collapse sidebar" }).click();
+  await collapse.click();
   await playwrightExpect(region).toHaveAttribute(
     "data-sidebar-state",
     "collapsed",
   );
-  // The click leaves the pointer inside the sidebar area, and a fine pointer
-  // hovering the collapsed region intentionally keeps the surface revealed.
-  // Move onto the content area so the sidebar tucks away.
+  // The pointer that pressed the control now rests on the rail. The control is
+  // where it was, and the sidebar does not open under the pointer.
+  const expand = page.getByRole("button", { name: "Expand sidebar" });
+  playwrightExpect(await expand.boundingBox()).toEqual(collapseBox);
+  await page.waitForTimeout(500);
+  await playwrightExpect(region).not.toHaveAttribute("data-sidebar-peek");
+
+  // Coming back to rest on the rail opens the sidebar over the page, and
+  // moving onto the page closes it.
   await page.mouse.move(700, 300);
-  await playwrightExpect(surface).toBeHidden();
+  await page.mouse.move(34, 300);
+  await playwrightExpect(region).toHaveAttribute("data-sidebar-peek", "open");
+  await page.mouse.move(700, 300);
+  await playwrightExpect(region).not.toHaveAttribute("data-sidebar-peek");
 
-  await page.mouse.move(4, 300);
-  await playwrightExpect(surface).toBeVisible();
-  await page.getByRole("main").hover({ position: { x: 500, y: 300 } });
-  await playwrightExpect(surface).toBeHidden();
-
-  await page.getByRole("button", { name: "Expand sidebar" }).click();
+  await expand.click();
   await playwrightExpect(region).toHaveAttribute(
     "data-sidebar-state",
     "expanded",

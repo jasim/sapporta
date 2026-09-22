@@ -9,10 +9,11 @@ export type SidebarToggleProps = Omit<
 >;
 
 /**
- * Uses the control that fits the current screen: it changes the persisted
- * desktop width preference, or opens the temporary compact drawer. `AppShell`
- * renders this by default, so a page only needs its own toggle when it replaces
- * the shell control deliberately.
+ * Uses the control that fits the current screen: on desktop it switches the
+ * persisted preference between the expanded sidebar and the rail, and on a
+ * compact screen it opens the temporary drawer. `AppShell` renders this by
+ * default, so a page only needs its own toggle when it replaces the shell
+ * control deliberately.
  */
 export function SidebarToggle({ className, ...props }: SidebarToggleProps) {
   const sidebar = useSidebar();
@@ -38,7 +39,7 @@ export function SidebarToggle({ className, ...props }: SidebarToggleProps) {
       aria-label={label}
       title={label}
       className={cn(
-        "inline-flex size-10 shrink-0 items-center justify-center rounded-md text-sap-muted transition-colors hover:bg-sap-row-hover hover:text-sap-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+        "inline-flex size-10 shrink-0 items-center justify-center rounded-md text-sap-soft transition-colors hover:bg-sap-row-hover hover:text-sap-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
         className,
       )}
       onClick={
@@ -49,7 +50,7 @@ export function SidebarToggle({ className, ...props }: SidebarToggleProps) {
             : sidebar.openDrawer
       }
     >
-      <Icon className="size-[18px]" strokeWidth={1.7} />
+      <Icon className="size-5" strokeWidth={1.7} />
     </button>
   );
 }
