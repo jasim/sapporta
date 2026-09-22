@@ -274,6 +274,56 @@ describe("SchemaTableGridView", () => {
     );
   });
 
+  it("hides the named columns of the root table", async () => {
+    const props = await renderSchemaTableGridView({
+      hiddenColumns: ["customer"],
+    });
+
+    expect(props.definition.levels.orders.columns).toEqual([
+      { kind: "remainingTable", exclude: ["customer"] },
+    ]);
+    expect(props.definition.levels["orders.order_lines"].columns).toBe(
+      undefined,
+    );
+  });
+
+  it("keeps the grid definition while the hidden column names stay the same", async () => {
+    const source = {
+      table: ordersTable,
+      tablesByName: { orders: ordersTable, order_lines: orderLinesTable },
+    };
+    const route = {
+      path: "/orders-workbench",
+      searchParams: new URLSearchParams(),
+      navigate: vi.fn(),
+    };
+    const renderView = (hiddenColumns: readonly string[]): ReactElement =>
+      createElement(SchemaTableGridView, {
+        source,
+        route,
+        registerAs: "orders",
+        hiddenColumns,
+      });
+
+    mounted = await render(renderView(["customer"]));
+    await act(async () => {
+      mounted?.root.render(renderView(["customer"]));
+    });
+    await act(async () => {
+      mounted?.root.render(renderView(["id"]));
+    });
+
+    const definitions = tableGridViewSpy.mock.calls.map(
+      ([props]) => props.definition,
+    );
+    expect(definitions).toHaveLength(3);
+    expect(definitions[1]).toBe(definitions[0]);
+    expect(definitions[2]).not.toBe(definitions[0]);
+    expect(definitions[2]?.levels.orders.columns).toEqual([
+      { kind: "remainingTable", exclude: ["id"] },
+    ]);
+  });
+
   it("applies related row options to child levels", async () => {
     const props = await renderSchemaTableGridView({
       relatedRows: {

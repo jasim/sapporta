@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import type { TableSchema } from "@sapporta/shared/contracts";
 import { CELL_GRID_WITH_ROW_CLICK_ACTIVATION } from "@sapporta/grid";
-import { defineTGrid } from "./tgrid-runtime-config";
+import { createLookupStore } from "../../lookup/store";
+import { createTGridColumnMapper } from "./tgrid-column-mapper";
+import { compileTGridRuntimeConfig, defineTGrid } from "./tgrid-runtime-config";
 import { buildSchemaTGridConfig, defineSchemaTGrid } from "./schema-tgrid";
 
 const ordersTable: TableSchema = {
@@ -121,6 +123,46 @@ describe("schema TGrid helpers", () => {
       pageSize: 25,
       initialPage: 3,
     });
+  });
+
+  it("leaves hidden columns out of the root level only", () => {
+    const definition = defineSchemaTGrid({
+      source: {
+        rootTableName: "orders",
+        tablesByName: {
+          orders: ordersTable,
+          order_lines: linesTable,
+        },
+      },
+      hiddenColumns: ["customer"],
+    });
+    const compiled = compileTGridRuntimeConfig({
+      rootLevel: definition.rootLevel,
+      levels: definition.levels,
+      columnMapper: createTGridColumnMapper({ lookups: createLookupStore() }),
+    });
+
+    expect(
+      compiled.gridSchema.levels.orders.columns.map((column) => column.id),
+    ).toEqual(["id"]);
+    expect(definition.levels["orders.order_lines"].columns).toBeUndefined();
+  });
+
+  it("rejects a hidden column the root table does not have", () => {
+    expect(() =>
+      defineSchemaTGrid({
+        source: {
+          rootTableName: "orders",
+          tablesByName: {
+            orders: ordersTable,
+            order_lines: linesTable,
+          },
+        },
+        hiddenColumns: ["line_no"],
+      }),
+    ).toThrow(
+      "buildSchemaTGridConfig: table 'orders' has no column 'line_no' to hide",
+    );
   });
 
   it("returns level config callers can customize before defining a grid", () => {

@@ -9,6 +9,7 @@ import {
   type SchemaTableRowsByLevel,
 } from "../tgrid/schema-tgrid";
 import type { TGridDefinition } from "../tgrid/tgrid-runtime-config";
+import type { TableColumnName } from "../tgrid/tgrid-types";
 import type {
   TGridLoadedRowsBoundaryHandler,
   TGridSession,
@@ -42,6 +43,8 @@ export type SchemaTableGridViewProps = {
   sessionRef?: Ref<TGridSession<SchemaTableRowsByLevel>>;
   /** Replace the standard pager-focus behavior at loaded-row boundaries. */
   onLoadedRowsBoundary?: TGridLoadedRowsBoundaryHandler<SchemaTableRowsByLevel>;
+  /** Hide these columns of `source.table` in this view only. */
+  hiddenColumns?: readonly TableColumnName[];
   /** Tune row expansion, row loading, interaction, controls, and styling. */
   viewRelatedRows?: ViewRelatedRowsOption;
   rootRows?: SchemaTableRootRowsOptions;
@@ -112,6 +115,15 @@ function useStableRowOptions({
       urlSync,
     ],
   );
+}
+
+// The list may be inline; its column names are the dependency contract.
+function useStableColumnNames(
+  columnNames?: readonly TableColumnName[],
+): readonly TableColumnName[] | undefined {
+  const key = columnNames ? JSON.stringify(columnNames) : undefined;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  return useMemo(() => columnNames, [key]);
 }
 
 function useStableInteractionOptions(
@@ -185,6 +197,7 @@ export function SchemaTableGridView({
   actions,
   sessionRef,
   onLoadedRowsBoundary,
+  hiddenColumns,
   viewRelatedRows,
   rootRows,
   relatedRows,
@@ -195,6 +208,7 @@ export function SchemaTableGridView({
 }: SchemaTableGridViewProps) {
   const definition = useSchemaTableGridDefinition({
     source,
+    hiddenColumns,
     rootRows,
     relatedRows,
     interaction,
@@ -225,6 +239,7 @@ export function useSchemaTableGrid({
   onNewRecord,
   actions,
   onLoadedRowsBoundary,
+  hiddenColumns,
   viewRelatedRows,
   rootRows,
   relatedRows,
@@ -235,6 +250,7 @@ export function useSchemaTableGrid({
 }: UseSchemaTableGridArgs): TableGridBinding<SchemaTableRowsByLevel> {
   const definition = useSchemaTableGridDefinition({
     source,
+    hiddenColumns,
     rootRows,
     relatedRows,
     interaction,
@@ -257,11 +273,13 @@ export function useSchemaTableGrid({
 
 function useSchemaTableGridDefinition({
   source,
+  hiddenColumns,
   rootRows,
   relatedRows,
   interaction,
 }: {
   source: SchemaTableGridViewSource;
+  hiddenColumns?: readonly TableColumnName[];
   rootRows?: SchemaTableRootRowsOptions;
   relatedRows?: SchemaTableRelatedRowsOptions;
   interaction?: GridInteractionConfig;
@@ -278,16 +296,24 @@ function useSchemaTableGridDefinition({
     defaults: schemaTableGridDefaultRootRows,
   });
   const relatedRowOptions = useStableRowOptions({ options: relatedRows });
+  const hiddenColumnNames = useStableColumnNames(hiddenColumns);
   const interactionOptions = useStableInteractionOptions(interaction);
   const definition = useMemo(
     () =>
       defineSchemaTGrid({
         source: gridSource,
+        hiddenColumns: hiddenColumnNames,
         rootRows: rootRowOptions,
         relatedRows: relatedRowOptions,
         interaction: interactionOptions,
       }),
-    [gridSource, interactionOptions, relatedRowOptions, rootRowOptions],
+    [
+      gridSource,
+      hiddenColumnNames,
+      interactionOptions,
+      relatedRowOptions,
+      rootRowOptions,
+    ],
   );
 
   return definition;
