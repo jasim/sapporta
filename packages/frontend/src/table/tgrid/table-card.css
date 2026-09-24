@@ -271,11 +271,17 @@
   padding-top: 0;
 }
 
-:where(
-  .sapporta-table-grid [data-grid-part="related-table-link"],
-  .sapporta-table-grid [data-grid-part="cards-level-link"]
-) {
+:where(.sapporta-table-grid [data-grid-part="related-table-link"]) {
   text-decoration: none;
+}
+
+/* A nested table's open-in-table link stays quiet until the pointer is over
+   that table. The :has() test keeps a hovered grandchild table from lighting
+   up its parent's link as well. */
+.sapporta-table-grid:hover:not(:has(.sapporta-table-grid:hover))
+  > [data-grid-part="header"]
+  [data-grid-part="related-table-link"] {
+  color: var(--sap-link);
 }
 
 /* The card title: the row-label column renders as the record's heading. */

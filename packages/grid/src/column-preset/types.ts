@@ -117,6 +117,14 @@ export type PresetChromeOptions<TMeta = unknown, TFilter = unknown> = {
   commandOverrides?: (
     level: HeaderLevelState<TFilter>,
   ) => Partial<GridLevelCommands<TFilter>>;
+  /**
+   * Renders a control after a nested level's label, such as a link that opens
+   * the level's rows on a page of their own. Return null to render nothing.
+   */
+  renderLevelLabelAction?: (context: {
+    path: GridPath;
+    levelName: string;
+  }) => ReactNode;
 };
 
 /**

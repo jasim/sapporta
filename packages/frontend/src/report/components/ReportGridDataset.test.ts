@@ -1120,7 +1120,7 @@ describe("ReportGridDataset", () => {
     // Only the nested entry level gets a header; the root level's identity
     // comes from the page around the report.
     expect(levelHeaders).toHaveLength(1);
-    expect(levelHeaders[0].textContent).toContain("entry");
+    expect(levelHeaders[0].textContent).toContain("Entry");
 
     const entryTitle = container.querySelector(
       '[data-grid-part="row-field"][data-card-role="title"][data-col-id="description"]',

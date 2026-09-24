@@ -730,11 +730,6 @@
   margin-inline-start: var(--sap-grid-nested-indent-deep, 46px);
 }
 
-.levelStatus[data-grid-depth]:not([data-grid-depth="0"]),
-.levelEmpty[data-grid-depth]:not([data-grid-depth="0"]) {
-  background: var(--sap-nested-bg);
-}
-
 .levelStatus[data-grid-status="loading"] {
   border-left: 2px solid var(--sap-loading-indicator-bar);
 }
@@ -779,10 +774,17 @@
     30px
   );
 
-  background: var(--sap-nested-bg);
+  padding-inline-end: 14px;
+}
+
+/* In a table, the nested level's label row already spaces it from the parent
+   row. Cards keep vertical padding to set the level apart from the parent
+   card and the one after it. */
+.presetGrid[data-grid-depth]:not(
+    [data-grid-depth="0"]
+  )[data-grid-presentation="cards"] {
   padding-block-end: 14px;
   padding-block-start: 10px;
-  padding-inline-end: 14px;
 }
 
 .presetGrid[data-grid-depth="1"] {
@@ -814,18 +816,23 @@
 }
 
 .levelLabelContent {
+  align-items: center;
   color: var(--grid-level-label-color, var(--sap-fg-subtle));
-  font-size: var(--grid-level-label-font-size, var(--text-sap-label));
-  font-weight: var(--grid-level-label-font-weight, 700);
-  letter-spacing: var(
-    --grid-level-label-letter-spacing,
-    var(--tracking-sap-head)
-  );
+  font-size: var(--grid-level-label-font-size, var(--text-sap-data));
+  font-weight: var(--grid-level-label-font-weight, 500);
+  gap: 4px;
+  letter-spacing: var(--grid-level-label-letter-spacing, normal);
   line-height: 1;
   min-height: var(--grid-level-label-min-height, 18px);
+  /* Flush left, unlike the cell padding that cell-content otherwise gets. */
+  padding: var(--grid-level-label-padding, 10px 0);
+  text-transform: var(--grid-level-label-text-transform, none);
+}
+
+.levelLabelText {
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
-  text-transform: var(--grid-level-label-text-transform, uppercase);
   white-space: nowrap;
 }
 

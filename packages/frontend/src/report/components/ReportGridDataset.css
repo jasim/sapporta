@@ -1,11 +1,9 @@
-/* Reports are readonly analysis surfaces. The gray wash and quiet focus ring
-   keep keyboard drill-down visible without making cells look edit-ready. */
+/* Reports sit on the same white surface as every other page. They are
+   readonly, so their focus is a quiet gray ring with a gray wash rather than
+   the blue ring and tint of an editable table: keyboard drill-down stays
+   visible without making cells look edit-ready. */
 .sapporta-report-grid-dataset {
-  --sap-report-grid-background: color-mix(
-    in oklab,
-    var(--sap-surface) 35%,
-    var(--sap-sidebar)
-  );
+  --sap-report-grid-background: var(--sap-surface);
   --sap-report-grid-focus-background: color-mix(
     in oklab,
     var(--sap-report-grid-background) 72%,
@@ -52,13 +50,6 @@
   /* Reports have no header menu button marking column boundaries, so keep the
      resize handle's separator line visible even before hover. */
   --grid-column-resize-handle-color: var(--sap-border);
-}
-
-.sapporta-report-grid-dataset
-  .sapporta-report-grid-dataset__level[data-grid-depth]:not(
-    [data-grid-depth="0"]
-  ) {
-  background: var(--grid-background);
 }
 
 .sapporta-report-grid-dataset

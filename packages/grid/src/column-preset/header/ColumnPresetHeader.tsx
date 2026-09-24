@@ -14,6 +14,7 @@ import {
   useGridRuntime,
   useLevelSnapshot,
 } from "../../core/react/GridRuntimeProvider";
+import { titleCaseIdentifier } from "@sapporta/shared/labels";
 import { cn, Popover, PopoverContent, PopoverTrigger } from "@sapporta/ui";
 import { meta, preset, presetRuntime } from "../preset";
 import {
@@ -80,7 +81,11 @@ export function ColumnPresetHeader<TMeta = unknown, TFilter = unknown>({
   return (
     <div data-grid-part="header" role="rowgroup">
       {levelLabel ? (
-        <LevelLabelRow label={levelLabel} title={levelName} />
+        <LevelLabelRow
+          label={levelLabel}
+          title={levelName}
+          action={options.renderLevelLabelAction?.({ path, levelName })}
+        />
       ) : null}
       <div data-grid-part="header-row" role="row">
         {rowHeaderColumn === "empty-selectable-cell" ? (
@@ -340,7 +345,15 @@ function defaultHeader(
   );
 }
 
-function LevelLabelRow({ label, title }: { label: string; title: string }) {
+function LevelLabelRow({
+  label,
+  title,
+  action,
+}: {
+  label: string;
+  title: string;
+  action: ReactNode;
+}) {
   return (
     <div data-grid-part="level-label-row" role="row">
       <div
@@ -348,12 +361,11 @@ function LevelLabelRow({ label, title }: { label: string; title: string }) {
         role="columnheader"
         data-grid-part="level-label-cell"
       >
-        <div
-          className={styles.levelLabelContent}
-          data-grid-part="cell-content"
-          title={title}
-        >
-          {label}
+        <div className={styles.levelLabelContent} data-grid-part="cell-content">
+          <span className={styles.levelLabelText} title={title}>
+            {label}
+          </span>
+          {action}
         </div>
       </div>
     </div>
@@ -362,7 +374,7 @@ function LevelLabelRow({ label, title }: { label: string; title: string }) {
 
 function nestedLevelLabel(path: GridPath, levelName: string): string | null {
   if (decomposePath(path).edges.length === 0) return null;
-  return compactLevelName(levelName);
+  return titleCaseIdentifier(compactLevelName(levelName));
 }
 
 function compactLevelName(levelName: string): string {

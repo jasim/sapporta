@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, type CSSProperties } from "react";
-import { ListTree, Table2 } from "lucide-react";
+import { ArrowUpRight, ListTree } from "lucide-react";
 import {
   trailingEdge,
   GridCopyContextMenu,
@@ -23,6 +23,7 @@ import {
   type ColumnSizingOptions,
 } from "@sapporta/grid/column-preset";
 import type { TableSchema } from "@sapporta/shared/contracts";
+import { titleCaseIdentifier } from "@sapporta/shared/labels";
 import { cn } from "@sapporta/ui/cn";
 import { relatedRowsTableHref } from "./tgrid-table-url";
 import {
@@ -61,6 +62,10 @@ export type TGridColumnSizing = Omit<ColumnSizingOptions, "storageKey">;
 export type ViewRelatedRowsOption =
   | boolean
   | {
+      /**
+       * The link's accessible name and tooltip. Defaults to
+       * "Open <related table> in table".
+       */
       label?: string;
       target?: "_self" | "_blank";
       href?: (context: ViewRelatedRowsContext) => string | null;
@@ -125,6 +130,10 @@ export function TGrid<
             `sapporta:grid-columns:${session.rootTableName}:${levelName}`,
         },
         renderColumnHeaderMenu: renderTGridHeaderMenu,
+        renderLevelLabelAction: viewRelatedRows
+          ? (level) =>
+              renderRelatedRowsLink(sessionContext, level, viewRelatedRows)
+          : undefined,
         commandOverrides: (level) => {
           const levelId = runtime.level(level.path).schema.name;
           const queryStore = sessionContext.levels[levelId]?.queryStore as
@@ -206,14 +215,9 @@ export function mergeTGridChrome({
   return {
     ...chrome,
     renderHeader: (ctx) =>
-      ctx.presentation === "cards" ? (
-        renderCardsLevelHeader(session, ctx, root, viewRelatedRows)
-      ) : (
-        <>
-          {chrome.renderHeader?.(ctx)}
-          {renderRelatedRowsLink(session, ctx, root, viewRelatedRows)}
-        </>
-      ),
+      ctx.presentation === "cards"
+        ? renderCardsLevelHeader(session, ctx, root, viewRelatedRows)
+        : chrome.renderHeader?.(ctx),
     renderStatus: (ctx) =>
       ctx.path === root ? null : chrome.renderStatus?.(ctx),
     renderEmpty: (ctx) =>
@@ -243,91 +247,56 @@ function renderCardsLevelHeader(
   option: ViewRelatedRowsOption | undefined,
 ) {
   if (ctx.path === root) return null;
-  const link = option ? resolveRelatedRowsLink(session, ctx, option) : null;
 
   return (
     <div
-      className="relative flex min-h-sap-ctl items-center justify-between gap-3 border-b border-sap-border/70 px-1 pb-2 pt-1"
+      className="flex min-h-sap-ctl items-center gap-1 border-b border-sap-border/70 px-1 pb-2 pt-1"
       data-grid-part="cards-level-header"
     >
       <div
-        className="min-w-0 truncate text-sap-meta font-bold uppercase tracking-sap-head text-sap-soft"
+        className="min-w-0 truncate text-sap-data font-medium text-sap-soft"
         data-grid-part="cards-level-title"
         title={ctx.levelName}
       >
-        {compactLevelName(ctx.levelName)}
+        {levelTitle(ctx.levelName)}
       </div>
-      {link ? (
-        <RelatedRowsIconLink
-          link={link}
-          ariaLabel={relatedRowsLinkLabel(link, ctx)}
-          className="absolute -left-9 top-0"
-          dataGridPart="cards-level-link"
-        />
-      ) : null}
+      {option ? renderRelatedRowsLink(session, ctx, option) : null}
     </div>
   );
 }
 
+/**
+ * The link after a nested level's label. It opens the related table's page,
+ * filtered to the rows under this level's parent row.
+ */
 function renderRelatedRowsLink(
   session: TGridRenderableSessionContext,
-  ctx: GridChromeContext,
-  root: string,
-  option: ViewRelatedRowsOption | undefined,
+  level: NestedLevel,
+  option: ViewRelatedRowsOption,
 ) {
-  if (!option || ctx.path === root) return null;
-  const resolved = resolveRelatedRowsLink(session, ctx, option);
-  if (!resolved) return null;
+  const link = resolveRelatedRowsLink(session, level, option);
+  if (!link) return null;
 
-  return (
-    <RelatedRowsIconLink
-      link={resolved}
-      ariaLabel={relatedRowsLinkLabel(resolved, ctx)}
-      className="absolute -left-11 top-0.5 z-[var(--sap-z-grid-header)]"
-      dataGridPart="related-table-link"
-    />
-  );
-}
-
-function RelatedRowsIconLink({
-  link,
-  ariaLabel,
-  className,
-  dataGridPart,
-}: {
-  link: { href: string; label: string; target: "_self" | "_blank" };
-  ariaLabel: string;
-  className?: string;
-  dataGridPart: string;
-}) {
   return (
     <a
       href={link.href}
       target={link.target}
       rel={link.target === "_blank" ? "noreferrer" : undefined}
-      aria-label={ariaLabel}
-      title={ariaLabel}
-      className={cn(
-        "inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-sap-border bg-sap-surface text-sap-soft hover:bg-sap-row-hover hover:text-sap-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sap-focus-ring",
-        className,
-      )}
-      data-grid-part={dataGridPart}
+      aria-label={link.label}
+      title={link.label}
+      className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-sm text-sap-subtle hover:bg-sap-row-hover hover:text-sap-link focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sap-focus-ring"
+      data-grid-part="related-table-link"
     >
-      <Table2 aria-hidden="true" className="h-[15px] w-[15px]" />
+      <ArrowUpRight aria-hidden="true" className="h-3.5 w-3.5" />
     </a>
   );
 }
 
-function relatedRowsLinkLabel(
-  link: { label: string },
-  ctx: GridChromeContext,
-): string {
-  return `${link.label} (${compactLevelName(ctx.levelName)})`;
-}
+type NestedLevel = Pick<GridChromeContext, "path" | "levelName">;
 
 function resolveRelatedRowsLink(
   session: TGridRenderableSessionContext,
-  ctx: GridChromeContext,
+  ctx: NestedLevel,
   option: ViewRelatedRowsOption,
 ): { href: string; label: string; target: "_self" | "_blank" } | null {
   const edge = trailingEdge(ctx.path);
@@ -370,14 +339,14 @@ function resolveRelatedRowsLink(
     href,
     label:
       config.label ??
-      `View ${relatedTable.label ?? relatedTable.name} in table`,
+      `Open ${relatedTable.label ?? levelTitle(relatedTable.name)} in table`,
     target: config.target ?? "_self",
   };
 }
 
-function compactLevelName(levelName: string): string {
+function levelTitle(levelName: string): string {
   const dot = levelName.lastIndexOf(".");
-  return dot >= 0 ? levelName.slice(dot + 1) : levelName;
+  return titleCaseIdentifier(dot >= 0 ? levelName.slice(dot + 1) : levelName);
 }
 
 /**

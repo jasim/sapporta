@@ -42,6 +42,7 @@ import {
   type ColumnSizingOptions,
 } from "@sapporta/grid/column-preset";
 import type { LinkIcon } from "@sapporta/shared/contracts";
+import { titleCaseIdentifier } from "@sapporta/shared/labels";
 import {
   gridDatasetLinkProblems,
   gridDatasetTreeColumn,
@@ -300,7 +301,9 @@ function renderReportCardsLevelHeader(
   root: GridPath,
 ): ReactNode {
   if (context.path === root) return null;
-  const label = dataset.levels[context.levelName]?.label ?? context.levelName;
+  const label =
+    dataset.levels[context.levelName]?.label ??
+    titleCaseIdentifier(context.levelName);
 
   return (
     <div
@@ -308,7 +311,7 @@ function renderReportCardsLevelHeader(
       data-grid-part="cards-level-header"
     >
       <div
-        className="min-w-0 truncate text-sap-meta font-bold uppercase tracking-sap-head text-sap-soft"
+        className="min-w-0 truncate text-sap-data font-medium text-sap-soft"
         data-grid-part="cards-level-title"
         title={label}
       >

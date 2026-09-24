@@ -58,6 +58,11 @@
       "sapporta:source": "./src/daterange.ts",
       "default": "./dist/daterange.js"
     },
+    "./labels": {
+      "types": "./dist/labels.d.ts",
+      "sapporta:source": "./src/labels.ts",
+      "default": "./dist/labels.js"
+    },
     "./csv": {
       "types": "./dist/csv.d.ts",
       "sapporta:source": "./src/csv.ts",
