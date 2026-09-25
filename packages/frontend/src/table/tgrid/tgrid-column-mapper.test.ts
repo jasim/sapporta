@@ -228,6 +228,20 @@ describe("TGridColumnMapper.columnFor", () => {
     expect(parser?.("-", undefined as never)).toBe("-");
   });
 
+  it("stops Delete and Backspace from emptying a required column", () => {
+    const ownerId = {
+      name: "owner_id",
+      label: "Owner",
+      kind: "number",
+      foreignKey: { table: "users", column: "id" },
+    } satisfies ColumnSchema;
+
+    expect(mapColumn(ownerId).disableBackspaceCellClear).toBeUndefined();
+    expect(
+      mapColumn({ ...ownerId, notNull: true }).disableBackspaceCellClear,
+    ).toBe(true);
+  });
+
   it("assigns FK label and editor lookups to preset data", () => {
     const column = mapColumn({
       name: "owner_id",

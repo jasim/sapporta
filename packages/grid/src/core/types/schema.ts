@@ -36,6 +36,11 @@
 // `column.activation` declares which gestures run a cell action. Renderers get
 // a narrow activation affordance; keyboard and pointer input are owned by the
 // grid.
+// Delete and Backspace write `null` into the focused cell, and into the other
+// selected cells of its column. Clearing is an edit, so it applies only where
+// an editor could open: the column declares `edit` and the row and source
+// accept writes. `column.disableBackspaceCellClear` turns this off for a
+// column that must not be empty.
 // `column.meta` is opaque to the grid — consumers use it for FK targets,
 // link configs, or anything else. Domain features built on top of the grid
 // (FK chips, link adornments, schema-derived context menu entries) are
@@ -186,6 +191,7 @@ export type ColumnSchema = {
   readonly align?: ColumnAlign;
   readonly compare?: (a: unknown, b: unknown) => number;
   readonly edit?: CellEditBehavior;
+  readonly disableBackspaceCellClear?: true;
   readonly activation?: CellActivation;
   readonly copy?: GridColumnCopyBehavior;
   readonly meta?: unknown;

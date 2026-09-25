@@ -91,6 +91,9 @@ function presetColumnFor(
     id: column.name as ColId,
     name: column.label,
     edit: editable ? ("default" as const) : ("none" as const),
+    // Delete and Backspace store null in an editable cell. A required column
+    // turns this off, and the picker or editor remains the way to change it.
+    ...(column.notNull ? { disableBackspaceCellClear: true as const } : {}),
     parse: (draft: string) => {
       const parsed = parseTablePatchValueDraft(column, draft);
       // TGrid's codec returns a value rather than a local field-issue result.

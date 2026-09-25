@@ -95,6 +95,20 @@ function isPlainSpace(e: KeyEventLike): boolean {
   return e.key === " " && !e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey;
 }
 
+// Both keys clear, as in Google Sheets and Numbers. The key labelled Delete on
+// a Mac keyboard reports "Backspace", and full-size keyboards add a forward
+// "Delete" key. Treating the two keys alike means the command works for users
+// of either keyboard. Modified presses stay free for browser and app shortcuts.
+function isPlainClearKey(e: KeyEventLike): boolean {
+  return (
+    (e.key === "Delete" || e.key === "Backspace") &&
+    !e.shiftKey &&
+    !e.ctrlKey &&
+    !e.metaKey &&
+    !e.altKey
+  );
+}
+
 function isShiftSpace(e: KeyEventLike): boolean {
   return e.key === " " && e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey;
 }
@@ -253,6 +267,9 @@ export function keyEventToCellIntent(
   }
 
   if (!column || !isCellEditable(focusedRow, column)) return null;
+  if (!column.disableBackspaceCellClear && isPlainClearKey(e)) {
+    return { type: "clearCell", coord: focus };
+  }
   if (isPrintableKey(e) && editStartsOn(column, "type")) {
     return {
       type: "startEdit",

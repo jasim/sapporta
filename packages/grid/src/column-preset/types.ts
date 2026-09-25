@@ -155,6 +155,12 @@ export type ColumnPresetOptions<TMeta = unknown> = {
   align?: ColumnAlign;
   width?: ColumnWidth;
   edit?: ColumnPresetEditOption;
+  /**
+   * Stops Delete and Backspace from writing `null` into the column's cells,
+   * for a column that must not be empty. Without it the keys clear an
+   * editable cell.
+   */
+  disableBackspaceCellClear?: true;
   sortable?: boolean;
   format?: (value: unknown) => string;
   parse?: (value: string, props: CellEditorProps) => unknown;

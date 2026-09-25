@@ -598,6 +598,77 @@ describe("keyEventToCellIntent", () => {
     });
   });
 
+  describe("Delete and Backspace", () => {
+    const disabledCols = [
+      { ...cols[0], disableBackspaceCellClear: true as const },
+      ...cols.slice(1),
+    ];
+
+    it("clear the focused cell of an editable column", () => {
+      for (const key of ["Delete", "Backspace"]) {
+        expect(
+          keyEventToCellIntent(
+            ev(key),
+            focusAt("r0", "a"),
+            displayed,
+            cols,
+            cellEditable,
+          ),
+        ).toEqual({
+          type: "clearCell",
+          coord: { rowId: makeRowId(path, "r0"), colId: "a" },
+        });
+      }
+    });
+
+    it("do nothing on a column that disables clearing", () => {
+      for (const key of ["Delete", "Backspace"]) {
+        expect(
+          keyEventToCellIntent(
+            ev(key),
+            focusAt("r0", "a"),
+            displayed,
+            disabledCols,
+            cellEditable,
+          ),
+        ).toBe(null);
+      }
+    });
+
+    it("do nothing where the cell cannot be edited", () => {
+      expect(
+        keyEventToCellIntent(
+          ev("Delete"),
+          focusAt("r0", "a"),
+          displayed,
+          cols,
+          () => false,
+        ),
+      ).toBe(null);
+    });
+
+    it("leave modified presses to the browser and the app", () => {
+      for (const key of ["Delete", "Backspace"]) {
+        for (const mods of [
+          { metaKey: true },
+          { ctrlKey: true },
+          { altKey: true },
+          { shiftKey: true },
+        ]) {
+          expect(
+            keyEventToCellIntent(
+              ev(key, mods),
+              focusAt("r0", "a"),
+              displayed,
+              cols,
+              cellEditable,
+            ),
+          ).toBe(null);
+        }
+      }
+    });
+  });
+
   it("does not open a 'type' edit on Ctrl+letter", () => {
     expect(
       keyEventToCellIntent(

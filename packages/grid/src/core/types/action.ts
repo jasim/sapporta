@@ -134,6 +134,11 @@ export type CellNavigationIntent =
         | { readonly kind: "row-control" };
       readonly gesture: RowSelectionGesture;
     }
+  // Delete and Backspace write `null` into the focused cell of an editable
+  // column, unless the column sets `disableBackspaceCellClear`.
+  // The write goes through the same path as an edit, so a selection within
+  // the column is cleared as well.
+  | { readonly type: "clearCell"; readonly coord: Coord }
   | { readonly type: "clearCellSelection" }
   | { readonly type: "clearRowSelection" }
   | { readonly type: "focusFirstCell" }

@@ -126,6 +126,9 @@ function constructColumn<TMeta>(
     renderCell: runtime.cellView.renderCell,
     align: columnPreset.layout.align,
     edit: runtime.edit,
+    ...(options.disableBackspaceCellClear
+      ? { disableBackspaceCellClear: true as const }
+      : {}),
     activation: runtime.activation,
     meta: options.meta,
     ...(copy ? { copy } : {}),

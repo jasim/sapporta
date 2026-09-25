@@ -370,6 +370,10 @@ export function createGridController(
         args.onNavigateCell?.(intent, presentation);
         return !!args.onNavigateCell;
       }
+      case "clearCell":
+        if (!args.writeValue) return false;
+        args.writeValue(intent.coord, null);
+        return true;
       case "activateCell":
         args.activateCell?.(intent.coord, intent.trigger);
         return !!args.activateCell;

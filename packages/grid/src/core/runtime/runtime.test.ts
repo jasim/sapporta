@@ -1100,6 +1100,126 @@ describe("GridRuntime", () => {
     });
   });
 
+  describe("clearing cells with Delete and Backspace", () => {
+    // Name disables clearing, so the keys leave it as is; Qty clears.
+    const clearSchema: GridSchema = {
+      ...tableSchema,
+      levels: {
+        rows: {
+          ...tableSchema.levels.rows,
+          columns: [{ ...cols[0], disableBackspaceCellClear: true }, cols[1]],
+        },
+      },
+    };
+    const key = (name: string) =>
+      ({
+        key: name,
+        ctrlKey: false,
+        metaKey: false,
+        shiftKey: false,
+        altKey: false,
+      }) as KeyboardEvent;
+
+    function readonlyClearSource(): LevelDataSource {
+      const writable = inMemoryLevelSource({
+        initialNodes: tableNodes(),
+        columns: clearSchema.levels.rows.columns,
+        sortMode: "none",
+        filterMode: "none",
+        paginationMode: "none",
+      });
+      return {
+        state: writable.state,
+        subscribe: writable.subscribe,
+        query: writable.query,
+        dispose: writable.dispose,
+      };
+    }
+
+    function clearRuntime(options: { readonly writable?: boolean } = {}) {
+      const handler = vi.fn();
+      const dataSource =
+        options.writable === false
+          ? dataSourceWithRoot(readonlyClearSource())
+          : inMemoryGridDataSource({
+              schema: clearSchema,
+              tree: tableNodes(),
+              levels: {
+                rows: {
+                  sortMode: "none",
+                  filterMode: "none",
+                  paginationMode: "none",
+                },
+              },
+            });
+      const rt = createGridRuntime({
+        schema: clearSchema,
+        dataSource,
+        on: { mutationCommitted: handler },
+      });
+      const internals = runtimeInternalsFor(rt);
+      return {
+        rt,
+        handler,
+        cursorManager: internals.cursorManager,
+        controller: internals.controllerFor(rowsRoot),
+      };
+    }
+
+    const aName = { rowId: makeRowId(rowsRoot, "a"), colId: "name" };
+    const aQty = { rowId: makeRowId(rowsRoot, "a"), colId: "qty" };
+    const bQty = { rowId: makeRowId(rowsRoot, "b"), colId: "qty" };
+
+    it("clears a selection within the column in one mutation", () => {
+      const { rt, handler, cursorManager, controller } = clearRuntime();
+      cursorManager.setCellRange(rowsRoot, aQty, bQty);
+
+      expect(controller.handleKey(key("Delete"), "tabular")).toBe(true);
+
+      expect(rt.root.displayedRow(aQty.rowId)?.columns.qty).toBe(null);
+      expect(rt.root.displayedRow(bQty.rowId)?.columns.qty).toBe(null);
+      expect(handler).toHaveBeenCalledTimes(1);
+      expect(handler).toHaveBeenCalledWith({
+        kind: "cells",
+        path: rowsRoot,
+        edits: [
+          { coord: aQty, oldValue: 1, newValue: null },
+          { coord: bQty, oldValue: 2, newValue: null },
+        ],
+      });
+    });
+
+    it("clears the focused cell when no range is selected", () => {
+      const { rt, cursorManager, controller } = clearRuntime();
+      cursorManager.moveCellCursorTo({ path: rowsRoot, ...aQty });
+
+      expect(controller.handleKey(key("Backspace"), "tabular")).toBe(true);
+
+      expect(rt.root.displayedRow(aQty.rowId)?.columns.qty).toBe(null);
+      expect(rt.root.displayedRow(bQty.rowId)?.columns.qty).toBe(2);
+    });
+
+    it("leaves a column that disables clearing unchanged", () => {
+      const { rt, handler, cursorManager, controller } = clearRuntime();
+      cursorManager.moveCellCursorTo({ path: rowsRoot, ...aName });
+
+      expect(controller.handleKey(key("Delete"), "tabular")).toBe(false);
+      expect(rt.root.displayedRow(aName.rowId)?.columns.name).toBe("Apple");
+      expect(handler).not.toHaveBeenCalled();
+    });
+
+    it("does not clear cells of a readonly source", () => {
+      const { rt, handler, cursorManager, controller } = clearRuntime({
+        writable: false,
+      });
+      cursorManager.moveCellCursorTo({ path: rowsRoot, ...aQty });
+
+      expect(controller.handleKey(key("Delete"), "tabular")).toBe(false);
+      expect(rt.root.displayedRow(aQty.rowId)?.columns.qty).toBe(1);
+      expect(handler).not.toHaveBeenCalled();
+    });
+  });
+
   it("subscribeDisplayedRowSequence wakes on create and remove", async () => {
     const rt = createGridRuntime({
       schema: tableSchema,
