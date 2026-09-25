@@ -1591,3 +1591,182 @@ describe("GridRow row headers", () => {
     expect(runtime.level(linesPath).selectedRowIds()).toHaveLength(1);
   });
 });
+
+describe("GridRow row-list pointer selection", () => {
+  const path = rootPath("quotes");
+  const [q1, q2, q3] = ["q1", "q2", "q3"].map((key) => makeRowId(path, key));
+  let mounted: { root: Root; container: HTMLElement } | null = null;
+
+  afterEach(async () => {
+    if (mounted) {
+      await unmount(mounted.root, mounted.container);
+      mounted = null;
+    }
+  });
+
+  async function renderRowList(interaction: GridInteractionConfig) {
+    const runtime = createGridRuntime({
+      schema,
+      dataSource: inMemoryGridDataSource({
+        schema,
+        tree: ["q1", "q2", "q3"].map((key) => ({
+          rowKey: key,
+          levelName: "quotes",
+          columns: { id: key, text: `Quote ${key}` },
+        })),
+        levels: {
+          quotes: {
+            sortMode: "none",
+            filterMode: "none",
+            paginationMode: "none",
+          },
+        },
+      }),
+      interaction,
+    });
+    mounted = await render(
+      createElement(GridRuntimeProvider, {
+        runtime,
+        children: createElement(GridLevel, {
+          path,
+          presentation: "tabular",
+        }),
+      }),
+    );
+    const container = mounted.container;
+
+    async function press(
+      rowId: string,
+      modifiers: {
+        metaKey?: boolean;
+        ctrlKey?: boolean;
+        shiftKey?: boolean;
+      } = {},
+    ) {
+      const row = container.querySelector(`[data-row-id="${rowId}"]`);
+      if (!(row instanceof HTMLElement)) throw new Error(`expected ${rowId}`);
+      await act(async () => {
+        row.dispatchEvent(
+          new MouseEvent("mousedown", {
+            bubbles: true,
+            button: 0,
+            ...modifiers,
+          }),
+        );
+      });
+    }
+
+    async function pressShiftSpace() {
+      const grid = container.querySelector('[data-grid-path="quotes"]');
+      if (!(grid instanceof HTMLElement)) throw new Error("expected grid");
+      await act(async () => {
+        grid.dispatchEvent(
+          new KeyboardEvent("keydown", {
+            bubbles: true,
+            key: " ",
+            shiftKey: true,
+          }),
+        );
+      });
+    }
+
+    return {
+      press,
+      pressShiftSpace,
+      selected: () => runtime.level(path).selectedRowIds(),
+      cursor: () =>
+        runtimeInternalsFor(runtime).coordinator.getState().rowCursor?.rowId,
+      storedSelection: () =>
+        runtimeInternalsFor(runtime).controllerFor(path).getState()
+          .rowSelection,
+    };
+  }
+
+  it.each([
+    ["Cmd", { metaKey: true }],
+    ["Ctrl", { ctrlKey: true }],
+  ] as const)(
+    "%s-click moves the cursor and toggles one row, keeping the rest",
+    async (_name, modifier) => {
+      const grid = await renderRowList(ROW_MULTISELECT_LIST);
+
+      await grid.press(q1);
+      await grid.press(q2, { shiftKey: true });
+      expect(grid.selected()).toEqual([q1, q2]);
+
+      await grid.press(q3, modifier);
+      expect(grid.cursor()).toBe(q3);
+      expect(grid.selected()).toEqual([q1, q2, q3]);
+
+      await grid.press(q1, modifier);
+      expect(grid.cursor()).toBe(q1);
+      expect(grid.selected()).toEqual([q2, q3]);
+
+      await grid.press(q2, modifier);
+      await grid.press(q3, modifier);
+      expect(grid.selected()).toEqual([]);
+    },
+  );
+
+  it("treats Cmd+Shift-click as a toggle rather than a range", async () => {
+    const grid = await renderRowList(ROW_MULTISELECT_LIST);
+
+    await grid.press(q1);
+    await grid.press(q3, { metaKey: true, shiftKey: true });
+
+    expect(grid.cursor()).toBe(q3);
+    expect(grid.selected()).toEqual([q3]);
+  });
+
+  it("extends a following Shift-click from the toggled row", async () => {
+    const grid = await renderRowList(ROW_MULTISELECT_LIST);
+
+    await grid.press(q1);
+    await grid.press(q2, { metaKey: true });
+    await grid.press(q3, { shiftKey: true });
+
+    expect(grid.cursor()).toBe(q3);
+    expect(grid.selected()).toEqual([q2, q3]);
+  });
+
+  it("toggles an independent single selection the same way as Shift+Space", async () => {
+    const grid = await renderRowList({
+      ...ROW_MULTISELECT_LIST,
+      selectedRows: {
+        kind: "enabled",
+        mode: "single",
+        sync: { kind: "independent" },
+      },
+    });
+
+    await grid.press(q1, { metaKey: true });
+    expect(grid.selected()).toEqual([q1]);
+
+    await grid.press(q2, { metaKey: true });
+    expect(grid.selected()).toEqual([q2]);
+
+    await grid.pressShiftSpace();
+    expect(grid.selected()).toEqual([]);
+
+    await grid.pressShiftSpace();
+    expect(grid.selected()).toEqual([q2]);
+
+    await grid.press(q2, { ctrlKey: true });
+    expect(grid.cursor()).toBe(q2);
+    expect(grid.selected()).toEqual([]);
+  });
+
+  it("only moves the cursor when row selection follows the active row", async () => {
+    const grid = await renderRowList(ROW_PRIMARY_MASTER_DETAIL);
+
+    await grid.press(q1);
+    await grid.press(q3, { metaKey: true });
+    expect(grid.cursor()).toBe(q3);
+    expect(grid.selected()).toEqual([q3]);
+
+    await grid.press(q2, { ctrlKey: true });
+    expect(grid.cursor()).toBe(q2);
+    expect(grid.selected()).toEqual([q2]);
+    expect(grid.storedSelection()).toBe(null);
+  });
+});

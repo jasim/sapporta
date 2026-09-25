@@ -195,7 +195,12 @@ cell when its source, displayed row, and column are all editable. Otherwise it
 runs the cell activation, then falls back to row activation. Space runs a
 declared cell activation, including row expansion, while Shift+Space toggles an
 independent row selection. In row-list mode, Space toggles expansion and Enter
-runs row activation when configured. A configuration cannot assign both click
+runs row activation when configured. A row-list click moves the row cursor and
+leaves the stored selection alone. Shift-click also extends an independent
+selection from the previous row cursor when `shiftArrows` is
+`"extend-selected-rows"`. Cmd-click or Ctrl-click also toggles the clicked row
+in an independent selection, the same way Shift+Space toggles the active row;
+with Shift added it is still a toggle. A configuration cannot assign both click
 and double-click to row activation because browsers deliver click events before
 `dblclick`.
 

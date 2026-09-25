@@ -4,6 +4,7 @@ import type { RowInteractionStatus } from "../../types/row-selection";
 import type { ColumnSchema, RowHeaderColumn } from "../../types/schema";
 import { cardRoleOf } from "../../types/presentation";
 import { capabilitiesFor } from "../../types/capabilities";
+import { rowSelectionGestureFromModifiers } from "../../interaction/key-handling";
 import { treeFactsOf } from "../../types/level-row";
 import { useDisplayedRow, useGridRuntime } from "../GridRuntimeProvider";
 import type { GridPresentation } from "../Grid";
@@ -94,13 +95,17 @@ export const GridRow = memo(function GridRow({
         // In row-list mode, row click owns the row cursor. In cell-grid mode,
         // cell click owns the cell cursor instead, so this row shell stays out
         // of the cell interaction path.
-        if (event.shiftKey) {
-          internals.cursorManager.extendRowSelectionToCursor({
-            path,
-            rowId: row.id,
-          });
+        const target = { path, rowId: row.id };
+        const gesture = rowSelectionGestureFromModifiers(event);
+        if (gesture === "extend") {
+          internals.cursorManager.extendRowSelectionToCursor(target);
         } else {
-          internals.cursorManager.moveRowCursorTo({ path, rowId: row.id });
+          // The cursor moves before a toggle, so a following Shift-click
+          // extends from the toggled row. The toggle command decides whether
+          // the configuration has a stored selection to change.
+          internals.cursorManager.moveRowCursorTo(target);
+          if (gesture === "toggle")
+            runtime.level(path).toggleRowSelection(row.id);
         }
       }}
       onClick={(event) => {

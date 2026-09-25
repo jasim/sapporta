@@ -312,7 +312,9 @@ export const ROW_PRIMARY_MASTER_DETAIL_WITH_ACTIVATION = {
 
 /**
  * Full-row navigation with independent multi-row operation selection.
- * Shift+Space toggles a row and Shift+arrows extends the selection.
+ * Shift+Space toggles a row and Shift+arrows extends the selection. With the
+ * mouse, Cmd-click or Ctrl-click toggles a row and Shift-click extends the
+ * selection from the row cursor.
  */
 export const ROW_MULTISELECT_LIST = {
   mode: "row-list",
