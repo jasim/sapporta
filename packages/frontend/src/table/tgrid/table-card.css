@@ -200,43 +200,40 @@
 
 /* Numeric columns right-align their cell content. In cards, a full-width
    cell pushes short numbers to the far edge of the card, so give numeric
-   values a stable 10-digit measure and let larger values grow. */
-:where(
-  .sapporta-table-grid[data-grid-presentation="cards"]
-    [data-grid-part="row-field"]:is(
-      [data-display-type="number"],
-      [data-display-type="currency"],
-      [data-display-type="percentage"]
-    )
-    [data-grid-part="cell"]
-) {
+   values a stable 10-digit measure and let larger values grow. The grid's
+   structural rules give cell-content and cell-frame `min-width: 0` and
+   `width: 100%`, so the field and part selectors stay outside :where() to
+   out-rank them. */
+:where(.sapporta-table-grid[data-grid-presentation="cards"])
+  [data-grid-part="row-field"]:is(
+    [data-display-type="number"],
+    [data-display-type="currency"],
+    [data-display-type="percentage"]
+  )
+  [data-grid-part="cell"] {
   max-width: 100%;
   width: fit-content;
 }
 
-:where(
-  .sapporta-table-grid[data-grid-presentation="cards"]
-    [data-grid-part="row-field"]:is(
-      [data-display-type="number"],
-      [data-display-type="currency"],
-      [data-display-type="percentage"]
-    )
-    [data-grid-part="cell-content"]
-) {
+:where(.sapporta-table-grid[data-grid-presentation="cards"])
+  [data-grid-part="row-field"]:is(
+    [data-display-type="number"],
+    [data-display-type="currency"],
+    [data-display-type="percentage"]
+  )
+  [data-grid-part="cell-content"] {
   max-width: 100%;
   min-width: var(--grid-card-numeric-width, 10ch);
   width: fit-content;
 }
 
-:where(
-  .sapporta-table-grid[data-grid-presentation="cards"]
-    [data-grid-part="row-field"]:is(
-      [data-display-type="number"],
-      [data-display-type="currency"],
-      [data-display-type="percentage"]
-    )
-    [data-grid-part="cell-frame"]
-) {
+:where(.sapporta-table-grid[data-grid-presentation="cards"])
+  [data-grid-part="row-field"]:is(
+    [data-display-type="number"],
+    [data-display-type="currency"],
+    [data-display-type="percentage"]
+  )
+  [data-grid-part="cell-frame"] {
   max-width: 100%;
   min-width: var(--grid-card-numeric-width, 10ch);
   width: fit-content;
