@@ -75,22 +75,27 @@ export function NavSection({
   children: ReactNode;
 }) {
   return (
-    <section className="flex flex-col gap-1 pt-4 first:pt-0">
+    <section className="flex flex-col pt-3 first:pt-0">
       <div
         className={cn(
-          "flex items-center justify-between px-2.5 text-sap-label font-bold uppercase tracking-sap-section text-sap-subtle",
+          "flex h-[26px] items-center justify-between px-2 text-xs font-medium text-sap-nav-section",
           labelHidden && "invisible",
         )}
       >
         <span className="truncate">{label}</span>
       </div>
-      <div className="flex flex-col gap-0.5">{children}</div>
+      <div className="flex flex-col">{children}</div>
     </section>
   );
 }
 
 /**
- * How a navigation link is drawn:
+ * A navigation link: grey text on the sidebar's tone, a faint wash under the
+ * pointer that comes at once rather than fading in, and the current page in
+ * darker text on a fainter wash, at the same weight so its label keeps its
+ * width. Rows sit edge to edge.
+ *
+ * How it is drawn:
  * - `row`: icon and label, as in the expanded sidebar.
  * - `icon-row`: the same row with its label hidden from view, as in the
  *   collapsed rail. The icon stays where it is in `row`, so it does not move
@@ -118,24 +123,19 @@ export function NavItem({
       aria-label={square ? item.label : undefined}
       aria-current={active ? "page" : undefined}
       className={cn(
-        "group flex items-center rounded-lg text-sap-body text-sap-soft no-underline transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-sap-sidebar",
-        square ? "size-10 justify-center" : "h-sap-ctl gap-2.5 px-3",
-        active
-          ? "bg-sap-active-nav"
-          : "hover:bg-sap-row-hover hover:text-sap-fg",
+        "flex items-center rounded-md text-sm font-medium no-underline transition-[background-color] duration-[20ms] ease-in hover:bg-sap-nav-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring",
+        square ? "size-10 justify-center" : "h-sap-ctl gap-2 px-2",
+        active ? "bg-sap-nav-selected text-sap-fg" : "text-sap-nav-fg",
       )}
     >
       <span
         className={cn(
-          "inline-flex shrink-0 items-center justify-center text-sap-subtle transition-colors group-hover:text-sap-muted",
-          square ? "size-5" : "size-4",
+          "inline-flex shrink-0 items-center justify-center text-sap-nav-icon",
+          square ? "size-5" : "size-6",
         )}
       >
         {Icon ? (
-          <Icon
-            className={square ? "size-[17px]" : "size-[15px]"}
-            strokeWidth={1.7}
-          />
+          <Icon className="size-[18px]" strokeWidth={1.5} />
         ) : (
           <span className="size-1.5 rounded-full bg-current" />
         )}
@@ -248,7 +248,7 @@ export function NavigationRail({ navigation }: NavigationShellProps) {
     : allItems.slice(0, 8);
 
   return (
-    <aside className="hidden h-full w-[68px] shrink-0 flex-col items-center border-r border-sap-border-soft bg-sap-sidebar py-4 text-sap-fg md:flex">
+    <aside className="hidden h-full w-[68px] shrink-0 flex-col items-center bg-sap-nav py-4 text-sap-fg md:flex">
       <SapportaMark size={22} />
       <nav aria-label="Primary" className="mt-6 flex flex-col gap-1.5">
         {items.map((item) => (
@@ -330,7 +330,7 @@ export function NavigationPicker({
   const buttonClass = cn(
     "transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
     trigger === "rail"
-      ? "inline-flex size-10 items-center justify-center rounded-lg text-sap-muted hover:bg-sap-row-hover hover:text-sap-fg"
+      ? "inline-flex size-10 items-center justify-center rounded-md text-sap-nav-icon duration-[20ms] ease-in hover:bg-sap-nav-hover"
       : "flex h-12 min-w-[60px] flex-col items-center justify-center gap-1 rounded-lg px-2 text-sap-label text-sap-muted hover:bg-sap-row-hover hover:text-sap-fg",
   );
   const panelClass =

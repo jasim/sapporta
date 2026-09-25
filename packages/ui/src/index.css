@@ -92,6 +92,16 @@
   --sap-active-nav-bg: #ededed;
   --sap-nav-count-bg: #eeeeee;
 
+  /* The navigation sidebar: a warm plane set apart by its tone alone, grey
+     rows whose hover and selection are faint washes over it, so the sidebar
+     stays quiet beside the page. */
+  --sap-nav-bg: #f9f8f7;
+  --sap-nav-fg: #5f5e59;
+  --sap-nav-icon: #8e8b86;
+  --sap-nav-section: #91918e;
+  --sap-nav-hover-bg: rgb(0 0 0 / 0.04);
+  --sap-nav-selected-bg: rgb(0 0 0 / 0.03);
+
   /* Kbd chrome */
   --sap-kbd-bg: #ffffff;
   --sap-kbd-inverted-bg: rgba(255, 255, 255, 0.15);
@@ -197,6 +207,13 @@
   --sap-active-nav-bg: rgb(220 168 107 / 0.14);
   --sap-nav-count-bg: #1f1f17;
 
+  --sap-nav-bg: #0a0b07;
+  --sap-nav-fg: #aeac9f;
+  --sap-nav-icon: #807f71;
+  --sap-nav-section: #6a6a5c;
+  --sap-nav-hover-bg: rgb(232 230 216 / 0.06);
+  --sap-nav-selected-bg: rgb(232 230 216 / 0.045);
+
   --sap-kbd-bg: #1a1b13;
   --sap-kbd-inverted-bg: rgba(0, 0, 0, 0.15);
   --sap-proj-chip-kbd-bg: #1a1b13;
@@ -257,6 +274,12 @@
 
   --color-sap-active-nav: var(--sap-active-nav-bg);
   --color-sap-nav-count: var(--sap-nav-count-bg);
+  --color-sap-nav: var(--sap-nav-bg);
+  --color-sap-nav-fg: var(--sap-nav-fg);
+  --color-sap-nav-icon: var(--sap-nav-icon);
+  --color-sap-nav-section: var(--sap-nav-section);
+  --color-sap-nav-hover: var(--sap-nav-hover-bg);
+  --color-sap-nav-selected: var(--sap-nav-selected-bg);
 
   --color-sap-kbd: var(--sap-kbd-bg);
   --color-sap-kbd-inverted: var(--sap-kbd-inverted-bg);

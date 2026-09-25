@@ -3,8 +3,9 @@ import { cn } from "@sapporta/ui/cn";
 
 /**
  * The visual contents of a sidebar: application identity, navigation, and an
- * optional account footer. It makes no responsive decisions. `SidebarRegion`
- * can place the same content beside a desktop page or inside a compact drawer.
+ * optional account footer. Its edge is its background's tone, not a line. It
+ * makes no responsive decisions. `SidebarRegion` can place the same content
+ * beside a desktop page or inside a compact drawer.
  *
  * Pass `rail` from `useSidebar().rail`. While it is true, the sidebar fills the
  * collapsed rail instead of its own width; the header, navigation, and footer
@@ -35,7 +36,7 @@ export function SidebarShell({
   return (
     <aside
       className={cn(
-        "flex h-full w-[240px] shrink-0 flex-col border-r border-sap-border-soft bg-sap-sidebar px-3 py-3 text-sap-fg",
+        "flex h-full w-[240px] shrink-0 flex-col bg-sap-nav px-3 py-3 text-sap-fg",
         className,
         rail && "w-full",
       )}
