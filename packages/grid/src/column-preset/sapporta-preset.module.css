@@ -797,14 +797,6 @@
   margin-inline-start: var(--sap-grid-nested-indent-deep, 46px);
 }
 
-.headerContent {
-  justify-content: flex-start;
-}
-
-.headerContentRight {
-  justify-content: flex-end;
-}
-
 .headerPopover {
   min-width: 160px;
   padding: 0;

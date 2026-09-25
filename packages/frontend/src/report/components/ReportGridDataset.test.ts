@@ -710,6 +710,39 @@ describe("ReportGridDataset", () => {
     ).toBeNull();
   });
 
+  it("aligns a linked number to the right of its cell", async () => {
+    const links = {
+      account: {
+        cell: {
+          debit: () => [{ label: "Open debits", href: "/reports/debits" }],
+        },
+      },
+    } satisfies ReportCellLinkResolvers;
+
+    const container = await renderClient(
+      createElement(ReportGridDataset, {
+        dataset: accountLedgerDataset(),
+        links,
+      }),
+    );
+
+    await waitForText(container, "Cash");
+    const debitCell = cellByColumn(container, "debit", "125");
+    expect(
+      debitCell.querySelector('a[data-grid-part="report-primary-link"]'),
+    ).not.toBeNull();
+    expect(
+      debitCell
+        .querySelector('[data-grid-part="cell-content"]')
+        ?.getAttribute("data-align"),
+    ).toBe("right");
+    expect(
+      cellByColumn(container, "name", "Cash")
+        .querySelector('[data-grid-part="cell-content"]')
+        ?.getAttribute("data-align"),
+    ).toBe("left");
+  });
+
   it("opens the primary drill-down link with Enter without expanding the row", async () => {
     const dataset = accountLedgerDataset({ defaultCollapsed: true });
     const links = {

@@ -26,6 +26,7 @@ export {
 } from "./identity";
 
 export type {
+  ColumnAlign,
   ColumnSchema,
   GridCopyColumn,
   GridColumnCopyBehavior,

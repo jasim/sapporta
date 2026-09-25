@@ -498,6 +498,7 @@ export type {
   CellCursor,
   PathEdge,
   PathDecomposition,
+  ColumnAlign,
   ColumnSchema,
   GridCopyColumn,
   GridColumnCopyBehavior,

@@ -129,7 +129,6 @@ function HeaderCell<TMeta = unknown, TFilter = unknown>({
 }) {
   const [open, setOpen] = useState(false);
   const resizeDrag = useRef<ResizeDragState | null>(null);
-  const columnPreset = column.preset;
   const runtime = presetRuntime<TMeta>(column.column);
   const customHeader = runtime?.headerBehavior.renderColumnHeader?.({
     level: level as HeaderLevelState,
@@ -243,13 +242,7 @@ function HeaderCell<TMeta = unknown, TFilter = unknown>({
       title={headerName}
       onClick={handleHeaderClick}
     >
-      <div
-        className={cn(
-          styles.headerContent,
-          columnPreset?.layout.align === "right" && styles.headerContentRight,
-        )}
-        data-grid-part="cell-content"
-      >
+      <div data-grid-part="cell-content" data-align={column.column.align}>
         {customHeader ?? defaultHeader(headerName, sort?.direction, sortRank)}
         {menu ? (
           <Popover open={open} onOpenChange={setOpen}>

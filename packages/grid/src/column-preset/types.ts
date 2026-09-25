@@ -5,6 +5,7 @@ import type {
   CellEditGesture,
   CellEditorProps,
   CellRenderProps,
+  ColumnAlign,
   ColumnSchema,
   GridColumnCopyBehavior,
 } from "../core/types/schema";
@@ -59,7 +60,7 @@ export type ColumnWidthMinimums = Partial<Record<NamedColumnWidth, number>>;
 
 export type NumberColorRule = "positive" | "negative" | "signed";
 export type ZeroDisplay = "blank" | "dot";
-export type ColumnAlign = "left" | "right" | "center";
+export type { ColumnAlign };
 export type TextDisplayMode = "multiLine" | "markdown";
 
 export type SelectOption = {

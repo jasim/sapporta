@@ -29,7 +29,9 @@ export function CellShell(props: {
       onClick={props.onClick}
       onDoubleClick={props.onDoubleClick}
     >
-      <div data-grid-part="cell-content">{props.children}</div>
+      <div data-grid-part="cell-content" data-align={props.column.align}>
+        {props.children}
+      </div>
     </div>
   );
 }

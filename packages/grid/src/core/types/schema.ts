@@ -174,10 +174,16 @@ export type GridColumnCopyBehavior = (context: {
   readonly rows: readonly LevelRow[];
 }) => readonly GridCopyColumn[] | Promise<readonly GridCopyColumn[]>;
 
+/** Where a column's cells place their content across the cell's width. */
+export type ColumnAlign = "left" | "right" | "center";
+
 export type ColumnSchema = {
   readonly id: ColId;
   readonly name: string;
   readonly renderCell: (props: CellRenderProps) => ReactNode;
+  // The cell aligns whatever `renderCell` returns, so content wrapped in a
+  // link or a custom renderer keeps the column's alignment. Left if unset.
+  readonly align?: ColumnAlign;
   readonly compare?: (a: unknown, b: unknown) => number;
   readonly edit?: CellEditBehavior;
   readonly activation?: CellActivation;

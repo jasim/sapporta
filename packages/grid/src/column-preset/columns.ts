@@ -124,6 +124,7 @@ function constructColumn<TMeta>(
     name: options.name,
     compare: runtime.valueCodec.compare,
     renderCell: runtime.cellView.renderCell,
+    align: columnPreset.layout.align,
     edit: runtime.edit,
     activation: runtime.activation,
     meta: options.meta,

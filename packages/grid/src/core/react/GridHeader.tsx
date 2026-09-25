@@ -22,7 +22,7 @@ export function GridHeader({
             data-grid-part="header-cell"
             data-col-id={col.id}
           >
-            <div data-grid-part="cell-content">
+            <div data-grid-part="cell-content" data-align={col.align}>
               <span data-grid-part="header-label">{col.name}</span>
             </div>
           </div>
