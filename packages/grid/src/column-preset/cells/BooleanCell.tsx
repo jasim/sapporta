@@ -11,7 +11,7 @@ export function BooleanCell({
   preset: BooleanPreset;
 }) {
   return (
-    <span className="grid w-full place-items-center">
+    <span className="inline-flex">
       {value === true ? (
         <Check aria-label="true" className="h-4 w-4 text-sap-fg" />
       ) : (

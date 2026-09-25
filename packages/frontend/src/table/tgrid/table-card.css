@@ -239,6 +239,24 @@
   width: fit-content;
 }
 
+/* A boolean column centers its icon in a table cell. In cards, centering
+   floats the icon in the middle of the card, away from its label, so it
+   starts at the value column like text. The selectors outside :where()
+   out-rank the grid's column-alignment rule. The field lines up its label
+   and value by baseline, and an icon's baseline is its bottom edge, which
+   would lift the icon above the label; center it on the label instead. */
+:where(.sapporta-table-grid[data-grid-presentation="cards"])
+  [data-grid-part="row-field"][data-display-type="boolean"]
+  [data-grid-part="cell-content"] {
+  justify-content: flex-start;
+}
+
+:where(.sapporta-table-grid[data-grid-presentation="cards"])
+  [data-grid-part="row-field"][data-display-type="boolean"]
+  [data-grid-part="row-field-cell"] {
+  align-self: center;
+}
+
 :where(
   .sapporta-table-grid[data-grid-presentation="cards"]
     [data-grid-part="cell-frame-content"]
