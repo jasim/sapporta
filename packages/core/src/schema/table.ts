@@ -132,6 +132,14 @@ export interface ColumnMeta {
   /** Whether callers may write this column through generated table APIs. */
   apiWritable?: boolean;
   /**
+   * Set to false for a column the generated grids and a record's detail
+   * fields show but never edit, such as text an import wrote that the person
+   * should not change. A create form still asks for it. Unlike
+   * `apiWritable: false`, the table API still accepts the column, so code and
+   * agents can set it.
+   */
+  gridEditable?: boolean;
+  /**
    * Navigation links offered on this column's cells, in addition to the
    * drill-up link Sapporta derives for FK columns. `bind` maps the
    * destination's filter / parameter names to source columns on the current

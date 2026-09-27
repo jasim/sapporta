@@ -23,7 +23,7 @@ const accounts = sapportaTable({
   meta: {
     label: "Accounts",
     rowLabelColumns: ["name"],
-    columns: { name: { apiWritable: false } },
+    columns: { name: { apiWritable: false }, balance: { gridEditable: false } },
   },
 });
 
@@ -119,6 +119,8 @@ describe("extractSchemas", () => {
     expect(balanceCol.notNull).toBe(false);
     expect(balanceCol.dataType).toBe("number");
     expect(balanceCol.label).toBe("Balance");
+    expect(balanceCol.gridEditable).toBe(false);
+    expect(nameCol.gridEditable).toBeUndefined();
   });
 
   it("includes select metadata", () => {

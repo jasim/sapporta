@@ -94,6 +94,7 @@ export function extractSchemas(defs: readonly TableDef[]): TableSchema[] {
         strong: columnMeta?.strong,
         notes: columnMeta?.notes,
         apiWritable: columnMeta?.apiWritable,
+        gridEditable: columnMeta?.gridEditable,
         visuallyHidden: columnMeta?.visuallyHidden,
       };
 

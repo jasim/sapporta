@@ -17,6 +17,7 @@ import {
 } from "@sapporta/grid/column-preset";
 import { inferDisplayType, type DisplayType } from "../model/column-types";
 import { parseTablePatchValueDraft } from "../model/table-value-draft";
+import { isGridEditableColumn } from "../form/field-policy";
 import { withTGridCellLinks } from "./tgrid-cell-links";
 import type { LookupStore } from "../../lookup";
 
@@ -84,6 +85,7 @@ function presetColumnFor(
   const displayType = inferDisplayType(column);
   const editable =
     !immutable &&
+    isGridEditableColumn(column) &&
     displayType !== "pk" &&
     displayType !== "date" &&
     displayType !== "timestamp";

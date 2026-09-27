@@ -32,7 +32,7 @@ import {
 } from "@sapporta/shared/temporal";
 import { appTimeZone } from "../../platform/app-time-zone";
 import type { LookupStore } from "../../lookup";
-import { isRecordFormEditableColumn } from "../form/field-policy";
+import { isGridEditableColumn } from "../form/field-policy";
 import {
   buildRecordFormFields,
   type RecordFormFieldModel,
@@ -80,7 +80,7 @@ function isDetailEditableColumn(
 ): boolean {
   if (table.immutable) return false;
   if (meta.displayType === "pk") return false;
-  if (!isRecordFormEditableColumn(meta.schema)) return false;
+  if (!isGridEditableColumn(meta.schema)) return false;
   if (meta.displayType === "date" || meta.displayType === "timestamp") {
     return true;
   }

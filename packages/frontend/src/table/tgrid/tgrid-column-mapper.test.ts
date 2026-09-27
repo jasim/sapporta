@@ -149,6 +149,28 @@ describe("TGridColumnMapper.columnFor", () => {
     expect(column.edit).toBeUndefined();
   });
 
+  it("makes a gridEditable: false column read-only in the grid", () => {
+    const column = mapColumn({
+      name: "imported_text",
+      label: "Imported text",
+      kind: "text",
+      gridEditable: false,
+    });
+
+    expect(column.edit).toBeUndefined();
+  });
+
+  it("makes an apiWritable: false column read-only in the grid", () => {
+    const column = mapColumn({
+      name: "internal_note",
+      label: "Internal note",
+      kind: "text",
+      apiWritable: false,
+    });
+
+    expect(column.edit).toBeUndefined();
+  });
+
   it("maps textDisplay into the text preset display", () => {
     const column = mapColumn({
       name: "body",

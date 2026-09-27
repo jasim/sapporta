@@ -114,6 +114,7 @@ export const columnSchemaSchema = z.object({
   strong: z.boolean().optional(),
   notes: z.string().optional(),
   apiWritable: z.boolean().optional(),
+  gridEditable: z.boolean().optional(),
   links: z.array(navLinkSchema).optional(),
 });
 export type ColumnSchema = z.output<typeof columnSchemaSchema>;

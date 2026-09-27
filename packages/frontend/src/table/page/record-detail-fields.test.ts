@@ -42,6 +42,7 @@ const columns: ColumnSchema[] = [
   { name: "cost", label: "Cost", kind: "number", displayFormat: "currency" },
   { name: "active", label: "Active", kind: "boolean" },
   { name: "locked", label: "Locked", kind: "text", apiWritable: false },
+  { name: "imported", label: "Imported", kind: "text", gridEditable: false },
 ];
 
 const table: TableSchema = {
@@ -99,6 +100,7 @@ describe("buildRecordDetailFields", () => {
       "cost",
       "active",
       "locked",
+      "imported",
     ]);
   });
 
@@ -119,6 +121,8 @@ describe("buildRecordDetailFields", () => {
     expect(byId.get("acquired_at")?.form?.kind).toBe("timestamp");
     // Server-owned fields stay readonly, like in the record form.
     expect(byId.get("locked")?.form).toBeNull();
+    // A column the UI only shows stays readonly though the API accepts it.
+    expect(byId.get("imported")?.form).toBeNull();
   });
 
   it("keeps every field readonly on an immutable table", () => {

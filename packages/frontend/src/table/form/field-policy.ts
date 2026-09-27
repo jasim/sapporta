@@ -16,3 +16,18 @@ export function isRecordFormEditableColumn(column: ColumnSchema): boolean {
   if (isSystemManagedScopeFieldName(column.name)) return false;
   return true;
 }
+
+/**
+ * Whether a person may edit this column of an existing row in a generated
+ * grid cell or a record's detail field.
+ *
+ * It applies the create form's policy, so a column the table API rejects is
+ * never offered for editing, and it also excludes `gridEditable: false`
+ * columns, which the table API accepts but the grids only show. The create
+ * form itself still asks for those columns.
+ */
+export function isGridEditableColumn(column: ColumnSchema): boolean {
+  if (!isRecordFormEditableColumn(column)) return false;
+  if (column.gridEditable === false) return false;
+  return true;
+}
