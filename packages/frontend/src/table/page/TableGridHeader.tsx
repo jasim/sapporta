@@ -323,7 +323,7 @@ function WideTableToolbar<
         onAdd={query.addFilter}
         onUpdate={query.updateFilter}
         onRemove={query.removeFilter}
-        className="min-w-0 flex-1 gap-2 bg-transparent p-0"
+        className="min-w-0 flex-auto gap-2 bg-transparent p-0"
       />
       <div className="ml-auto flex flex-wrap items-center gap-2">
         {Actions && (

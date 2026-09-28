@@ -82,7 +82,7 @@ export function FilterCardsBar({
           render={
             <button
               type="button"
-              className="inline-flex items-center gap-[4px] h-sap-ctl px-[10px] rounded-md border border-sap-border-soft text-sap-muted hover:text-sap-fg hover:bg-sap-row-hover text-sap-data font-semibold"
+              className="inline-flex shrink-0 items-center gap-[4px] whitespace-nowrap h-sap-ctl px-[10px] rounded-md border border-sap-border-soft text-sap-muted hover:text-sap-fg hover:bg-sap-row-hover text-sap-data font-semibold"
             />
           }
         >
