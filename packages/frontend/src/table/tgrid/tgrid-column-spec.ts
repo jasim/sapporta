@@ -133,14 +133,31 @@ export type TGridClientColumnSpec<
   options: ClientColumnOptions<RowsByLevel, AppServices, LevelId>;
 };
 
-// Spec that expands to every non-specified visible table column.
-// Exclusions let callers hide specific columns while using shorthand.
+// Options for some of a level's table columns, keyed by column name.
+export type TableColumnOptionsByName<
+  RowsByLevel extends TGridRowsByLevel,
+  AppServices,
+  LevelId extends TGridLevelId<RowsByLevel>,
+> = {
+  readonly [K in RowFieldName<RowsByLevel[LevelId]>]?: TableColumnOptions<
+    RowsByLevel,
+    AppServices,
+    LevelId,
+    K
+  >;
+};
+
+// Spec that expands to every visible table column the list does not name
+// with `table(...)`, in schema order. `exclude` leaves columns out;
+// `columnOptions` changes some of the added columns without moving them.
 export type TGridRemainingTableColumnSpec<
   RowsByLevel extends TGridRowsByLevel,
+  AppServices,
   LevelId extends TGridLevelId<RowsByLevel>,
 > = {
   kind: "remainingTable";
   exclude?: readonly RowFieldName<RowsByLevel[LevelId]>[];
+  columnOptions?: TableColumnOptionsByName<RowsByLevel, AppServices, LevelId>;
 };
 
 // Union member for any table-backed field spec.
@@ -167,7 +184,7 @@ export type TGridColumnSpec<
 > =
   | TGridAnyTableColumnSpec<RowsByLevel, AppServices, LevelId>
   | TGridClientColumnSpec<RowsByLevel, AppServices, LevelId>
-  | TGridRemainingTableColumnSpec<RowsByLevel, LevelId>;
+  | TGridRemainingTableColumnSpec<RowsByLevel, AppServices, LevelId>;
 
 // Builder surface exposed by `columns(...)`.
 // `table`, `client`, and `remainingTable` return ordered column spec values.
@@ -186,10 +203,12 @@ export type TGridColumnsBuilder<
     id: string,
     options: ClientColumnOptions<RowsByLevel, AppServices, LevelId>,
   ): TGridClientColumnSpec<RowsByLevel, AppServices, LevelId>;
-  // Add all remaining table columns except the excluded set.
+  // Add the table columns the list does not name, in schema order, except
+  // the excluded ones. `columnOptions` changes some of them in place.
   remainingTable(options?: {
     exclude?: readonly RowFieldName<RowsByLevel[LevelId]>[];
-  }): TGridRemainingTableColumnSpec<RowsByLevel, LevelId>;
+    columnOptions?: TableColumnOptionsByName<RowsByLevel, AppServices, LevelId>;
+  }): TGridRemainingTableColumnSpec<RowsByLevel, AppServices, LevelId>;
 };
 
 // Callback signature used when `columns` is passed as a function.
@@ -201,6 +220,15 @@ export type TGridColumnSpecBuilder<
 > = (
   columns: TGridColumnsBuilder<RowsByLevel, AppServices, LevelId>,
 ) => readonly TGridColumnSpec<RowsByLevel, AppServices, LevelId>[];
+
+// A level's columns: an ordered spec list, or a callback that builds one.
+export type TGridLevelColumns<
+  RowsByLevel extends TGridRowsByLevel,
+  AppServices,
+  LevelId extends TGridLevelId<RowsByLevel>,
+> =
+  | TGridColumnSpecBuilder<RowsByLevel, AppServices, LevelId>
+  | readonly TGridColumnSpec<RowsByLevel, AppServices, LevelId>[];
 
 export function createTGridColumnsBuilder<
   RowsByLevel extends TGridRowsByLevel,
@@ -224,8 +252,17 @@ export function createTGridColumnsBuilder<
 
     remainingTable(options?: {
       exclude?: readonly RowFieldName<RowsByLevel[LevelId]>[];
-    }): TGridRemainingTableColumnSpec<RowsByLevel, LevelId> {
-      return { kind: "remainingTable", exclude: options?.exclude };
+      columnOptions?: TableColumnOptionsByName<
+        RowsByLevel,
+        AppServices,
+        LevelId
+      >;
+    }): TGridRemainingTableColumnSpec<RowsByLevel, AppServices, LevelId> {
+      return {
+        kind: "remainingTable",
+        exclude: options?.exclude,
+        columnOptions: options?.columnOptions,
+      };
     },
   };
 }

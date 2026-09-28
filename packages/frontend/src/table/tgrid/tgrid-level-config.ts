@@ -17,10 +17,7 @@ import type {
   TGridLevelId,
   TGridRowsByLevel,
 } from "./tgrid-types";
-import type {
-  TGridColumnSpec,
-  TGridColumnSpecBuilder,
-} from "./tgrid-column-spec";
+import type { TGridLevelColumns } from "./tgrid-column-spec";
 
 // Query behavior for one table level.
 // Use `host` for the root level where one page owns the controls. Expanded
@@ -95,9 +92,7 @@ export type TGridLevelConfig<
   // `columns.table(...)` entries may still include table fields outside it.
   includedColumnNames?: readonly TableColumnName[];
   rowHeaderColumn?: RowHeaderColumn | null;
-  columns?:
-    | TGridColumnSpecBuilder<RowsByLevel, AppServices, LevelId>
-    | readonly TGridColumnSpec<RowsByLevel, AppServices, LevelId>[];
+  columns?: TGridLevelColumns<RowsByLevel, AppServices, LevelId>;
   childLevels: readonly TGridLevelId<RowsByLevel>[];
   parent?: {
     level: TGridLevelId<RowsByLevel>;

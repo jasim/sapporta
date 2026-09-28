@@ -16,7 +16,10 @@ import {
 } from "@sapporta/grid";
 import type { TableSchema } from "@sapporta/shared/contracts";
 import type { TGridDefinition } from "../tgrid/tgrid-runtime-config";
-import type { SchemaTableRowsByLevel } from "../tgrid/schema-tgrid";
+import type {
+  SchemaTableColumns,
+  SchemaTableRowsByLevel,
+} from "../tgrid/schema-tgrid";
 import {
   SchemaTableGridView as PublicSchemaTableGridView,
   type TableGridActionsProps as PublicTableGridActionsProps,
@@ -274,20 +277,19 @@ describe("SchemaTableGridView", () => {
     );
   });
 
-  it("hides the named columns of the root table", async () => {
-    const props = await renderSchemaTableGridView({
-      hiddenColumns: ["customer"],
-    });
+  it("gives the root level the view's columns", async () => {
+    const columns: SchemaTableColumns = (c) => [
+      c.remainingTable({ exclude: ["customer"] }),
+    ];
+    const props = await renderSchemaTableGridView({ columns });
 
-    expect(props.definition.levels.orders.columns).toEqual([
-      { kind: "remainingTable", exclude: ["customer"] },
-    ]);
+    expect(props.definition.levels.orders.columns).toBe(columns);
     expect(props.definition.levels["orders.order_lines"].columns).toBe(
       undefined,
     );
   });
 
-  it("keeps the grid definition while the hidden column names stay the same", async () => {
+  it("keeps the grid definition while the columns value stays the same", async () => {
     const source = {
       table: ordersTable,
       tablesByName: { orders: ordersTable, order_lines: orderLinesTable },
@@ -297,20 +299,26 @@ describe("SchemaTableGridView", () => {
       searchParams: new URLSearchParams(),
       navigate: vi.fn(),
     };
-    const renderView = (hiddenColumns: readonly string[]): ReactElement =>
+    const hideCustomer: SchemaTableColumns = (c) => [
+      c.remainingTable({ exclude: ["customer"] }),
+    ];
+    const hideId: SchemaTableColumns = (c) => [
+      c.remainingTable({ exclude: ["id"] }),
+    ];
+    const renderView = (columns: SchemaTableColumns): ReactElement =>
       createElement(SchemaTableGridView, {
         source,
         route,
         registerAs: "orders",
-        hiddenColumns,
+        columns,
       });
 
-    mounted = await render(renderView(["customer"]));
+    mounted = await render(renderView(hideCustomer));
     await act(async () => {
-      mounted?.root.render(renderView(["customer"]));
+      mounted?.root.render(renderView(hideCustomer));
     });
     await act(async () => {
-      mounted?.root.render(renderView(["id"]));
+      mounted?.root.render(renderView(hideId));
     });
 
     const definitions = tableGridViewSpy.mock.calls.map(
@@ -319,9 +327,7 @@ describe("SchemaTableGridView", () => {
     expect(definitions).toHaveLength(3);
     expect(definitions[1]).toBe(definitions[0]);
     expect(definitions[2]).not.toBe(definitions[0]);
-    expect(definitions[2]?.levels.orders.columns).toEqual([
-      { kind: "remainingTable", exclude: ["id"] },
-    ]);
+    expect(definitions[2]?.levels.orders.columns).toBe(hideId);
   });
 
   it("applies related row options to child levels", async () => {
@@ -559,5 +565,30 @@ describe("SchemaTableGridView", () => {
     expect(routeOptions.orders.actions).toBe(Actions);
     expect(routeOptions.orders.sessionRef).toBe(callbackSessionRef);
     expect(objectRefOptions.sessionRef).toBe(objectSessionRef);
+  });
+
+  it("takes root columns through the table page's grid options", async () => {
+    // A client column's cell and activation read the row they are on.
+    const pageOptions = {
+      columns: (c) => [
+        c.remainingTable(),
+        c.client("edit", {
+          label: "Edit",
+          renderCell: ({ row }) => `Edit ${String(row.customer)}`,
+          activation: {
+            startsOn: ["click", "enter"],
+            describe: ({ row }) => ({
+              label: `Edit ${String(row.customer)}`,
+              availability: { kind: "enabled" },
+            }),
+            run: () => undefined,
+          },
+        }),
+      ],
+    } satisfies TablePageGridOptions;
+
+    const props = await renderSchemaTableGridView(pageOptions);
+
+    expect(props.definition.levels.orders.columns).toBe(pageOptions.columns);
   });
 });

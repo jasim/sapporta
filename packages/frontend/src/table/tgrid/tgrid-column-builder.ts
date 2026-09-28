@@ -124,48 +124,22 @@ export function buildTGridColumnsForTable<
 >(
   args: TGridColumnBuildArgs<RowsByLevel, AppServices, LevelId>,
 ): TGridColumnBuildResult {
-  // Remember table fields already positioned by the application so a later
-  // `remainingTable` placeholder fills only the gaps.
-  const usedTableColumns = new Set<TableColumnName>();
   const saveCellValueByColumn = new Map<
     ColId,
     TGridRuntimeCellWriteHandler<TGridRowsByLevel, unknown, string>
   >();
   const columns: GridColumnSchema[] = [];
 
-  // Omitting column specs means the ordinary table view, not an empty view.
-  // An explicit empty array remains meaningful and produces no data columns.
-  const specs: readonly TGridColumnSpec<RowsByLevel, AppServices, LevelId>[] =
-    args.specs ?? [{ kind: "remainingTable" }];
+  const specs = expandTGridColumnSpecs({
+    label: "buildTGridColumnsForTable",
+    levelId: args.levelId,
+    table: args.table,
+    includedColumnNames: args.includedColumnNames,
+    specs: args.specs,
+  });
 
+  // Declaration order is layout order, and each expanded spec is one column.
   for (const spec of specs) {
-    // Declaration order is layout order. Each spec either emits one column or,
-    // for `remainingTable`, expands in the underlying table schema order.
-    if (spec.kind === "remainingTable") {
-      // `includedColumnNames` limits fields added by this placeholder, while an
-      // explicit field can still opt in outside that list. Hidden, previously
-      // positioned, and locally excluded fields are never added here.
-      const excluded = new Set(spec.exclude ?? []);
-      for (const column of tableColumnsForProjection(
-        args.table,
-        args.includedColumnNames,
-      )) {
-        if (column.visuallyHidden) continue;
-        if (usedTableColumns.has(column.name)) continue;
-        if (excluded.has(column.name as RowFieldName<RowsByLevel[LevelId]>))
-          continue;
-        columns.push(
-          args.columnMapper.columnFor({
-            tableName: args.table.name,
-            column,
-            immutable: args.immutable,
-          }),
-        );
-        usedTableColumns.add(column.name);
-      }
-      continue;
-    }
-
     if (spec.kind === "client") {
       // Client columns can render and interact like table fields, but they do
       // not represent stored table data.
@@ -173,8 +147,8 @@ export function buildTGridColumnsForTable<
       continue;
     }
 
-    // Explicit table fields retain their normal formatting and lookup behavior,
-    // then apply the view's render, edit, activation, and copy overrides.
+    // Table fields retain their normal formatting and lookup behavior, then
+    // apply the view's render, edit, activation, and copy overrides.
     const tableColumn = tableColumnByName(
       args.table,
       spec.columnName as TableColumnName,
@@ -193,7 +167,6 @@ export function buildTGridColumnsForTable<
         args.sessionContext,
       ),
     );
-    usedTableColumns.add(tableColumn.name);
 
     if (spec.options?.saveCellValue) {
       // A custom save callback belongs to the same field declaration but runs
@@ -269,6 +242,135 @@ export function buildTGridColumnsForTable<
   };
 }
 
+// A level's column specs with every `remainingTable` placeholder replaced by
+// one table spec per column it adds, so each spec is one visible column.
+export type TGridExpandedColumnSpec<
+  RowsByLevel extends TGridRowsByLevel,
+  AppServices,
+  LevelId extends TGridLevelId<RowsByLevel>,
+> =
+  | TGridTableColumnSpec<RowsByLevel, AppServices, LevelId>
+  | TGridClientColumnSpec<RowsByLevel, AppServices, LevelId>;
+
+// A level's visible columns, in order, from the `columns` value that level
+// takes, with every name they use checked against the table. `defineTGrid` and
+// `compileTGridRuntimeConfig` resolve their levels through it; an app that
+// compiles columns itself can run it for the same order and the same checks
+// instead of working out `table(...)` and `remainingTable` on its own.
+//
+// Omitted `specs` mean the ordinary table view, every visible table column in
+// schema order, while an empty list means no data columns.
+//
+// A `table(...)` entry keeps its place wherever it appears, so a placeholder
+// skips every column the list names, including one named after it. A
+// placeholder adds, in schema order, the visible columns inside
+// `includedColumnNames` that the list does not name, that no earlier
+// placeholder added, and that it does not exclude. A `table(...)` entry can
+// still show a column outside `includedColumnNames` or a visually hidden one.
+//
+// It throws, naming the level and the table, when a spec names a column the
+// table lacks, when `columnOptions` names a column the placeholder does not
+// add (the options would never apply), when a client column takes a table
+// column's id (the grid reads a cell by column id, so the client cell would
+// show that field), or when a column would be shown twice.
+export function expandTGridColumnSpecs<
+  RowsByLevel extends TGridRowsByLevel,
+  AppServices,
+  LevelId extends TGridLevelId<RowsByLevel>,
+>({
+  label,
+  levelId,
+  table,
+  includedColumnNames,
+  specs = [{ kind: "remainingTable" }],
+}: {
+  label: string;
+  levelId: LevelId;
+  table: TableSchema;
+  includedColumnNames?: readonly TableColumnName[];
+  specs?: readonly TGridColumnSpec<RowsByLevel, AppServices, LevelId>[];
+}): readonly TGridExpandedColumnSpec<RowsByLevel, AppServices, LevelId>[] {
+  const where = `${label}: level '${String(levelId)}' table '${table.name}'`;
+  const tableColumnNames = new Set(table.columns.map((column) => column.name));
+  const requireColumn = (columnName: string, purpose: string) => {
+    if (!tableColumnNames.has(columnName)) {
+      throw new Error(`${where} has no column '${columnName}' to ${purpose}`);
+    }
+  };
+
+  // The columns the list places with `table()`, wherever they sit: a
+  // placeholder skips them, so a column is never both placed and filled in.
+  const named = new Set<TableColumnName>();
+  for (const spec of specs) {
+    if (spec.kind === "table") {
+      requireColumn(spec.columnName, "show");
+      named.add(spec.columnName);
+    } else if (spec.kind === "client" && tableColumnNames.has(spec.id)) {
+      throw new Error(
+        `${where} has a column '${spec.id}', so a client column cannot use that id`,
+      );
+    }
+  }
+
+  const projected = tableColumnsForProjection(table, includedColumnNames);
+  const added = new Set<TableColumnName>();
+  const expanded: TGridExpandedColumnSpec<RowsByLevel, AppServices, LevelId>[] =
+    [];
+  for (const spec of specs) {
+    if (spec.kind !== "remainingTable") {
+      expanded.push(spec);
+      continue;
+    }
+
+    const excluded = new Set<TableColumnName>(spec.exclude ?? []);
+    for (const columnName of excluded) requireColumn(columnName, "exclude");
+    const customized = Object.keys(spec.columnOptions ?? {});
+
+    // A placeholder fills only the gaps: the projected columns, less the ones
+    // the table hides, less the ones the list places with `table()` anywhere,
+    // less the ones an earlier placeholder added, less its own exclusions.
+    const addedHere = new Set<TableColumnName>();
+    for (const column of projected) {
+      if (column.visuallyHidden) continue;
+      if (named.has(column.name)) continue;
+      if (added.has(column.name)) continue;
+      if (excluded.has(column.name)) continue;
+
+      const columnName = column.name as RowFieldName<RowsByLevel[LevelId]>;
+      // The options were typed for this one column, as `table(...)` types
+      // them; the spec keeps them for the same column.
+      expanded.push({
+        kind: "table",
+        columnName,
+        options: spec.columnOptions?.[columnName],
+      } as TGridTableColumnSpec<RowsByLevel, AppServices, LevelId>);
+      addedHere.add(column.name);
+    }
+    for (const columnName of addedHere) added.add(columnName);
+
+    // Options for a column this placeholder does not add would never apply.
+    for (const columnName of customized) {
+      requireColumn(columnName, "customize");
+      if (addedHere.has(columnName)) continue;
+      const adds = [...addedHere].join(", ") || "no columns";
+      throw new Error(
+        `${where} has columnOptions for '${columnName}', but this remainingTable does not add it, so the options would never apply. It adds: ${adds}`,
+      );
+    }
+  }
+
+  const shown = new Set<string>();
+  for (const spec of expanded) {
+    const id = spec.kind === "table" ? spec.columnName : spec.id;
+    if (shown.has(id)) {
+      throw new Error(`${where} shows column '${id}' twice`);
+    }
+    shown.add(id);
+  }
+
+  return expanded;
+}
+
 function treeColumnIndexFor(
   columns: readonly GridColumnSchema[],
   declared: TableColumnName,
@@ -323,6 +425,9 @@ function tableColumnsForProjection(
   return table.columns.filter((column) => included.has(column.name));
 }
 
+// Every spec reaching the column builder names a column the table has:
+// `expandTGridColumnSpecs` checks the names first, so this only turns a checked
+// name into the column it names.
 function tableColumnByName(
   table: TableSchema,
   columnName: TableColumnName,
@@ -330,7 +435,7 @@ function tableColumnByName(
   const column = table.columns.find((c) => c.name === columnName);
   if (!column) {
     throw new Error(
-      `TGridColumnsBuilder.table: table '${table.name}' has no column '${columnName}'`,
+      `buildTGridColumnsForTable: table '${table.name}' has no column '${columnName}'`,
     );
   }
   return column;

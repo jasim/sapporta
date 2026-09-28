@@ -7,9 +7,9 @@ import {
   type SchemaTableGridSource,
   type SchemaTableRootRowsOptions,
   type SchemaTableRowsByLevel,
+  type SchemaTableColumns,
 } from "../tgrid/schema-tgrid";
 import type { TGridDefinition } from "../tgrid/tgrid-runtime-config";
-import type { TableColumnName } from "../tgrid/tgrid-types";
 import type {
   TGridLoadedRowsBoundaryHandler,
   TGridSession,
@@ -44,8 +44,29 @@ export type SchemaTableGridViewProps = {
   sessionRef?: Ref<TGridSession<SchemaTableRowsByLevel>>;
   /** Replace the standard pager-focus behavior at loaded-row boundaries. */
   onLoadedRowsBoundary?: TGridLoadedRowsBoundaryHandler<SchemaTableRowsByLevel>;
-  /** Hide these columns of `source.table` in this view only. */
-  hiddenColumns?: readonly TableColumnName[];
+  /**
+   * The columns of `source.table` in this view only: hide some, change how
+   * some show, or add your own. This one shows the schema's columns in schema
+   * order, less `created_at`, with `note` drawn by `NoteCell`, then an `edit`
+   * column:
+   *
+   * ```ts
+   * (c) => [
+   *   c.remainingTable({
+   *     exclude: ["created_at"],
+   *     columnOptions: { note: { renderCell: NoteCell } },
+   *   }),
+   *   c.client("edit", { renderCell: EditButton, activation: editRow }),
+   * ]
+   * ```
+   *
+   * `NoteCell` and `EditButton` are your own cell components. `editRow` is a
+   * cell activation — `{ startsOn, describe, run }` — not just a handler.
+   *
+   * Keep the value stable (a module constant or `useMemo`): a new one
+   * rebuilds the grid.
+   */
+  columns?: SchemaTableColumns;
   /** Tune row expansion, row loading, interaction, controls, and styling. */
   viewRelatedRows?: ViewRelatedRowsOption;
   /**
@@ -123,15 +144,6 @@ function useStableRowOptions({
   );
 }
 
-// The list may be inline; its column names are the dependency contract.
-function useStableColumnNames(
-  columnNames?: readonly TableColumnName[],
-): readonly TableColumnName[] | undefined {
-  const key = columnNames ? JSON.stringify(columnNames) : undefined;
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  return useMemo(() => columnNames, [key]);
-}
-
 function useStableInteractionOptions(
   interaction?: GridInteractionConfig,
 ): GridInteractionConfig | undefined {
@@ -203,7 +215,7 @@ export function SchemaTableGridView({
   actions,
   sessionRef,
   onLoadedRowsBoundary,
-  hiddenColumns,
+  columns,
   viewRelatedRows,
   header,
   rootRows,
@@ -215,7 +227,7 @@ export function SchemaTableGridView({
 }: SchemaTableGridViewProps) {
   const definition = useSchemaTableGridDefinition({
     source,
-    hiddenColumns,
+    columns,
     rootRows,
     relatedRows,
     interaction,
@@ -247,7 +259,7 @@ export function useSchemaTableGrid({
   onNewRecord,
   actions,
   onLoadedRowsBoundary,
-  hiddenColumns,
+  columns,
   viewRelatedRows,
   rootRows,
   relatedRows,
@@ -258,7 +270,7 @@ export function useSchemaTableGrid({
 }: UseSchemaTableGridArgs): TableGridBinding<SchemaTableRowsByLevel> {
   const definition = useSchemaTableGridDefinition({
     source,
-    hiddenColumns,
+    columns,
     rootRows,
     relatedRows,
     interaction,
@@ -281,13 +293,13 @@ export function useSchemaTableGrid({
 
 function useSchemaTableGridDefinition({
   source,
-  hiddenColumns,
+  columns,
   rootRows,
   relatedRows,
   interaction,
 }: {
   source: SchemaTableGridViewSource;
-  hiddenColumns?: readonly TableColumnName[];
+  columns?: SchemaTableColumns;
   rootRows?: SchemaTableRootRowsOptions;
   relatedRows?: SchemaTableRelatedRowsOptions;
   interaction?: GridInteractionConfig;
@@ -304,20 +316,19 @@ function useSchemaTableGridDefinition({
     defaults: schemaTableGridDefaultRootRows,
   });
   const relatedRowOptions = useStableRowOptions({ options: relatedRows });
-  const hiddenColumnNames = useStableColumnNames(hiddenColumns);
   const interactionOptions = useStableInteractionOptions(interaction);
   const definition = useMemo(
     () =>
       defineSchemaTGrid({
         source: gridSource,
-        hiddenColumns: hiddenColumnNames,
+        columns,
         rootRows: rootRowOptions,
         relatedRows: relatedRowOptions,
         interaction: interactionOptions,
       }),
     [
+      columns,
       gridSource,
-      hiddenColumnNames,
       interactionOptions,
       relatedRowOptions,
       rootRowOptions,

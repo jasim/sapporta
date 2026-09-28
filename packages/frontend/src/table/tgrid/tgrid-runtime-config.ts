@@ -56,7 +56,7 @@ import type {
 import {
   createTGridColumnsBuilder,
   type TGridColumnSpec,
-  type TGridColumnSpecBuilder,
+  type TGridLevelColumns,
 } from "./tgrid-column-spec";
 import {
   buildTGridColumnsForTable,
@@ -295,6 +295,10 @@ export function compileTGridRuntimeConfig<
   };
 }
 
+// Check the structure of a grid definition: its levels, parents, child levels,
+// trees, and primary keys. Column names are checked when the grid builds its
+// columns instead (see `buildTGridColumnsForTable`), because checking them here
+// would run a level's `columns` callback while the grid is still being declared.
 function validateTGridDefinition<
   RowsByLevel extends TGridRowsByLevel,
   AppServices,
@@ -400,10 +404,7 @@ function resolveColumns<
   LevelId extends TGridLevelId<RowsByLevel>,
 >(
   levelId: LevelId,
-  cols:
-    | TGridColumnSpecBuilder<RowsByLevel, AppServices, LevelId>
-    | readonly TGridColumnSpec<RowsByLevel, AppServices, LevelId>[]
-    | undefined,
+  cols: TGridLevelColumns<RowsByLevel, AppServices, LevelId> | undefined,
 ): readonly TGridColumnSpec<RowsByLevel, AppServices, LevelId>[] | undefined {
   if (!cols) return undefined;
   if (typeof cols !== "function") return cols;

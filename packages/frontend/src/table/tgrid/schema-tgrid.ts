@@ -10,7 +10,7 @@ import {
   buildTableGridGraphFromSchema,
   type RootLevelQueryConfig,
 } from "./tgrid-schema-compiler";
-import type { TableColumnName } from "./tgrid-types";
+import type { TGridLevelColumns } from "./tgrid-column-spec";
 
 // Row shape used by schema table grids.
 // The exact columns come from the loaded table schema, so each row is a plain
@@ -28,13 +28,26 @@ export type SchemaTableRelatedRowsOptions = Omit<
   "owner"
 >;
 
-export type SchemaTGridConfigInput = {
+/**
+ * The root table's columns in one schema table grid: the spec list or
+ * builder callback a `defineTGrid` level's `columns` takes. For example,
+ * `(c) => [c.remainingTable({ exclude: ["created_at"] }), c.client("edit", …)]`.
+ */
+export type SchemaTableColumns<AppServices = unknown> = TGridLevelColumns<
+  SchemaTableRowsByLevel,
+  AppServices,
+  string
+>;
+
+export type SchemaTGridConfigInput<AppServices = unknown> = {
   source: SchemaTableGridSource;
   rootRows?: SchemaTableRootRowsOptions;
   relatedRows?: SchemaTableRelatedRowsOptions;
-  // Root table columns this grid does not show, such as a column a fixed
-  // filter holds to one value. Other views of the table still show them.
-  hiddenColumns?: readonly TableColumnName[];
+  // The root table's columns in this grid, such as the schema's columns less
+  // one a fixed filter holds to one value, plus a client column of row
+  // actions. Other views of the table are unchanged. Leave it out to show
+  // every visible column in schema order.
+  columns?: SchemaTableColumns<AppServices>;
 };
 
 export type DefineSchemaTGridArgs = SchemaTGridConfigInput & {
@@ -45,8 +58,8 @@ export function buildSchemaTGridConfig<AppServices = unknown>({
   source,
   rootRows,
   relatedRows,
-  hiddenColumns,
-}: SchemaTGridConfigInput): {
+  columns,
+}: SchemaTGridConfigInput<AppServices>): {
   rootLevel: string;
   levels: TGridLevelsConfigMap<SchemaTableRowsByLevel, AppServices>;
 } {
@@ -60,20 +73,8 @@ export function buildSchemaTGridConfig<AppServices = unknown>({
     SchemaTableRowsByLevel,
     AppServices
   >;
-
-  if (hiddenColumns && hiddenColumns.length > 0) {
-    const rootTable = levels[generated.rootLevel].table;
-    for (const columnName of hiddenColumns) {
-      if (!rootTable.columns.some((column) => column.name === columnName)) {
-        throw new Error(
-          `buildSchemaTGridConfig: table '${rootTable.name}' has no column '${columnName}' to hide`,
-        );
-      }
-    }
-    // The ordinary table columns, less the hidden ones, in schema order.
-    levels[generated.rootLevel].columns = [
-      { kind: "remainingTable", exclude: hiddenColumns },
-    ];
+  if (columns) {
+    levels[generated.rootLevel].columns = columns;
   }
 
   return {
