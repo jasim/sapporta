@@ -1,5 +1,67 @@
 # @sapporta/server
 
+## 0.8.0
+
+### Minor Changes
+
+- 3dfbae0: An app can keep its Drizzle migrations in a directory it names, and can apply
+  them from its own code, for example at startup. `assertMigrationsReady` and
+  `loadSapportaProject` take `migrationsDir`, which defaults to
+  `packages/api/migrations` under the project root as before.
+  `pendingMigrations(sqlite, migrationsDir)` lists the migrations the database
+  has not applied, and `applyMigrations(sqlite, migrationsDir)` applies them with
+  drizzle-orm's `migrate()` and returns the ones it applied. It throws, and
+  applies nothing, when a pending migration is dated before the latest applied
+  one, because `migrate()` would skip that migration without an error.
+- bc914c7: A column's meta takes `gridEditable: false` for a column the generated grids
+  and a record's detail fields show but never edit, such as text an import
+  wrote. Unlike `apiWritable: false`, the table API still accepts it, so code
+  and agents can set it, and a create form still asks for it. The extracted
+  `ColumnSchema` carries it.
+- 620d16f: A generated project's root `package.json` now declares `@sapporta/server`, so
+  `pnpm exec sapporta ...` runs from the project root. The root declared no
+  dependencies at all, and the `sapporta` bin reached the project only through
+  `packages/api`. `pnpm exec` searches the current package and then PATH, never
+  an ancestor, so the root form that the generated `AGENTS.md`, `README.md`,
+  `.env.development`, and the agent skill all give failed on any machine without
+  a global install:
+
+      [ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL] Command "sapporta" not found
+
+  The root pins the spec `packages/api` already resolves, so a project keeps one
+  CLI and one server version, and pnpm links the package it already installed
+  rather than adding a second copy.
+
+- e59cd71: Export `createTestAuthContext` from `@sapporta/server/testing`. It builds a
+  real auth context, with real row security over the tables it is given, for a
+  workspace/user-scoped member, so an app's tests can call row-scoped code
+  without faking `rowSecurity`.
+- 54bd1c5: `meta.tree: { parentColumn }` declares that a table's rows form a tree through
+  a nullable foreign key to its own primary key. The declaration is checked at
+  boot and published in `TableSchema.tree`. A list read with a filter or search
+  and `tree=ancestors-and-descendants` (or `ancestors`) returns each match with
+  its ancestors and subtree, inside the caller's row scope, and reports
+  `meta.tree`. List reads also accept `fixed[col][op]=value` conditions, which
+  every returned row satisfies, including the ancestors and descendants of a
+  tree read. `sapporta rows list` takes `--tree` and `--fixed`.
+
+  `scopedRows().treeMatch({ fixed, match, matchContext })` selects the matches
+  of a tree table with their ancestors (and descendants) and returns a `where`
+  for `page`, `findMany`, `scan`, or `count`, with the match count and the ids
+  of the context rows. `resolvePageQuery` now returns `{ kind: "rows", input }`
+  or, for a tree read with a filter or search, `{ kind: "treeMatch", treeMatch,
+page }`.
+
+### Patch Changes
+
+- Grid updates and new release
+- Updated dependencies [bc914c7]
+- Updated dependencies
+- Updated dependencies [b52c7a6]
+- Updated dependencies [1ff6208]
+  - @sapporta/shared@0.4.0
+  - @sapporta/honest@0.3.16
+
 ## 0.7.0
 
 ### Minor Changes

@@ -1,5 +1,40 @@
 # @sapporta/grid
 
+## 0.8.0
+
+### Minor Changes
+
+- a8f59c5: `ColumnSchema` takes an optional `align` (`"left" | "right" | "center"`),
+  and `ColumnAlign` is exported from the grid core. The cell and the column
+  header align their content by it, so a value that a custom renderer wraps,
+  such as a report drill-down link, keeps its column's alignment. Preset
+  columns set it from their kind: numbers right, booleans center. A linked
+  number in a report grid now sits on the right like the other numbers.
+- 916e406: `LevelOptions.defaultCollapsed` is removed. The grid never read it, so a
+  level that set it still started with its rows as the host expanded them. A
+  host collapses a level's rows by not expanding them, and a tree level's rows
+  start collapsed with `tree.defaultExpanded: false`.
+- 34a18a3: A level can declare `tree` to show rows that refer to each other, such as
+  accounts with a `parent_id`, as one tree under one header. The tree column,
+  wrapped with `withTreeColumn`, indents each row by its depth and shows a
+  chevron on rows with children. `level.tree` expands, collapses, reveals, and
+  adds child drafts, and `treeExpansionChanged` reports expansion changes.
+  `tree.parentKeyValue` sets the typed key a child draft stores, and
+  `validateLevelTree` checks a tree declaration before a runtime exists. The
+  in-memory source keeps each filter match's ancestors, and a custom source can
+  mark such rows with `LevelSnapshot.treeContextRowKeys`.
+
+### Patch Changes
+
+- Grid updates and new release
+- Updated dependencies [bc914c7]
+- Updated dependencies
+- Updated dependencies [b52c7a6]
+- Updated dependencies [1ff6208]
+- Updated dependencies [3e10336]
+  - @sapporta/shared@0.4.0
+  - @sapporta/ui@0.4.0
+
 ## 0.7.0
 
 ### Minor Changes

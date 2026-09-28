@@ -1,5 +1,122 @@
 # @sapporta/frontend
 
+## 0.9.0
+
+### Minor Changes
+
+- bc914c7: A column's meta takes `gridEditable: false` for a column the generated grids
+  and a record's detail fields show but never edit, such as text an import
+  wrote. Unlike `apiWritable: false`, the table API still accepts it, so code
+  and agents can set it, and a create form still asks for it. The extracted
+  `ColumnSchema` carries it.
+- c21c4f2: The stock table page shows a table with `meta.tree` as one indented tree. It
+  loads all rows at once and hides the pager, shows each search or filter match
+  under its ancestors with "N matches" in the header, notes when the table has
+  more rows than one load returns, and offers "Add child row" in the row's
+  context menu. A `defineTGrid` level can override `tree` or set `tree: false`.
+  `TGridLevelInfo.pagination` says whether a level reads its rows by page or all
+  at once. Query state and `useTableLevelPager` follow it, so a custom page built
+  from the table hooks also shows a tree on one page.
+  TGrid sends a level's parent-row constraint and fixed filters as the list
+  read's `fixed` conditions, so a tree search never brings back rows outside
+  them. `fetchTableRows` takes `fixed`.
+- 19c4166: `ReportGridDataset` shows a `GridDataset` level that declares `tree` as one
+  tree under one header. It indents each row by its depth in the tree column
+  and shows a chevron on rows with children. Enter opens the cell's link, and
+  Space or the chevron expands or collapses the row. A sort orders the rows
+  among their siblings at every depth, and footer rows stay below the tree.
+  `defaultCollapsed: true` starts the tree collapsed. In the narrow cards
+  layout, the tree column is the card title. `ReportGridDataset` runs
+  `gridDatasetTreeProblems` when it receives a dataset, and also rejects a
+  tree level that declares child levels.
+- 213c4b8: `SchemaTableGridView`, `useSchemaTableGrid`, `defineSchemaTGrid` and
+  `TablePage`'s `gridOptions` take `columns`: the root table's columns in that
+  view, as the spec list or builder callback a `defineTGrid` level takes. A page
+  can hide columns, change how some show, and add its own, such as an "Edit"
+  column with a button, without listing every schema column:
+
+  ```tsx
+  columns={(c) => [
+    c.remainingTable({
+      exclude: ["created_at"],
+      columnOptions: { note: { renderCell: NoteCell } },
+    }),
+    c.client("edit", { renderCell: EditButton, activation: editRow }),
+  ]}
+  ```
+
+  `NoteCell` and `EditButton` are your own cell components; `editRow` is a cell
+  activation, `{ startsOn, describe, run }`.
+
+  A new `columns` value rebuilds the grid, so keep it in a module constant or
+  `useMemo`. A builder callback runs when the grid builds, not when the grid is
+  declared.
+
+  `remainingTable` takes `columnOptions`, the options `table(...)` takes, for
+  some of the columns it adds; those columns keep their schema order. It now
+  also skips a column the list names with `table(...)` after it, so
+  `[c.remainingTable(), c.table("notes")]` moves `notes` to the end.
+  `TGridRemainingTableColumnSpec` takes `AppServices` as its second type
+  parameter, like the other column specs.
+
+  A level's columns are checked against its table when the grid builds, so a
+  wrong name is reported then rather than when the grid is declared. It throws,
+  naming the level and the table, for a column the table lacks, for
+  `columnOptions` on a column `remainingTable` does not add, for a client column
+  whose id is a table column's name, and for a column shown twice.
+
+  `expandTGridColumnSpecs` and its `TGridExpandedColumnSpec` result are exported
+  for an app that compiles a level's columns itself: it turns a `columns` value
+  into the visible columns, in order, with every name checked against the table.
+
+- 831a545: The agent setup prompt copied from the account profile page now has the agent
+  use the CLI and the authenticated command a project already has. It told the
+  agent to run `pnpm install sapporta` unless a project-local CLI existed, and a
+  generated app ships the `sapporta` bin in `packages/api` through
+  `@sapporta/server`, where `pnpm exec sapporta` at the workspace root does not
+  find it; the agent then added a dependency to the root `package.json`. It also
+  told the agent to update `AGENTS.md` with the authenticated command even when
+  the project's agent docs already gave one. The prompt now reads the agent docs
+  first, looks for a workspace package that provides the bin, and installs the
+  CLI or edits `AGENTS.md` only when neither is there.
+
+### Patch Changes
+
+- Grid updates and new release
+- a8f59c5: `ColumnSchema` takes an optional `align` (`"left" | "right" | "center"`),
+  and `ColumnAlign` is exported from the grid core. The cell and the column
+  header align their content by it, so a value that a custom renderer wraps,
+  such as a report drill-down link, keeps its column's alignment. Preset
+  columns set it from their kind: numbers right, booleans center. A linked
+  number in a report grid now sits on the right like the other numbers.
+- bc914c7: A generated grid no longer offers a cell of an `apiWritable: false` column for
+  editing. The table API rejects that column, so the edit used to fail on save.
+  The record form and a record's detail fields already kept it read-only.
+- 3e10336: The navigation sidebar is quieter. It sits on a warm tone with no line at its
+  edge. Its rows are 14px grey labels with 18px icons, sitting edge to edge.
+  Hover shows at once instead of fading in. The current page shows in darker
+  text on a faint wash, without turning bold. Section labels are small grey
+  sentence case instead of spaced capitals.
+
+  The colours are new tokens that an app can redeclare: `--sap-nav-bg`,
+  `--sap-nav-fg`, `--sap-nav-icon`, `--sap-nav-section`, `--sap-nav-hover-bg`
+  and `--sap-nav-selected-bg`, with `bg-sap-nav`, `text-sap-nav-fg` and the
+  rest as utilities. `--sap-sidebar` and `--sap-active-nav-bg` keep their
+  values and their other uses, such as grid headers, the status bar and
+  account avatars.
+
+- Updated dependencies [bc914c7]
+- Updated dependencies
+- Updated dependencies [a8f59c5]
+- Updated dependencies [916e406]
+- Updated dependencies [34a18a3]
+- Updated dependencies [b52c7a6]
+- Updated dependencies [1ff6208]
+- Updated dependencies [3e10336]
+  - @sapporta/shared@0.4.0
+  - @sapporta/grid@0.8.0
+  - @sapporta/ui@0.4.0
+
 ## 0.8.0
 
 ### Minor Changes

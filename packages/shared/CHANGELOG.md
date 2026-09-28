@@ -1,5 +1,32 @@
 # @sapporta/shared
 
+## 0.4.0
+
+### Minor Changes
+
+- bc914c7: A column's meta takes `gridEditable: false` for a column the generated grids
+  and a record's detail fields show but never edit, such as text an import
+  wrote. Unlike `apiWritable: false`, the table API still accepts it, so code
+  and agents can set it, and a create form still asks for it. The extracted
+  `ColumnSchema` carries it.
+- b52c7a6: A `GridDataset` level can declare `tree: { parentColumn, column? }` to show
+  rows that name a parent row of the same level, such as accounts with a
+  `parent_id`, as one tree. The level's nodes are one flat list, and
+  `parentColumn` names the column that holds the parent row's `rowKey`.
+  `gridDatasetTreeProblems` reports a tree level that names a parent column the
+  level does not have, or names a tree column that is not visible.
+  `gridDatasetTreeColumn` returns the column that shows a level's tree.
+- 1ff6208: `TableSchema.tree` describes a table whose rows form a tree. The list query
+  accepts `tree` (`ancestors` or `ancestors-and-descendants`) and
+  `fixed[col][op]` conditions, and the list response `meta` can carry
+  `tree: { matchCount, contextIds }`. `resolveTableTree` fills in the defaults
+  of a tree declaration. `encodeFilters`, `encodeTypedFilters`, `decodeFilters`,
+  and `wireKey` take an optional `FilterNamespace` (`"filter"` or `"fixed"`).
+
+### Patch Changes
+
+- Grid updates and new release
+
 ## 0.3.3
 
 ### Patch Changes

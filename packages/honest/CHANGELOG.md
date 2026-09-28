@@ -1,5 +1,11 @@
 # @sapporta/honest
 
+## 0.3.16
+
+### Patch Changes
+
+- Grid updates and new release
+
 ## 0.3.15
 
 ### Patch Changes
