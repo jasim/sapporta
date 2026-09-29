@@ -27,45 +27,82 @@ describe("readProjectApiUrl", () => {
     const root = makeProject(
       "SAPPORTA_API_PORT=3117\nSAPPORTA_FRONTEND_PORT=5290\n",
     );
-    expect(readProjectApiUrl(root)).toBe("http://localhost:3117");
+    expect(readProjectApiUrl(root, {})).toBe("http://localhost:3117");
   });
 
   it("finds the project from a directory inside it", () => {
     const root = makeProject("SAPPORTA_API_PORT=3117\n");
     const nested = join(root, "packages", "api");
     mkdirSync(nested, { recursive: true });
-    expect(readProjectApiUrl(nested)).toBe("http://localhost:3117");
+    expect(readProjectApiUrl(nested, {})).toBe("http://localhost:3117");
   });
 
   it("ignores the public app URL, which names a browser origin rather than the API", () => {
     const root = makeProject(
       "SAPPORTA_API_PORT=3117\nSAPPORTA_PUBLIC_APP_URL=https://app.example.com\n",
     );
-    expect(readProjectApiUrl(root)).toBe("http://localhost:3117");
+    expect(readProjectApiUrl(root, {})).toBe("http://localhost:3117");
   });
 
   it("returns nothing outside a project", () => {
     const outside = mkdtempSync(join(tmpdir(), "sapporta-not-a-project-"));
     roots.push(outside);
-    expect(readProjectApiUrl(outside)).toBeUndefined();
+    expect(readProjectApiUrl(outside, {})).toBeUndefined();
   });
 
   it("returns nothing when the project has no development env file", () => {
-    expect(readProjectApiUrl(makeProject())).toBeUndefined();
+    expect(readProjectApiUrl(makeProject(), {})).toBeUndefined();
   });
 
   it("returns nothing when the port is absent, blank, or not a port", () => {
     expect(
-      readProjectApiUrl(makeProject("BETTER_AUTH_SECRET=x\n")),
+      readProjectApiUrl(makeProject("BETTER_AUTH_SECRET=x\n"), {}),
     ).toBeUndefined();
     expect(
-      readProjectApiUrl(makeProject("SAPPORTA_API_PORT=\n")),
+      readProjectApiUrl(makeProject("SAPPORTA_API_PORT=\n"), {}),
     ).toBeUndefined();
     expect(
-      readProjectApiUrl(makeProject("SAPPORTA_API_PORT=nope\n")),
+      readProjectApiUrl(makeProject("SAPPORTA_API_PORT=nope\n"), {}),
     ).toBeUndefined();
     expect(
-      readProjectApiUrl(makeProject("SAPPORTA_API_PORT=70000\n")),
+      readProjectApiUrl(makeProject("SAPPORTA_API_PORT=70000\n"), {}),
     ).toBeUndefined();
+  });
+
+  it("lets the environment's port take precedence over the file's, as node --env-file does", () => {
+    const root = makeProject("SAPPORTA_API_PORT=3117\n");
+    expect(readProjectApiUrl(root, { SAPPORTA_API_PORT: "4000" })).toBe(
+      "http://localhost:4000",
+    );
+  });
+
+  it("reads the environment's port when the project has no development env file", () => {
+    expect(
+      readProjectApiUrl(makeProject(), { SAPPORTA_API_PORT: "4000" }),
+    ).toBe("http://localhost:4000");
+  });
+
+  it("treats an empty environment value as unset, without falling back to the file", () => {
+    const root = makeProject("SAPPORTA_API_PORT=3117\n");
+    expect(readProjectApiUrl(root, { SAPPORTA_API_PORT: "" })).toBeUndefined();
+  });
+
+  it("returns nothing when the environment's port is not a port", () => {
+    const root = makeProject("SAPPORTA_API_PORT=3117\n");
+    expect(
+      readProjectApiUrl(root, { SAPPORTA_API_PORT: "nope" }),
+    ).toBeUndefined();
+  });
+
+  it("ignores the environment's port outside a project", () => {
+    const outside = mkdtempSync(join(tmpdir(), "sapporta-not-a-project-"));
+    roots.push(outside);
+    expect(
+      readProjectApiUrl(outside, { SAPPORTA_API_PORT: "4000" }),
+    ).toBeUndefined();
+  });
+
+  it("does not read PORT, which the server treats as a hosting fallback", () => {
+    expect(readProjectApiUrl(makeProject(), { PORT: "4000" })).toBeUndefined();
   });
 });

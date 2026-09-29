@@ -49,9 +49,9 @@ there and run `pnpm dev` again. Changing the frontend port also means changing
 and the origin sign-in is accepted from.
 
 Prefer the project-local CLI form, `pnpm exec sapporta ...`, run from the
-project root. It reads `SAPPORTA_API_PORT` from `.env.development`, so
-API-backed commands need no `--api-url`; pass one only to reach a different
-deployment.
+project root. It reads `SAPPORTA_API_PORT` the way `pnpm dev` does, from the
+environment first and then from `.env.development`, so API-backed commands
+need no `--api-url`; pass one only to reach a different deployment.
 
 ## Where changes go
 

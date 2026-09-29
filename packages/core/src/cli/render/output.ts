@@ -33,7 +33,8 @@ export function renderCommandResult(
 const API_URL_SOURCES: Record<ApiUrlSource, string> = {
   flag: "API URL from --api-url",
   env: "API URL from SAPPORTA_API_URL",
-  project: "API URL from SAPPORTA_API_PORT in this project's .env.development",
+  project:
+    "API URL from SAPPORTA_API_PORT, taken from the environment or else this project's .env.development",
   default:
     "API URL from the built-in default — set SAPPORTA_API_URL or pass --api-url",
 };

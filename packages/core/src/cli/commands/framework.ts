@@ -25,7 +25,7 @@ export function createCliProgram(
     .version(version)
     .option(
       "--api-url <url>",
-      "API server URL (overrides SAPPORTA_API_URL and the surrounding project's SAPPORTA_API_PORT; default: http://localhost:3000)",
+      "API server URL (overrides SAPPORTA_API_URL and the surrounding project's SAPPORTA_API_PORT from the environment or .env.development; default: http://localhost:3000)",
     )
     .option(
       "--api-token <token>",
