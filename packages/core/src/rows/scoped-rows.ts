@@ -332,6 +332,11 @@ export function scopedRows<TTable extends AnySQLiteTable>(
         throw new ImmutableTableOperationError(table.sqlName);
       }
       const preparedPatch = await access.patchValues(db, patch);
+      if (Object.keys(preparedPatch).length === 0) {
+        throw new ValidationError([
+          { field: "body", message: "Expected at least one field to update" },
+        ]);
+      }
       try {
         // `savePipeline()` owns validation/reference semantics; the extra
         // predicate keeps the SQL update scoped even when the id exists.

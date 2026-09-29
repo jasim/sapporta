@@ -75,6 +75,19 @@ describe("/api/tables table operations", () => {
       expect(body.data.balance).toBe(500);
     });
 
+    it("PUT /api/tables/accounts/:id rejects an empty patch with 422", async () => {
+      const res = await putJson(`/api/tables/accounts/${createdId}`, {});
+      expect(res.status).toBe(422);
+
+      const body = await res.json();
+      expect(body).toMatchObject({
+        code: "VALIDATION_FAILED",
+        details: [
+          { field: "body", message: "Expected at least one field to update" },
+        ],
+      });
+    });
+
     it("DELETE /api/tables/accounts/:id deletes a row", async () => {
       const res = await del(`/api/tables/accounts/${createdId}`);
       expect(res.status).toBe(200);
