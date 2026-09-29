@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
-import { openSync, readdirSync, readFileSync, closeSync } from "node:fs";
+import { closeSync, mkdtempSync, openSync, readdirSync, readFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawn } from "node:child_process";
 import { pathToFileURL } from "node:url";
@@ -248,13 +249,22 @@ async function publishPackage({ dir, packageJson, published }, options) {
   }
 
   console.log(`Publishing ${label}.`);
+
+  // `pnpm pack` writes the tarball with `workspace:` dependencies replaced by
+  // versions, and `npm publish` uploads it. The upload is made by npm and not
+  // by `pnpm publish` because an account that requires 2FA for writes is asked
+  // to approve the publish in the browser, and only npm asks. pnpm 11 sends
+  // the upload without the approval, and npm answers it with a 404.
+  const packDir = mkdtempSync(join(tmpdir(), "sapporta-release-"));
+  const tarball = join(packDir, "package.tgz");
   const args = [
     "publish",
+    tarball,
     "--access",
     accessFor(packageJson),
     "--tag",
     options.tag,
-    "--no-git-checks",
+    `--registry=${registryFor(packageJson)}`,
   ];
 
   if (options.dryRun) {
@@ -263,16 +273,14 @@ async function publishPackage({ dir, packageJson, published }, options) {
 
   const tty = releaseStdin();
   try {
-    await run("pnpm", args, `Publish ${label}`, {
-      cwd: dir,
-      env: {
-        ...process.env,
-        npm_config_registry: registryFor(packageJson),
-      },
+    await run("pnpm", ["pack", "--out", tarball], `Pack ${label}`, { cwd: dir });
+    await run("npm", args, `Publish ${label}`, {
+      cwd: packDir,
       stdio: [tty.fd, "inherit", "inherit"],
     });
   } finally {
     tty.close();
+    rmSync(packDir, { recursive: true, force: true });
   }
 
   return options.dryRun ? "dry-run" : "published";
