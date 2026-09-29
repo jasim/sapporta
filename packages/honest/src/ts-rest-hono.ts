@@ -212,10 +212,16 @@ async function execute<E extends Env>(
         // `{ [field]: string | File | (string | File)[] }` object for both
         // multipart and urlencoded. `{ all: true }` preserves repeated
         // fields as arrays, which matters for multi-file uploads.
-        raw =
-          isMultipart || isUrlEncoded
-            ? await c.req.parseBody({ all: true })
-            : await c.req.json();
+        if (isMultipart || isUrlEncoded) {
+          raw = await c.req.parseBody({ all: true });
+        } else {
+          // An empty JSON body is an absent body, not malformed JSON: a
+          // DELETE sent without a payload reaches the contract's body schema
+          // as `undefined`, so an optional body passes and a required one
+          // fails validation with BAD_REQUEST.
+          const text = await c.req.text();
+          raw = text === "" ? undefined : JSON.parse(text);
+        }
       } catch (err) {
         if (err instanceof SyntaxError) {
           return c.json({ error: "Invalid JSON body", code: "BAD_JSON" }, 400);

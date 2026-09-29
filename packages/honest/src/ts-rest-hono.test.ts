@@ -90,3 +90,52 @@ describe("TsRestApi query parsing", () => {
     expect(response.status).toBe(400);
   });
 });
+
+describe("TsRestApi body parsing", () => {
+  function deleteApi(body: z.ZodTypeAny) {
+    const c = initContract();
+    const route = c.mutation({
+      method: "DELETE",
+      path: "/rows/:id",
+      body,
+      responses: { 200: z.object({ deleted: z.number() }) },
+    });
+    const api = new TsRestApi();
+    api.register("deleteRow", route, () => ({
+      status: 200,
+      body: { deleted: 1 },
+    }));
+    return api;
+  }
+
+  it("accepts an empty body when the contract's body is optional", async () => {
+    const api = deleteApi(z.object({}).optional());
+
+    const response = await api.request("/rows/4", { method: "DELETE" });
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ deleted: 1 });
+  });
+
+  it("reports an empty required body as a validation error", async () => {
+    const api = deleteApi(z.object({ reason: z.string() }));
+
+    const response = await api.request("/rows/4", { method: "DELETE" });
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject({ code: "BAD_REQUEST" });
+  });
+
+  it("still rejects malformed JSON", async () => {
+    const api = deleteApi(z.object({}).optional());
+
+    const response = await api.request("/rows/4", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: "{",
+    });
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject({ code: "BAD_JSON" });
+  });
+});
