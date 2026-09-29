@@ -1,5 +1,11 @@
 # @sapporta/frontend
 
+## 0.9.1
+
+### Patch Changes
+
+- UI Fixes
+
 ## 0.9.0
 
 ### Minor Changes

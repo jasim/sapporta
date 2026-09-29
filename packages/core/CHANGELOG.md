@@ -1,5 +1,27 @@
 # @sapporta/server
 
+## 0.8.1
+
+### Patch Changes
+
+- 74132d6: The CLI reads `SAPPORTA_API_PORT` the way `pnpm dev` does: from the
+  environment first, then from the project's `.env.development`. Before, it read
+  only the file, so after `export SAPPORTA_API_PORT=4000` the server listened on
+  4000 while API-backed commands still called the file's port. The environment
+  value is consulted only inside a project, and `PORT` is still not read.
+- 7085052: New projects answer an unmatched `/api/*` path with a JSON 404 whose code is
+  `ROUTE_NOT_FOUND`. Before, a GET to a mistyped API path fell through to the
+  frontend and returned `index.html` with status 200, and other methods got a
+  plain-text 404, so the CLI reported that the server did not return JSON.
+  `ErrorCode.ROUTE_NOT_FOUND` is exported. Existing projects pick up the
+  catch-all in `packages/api/boot.ts` through a scaffold refresh.
+- d77cfb0: `scopedRows().update()` rejects a patch with no fields with a
+  `ValidationError`, so `PUT /api/tables/<table>/<id>` with `{}` answers with
+  422 `VALIDATION_FAILED` ("Expected at least one field to update") instead of
+  a 500 from the database layer.
+- Updated dependencies [af9df0d]
+  - @sapporta/honest@0.3.17
+
 ## 0.8.0
 
 ### Minor Changes

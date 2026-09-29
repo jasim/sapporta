@@ -1,5 +1,15 @@
 # sapporta
 
+## 0.2.17
+
+### Patch Changes
+
+- docs: create projects with pnpm dlx and run the project-local CLI
+- Updated dependencies [74132d6]
+- Updated dependencies [7085052]
+- Updated dependencies [d77cfb0]
+  - @sapporta/server@0.8.1
+
 ## 0.2.16
 
 ### Patch Changes
