@@ -86,6 +86,19 @@ app.route("/api", projectAuth.routes);
 // Describe all mounted APIs at /api/openapi.json.
 mountOpenApi(app, sapporta, sapportaApi, apiApp, projectAuth.routes);
 
+// Every API route is mounted above, so an unmatched /api path is a wrong path
+// or method. Answer in JSON here; otherwise a GET would fall through to the
+// frontend's index.html below and look like a successful page load.
+app.all("/api/*", (c) =>
+  c.json(
+    {
+      error: `No API route for ${c.req.method} ${c.req.path}`,
+      code: "ROUTE_NOT_FOUND",
+    },
+    404,
+  ),
+);
+
 // Serve the frontend from the same process by default. Three deployment shapes work:
 //   (a) same-origin via this Hono process (default; `pnpm start`)
 //   (b) same-origin behind nginx - nginx serves packages/frontend/dist directly
