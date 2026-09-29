@@ -3,6 +3,7 @@
 import { openSync, readdirSync, readFileSync, closeSync } from "node:fs";
 import { join } from "node:path";
 import { spawn } from "node:child_process";
+import { pathToFileURL } from "node:url";
 
 const repoDir = process.cwd();
 const packageRoot = join(repoDir, "packages");
@@ -45,7 +46,7 @@ function readJson(path) {
   return JSON.parse(readFileSync(path, "utf8"));
 }
 
-function workspacePackages() {
+export function workspacePackages() {
   const packages = readdirSync(packageRoot, { withFileTypes: true })
     .filter((entry) => entry.isDirectory())
     .map((entry) => {
@@ -179,7 +180,7 @@ function npmInfoArgs(packageJson) {
   ];
 }
 
-async function isVersionPublished(packageJson) {
+export async function isVersionPublished(packageJson) {
   const result = await spawnCommand("npm", npmInfoArgs(packageJson), {
     cwd: repoDir,
     env: process.env,
@@ -221,7 +222,7 @@ function pendingChangesets() {
 
 // Publishing is in order, with the scaffold packages last, so every package
 // before a published scaffold package must be published too. Otherwise the
-// release was versioned without `pnpm run version`, which releases them with
+// release was versioned without `pnpm release:version`, which releases them with
 // every other package.
 function assertScaffoldPackagesReleased(packages) {
   packages.forEach((pkg, index) => {
@@ -233,7 +234,7 @@ function assertScaffoldPackagesReleased(packages) {
       throw new Error(
         `This release publishes ${unpublished.map((earlier) => earlier.packageJson.name).join(", ")} ` +
           `but not ${pkg.packageJson.name}, whose current version is already on npm. ` +
-          "Add a patch changeset for @sapporta/server, run `pnpm run version`, and release again.",
+          "Add a patch changeset for @sapporta/server, run `pnpm release:version`, and release again.",
       );
     }
   });
@@ -283,7 +284,7 @@ async function main() {
   const pending = pendingChangesets();
   if (pending.length > 0) {
     throw new Error(
-      `Pending changesets in .changeset/ (${pending.join(", ")}). Run \`pnpm run version\` first.`,
+      `Pending changesets in .changeset/ (${pending.join(", ")}). Run \`pnpm release:version\` first.`,
     );
   }
 
@@ -311,7 +312,11 @@ async function main() {
   console.log(`Skipped: ${skipped.length ? skipped.join(", ") : "none"}`);
 }
 
-main().catch((error) => {
-  console.error(error instanceof Error ? error.message : error);
-  process.exitCode = 1;
-});
+// scripts/release-status.mjs imports the npm check above, so publishing runs
+// only when this file is the command.
+if (import.meta.url === pathToFileURL(process.argv[1]).href) {
+  main().catch((error) => {
+    console.error(error instanceof Error ? error.message : error);
+    process.exitCode = 1;
+  });
+}
