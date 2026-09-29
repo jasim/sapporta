@@ -39,9 +39,13 @@ The release script attaches stdin to the terminal when possible so npm can run
 the browser/passkey auth flow. Do not pass `--otp` for the normal passkey login
 case.
 
-Run the `vendor` step after `pnpm run version` because `@sapporta/server` ships snapshots of the dependency package manifests used by project scaffolding. If `pnpm install` needs to run in a non-interactive environment, use `CI=true pnpm install`.
+Before building, the release script aborts if `.changeset/` still holds
+changesets (run `pnpm run version` first), or if the release would publish
+packages without also publishing `@sapporta/server` and `sapporta`. If a
+release fails partway, run `pnpm release` again: it skips the versions that
+are already on npm and publishes the rest.
 
-For CLI-related releases, prefer `sapporta` as the user-facing package. Keep `@sapporta/server` as the owner of the CLI implementation and publish it when exports, command behavior, templates, or server APIs change.
+For CLI-related releases, prefer `sapporta` as the user-facing package. `@sapporta/server` owns the CLI implementation and is published with every release (see "Which packages a release publishes").
 
 To verify the publish path without uploading packages:
 
@@ -49,10 +53,13 @@ To verify the publish path without uploading packages:
 node scripts/release.mjs --dry-run
 ```
 
-The release script sorts workspace packages by internal dependencies before
-publishing. If the script ever needs to be bypassed, publish manually in the
-same dependency-aware order: shared dependencies first, then packages that
-depend on them, and the thin `sapporta` CLI package after `@sapporta/server`.
+The dry run makes the same checks as a real release, so it also aborts while
+changesets are pending.
+
+The release script sorts workspace packages by internal dependencies and
+publishes `@sapporta/server` and then `sapporta` last, so a published server
+never scaffolds projects with versions that are not on npm yet. If the script
+ever needs to be bypassed, publish manually in the same order.
 
 ## Before publishing
 
@@ -88,20 +95,64 @@ For a first publish of `sapporta`, confirm the npm name is available or owned by
 - **major**: breaking API changes, removed exports, migration-requiring schema changes
 
 
+## Which packages a release publishes
+
+Each release publishes three groups of packages:
+
+1. Every package named in a pending changeset.
+2. Every package that lists a released package in `dependencies` with
+   `workspace:*`, and then the packages that depend on those, and so on.
+   `workspace:*` is published as an exact version, so a dependent must be
+   republished to use the new version. For example, a `@sapporta/ui` patch
+   also releases `@sapporta/grid` and `@sapporta/frontend`. A
+   `devDependencies` entry does not release the package that declares it. A
+   peer dependency releases it only when the new version leaves the peer
+   range, or on a minor or major release.
+3. `@sapporta/server` and `sapporta`, whenever anything is released. Server
+   embeds the other packages' `package.json` files
+   (`packages/core/src/vendored-package-snapshots`), and `sapporta init`
+   scaffolds new projects with those versions. `sapporta` pins server.
+
+Changesets computes groups 1 and 2. `pnpm run version` (`scripts/version.mjs`)
+adds group 3 by writing a patch changeset for `@sapporta/server` when no
+changeset names it. That changeset is created at version time and is never
+committed, so its changelog entry has no commit hash.
+
+Changesets gives a package a major bump when one of its peer dependencies gets
+a minor or major release, so a `@sapporta/honest` minor release would take
+`@sapporta/server` from 0.x to 1.0.0. `pnpm run version` lowers such a bump to
+a minor bump while the package is on 0.x. A changeset that names a 0.x package
+as `major` still releases 1.0.0.
+
+Write a changeset only for a package whose code changed. Do not write one
+changeset naming every package: it releases packages that did not change. A
+package released only through group 2 gets an "Updated dependencies"
+changelog entry, so give it its own changeset if its behaviour changed.
+
+`pnpm exec changeset status --verbose` shows groups 1 and 2 before versioning.
+`pnpm run version` also lists packages that changed since the last version
+commit but that no changeset names, and asks before continuing (without a
+terminal it continues). It stops if Changesets pre mode is on, or if
+`.changeset/config.json` sets `commit` or `ignore`, which it does not support.
+If it fails partway, run it again: with no pending changesets it lists the
+changed packages and only refreshes server's package snapshots and the
+lockfile.
+
 ## Workflow
 
 ```bash
-# 1. select packages, bump type, summary -> .changeset/*.md
-pnpm changeset          
-# 2. consume changesets → bump package.json, write CHANGELOG.md
-pnpm run version        
-pnpm --filter @sapporta/server vendor
-pnpm install
+# 1. with each change: select packages, bump type, summary -> .changeset/*.md
+pnpm changeset
+# 2. consume changesets, bump versions, write CHANGELOG.md,
+#    refresh server's package snapshots, and update pnpm-lock.yaml
+pnpm run version
 git add .
 git commit -m "Version packages for release"
 # 3. build and publish unpublished package versions
-pnpm release            
+pnpm release
 # 4. push release commit
-git push                
+git push
 ```
 
+If `pnpm install` needs to run in a non-interactive environment, run
+`CI=true pnpm run version`.

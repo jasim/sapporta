@@ -3,6 +3,7 @@ import {
   existsSync,
   mkdirSync,
   mkdtempSync,
+  readdirSync,
   readFileSync,
   realpathSync,
   rmSync,
@@ -18,28 +19,15 @@ const testDir = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(testDir, "..");
 
 const sapportaPackages = [
-  { packageDir: "packages/core", snapshotDir: undefined },
-  {
-    packageDir: "packages/honest",
-    snapshotDir: "packages/core/src/vendored-package-snapshots/honest",
-  },
-  {
-    packageDir: "packages/shared",
-    snapshotDir: "packages/core/src/vendored-package-snapshots/shared",
-  },
-  {
-    packageDir: "packages/frontend",
-    snapshotDir: "packages/core/src/vendored-package-snapshots/frontend",
-  },
-  {
-    packageDir: "packages/grid",
-    snapshotDir: "packages/core/src/vendored-package-snapshots/grid",
-  },
-  {
-    packageDir: "packages/ui",
-    snapshotDir: "packages/core/src/vendored-package-snapshots/ui",
-  },
+  "packages/core",
+  "packages/honest",
+  "packages/shared",
+  "packages/frontend",
+  "packages/grid",
+  "packages/ui",
 ] as const;
+
+const vendoredSnapshotsDir = "packages/core/src/vendored-package-snapshots";
 
 type PackageJson = {
   name: string;
@@ -329,11 +317,18 @@ describe("Sapporta package exports", () => {
   });
 
   it("keeps vendored dependency package snapshots in sync with source manifests", () => {
-    for (const { packageDir, snapshotDir } of sapportaPackages) {
-      if (!snapshotDir) continue;
+    // build.mjs vendors packages/<name>/package.json to <snapshots>/<name>.
+    const snapshotNames = readdirSync(path.join(repoRoot, vendoredSnapshotsDir), {
+      withFileTypes: true,
+    })
+      .filter((entry) => entry.isDirectory())
+      .map((entry) => entry.name);
+    expect(snapshotNames).toContain("cli");
 
+    for (const name of snapshotNames) {
+      const snapshotDir = path.join(vendoredSnapshotsDir, name);
       const source = readFileSync(
-        path.join(repoRoot, packageDir, "package.json"),
+        path.join(repoRoot, "packages", name, "package.json"),
         "utf8",
       );
       const snapshot = readFileSync(
@@ -346,7 +341,7 @@ describe("Sapporta package exports", () => {
 });
 
 function readPackages(): PackageUnderTest[] {
-  return sapportaPackages.map(({ packageDir }) => {
+  return sapportaPackages.map((packageDir) => {
     const root = path.join(repoRoot, packageDir);
     const packageJson = parsePackageJson(
       readFileSync(path.join(root, "package.json"), "utf8"),

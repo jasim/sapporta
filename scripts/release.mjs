@@ -57,7 +57,27 @@ function workspacePackages() {
     })
     .filter(({ packageJson }) => !packageJson.private);
 
-  return sortByWorkspaceDependencies(packages);
+  return scaffoldPackagesLast(sortByWorkspaceDependencies(packages));
+}
+
+// `@sapporta/server` embeds the other packages' versions for `sapporta init`,
+// and `sapporta` pins `@sapporta/server`. Both ship with every release and go
+// out last, so a published server never scaffolds versions that are not on npm
+// yet, and a release that failed partway can be resumed.
+const scaffoldPackageNames = ["@sapporta/server", "sapporta"];
+
+function scaffoldPackagesLast(packages) {
+  const isScaffold = (pkg) => scaffoldPackageNames.includes(pkg.packageJson.name);
+  return [
+    ...packages.filter((pkg) => !isScaffold(pkg)),
+    ...scaffoldPackageNames.map((name) => {
+      const pkg = packages.find((candidate) => candidate.packageJson.name === name);
+      if (!pkg) {
+        throw new Error(`${name} is not a public workspace package; release.mjs publishes it last.`);
+      }
+      return pkg;
+    }),
+  ];
 }
 
 function sortByWorkspaceDependencies(packages) {
@@ -193,9 +213,34 @@ function releaseStdin() {
   }
 }
 
-async function publishPackage({ dir, packageJson }, options) {
+function pendingChangesets() {
+  return readdirSync(join(repoDir, ".changeset")).filter(
+    (file) => file.endsWith(".md") && file !== "README.md",
+  );
+}
+
+// Publishing is in order, with the scaffold packages last, so every package
+// before a published scaffold package must be published too. Otherwise the
+// release was versioned without `pnpm run version`, which releases them with
+// every other package.
+function assertScaffoldPackagesReleased(packages) {
+  packages.forEach((pkg, index) => {
+    if (!scaffoldPackageNames.includes(pkg.packageJson.name) || !pkg.published) {
+      return;
+    }
+    const unpublished = packages.slice(0, index).filter((earlier) => !earlier.published);
+    if (unpublished.length > 0) {
+      throw new Error(
+        `This release publishes ${unpublished.map((earlier) => earlier.packageJson.name).join(", ")} ` +
+          `but not ${pkg.packageJson.name}, whose current version is already on npm. ` +
+          "Add a patch changeset for @sapporta/server, run `pnpm run version`, and release again.",
+      );
+    }
+  });
+}
+
+async function publishPackage({ dir, packageJson, published }, options) {
   const label = `${packageJson.name}@${packageJson.version}`;
-  const published = await isVersionPublished(packageJson);
   if (published) {
     console.log(`Skipping ${label}; this version is already published.`);
     return "skipped";
@@ -234,9 +279,22 @@ async function publishPackage({ dir, packageJson }, options) {
 
 async function main() {
   const options = parseArgs(process.argv.slice(2));
+
+  const pending = pendingChangesets();
+  if (pending.length > 0) {
+    throw new Error(
+      `Pending changesets in .changeset/ (${pending.join(", ")}). Run \`pnpm run version\` first.`,
+    );
+  }
+
+  const packages = [];
+  for (const pkg of workspacePackages()) {
+    packages.push({ ...pkg, published: await isVersionPublished(pkg.packageJson) });
+  }
+  assertScaffoldPackagesReleased(packages);
+
   await run("pnpm", ["build"], "Build workspace");
 
-  const packages = workspacePackages();
   const published = [];
   const skipped = [];
   for (const pkg of packages) {
