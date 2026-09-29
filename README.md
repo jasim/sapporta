@@ -10,7 +10,7 @@ This is what Sapporta provides to make building database applications easy:
 - Forms for data entry with validation and keyboard navigation
 - Relationship lookups that link related records across tables
 - Row-scoped security that ties every read and write to the signed-in user's workspace and role
-- Deployment wiring from `npx sapporta init` to running in production
+- Deployment wiring from `sapporta init` to running in production
 - Reports that drill down from summaries to related detail — a balance links to its transactions, a customer to its orders
 
 Together these make up a working surface that covers a large area of what database applications require.
@@ -28,7 +28,7 @@ workspace and keeps its settings in `pnpm-workspace.yaml`, which earlier pnpm
 versions ignore.
 
 ```bash
-npx sapporta init my-app
+pnpm dlx sapporta@latest init my-app
 cd my-app
 pnpm dev
 ```

@@ -30,7 +30,7 @@ auth context, row helpers, and OpenAPI document.
 Most projects arrive here through the scaffold rather than a direct install:
 
 ```bash
-npx sapporta init my-app
+pnpm dlx sapporta@latest init my-app
 ```
 
 Requires Node.js and pnpm 11 or later — a generated project keeps its workspace
