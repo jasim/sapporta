@@ -43,4 +43,12 @@ describe("user-defined app routes", () => {
     expect(spec.paths["/api/accounts"]).toBeDefined();
     expect(spec.paths["/api/accounts"].post).toBeDefined();
   });
+
+  it("documents a route that loadApp mounts with route() alone", async () => {
+    // setup.ts mounts the accounts fixture with `apiApp.route("/", ...)`
+    // and no `extend()`, as the scaffold's `loadApp()` does.
+    const res = await request("/api/openapi.json");
+    const spec = await res.json();
+    expect(spec.paths["/api/accounts"].post.operationId).toBe("createAccount");
+  });
 });

@@ -31,6 +31,60 @@ describe("TsRestApi.extend", () => {
   });
 });
 
+describe("TsRestApi.route", () => {
+  const c = initContract();
+  const statusRoute = c.query({
+    method: "GET",
+    path: "/status",
+    responses: {
+      200: z.object({ ok: z.boolean() }),
+    },
+  });
+
+  function statusApi() {
+    const api = new TsRestApi();
+    api.register("status", statusRoute, () => ({
+      status: 200,
+      body: { ok: true },
+    }));
+    return api;
+  }
+
+  function documentedPaths(api: TsRestApi): string[] {
+    const document = api.generateDocument(undefined, {
+      info: { title: "Test", version: "1" },
+    }) as { paths: Record<string, unknown> };
+    return Object.keys(document.paths);
+  }
+
+  it("documents the routes of a mounted TsRestApi", async () => {
+    const parent = new TsRestApi();
+    parent.route("/", statusApi());
+
+    expect(documentedPaths(parent)).toEqual(["/status"]);
+    const res = await parent.request("/status");
+    expect(res.status).toBe(200);
+  });
+
+  it("documents a mounted route at the path that serves it", async () => {
+    const parent = new TsRestApi();
+    parent.route("/bank", statusApi());
+
+    expect(documentedPaths(parent)).toEqual(["/bank/status"]);
+    const res = await parent.request("/bank/status");
+    expect(res.status).toBe(200);
+  });
+
+  it("documents a route once when the sub-api is also extended", () => {
+    const child = statusApi();
+    const parent = new TsRestApi();
+    parent.route("/", child);
+    parent.extend(child);
+
+    expect(documentedPaths(parent)).toEqual(["/status"]);
+  });
+});
+
 describe("TsRestApi query parsing", () => {
   it("keeps singleton values scalar and repeated values lossless", async () => {
     const c = initContract();

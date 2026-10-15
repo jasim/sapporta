@@ -89,13 +89,14 @@ export async function createIntegrationApp(
     installSapportaDefaults(app);
   }
 
-  // accountsApi comes from the compiled fixture bundle — a separate
-  // module instance than this file's `TsRestApi`. All merging goes
-  // through `extend()`'s structural duck typing.
+  // Mount the fixture routes the way a scaffolded app's `loadApp()` does:
+  // `route()` alone, with no `extend()`. `route()` must carry the docs into
+  // /api/openapi.json by itself. accountsApi comes from the compiled fixture
+  // bundle, a separate module instance from this file's `TsRestApi`, so
+  // the docs are merged through structural duck typing.
   const apiApp = new TsRestApi<SapportaEnv>();
   const accountsModule = await import(join(FIXTURES_DIR, "app/accounts.js"));
   apiApp.route("/", accountsModule.default);
-  apiApp.extend(accountsModule.default);
   options.configureApi?.(apiApp);
 
   const sapporta = await loadSapportaProject({

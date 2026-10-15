@@ -94,6 +94,7 @@ Extends `Hono<E>`. `E` is the Hono env generic (`Variables` / `Bindings`). `DocC
 ```ts
 api.register(operationId, route, handler);               // static route
 api.registerFamily({ method, genericPath, docs, dispatch, notFound }); // dynamic
+api.route(prefix, otherApi);                              // mount another api and merge its docs
 api.extend(otherApi);                                     // merge another api's doc emitters
 api.generateDocument(ctx, apiDoc, options?);              // OpenAPI 3.1 JSON
 ```
@@ -106,9 +107,13 @@ Bind a ts-rest `AppRoute` to a Hono route and a handler. The operationId becomes
 
 One Hono route, many OpenAPI entries. `genericPath` is Hono-style (`/tables/:tableName`). `docs(ctx)` returns `Record<operationId, AppRoute>` at doc-generation time. `dispatch(c)` returns `{ route, handler }` at request time, or `undefined` to fall through to `notFound` (defaults to `404 NOT_FOUND`).
 
+### `route(prefix, other)`
+
+Hono's `route()`, plus doc merging: when `other` is a `TsRestApi`, its doc emitters join this api's, with `prefix` prepended to each contract path, so `generateDocument()` lists the mounted routes at the URLs that serve them. Like Hono's `route()`, it copies what `other` holds at call time.
+
 ### `extend(other)`
 
-Pull another `TsRestApi`'s doc emitters into this one so the merged spec includes the other's routes. Runtime routes on `other` are served by `other`'s own Hono tree — mount it separately via `parent.route(prefix, other)`. This is the decoupling point: per-sub-app Hono autonomy, centralized spec emission. `other` just needs a `docEmitters` array, so cross-bundle reuse (e.g. compiled fixtures loaded by a test runner) works via duck typing.
+Pull another `TsRestApi`'s doc emitters into this one so the merged spec includes the other's routes, without mounting them. Runtime routes on `other` are served by `other`'s own Hono tree, mounted elsewhere. Merging is idempotent: extending an api already mounted with this api's `route()` adds nothing. This is the decoupling point: per-sub-app Hono autonomy, centralized spec emission. `other` just needs a `docEmitters` array, so cross-bundle reuse (e.g. compiled fixtures loaded by a test runner) works via duck typing.
 
 ### `generateDocument(ctx, apiDoc, options?)`
 

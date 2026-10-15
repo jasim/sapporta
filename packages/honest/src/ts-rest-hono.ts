@@ -68,7 +68,7 @@
  */
 
 import { Hono } from "hono";
-import type { Context, Env } from "hono";
+import type { Context, Env, Schema } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { z } from "zod";
 import type {
@@ -299,6 +299,30 @@ function routeKey(method: string, path: string): string {
 
 type DocEmitter<DocCtx> = (ctx: DocCtx) => Record<string, AppRoute>;
 
+/** The part of a `TsRestApi` that doc merging reads, matched structurally. */
+interface DocSource {
+  docEmitters: readonly DocEmitter<never>[];
+}
+
+function isDocSource(value: unknown): value is DocSource {
+  return (
+    isRecord(value) &&
+    "docEmitters" in value &&
+    Array.isArray((value as { docEmitters: unknown }).docEmitters)
+  );
+}
+
+/**
+ * Join a Hono mount path and a contract path the way Hono joins them when
+ * it serves the route: `("/bank", "/accounts")` gives `/bank/accounts`, and
+ * the mount path `/` leaves the contract path unchanged.
+ */
+function joinMountPath(mountPath: string, routePath: string): string {
+  const base = mountPath.replace(/\/+$/, "");
+  if (base === "") return routePath;
+  return routePath === "/" ? base : base + routePath;
+}
+
 export interface ApiDoc {
   info: { title: string; version: string; description?: string };
   [key: string]: unknown;
@@ -360,6 +384,12 @@ export class TsRestApi<E extends Env = Env, DocCtx = void> extends Hono<E> {
    * Do not mutate from outside.
    */
   readonly docEmitters: DocEmitter<DocCtx>[] = [];
+  /**
+   * Emitters already merged from other apis by `route()` or `extend()`.
+   * Merging is idempotent, so code that calls both `route()` and
+   * `extend()` for the same sub-api does not list its routes twice.
+   */
+  private readonly mergedEmitters = new Set<DocEmitter<never>>();
 
   register<R extends AppRoute>(
     operationId: string,
@@ -399,19 +429,61 @@ export class TsRestApi<E extends Env = Env, DocCtx = void> extends Hono<E> {
   }
 
   /**
+   * Mount another Hono app under `path`, as Hono's `route()` does. When
+   * the mounted app is a `TsRestApi`, its doc emitters are merged too, with
+   * `path` prepended to each contract path, so this api's
+   * `generateDocument()` lists the mounted routes at the URLs that serve
+   * them. Like Hono's `route()`, this copies what `app` holds at call time:
+   * routes registered on `app` afterwards are neither served nor documented.
+   */
+  override route<
+    SubPath extends string,
+    SubEnv extends Env,
+    SubSchema extends Schema,
+    SubBasePath extends string,
+  >(path: SubPath, app: Hono<SubEnv, SubSchema, SubBasePath>) {
+    if (isDocSource(app)) {
+      for (const emit of app.docEmitters) {
+        this.mergeEmitter(emit, path);
+      }
+    }
+    return super.route(path, app);
+  }
+
+  /**
    * Pull another `TsRestApi`'s doc emitters into this one, so this api's
    * `generateDocument()` spec includes the other's routes. Runtime routes
    * on `other` are served by `other`'s own Hono tree (mount it separately
    * via `parentApp.route(prefix, other)`). This is the decoupling point:
-   * per-sub-app Hono autonomy, centralized spec emission.
+   * per-sub-app Hono autonomy, centralized spec emission. A sub-api mounted
+   * with this api's own `route()` is already merged; extending it again
+   * adds nothing.
    */
   extend(other: { docEmitters: readonly DocEmitter<DocCtx>[] }): this;
   extend(other: { docEmitters: readonly DocEmitter<void>[] }): this;
-  extend(other: { docEmitters: readonly DocEmitter<never>[] }): this {
+  extend(other: DocSource): this {
     for (const emit of other.docEmitters) {
-      this.docEmitters.push(emit as DocEmitter<DocCtx>);
+      this.mergeEmitter(emit, "/");
     }
     return this;
+  }
+
+  private mergeEmitter(emit: DocEmitter<never>, mountPath: string): void {
+    if (this.mergedEmitters.has(emit)) return;
+    this.mergedEmitters.add(emit);
+    const emitForCtx = emit as unknown as DocEmitter<DocCtx>;
+    if (mountPath.replace(/\/+$/, "") === "") {
+      this.docEmitters.push(emitForCtx);
+      return;
+    }
+    this.docEmitters.push((ctx) =>
+      Object.fromEntries(
+        Object.entries(emitForCtx(ctx)).map(([name, route]) => [
+          name,
+          { ...route, path: joinMountPath(mountPath, route.path) },
+        ]),
+      ),
+    );
   }
 
   /**
