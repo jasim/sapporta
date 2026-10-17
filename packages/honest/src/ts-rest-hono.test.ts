@@ -83,6 +83,65 @@ describe("TsRestApi.route", () => {
 
     expect(documentedPaths(parent)).toEqual(["/status"]);
   });
+
+  it("documents a sub-api at every path it is mounted at", async () => {
+    const child = statusApi();
+    const parent = new TsRestApi();
+    parent.route("/v1", child);
+    parent.route("/v2", child);
+
+    expect(documentedPaths(parent)).toEqual(["/v1/status", "/v2/status"]);
+    expect((await parent.request("/v2/status")).status).toBe(200);
+  });
+
+  it("replaces an extended entry when the sub-api is mounted later", () => {
+    const child = statusApi();
+    const parent = new TsRestApi();
+    parent.extend(child);
+    parent.route("/bank", child);
+
+    expect(documentedPaths(parent)).toEqual(["/bank/status"]);
+  });
+
+  it("documents a trailing-slash mount at the URL Hono serves", async () => {
+    const rootRoute = c.query({
+      method: "GET",
+      path: "/",
+      responses: { 200: z.object({ ok: z.boolean() }) },
+    });
+    const child = new TsRestApi();
+    child.register("root", rootRoute, () => ({
+      status: 200,
+      body: { ok: true },
+    }));
+    const parent = new TsRestApi();
+    parent.route("/bank/", child);
+
+    expect(documentedPaths(parent)).toEqual(["/bank/"]);
+    expect((await parent.request("/bank/")).status).toBe(200);
+  });
+
+  it("rejects a sub-api whose docs need a different context", () => {
+    const child = new TsRestApi<Env, { tables: readonly string[] }>();
+    const parent = new TsRestApi();
+
+    // @ts-expect-error The child's emitters need `{ tables }`, which the
+    // parent's `generateDocument()` does not pass.
+    parent.route("/", child);
+    // @ts-expect-error `extend()` applies the same check.
+    parent.extend(child);
+  });
+
+  it("accepts a sub-api without docs context in an api with one", () => {
+    const parent = new TsRestApi<Env, { tables: readonly string[] }>();
+    parent.route("/", statusApi());
+
+    const document = parent.generateDocument(
+      { tables: [] },
+      { info: { title: "Test", version: "1" } },
+    ) as { paths: Record<string, unknown> };
+    expect(Object.keys(document.paths)).toEqual(["/status"]);
+  });
 });
 
 describe("TsRestApi query parsing", () => {

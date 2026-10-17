@@ -70,6 +70,7 @@
 import { Hono } from "hono";
 import type { Context, Env, Schema } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
+import { mergePath } from "hono/utils/url";
 import { z } from "zod";
 import type {
   AppRoute,
@@ -313,14 +314,22 @@ function isDocSource(value: unknown): value is DocSource {
 }
 
 /**
- * Join a Hono mount path and a contract path the way Hono joins them when
- * it serves the route: `("/bank", "/accounts")` gives `/bank/accounts`, and
- * the mount path `/` leaves the contract path unchanged.
+ * The URL at which Hono serves a contract path after `route(mountPath, …)`.
+ * Hono joins the two with `mergePath`, so the docs use it too:
+ * `("/bank", "/accounts")` gives `/bank/accounts`, and `("/bank/", "/")`
+ * gives `/bank/`.
  */
-function joinMountPath(mountPath: string, routePath: string): string {
-  const base = mountPath.replace(/\/+$/, "");
-  if (base === "") return routePath;
-  return routePath === "/" ? base : base + routePath;
+function mountedPath(mountPath: string, routePath: string): string {
+  return mergePath(mergePath("/", mountPath), routePath);
+}
+
+/**
+ * A mount-time constraint on `route()`: a mounted `TsRestApi` must have
+ * emitters that accept this api's doc context, as `extend()` requires.
+ * A plain Hono app has no `docEmitters` and always passes.
+ */
+interface MountableDocs<DocCtx> {
+  docEmitters?: readonly DocEmitter<DocCtx>[] | readonly DocEmitter<void>[];
 }
 
 export interface ApiDoc {
@@ -385,11 +394,17 @@ export class TsRestApi<E extends Env = Env, DocCtx = void> extends Hono<E> {
    */
   readonly docEmitters: DocEmitter<DocCtx>[] = [];
   /**
-   * Emitters already merged from other apis by `route()` or `extend()`.
-   * Merging is idempotent, so code that calls both `route()` and
-   * `extend()` for the same sub-api does not list its routes twice.
+   * Where each emitter merged from another api is documented: the mount
+   * paths that `route()` used, and the entry that `extend()` added, if
+   * any. `route()` merges once per (emitter, mount path), so one sub-api
+   * mounted at `/v1` and `/v2` is documented at both. `extend()` adds an
+   * emitter only when no merge has documented it yet, so code that calls
+   * both `route()` and `extend()` lists each route once.
    */
-  private readonly mergedEmitters = new Set<DocEmitter<never>>();
+  private readonly mergedEmitters = new Map<
+    DocEmitter<never>,
+    { mountPaths: Set<string>; extendEntry?: DocEmitter<DocCtx> }
+  >();
 
   register<R extends AppRoute>(
     operationId: string,
@@ -435,16 +450,20 @@ export class TsRestApi<E extends Env = Env, DocCtx = void> extends Hono<E> {
    * `generateDocument()` lists the mounted routes at the URLs that serve
    * them. Like Hono's `route()`, this copies what `app` holds at call time:
    * routes registered on `app` afterwards are neither served nor documented.
+   * A mounted `TsRestApi` must accept this api's doc context, or have none.
    */
   override route<
     SubPath extends string,
     SubEnv extends Env,
     SubSchema extends Schema,
     SubBasePath extends string,
-  >(path: SubPath, app: Hono<SubEnv, SubSchema, SubBasePath>) {
+  >(
+    path: SubPath,
+    app: Hono<SubEnv, SubSchema, SubBasePath> & MountableDocs<DocCtx>,
+  ) {
     if (isDocSource(app)) {
       for (const emit of app.docEmitters) {
-        this.mergeEmitter(emit, path);
+        this.mergeMountedEmitter(emit, path);
       }
     }
     return super.route(path, app);
@@ -455,32 +474,48 @@ export class TsRestApi<E extends Env = Env, DocCtx = void> extends Hono<E> {
    * `generateDocument()` spec includes the other's routes. Runtime routes
    * on `other` are served by `other`'s own Hono tree (mount it separately
    * via `parentApp.route(prefix, other)`). This is the decoupling point:
-   * per-sub-app Hono autonomy, centralized spec emission. A sub-api mounted
-   * with this api's own `route()` is already merged; extending it again
-   * adds nothing.
+   * per-sub-app Hono autonomy, centralized spec emission. Use it only for
+   * a sub-api mounted on another app; this api's own `route()` already
+   * merges the docs. Extending a sub-api that this api's `route()` has
+   * merged adds nothing, and a later `route()` replaces the extended entry
+   * with the mounted paths.
    */
   extend(other: { docEmitters: readonly DocEmitter<DocCtx>[] }): this;
   extend(other: { docEmitters: readonly DocEmitter<void>[] }): this;
   extend(other: DocSource): this {
     for (const emit of other.docEmitters) {
-      this.mergeEmitter(emit, "/");
+      if (this.mergedEmitters.has(emit)) continue;
+      const entry = emit as unknown as DocEmitter<DocCtx>;
+      this.mergedEmitters.set(emit, {
+        mountPaths: new Set(),
+        extendEntry: entry,
+      });
+      this.docEmitters.push(entry);
     }
     return this;
   }
 
-  private mergeEmitter(emit: DocEmitter<never>, mountPath: string): void {
-    if (this.mergedEmitters.has(emit)) return;
-    this.mergedEmitters.add(emit);
-    const emitForCtx = emit as unknown as DocEmitter<DocCtx>;
-    if (mountPath.replace(/\/+$/, "") === "") {
-      this.docEmitters.push(emitForCtx);
-      return;
+  private mergeMountedEmitter(
+    emit: DocEmitter<never>,
+    mountPath: string,
+  ): void {
+    let merged = this.mergedEmitters.get(emit);
+    if (!merged) {
+      merged = { mountPaths: new Set() };
+      this.mergedEmitters.set(emit, merged);
     }
+    if (merged.mountPaths.has(mountPath)) return;
+    merged.mountPaths.add(mountPath);
+    if (merged.extendEntry) {
+      this.docEmitters.splice(this.docEmitters.indexOf(merged.extendEntry), 1);
+      merged.extendEntry = undefined;
+    }
+    const emitForCtx = emit as unknown as DocEmitter<DocCtx>;
     this.docEmitters.push((ctx) =>
       Object.fromEntries(
         Object.entries(emitForCtx(ctx)).map(([name, route]) => [
           name,
-          { ...route, path: joinMountPath(mountPath, route.path) },
+          { ...route, path: mountedPath(mountPath, route.path) },
         ]),
       ),
     );
