@@ -33,11 +33,34 @@ describe("SelectEditor", () => {
     });
 
     expect(requiredInput(container).value).toBe("str");
-    expect(optionTexts(container)).toEqual(["String one"]);
+    expect(optionTexts()).toEqual(["String one"]);
     expect(commit).not.toHaveBeenCalled();
   });
 
-  it("commits exact option values for mouse and keyboard selection", async () => {
+  it("commits the exact option value for mouse selection", async () => {
+    const commit = vi.fn();
+    const cancel = vi.fn();
+    const container = await renderEditor({
+      editStart: { trigger: "enter" },
+      value: null,
+      commit,
+      cancel,
+    });
+    const input = requiredInput(container);
+
+    await changeInput(input, "Numeric");
+    const numeric = requiredOption("Numeric one");
+    expect(container.contains(numeric)).toBe(false);
+    await click(numeric);
+    await act(async () => {
+      await new Promise((resolve) => window.setTimeout(resolve, 0));
+    });
+
+    expect(commit).toHaveBeenLastCalledWith(1);
+    expect(cancel).not.toHaveBeenCalled();
+  });
+
+  it("commits the exact option value for keyboard selection", async () => {
     const commit = vi.fn();
     const container = await renderEditor({
       editStart: { trigger: "enter" },
@@ -46,12 +69,6 @@ describe("SelectEditor", () => {
     });
     const input = requiredInput(container);
 
-    await changeInput(input, "Numeric");
-    const numeric = requiredOption(container, "Numeric one");
-    await click(numeric);
-    expect(commit).toHaveBeenLastCalledWith(1);
-
-    commit.mockClear();
     await changeInput(input, "String");
     await pressKey(input, "ArrowDown");
     await pressKey(input, "Enter");
@@ -70,7 +87,7 @@ describe("SelectEditor", () => {
     await changeInput(input, "not an option");
     await pressKey(input, "Enter");
 
-    expect(optionTexts(container)).toEqual([]);
+    expect(optionTexts()).toEqual([]);
     expect(commit).not.toHaveBeenCalled();
   });
 
@@ -149,16 +166,17 @@ function requiredInput(container: ParentNode): HTMLInputElement {
   return input;
 }
 
-function requiredOption(container: ParentNode, text: string): Element {
-  const option = Array.from(container.querySelectorAll('[role="option"]')).find(
+// The option list is portaled to document.body, outside the editor container.
+function requiredOption(text: string): Element {
+  const option = Array.from(document.querySelectorAll('[role="option"]')).find(
     (candidate) => candidate.textContent?.includes(text),
   );
   if (!option) throw new Error(`Expected option '${text}'.`);
   return option;
 }
 
-function optionTexts(container: ParentNode): string[] {
-  return Array.from(container.querySelectorAll('[role="option"]')).map(
+function optionTexts(): string[] {
+  return Array.from(document.querySelectorAll('[role="option"]')).map(
     (option) => option.textContent ?? "",
   );
 }

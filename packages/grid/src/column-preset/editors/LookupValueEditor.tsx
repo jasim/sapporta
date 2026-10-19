@@ -95,6 +95,12 @@ export function LookupValueEditor(props: CellEditorProps) {
         }
         filter={null}
         open
+        onOpenChange={(open, details) => {
+          // The positioned popup handles Escape itself to close the list,
+          // so the wrapper's keydown handler never sees it. Closing the list
+          // ends the edit.
+          if (!open && details.reason === "escape-key") props.cancel();
+        }}
       >
         <Combobox.InputGroup
           className={cn(
@@ -112,28 +118,43 @@ export function LookupValueEditor(props: CellEditorProps) {
             data-grid-part="editor-input"
           />
         </Combobox.InputGroup>
-        <div className="absolute left-0 top-full z-[var(--sap-z-popover)] mt-1 min-w-full overflow-hidden rounded-lg border border-sap-border bg-sap-surface shadow-sap-elevated">
-          <Combobox.Empty className={comboboxClassNames.empty}>
-            No results.
-          </Combobox.Empty>
-          <Combobox.List className={cn(comboboxClassNames.list, "max-h-64")}>
-            {(entry: LookupEntry) => (
-              <Combobox.Item
-                key={lookupValueKey(entry.value)}
-                value={entry}
-                disabled={entry.disabled}
-                className={comboboxClassNames.item}
+        <Combobox.Portal>
+          <Combobox.Positioner
+            align="start"
+            sideOffset={4}
+            className={comboboxClassNames.positioner}
+          >
+            <Combobox.Popup
+              className={cn(
+                comboboxClassNames.popup,
+                "w-auto min-w-(--anchor-width)",
+              )}
+            >
+              <Combobox.Empty className={comboboxClassNames.empty}>
+                No results.
+              </Combobox.Empty>
+              <Combobox.List
+                className={cn(comboboxClassNames.list, "max-h-64")}
               >
-                {entry.label}
-                <Combobox.ItemIndicator
-                  className={comboboxClassNames.itemIndicator}
-                >
-                  <Check aria-hidden />
-                </Combobox.ItemIndicator>
-              </Combobox.Item>
-            )}
-          </Combobox.List>
-        </div>
+                {(entry: LookupEntry) => (
+                  <Combobox.Item
+                    key={lookupValueKey(entry.value)}
+                    value={entry}
+                    disabled={entry.disabled}
+                    className={comboboxClassNames.item}
+                  >
+                    {entry.label}
+                    <Combobox.ItemIndicator
+                      className={comboboxClassNames.itemIndicator}
+                    >
+                      <Check aria-hidden />
+                    </Combobox.ItemIndicator>
+                  </Combobox.Item>
+                )}
+              </Combobox.List>
+            </Combobox.Popup>
+          </Combobox.Positioner>
+        </Combobox.Portal>
       </Combobox.Root>
     </div>
   );

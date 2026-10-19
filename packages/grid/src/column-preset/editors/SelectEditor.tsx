@@ -52,8 +52,13 @@ export function SelectEditor(props: CellEditorProps) {
           Object.is(option.value, selected.value)
         }
         autoHighlight
-        inline
         open
+        onOpenChange={(open, details) => {
+          // The positioned popup handles Escape itself to close the list,
+          // so the wrapper's keydown handler never sees it. Closing the list
+          // ends the edit.
+          if (!open && details.reason === "escape-key") props.cancel();
+        }}
       >
         <Combobox.InputGroup
           className={cn(
@@ -71,27 +76,42 @@ export function SelectEditor(props: CellEditorProps) {
             data-grid-part="editor-input"
           />
         </Combobox.InputGroup>
-        <div className="absolute left-0 top-full z-[var(--sap-z-popover)] mt-1 min-w-full overflow-hidden rounded-lg border border-sap-border bg-sap-surface shadow-sap-elevated">
-          <Combobox.Empty className={comboboxClassNames.empty}>
-            No results.
-          </Combobox.Empty>
-          <Combobox.List className={cn(comboboxClassNames.list, "max-h-64")}>
-            {(option, index) => (
-              <Combobox.Item
-                key={index}
-                value={option}
-                className={comboboxClassNames.item}
+        <Combobox.Portal>
+          <Combobox.Positioner
+            align="start"
+            sideOffset={4}
+            className={comboboxClassNames.positioner}
+          >
+            <Combobox.Popup
+              className={cn(
+                comboboxClassNames.popup,
+                "w-auto min-w-(--anchor-width)",
+              )}
+            >
+              <Combobox.Empty className={comboboxClassNames.empty}>
+                No results.
+              </Combobox.Empty>
+              <Combobox.List
+                className={cn(comboboxClassNames.list, "max-h-64")}
               >
-                {option.label}
-                <Combobox.ItemIndicator
-                  className={comboboxClassNames.itemIndicator}
-                >
-                  <Check aria-hidden />
-                </Combobox.ItemIndicator>
-              </Combobox.Item>
-            )}
-          </Combobox.List>
-        </div>
+                {(option, index) => (
+                  <Combobox.Item
+                    key={index}
+                    value={option}
+                    className={comboboxClassNames.item}
+                  >
+                    {option.label}
+                    <Combobox.ItemIndicator
+                      className={comboboxClassNames.itemIndicator}
+                    >
+                      <Check aria-hidden />
+                    </Combobox.ItemIndicator>
+                  </Combobox.Item>
+                )}
+              </Combobox.List>
+            </Combobox.Popup>
+          </Combobox.Positioner>
+        </Combobox.Portal>
       </Combobox.Root>
     </div>
   );
