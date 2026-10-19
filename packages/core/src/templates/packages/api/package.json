@@ -39,7 +39,7 @@
     "zod": "%%SAPPORTA:ZOD_VERSION%%"
   },
   "devDependencies": {
-    "typescript": "^5.7.0",
+    "typescript": "^6.0.3",
     "tsc-watch": "^7.2.0",
     "drizzle-kit": "%%SAPPORTA:DRIZZLE_KIT_VERSION%%",
     "@types/better-sqlite3": "^7.6.0",

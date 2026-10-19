@@ -29,7 +29,7 @@
   "devDependencies": {
     "@types/react": "%%SAPPORTA:TYPES_REACT_VERSION%%",
     "@types/react-dom": "%%SAPPORTA:TYPES_REACT_DOM_VERSION%%",
-    "typescript": "^5.7.0",
+    "typescript": "^6.0.3",
     "vite": "%%SAPPORTA:VITE_VERSION%%",
     "@vitejs/plugin-react": "%%SAPPORTA:VITE_REACT_VERSION%%",
     "@tailwindcss/vite": "%%SAPPORTA:TAILWIND_VITE_VERSION%%",
