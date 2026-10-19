@@ -8,12 +8,18 @@ import {
   type ResolvedReferenceFact,
 } from "../auth/row-scope.js";
 import { findPkColumn } from "../schema/pk.js";
+import { resolveColumnKind } from "../schema/resolve-kind.js";
 import type { TableDef } from "../schema/table.js";
 import type { NormalizedTableSearch, SearchSelf } from "./search-types.js";
 
 export type SearchValuePlan =
   | {
       readonly kind: "column";
+      readonly column: SQLiteColumn;
+    }
+  | {
+      /** A number column: a numeric search word matches it by value. */
+      readonly kind: "number";
       readonly column: SQLiteColumn;
     }
   | {
@@ -216,6 +222,8 @@ export function compileSearchPlans(
       if (!reference) {
         if (referenceCandidates.has(column.name)) {
           addReferenceIssues(table, column.name, path, resolved.issues);
+        } else if (resolveColumnKind(table, column.name) === "number") {
+          plans.push(Object.freeze({ kind: "number", column }));
         } else {
           plans.push(Object.freeze({ kind: "column", column }));
         }

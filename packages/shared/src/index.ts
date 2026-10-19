@@ -9,4 +9,5 @@ export * from "./record-id.js";
 export * from "./row-scope.js";
 export * from "./labels.js";
 export * from "./count.js";
+export * from "./search-words.js";
 export * from "./validation/index.js";

@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { index, integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
+import {
+  index,
+  integer,
+  real,
+  sqliteTable,
+  text,
+} from "drizzle-orm/sqlite-core";
 import { sapportaTable } from "../schema/table.js";
 import { createTableCatalog } from "../schema/catalog.js";
 import type { TableCatalog } from "../schema/catalog.js";
@@ -23,6 +29,7 @@ const booksTable = sqliteTable("books", {
     .notNull()
     .references(() => authorsTable.id),
   private_note: text("private_note"),
+  price: real("price"),
 });
 
 const quotesTable = sqliteTable(
@@ -84,7 +91,8 @@ function setup() {
       id INTEGER PRIMARY KEY,
       title TEXT NOT NULL,
       author_id INTEGER NOT NULL REFERENCES authors(id),
-      private_note TEXT
+      private_note TEXT,
+      price REAL
     );
     CREATE TABLE quotes (
       id INTEGER PRIMARY KEY,
@@ -98,10 +106,10 @@ function setup() {
       (7001, 'workspace-1', 'Jane', 'Doe'),
       (7002, 'workspace-2', 'Octavia', 'Butler');
     INSERT INTO books VALUES
-      (101, 'Blue Horizon', 7001, 'hidden-cipher'),
-      (102, 'Kindred', 7002, 'not-public'),
-      (103, '100%_literal\\path', 7001, NULL),
-      (104, '100XXliteral\\path', 7001, NULL);
+      (101, 'Blue Horizon', 7001, 'hidden-cipher', 2500),
+      (102, 'Kindred', 7002, 'not-public', 100),
+      (103, '100%_literal\\path', 7001, NULL, 250),
+      (104, '100XXliteral\\path', 7001, NULL, NULL);
     INSERT INTO quotes VALUES
       (1, 'workspace-1', 101, 'The sea remembers blue.'),
       (2, 'workspace-1', 101, 'Blue appears twice.'),
@@ -163,6 +171,55 @@ describe("explicit relational table search", () => {
       data: [{ id: 101 }],
       meta: { total: 1 },
     });
+  });
+
+  it("requires every word, each matching anywhere in the row", async () => {
+    const { rows, catalog, auth } = setup();
+    const ids = async (term: string) =>
+      (await rows.page(searchInput(catalog, auth, term))).data.map(
+        (row) => row.id,
+      );
+
+    expect(await ids("Horizon remembers")).toEqual([101]);
+    expect(await ids("remembers Horizon")).toEqual([101]);
+    expect(await ids("Horizon Kindred")).toEqual([]);
+    expect(await ids("  Horizon   ")).toEqual([101]);
+  });
+
+  it("keeps a double-quoted phrase as one word", async () => {
+    const { rows, catalog, auth } = setup();
+    const ids = async (term: string) =>
+      (await rows.page(searchInput(catalog, auth, term))).data.map(
+        (row) => row.id,
+      );
+
+    expect(await ids('"sea remembers"')).toEqual([101]);
+    expect(await ids('"remembers sea"')).toEqual([]);
+    expect(await ids("remembers sea")).toEqual([101]);
+  });
+
+  it("matches number columns by value, not by their text", async () => {
+    const { rows, catalog, auth } = setup();
+    const ids = async (term: string) =>
+      (await rows.page(searchInput(catalog, auth, term))).data.map(
+        (row) => row.id,
+      );
+
+    expect(await ids("2500")).toEqual([101]);
+    expect(await ids("2,500")).toEqual([101]);
+    expect(await ids("2500.00")).toEqual([101]);
+    expect(await ids("250")).toEqual([103]);
+    expect(await ids("Blue 2500")).toEqual([101]);
+    expect(await ids("Blue 250")).toEqual([]);
+  });
+
+  it("searches a term of many words without exceeding SQLite's limits", async () => {
+    const { rows, catalog, auth } = setup();
+    const term = `Horizon ${Array.from({ length: 2000 }, (_, i) => `w${i}`).join(" ")}`;
+
+    const page = await rows.page(searchInput(catalog, auth, term));
+
+    expect(page.data).toEqual([]);
   });
 
   it("does not search raw FK ids or visually hidden columns", async () => {

@@ -351,9 +351,11 @@ describe("resolvePageQuery()", () => {
       expect(params).toEqual(["%foo%", "%foo%"]);
     });
 
-    it("does not split or otherwise interpret the term", () => {
-      const q = parseQuery({ q: "  blue moon  " }, singleSearchOrders);
-      expect(compile(q.where).params).toEqual(["%blue moon%"]);
+    it("requires each word of the term, keeping a quoted phrase whole", () => {
+      const words = parseQuery({ q: "  blue moon  " }, singleSearchOrders);
+      expect(compile(words.where).params).toEqual(["%blue%", "%moon%"]);
+      const phrase = parseQuery({ q: '"blue moon"' }, singleSearchOrders);
+      expect(compile(phrase.where).params).toEqual(["%blue moon%"]);
     });
 
     it("composes structured filters with search", () => {

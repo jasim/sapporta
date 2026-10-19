@@ -81,7 +81,7 @@ pnpm generate:api-reference   # pnpm check:api-reference fails if it is stale
 
 | Module | Purpose |
 | --- | --- |
-| `.` | Barrel of the pure value helpers: filter grammar, query params, value kinds, temporal and date-range helpers, CSV, record ids, row scopes, labels, counts, validation |
+| `.` | Barrel of the pure value helpers: filter grammar, query params, value kinds, temporal and date-range helpers, CSV, record ids, row scopes, labels, counts, search words, validation |
 | `./contracts` | ts-rest route definitions and Zod wire schemas for the table, meta, and auth APIs; re-exports `initContract` so consumers avoid a direct `@sapporta/rest-core` dependency |
 | `./filter` | Filter operator vocabulary shared by the server query grammar and grid filtering |
 | `./value-kind` | Classification of column values used by formatting and filtering |
