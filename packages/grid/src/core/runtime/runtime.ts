@@ -1956,6 +1956,10 @@ export function createGridRuntime(args: RuntimeArgs): GridRuntime {
             assertLevelRegisteredForOperation(path);
             return createRow(path, node, atIndex);
           }),
+        addSavedRow: (node, atIndex) => {
+          assertLevelLive(path);
+          return mutations.addSavedRow(path, node, atIndex);
+        },
         removeRow: (rowKey) => removeSingleRow(path, rowKey),
         drafts: Object.freeze({
           get: () => {

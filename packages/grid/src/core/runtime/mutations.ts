@@ -126,7 +126,7 @@ export function createMutationRuntime(args: {
     atIndex?: number,
   ): Promise<CreateNodeResult> {
     const { write } = requireWritable(path);
-    const existingKeys = assertCreateNode(path, node);
+    const existingKeys = assertCreateNode(path, node, "GridRuntime.createRow");
     const result = await write.createNode(node, atIndex);
     try {
       // The source result is authoritative. Invalid identity faults the
@@ -145,6 +145,23 @@ export function createMutationRuntime(args: {
       });
     }
     return result;
+  }
+
+  // A row saved elsewhere joins the loaded rows as they are; no save runs, so
+  // no `mutationCommitted` event claims an edit made in this grid. A source
+  // that cannot take the row answers false instead of throwing, so the caller
+  // can read the rows again.
+  function addSavedRow(
+    path: GridPath,
+    node: TreeNode,
+    atIndex?: number,
+  ): boolean {
+    args.assertLive();
+    const write = args.source(path)?.write;
+    if (!write?.addSavedNode || !args.isWritable(path)) return false;
+    assertCreateNode(path, node, "GridRuntime.addSavedRow");
+    write.addSavedNode(node, atIndex);
+    return true;
   }
 
   async function removeRow(path: GridPath, rowKey: RowKey): Promise<void> {
@@ -167,16 +184,17 @@ export function createMutationRuntime(args: {
   function assertCreateNode(
     path: GridPath,
     node: TreeNode,
+    operation: string,
   ): ReadonlySet<RowKey> {
     const schema = args.schemaAt(path);
     if (node.levelName !== schema.name) {
       throw new Error(
-        `GridRuntime.createRow: node levelName "${node.levelName}" does not match level "${schema.name}".`,
+        `${operation}: node levelName "${node.levelName}" does not match level "${schema.name}".`,
       );
     }
-    rowKeyOfTreeNode(node, "GridRuntime.createRow");
+    rowKeyOfTreeNode(node, operation);
     const nodes = args.sourceSnapshot(path).nodes;
-    assertTreeNodeCanBeInserted(nodes, node, "GridRuntime.createRow");
+    assertTreeNodeCanBeInserted(nodes, node, operation);
     return new Set(nodes.map((existing) => existing.rowKey));
   }
 
@@ -202,7 +220,14 @@ export function createMutationRuntime(args: {
     }
   }
 
-  return { requireWritable, writeCell, applyChanges, createRow, removeRow };
+  return {
+    requireWritable,
+    writeCell,
+    applyChanges,
+    createRow,
+    addSavedRow,
+    removeRow,
+  };
 }
 
 function readCellValue(

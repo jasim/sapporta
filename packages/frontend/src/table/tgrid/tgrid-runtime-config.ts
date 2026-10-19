@@ -413,7 +413,7 @@ function resolveColumns<
   );
 }
 
-function primaryKeyOf(table: TableSchema, levelId: string): TableColumnSchema {
+export function primaryKeyOf(table: TableSchema, levelId: string): TableColumnSchema {
   const pk = table.columns.find((c) => c.primary);
   if (!pk) {
     throw new Error(
@@ -705,7 +705,7 @@ function buildTableTreeNodes(
   return rows.map((row) => tableTreeNode(row, levelId, rowKeyColumn));
 }
 
-function tableTreeNode(
+export function tableTreeNode(
   row: Readonly<Record<string, unknown>> | undefined,
   levelId: string,
   rowKeyColumn: TableColumnName,

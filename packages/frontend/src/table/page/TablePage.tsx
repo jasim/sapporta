@@ -103,7 +103,7 @@ function TablePageWithSession({
       onNewRecord={
         tableSchema.immutable
           ? undefined
-          : () => navigateToNewRecord(tableSchema.name)
+          : () => navigateToNewRecord(tableSchema.name, searchParams.toString())
       }
       viewRelatedRows={gridOptions?.viewRelatedRows ?? true}
       sessionRef={sessionRef}

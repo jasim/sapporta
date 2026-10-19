@@ -1061,6 +1061,73 @@ describe("restLevelSource — createNode", () => {
   });
 });
 
+describe("restLevelSource — addSavedNode", () => {
+  async function readyWritable(
+    extra: Partial<RestLevelSourceOpts<TestFilter>> = {},
+  ): Promise<WritableTestSource> {
+    const src = restLevelSource(
+      baseOpts({
+        patchCell: async () => ({ kind: "value", value: 0 }),
+        insertNode: async (req) => req.node,
+        removeNode: async () => {},
+        ...extra,
+      }),
+    );
+    requireWrite(src);
+    await flush();
+    await flush();
+    return src as WritableTestSource;
+  }
+
+  it("adds a saved row to the loaded rows without saving it", async () => {
+    const insertNode = vi.fn(
+      async (request: { node: TreeNode }) => request.node,
+    );
+    const fetchPage = vi.fn(async () => ({ nodes: fixtureNodes() }));
+    const src = await readyWritable({ insertNode, fetchPage });
+    const saved: TreeNode = {
+      rowKey: "z",
+      levelName: "rows",
+      columns: { id: "z", v: 26 },
+    };
+
+    expect(src.write.addSavedNode!(saved, 0)).toEqual({
+      node: saved,
+      atIndex: 0,
+    });
+
+    expect(src.state().snapshot.nodes.map((node) => node.rowKey)).toEqual([
+      "z",
+      "a",
+      "b",
+      "c",
+    ]);
+    expect(insertNode).not.toHaveBeenCalled();
+    expect(fetchPage).toHaveBeenCalledTimes(1);
+
+    // The next read replaces the loaded rows.
+    await src.query!.refetch!();
+    expect(src.state().snapshot.nodes.map((node) => node.rowKey)).toEqual([
+      "a",
+      "b",
+      "c",
+    ]);
+  });
+
+  it("rejects a row that is already loaded", async () => {
+    const src = await readyWritable();
+    const before = src.state().snapshot;
+    expect(() =>
+      src.write.addSavedNode!({
+        rowKey: "a",
+        levelName: "rows",
+        columns: { id: "a", v: 1 },
+      }),
+    ).toThrow('duplicate TreeNode.rowKey "a"');
+    expect(src.state().snapshot).toBe(before);
+  });
+});
+
 describe("restLevelSource — removeNode", () => {
   async function readyWritable(
     extra: Partial<RestLevelSourceOpts<TestFilter>> = {},

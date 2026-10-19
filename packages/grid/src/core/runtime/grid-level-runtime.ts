@@ -170,6 +170,16 @@ export type GridLevelRuntime = {
   applyChanges(changes: readonly CellChange[]): void;
   /** Creates a source row after validating its level and row identity. */
   createRow(node: TreeNode, atIndex?: number): Promise<CreateNodeResult>;
+  /**
+   * Adds a row that was saved elsewhere, such as by a form, to this level's
+   * loaded rows at `atIndex` (the end when omitted), without saving it again
+   * and without reading the rows again. The rows around it keep their places
+   * until the next read, which puts the row where its sort and filters put
+   * it. Returns false when the level's source cannot add rows this way: a
+   * readonly source, one without `write.addSavedNode`, or one whose row
+   * identity is invalid.
+   */
+  addSavedRow(node: TreeNode, atIndex?: number): boolean;
   /** Removes one current data row and preserves a valid cursor landing. */
   removeRow(rowKey: RowKey): Promise<void>;
 
@@ -331,6 +341,7 @@ export function createGridLevelRuntime(args: {
     writeCell: command(args.ports.writeCell),
     applyChanges: command(args.ports.applyChanges),
     createRow: asyncCommand(args.ports.createRow),
+    addSavedRow: command(args.ports.addSavedRow),
     removeRow: asyncCommand(args.ports.removeRow),
     drafts: Object.freeze({
       get: command(drafts.get),

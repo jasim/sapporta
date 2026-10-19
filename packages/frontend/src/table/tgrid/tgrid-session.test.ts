@@ -817,4 +817,102 @@ describe("TGridSession", () => {
       session.dispose();
     }
   });
+
+  describe("showRow on a paged table", () => {
+    // Page 2 of the orders, sorted by customer, is loaded. The saved row
+    // sorts onto another page.
+    function pagedSession() {
+      const rowsClient: TableRowsClient = {
+        fetch: vi.fn(async ({ page }) => ({
+          data: [
+            { id: 3, customer: "Core", status: "open" },
+            { id: 4, customer: "Dale", status: "open" },
+          ],
+          meta: { total: 6, page, limit: 2, pages: 3 },
+        })),
+        create: vi.fn(async (_table, data) => ({ data })),
+        update: vi.fn(async (_table, _id, data) => ({ data })),
+        remove: vi.fn(async (_table, id) => ({ data: { id } })),
+      };
+      const onQueryUrlChange = vi.fn();
+      const session = createTGridSession<RowsByLevel>(
+        defineTGrid<RowsByLevel>({
+          rootLevel: "orders",
+          levels: {
+            orders: {
+              table: ordersTable,
+              childLevels: [],
+              query: { owner: "host", pageSize: 2 },
+              rowsClient,
+            },
+          },
+        }),
+        {
+          onQueryUrlChange,
+          routeQuerySeeds: {
+            orders: {
+              page: 2,
+              sort: [{ colId: "customer", direction: "asc" }],
+            },
+          },
+        },
+      );
+      return { session, fetch: rowsClient.fetch, onQueryUrlChange };
+    }
+
+    it("pins a saved row on another page at the top of the loaded page", async () => {
+      const { session, fetch, onQueryUrlChange } = pagedSession();
+      try {
+        const saved = { id: 9, customer: "Acme", status: "open" };
+
+        expect(await session.showRow("9", { savedRow: saved })).toBe("shown");
+
+        // The page the user is on stays; the saved row joins it at the top,
+        // without the rows being read again.
+        expect(session.getVisibleRows().map((row) => row.id)).toEqual([
+          9, 3, 4,
+        ]);
+        expect(fetch).toHaveBeenCalledTimes(1);
+        expect(session.getQueryState().page).toBe(2);
+        expect(onQueryUrlChange).not.toHaveBeenCalled();
+        expect(cursorManagerFor(session.runtime).currentCellCursor()).toEqual(
+          expect.objectContaining({
+            rowId: makeRowId(rootPath("orders"), "9"),
+          }),
+        );
+
+        // The next read places rows by sort again.
+        await session.reloadRows();
+        expect(session.getVisibleRows().map((row) => row.id)).toEqual([3, 4]);
+      } finally {
+        session.dispose();
+      }
+    });
+
+    it("focuses a saved row the loaded page already holds in place", async () => {
+      const { session } = pagedSession();
+      try {
+        const saved = { id: 4, customer: "Dale", status: "open" };
+        expect(await session.showRow("4", { savedRow: saved })).toBe("shown");
+        expect(session.getVisibleRows().map((row) => row.id)).toEqual([3, 4]);
+        expect(cursorManagerFor(session.runtime).currentCellCursor()).toEqual(
+          expect.objectContaining({
+            rowId: makeRowId(rootPath("orders"), "4"),
+          }),
+        );
+      } finally {
+        session.dispose();
+      }
+    });
+
+    it("finds no row on another page without the saved row", async () => {
+      const { session } = pagedSession();
+      try {
+        expect(await session.showRow("9")).toBe("not-found");
+        expect(session.getVisibleRows().map((row) => row.id)).toEqual([3, 4]);
+      } finally {
+        session.dispose();
+      }
+    });
+  });
 });

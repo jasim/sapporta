@@ -2,8 +2,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { TableSchema } from "@sapporta/shared/contracts";
 import { setNavigate } from "../../app/router/router-bridge";
 import { useSchemaStore } from "../../schema-catalog/state/schema-store";
-import { showTableRowState } from "../page/show-table-row";
-import { createRecord } from "./record-actions";
+import { showTableRowState, tableReturnState } from "../page/show-table-row";
+import { createRecord, navigateToNewRecord } from "./record-actions";
 
 const { createTableRow } = vi.hoisted(() => ({ createTableRow: vi.fn() }));
 vi.mock("../api/rows", () => ({ createTableRow }));
@@ -39,7 +39,25 @@ describe("createRecord", () => {
 
     expect(navigate).toHaveBeenCalledWith("/tables/orders", {
       replace: true,
-      state: showTableRowState("orders", "050505"),
+      state: showTableRowState("orders", "050505", {
+        id: "050505",
+        customer: "sample",
+      }),
     });
+  });
+});
+
+describe("navigateToNewRecord", () => {
+  it("carries the table page's query string to the form", () => {
+    const navigate = vi.fn();
+    setNavigate(navigate);
+
+    navigateToNewRecord("orders", "page=3&sort=-customer");
+    expect(navigate).toHaveBeenCalledWith("/tables/orders/new", {
+      state: tableReturnState("page=3&sort=-customer"),
+    });
+
+    navigateToNewRecord("orders");
+    expect(navigate).toHaveBeenLastCalledWith("/tables/orders/new", undefined);
   });
 });

@@ -8,28 +8,45 @@ import { tableRowKey } from "../tgrid/tgrid-runtime-config";
 // Opening a table at one of its rows. A page that creates a row navigates to
 // its table with `showTableRowState` as the location state; the table page
 // then shows that row once its rows have loaded: the cursor on it, the
-// branches above it open, a search or filter that leaves it out cleared.
+// branches above it open. On a flat table that has not loaded the row, the
+// saved row joins the top of the loaded rows.
+
+export type TableRowToShow = {
+  rowKey: string;
+  /** The row as the table API saved it, when the page that saved it has it. */
+  savedRow?: Readonly<Record<string, unknown>>;
+};
 
 export type ShowTableRowState = {
-  showTableRow: { table: string; rowKey: string };
+  showTableRow: TableRowToShow & { table: string };
 };
 
 /** Location state that asks a table's page to show one of its rows. */
 export function showTableRowState(
   table: string,
   rowKey: string,
+  savedRow?: Readonly<Record<string, unknown>>,
 ): ShowTableRowState {
-  return { showTableRow: { table, rowKey } };
+  return {
+    showTableRow: { table, rowKey, ...(savedRow ? { savedRow } : {}) },
+  };
 }
 
 /** The row a location asks this table to show, if any. */
-export function tableRowToShow(state: unknown, table: string): string | null {
+export function tableRowToShow(
+  state: unknown,
+  table: string,
+): TableRowToShow | null {
   if (typeof state !== "object" || state === null) return null;
   const request = (state as Partial<ShowTableRowState>).showTableRow;
   if (typeof request !== "object" || request === null) return null;
-  return request.table === table && typeof request.rowKey === "string"
-    ? request.rowKey
-    : null;
+  if (request.table !== table || typeof request.rowKey !== "string") {
+    return null;
+  }
+  const savedRow = request.savedRow;
+  return typeof savedRow === "object" && savedRow !== null
+    ? { rowKey: request.rowKey, savedRow }
+    : { rowKey: request.rowKey };
 }
 
 /**
@@ -44,7 +61,30 @@ export function showCreatedRowState(
   const row = Array.isArray(created) ? created[0] : created;
   const primaryKey = table.columns.find((column) => column.primary);
   const rowKey = primaryKey && row ? tableRowKey(row, primaryKey.name) : null;
-  return rowKey === null ? undefined : showTableRowState(table.name, rowKey);
+  return rowKey === null || !row
+    ? undefined
+    : showTableRowState(table.name, rowKey, row);
+}
+
+// Coming back to a table page. The New record form opens with the table
+// page's query string in its location state, and goes back to the table with
+// it, so the user returns to the page, sort, search and filters they left.
+
+export type TableReturnState = { tableSearch: string };
+
+/** Location state for a page that returns to a table page with `search`. */
+export function tableReturnState(search: string): TableReturnState {
+  return { tableSearch: search };
+}
+
+/** The table page URL to return to from a location with `state`. */
+export function tableReturnUrl(table: string, state: unknown): string {
+  const search =
+    typeof state === "object" && state !== null
+      ? (state as Partial<TableReturnState>).tableSearch
+      : undefined;
+  const query = typeof search === "string" ? search.replace(/^\?/, "") : "";
+  return `/tables/${table}${query ? `?${query}` : ""}`;
 }
 
 /**
@@ -58,7 +98,9 @@ export function useShowTableRowFromLocation<
 >(table: string, session: TGridSession<RowsByLevel, AppServices> | null) {
   const location = useLocation();
   const navigate = useNavigate();
-  const rowKey = tableRowToShow(location.state, table);
+  const request = tableRowToShow(location.state, table);
+  const rowKey = request?.rowKey ?? null;
+  const savedRow = request?.savedRow;
   // Strict Mode runs the effect twice for one location; show the row once.
   const shownFor = useRef<string | null>(null);
 
@@ -70,13 +112,17 @@ export function useShowTableRowFromLocation<
       { pathname: location.pathname, search: location.search },
       { replace: true, state: null },
     );
-    void session.showRow(rowKey, { clearQueryIfHidden: true });
+    void session.showRow(rowKey, {
+      savedRow,
+      clearQueryIfHidden: true,
+    });
   }, [
     location.key,
     location.pathname,
     location.search,
     navigate,
     rowKey,
+    savedRow,
     session,
   ]);
 }

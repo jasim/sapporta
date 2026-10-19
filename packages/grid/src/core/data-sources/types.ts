@@ -151,6 +151,13 @@ export type WriteCapability = {
     atIndex?: number,
   ) => Promise<CreateNodeResult>;
   readonly removeNode: (rowKey: RowKey) => void | Promise<void>;
+  // Adds a row that was saved elsewhere, such as by a form, to the loaded
+  // rows without saving it again. The next read replaces the loaded rows, and
+  // the row then shows wherever that read puts it.
+  readonly addSavedNode?: (
+    node: TreeNode,
+    atIndex?: number,
+  ) => CreateNodeResult;
   readonly onReconcile: (fn: (event: ReconcileEvent) => void) => () => void;
   readonly canAppendRow?: () => boolean;
 };

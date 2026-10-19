@@ -875,6 +875,22 @@ export function restLevelSource<F = unknown>(
     return Object.freeze({ node: serverNode, atIndex: idx });
   };
 
+  const addSavedNode: WriteCapability["addSavedNode"] = (node, atIndex) => {
+    const savedNode = snapshotTreeNode(node, structuralSnapshots);
+    rowKeyOfTreeNode(savedNode, "restLevelSource.addSavedNode input");
+    assertTreeNodeCanBeInserted(
+      nodes,
+      savedNode,
+      "restLevelSource.addSavedNode input",
+    );
+    const idx = atIndex === undefined ? nodes.length : atIndex;
+    const next = nodes.slice();
+    next.splice(idx, 0, savedNode);
+    nodes = Object.freeze(next);
+    publishDataMutation();
+    return Object.freeze({ node: savedNode, atIndex: idx });
+  };
+
   const removeNode: WriteCapability["removeNode"] = async (rowKey) => {
     await opts.removeNode!({ rowKey });
     if (disposed) return;
@@ -900,6 +916,7 @@ export function restLevelSource<F = unknown>(
       applyChanges,
       createNode,
       removeNode,
+      addSavedNode,
       onReconcile,
       canAppendRow: () => {
         const req = displayRequest ?? request();

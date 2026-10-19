@@ -1,7 +1,7 @@
 import { useMemo, type FormEvent } from "react";
 import { useForm } from "@tanstack/react-form";
 import { useQueryClient } from "@tanstack/react-query";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { ArrowLeft, Loader2 } from "lucide-react";
 import type { TableSchema } from "@sapporta/shared/contracts";
 import { ApiError } from "@sapporta/shared/client";
@@ -25,14 +25,16 @@ import {
 import { createTableRow } from "../api/rows";
 import { tableQueryKeys } from "../query";
 import { reloadTGridRows } from "../tgrid/tgrid-session-registry";
-import { showCreatedRowState } from "../page/show-table-row";
+import { showCreatedRowState, tableReturnUrl } from "../page/show-table-row";
 import { useLookupStore } from "../../lookup";
 
 export function NewRecordPage({ tableSchema }: { tableSchema: TableSchema }) {
   const navigate = useNavigate();
+  const location = useLocation();
   const queryClient = useQueryClient();
   const tableLabel = tableSchema.label ?? tableSchema.name;
-  const tableUrl = `/tables/${tableSchema.name}`;
+  // Back to the page, sort, search and filters the table had.
+  const tableUrl = tableReturnUrl(tableSchema.name, location.state);
   const lookups = useLookupStore();
   const formFields = useMemo(
     () => buildRecordFormFields({ table: tableSchema, lookups }),
@@ -57,7 +59,8 @@ export function NewRecordPage({ tableSchema }: { tableSchema: TableSchema }) {
         await queryClient.invalidateQueries({
           queryKey: tableQueryKeys.table(tableSchema.name),
         });
-        // The table opens on the new row when it is on the loaded rows.
+        // The table opens on the new row, at the top of the page the user
+        // left when that page doesn't already hold it.
         navigate(tableUrl, {
           replace: true,
           state: showCreatedRowState(tableSchema, data),

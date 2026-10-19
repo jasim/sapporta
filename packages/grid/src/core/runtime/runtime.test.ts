@@ -2237,6 +2237,77 @@ describe("GridRuntime", () => {
     });
   });
 
+  it("addSavedRow adds a saved row without saving it or emitting mutationCommitted", () => {
+    const mutation = vi.fn();
+    const mutable = mutableWritableSource({ nodes: tableNodes() });
+    const addSavedNode: NonNullable<WriteCapability["addSavedNode"]> = (
+      node,
+      atIndex = 0,
+    ) => {
+      const nodes = mutable.source.state().snapshot.nodes.slice();
+      nodes.splice(atIndex, 0, node);
+      mutable.publish({ nodes });
+      return { node, atIndex };
+    };
+    const createNode = vi.spyOn(mutable.source.write, "createNode");
+    const source: WritableTestSource = {
+      ...mutable.source,
+      write: { ...mutable.source.write, addSavedNode },
+    };
+    const rt = createGridRuntime({
+      schema: tableSchema,
+      dataSource: dataSourceWithRoot(source),
+      on: { mutationCommitted: mutation },
+    });
+    const node: TreeNode = {
+      rowKey: "c",
+      levelName: "rows",
+      columns: { id: "c", name: "Cherry", qty: 3 },
+    };
+
+    expect(rt.root.addSavedRow(node, 0)).toBe(true);
+    expect(
+      rt.root.data.state().snapshot.nodes.map((n) => n.columns.id),
+    ).toEqual(["c", "a", "b"]);
+    expect(createNode).not.toHaveBeenCalled();
+    expect(mutation).not.toHaveBeenCalled();
+
+    expect(() => rt.root.addSavedRow(node)).toThrow(
+      'GridRuntime.addSavedRow: duplicate TreeNode.rowKey "c"',
+    );
+  });
+
+  it("addSavedRow returns false for a source that cannot add a saved row", () => {
+    const node: TreeNode = {
+      rowKey: "c",
+      levelName: "rows",
+      columns: { id: "c", name: "Cherry", qty: 3 },
+    };
+    // A writable source without `write.addSavedNode`.
+    const withoutAddSaved = createGridRuntime({
+      schema: tableSchema,
+      dataSource: tableDataSource(),
+    });
+    expect(withoutAddSaved.root.addSavedRow(node)).toBe(false);
+
+    const memory = inMemoryLevelSource({
+      initialNodes: tableNodes(),
+      columns: tableSchema.levels.rows.columns,
+      sortMode: "none",
+      filterMode: "none",
+      paginationMode: "none",
+    });
+    const readonly = createGridRuntime({
+      schema: tableSchema,
+      dataSource: dataSourceWithRoot({
+        state: memory.state,
+        subscribe: memory.subscribe,
+        dispose: memory.dispose,
+      }),
+    });
+    expect(readonly.root.addSavedRow(node)).toBe(false);
+  });
+
   it("plans and applies cursor continuation before a row removal", async () => {
     const rt = createGridRuntime({
       schema: tableSchema,

@@ -21,6 +21,8 @@ import type { TableSchema } from "@sapporta/shared/contracts";
 import { sortOrderEqual } from "@sapporta/grid";
 import {
   compileTGridRuntimeConfig,
+  primaryKeyOf,
+  tableTreeNode,
   type TGridDefinition,
 } from "./tgrid-runtime-config";
 import type { TGridFilter } from "./tgrid-filter";
@@ -154,12 +156,16 @@ export type TGridSession<
   /**
    * Shows one root row: puts the cursor on it, opens the tree branches above
    * it and scrolls it into view. Use it after creating a row, so the user
-   * sees where it landed. The rows are read again when the table doesn't
-   * have the row yet. With `clearQueryIfHidden`, a search or filter that
-   * leaves the row out is cleared, and the URL follows; when clearing does
-   * not bring the row, the search and filters are put back. Resolves to
-   * `"not-found"` when the row is still not on screen, such as a row on
-   * another page of a paged table.
+   * sees where it landed. On a flat table, pass the row as the table API
+   * saved it as `savedRow`: when the loaded rows don't include it, it joins
+   * them at the top, and the other rows keep their places. It stays there
+   * until the rows are read again, such as on reload or a change of page,
+   * sort, search or filter. Otherwise the rows are read again when the
+   * table doesn't have the row yet. With `clearQueryIfHidden`, a search or
+   * filter that leaves the row out is then cleared, and the URL follows;
+   * when clearing does not bring the row, the search and filters are put
+   * back. Resolves to `"not-found"` when the row is still not on screen,
+   * such as a row on another page of a paged table.
    */
   showRow(
     rowKey: string,
@@ -189,6 +195,9 @@ export type TGridSession<
 };
 
 export type TGridShowRowOptions = {
+  /** The row as the table API saved it. A flat table that has not loaded
+   *  the row shows it at the top of its loaded rows. */
+  savedRow?: Readonly<Record<string, unknown>>;
   /** Clear the search and filters when they leave the row out. */
   clearQueryIfHidden?: boolean;
 };
@@ -224,6 +233,7 @@ class DefaultTGridSession<
 > implements TGridSession<RowsByLevel, AppServices> {
   readonly rootLevel: TGridLevelId<RowsByLevel>;
   readonly rootTableName: string;
+  private readonly rootRowKeyColumn: string;
   private readonly liveInputsRef: TGridLiveInputsRef<RowsByLevel, AppServices>;
   private readonly rootGridPath: GridPath;
   private readonly queryStoresByLevel = new Map<
@@ -253,6 +263,10 @@ class DefaultTGridSession<
     this.liveInputsRef = liveInputsRef;
     this.rootLevel = definition.rootLevel;
     this.rootTableName = definition.levels[definition.rootLevel].table.name;
+    this.rootRowKeyColumn = primaryKeyOf(
+      definition.levels[definition.rootLevel].table,
+      definition.rootLevel,
+    ).name;
     this.lookups = createLookupStore();
     this.lookupForColumn = (column) => this.lookups.foreignKey(column);
     this.columnMapper = createTGridColumnMapper({ lookups: this.lookups });
@@ -399,6 +413,12 @@ class DefaultTGridSession<
     const settled = await this.rootRowsSettled();
     if (this.disposed) return "not-found";
     if (settled && focus()) return "shown";
+    // A flat table keeps the rows the user is looking at, such as the page
+    // they are on: the saved row joins them at the top rather than the table
+    // reading its rows again to place it by sort.
+    if (settled && options.savedRow && this.addSavedRootRow(options.savedRow)) {
+      return focus() ? "shown" : "not-found";
+    }
     if (!(await this.rootRowsAfter(this.reloadRows()))) return "not-found";
     if (focus()) return "shown";
 
@@ -485,6 +505,19 @@ class DefaultTGridSession<
     for (const stopWaiting of this.settleWaiters) stopWaiting();
     this.runtime.dispose();
     this.lookups.clear();
+  }
+
+  // Adds a saved row to the top of a flat root level's loaded rows. False on a
+  // tree level, whose rows go under their parents, and when the row is already
+  // loaded but could not take the cursor.
+  private addSavedRootRow(row: Readonly<Record<string, unknown>>): boolean {
+    if (this.levelInfoById[this.rootLevel].tree) return false;
+    const node = tableTreeNode(row, this.rootLevel, this.rootRowKeyColumn);
+    const loaded = this.rootSource
+      .state()
+      .snapshot.nodes.some((one) => one.rowKey === node.rowKey);
+    if (loaded) return false;
+    return this.runtime.root.addSavedRow(node, 0);
   }
 
   // True once the root rows are ready, false when they failed to load or the
