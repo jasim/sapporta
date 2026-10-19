@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useCallback, useMemo, useState, type Ref } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import type { TableSchema } from "@sapporta/shared/contracts";
 import { useSchemaStore } from "../../schema-catalog/state/schema-store";
@@ -8,6 +8,9 @@ import {
   type SchemaTableGridViewProps,
 } from "./SchemaTableGridView";
 import { AppPage } from "../../shell/components/Page";
+import type { TGridSession } from "../tgrid/tgrid-session";
+import type { SchemaTableRowsByLevel } from "../tgrid/schema-tgrid";
+import { useShowTableRowFromLocation } from "./show-table-row";
 
 export type TablePageGridOptions = Omit<
   // These values come from the current table route. Pass grid options for
@@ -75,6 +78,18 @@ function TablePageWithSession({
     }),
     [navigate, searchParams, tableName],
   );
+  // A New record form that saved a row opens this page asking to show it.
+  const [session, setSession] =
+    useState<TGridSession<SchemaTableRowsByLevel> | null>(null);
+  const callerSessionRef = gridOptions?.sessionRef;
+  const sessionRef = useCallback(
+    (live: TGridSession<SchemaTableRowsByLevel> | null) => {
+      setSession(live);
+      setRef(callerSessionRef, live);
+    },
+    [callerSessionRef],
+  );
+  useShowTableRowFromLocation(tableName, session);
 
   return (
     <SchemaTableGridView
@@ -91,6 +106,12 @@ function TablePageWithSession({
           : () => navigateToNewRecord(tableSchema.name)
       }
       viewRelatedRows={gridOptions?.viewRelatedRows ?? true}
+      sessionRef={sessionRef}
     />
   );
+}
+
+function setRef<T>(ref: Ref<T> | undefined, value: T | null): void {
+  if (typeof ref === "function") ref(value);
+  else if (ref) ref.current = value;
 }

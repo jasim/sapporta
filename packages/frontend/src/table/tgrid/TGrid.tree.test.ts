@@ -258,3 +258,175 @@ describe("TGrid tree tables", () => {
     expect(session.runtime.root.tree?.childrenOf(id(7))).toEqual([id(8)]);
   });
 });
+
+describe("showing one row of a tree table", () => {
+  // The server's rows, which a test may add to, as a search returns them:
+  // each match with the branches above it.
+  function liveRowsClient(rows: AccountRow[]) {
+    const client = rowsClient();
+    client.fetch.mockImplementation(async (params: FetchTableRowsParams) => {
+      if (!params.search) return page([...rows]);
+      const kept = new Set<number>();
+      for (const match of rows.filter((row) =>
+        row.name.toLowerCase().includes(String(params.search)),
+      )) {
+        let at: AccountRow | undefined = match;
+        while (at) {
+          kept.add(at.id);
+          at = rows.find((row) => row.id === at?.parent_id);
+        }
+      }
+      return page(rows.filter((row) => kept.has(row.id)));
+    });
+    return client;
+  }
+
+  async function mountTree(rows: AccountRow[]) {
+    const client = liveRowsClient(rows);
+    const onQueryUrlChange = vi.fn();
+    const session = createTGridSession(
+      defineTGrid<Rows>({
+        rootLevel: "accounts",
+        levels: {
+          accounts: {
+            table: accountsTable,
+            childLevels: [],
+            rowsClient: client,
+          },
+        },
+      }),
+      { onQueryUrlChange },
+    );
+    sessions.push(session);
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+    await act(async () => {
+      root.render(
+        createElement(TGrid<Rows>, { session, presentation: "tabular" }),
+      );
+      await flush();
+    });
+    mounted = { root, container };
+    return { session, container, client, onQueryUrlChange };
+  }
+
+  async function show(
+    session: TGridSession<Rows>,
+    rowKey: string,
+    options?: { clearQueryIfHidden?: boolean },
+  ) {
+    let result: string | undefined;
+    await act(async () => {
+      result = await session.showRow(rowKey, options);
+      await flush();
+    });
+    return result;
+  }
+
+  it("opens the branches above a loaded row and puts the cursor on it", async () => {
+    const { session, container, client } = await mountTree([...allRows]);
+    await act(async () => session.runtime.root.tree?.collapseAll());
+    expect(rowNames(container)).toEqual(["Expenses", "Income"]);
+    const reads = client.fetch.mock.calls.length;
+
+    expect(await show(session, "6")).toBe("shown");
+
+    expect(rowNames(container)).toEqual([
+      "Expenses",
+      "Taxes",
+      "Federal",
+      "Income",
+    ]);
+    expect(session.activeRow()?.id).toBe(id(6));
+    expect(client.fetch.mock.calls.length).toBe(reads);
+  });
+
+  it("reads the rows again for a row saved after they loaded", async () => {
+    const rows = [...allRows];
+    const { session, client } = await mountTree(rows);
+    const reads = client.fetch.mock.calls.length;
+    rows.push({ id: 8, name: "Salary", parent_id: 7 });
+
+    expect(await show(session, "8")).toBe("shown");
+
+    expect(session.activeRow()?.id).toBe(id(8));
+    expect(client.fetch.mock.calls.length).toBe(reads + 1);
+  });
+
+  it("waits for a read already under way instead of starting another", async () => {
+    const rows = [...allRows];
+    const { session, client } = await mountTree(rows);
+    const reads = client.fetch.mock.calls.length;
+    rows.push({ id: 8, name: "Salary", parent_id: 7 });
+
+    let result: string | undefined;
+    await act(async () => {
+      void session.reloadRows();
+      result = await session.showRow("8");
+      await flush();
+    });
+
+    expect(result).toBe("shown");
+    expect(client.fetch.mock.calls.length).toBe(reads + 1);
+  });
+
+  it("clears a search that leaves the row out, and the URL follows", async () => {
+    const rows = [...allRows];
+    const { session, container, onQueryUrlChange } = await mountTree(rows);
+    await act(async () => {
+      session.queryStore.getState().setSearch("federal");
+      await flush();
+    });
+    rows.push({ id: 8, name: "Salary", parent_id: 7 });
+
+    expect(await show(session, "8", { clearQueryIfHidden: true })).toBe(
+      "shown",
+    );
+
+    expect(session.queryStore.getState().search).toBeNull();
+    expect(onQueryUrlChange).toHaveBeenLastCalledWith(
+      expect.objectContaining({ search: null, filters: [] }),
+    );
+    expect(rowNames(container)).toContain("Salary");
+    expect(session.activeRow()?.id).toBe(id(8));
+  });
+
+  it("keeps the search unless asked to clear it", async () => {
+    const rows = [...allRows];
+    const { session } = await mountTree(rows);
+    await act(async () => {
+      session.queryStore.getState().setSearch("federal");
+      await flush();
+    });
+    rows.push({ id: 8, name: "Salary", parent_id: 7 });
+
+    expect(await show(session, "8")).toBe("not-found");
+
+    expect(session.queryStore.getState().search).toBe("federal");
+    expect(session.activeRow()).toBeNull();
+  });
+
+  it("puts the search back when clearing it does not bring the row", async () => {
+    const { session, onQueryUrlChange } = await mountTree([...allRows]);
+    await act(async () => {
+      session.queryStore.getState().setSearch("federal");
+      await flush();
+    });
+
+    expect(await show(session, "99", { clearQueryIfHidden: true })).toBe(
+      "not-found",
+    );
+
+    expect(session.queryStore.getState().search).toBe("federal");
+    expect(onQueryUrlChange).toHaveBeenLastCalledWith(
+      expect.objectContaining({ search: "federal" }),
+    );
+  });
+
+  it("finds nothing once the session is disposed", async () => {
+    const { session } = await mountTree([...allRows]);
+    session.dispose();
+    expect(await session.showRow("6")).toBe("not-found");
+  });
+});

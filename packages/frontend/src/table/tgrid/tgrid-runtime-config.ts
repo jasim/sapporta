@@ -715,14 +715,14 @@ function tableTreeNode(
       `TGrid row adapter: '${levelId}' returned no authoritative row`,
     );
   }
-  const primaryKey = row[rowKeyColumn];
-  if (primaryKey === null || primaryKey === undefined || primaryKey === "") {
+  const rowKey = tableRowKey(row, rowKeyColumn);
+  if (rowKey === null) {
     throw new Error(
       `TGrid row adapter: '${levelId}' row is missing primary key '${rowKeyColumn}'`,
     );
   }
   return {
-    rowKey: String(primaryKey),
+    rowKey,
     levelName: levelId,
     columns: row,
   };
@@ -776,4 +776,15 @@ function pathForEndpoint(
   }
   const parent = ancestors[ancestors.length - 1];
   return childPath(path, parent.rowKey, levelId);
+}
+
+/** The row key of a table row: its primary key as a string, if it has one. */
+export function tableRowKey(
+  row: Readonly<Record<string, unknown>>,
+  primaryKeyColumn: string,
+): string | null {
+  const value = row[primaryKeyColumn];
+  return value === null || value === undefined || value === ""
+    ? null
+    : String(value);
 }

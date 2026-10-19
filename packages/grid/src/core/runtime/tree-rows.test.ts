@@ -316,6 +316,86 @@ describe("tree levels", () => {
     expect(rt.root.selectedRowIds()).toEqual([id("7")]);
   });
 
+  describe("focusRow", () => {
+    it("opens the branches above a row and puts the cell cursor on it", () => {
+      const rt = createTreeRuntime();
+      const internals = runtimeInternalsFor(rt);
+      treeOf(rt).collapseAll();
+
+      expect(rt.root.focusRow("6", { colId: "parent_id" })).toBe(true);
+
+      expect(displayedKeys(rt.root.displayedRows().rows)).toEqual([
+        "1",
+        "4",
+        "5",
+        "6",
+        "7",
+      ]);
+      expect(internals.cursorManager.currentCellCursor()).toEqual({
+        path,
+        rowId: id("6"),
+        colId: "parent_id",
+      });
+      expect(
+        internals
+          .controllerFor(path)
+          .effects.getState()
+          .map((effect) => effect.type),
+      ).toContain("scrollFocusIntoView");
+    });
+
+    it("keeps the cursor's column, else lands on the first", () => {
+      const rt = createTreeRuntime();
+      const internals = runtimeInternalsFor(rt);
+      expect(rt.root.focusRow("2")).toBe(true);
+      expect(internals.cursorManager.currentCellCursor()?.colId).toBe("name");
+      internals.cursorManager.moveCellCursorTo({
+        path,
+        rowId: id("7"),
+        colId: "parent_id",
+      });
+      expect(rt.root.focusRow("3")).toBe(true);
+      expect(internals.cursorManager.currentCellCursor()).toEqual({
+        path,
+        rowId: id("3"),
+        colId: "parent_id",
+      });
+    });
+
+    it("moves a row cursor and scrolls the row into view in a row list", () => {
+      const rt = createTreeRuntime({ interaction: ROW_PRIMARY_MASTER_DETAIL });
+      const internals = runtimeInternalsFor(rt);
+      const activated = vi.fn();
+      rt.on("rowActivated", activated);
+      treeOf(rt).collapseAll();
+
+      expect(rt.root.focusRow("5")).toBe(true);
+
+      expect(internals.cursorManager.currentRowCursor()).toEqual({
+        path,
+        rowId: id("5"),
+      });
+      expect(
+        internals
+          .controllerFor(path)
+          .effects.getState()
+          .map((effect) => effect.type),
+      ).toContain("scrollRowIntoView");
+      // Finding a row is not the user activating it.
+      expect(activated).not.toHaveBeenCalled();
+    });
+
+    it("answers false and leaves the cursor for a row that is not loaded", async () => {
+      const rt = createTreeRuntime();
+      const internals = runtimeInternalsFor(rt);
+      expect(rt.root.focusRow("2")).toBe(true);
+      expect(rt.root.focusRow("99")).toBe(false);
+      await rt.root.data.query!.filter!.set("federal");
+      expect(rt.root.focusRow("2")).toBe(false);
+      expect(internals.cursorManager.currentCellCursor()?.rowId).toBe(id("2"));
+    });
+  });
+
   describe("row-list keyboard", () => {
     function rowListRuntime() {
       const rt = createTreeRuntime({ interaction: ROW_PRIMARY_MASTER_DETAIL });

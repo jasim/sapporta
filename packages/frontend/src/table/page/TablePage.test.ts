@@ -2,12 +2,15 @@
 
 import { act, createElement, type ReactElement } from "react";
 import { createRoot, type Root } from "react-dom/client";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, useLocation, type Location } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { TableSchema } from "@sapporta/shared/contracts";
 import { useSchemaStore } from "../../schema-catalog/state/schema-store";
 import { TablePage, type TablePageGridOptions } from "./TablePage";
 import type { SchemaTableGridViewProps } from "./SchemaTableGridView";
+import { showTableRowState } from "./show-table-row";
+import type { TGridSession } from "../tgrid/tgrid-session";
+import type { SchemaTableRowsByLevel } from "../tgrid/schema-tgrid";
 
 (
   globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
@@ -63,9 +66,22 @@ const orderLinesTable: TableSchema = {
 };
 
 let mounted: { root: Root; container: HTMLElement } | null = null;
+let location: Location | null = null;
+
+function LocationProbe() {
+  location = useLocation();
+  return null;
+}
 
 async function renderTablePage(
   gridOptions?: TablePageGridOptions,
+  entry:
+    | string
+    | {
+        pathname: string;
+        search?: string;
+        state?: unknown;
+      } = "/tables/orders?page=2",
 ): Promise<SchemaTableGridViewProps> {
   useSchemaStore.getState().setTables([ordersTable, orderLinesTable]);
   const container = document.createElement("div");
@@ -76,7 +92,8 @@ async function renderTablePage(
     root.render(
       createElement(
         MemoryRouter,
-        { initialEntries: ["/tables/orders?page=2"] },
+        { initialEntries: [entry] },
+        createElement(LocationProbe),
         createElement(TablePage, {
           tableName: "orders",
           gridOptions,
@@ -141,5 +158,66 @@ describe("TablePage", () => {
     });
 
     expect(props.viewRelatedRows).toBe(false);
+  });
+
+  describe("opened to show a row", () => {
+    type Session = TGridSession<SchemaTableRowsByLevel>;
+
+    function fakeSession() {
+      const showRow = vi.fn(async () => "shown" as const);
+      return { session: { showRow } as unknown as Session, showRow };
+    }
+
+    async function giveSession(
+      props: SchemaTableGridViewProps,
+      session: Session,
+    ) {
+      const ref = props.sessionRef;
+      if (typeof ref !== "function") throw new Error("no session callback");
+      await act(async () => {
+        ref(session);
+      });
+    }
+
+    it("shows the row once the table has its session, then forgets it", async () => {
+      const props = await renderTablePage(undefined, {
+        pathname: "/tables/orders",
+        search: "?q=sample",
+        state: showTableRowState("orders", "050505"),
+      });
+      const { session, showRow } = fakeSession();
+
+      await giveSession(props, session);
+
+      expect(showRow).toHaveBeenCalledTimes(1);
+      expect(showRow).toHaveBeenCalledWith("050505", {
+        clearQueryIfHidden: true,
+      });
+      expect(location?.pathname).toBe("/tables/orders");
+      expect(location?.search).toBe("?q=sample");
+      expect(location?.state).toBeNull();
+    });
+
+    it("ignores a row another table was asked to show", async () => {
+      const props = await renderTablePage(undefined, {
+        pathname: "/tables/orders",
+        state: showTableRowState("order_lines", "050505"),
+      });
+      const { session, showRow } = fakeSession();
+
+      await giveSession(props, session);
+
+      expect(showRow).not.toHaveBeenCalled();
+    });
+
+    it("still hands the session to a caller's own ref", async () => {
+      const callerRef = { current: null as Session | null };
+      const props = await renderTablePage({ sessionRef: callerRef });
+      const { session } = fakeSession();
+
+      await giveSession(props, session);
+
+      expect(callerRef.current).toBe(session);
+    });
   });
 });

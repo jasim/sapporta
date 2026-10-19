@@ -25,6 +25,7 @@ import {
 import { createTableRow } from "../api/rows";
 import { tableQueryKeys } from "../query";
 import { reloadTGridRows } from "../tgrid/tgrid-session-registry";
+import { showCreatedRowState } from "../page/show-table-row";
 import { useLookupStore } from "../../lookup";
 
 export function NewRecordPage({ tableSchema }: { tableSchema: TableSchema }) {
@@ -51,12 +52,16 @@ export function NewRecordPage({ tableSchema }: { tableSchema: TableSchema }) {
       if (!parsed.ok) return;
 
       try {
-        await createTableRow(tableSchema.name, parsed.value);
+        const { data } = await createTableRow(tableSchema.name, parsed.value);
         reloadTGridRows(tableSchema.name);
         await queryClient.invalidateQueries({
           queryKey: tableQueryKeys.table(tableSchema.name),
         });
-        navigate(tableUrl, { replace: true });
+        // The table opens on the new row when it is on the loaded rows.
+        navigate(tableUrl, {
+          replace: true,
+          state: showCreatedRowState(tableSchema, data),
+        });
       } catch (error: unknown) {
         const fieldIssues = fieldIssuesForSubmissionError(error);
         formApi.setErrorMap({

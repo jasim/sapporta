@@ -85,6 +85,7 @@ export * from "./page/table-level-query";
 export * from "./page/table-page-mode";
 export * from "./page/table-selection";
 export * from "./page/table-view-pref";
+export * from "./page/show-table-row";
 export * from "./tgrid/tgrid-lifecycle";
 export * from "./tgrid/tgrid-source-status";
 export * from "./query";
@@ -101,6 +102,8 @@ export {
   type TGridLoadedRowsBoundaryHandler,
   type TGridRouteQuerySeed,
   type TGridSession,
+  type TGridShowRowOptions,
+  type TGridShowRowResult,
 } from "./tgrid/tgrid-session";
 export {
   reloadTGridRows,

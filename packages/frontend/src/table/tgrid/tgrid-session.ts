@@ -151,6 +151,20 @@ export type TGridSession<
     levelId?: TGridLevelId<RowsByLevel>,
     path?: GridPath,
   ): Promise<SourceLoadResult>;
+  /**
+   * Shows one root row: puts the cursor on it, opens the tree branches above
+   * it and scrolls it into view. Use it after creating a row, so the user
+   * sees where it landed. The rows are read again when the table doesn't
+   * have the row yet. With `clearQueryIfHidden`, a search or filter that
+   * leaves the row out is cleared, and the URL follows; when clearing does
+   * not bring the row, the search and filters are put back. Resolves to
+   * `"not-found"` when the row is still not on screen, such as a row on
+   * another page of a paged table.
+   */
+  showRow(
+    rowKey: string,
+    options?: TGridShowRowOptions,
+  ): Promise<TGridShowRowResult>;
   setLevelSort(
     levelId: TGridLevelId<RowsByLevel>,
     path: GridPath,
@@ -173,6 +187,13 @@ export type TGridSession<
   csvExportUrl(levelId?: TGridLevelId<RowsByLevel>): string;
   dispose(): void;
 };
+
+export type TGridShowRowOptions = {
+  /** Clear the search and filters when they leave the row out. */
+  clearQueryIfHidden?: boolean;
+};
+
+export type TGridShowRowResult = "shown" | "not-found";
 
 // Create a table session outside React, such as in tests or custom mounting code.
 export function createTGridSession<
@@ -219,6 +240,9 @@ class DefaultTGridSession<
   readonly columnMapper: TGridColumnMapper;
   readonly levelInfoById: Record<TGridLevelId<RowsByLevel>, TGridLevelInfo>;
   readonly levels: TGridSessionContext<RowsByLevel, AppServices>["levels"];
+  private disposed = false;
+  // Ends each `rootRowsSettled` wait when the session is disposed.
+  private readonly settleWaiters = new Set<() => void>();
   private activeGridRowSnapshot: GridActiveRow | null = null;
   private activeTGridRowSnapshot: TGridActiveRow<RowsByLevel> | null = null;
 
@@ -358,6 +382,52 @@ class DefaultTGridSession<
     return this.refetchSource(targetPath);
   }
 
+  async showRow(
+    rowKey: string,
+    options: TGridShowRowOptions = {},
+  ): Promise<TGridShowRowResult> {
+    const treeColumn = this.levelInfoById[this.rootLevel].tree?.column;
+    const focus = () =>
+      !this.disposed &&
+      this.runtime.root.focusRow(
+        rowKey,
+        treeColumn ? { colId: treeColumn } : undefined,
+      );
+
+    // A read already under way, such as one the URL started, may bring the
+    // row; wait for it rather than asking for the same rows twice.
+    const settled = await this.rootRowsSettled();
+    if (this.disposed) return "not-found";
+    if (settled && focus()) return "shown";
+    if (!(await this.rootRowsAfter(this.reloadRows()))) return "not-found";
+    if (focus()) return "shown";
+
+    const query = this.queryStore.getState();
+    if (
+      !options.clearQueryIfHidden ||
+      (query.filters.length === 0 && query.search === null)
+    ) {
+      return "not-found";
+    }
+    // Through the session's own filter command, so the URL is written the
+    // way every search and filter change writes it.
+    const cleared = this.setLevelFilter(
+      this.rootLevel,
+      this.rootGridPath,
+      undefined,
+    );
+    if ((await this.rootRowsAfter(cleared)) && focus()) return "shown";
+    // The query was not what hid the row, such as a row on another page of a
+    // paged table, so the user's search and filters come back.
+    if (!this.disposed) {
+      await this.setLevelFilter(this.rootLevel, this.rootGridPath, {
+        conditions: query.filters,
+        search: query.search,
+      });
+    }
+    return "not-found";
+  }
+
   async setLevelSort(
     levelId: TGridLevelId<RowsByLevel>,
     path: GridPath,
@@ -411,8 +481,49 @@ class DefaultTGridSession<
   }
 
   dispose(): void {
+    this.disposed = true;
+    for (const stopWaiting of this.settleWaiters) stopWaiting();
     this.runtime.dispose();
     this.lookups.clear();
+  }
+
+  // True once the root rows are ready, false when they failed to load or the
+  // session was disposed while waiting.
+  private rootRowsSettled(): Promise<boolean> {
+    return new Promise((resolve) => {
+      const settled = (): boolean => {
+        if (this.disposed) {
+          resolve(false);
+          return true;
+        }
+        const { status } = this.rootSource.state();
+        if (status === "initialLoading" || status === "refreshing") {
+          return false;
+        }
+        resolve(status === "ready");
+        return true;
+      };
+      if (settled()) return;
+      const stop = () => {
+        unsubscribe();
+        this.settleWaiters.delete(stop);
+        resolve(false);
+      };
+      const unsubscribe = this.rootSource.subscribe(() => {
+        if (settled()) stop();
+      });
+      this.settleWaiters.add(stop);
+    });
+  }
+
+  // Whether a root load left rows to look at. A load that a newer one replaced
+  // waits for that one.
+  private async rootRowsAfter(
+    load: Promise<SourceLoadResult>,
+  ): Promise<boolean> {
+    const result = await load;
+    if (result.kind === "superseded") return this.rootRowsSettled();
+    return result.kind === "ready" || result.kind === "unchanged";
   }
 
   private createRuntimeLevels(

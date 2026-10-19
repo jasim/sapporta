@@ -134,6 +134,15 @@ export type GridLevelRuntime = {
   extendRowSelectionTo(rowId: RowId): void;
   /** Clears stored independent row selection for this path. */
   clearRowSelection(): void;
+  /**
+   * Puts the cursor on a loaded data row and scrolls it into view. On a tree
+   * level the branches above the row open first, so a row under a collapsed
+   * parent is found too. In a cell grid the cursor lands on `colId`, else on
+   * the column the cursor already has on this level, else on the first
+   * column. Returns false, and leaves the cursor alone, when the level's
+   * loaded rows do not include the row.
+   */
+  focusRow(rowKey: RowKey, options?: { readonly colId?: ColId }): boolean;
 
   /** Reads whether this path currently renders the named row as expanded. */
   isExpanded(rowId: RowId): boolean;
@@ -313,6 +322,7 @@ export function createGridLevelRuntime(args: {
     toggleRowSelection: command(args.ports.toggleRowSelection),
     extendRowSelectionTo: command(args.ports.extendRowSelectionTo),
     clearRowSelection: command(args.ports.clearRowSelection),
+    focusRow: command(args.ports.focusRow),
     isExpanded: command(args.ports.isExpanded),
     subscribeExpansion: subscription(args.ports.subscribeExpansion),
     expand: command(args.ports.expand),

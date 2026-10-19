@@ -1380,6 +1380,19 @@ export function createGridRuntime(args: RuntimeArgs): GridRuntime {
     };
   }
 
+  // The column a cell cursor lands on when it moves onto a row of `path`: the
+  // requested column, else the column the cursor already has on this path,
+  // else the first column. Null when that column is not in the level.
+  function cursorLandingColumn(path: GridPath, colId?: ColId): ColId | null {
+    const columns = schemaForPath(path).columns;
+    const current = coordinator.getState().cellCursor;
+    const landing =
+      colId ?? (current?.path === path ? current.colId : columns[0]?.id);
+    return landing && columns.some((column) => column.id === landing)
+      ? landing
+      : null;
+  }
+
   function activateRow(
     path: GridPath,
     rowId: RowId,
@@ -1399,17 +1412,11 @@ export function createGridRuntime(args: RuntimeArgs): GridRuntime {
     if (interaction.mode === "row-list") {
       cursorManager.moveRowCursorTo({ path, rowId });
     } else {
-      const current = coordinator.getState().cellCursor;
-      const colId =
-        coord?.rowId === rowId
-          ? coord.colId
-          : current?.path === path
-            ? current.colId
-            : schemaForPath(path).columns[0]?.id;
+      const colId = cursorLandingColumn(
+        path,
+        coord?.rowId === rowId ? coord.colId : undefined,
+      );
       if (!colId) return false;
-      if (!schemaForPath(path).columns.some((column) => column.id === colId)) {
-        return false;
-      }
       cursorManager.moveCellCursorTo({ path, rowId, colId });
     }
 
@@ -1418,6 +1425,32 @@ export function createGridRuntime(args: RuntimeArgs): GridRuntime {
       return false;
     }
     emitter.emit("rowActivated", { activeRow: active, trigger });
+    return true;
+  }
+
+  // Moves the cursor without activating the row: finding a row is not a
+  // gesture, so no `rowActivated` handler (a detail sheet, a navigation) runs.
+  function focusRow(path: GridPath, rowKey: RowKey, colId?: ColId): boolean {
+    assertLive();
+    const loaded = sourceStateFor(path).snapshot.nodes.some(
+      (node) => node.rowKey === rowKey,
+    );
+    if (!loaded) return false;
+    const rowId = makeLevelRowId(path, "data", rowKey);
+    if (isTreeLevel(path)) treeExpansion.reveal(path, rowId);
+    const row = displayedRowFor(path, rowId);
+    if (!row || !capabilitiesFor(row.kind).focusable) return false;
+
+    const controller = controllerCursorPortFor(path);
+    if (interaction.mode === "row-list") {
+      cursorManager.moveRowCursorTo({ path, rowId });
+      controller.revealRow(rowId);
+      return true;
+    }
+    const landing = cursorLandingColumn(path, colId);
+    if (!landing) return false;
+    cursorManager.moveCellCursorTo({ path, rowId, colId: landing });
+    controller.revealCell({ rowId, colId: landing });
     return true;
   }
 
@@ -1871,6 +1904,10 @@ export function createGridRuntime(args: RuntimeArgs): GridRuntime {
         clearRowSelection: () => {
           assertLevelLive(path);
           rowInteraction.clearRowSelection(path);
+        },
+        focusRow: (rowKey, options) => {
+          assertLevelLive(path);
+          return focusRow(path, rowKey, options?.colId);
         },
         isExpanded: (rowId) => {
           assertLevelLive(path);
