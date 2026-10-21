@@ -98,6 +98,11 @@ export function RecordDetailSheet<
     if (missing) onClose();
   }, [missing, onClose]);
 
+  const rowValues = row && row.kind === "data" ? row.columns : null;
+  const primaryKey = table?.columns.find((column) => column.primary)?.name;
+  const rowId = rowValues && primaryKey ? rowValues[primaryKey] : undefined;
+  const recordId = isLookupValue(rowId) ? rowId : undefined;
+
   const fields = useMemo(
     () =>
       level && table
@@ -106,9 +111,10 @@ export function RecordDetailSheet<
             columns: level.schema.columns,
             columnMapper: session.columnMapper,
             lookups: session.lookups,
+            ...(recordId !== undefined ? { rowId: recordId } : {}),
           })
         : [],
-    [level, session, table],
+    [level, session, table, recordId],
   );
 
   const [editing, setEditing] = useState<FieldEditState | null>(null);
@@ -137,9 +143,6 @@ export function RecordDetailSheet<
   }
 
   const open = target !== null && !missing;
-  const rowValues = row && row.kind === "data" ? row.columns : null;
-  const primaryKey = table?.columns.find((column) => column.primary)?.name;
-  const rowId = rowValues && primaryKey ? rowValues[primaryKey] : undefined;
   const slotRow =
     table && rowValues && isLookupValue(rowId)
       ? { store: session.lookups, table: table.name, id: rowId, row: rowValues }

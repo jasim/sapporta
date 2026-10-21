@@ -1,4 +1,5 @@
 import type { CellEditorProps, ColumnSchema } from "../core/types/schema";
+import type { LevelRow } from "../core/types/level-row";
 import type {
   BuiltInColumnPresetKind,
   ColumnAlign,
@@ -73,12 +74,14 @@ export type LookupPreset = PresetBase & {
   kind: "lookupValue";
   lookup: LookupCapabilities;
   renderEntry?: LookupEntryRenderer;
+  lookupForRow?: (row: LevelRow) => LookupCapabilities | undefined;
 };
 
 export type ForeignKeyPreset = PresetBase & {
   kind: "foreignKey";
   lookup: LookupCapabilities;
   renderEntry?: LookupEntryRenderer;
+  lookupForRow?: (row: LevelRow) => LookupCapabilities | undefined;
 };
 
 export type CustomPreset = PresetBase & {
@@ -140,4 +143,16 @@ export function lookupCapabilities(
 ): LookupCapabilities | undefined {
   if ("lookup" in preset) return preset.lookup;
   return undefined;
+}
+
+/** The choices a lookup column's editor offers for `row`: its
+ *  `lookupForRow`, or the column's lookup. */
+export function rowLookupCapabilities(
+  preset: ColumnPreset,
+  row: LevelRow,
+): LookupCapabilities | undefined {
+  if ("lookupForRow" in preset && preset.lookupForRow) {
+    return preset.lookupForRow(row) ?? lookupCapabilities(preset);
+  }
+  return lookupCapabilities(preset);
 }

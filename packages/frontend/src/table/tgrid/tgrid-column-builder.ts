@@ -179,6 +179,9 @@ export function buildTGridColumnsForTable<
       column: applyTableColumnOptions(tableColumn, spec.options),
       immutable: args.immutable,
       display,
+      ...(args.table.tree?.parentColumn === spec.columnName
+        ? { treeParent: { rowKeyColumn: args.rowKeyColumn } }
+        : {}),
     });
     // Display slots draw below the view's own `renderCell`, which stays the
     // most specific override: the label slot on the label column, then the

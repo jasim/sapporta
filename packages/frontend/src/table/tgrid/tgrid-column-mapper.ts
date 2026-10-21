@@ -14,7 +14,9 @@ import type {
   CellRenderProps,
   ColId,
   ColumnSchema as GridColumnSchema,
+  LevelRow,
 } from "@sapporta/grid";
+import type { LookupCapabilities } from "@sapporta/grid/lookup";
 import {
   columnPreset,
   columnPresetWidthForSizing,
@@ -59,6 +61,10 @@ export type TGridColumnMapper = {
     column: TableColumnSchema;
     immutable: boolean;
     display?: TGridColumnDisplay;
+    /** Set when this column holds the parent of a tree table's row. Its
+     *  editor then leaves out the row itself and the rows below it, which
+     *  would make a loop. */
+    treeParent?: { rowKeyColumn: string };
   }): GridColumnSchema;
   /**
    * Draws the level's own label column (the first visible row-label column,
@@ -130,6 +136,10 @@ function columnFor(
     column: TableColumnSchema;
     immutable: boolean;
     display?: TGridColumnDisplay;
+    /** Set when this column holds the parent of a tree table's row. Its
+     *  editor then leaves out the row itself and the rows below it, which
+     *  would make a loop. */
+    treeParent?: { rowKeyColumn: string };
   },
 ): GridColumnSchema {
   // Schema-declared cell links (FK drill-up and author-declared links)
@@ -241,6 +251,22 @@ function columnSlotColumnFor(
 
 // The server's row label rule: the non-empty label column values joined by a
 // space, else the primary key.
+// The parent choices for one row of a tree table: every row except the row
+// itself and the rows below it.
+function parentChoicesFor(
+  rowData: RowDataStore,
+  tableName: string,
+  rowKeyColumn: string,
+): (row: LevelRow) => LookupCapabilities | undefined {
+  return (row) => {
+    if (row.kind !== "data") return undefined;
+    const id = row.columns[rowKeyColumn];
+    return typeof id === "string" || typeof id === "number"
+      ? rowData.table(tableName, { notUnder: id })
+      : undefined;
+  };
+}
+
 function rowLabelOf(
   row: Readonly<Record<string, unknown>>,
   labelColumns: readonly string[],
@@ -261,6 +287,10 @@ function presetColumnFor(
     column: TableColumnSchema;
     immutable: boolean;
     display?: TGridColumnDisplay;
+    /** Set when this column holds the parent of a tree table's row. Its
+     *  editor then leaves out the row itself and the rows below it, which
+     *  would make a loop. */
+    treeParent?: { rowKeyColumn: string };
   },
 ): GridColumnSchema {
   const { tableName, column, immutable } = args;
@@ -317,6 +347,15 @@ function presetColumnFor(
                 source: { table: tableName, column: column.name },
                 hierarchyShown: args.display?.hierarchyShown ?? false,
               }),
+            }
+          : {}),
+        ...(rowData && referenced && args.treeParent
+          ? {
+              lookupForRow: parentChoicesFor(
+                rowData,
+                referenced,
+                args.treeParent.rowKeyColumn,
+              ),
             }
           : {}),
       });

@@ -15,8 +15,13 @@ import type {
   LevelSnapshot,
   SourceLoadResult,
 } from "../core/data-sources/types";
-import type { TreeNode } from "../core/types/level-row";
-import type { LookupEntry, SearchLookup, ValueLookup } from "../lookup";
+import type { LevelRow, TreeNode } from "../core/types/level-row";
+import type {
+  LookupCapabilities,
+  LookupEntry,
+  SearchLookup,
+  ValueLookup,
+} from "../lookup";
 import type { ColumnPreset } from "./preset";
 import type { ColumnSizingOptions } from "./column-sizing";
 
@@ -220,4 +225,10 @@ export type LookupColumnOptions<TMeta = unknown> =
     valueLookup: ValueLookup;
     searchLookup?: SearchLookup;
     renderEntry?: LookupEntryRenderer;
+    /**
+     * The choices the editor offers for one row, when they differ by row,
+     * such as a parent column that must leave out the row itself. Cells
+     * still read their labels from `valueLookup`.
+     */
+    lookupForRow?: (row: LevelRow) => LookupCapabilities | undefined;
   };

@@ -1,13 +1,18 @@
 import { describe, expect, it } from "vitest";
 import type { ColumnSchema } from "@sapporta/shared/contracts";
-import { parse, preset } from "@sapporta/grid/column-preset";
+import {
+  parse,
+  preset,
+  rowLookupCapabilities,
+} from "@sapporta/grid/column-preset";
+import type { LevelRow } from "@sapporta/grid";
 import { StaticSearchLookup, StaticValueLookup } from "@sapporta/grid/lookup";
 import {
   createTGridColumnMapper,
   tableColumnPresetWidth,
 } from "./tgrid-column-mapper";
 import type { LookupCapabilities } from "@sapporta/grid/lookup";
-import type { LookupStore } from "../../lookup";
+import { createLookupStore, type LookupStore } from "../../lookup";
 import { setAppTimeZone } from "../../platform/app-time-zone";
 
 // Boot publishes the workspace zone before any screen renders; these tests
@@ -37,6 +42,40 @@ function mapColumn(column: ColumnSchema, immutable = false) {
 }
 
 describe("TGridColumnMapper.columnFor", () => {
+  it("leaves a row and its descendants out of its tree parent's choices", () => {
+    const store = createLookupStore({ tables: () => [] });
+    const mapper = createTGridColumnMapper({ lookups: store, rowData: store });
+    const parentColumn: ColumnSchema = {
+      name: "parent_id",
+      label: "Parent",
+      kind: "number",
+      foreignKey: { table: "accounts", column: "id" },
+    };
+    const mapped = mapper.columnFor({
+      tableName: "accounts",
+      column: parentColumn,
+      immutable: false,
+      treeParent: { rowKeyColumn: "id" },
+    });
+    const row = {
+      kind: "data",
+      columns: { id: 7, parent_id: 2 },
+    } as unknown as LevelRow;
+
+    expect(rowLookupCapabilities(preset(mapped)!, row)).toBe(
+      store.table("accounts", { notUnder: 7 }),
+    );
+
+    const plain = mapper.columnFor({
+      tableName: "accounts",
+      column: parentColumn,
+      immutable: false,
+    });
+    expect(rowLookupCapabilities(preset(plain)!, row)?.searchLookup).toBe(
+      store.table("accounts").searchLookup,
+    );
+  });
+
   it("maps every table display type to the matching preset kind", () => {
     const tableColumns = [
       { name: "id", label: "ID", primary: true, kind: "number" },

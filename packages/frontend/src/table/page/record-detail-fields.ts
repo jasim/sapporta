@@ -24,7 +24,7 @@ import {
   formatText,
   formatTimestamp,
 } from "@sapporta/grid/column-preset";
-import { isLookupValue } from "@sapporta/grid/lookup";
+import { isLookupValue, type LookupValue } from "@sapporta/grid/lookup";
 import type { TableSchema } from "@sapporta/shared/contracts";
 import {
   formatInstantForDateTimeLocalInput,
@@ -54,11 +54,15 @@ export function buildRecordDetailFields(args: {
   columns: readonly GridColumnSchema[];
   columnMapper: TGridColumnMapper;
   lookups: LookupStore;
+  /** The record the sheet shows, for fields whose choices depend on it. */
+  rowId?: LookupValue;
 }): RecordDetailField[] {
   const formModels = new Map(
-    buildRecordFormFields({ table: args.table, lookups: args.lookups }).map(
-      (field) => [field.column.name, field],
-    ),
+    buildRecordFormFields({
+      table: args.table,
+      lookups: args.lookups,
+      ...(args.rowId !== undefined ? { rowId: args.rowId } : {}),
+    }).map((field) => [field.column.name, field]),
   );
 
   const fields: RecordDetailField[] = [];
@@ -146,7 +150,15 @@ export function formatRecordFieldValue(
 }
 
 const MONO_DISPLAY_TYPES: ReadonlySet<TGridTableColumnMeta["displayType"]> =
-  new Set(["pk", "fk", "number", "currency", "percentage", "date", "timestamp"]);
+  new Set([
+    "pk",
+    "fk",
+    "number",
+    "currency",
+    "percentage",
+    "date",
+    "timestamp",
+  ]);
 
 export function isMonoRecordField(meta: TGridTableColumnMeta): boolean {
   return MONO_DISPLAY_TYPES.has(meta.displayType);

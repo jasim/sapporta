@@ -11,9 +11,9 @@ import {
   type LookupValue,
 } from "../../lookup";
 import {
-  lookupCapabilities,
   lookupEntryRenderer,
   presetRuntime,
+  rowLookupCapabilities,
 } from "../preset";
 import { useLookupOptions } from "../../lookup/react";
 
@@ -22,7 +22,7 @@ const SEARCH_LIMIT = 50;
 export function LookupValueEditor(props: CellEditorProps) {
   const columnPreset = presetRuntime(props.column)?.preset;
   const capabilities = columnPreset
-    ? lookupCapabilities(columnPreset)
+    ? rowLookupCapabilities(columnPreset, props.row)
     : undefined;
   const searchLookup = capabilities?.searchLookup;
   const renderEntry = columnPreset

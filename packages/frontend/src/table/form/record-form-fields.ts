@@ -1,4 +1,4 @@
-import type { LookupCapabilities } from "@sapporta/grid/lookup";
+import type { LookupCapabilities, LookupValue } from "@sapporta/grid/lookup";
 import type { ColumnSchema, TableSchema } from "@sapporta/shared/contracts";
 import type { LookupStore } from "../../lookup";
 import { inferDisplayType } from "../model/column-types";
@@ -27,6 +27,9 @@ export type ForeignKeyRecordFormFieldModel = Extract<
 export function buildRecordFormFields(args: {
   table: TableSchema;
   lookups: LookupStore;
+  /** The row being edited, when the form edits one. A tree table's parent
+   *  field then leaves out the row itself and the rows below it. */
+  rowId?: LookupValue;
 }): RecordFormFieldModel[] {
   const fields: RecordFormFieldModel[] = [];
 
@@ -39,10 +42,14 @@ export function buildRecordFormFields(args: {
         fields.push({
           kind: "foreignKey",
           column,
-          lookup: args.lookups.requireForeignKey({
-            tableName: args.table.name,
-            column,
-          }),
+          lookup:
+            args.rowId !== undefined &&
+            column.name === args.table.tree?.parentColumn
+              ? args.lookups.table(args.table.name, { notUnder: args.rowId })
+              : args.lookups.requireForeignKey({
+                  tableName: args.table.name,
+                  column,
+                }),
         });
         break;
       case "select":

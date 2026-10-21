@@ -24,6 +24,7 @@ export {
   width,
   parse,
   lookupCapabilities,
+  rowLookupCapabilities,
   lookupEntryRenderer,
 } from "./preset";
 export type * from "./preset";
