@@ -47,6 +47,7 @@ export {
 export {
   columnSchemaSchema,
   childSchemaSchema,
+  computedFieldSchemaSchema,
   tableSchemaSchema,
   tableTreeSchema,
   navLinkSchema,
@@ -59,6 +60,7 @@ export {
   resolveTableTree,
   type ColumnSchema,
   type ChildSchema,
+  type ComputedFieldSchema,
   type TableSchema,
   type TableTree,
   type TableTreeInput,
@@ -77,6 +79,9 @@ export {
 // ── Table wire shapes ───────────────────────────────────────────────────────
 export {
   rowSchema,
+  jsonSchema,
+  computedValuesSchema,
+  singleRowQuerySchema,
   listMetaSchema,
   listTreeMetaSchema,
   treeMatchContextSchema,
@@ -99,6 +104,9 @@ export {
   MAX_LOOKUP_LIMIT,
   MAX_LOOKUP_IDS,
   type Row,
+  type Json,
+  type ComputedValues,
+  type SingleRowQuery,
   type ListMeta,
   type ListTreeMeta,
   type TreeMatchContext,

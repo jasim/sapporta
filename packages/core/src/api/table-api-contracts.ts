@@ -26,8 +26,10 @@ import { initContract } from "@sapporta/rest-core";
 import {
   errorBodySchema,
   exportRowsQuerySchema,
+  jsonSchema,
   listMetaSchema,
   listRowsQuerySchema,
+  singleRowQuerySchema,
 } from "@sapporta/shared/contracts";
 import type { TableDef } from "../schema/table.js";
 import { tableZodComponentId } from "../schema/table-value-zod.js";
@@ -46,7 +48,11 @@ export function listRoute(def: TableDef) {
     metadata: { tags: ["tables"] },
     query: listRowsQuerySchema,
     responses: {
-      200: z.object({ data: z.array(row), meta: listMetaSchema }),
+      200: z.object({
+        data: z.array(row),
+        meta: listMetaSchema,
+        computed: computedZod(def),
+      }),
       400: errorBodySchema,
       404: errorBodySchema,
     },
@@ -60,8 +66,12 @@ export function getRoute(def: TableDef) {
     summary: `Get one row from ${def.sqlName}`,
     metadata: { tags: ["tables"] },
     pathParams: z.object({ id: z.string() }),
+    query: singleRowQuerySchema,
     responses: {
-      200: z.object({ data: tableApiZod.forRow(def) }),
+      200: z.object({
+        data: tableApiZod.forRow(def),
+        computed: computedZod(def),
+      }),
       404: errorBodySchema,
     },
   });
@@ -114,6 +124,27 @@ export function updateRoute(def: TableDef, tables: readonly TableDef[]) {
       500: errorBodySchema,
     },
   });
+}
+
+/**
+ * The `computed` member of a response: for each computed field the request
+ * named, the row ids and their values. A field's `schema` documents its value.
+ */
+function computedZod(def: TableDef) {
+  const fields = Object.entries(def.computed ?? {});
+  return z
+    .object(
+      Object.fromEntries(
+        fields.map(([name, field]) => [
+          name,
+          z
+            .record(z.string(), (field.schema ?? jsonSchema).nullable())
+            .optional()
+            .describe(field.notes ?? `Values of ${name}, by row id.`),
+        ]),
+      ),
+    )
+    .optional();
 }
 
 function findChild(

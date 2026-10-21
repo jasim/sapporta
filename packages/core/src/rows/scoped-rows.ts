@@ -59,7 +59,7 @@ import {
 } from "@sapporta/shared/contracts";
 import type { SapportaAuthContext } from "../auth/context.js";
 import { ValidationError } from "../errors.js";
-import { findPkColumn } from "../schema/pk.js";
+import { findPkColumn, primaryKeyValues } from "../schema/pk.js";
 import { resolveColumnKind } from "../schema/resolve-kind.js";
 import type { TableDef } from "../schema/table.js";
 import { savePipeline } from "./save-pipeline.js";
@@ -559,15 +559,7 @@ function normalizeLookupIds(
       return ids;
     }
     case "number":
-      return ids.map((id) => {
-        const value = Number(id);
-        if (!Number.isFinite(value)) {
-          throw new TypeError(
-            `Lookup id for numeric column "${primaryKeyColumn}" must be a finite number, got ${JSON.stringify(id)}.`,
-          );
-        }
-        return value;
-      });
+      return primaryKeyValues(table, ids);
     case "boolean":
     case "date":
     case "timestamp":

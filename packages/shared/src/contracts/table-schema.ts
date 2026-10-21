@@ -51,13 +51,62 @@ export const listMetaSchema = z.object({
 });
 export type ListMeta = z.output<typeof listMetaSchema>;
 
+/** A JSON value, as computed fields carry them. */
+export type Json =
+  | string
+  | number
+  | boolean
+  | null
+  | readonly Json[]
+  | { readonly [key: string]: Json };
+
+export const jsonSchema: z.ZodType<Json> = z.lazy(() =>
+  z.union([
+    z.string(),
+    z.number(),
+    z.boolean(),
+    z.null(),
+    z.array(jsonSchema),
+    z.record(z.string(), jsonSchema),
+  ]),
+);
+
+/**
+ * Computed field values that a row read returns beside its rows, when the
+ * request names fields in its `computed` parameter: field name, then row id
+ * (in its string form, as `toRecordId` writes it), then the value. Every
+ * requested field holds every returned row's id; `null` means the row has no
+ * value.
+ */
+export const computedValuesSchema = z.record(
+  z.string(),
+  z.record(z.string(), jsonSchema),
+);
+export type ComputedValues = z.output<typeof computedValuesSchema>;
+
+/**
+ * Names of computed fields to return, separated by commas, such as
+ * `computed=onHand,stockLine`. Absent or empty computes nothing.
+ */
+const computedQuerySchema = z.string().optional();
+
+/** Query shape of the read that returns one row. */
+export const singleRowQuerySchema = z
+  .object({ computed: computedQuerySchema })
+  .strict();
+export type SingleRowQuery = z.output<typeof singleRowQuerySchema>;
+
 export const paginatedRowsSchema = z.object({
   data: z.array(rowSchema),
   meta: listMetaSchema,
+  computed: computedValuesSchema.optional(),
 });
 export type PaginatedRows = z.output<typeof paginatedRowsSchema>;
 
-export const singleRowSchema = z.object({ data: rowSchema });
+export const singleRowSchema = z.object({
+  data: rowSchema,
+  computed: computedValuesSchema.optional(),
+});
 export type SingleRow = z.output<typeof singleRowSchema>;
 
 /**
@@ -79,6 +128,7 @@ export type LookupEntry = z.output<typeof lookupEntrySchema>;
 
 export const lookupResponseSchema = z.object({
   entries: z.array(lookupEntrySchema),
+  computed: computedValuesSchema.optional(),
 });
 export type LookupResponse = z.output<typeof lookupResponseSchema>;
 
@@ -128,6 +178,7 @@ export const listRowsQuerySchema = z
      *  Without a filter or search, every row that satisfies the fixed
      *  conditions is returned. */
     tree: treeMatchContextSchema.optional(),
+    computed: computedQuerySchema,
     page: z.coerce
       .number<string>()
       .int()
@@ -152,6 +203,7 @@ const lookupIdsQuerySchema = z
 const lookupByIdsQuerySchema = z
   .object({
     ids: lookupIdsQuerySchema,
+    computed: computedQuerySchema,
     q: z.never().optional(),
     fields: z.never().optional(),
     limit: z.never().optional(),
@@ -163,6 +215,7 @@ const lookupBySearchQuerySchema = z
     ids: z.never().optional(),
     q: z.string().optional(),
     fields: z.string().optional(),
+    computed: computedQuerySchema,
     limit: z.coerce
       .number<string>()
       .int()

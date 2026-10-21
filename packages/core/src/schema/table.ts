@@ -30,7 +30,16 @@ import {
   type NormalizedTableSearch,
   type TableSearch,
 } from "../search/search-types.js";
+import { checkComputedFields, type ComputedField } from "./computed-field.js";
 export type { SearchSelf, TableSearch } from "../search/search-types.js";
+export {
+  computedField,
+  type ComputedBatch,
+  type ComputedField,
+  type ComputedFieldKind,
+  type ComputedFieldLoader,
+} from "./computed-field.js";
+export { treePath, type TreePathOptions } from "../rows/tree-path.js";
 
 /**
  * Column factories live in `./columns.ts` — importing them here so users
@@ -195,6 +204,13 @@ export interface SapportaMeta {
   search: NormalizedTableSearch;
   /** Same-table parent/child rows. Absent for an ordinary flat table. */
   tree?: TreeMeta;
+  /**
+   * A column or computed field whose text the default display of a row draws
+   * under its label, such as an account's parent path. It shows wherever the
+   * row is shown or referenced: pickers, the record sheet, and grid cells
+   * that opt in.
+   */
+  rowCaption?: string;
 }
 
 type SapportaMetaDefaultedField =
@@ -299,6 +315,8 @@ export interface TableDef<TTable extends AnySQLiteTable = AnySQLiteTable> {
   sqlName: string;
   /** Sapporta metadata */
   meta: SapportaMeta;
+  /** Computed fields by name, as declared in `TableOptions`. */
+  computed?: Readonly<Record<string, ComputedField>>;
   /** Runtime form of the application validation declared in `TableOptions`. */
   validate?(
     value: Readonly<Record<string, unknown>>,
@@ -326,6 +344,12 @@ export interface TableOptions<TTable extends AnySQLiteTable> {
     value: TableValidationValue<TTable>,
     context: TableValidationContext<TTable>,
   ): void;
+  /**
+   * Values of each row that the server computes when a read asks for them by
+   * name, such as an account's parent path or an item's stock on hand. Their
+   * names must differ from the column names.
+   */
+  computed?: Record<string, ComputedField<TTable>>;
 }
 
 const AUTO_MANAGED_TIMESTAMP_COLUMN_NAMES = new Set([
@@ -477,6 +501,17 @@ export function sapportaTable<TTable extends AnySQLiteTable>(
   // `meta.columns` data on the returned TableDef.
   const columnNames = config.columns.map((c) => c.name);
   const drained = drainPendingColumnMeta(columnNames);
+  // The row engine reads every table through `TableDef<AnySQLiteTable>`, so
+  // the loaders are stored in that form, as `validate` is.
+  const computed = (options.computed ?? {}) as Readonly<
+    Record<string, ComputedField>
+  >;
+  checkComputedFields(
+    config.name,
+    columnNames,
+    computed,
+    options.meta.rowCaption,
+  );
   return {
     drizzle: options.drizzle,
     sqlName: config.name,
@@ -486,6 +521,7 @@ export function sapportaTable<TTable extends AnySQLiteTable>(
       options.meta,
       drained,
     ),
+    ...(Object.keys(computed).length > 0 ? { computed } : {}),
     validate: options.validate
       ? (value, context) =>
           options.validate!(

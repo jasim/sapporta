@@ -12,6 +12,7 @@ import {
   hrefPlaceholderColumns,
   type ChildSchema,
   type ColumnSchema,
+  type ComputedFieldSchema,
   type NavLink,
   type TableSchema,
 } from "@sapporta/shared/contracts";
@@ -184,6 +185,17 @@ export function extractSchemas(defs: readonly TableDef[]): TableSchema[] {
     }));
     const rowLinks = dedupeLinks([...declaredRowLinks, ...childRowLinks]);
 
+    // Computed fields are advertised by name, label and kind; their loaders
+    // and schemas stay on the server.
+    const computed: ComputedFieldSchema[] = Object.entries(
+      schema.computed ?? {},
+    ).map(([name, field]) => ({
+      name,
+      label: field.label ?? computedFieldLabel(name),
+      kind: field.kind,
+      ...(field.notes !== undefined ? { notes: field.notes } : {}),
+    }));
+
     return {
       name: schema.sqlName,
       label: schema.meta.label,
@@ -194,8 +206,19 @@ export function extractSchemas(defs: readonly TableDef[]): TableSchema[] {
       rowLabelColumns,
       searchable: schema.meta.search !== false,
       ...(schema.meta.tree ? { tree: { ...schema.meta.tree } } : {}),
+      ...(computed.length > 0 ? { computed } : {}),
+      ...(schema.meta.rowCaption !== undefined
+        ? { rowCaption: schema.meta.rowCaption }
+        : {}),
     };
   });
+}
+
+/** "parentPath" and "parent_path" both read "Parent path". */
+function computedFieldLabel(name: string): string {
+  return defaultColumnLabel(
+    name.replace(/([a-z0-9])([A-Z])/g, "$1_$2").toLowerCase(),
+  );
 }
 
 /**

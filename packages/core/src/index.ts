@@ -25,6 +25,7 @@ export type {
 // Table definition
 export {
   bool,
+  computedField,
   date,
   money,
   number,
@@ -33,9 +34,15 @@ export {
   select,
   text,
   timestamp,
+  treePath,
 } from "./schema/table.js";
 export { columnBySqlName, columnPropertyName } from "./schema/column.js";
 export type {
+  ComputedBatch,
+  ComputedField,
+  ComputedFieldKind,
+  ComputedFieldLoader,
+  TreePathOptions,
   TableDef,
   TableOptions,
   SapportaMeta,
@@ -111,6 +118,11 @@ export type {
   TreeMatchInput,
 } from "./rows/scoped-rows.js";
 export { scanTableRows } from "./rows/table-row-scan.js";
+
+// Computed fields
+export { computeFields } from "./rows/computed-fields.js";
+export type { ComputeFieldsInput } from "./rows/computed-fields.js";
+export type { ComputedValues, Json } from "@sapporta/shared/contracts";
 export type {
   TableRowScanInput,
   TableRowScanOrder,
@@ -119,6 +131,7 @@ export type { GroupCount } from "@sapporta/shared";
 
 // Generated table HTTP query resolvers
 export {
+  resolveComputedQuery,
   resolveCountQuery,
   resolveExportQuery,
   resolveLookupQuery,

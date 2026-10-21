@@ -90,7 +90,14 @@ export type ResolvedPageQuery =
       page: Omit<PageRowsInput, "where">;
     };
 
-const PAGE_QUERY_KEYS = new Set(["page", "limit", "sort", "q", "tree"]);
+const PAGE_QUERY_KEYS = new Set([
+  "page",
+  "limit",
+  "sort",
+  "q",
+  "tree",
+  "computed",
+]);
 const EXPORT_QUERY_KEYS = new Set(["sort", "q"]);
 const COUNT_QUERY_KEYS = new Set(["group_by", "order", "limit"]);
 
@@ -118,6 +125,7 @@ const COUNT_QUERY_KEYS = new Set(["group_by", "order", "limit"]);
  *   sort=col,-col2                  leading `-` is descending
  *   page=N, limit=M                 numeric bounds are enforced by the shared
  *                                   HTTP contract
+ *   computed=name,name2             computed fields to return beside the rows
  *   tree=ancestors                  on a table with `meta.tree`, return each
  *   tree=ancestors-and-descendants  filter or search match with its ancestors
  *                                   (and its descendants); list reads only
@@ -136,6 +144,8 @@ const COUNT_QUERY_KEYS = new Set(["group_by", "order", "limit"]);
  *                                   not on the table
  *   no_search_config                q set on a table with search: false
  *   no_tree_config                  tree set on a table without meta.tree
+ *   unknown_computed_field          computed names a field the table does not
+ *                                   declare
  *
  * Silent-ignore is rejected as a class: typos like filter[naration]=foo
  * return 400, not "all rows".
@@ -218,6 +228,29 @@ export function resolveLookupQuery<TTable extends AnySQLiteTable>(
     fields: resolveLookupFields(table, query.fields),
     limit: query.limit,
   };
+}
+
+/**
+ * Parse a `computed=name,name2` parameter into the table's computed field
+ * names. Absent or empty asks for none; an unknown name is a 400 that lists the
+ * fields the table declares.
+ */
+export function resolveComputedQuery(
+  param: string | undefined,
+  table: TableDef,
+): string[] {
+  if (param === undefined) return [];
+  const names = Array.from(new Set(parseCommaSeparatedValues(param)));
+  const fields = table.computed ?? {};
+  const unknown = names.filter((name) => !Object.hasOwn(fields, name));
+  if (unknown.length > 0) {
+    const known = Object.keys(fields);
+    throw new QueryParseError(
+      "unknown_computed_field",
+      `Unknown computed field(s) on table "${table.sqlName}": ${unknown.join(", ")}. ${known.length > 0 ? `Its computed fields are: ${known.join(", ")}.` : "It declares no computed fields."}`,
+    );
+  }
+  return names;
 }
 
 export function resolveCountQuery<TTable extends AnySQLiteTable>(

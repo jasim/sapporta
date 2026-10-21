@@ -166,6 +166,19 @@ export function resolveTableTree(
   };
 }
 
+/**
+ * A computed field of a table: a value of each row that the server computes
+ * when a read names it in its `computed` parameter.
+ */
+export const computedFieldSchemaSchema = z.object({
+  name: z.string(),
+  label: z.string(),
+  /** How the value reads. `"json"` is anything that is not one scalar. */
+  kind: z.union([valueKindSchema, z.literal("json")]),
+  notes: z.string().optional(),
+});
+export type ComputedFieldSchema = z.output<typeof computedFieldSchemaSchema>;
+
 export const tableSchemaSchema = z.object({
   name: z.string(),
   label: z.string(),
@@ -177,6 +190,11 @@ export const tableSchemaSchema = z.object({
   rowCount: z.number().optional(),
   searchable: z.boolean(),
   tree: tableTreeSchema.optional(),
+  /** The table's computed fields, when it declares any. */
+  computed: z.array(computedFieldSchemaSchema).optional(),
+  /** A column or computed field whose text a row's default display draws
+   *  under its label. */
+  rowCaption: z.string().optional(),
 });
 export type TableSchema = z.output<typeof tableSchemaSchema>;
 

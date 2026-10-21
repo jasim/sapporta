@@ -26,6 +26,7 @@ import {
   lookupResponseSchema,
   paginatedRowsSchema,
   rowSchema,
+  singleRowQuerySchema,
   singleRowSchema,
 } from "./table-schema.js";
 
@@ -54,6 +55,7 @@ export const getRowRoute = c.query({
   summary: "Get one row by id",
   metadata: { tags: ["tables"] },
   pathParams: tableRowParam,
+  query: singleRowQuerySchema,
   responses: {
     200: singleRowSchema,
     404: errorBodySchema,

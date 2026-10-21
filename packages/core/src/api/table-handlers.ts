@@ -19,7 +19,8 @@ import type { BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
 import type { Context } from "hono";
 import { stream } from "hono/streaming";
 import { getTableConfig } from "drizzle-orm/sqlite-core";
-import type { CountResult } from "@sapporta/shared/contracts";
+import type { ComputedValues, CountResult } from "@sapporta/shared/contracts";
+import { toRecordId, type RecordId } from "@sapporta/shared/record-id";
 import type { TableCatalog } from "../schema/catalog.js";
 import { savePipeline, savePipelineInsertSync } from "../rows/save-pipeline.js";
 import {
@@ -28,6 +29,7 @@ import {
   scopedRows,
 } from "../rows/scoped-rows.js";
 import { cellToString, csvEscape } from "../rows/csv.js";
+import { computeFields } from "../rows/computed-fields.js";
 import { findPkColumn } from "../schema/pk.js";
 import {
   classifySqliteError,
@@ -51,6 +53,7 @@ import {
 } from "../auth/index.js";
 import type { TableDef } from "../schema/table.js";
 import {
+  resolveComputedQuery,
   resolveCountQuery,
   resolveExportQuery,
   resolveLookupQuery,
@@ -91,8 +94,22 @@ export function makeAuthorizedTableHandlers<E extends SapportaEnv>(
             auth,
             searchPlan: catalog.searchPlanFor(def.sqlName),
           });
+          const computed = resolveComputedQuery(request.query.computed, def);
           if (query.kind === "rows") {
-            return c.json(await rows.page(query.input), 200);
+            const result = await rows.page(query.input);
+            return c.json(
+              {
+                ...result,
+                ...(await computedFor(
+                  db,
+                  auth,
+                  def,
+                  idsOf(def, result.data),
+                  computed,
+                )),
+              },
+              200,
+            );
           }
           // A tree read with a filter or search pages over each match with its
           // ancestors (and descendants), and reports which rows are context.
@@ -108,6 +125,13 @@ export function makeAuthorizedTableHandlers<E extends SapportaEnv>(
                   contextIds: match.contextIds,
                 },
               },
+              ...(await computedFor(
+                db,
+                auth,
+                def,
+                idsOf(def, result.data),
+                computed,
+              )),
             },
             200,
           );
@@ -121,7 +145,21 @@ export function makeAuthorizedTableHandlers<E extends SapportaEnv>(
         const auth = authorizeTableAction(c, guard(c), "read", def);
         const rows = scopedRows(db, auth, def);
         try {
-          return c.json({ data: await rows.get(request.params.id) }, 200);
+          const computed = resolveComputedQuery(request.query.computed, def);
+          const data = await rows.get(request.params.id);
+          return c.json(
+            {
+              data,
+              ...(await computedFor(
+                db,
+                auth,
+                def,
+                idsOf(def, [data]),
+                computed,
+              )),
+            },
+            200,
+          );
         } catch (err) {
           return tableReadErrorResponse(c, err);
         }
@@ -198,9 +236,20 @@ export function makeAuthorizedTableHandlers<E extends SapportaEnv>(
       const auth = authorizeTableAction(c, guard(c), "read", def);
       const rows = scopedRows(db, auth, def);
       try {
+        const computed = resolveComputedQuery(request.query.computed, def);
+        const entries = await rows.lookup(
+          resolveLookupQuery(request.query, def),
+        );
         return c.json(
           {
-            entries: await rows.lookup(resolveLookupQuery(request.query, def)),
+            entries,
+            ...(await computedFor(
+              db,
+              auth,
+              def,
+              entries.map((entry) => toRecordId(entry.value)),
+              computed,
+            )),
           },
           200,
         );
@@ -233,6 +282,27 @@ export function makeAuthorizedTableHandlers<E extends SapportaEnv>(
       }
     },
   };
+}
+
+/** The `computed` member of a response: absent when no field was named. */
+async function computedFor(
+  db: BetterSQLite3Database,
+  auth: SapportaAuthContext,
+  table: TableDef,
+  ids: readonly RecordId[],
+  names: readonly string[],
+): Promise<{ computed?: ComputedValues }> {
+  if (names.length === 0) return {};
+  return { computed: await computeFields({ db, auth, table, ids, names }) };
+}
+
+/** The primary keys of rows a read returned. */
+function idsOf(
+  table: TableDef,
+  rows: readonly Record<string, unknown>[],
+): RecordId[] {
+  const pkName = findPkColumn(table).name;
+  return rows.map((row) => toRecordId(row[pkName] as string | number));
 }
 
 function authorizeTableAction<E extends SapportaEnv>(

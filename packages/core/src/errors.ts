@@ -153,7 +153,8 @@ export type QueryParseErrorCode =
   | "bad_limit"
   | "bad_page"
   | "no_search_config"
-  | "no_tree_config";
+  | "no_tree_config"
+  | "unknown_computed_field";
 
 export class QueryParseError extends Error {
   public readonly code: QueryParseErrorCode;
