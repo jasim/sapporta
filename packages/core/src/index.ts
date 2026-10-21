@@ -124,6 +124,8 @@ export { scanTableRows } from "./rows/table-row-scan.js";
 // Computed fields
 export { computeFields } from "./rows/computed-fields.js";
 export type { ComputeFieldsInput } from "./rows/computed-fields.js";
+export { attachReferenceComputed } from "./rows/reference-computed.js";
+export type { AttachReferenceComputedInput } from "./rows/reference-computed.js";
 export type { ComputedValues, Json } from "@sapporta/shared/contracts";
 export type {
   TableRowScanInput,
