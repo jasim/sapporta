@@ -55,6 +55,9 @@ export type TGridColumnBuildResult = {
   rowHeaderColumn: RowHeaderColumn;
   // The column that carries tree indentation, or `null` for a flat level.
   treeColumnId: ColId | null;
+  // The row's own label cell (the card title), or `null` when the level shows
+  // no row-label column.
+  titleColumnId: ColId | null;
   saveCellValueByColumn: ReadonlyMap<
     ColId,
     TGridRuntimeCellWriteHandler<TGridRowsByLevel, unknown, string>
@@ -138,6 +141,23 @@ export function buildTGridColumnsForTable<
     specs: args.specs,
   });
 
+  // The row's own label cell is the card title: the first row-label column
+  // the level shows, the same rule FK lookups use for row labels.
+  const shownTableColumns = specs.flatMap((spec) =>
+    spec.kind === "table" ? [spec.columnName as TableColumnName] : [],
+  );
+  const titleColumnName = args.table.rowLabelColumns.find((name) =>
+    shownTableColumns.includes(name),
+  );
+  // A tree level shows its hierarchy in one column. That column already says
+  // where each row sits, which display slots read as `hierarchyShown`. The
+  // parent column does not: its picker is where a parent path tells two rows
+  // of the same name apart.
+  const treeColumnId =
+    args.treeColumn === undefined || args.treeColumn === null
+      ? undefined
+      : treeColumnIdFor(specs, args.treeColumn, titleColumnName);
+
   // Declaration order is layout order, and each expanded spec is one column.
   for (const spec of specs) {
     if (spec.kind === "client") {
@@ -153,19 +173,42 @@ export function buildTGridColumnsForTable<
       args.table,
       spec.columnName as TableColumnName,
     );
-    const baseColumn = args.columnMapper.columnFor({
+    const display = { hierarchyShown: spec.columnName === treeColumnId };
+    const mappedColumn = args.columnMapper.columnFor({
       tableName: args.table.name,
       column: applyTableColumnOptions(tableColumn, spec.options),
       immutable: args.immutable,
+      display,
     });
+    // Display slots draw below the view's own `renderCell`, which stays the
+    // most specific override: the label slot on the label column, then the
+    // column's slot over it.
+    const labelledColumn =
+      spec.columnName === titleColumnName
+        ? args.columnMapper.labelColumnFor({
+            tableName: args.table.name,
+            rowKeyColumn: args.rowKeyColumn,
+            labelColumns: args.table.rowLabelColumns,
+            gridColumn: mappedColumn,
+            display,
+          })
+        : mappedColumn;
+    const baseColumn = args.columnMapper.columnSlotColumnFor({
+      tableName: args.table.name,
+      column: tableColumn,
+      rowKeyColumn: args.rowKeyColumn,
+      gridColumn: labelledColumn,
+      display,
+    });
+    const column = customizeTableColumn(
+      args.levelId,
+      baseColumn,
+      tableColumn,
+      spec,
+      args.sessionContext,
+    );
     columns.push(
-      customizeTableColumn(
-        args.levelId,
-        baseColumn,
-        tableColumn,
-        spec,
-        args.sessionContext,
-      ),
+      spec.columnName === titleColumnName ? withCardTitle(column) : column,
     );
 
     if (spec.options?.saveCellValue) {
@@ -183,8 +226,6 @@ export function buildTGridColumnsForTable<
       );
     }
   }
-
-  markCardTitleColumn(columns, args.table);
 
   // Row-header inference is deliberately based on the completed visible list.
   // A data-backed header must be the left-most column and readonly; otherwise
@@ -213,13 +254,10 @@ export function buildTGridColumnsForTable<
       : rowHeaderReadyColumn;
   }
 
-  // A tree level shows its hierarchy in one column: the declared one when it
-  // is visible, else the card title, else the first column. The card title is
-  // the first visible row-label column, so cards indent their titles.
   const treeColumnIndex =
-    args.treeColumn === undefined || args.treeColumn === null
+    treeColumnId === undefined
       ? -1
-      : treeColumnIndexFor(columns, args.treeColumn);
+      : columns.findIndex((column) => column.id === treeColumnId);
   if (treeColumnIndex >= 0) {
     columns[treeColumnIndex] = withTreeColumn(
       withoutCardEmptyHiding(columns[treeColumnIndex]),
@@ -238,6 +276,7 @@ export function buildTGridColumnsForTable<
     columns,
     rowHeaderColumn,
     treeColumnId: treeColumnIndex >= 0 ? columns[treeColumnIndex].id : null,
+    titleColumnId: titleColumnName ?? null,
     saveCellValueByColumn,
   };
 }
@@ -371,36 +410,31 @@ export function expandTGridColumnSpecs<
   return expanded;
 }
 
-function treeColumnIndexFor(
-  columns: readonly GridColumnSchema[],
+// The column a tree level shows its hierarchy in: the declared one when it is
+// visible, else the card title, so cards indent their titles, else the first
+// column.
+function treeColumnIdFor<
+  RowsByLevel extends TGridRowsByLevel,
+  AppServices,
+  LevelId extends TGridLevelId<RowsByLevel>,
+>(
+  specs: readonly TGridExpandedColumnSpec<RowsByLevel, AppServices, LevelId>[],
   declared: TableColumnName,
-): number {
-  const declaredIndex = columns.findIndex((column) => column.id === declared);
-  if (declaredIndex >= 0) return declaredIndex;
-  const titleIndex = columns.findIndex(
-    (column) => isRecord(column.meta) && column.meta.cardRole === "title",
+  titleColumnName: TableColumnName | undefined,
+): string | undefined {
+  const shown = specs.some(
+    (spec) => spec.kind === "table" && spec.columnName === declared,
   );
-  if (titleIndex >= 0) return titleIndex;
-  return columns.length > 0 ? 0 : -1;
+  if (shown) return declared;
+  if (titleColumnName !== undefined) return titleColumnName;
+  const first = specs[0];
+  if (!first) return undefined;
+  return first.kind === "table" ? first.columnName : first.id;
 }
 
-// The card title is the first visible `rowLabelColumns` entry — the same
-// rule FK lookups use for row labels.
-function markCardTitleColumn(
-  columns: GridColumnSchema[],
-  table: TableSchema,
-): void {
-  for (const labelColumnName of table.rowLabelColumns) {
-    const index = columns.findIndex((column) => column.id === labelColumnName);
-    if (index === -1) continue;
-    const column = columns[index];
-    if (!isRecord(column.meta)) continue;
-    columns[index] = {
-      ...column,
-      meta: { ...column.meta, cardRole: "title" },
-    };
-    return;
-  }
+function withCardTitle(column: GridColumnSchema): GridColumnSchema {
+  if (!isRecord(column.meta)) return column;
+  return { ...column, meta: { ...column.meta, cardRole: "title" } };
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

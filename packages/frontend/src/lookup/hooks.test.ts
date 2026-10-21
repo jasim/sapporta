@@ -11,13 +11,13 @@ import { useTableLookup } from "./index";
   globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
 ).IS_REACT_ACT_ENVIRONMENT = true;
 
-const { fetchLookupEntriesForSearchSpy } = vi.hoisted(() => ({
-  fetchLookupEntriesForSearchSpy: vi.fn(),
+const { fetchLookupSearchSpy } = vi.hoisted(() => ({
+  fetchLookupSearchSpy: vi.fn(),
 }));
 
 vi.mock("./api/lookup", () => ({
-  fetchLookupEntriesForSearch: fetchLookupEntriesForSearchSpy,
-  fetchLookupEntriesForValues: vi.fn(async () => []),
+  fetchLookupSearch: fetchLookupSearchSpy,
+  fetchLookup: vi.fn(async () => ({ entries: [] })),
 }));
 
 let mounted: { root: Root; container: HTMLElement } | null = null;
@@ -42,7 +42,7 @@ describe("lookup hooks", () => {
       mounted.container.remove();
       mounted = null;
     }
-    fetchLookupEntriesForSearchSpy.mockReset();
+    fetchLookupSearchSpy.mockReset();
   });
 
   it("creates a new lookup source when the table changes", async () => {
@@ -63,7 +63,7 @@ describe("lookup hooks", () => {
   });
 
   it("stays usable after StrictMode unmounts and remounts the same memoized source", async () => {
-    fetchLookupEntriesForSearchSpy.mockResolvedValue({
+    fetchLookupSearchSpy.mockResolvedValue({
       entries: [{ value: 1, label: "Customer 1" }],
     });
     let seen: LookupCapabilities | undefined;
@@ -93,12 +93,13 @@ describe("lookup hooks", () => {
       });
     });
 
-    expect(fetchLookupEntriesForSearchSpy).toHaveBeenCalledWith({
-      tableName: "customers",
-      searchText: "cus",
-      limit: 10,
-      fields: ["email", "name"],
-    });
+    expect(fetchLookupSearchSpy).toHaveBeenCalledWith(
+      "customers",
+      "cus",
+      10,
+      ["email", "name"],
+      [],
+    );
     expect(
       (
         seen!.searchLookup!.cachedSearchResults({

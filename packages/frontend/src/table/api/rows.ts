@@ -37,6 +37,8 @@ export interface FetchTableRowsParams {
   // "ancestors-and-descendants", its descendants). The response then carries
   // `meta.tree` when a filter or search selected matches.
   tree?: TreeMatchContext;
+  // Computed fields to return beside the rows, in the response's `computed`.
+  computed?: readonly string[];
 }
 
 export type TableRowsSelectionParams = Pick<
@@ -76,6 +78,8 @@ export function buildTableRowsQuery(
   if (params.page) out.page = String(params.page);
   if (params.limit) out.limit = String(params.limit);
   if (params.tree) out.tree = params.tree;
+  const computed = Array.from(new Set(params.computed ?? []));
+  if (computed.length > 0) out.computed = computed.join(",");
   return out;
 }
 

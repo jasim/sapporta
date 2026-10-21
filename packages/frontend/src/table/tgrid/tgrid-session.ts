@@ -47,9 +47,11 @@ import {
   type TGridActiveRow,
 } from "./tgrid-active-row";
 import {
+  checkRowDisplays,
   createLookupStore,
   type LookupForColumn,
-  type LookupStore,
+  type RowDataStore,
+  type RowDisplays,
 } from "../../lookup";
 import { buildTableRowsQuery, buildTableSelectionQuery } from "../api/rows";
 import { queryParamRecordToSearchParams } from "@sapporta/shared";
@@ -97,6 +99,13 @@ export type CreateTGridSessionArgs<
     RowsByLevel,
     AppServices
   >;
+  /**
+   * Display slots the session draws rows with: labels, references and
+   * cells. React pages pass the displays of the nearest
+   * `RowDisplayProvider`; code outside React passes them here. Read once,
+   * when the session is created.
+   */
+  rowDisplays?: RowDisplays;
 };
 
 // Values a mounted React page can update without recreating the table session.
@@ -188,7 +197,9 @@ export type TGridSession<
     pageSize: number,
   ): Promise<SourceLoadResult>;
   setErrorBanner(message: string | null): void;
-  lookups: LookupStore;
+  /** The session's row store: labels and computed values of the rows it
+   *  shows, and the display slots that draw them. */
+  lookups: RowDataStore;
   lookupForColumn: LookupForColumn;
   csvExportUrl(levelId?: TGridLevelId<RowsByLevel>): string;
   dispose(): void;
@@ -245,7 +256,7 @@ class DefaultTGridSession<
   >;
   readonly runtime: GridRuntime;
   readonly rootSource: RuntimeLevelDataSource;
-  readonly lookups: LookupStore;
+  readonly lookups: RowDataStore;
   readonly lookupForColumn: LookupForColumn;
   readonly columnMapper: TGridColumnMapper;
   readonly levelInfoById: Record<TGridLevelId<RowsByLevel>, TGridLevelInfo>;
@@ -267,9 +278,25 @@ class DefaultTGridSession<
       definition.levels[definition.rootLevel].table,
       definition.rootLevel,
     ).name;
-    this.lookups = createLookupStore();
+    const rowDisplays = liveInputsRef.current.rowDisplays ?? {};
+    this.lookups = createLookupStore({ rowDisplays });
+    // A slot naming a table, column or computed field that does not exist
+    // would never draw; fail here, where the schemas are known.
+    checkRowDisplays(
+      rowDisplays,
+      Object.keys(rowDisplays).flatMap((name) => {
+        const schema =
+          Object.values(definition.levels).find(
+            (level) => level.table.name === name,
+          )?.table ?? this.lookups.tableSchema(name);
+        return schema ? [schema] : [];
+      }),
+    );
     this.lookupForColumn = (column) => this.lookups.foreignKey(column);
-    this.columnMapper = createTGridColumnMapper({ lookups: this.lookups });
+    this.columnMapper = createTGridColumnMapper({
+      lookups: this.lookups,
+      rowData: this.lookups,
+    });
 
     const runtimeConfig = compileTGridRuntimeConfig({
       rootLevel: definition.rootLevel,
@@ -284,6 +311,7 @@ class DefaultTGridSession<
       recordTreeResult: (levelId, result) =>
         this.queryStoresByLevel.get(levelId)?.getState().setTreeResult(result),
       sessionContext: this.currentSessionContext,
+      rowData: this.lookups,
     });
 
     // Levels with visible table controls need query stores so filters, search,

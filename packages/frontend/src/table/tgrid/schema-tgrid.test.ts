@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { TableSchema } from "@sapporta/shared/contracts";
 import { CELL_GRID_WITH_ROW_CLICK_ACTIVATION } from "@sapporta/grid";
-import { createLookupStore } from "../../lookup/store";
+import { createLookupStore } from "../../lookup/row-data";
 import { createTGridColumnMapper } from "./tgrid-column-mapper";
 import { compileTGridRuntimeConfig, defineTGrid } from "./tgrid-runtime-config";
 import {

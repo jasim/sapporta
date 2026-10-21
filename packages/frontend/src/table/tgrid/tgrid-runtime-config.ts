@@ -60,6 +60,7 @@ import {
 } from "./tgrid-column-spec";
 import {
   buildTGridColumnsForTable,
+  type TGridColumnBuildResult,
   type TGridRuntimeCellWriteHandler,
   type TGridRuntimeCellWriteResult,
 } from "./tgrid-column-builder";
@@ -75,6 +76,7 @@ import type {
   TGridLevelsConfigMap,
 } from "./tgrid-level-config";
 import { tgridPageWindow } from "./tgrid-page-window";
+import type { RowDataStore, TableRowData } from "../../lookup";
 
 export type TGridDefinition<
   RowsByLevel extends TGridRowsByLevel = TGridRowsByLevel,
@@ -128,6 +130,9 @@ type CompileTGridRuntimeConfigArgs<
     result: TGridTreeResult,
   ) => void;
   sessionContext?: () => TGridSessionContext<RowsByLevel, AppServices>;
+  // The session's row store. Page reads store their rows' computed values
+  // in it, and a write marks its values out of date.
+  rowData?: RowDataStore;
 };
 
 // Prepared table view data: row loading, cell editing, and level metadata.
@@ -257,6 +262,9 @@ export function compileTGridRuntimeConfig<
     endpointFactoriesByLevel[levelId] = makeEndpointFactory({
       levelId,
       table,
+      rowData: args.rowData
+        ? levelRowData(args.rowData, table, columnBuild)
+        : undefined,
       rowKeyColumn: pkCol.name,
       parent: parent
         ? {
@@ -413,7 +421,10 @@ function resolveColumns<
   );
 }
 
-export function primaryKeyOf(table: TableSchema, levelId: string): TableColumnSchema {
+export function primaryKeyOf(
+  table: TableSchema,
+  levelId: string,
+): TableColumnSchema {
   const pk = table.columns.find((c) => c.primary);
   if (!pk) {
     throw new Error(
@@ -451,9 +462,52 @@ function missingTGridSessionContext(): never {
   );
 }
 
+// What a level asks its row store for, and how it reports its writes.
+type TGridLevelRowData = {
+  data: TableRowData;
+  // Computed fields every page read of the level returns.
+  computed: readonly string[];
+  // A write may change computed values of any row, such as a parent path or
+  // a stock count, so every value is read again. The written table's labels
+  // are read again too.
+  afterWrite(): void;
+};
+
+function levelRowData(
+  store: RowDataStore,
+  table: TableSchema,
+  columnBuild: TGridColumnBuildResult,
+): TGridLevelRowData {
+  const data = store.table(table.name);
+  // The own label cell draws the table's label slot, so the page brings
+  // what that slot needs with the rows.
+  const labelShown = columnBuild.titleColumnId !== null;
+  // Each visible column's slot adds what it needs, so a hidden column
+  // costs nothing.
+  const display = store.rowDisplays[table.name];
+  const shown = new Set(columnBuild.columns.map((column) => String(column.id)));
+  const computed = Array.from(
+    new Set([
+      ...(labelShown ? (display?.label?.needs ?? []) : []),
+      ...Object.entries(display?.columns ?? {}).flatMap(([name, slot]) =>
+        shown.has(name) ? (slot.needs ?? []) : [],
+      ),
+    ]),
+  );
+  return {
+    data,
+    computed,
+    afterWrite() {
+      store.invalidateComputed();
+      store.reloadLabels(table.name);
+    },
+  };
+}
+
 function makeEndpointFactory(args: {
   levelId: string;
   table: TableSchema;
+  rowData: TGridLevelRowData | undefined;
   rowKeyColumn: TableColumnName;
   parent?: {
     parentLevelId: string;
@@ -527,6 +581,7 @@ function makeEndpointFactory(args: {
       rowQuery,
       buildRowsRequest: buildTGridRowsRequest(args.pagination),
       fetchPage: async (req) => {
+        const sentAt = args.rowData?.data.generation ?? 0;
         const res = await args.rowsClient.fetch({
           tableName: args.table.name,
           page: req.page,
@@ -539,7 +594,15 @@ function makeEndpointFactory(args: {
           // so the match shows in place. The server walks the tree only when
           // the request has a filter or search.
           ...(args.tree?.serverWalk ? { tree: args.tree.matchContext } : {}),
+          ...(args.rowData?.computed.length
+            ? { computed: args.rowData.computed }
+            : {}),
         } satisfies FetchTableRowsParams);
+        // Stored before the nodes return, so the page's first render has
+        // its rows' values.
+        if (args.rowData && res.computed) {
+          args.rowData.data.storeComputed(res.computed, sentAt);
+        }
         args.recordTotalCount?.(res.meta.total);
         args.tree?.recordResult({
           matchCount: res.meta.tree?.matchCount ?? null,
@@ -575,6 +638,7 @@ function makeEndpointFactory(args: {
             runtime: session.runtime,
             appServices: session.appServices,
           });
+          args.rowData?.afterWrite();
           return patchCellResponseFromTGridResult(
             result,
             args.levelId,
@@ -587,6 +651,7 @@ function makeEndpointFactory(args: {
           String(req.rowKey),
           { [req.colId]: req.value },
         );
+        args.rowData?.afterWrite();
         return { kind: "value", value: result.data[req.colId] };
       },
       insertNode: async (req) => {
@@ -598,11 +663,13 @@ function makeEndpointFactory(args: {
             }
           : { ...req.node.columns };
         const result = await args.rowsClient.create(args.table.name, columns);
+        args.rowData?.afterWrite();
         const row = Array.isArray(result.data) ? result.data[0] : result.data;
         return tableTreeNode(row, args.levelId, args.rowKeyColumn);
       },
       removeNode: async (req) => {
         await args.rowsClient.remove(args.table.name, String(req.rowKey));
+        args.rowData?.afterWrite();
       },
       canAppendRow: ({ request, visibleCount, totalCount }) => {
         // TGrid request pages are one-based because the table API and URL state

@@ -152,7 +152,7 @@ keeping them out of the barrel keeps casual root imports lightweight.
 | `./routes/new-record` | New-record form route |
 | `./table/query` | Table query options and URL state |
 | `./report` | Report pages: grid-dataset rendering, report chrome, summary stats, date-range params |
-| `./lookup` | `LookupPicker` and the lookup source bound to the Sapporta API |
+| `./lookup` | `LookupPicker`, the lookup source bound to the Sapporta API, the row data store, and row display slots (`RowDisplayProvider`) |
 | `./layout` | `Page`, `PageHeader`, and page-level chrome |
 | `./shell` | `AppShell`, sidebar, status bar, account menu |
 | `./index.css` | Compiled stylesheet |

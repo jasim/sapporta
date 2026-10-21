@@ -1,10 +1,21 @@
 import { useEffect, useMemo } from "react";
 import type { LookupCapabilities, LookupValue } from "@sapporta/grid/lookup";
 import type { Row } from "@sapporta/shared/contracts";
-import { createLookupStore, type LookupStore } from "./store";
+import { createLookupStore } from "./row-data";
+import type { RowDataStore } from "./row-data";
+import { useRowDisplays } from "./row-display";
 
-export function useLookupStore(): LookupStore<Row> {
-  const store = useMemo(() => createLookupStore(), []);
+/**
+ * A row store for a component, such as a form page, that lives as long as
+ * the component. It draws rows with the displays of the nearest
+ * `RowDisplayProvider`.
+ */
+export function useLookupStore(): RowDataStore {
+  const rowDisplays = useRowDisplays();
+  const store = useMemo(
+    () => createLookupStore({ rowDisplays }),
+    [rowDisplays],
+  );
   useEffect(() => () => store.clear(), [store]);
   return store;
 }
@@ -19,5 +30,7 @@ export function useLookupStore(): LookupStore<Row> {
 export function useTableLookup<TValue extends LookupValue = LookupValue>(
   tableName: string,
 ): LookupCapabilities<TValue, Row> {
-  return useLookupStore().table(tableName) as LookupCapabilities<TValue, Row>;
+  const lookup: LookupCapabilities<LookupValue, Row> =
+    useLookupStore().table(tableName);
+  return lookup as LookupCapabilities<TValue, Row>;
 }

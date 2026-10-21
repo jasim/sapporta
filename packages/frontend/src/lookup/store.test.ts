@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { ColumnSchema } from "@sapporta/shared/contracts";
-import { createLookupStore } from "./store";
+import { createLookupStore } from "./row-data";
 
 const ownerColumn: ColumnSchema = {
   name: "owner_id",

@@ -41,6 +41,9 @@ import { parseTablePatchValueDraft } from "../model/table-value-draft";
 import { FormField } from "../form/FormField";
 import type { TGridSession } from "../tgrid/tgrid-session";
 import type { TGridLevelId, TGridRowsByLevel } from "../tgrid/tgrid-types";
+import { ColumnSlotCell, RowLabel } from "../../lookup/row-display";
+import { isTableRowData, type RowDataStore } from "../../lookup/row-data";
+import type { DisplayContext } from "../../lookup/row-display-types";
 import {
   buildRecordDetailFields,
   formatRecordFieldValue,
@@ -135,6 +138,12 @@ export function RecordDetailSheet<
 
   const open = target !== null && !missing;
   const rowValues = row && row.kind === "data" ? row.columns : null;
+  const primaryKey = table?.columns.find((column) => column.primary)?.name;
+  const rowId = rowValues && primaryKey ? rowValues[primaryKey] : undefined;
+  const slotRow =
+    table && rowValues && isLookupValue(rowId)
+      ? { store: session.lookups, table: table.name, id: rowId, row: rowValues }
+      : undefined;
   const tableLabel = table ? (table.label ?? table.name) : "";
   const title = rowValues ? recordDetailTitle(fields, rowValues) : null;
 
@@ -177,6 +186,7 @@ export function RecordDetailSheet<
                   key={field.column.id}
                   field={field}
                   value={rowValues[field.column.id]}
+                  slotRow={slotRow}
                   lookup={
                     field.meta.displayType === "fk"
                       ? session.lookupForColumn(field.meta.schema)
@@ -207,17 +217,58 @@ export function RecordDetailSheet<
   );
 }
 
+// The row the sheet shows, for the display slots that draw its fields.
+type RecordSlotRow = {
+  store: RowDataStore;
+  table: string;
+  id: string | number;
+  row: Readonly<Record<string, unknown>>;
+};
+
 function RecordFieldLine({
   field,
   value,
   lookup,
+  slotRow,
   onEdit,
 }: {
   field: RecordDetailField;
   value: unknown;
   lookup?: LookupCapabilities;
+  slotRow?: RecordSlotRow;
   onEdit?: () => void;
 }) {
+  const context: DisplayContext | undefined = slotRow && {
+    as: "self",
+    surface: "field",
+    density: "regular",
+    source: { table: slotRow.table, column: field.meta.schema.name },
+    hierarchyShown: false,
+  };
+  const columnSlot =
+    slotRow?.store.rowDisplays[slotRow.table]?.columns?.[
+      field.meta.schema.name
+    ];
+  const defaultValue = lookup ? (
+    <LookupValueLabel lookup={lookup} value={value} />
+  ) : (
+    formatRecordFieldValue(field.meta, value)
+  );
+  const shownValue =
+    slotRow && context && columnSlot ? (
+      <ColumnSlotCell
+        data={slotRow.store.table(slotRow.table)}
+        slot={columnSlot}
+        id={slotRow.id}
+        value={value}
+        row={slotRow.row}
+        context={context}
+        defaultContent={defaultValue}
+        {...(lookup && isTableRowData(lookup) ? { reference: lookup } : {})}
+      />
+    ) : (
+      defaultValue
+    );
   const content = (
     <>
       <div className="w-[7.25rem] shrink-0 pt-px text-sap-data font-medium leading-[1.5] text-sap-muted">
@@ -229,11 +280,7 @@ function RecordFieldLine({
           isMonoRecordField(field.meta) && "mono",
         )}
       >
-        {lookup ? (
-          <LookupValueLabel lookup={lookup} value={value} />
-        ) : (
-          formatRecordFieldValue(field.meta, value)
-        )}
+        {shownValue}
       </div>
       {onEdit && (
         <ChevronRight
@@ -326,7 +373,35 @@ function LookupValueLabel({
         : null,
   );
   if (value === null || value === undefined || value === "") return null;
+  // A table's row data draws the reference with the table's label slot,
+  // which shows its caption under the label here.
+  if (label !== null && isLookupValue(value) && isTableRowData(lookup)) {
+    return (
+      <RowLabel
+        data={lookup}
+        id={value}
+        label={label}
+        row={entryRow(lookup, value)}
+        context={{
+          as: "reference",
+          surface: "field",
+          density: "regular",
+          hierarchyShown: false,
+        }}
+      />
+    );
+  }
   return <>{label ?? String(value)}</>;
+}
+
+function entryRow(
+  lookup: LookupCapabilities,
+  value: string | number,
+): Readonly<Record<string, unknown>> | undefined {
+  const meta = lookup.valueLookup.entryForValue(value)?.meta;
+  return typeof meta === "object" && meta !== null
+    ? (meta as Readonly<Record<string, unknown>>)
+    : undefined;
 }
 
 function useDisplayedRowOrNull(

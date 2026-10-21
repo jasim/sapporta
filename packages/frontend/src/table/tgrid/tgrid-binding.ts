@@ -25,6 +25,7 @@ import type {
   TGridTableRow,
 } from "./tgrid-types";
 import { useCommittedDisposableResource } from "./use-committed-disposable-resource";
+import { useRowDisplays } from "../../lookup/row-display";
 
 // Table metadata for callers that choose the table name at the use site.
 export type TGridTableSchemaInput = Omit<TableSchema, "name">;
@@ -48,10 +49,11 @@ export type UseTGridQueryStateArgs<
 };
 
 // Options accepted when a React page creates a table session.
+// React pages take their displays from the nearest `RowDisplayProvider`.
 export type UseTGridSessionArgs<
   RowsByLevel extends TGridRowsByLevel,
   AppServices,
-> = CreateTGridSessionArgs<RowsByLevel, AppServices>;
+> = Omit<CreateTGridSessionArgs<RowsByLevel, AppServices>, "rowDisplays">;
 
 // Read and update the query controls for one page-controlled level.
 export function useTGridQueryState<
@@ -82,16 +84,20 @@ export function useTGridSession<
   args: UseTGridSessionArgs<RowsByLevel, AppServices> = {},
 ): TGridSession<RowsByLevel, AppServices> | null {
   const liveInputsRef = useRef<TGridLiveInputs<RowsByLevel, AppServices>>({});
+  const rowDisplays = useRowDisplays();
   liveInputsRef.current = {
     services: args.services,
     onQueryUrlChange: args.onQueryUrlChange,
     routeQuerySeeds: args.routeQuerySeeds,
     onLoadedRowsBoundary: args.onLoadedRowsBoundary,
+    rowDisplays,
   };
 
+  // The displays decide which computed fields the session asks for, so new
+  // displays start a new session.
   return useCommittedDisposableResource(
     () => createTGridSessionWithRef(definition, liveInputsRef),
-    [definition],
+    [definition, rowDisplays],
   );
 }
 

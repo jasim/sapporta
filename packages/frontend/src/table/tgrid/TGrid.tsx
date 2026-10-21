@@ -42,6 +42,7 @@ import type { TGridRowActivatedEvent } from "./tgrid-active-row";
 import type { TGridRowsByLevel } from "./tgrid-types";
 import type { TGridLevelQueryState } from "./tgrid-level-query-state";
 import type { TGridSession } from "./tgrid-session";
+import { RowDataStoreProvider } from "../../lookup/row-display";
 import type { TGridLevelInfo } from "./tgrid-level-config";
 import "./table-card.css";
 
@@ -171,22 +172,28 @@ export function TGrid<
 
   return (
     <GridRuntimeProvider runtime={runtime}>
-      <GridCopyContextMenu
-        renderExtraItems={(target) => (
-          <>
-            {renderTGridTreeMenuItems(sessionContext, runtime, target)}
-            {renderTGridLinkMenuItems(sessionContext, runtime, target)}
-          </>
-        )}
-      >
-        {withTGridSessionContext(
-          sessionContext as unknown as TGridSessionContext<
-            TGridRowsByLevel,
-            unknown
-          >,
-          <GridLevel path={root} chrome={chrome} presentation={presentation} />,
-        )}
-      </GridCopyContextMenu>
+      <RowDataStoreProvider store={session.lookups}>
+        <GridCopyContextMenu
+          renderExtraItems={(target) => (
+            <>
+              {renderTGridTreeMenuItems(sessionContext, runtime, target)}
+              {renderTGridLinkMenuItems(sessionContext, runtime, target)}
+            </>
+          )}
+        >
+          {withTGridSessionContext(
+            sessionContext as unknown as TGridSessionContext<
+              TGridRowsByLevel,
+              unknown
+            >,
+            <GridLevel
+              path={root}
+              chrome={chrome}
+              presentation={presentation}
+            />,
+          )}
+        </GridCopyContextMenu>
+      </RowDataStoreProvider>
     </GridRuntimeProvider>
   );
 }

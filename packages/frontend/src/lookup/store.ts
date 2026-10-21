@@ -1,6 +1,5 @@
 import type { LookupCapabilities, LookupValue } from "@sapporta/grid/lookup";
-import type { ColumnSchema, Row } from "@sapporta/shared/contracts";
-import { createTableLookupSource, type TableLookupSource } from "./source";
+import type { ColumnSchema } from "@sapporta/shared/contracts";
 
 export type LookupForColumn<TMeta = unknown> = (
   column: ColumnSchema,
@@ -15,44 +14,3 @@ export type LookupStore<TMeta = unknown> = {
   }): LookupCapabilities<LookupValue, TMeta>;
   clear(): void;
 };
-
-export function createLookupStore(): LookupStore<Row> {
-  const byTable = new Map<string, TableLookupSource>();
-
-  function table(tableName: string): TableLookupSource {
-    const existing = byTable.get(tableName);
-    if (existing) return existing;
-
-    const lookup = createTableLookupSource(tableName);
-    byTable.set(tableName, lookup);
-    return lookup;
-  }
-
-  function foreignKey(column: ColumnSchema): TableLookupSource | undefined {
-    return column.foreignKey ? table(column.foreignKey.table) : undefined;
-  }
-
-  function requireForeignKey({
-    tableName,
-    column,
-  }: {
-    tableName: string;
-    column: ColumnSchema;
-  }): TableLookupSource {
-    const lookup = foreignKey(column);
-    if (lookup) return lookup;
-
-    throw new Error(
-      `Column '${tableName}.${column.name}' is not a foreign-key column.`,
-    );
-  }
-
-  return {
-    table,
-    foreignKey,
-    requireForeignKey,
-    clear() {
-      byTable.clear();
-    },
-  };
-}
