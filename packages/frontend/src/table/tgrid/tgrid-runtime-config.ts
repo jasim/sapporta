@@ -77,6 +77,7 @@ import type {
 } from "./tgrid-level-config";
 import { tgridPageWindow } from "./tgrid-page-window";
 import type { RowDataStore, TableRowData } from "../../lookup";
+import { invalidateRowsExcept } from "../../lookup/row-data";
 
 export type TGridDefinition<
   RowsByLevel extends TGridRowsByLevel = TGridRowsByLevel,
@@ -500,6 +501,8 @@ function levelRowData(
     afterWrite() {
       store.invalidateComputed();
       store.reloadLabels(table.name);
+      // Other grids, pickers and forms may show the same rows.
+      invalidateRowsExcept(table.name, store);
     },
   };
 }

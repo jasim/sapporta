@@ -26,7 +26,7 @@ import { createTableRow } from "../api/rows";
 import { tableQueryKeys } from "../query";
 import { reloadTGridRows } from "../tgrid/tgrid-session-registry";
 import { showCreatedRowState, tableReturnUrl } from "../page/show-table-row";
-import { useLookupStore } from "../../lookup";
+import { invalidateRows, useLookupStore } from "../../lookup";
 
 export function NewRecordPage({ tableSchema }: { tableSchema: TableSchema }) {
   const navigate = useNavigate();
@@ -56,6 +56,7 @@ export function NewRecordPage({ tableSchema }: { tableSchema: TableSchema }) {
       try {
         const { data } = await createTableRow(tableSchema.name, parsed.value);
         reloadTGridRows(tableSchema.name);
+        invalidateRows(tableSchema.name);
         await queryClient.invalidateQueries({
           queryKey: tableQueryKeys.table(tableSchema.name),
         });

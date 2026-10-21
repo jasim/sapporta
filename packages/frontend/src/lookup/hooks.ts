@@ -1,7 +1,7 @@
 import { useEffect, useMemo } from "react";
 import type { LookupCapabilities, LookupValue } from "@sapporta/grid/lookup";
 import type { Row } from "@sapporta/shared/contracts";
-import { createLookupStore } from "./row-data";
+import { connectRowDataStore, createLookupStore } from "./row-data";
 import type { RowDataStore } from "./row-data";
 import { useRowDisplays } from "./row-display";
 
@@ -16,7 +16,13 @@ export function useLookupStore(): RowDataStore {
     () => createLookupStore({ rowDisplays }),
     [rowDisplays],
   );
-  useEffect(() => () => store.clear(), [store]);
+  useEffect(() => {
+    const disconnect = connectRowDataStore(store);
+    return () => {
+      disconnect();
+      store.clear();
+    };
+  }, [store]);
   return store;
 }
 

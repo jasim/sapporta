@@ -4,7 +4,12 @@ import { act, createElement, type ReactElement } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { LookupResponse, TableSchema } from "@sapporta/shared/contracts";
-import { createLookupStore } from "./row-data";
+import {
+  connectRowDataStore,
+  createLookupStore,
+  invalidateRows,
+  invalidateRowsExcept,
+} from "./row-data";
 import {
   referenceEntryRenderer,
   RowDisplayProvider,
@@ -105,6 +110,29 @@ describe("row data store", () => {
     expect(data.computedFor(1)).toEqual({ parentPath: "P1" });
     await data.ensureComputed([1], ["parentPath"]);
     expect(fetchLookup).toHaveBeenCalledTimes(2);
+  });
+
+  it("invalidates every connected store, and only those", async () => {
+    fetchLookup.mockImplementation(async (_table, ids: string[]) =>
+      pathsFor(ids),
+    );
+    const connected = createLookupStore({ tables: () => [accounts] });
+    const written = createLookupStore({ tables: () => [accounts] });
+    const loose = createLookupStore({ tables: () => [accounts] });
+    const disconnect = connectRowDataStore(connected);
+    const disconnectWritten = connectRowDataStore(written);
+    const stores = [connected, written, loose];
+    const before = stores.map((store) => store.table("accounts").generation);
+
+    invalidateRowsExcept("accounts", written);
+    expect(stores.map((store) => store.table("accounts").generation)).toEqual(
+      [before[0]! + 1, before[1], before[2]],
+    );
+
+    disconnect();
+    disconnectWritten();
+    invalidateRows("accounts");
+    expect(connected.table("accounts").generation).toBe(before[0]! + 1);
   });
 
   it("reads a value again when the read was sent before an invalidation", async () => {

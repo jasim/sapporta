@@ -87,8 +87,9 @@ export type RowDataStore = {
    * arrive. Call it after a write, since a value may depend on any row.
    */
   invalidateComputed(): void;
-  /** Reads a table's labels again, such as after its rows were edited. */
-  reloadLabels(tableName: string): void;
+  /** Reads a table's labels again, such as after its rows were edited;
+   *  every table's labels when no table is named. */
+  reloadLabels(tableName?: string): void;
   /** The display slots the rows of this store are drawn with. */
   readonly rowDisplays: RowDisplays;
   /** The schema of a table, when it is loaded. */
@@ -155,11 +156,52 @@ export function createLookupStore(
       for (const source of byTable.values()) source.invalidateComputed();
     },
     reloadLabels(tableName) {
-      byTable.get(tableName)?.reloadLabels();
+      if (tableName === undefined) {
+        for (const source of byTable.values()) source.reloadLabels();
+      } else {
+        byTable.get(tableName)?.reloadLabels();
+      }
     },
     rowDisplays,
     tableSchema,
   };
+}
+
+const connectedStores = new Set<RowDataStore>();
+
+/**
+ * Keeps `store` current with `invalidateRows` until the returned function is
+ * called. Table grids and `useLookupStore` connect their stores while they
+ * are mounted; connect a store made with `createLookupStore` the same way.
+ */
+export function connectRowDataStore(store: RowDataStore): () => void {
+  connectedStores.add(store);
+  return () => {
+    connectedStores.delete(store);
+  };
+}
+
+/**
+ * Tells every connected row store that rows changed: computed values are
+ * read again for the rows on screen, and the labels of `tableName` (every
+ * table's, when none is named) are read again. Sapporta calls it after its
+ * own writes; call it after your own endpoints write.
+ */
+export function invalidateRows(tableName?: string): void {
+  invalidateRowsExcept(tableName, undefined);
+}
+
+/** `invalidateRows` for the stores other than `written`, which the caller
+ *  has already brought up to date. */
+export function invalidateRowsExcept(
+  tableName: string | undefined,
+  written: RowDataStore | undefined,
+): void {
+  for (const store of connectedStores) {
+    if (store === written) continue;
+    store.invalidateComputed();
+    store.reloadLabels(tableName);
+  }
 }
 
 /** The computed fields every lookup of a table carries: what its label slot

@@ -4,7 +4,9 @@ export * from "./LookupPicker";
 export * from "./source";
 export * from "./store";
 export {
+  connectRowDataStore,
   createLookupStore,
+  invalidateRows,
   type RowDataStore,
   type RowDataStoreOptions,
   type TableRowData,

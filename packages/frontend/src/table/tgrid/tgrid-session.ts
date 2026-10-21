@@ -48,6 +48,7 @@ import {
 } from "./tgrid-active-row";
 import {
   checkRowDisplays,
+  connectRowDataStore,
   createLookupStore,
   type LookupForColumn,
   type RowDataStore,
@@ -257,6 +258,7 @@ class DefaultTGridSession<
   readonly runtime: GridRuntime;
   readonly rootSource: RuntimeLevelDataSource;
   readonly lookups: RowDataStore;
+  private readonly disconnectLookups: () => void;
   readonly lookupForColumn: LookupForColumn;
   readonly columnMapper: TGridColumnMapper;
   readonly levelInfoById: Record<TGridLevelId<RowsByLevel>, TGridLevelInfo>;
@@ -280,6 +282,7 @@ class DefaultTGridSession<
     ).name;
     const rowDisplays = liveInputsRef.current.rowDisplays ?? {};
     this.lookups = createLookupStore({ rowDisplays });
+    this.disconnectLookups = connectRowDataStore(this.lookups);
     // A slot naming a table, column or computed field that does not exist
     // would never draw; fail here, where the schemas are known.
     checkRowDisplays(
@@ -532,6 +535,7 @@ class DefaultTGridSession<
     this.disposed = true;
     for (const stopWaiting of this.settleWaiters) stopWaiting();
     this.runtime.dispose();
+    this.disconnectLookups();
     this.lookups.clear();
   }
 
