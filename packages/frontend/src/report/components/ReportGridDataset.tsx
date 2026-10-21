@@ -45,6 +45,8 @@ import type { LinkIcon } from "@sapporta/shared/contracts";
 import { titleCaseIdentifier } from "@sapporta/shared/labels";
 import {
   gridDatasetLinkProblems,
+  gridDatasetReferenceIds,
+  gridDatasetReferenceProblems,
   gridDatasetTreeColumn,
   gridDatasetTreeProblems,
   type GridDataset,
@@ -65,6 +67,10 @@ import {
   openResolvedLink,
 } from "../../links/open-link";
 import { LinkMenuItems } from "../../links/LinkMenuItems";
+import { useLookupStore } from "../../lookup/hooks";
+import type { RowDataStore, TableRowData } from "../../lookup/row-data";
+import type { DisplayContext } from "../../lookup/row-display-types";
+import { RowLabel, rowLabelFields } from "../../lookup/row-display";
 import { useTablePageMode } from "../../table/page/table-page-mode";
 // The cards presentation is styled once for every sapporta-table-grid level;
 // report grids reuse it rather than declaring a report-only card layout.
@@ -119,7 +125,8 @@ export type ReportCellRenderContext = CellRenderProps & {
   reportColumn: GridDatasetColumn;
   /**
    * The cell as the column renders it on its own, formatting and truncation
-   * included. The report's drill-through link wraps the override's output
+   * included. On a `reference` column it is the row drawn with its table's
+   * label slot. The report's drill-through link wraps the override's output
    * afterwards, so wrapping this keeps the link either way.
    */
   defaultContent: ReactNode;
@@ -192,19 +199,26 @@ export function ReportGridDataset<TInput = unknown>({
   columnSizing,
 }: ReportGridDatasetProps<TInput>) {
   const input = linkContext?.input;
+  // The rows that reference columns name. The report owns its store, so its
+  // values live as long as the report does.
+  const rowData = useLookupStore();
   const runtime = useGridRuntimeEffect(() => {
     const model = buildReportGridDatasetModel(
       dataset,
       links,
       input,
       renderCell,
+      rowData,
     );
+    // Before the cells draw, so values the server sent with the report never
+    // arrive late, and the rest arrive in one lookup per table.
+    loadReferencedRows(rowData, dataset);
     return createGridRuntime({
       schema: model.schema,
       dataSource: model.dataSource,
       interaction: CELL_GRID_WITH_ACTIVE_ROW,
     });
-  }, [dataset, links, input, renderCell]);
+  }, [dataset, links, input, renderCell, rowData]);
 
   if (!runtime) {
     return (
@@ -326,6 +340,7 @@ function buildReportGridDatasetModel<TInput>(
   links: ReportCellLinkResolvers<TInput> | undefined,
   input: TInput | undefined,
   renderCellOverrides: ReportCellRenderers | undefined,
+  rowData: RowDataStore,
 ): {
   schema: GridSchema;
   dataSource: ReturnType<typeof inMemoryGridDataSource>;
@@ -339,6 +354,7 @@ function buildReportGridDatasetModel<TInput>(
   const problems = [
     ...gridDatasetLinkProblems(dataset),
     ...gridDatasetTreeProblems(dataset),
+    ...gridDatasetReferenceProblems(dataset),
   ];
   if (problems.length > 0) {
     throw new Error(problems.join("\n"));
@@ -383,6 +399,7 @@ function buildReportGridDatasetModel<TInput>(
         input,
         linkCache,
         renderCellOverrides,
+        rowData,
       }),
     );
 
@@ -501,6 +518,66 @@ const TREE_EXPANSION: ReportExpansionControl = {
   activation: treeExpansionActivation,
 };
 
+// Where a report's reference cells draw a row. Like other grid cells, they
+// draw no caption unless the table's label slot draws one.
+const REFERENCE_CELL_CONTEXT: DisplayContext = {
+  as: "reference",
+  surface: "cell",
+  density: "compact",
+  hierarchyShown: false,
+};
+
+/**
+ * Stores the computed values the server sent with the dataset, then asks for
+ * what the referenced tables' label slots need and the dataset does not
+ * carry: one lookup per table, for every row of the report.
+ */
+function loadReferencedRows(rowData: RowDataStore, dataset: GridDataset) {
+  for (const [tableName, values] of Object.entries(dataset.computed ?? {})) {
+    const data = rowData.table(tableName);
+    data.storeComputed(values, data.generation);
+  }
+  for (const [tableName, ids] of gridDatasetReferenceIds(dataset)) {
+    const data = rowData.table(tableName);
+    const fields = rowLabelFields(
+      data.labelSlot(),
+      data.schema(),
+      REFERENCE_CELL_CONTEXT,
+    );
+    void data.ensureComputed(ids, fields);
+  }
+}
+
+/** A reference cell: the row its id column names, drawn with the table's
+ *  label slot. A cell without an id or a label draws `content` alone. */
+function renderReferenceCell({
+  props,
+  content,
+  data,
+  idColumn,
+}: {
+  props: CellRenderProps;
+  content: ReactNode;
+  data: TableRowData;
+  idColumn: string;
+}): ReactNode {
+  const id = props.row.columns[idColumn];
+  const label = props.value;
+  if (typeof id !== "string" && typeof id !== "number") return content;
+  if (id === "" || label === null || label === undefined || label === "") {
+    return content;
+  }
+  return (
+    <RowLabel
+      data={data}
+      id={id}
+      label={String(label)}
+      labelContent={content}
+      context={REFERENCE_CELL_CONTEXT}
+    />
+  );
+}
+
 function gridColumnForDatasetColumn<TInput>({
   dataset,
   levelName,
@@ -511,6 +588,7 @@ function gridColumnForDatasetColumn<TInput>({
   input,
   linkCache,
   renderCellOverrides,
+  rowData,
 }: {
   dataset: GridDataset;
   levelName: string;
@@ -521,6 +599,7 @@ function gridColumnForDatasetColumn<TInput>({
   input: TInput | undefined;
   linkCache: ReportCellLinkCache;
   renderCellOverrides: ReportCellRenderers | undefined;
+  rowData: RowDataStore;
 }): ColumnSchema {
   const options = {
     id: column.id,
@@ -560,6 +639,17 @@ function gridColumnForDatasetColumn<TInput>({
   }
 
   const presetRenderCell = gridColumn.renderCell;
+  const reference = column.reference;
+  // A reference column draws the named row with its table's label slot.
+  const defaultRenderCell = reference
+    ? (props: CellRenderProps) =>
+        renderReferenceCell({
+          props,
+          content: presetRenderCell(props),
+          data: rowData.table(reference.table),
+          idColumn: reference.idColumn,
+        })
+    : presetRenderCell;
   const override = renderCellOverrides?.[levelName]?.[column.id];
   // The override sits inside the link adornment rather than replacing it, so
   // a column can restyle its value and keep the report's drill-through links.
@@ -570,9 +660,9 @@ function gridColumnForDatasetColumn<TInput>({
           dataset,
           levelName,
           reportColumn: column,
-          defaultContent: presetRenderCell(props),
+          defaultContent: defaultRenderCell(props),
         })
-    : presetRenderCell;
+    : defaultRenderCell;
   const columnWithLinks = {
     ...gridColumn,
     renderCell: (props: CellRenderProps) =>
