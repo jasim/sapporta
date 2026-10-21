@@ -1,4 +1,9 @@
-import { useMemo, useState, type ComponentType } from "react";
+import {
+  useMemo,
+  useState,
+  type ComponentType,
+  type ReactNode,
+} from "react";
 import { Check, ChevronDown, X } from "lucide-react";
 import {
   lookupValueEquals,
@@ -11,7 +16,7 @@ import { useLookupOptions } from "@sapporta/grid/lookup/react";
 import { Combobox, comboboxClassNames } from "@sapporta/ui/combobox";
 import { cn } from "@sapporta/ui/cn";
 import type { Row } from "@sapporta/shared/contracts";
-import { isTableRowData } from "./row-data";
+import { isTableRowData, type TableRowData } from "./row-data";
 import { RowLabel } from "./row-display";
 
 const DEFAULT_SEARCH_LIMIT = 50;
@@ -21,6 +26,10 @@ export type LookupPickerItemProps<
   TMeta = unknown,
 > = {
   entry: LookupEntry<TValue, TMeta> & { meta: TMeta };
+  /** What the option draws without this component: for a table's lookup, the
+   *  row through the table's label slot; otherwise the label. Return it, or
+   *  wrap it, to keep the table's caption. */
+  defaultContent: ReactNode;
 };
 
 /** Choose table-like fields or a React component for each dropdown item. */
@@ -28,7 +37,8 @@ export type LookupPickerItemDisplay<
   TValue extends LookupValue = LookupValue,
   TMeta = unknown,
 > = {
-  /** Fields rendered by this item and therefore included in lookup search. */
+  /** Fields rendered by this item and therefore included in lookup search.
+   *  The options' `entry.meta` holds every visible column either way. */
   fields: readonly Extract<keyof TMeta, string>[];
   component?: ComponentType<LookupPickerItemProps<TValue, TMeta>>;
 };
@@ -40,7 +50,14 @@ export type LookupPickerProps<
   lookup: LookupCapabilities<TValue, TMeta>;
   value: TValue | null;
   onChange: (value: TValue | null) => void;
+  /** Draws each option. The chosen value's caption keeps the table's label
+   *  slot. */
   itemDisplay?: LookupPickerItemDisplay<TValue, TMeta>;
+  /** Where a table's lookup draws the chosen row's caption: `"inline"` inside
+   *  the field, at its end; `"below"` on a line of its own under the field,
+   *  at full width. The line under the field is kept even while it is empty,
+   *  so picking a value never moves what follows. */
+  selectedCaption?: "inline" | "below";
   placeholder?: string;
   disabled?: boolean;
   allowClear?: boolean;
@@ -59,6 +76,7 @@ export function LookupPicker<
   value,
   onChange,
   itemDisplay,
+  selectedCaption = "inline",
   placeholder = "Select...",
   disabled,
   allowClear = true,
@@ -69,9 +87,8 @@ export function LookupPicker<
   ariaDescribedBy,
 }: LookupPickerProps<TValue, TMeta>) {
   // A table's row data draws options and the selected value with the
-  // table's label slot; `itemDisplay` stays the most specific choice.
-  const rowData =
-    itemDisplay === undefined && isTableRowData(lookup) ? lookup : undefined;
+  // table's label slot. `itemDisplay` draws options over it.
+  const rowData = isTableRowData(lookup) ? lookup : undefined;
   const [searchText, setSearchText] = useState("");
   const selectedValues = useMemo(() => (value == null ? [] : [value]), [value]);
   const entries = useLookupOptions({
@@ -91,7 +108,27 @@ export function LookupPicker<
     [entries, value],
   );
 
-  return (
+  const selectedLabel =
+    rowData && selectedEntry ? (
+      <RowLabel
+        data={rowData}
+        id={selectedEntry.value}
+        label={selectedEntry.label}
+        row={rowOfEntry(selectedEntry)}
+        context={{
+          as: "reference",
+          surface: "selected",
+          density: "regular",
+          hierarchyShown: false,
+        }}
+      />
+    ) : null;
+  const inputGroupClassName =
+    rowData && selectedCaption === "below"
+      ? comboboxClassNames.inputGroup
+      : cn(comboboxClassNames.inputGroup, className);
+
+  const picker = (
     <Combobox.Root
       items={entries}
       value={selectedEntry}
@@ -109,9 +146,7 @@ export function LookupPicker<
       filter={null}
       disabled={disabled}
     >
-      <Combobox.InputGroup
-        className={cn(comboboxClassNames.inputGroup, className)}
-      >
+      <Combobox.InputGroup className={inputGroupClassName}>
         <Combobox.Input
           id={id}
           aria-invalid={ariaInvalid || undefined}
@@ -119,25 +154,16 @@ export function LookupPicker<
           placeholder={placeholder}
           className={comboboxClassNames.input}
         />
-        {rowData && selectedEntry && searchText === "" && (
-          <span
-            className="pointer-events-none flex h-full max-w-[45%] shrink-0 items-center overflow-hidden whitespace-nowrap pe-1 text-sap-meta text-sap-muted"
-            data-lookup-selected-adornment=""
-          >
-            <RowLabel
-              data={rowData}
-              id={selectedEntry.value}
-              label={selectedEntry.label}
-              row={rowOfEntry(selectedEntry)}
-              context={{
-                as: "reference",
-                surface: "selected",
-                density: "regular",
-                hierarchyShown: false,
-              }}
-            />
-          </span>
-        )}
+        {selectedCaption === "inline" &&
+          selectedLabel &&
+          searchText === "" && (
+            <span
+              className="pointer-events-none flex h-full max-w-[45%] shrink-0 items-center overflow-hidden whitespace-nowrap pe-1 text-sap-meta text-sap-muted"
+              data-lookup-selected-adornment=""
+            >
+              {selectedLabel}
+            </span>
+          )}
         {allowClear && (
           <Combobox.Clear
             aria-label="Clear selection"
@@ -171,30 +197,24 @@ export function LookupPicker<
                   disabled={entry.disabled}
                   className={comboboxClassNames.item}
                 >
-                  {rowData ? (
-                    <span className="flex min-w-0 flex-1">
-                      <RowLabel
-                        data={rowData}
-                        id={entry.value}
-                        label={entry.label}
-                        row={rowOfEntry(entry)}
-                        context={{
-                          as: "reference",
-                          surface: "option",
-                          density: "regular",
-                          hierarchyShown: false,
-                          selected:
+                  <LookupPickerItemContent
+                    entry={entry}
+                    itemDisplay={itemDisplay}
+                    defaultContent={
+                      rowData ? (
+                        <RowOption
+                          data={rowData}
+                          entry={entry}
+                          selected={
                             value != null &&
-                            lookupValueEquals(entry.value, value),
-                        }}
-                      />
-                    </span>
-                  ) : (
-                    <LookupPickerItemContent
-                      entry={entry}
-                      itemDisplay={itemDisplay}
-                    />
-                  )}
+                            lookupValueEquals(entry.value, value)
+                          }
+                        />
+                      ) : (
+                        entry.label
+                      )
+                    }
+                  />
                   <Combobox.ItemIndicator
                     className={comboboxClassNames.itemIndicator}
                   >
@@ -208,26 +228,69 @@ export function LookupPicker<
       </Combobox.Portal>
     </Combobox.Root>
   );
+
+  if (!rowData || selectedCaption !== "below") return picker;
+  return (
+    <div className={cn("flex min-w-0 flex-col", className)}>
+      {picker}
+      <div
+        className="flex h-4 min-w-0 items-center overflow-hidden whitespace-nowrap px-3 text-sap-meta text-sap-muted"
+        data-lookup-selected-caption=""
+      >
+        {selectedLabel}
+      </div>
+    </div>
+  );
+}
+
+function RowOption({
+  data,
+  entry,
+  selected,
+}: {
+  data: TableRowData;
+  entry: LookupEntry;
+  selected: boolean;
+}) {
+  return (
+    <span className="flex min-w-0 flex-1">
+      <RowLabel
+        data={data}
+        id={entry.value}
+        label={entry.label}
+        row={rowOfEntry(entry)}
+        context={{
+          as: "reference",
+          surface: "option",
+          density: "regular",
+          hierarchyShown: false,
+          selected,
+        }}
+      />
+    </span>
+  );
 }
 
 function LookupPickerItemContent<TValue extends LookupValue, TMeta>({
   entry,
   itemDisplay,
+  defaultContent,
 }: {
   entry: LookupEntry<TValue, TMeta>;
   itemDisplay: LookupPickerItemDisplay<TValue, TMeta> | undefined;
+  defaultContent: ReactNode;
 }) {
   if (itemDisplay === undefined || !hasLookupEntryMeta(entry)) {
-    return entry.label;
+    return defaultContent;
   }
 
   if (itemDisplay.component !== undefined) {
     const ItemComponent = itemDisplay.component;
-    return <ItemComponent entry={entry} />;
+    return <ItemComponent entry={entry} defaultContent={defaultContent} />;
   }
 
   if (itemDisplay.fields.length === 0 || !isObject(entry.meta)) {
-    return entry.label;
+    return defaultContent;
   }
   const meta = entry.meta;
 

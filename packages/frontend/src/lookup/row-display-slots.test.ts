@@ -5,6 +5,7 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 import type { LookupResponse, TableSchema } from "@sapporta/shared/contracts";
+import type { LookupCapabilities } from "@sapporta/grid/lookup";
 import { createLookupStore } from "./row-data";
 import {
   ColumnSlotCell,
@@ -310,4 +311,80 @@ describe("LookupPicker with a table's row data", () => {
     expect(adornment?.textContent).toBe("Expenses > Kitchen");
     expect(fetchLookup).toHaveBeenCalledWith("accounts", [9], ["parentPath"]);
   });
+
+  it("keeps the caption beside the chosen value with a custom item", async () => {
+    mockAccountLookups();
+    const store = createLookupStore({ tables: () => [accounts] });
+
+    await render(
+      createElement(LookupPicker<number, Record<string, unknown>>, {
+        lookup: store.table("accounts") as LookupCapabilities<
+          number,
+          Record<string, unknown>
+        >,
+        value: 9,
+        onChange: () => undefined,
+        itemDisplay: {
+          fields: [],
+          component: ({ defaultContent }) =>
+            createElement("span", { "data-custom-item": "" }, defaultContent),
+        },
+      }),
+    );
+    await settle();
+
+    expect(
+      document.querySelector("[data-lookup-selected-adornment]")?.textContent,
+    ).toBe("Expenses > Kitchen");
+  });
+
+  it("draws the caption on its own line with selectedCaption below", async () => {
+    mockAccountLookups();
+    const store = createLookupStore({ tables: () => [accounts] });
+
+    const empty = await render(
+      createElement(LookupPicker, {
+        lookup: store.table("accounts"),
+        value: null,
+        onChange: () => undefined,
+        selectedCaption: "below",
+      }),
+    );
+    await settle();
+    // The line is there before a value is chosen, so picking one moves nothing.
+    expect(
+      empty.querySelector("[data-lookup-selected-caption]")?.textContent,
+    ).toBe("");
+
+    const chosen = await render(
+      createElement(LookupPicker, {
+        lookup: store.table("accounts"),
+        value: 9,
+        onChange: () => undefined,
+        selectedCaption: "below",
+      }),
+    );
+    await settle();
+
+    expect(
+      chosen.querySelector("[data-lookup-selected-caption]")?.textContent,
+    ).toBe("Expenses > Kitchen");
+    expect(chosen.querySelector("[data-lookup-selected-adornment]")).toBe(null);
+  });
 });
+
+function mockAccountLookups() {
+  fetchLookup.mockImplementation(async (_table, ids: number[]) => ({
+    entries: ids.map((id) => ({
+      value: id,
+      label: `Account ${id}`,
+      meta: {},
+    })),
+    computed: {
+      parentPath: Object.fromEntries(
+        ids.map((id) => [String(id), "Expenses > Kitchen"]),
+      ),
+    },
+  }));
+  fetchLookupSearch.mockResolvedValue({ entries: [] });
+}
