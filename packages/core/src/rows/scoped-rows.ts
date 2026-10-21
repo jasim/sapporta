@@ -126,6 +126,10 @@ export type LookupRowsBySearchInput<
   search?: string;
   fields?: readonly TableColumn<TTable>[];
   limit?: number;
+  /** Narrows the choices, such as to accounts of one type. Lookups by id
+   *  do not take it, so a chosen row still shows its label after it stops
+   *  matching. */
+  where?: SQL;
 };
 
 export type LookupRowsInput<TTable extends AnySQLiteTable = AnySQLiteTable> =
@@ -404,7 +408,7 @@ export function scopedRows<TTable extends AnySQLiteTable>(
         const query = db
           .select(queryFields.databaseSelection)
           .from(table.drizzle)
-          .where(access.ownedRows(searchWhere))
+          .where(access.ownedRows(and(input.where, searchWhere)))
           .orderBy(asc(pk.drizzlePk));
         rows = (await query.limit(limit)) as Record<string, unknown>[];
       } else {

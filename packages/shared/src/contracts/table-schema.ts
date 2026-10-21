@@ -207,6 +207,7 @@ const lookupByIdsQuerySchema = z
     q: z.never().optional(),
     fields: z.never().optional(),
     limit: z.never().optional(),
+    notUnder: z.never().optional(),
   })
   .strict();
 
@@ -222,8 +223,12 @@ const lookupBySearchQuerySchema = z
       .min(1)
       .max(MAX_LOOKUP_LIMIT)
       .default(DEFAULT_LOOKUP_LIMIT),
+    /** Leaves out this row of a tree table and the rows below it. */
+    notUnder: z.string().min(1).optional(),
   })
-  .strict();
+  // `filter[col][op]=value` narrows the choices, as on list reads. Lookups
+  // by id take no filter, so a chosen row keeps its label.
+  .catchall(filterQueryValueSchema);
 
 export const lookupQuerySchema = z.union([
   lookupByIdsQuerySchema,

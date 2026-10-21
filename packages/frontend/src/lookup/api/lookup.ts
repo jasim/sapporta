@@ -2,6 +2,45 @@ import { uiClient } from "../../platform/client";
 import type { LookupResponse, Row } from "@sapporta/shared/contracts";
 import type { LookupEntry, LookupValue } from "@sapporta/grid/lookup";
 import type { LookupSearchPage } from "@sapporta/grid/lookup";
+import { wireKey, type FilterDraftCondition } from "@sapporta/shared/filter";
+
+/**
+ * Narrows a lookup's choices. Lookups by id are never narrowed, so a chosen
+ * row keeps its label after it stops matching.
+ */
+export type LookupNarrowing = {
+  /** Conditions in the list filter grammar, such as accounts of one type. */
+  filter?: readonly FilterDraftCondition[];
+  /** Leaves out this row of a tree table and the rows below it, such as when
+   *  choosing a row's parent. */
+  notUnder?: LookupValue;
+};
+
+/** The query parameters of a narrowing. */
+export function lookupNarrowingQuery(
+  narrowing: LookupNarrowing | undefined,
+): Record<string, string | string[]> {
+  const query: Record<string, string | string[]> = {};
+  for (const cond of narrowing?.filter ?? []) {
+    const key = wireKey(cond.column, cond.op);
+    const value =
+      "values" in cond
+        ? cond.values.map(String).join(",")
+        : "polarity" in cond
+          ? cond.polarity
+          : cond.value;
+    const existing = query[key];
+    // The grammar ANDs repeated conditions on one key.
+    query[key] =
+      existing === undefined
+        ? value
+        : [...(Array.isArray(existing) ? existing : [existing]), value];
+  }
+  if (narrowing?.notUnder !== undefined) {
+    query.notUnder = String(narrowing.notUnder);
+  }
+  return query;
+}
 
 export function buildLookupValueQuery(
   values: readonly LookupValue[],
@@ -60,10 +99,14 @@ export async function fetchLookupSearch(
   limit?: number,
   fields?: readonly string[],
   computed?: readonly string[],
+  narrowing?: LookupNarrowing,
 ): Promise<LookupResponse> {
   return uiClient.lookup({
     params: { tableName },
-    query: buildLookupSearchQuery(searchText, limit, fields, computed),
+    query: {
+      ...lookupNarrowingQuery(narrowing),
+      ...buildLookupSearchQuery(searchText, limit, fields, computed),
+    },
   });
 }
 

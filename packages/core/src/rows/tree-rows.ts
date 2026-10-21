@@ -93,6 +93,28 @@ export function treeMatchPredicates(
   };
 }
 
+/**
+ * A predicate on the primary key that keeps every row except `id` and the
+ * rows below it, such as the choices for a row's parent, where picking the
+ * row itself or one of its descendants would make a loop.
+ *
+ * The walk goes through every row of the table, not only the ones the
+ * caller may see: a row under `id` through a hidden row is still below it.
+ * The predicate only removes rows, so it shows the caller nothing new.
+ */
+export function notUnderPredicate(
+  table: TableDef,
+  tree: TreeMeta,
+  id: string,
+): SQL {
+  const tableName = sql.identifier(getTableConfig(table.drizzle).name);
+  const pk = findPkColumn(table);
+  const parent = requireColumn(table, tree.parentColumn);
+  const under = sql.identifier("sapporta_tree_under");
+  const underId = sql.identifier("id");
+  return sql`${pk} not in (with recursive ${under}(${underId}) as (select ${pk} from ${tableName} where ${pk} = ${id} union select ${pk} from ${tableName} join ${under} on ${parent} = ${under}.${underId}) select ${underId} from ${under})`;
+}
+
 function requireColumn(table: TableDef, name: string): SQLiteColumn {
   const column = columnBySqlName(table, name);
   if (!column) {

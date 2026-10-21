@@ -3,6 +3,7 @@ import type { LookupCapabilities, LookupValue } from "@sapporta/grid/lookup";
 import type { Row } from "@sapporta/shared/contracts";
 import { connectRowDataStore, createLookupStore } from "./row-data";
 import type { RowDataStore } from "./row-data";
+import type { LookupNarrowing } from "./api/lookup";
 import { useRowDisplays } from "./row-display";
 
 /**
@@ -32,11 +33,18 @@ export function useLookupStore(): RowDataStore {
  * the same type. The store is key-agnostic at runtime, so the parameter is an
  * assertion about the column, the same one `LookupPicker<number>` already asks
  * for. Left unparameterized, ids stay `string | number`.
+ *
+ * `narrowing` limits the choices the search offers, such as
+ * `{ filter: [{ column: "account_type", op: "in", values: ["asset"] }] }`,
+ * or `{ notUnder: accountId }` for an account's parent.
  */
 export function useTableLookup<TValue extends LookupValue = LookupValue>(
   tableName: string,
+  narrowing?: LookupNarrowing,
 ): LookupCapabilities<TValue, Row> {
-  const lookup: LookupCapabilities<LookupValue, Row> =
-    useLookupStore().table(tableName);
+  const lookup: LookupCapabilities<LookupValue, Row> = useLookupStore().table(
+    tableName,
+    narrowing,
+  );
   return lookup as LookupCapabilities<TValue, Row>;
 }

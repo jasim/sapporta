@@ -11,7 +11,11 @@ import {
   type ComputedValues,
   type Row,
 } from "@sapporta/shared/contracts";
-import { fetchLookup, fetchLookupSearch } from "./api/lookup";
+import {
+  fetchLookup,
+  fetchLookupSearch,
+  type LookupNarrowing,
+} from "./api/lookup";
 
 export type TableLookupSource = {
   valueLookup: ValueLookup<LookupValue, Row>;
@@ -35,6 +39,8 @@ export function createTableLookupSource(
   tableName: string,
   /** Called as each lookup is sent. */
   computed?: () => LookupComputedRequest,
+  /** Narrows the search; lookups by id are never narrowed. */
+  narrowing?: LookupNarrowing,
 ): CachedTableLookupSource {
   return {
     valueLookup: new CachedValueLookup<LookupValue, Row>({
@@ -64,6 +70,7 @@ export function createTableLookupSource(
           limit,
           fields,
           request?.fields,
+          narrowing,
         );
         if (response.computed) request?.store(response.computed);
         return { entries: response.entries };

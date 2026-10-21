@@ -135,6 +135,30 @@ describe("row data store", () => {
     expect(connected.table("accounts").generation).toBe(before[0]! + 1);
   });
 
+  it("keeps a cache per narrowing, and sends it with searches only", async () => {
+    fetchLookupSearch.mockResolvedValue({ entries: [] });
+    const store = createLookupStore({ tables: () => [accounts] });
+    const narrowing = {
+      filter: [{ column: "name", op: "in" as const, values: ["Cash"] }],
+      notUnder: 4,
+    };
+
+    const narrowed = store.table("accounts", narrowing);
+    expect(store.table("accounts", { ...narrowing })).toBe(narrowed);
+    expect(store.table("accounts", {})).toBe(store.table("accounts"));
+    expect(narrowed).not.toBe(store.table("accounts"));
+
+    await narrowed.searchLookup.loadSearchResults({ searchText: "ca", limit: 5 });
+    expect(fetchLookupSearch).toHaveBeenCalledWith(
+      "accounts",
+      "ca",
+      5,
+      undefined,
+      ["parentPath"],
+      narrowing,
+    );
+  });
+
   it("reads a value again when the read was sent before an invalidation", async () => {
     let finishOld: (() => void) | undefined;
     fetchLookup

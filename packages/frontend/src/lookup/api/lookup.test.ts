@@ -3,6 +3,7 @@ import {
   buildLookupSearchQuery,
   buildLookupValueQuery,
   lookupEntriesFromResponse,
+  lookupNarrowingQuery,
 } from "./lookup";
 
 describe("lookup API query serialization", () => {
@@ -41,5 +42,25 @@ describe("lookup API query serialization", () => {
         meta: { id: 7, name: "Alice Adams", email: "alice@example.com" },
       },
     ]);
+  });
+
+  it("serializes a narrowing in the list filter grammar", () => {
+    expect(
+      lookupNarrowingQuery({
+        filter: [
+          { column: "account_type", op: "in", values: ["asset", "liability"] },
+          { column: "name", op: "contains", value: "a" },
+          { column: "name", op: "contains", value: "b" },
+          { column: "closed_on", op: "is", polarity: "null" },
+        ],
+        notUnder: 4,
+      }),
+    ).toEqual({
+      "filter[account_type][in]": "asset,liability",
+      "filter[name][contains]": ["a", "b"],
+      "filter[closed_on][is]": "null",
+      notUnder: "4",
+    });
+    expect(lookupNarrowingQuery(undefined)).toEqual({});
   });
 });

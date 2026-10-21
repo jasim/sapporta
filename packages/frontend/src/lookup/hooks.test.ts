@@ -99,6 +99,7 @@ describe("lookup hooks", () => {
       10,
       ["email", "name"],
       [],
+      undefined,
     );
     expect(
       (

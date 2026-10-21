@@ -38,6 +38,7 @@ import type {
   TableColumn,
   TreeMatchInput,
 } from "../rows/scoped-rows.js";
+import { notUnderPredicate } from "../rows/tree-rows.js";
 import { findPkColumn } from "../schema/pk.js";
 import type { TableDef } from "../schema/table.js";
 import { columnBySqlName } from "../schema/column.js";
@@ -100,6 +101,13 @@ const PAGE_QUERY_KEYS = new Set([
 ]);
 const EXPORT_QUERY_KEYS = new Set(["sort", "q"]);
 const COUNT_QUERY_KEYS = new Set(["group_by", "order", "limit"]);
+const LOOKUP_SEARCH_QUERY_KEYS = new Set([
+  "q",
+  "fields",
+  "computed",
+  "limit",
+  "notUnder",
+]);
 
 /**
  * Parse query string parameters into Drizzle query parts.
@@ -223,11 +231,36 @@ export function resolveLookupQuery<TTable extends AnySQLiteTable>(
     };
   }
 
+  const filters = parseTableFilters(
+    extractFilterParams(query, LOOKUP_SEARCH_QUERY_KEYS, "lookup"),
+    table,
+  );
+  const where = and(filters, resolveNotUnder(query.notUnder, table));
   return {
     search: query.q?.trim() || undefined,
     fields: resolveLookupFields(table, query.fields),
     limit: query.limit,
+    ...(where ? { where } : {}),
   };
+}
+
+/** `notUnder=<id>`: leave out a tree row and the rows below it, such as when
+ *  choosing a row's parent. */
+function resolveNotUnder(
+  id: string | undefined,
+  table: TableDef,
+): SQL | undefined {
+  if (id === undefined) return undefined;
+  const tree = table.meta.tree;
+  if (!tree) {
+    throw new QueryParseError(
+      "bad_value",
+      `notUnder needs a tree table; "${table.sqlName}" does not declare meta.tree.`,
+    );
+  }
+  const pkName = findPkColumn(table).name;
+  const [checked] = parseLookupIds([id], table, pkName);
+  return notUnderPredicate(table, tree, checked!);
 }
 
 /**

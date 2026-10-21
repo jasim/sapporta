@@ -6,7 +6,7 @@ import {
   type TableSchema,
 } from "@sapporta/shared/contracts";
 import { toRecordId, type RecordId } from "@sapporta/shared/record-id";
-import { fetchLookup } from "./api/lookup";
+import { fetchLookup, type LookupNarrowing } from "./api/lookup";
 import type {
   ComputedRecord,
   LabelSlotProps,
@@ -73,7 +73,9 @@ export type TableRowData = TableLookupSource & {
  * seen, and the display slots that draw them.
  */
 export type RowDataStore = {
-  table(tableName: string): TableRowData;
+  /** A table's row data. With `narrowing`, its search offers only the rows
+   *  that match; each narrowing has its own caches. */
+  table(tableName: string, narrowing?: LookupNarrowing): TableRowData;
   foreignKey(
     column: Parameters<LookupStore["foreignKey"]>[0],
   ): TableRowData | undefined;
@@ -120,16 +122,21 @@ export function createLookupStore(
   const tableSchema = (tableName: string) =>
     tables().find((table) => table.name === tableName);
 
-  function table(tableName: string): TableRowDataSource {
-    const existing = byTable.get(tableName);
+  function table(
+    tableName: string,
+    narrowing?: LookupNarrowing,
+  ): TableRowDataSource {
+    const key = narrowingKey(tableName, narrowing);
+    const existing = byTable.get(key);
     if (existing) return existing;
     const created = new TableRowDataSource(tableName, {
       lookupFields: () =>
         lookupFieldsFor(tableName, rowDisplays, tableSchema, tables()),
       display: () => rowDisplays[tableName],
       schema: () => tableSchema(tableName),
+      narrowing,
     });
-    byTable.set(tableName, created);
+    byTable.set(key, created);
     return created;
   }
 
@@ -156,15 +163,28 @@ export function createLookupStore(
       for (const source of byTable.values()) source.invalidateComputed();
     },
     reloadLabels(tableName) {
-      if (tableName === undefined) {
-        for (const source of byTable.values()) source.reloadLabels();
-      } else {
-        byTable.get(tableName)?.reloadLabels();
+      for (const source of byTable.values()) {
+        if (tableName === undefined || source.tableName === tableName) {
+          source.reloadLabels();
+        }
       }
     },
     rowDisplays,
     tableSchema,
   };
+}
+
+// One cache per table and narrowing. A narrowing with no conditions is the
+// table itself.
+function narrowingKey(
+  tableName: string,
+  narrowing: LookupNarrowing | undefined,
+): string {
+  const filter = narrowing?.filter ?? [];
+  if (filter.length === 0 && narrowing?.notUnder === undefined) {
+    return tableName;
+  }
+  return `${tableName}\u0000${JSON.stringify([filter, narrowing?.notUnder ?? null])}`;
 }
 
 const connectedStores = new Set<RowDataStore>();
@@ -258,19 +278,24 @@ class TableRowDataSource implements TableRowData {
       lookupFields: () => readonly string[];
       display: () => TableDisplay | undefined;
       schema: () => TableSchema | undefined;
+      narrowing?: LookupNarrowing;
     },
   ) {
     this.tableName = tableName;
     this.lookupFields = args.lookupFields;
     this.display = args.display;
     this.schema = args.schema;
-    const source = createTableLookupSource(tableName, () => {
-      const sentAt = this.currentGeneration;
-      return {
-        fields: this.lookupFields(),
-        store: (values) => this.storeComputed(values, sentAt),
-      };
-    });
+    const source = createTableLookupSource(
+      tableName,
+      () => {
+        const sentAt = this.currentGeneration;
+        return {
+          fields: this.lookupFields(),
+          store: (values) => this.storeComputed(values, sentAt),
+        };
+      },
+      args.narrowing,
+    );
     this.valueLookup = source.valueLookup;
     this.searchLookup = source.searchLookup;
   }
