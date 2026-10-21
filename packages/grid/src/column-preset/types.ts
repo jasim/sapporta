@@ -16,7 +16,7 @@ import type {
   SourceLoadResult,
 } from "../core/data-sources/types";
 import type { TreeNode } from "../core/types/level-row";
-import type { SearchLookup, ValueLookup } from "../lookup";
+import type { LookupEntry, SearchLookup, ValueLookup } from "../lookup";
 import type { ColumnPreset } from "./preset";
 import type { ColumnSizingOptions } from "./column-sizing";
 
@@ -193,8 +193,31 @@ export type SelectColumnOptions<TMeta = unknown> =
     options: readonly (SelectOption | string)[];
   };
 
+/**
+ * Props of a lookup column's `renderEntry`: the entry to draw, where it is
+ * drawn, and what the column would draw without it.
+ */
+export type LookupEntryRenderProps = {
+  entry: LookupEntry;
+  /** `"cell"` for the column's cells, `"option"` for the editor's options. */
+  surface: "cell" | "option";
+  /** Cells and the cell editor are compact. */
+  density: "compact" | "regular";
+  /** For options: the option of the current value. */
+  selected?: boolean;
+  /** The column's own drawing of the entry: its label. */
+  defaultContent: ReactNode;
+};
+
+/**
+ * Draws a lookup entry in a lookup column's cells and editor options. Return
+ * `defaultContent` to keep the column's drawing, or wrap it.
+ */
+export type LookupEntryRenderer = (props: LookupEntryRenderProps) => ReactNode;
+
 export type LookupColumnOptions<TMeta = unknown> =
   ColumnPresetOptions<TMeta> & {
     valueLookup: ValueLookup;
     searchLookup?: SearchLookup;
+    renderEntry?: LookupEntryRenderer;
   };

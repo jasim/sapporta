@@ -194,6 +194,7 @@ function normalizePreset<TMeta>(
           valueLookup: (options as LookupColumnOptions<TMeta>).valueLookup,
           searchLookup: (options as LookupColumnOptions<TMeta>).searchLookup,
         },
+        renderEntry: (options as LookupColumnOptions<TMeta>).renderEntry,
       };
     case "foreignKey":
       return {
@@ -203,6 +204,7 @@ function normalizePreset<TMeta>(
           valueLookup: (options as LookupColumnOptions<TMeta>).valueLookup,
           searchLookup: (options as LookupColumnOptions<TMeta>).searchLookup,
         },
+        renderEntry: (options as LookupColumnOptions<TMeta>).renderEntry,
       };
     case "text":
       return {

@@ -10,6 +10,7 @@ import type {
   ZeroDisplay,
 } from "./types";
 import type { LookupCapabilities } from "../lookup";
+import type { LookupEntryRenderer } from "./types";
 import type { ColumnPresetRuntime } from "./runtime";
 
 export const GRID_COLUMN_PRESET_RUNTIME: unique symbol = Symbol(
@@ -71,11 +72,13 @@ export type SelectPreset = PresetBase & {
 export type LookupPreset = PresetBase & {
   kind: "lookupValue";
   lookup: LookupCapabilities;
+  renderEntry?: LookupEntryRenderer;
 };
 
 export type ForeignKeyPreset = PresetBase & {
   kind: "foreignKey";
   lookup: LookupCapabilities;
+  renderEntry?: LookupEntryRenderer;
 };
 
 export type CustomPreset = PresetBase & {
@@ -122,6 +125,14 @@ export function parse(
   column: ColumnSchema,
 ): ((value: string, props: CellEditorProps) => unknown) | undefined {
   return presetRuntime(column)?.valueCodec.parse;
+}
+
+/** The `renderEntry` a lookup column was built with, if any. */
+export function lookupEntryRenderer(
+  preset: ColumnPreset,
+): LookupEntryRenderer | undefined {
+  if ("renderEntry" in preset) return preset.renderEntry;
+  return undefined;
 }
 
 export function lookupCapabilities(

@@ -182,3 +182,75 @@ describe("CachedValueLookup", () => {
     expect(listener).not.toHaveBeenCalled();
   });
 });
+
+describe("CachedValueLookup.reloadEntries", () => {
+  it("reads every cached entry again and keeps the old one until then", async () => {
+    let suffix = "";
+    const load = vi.fn(async (values: readonly LookupValue[]) =>
+      values.map((value) => ({ value, label: `Row ${value}${suffix}` })),
+    );
+    const lookup = new CachedValueLookup<LookupValue>({
+      loadEntriesForValues: load,
+    });
+    await lookup.loadMissingEntries([1, 2]);
+    suffix = " (renamed)";
+
+    const reload = lookup.reloadEntries();
+    expect(lookup.entryForValue(1)?.label).toBe("Row 1");
+    await reload;
+
+    expect(load).toHaveBeenLastCalledWith([1, 2]);
+    expect(lookup.entryForValue(2)?.label).toBe("Row 2 (renamed)");
+  });
+});
+
+describe("CachedValueLookup.reloadEntries with a load in flight", () => {
+  it("keeps the reload's answer over an older one that lands later", async () => {
+    let releaseOld: (() => void) | undefined;
+    const labels = ["Seed", "Old", "New"];
+    const lookup = new CachedValueLookup<LookupValue>({
+      loadEntriesForValues: async (values) => {
+        const label = labels.shift()!;
+        if (label === "Old") {
+          await new Promise<void>((resolve) => (releaseOld = resolve));
+        }
+        return values.map((value) => ({ value, label }));
+      },
+    });
+    await lookup.loadMissingEntries([1]);
+
+    const old = lookup.reloadEntries();
+    await Promise.resolve();
+    await Promise.resolve();
+    await lookup.reloadEntries();
+    releaseOld?.();
+    await old;
+
+    expect(lookup.entryForValue(1)?.label).toBe("New");
+  });
+});
+
+describe("CachedValueLookup.reloadEntries with a first load in flight", () => {
+  it("reads the entry again, and keeps the reload's answer", async () => {
+    let releaseFirst: (() => void) | undefined;
+    const labels = ["Before edit", "After edit"];
+    const load = vi.fn(async (values: readonly LookupValue[]) => {
+      const label = labels.shift()!;
+      if (label === "Before edit") {
+        await new Promise<void>((resolve) => (releaseFirst = resolve));
+      }
+      return values.map((value) => ({ value, label }));
+    });
+    const lookup = new CachedValueLookup<LookupValue>({
+      loadEntriesForValues: load,
+    });
+
+    const first = lookup.loadMissingEntries([1]);
+    await lookup.reloadEntries();
+    releaseFirst?.();
+    await first;
+
+    expect(load).toHaveBeenCalledTimes(2);
+    expect(lookup.entryForValue(1)?.label).toBe("After edit");
+  });
+});

@@ -10,7 +10,11 @@ import {
   type LookupEntry,
   type LookupValue,
 } from "../../lookup";
-import { lookupCapabilities, presetRuntime } from "../preset";
+import {
+  lookupCapabilities,
+  lookupEntryRenderer,
+  presetRuntime,
+} from "../preset";
 import { useLookupOptions } from "../../lookup/react";
 
 const SEARCH_LIMIT = 50;
@@ -21,6 +25,9 @@ export function LookupValueEditor(props: CellEditorProps) {
     ? lookupCapabilities(columnPreset)
     : undefined;
   const searchLookup = capabilities?.searchLookup;
+  const renderEntry = columnPreset
+    ? lookupEntryRenderer(columnPreset)
+    : undefined;
   const [searchText, setSearchText] = useState(() =>
     props.editStart.trigger === "type" ? props.editStart.typedSeed : "",
   );
@@ -110,7 +117,9 @@ export function LookupValueEditor(props: CellEditorProps) {
         >
           <Combobox.Input
             ref={inputRef}
-            placeholder="Search…"
+            // The current value is the first option; the placeholder names it
+            // too, so the cell keeps showing it while the search is empty.
+            placeholder={selectedEntry?.label ?? "Search…"}
             className={cn(
               comboboxClassNames.input,
               "h-full py-0 text-sap-body",
@@ -143,7 +152,17 @@ export function LookupValueEditor(props: CellEditorProps) {
                     disabled={entry.disabled}
                     className={comboboxClassNames.item}
                   >
-                    {entry.label}
+                    {renderEntry
+                      ? renderEntry({
+                          entry,
+                          surface: "option",
+                          density: "compact",
+                          selected:
+                            selectedValue != null &&
+                            lookupValueEquals(entry.value, selectedValue),
+                          defaultContent: entry.label,
+                        })
+                      : entry.label}
                     <Combobox.ItemIndicator
                       className={comboboxClassNames.itemIndicator}
                     >

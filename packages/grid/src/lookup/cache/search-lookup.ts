@@ -222,6 +222,9 @@ export class CachedSearchLookup<
     Promise<LookupSearchPage<TValue, TMeta>>
   >();
   private readonly latestRequestBySearchScope = new Map<string, string>();
+  // Counts markSearchesStale calls. A search sent before the latest one is
+  // stored as stale, so the next load reads it again.
+  private staleMarks = 0;
 
   constructor(args: {
     loadEntriesForSearch: LoadEntriesForSearch<TValue, TMeta>;
@@ -272,6 +275,19 @@ export class CachedSearchLookup<
     return load;
   }
 
+  /**
+   * Marks every cached search as out of date, such as after rows of the
+   * table were edited. Cached results stay readable, and the next load of
+   * each search reads it again.
+   */
+  markSearchesStale(): void {
+    for (const cached of this.searchPagesByScope.values()) {
+      cached.requestKey = "";
+    }
+    this.loadingSearchesByRequest.clear();
+    this.staleMarks += 1;
+  }
+
   private normalizeRequest(
     request: LookupSearchRequest,
   ): Required<Pick<LookupSearchRequest, "searchText" | "limit">> &
@@ -291,16 +307,29 @@ export class CachedSearchLookup<
     scopeKey: string,
     requestKey: string,
   ): Promise<LookupSearchPage<TValue, TMeta>> {
+    const staleMarks = this.staleMarks;
     try {
       const page = await this.loadEntriesForSearch(request);
-      if (this.latestRequestBySearchScope.get(scopeKey) === requestKey) {
-        this.searchPagesByScope.set(scopeKey, { page, requestKey });
+      const fresh = staleMarks === this.staleMarks;
+      // A stale answer never replaces one read after the searches went stale.
+      const replaces =
+        fresh || !this.searchPagesByScope.get(scopeKey)?.requestKey;
+      if (
+        this.latestRequestBySearchScope.get(scopeKey) === requestKey &&
+        replaces
+      ) {
+        this.searchPagesByScope.set(scopeKey, {
+          page,
+          requestKey: fresh ? requestKey : "",
+        });
         this.evictOldSearches();
         this.notifyLookupChanged();
       }
       return page;
     } finally {
-      this.loadingSearchesByRequest.delete(requestKey);
+      if (staleMarks === this.staleMarks) {
+        this.loadingSearchesByRequest.delete(requestKey);
+      }
     }
   }
 

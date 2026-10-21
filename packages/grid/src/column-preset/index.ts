@@ -24,6 +24,7 @@ export {
   width,
   parse,
   lookupCapabilities,
+  lookupEntryRenderer,
 } from "./preset";
 export type * from "./preset";
 export type { LookupCapabilities } from "../lookup";

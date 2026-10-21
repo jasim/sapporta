@@ -33,13 +33,21 @@ export function LookupValueCell({
 
   const entry = valueLookup.entryForValue(value);
   if (entry) {
-    return foreignKey ? (
+    const content = foreignKey ? (
       <span className="mono truncate text-sap-data text-sap-link">
         {entry.label}
       </span>
     ) : (
       <span className="block truncate">{entry.label}</span>
     );
+    return preset.renderEntry
+      ? preset.renderEntry({
+          entry,
+          surface: "cell",
+          density: "compact",
+          defaultContent: content,
+        })
+      : content;
   }
 
   return foreignKey ? (

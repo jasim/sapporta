@@ -368,3 +368,52 @@ describe("CachedSearchLookup", () => {
     ]);
   });
 });
+
+describe("CachedSearchLookup.markSearchesStale", () => {
+  it("keeps cached results readable and reads the search again", async () => {
+    let label = "Old";
+    const load = vi.fn(async () => ({ entries: [{ value: 1, label }] }));
+    const lookup = new CachedSearchLookup({ loadEntriesForSearch: load });
+    await lookup.loadSearchResults({ searchText: "a" });
+    label = "New";
+
+    lookup.markSearchesStale();
+    expect(lookup.cachedSearchResults({ searchText: "a" })[0]?.label).toBe(
+      "Old",
+    );
+    await lookup.loadSearchResults({ searchText: "a" });
+
+    expect(load).toHaveBeenCalledTimes(2);
+    expect(lookup.cachedSearchResults({ searchText: "a" })[0]?.label).toBe(
+      "New",
+    );
+  });
+});
+
+describe("CachedSearchLookup.markSearchesStale with a search in flight", () => {
+  it("reads the search again instead of trusting the earlier answer", async () => {
+    let label = "Old";
+    let release: (() => void) | undefined;
+    const load = vi.fn(async () => {
+      const answer = { entries: [{ value: 1, label }] };
+      if (load.mock.calls.length === 1) {
+        await new Promise<void>((resolve) => (release = resolve));
+      }
+      return answer;
+    });
+    const lookup = new CachedSearchLookup({ loadEntriesForSearch: load });
+    const first = lookup.loadSearchResults({ searchText: "a" });
+    await Promise.resolve();
+
+    label = "New";
+    lookup.markSearchesStale();
+    release?.();
+    await first;
+    await lookup.loadSearchResults({ searchText: "a" });
+
+    expect(load).toHaveBeenCalledTimes(2);
+    expect(lookup.cachedSearchResults({ searchText: "a" })[0]?.label).toBe(
+      "New",
+    );
+  });
+});

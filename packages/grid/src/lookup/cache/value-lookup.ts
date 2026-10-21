@@ -156,7 +156,12 @@ export class CachedValueLookup<
   implements ValueLookup<TValue, TMeta>
 {
   private readonly loadEntriesForValues: LoadEntriesForValues<TValue, TMeta>;
-  private readonly loadingEntriesByValueKey = new Map<string, Promise<void>>();
+  // The value of each key a load is in flight for, and that load. A reload
+  // reads the values from here for keys that are not cached yet.
+  private readonly loadingEntriesByValueKey = new Map<
+    string,
+    { value: TValue; load: Promise<void> }
+  >();
 
   constructor(args: {
     loadEntriesForValues: LoadEntriesForValues<TValue, TMeta>;
@@ -177,35 +182,82 @@ export class CachedValueLookup<
       const { key } = request;
       const pending = this.loadingEntriesByValueKey.get(key);
       if (pending) {
-        pendingLoads.push(pending);
+        pendingLoads.push(pending.load);
       } else {
         requestsToLoad.push(request);
       }
     }
 
     if (requestsToLoad.length > 0) {
-      const load = this.loadAndStoreEntries(requestsToLoad);
-      for (const { key } of requestsToLoad) {
-        this.loadingEntriesByValueKey.set(key, load);
-      }
-      pendingLoads.push(load);
+      pendingLoads.push(this.startLoad(requestsToLoad));
     }
 
     await Promise.all(pendingLoads);
   }
 
+  /**
+   * Loads every cached entry again, such as after its rows were edited, and
+   * every entry whose first load is in flight. The old entries stay readable
+   * until the new ones arrive, so cells do not flash; an entry the load no
+   * longer returns keeps its old value. A load already in flight was sent
+   * before the edit, so its answer no longer counts for the entries this
+   * reload asks for.
+   */
+  async reloadEntries(): Promise<void> {
+    const valuesByKey = new Map<string, TValue>();
+    for (const [key, entry] of this.entriesByValue) {
+      valuesByKey.set(key, entry.value);
+    }
+    for (const [key, { value }] of this.loadingEntriesByValueKey) {
+      valuesByKey.set(key, value);
+    }
+    if (valuesByKey.size === 0) return;
+    await this.startLoad(
+      Array.from(valuesByKey, ([key, value]) => ({ key, value })),
+    );
+  }
+
+  // Each key belongs to the latest load that asked for it. A load stores only
+  // the entries it still owns, so an older answer that arrives late cannot
+  // replace a newer one.
+  private startLoad(requests: readonly ValueRequest<TValue>[]): Promise<void> {
+    const load: Promise<void> = this.loadAndStoreEntries(requests, () => load);
+    for (const { key, value } of requests) {
+      this.loadingEntriesByValueKey.set(key, { value, load });
+    }
+    return load;
+  }
+
   private async loadAndStoreEntries(
-    requestsToLoad: readonly ValueRequest<TValue>[],
+    requests: readonly ValueRequest<TValue>[],
+    // Read after the answer arrives, by when the caller has stored it.
+    self: () => Promise<void>,
   ): Promise<void> {
     try {
       const entries = await this.loadEntriesForValues(
-        requestsToLoad.map((request) => request.value),
+        requests.map((request) => request.value),
       );
-      const changed = this.setEntries(entries);
+      // Keys a later load has taken over, whether it is still in flight or
+      // has already stored its answer.
+      const taken = new Set(
+        requests
+          .filter(
+            ({ key }) =>
+              this.loadingEntriesByValueKey.get(key)?.load !== self(),
+          )
+          .map(({ key }) => key),
+      );
+      const owned = entries.filter((entry) => {
+        const key = valueKey(entry.value);
+        return key === undefined || !taken.has(key);
+      });
+      const changed = this.setEntries(owned);
       if (changed) this.notifyLookupChanged();
     } finally {
-      for (const { key } of requestsToLoad) {
-        this.loadingEntriesByValueKey.delete(key);
+      for (const { key } of requests) {
+        if (this.loadingEntriesByValueKey.get(key)?.load === self()) {
+          this.loadingEntriesByValueKey.delete(key);
+        }
       }
     }
   }
