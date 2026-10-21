@@ -9,14 +9,16 @@
  * the nearest ancestor the request cannot read and never names it. `UNION`
  * removes rows already reached, so a loop in the data ends the walk.
  */
-import { inArray, sql } from "drizzle-orm";
+import { inArray, sql, type SQL } from "drizzle-orm";
 import { getTableConfig, type SQLiteColumn } from "drizzle-orm/sqlite-core";
 import type { RecordId } from "@sapporta/shared/record-id";
 import { toRecordId } from "@sapporta/shared/record-id";
 import { columnBySqlName } from "../schema/column.js";
+import type { SapportaAuthContext } from "../auth/context.js";
 import type { ComputedBatch, ComputedField } from "../schema/computed-field.js";
+import type { TableDef } from "../schema/table.js";
 import { findPkColumn, primaryKeyValues } from "../schema/pk.js";
-import { rowLabeller } from "./row-label.js";
+import { labelValueSql, rowLabeller, rowLabelSql } from "./row-label.js";
 import { resolveRowFields } from "./row-fields.js";
 
 export interface TreePathOptions {
@@ -121,10 +123,77 @@ async function loadTreePaths(
   return paths;
 }
 
-function requireColumn(
-  table: ComputedBatch["table"],
-  name: string,
-): SQLiteColumn {
+export interface TreePathRelationOptions {
+  /** Name of the relation in the `with recursive` list. Defaults to
+   *  `tree_paths`. */
+  name?: string;
+  /** Placed between two ancestors' labels. Defaults to `" > "`. */
+  separator?: string;
+  /** Column whose value names each row. Defaults to the row label. */
+  column?: string;
+}
+
+/**
+ * The paths of a tree table's rows as a SQL relation, for reports and other
+ * code that runs raw SQL. It gives the same paths as `treePath()`.
+ *
+ * The result is one member of a `with recursive` list, named `tree_paths`
+ * unless `name` says otherwise, with three columns:
+ *
+ * - `id`: the row's primary key.
+ * - `parent_path`: the labels of the row's ancestors, from the top down,
+ *   joined by `separator`; NULL for a row with no visible parent.
+ * - `path`: `parent_path`, the separator and the row's own label, or only
+ *   the row's own label.
+ *
+ * It reads only the rows `auth` may see. A path stops at the nearest
+ * ancestor the request cannot see, as `treePath()`'s does. Rows in a loop of
+ * parents that never reaches a top-level row, and the rows under them, have
+ * no row in the relation.
+ *
+ * ```ts
+ * const paths = treePathRelation(accounts, auth);
+ * db.all(sql`with recursive ${paths}
+ *   select a.name, p.parent_path from accounts a
+ *   left join tree_paths p on p.id = a.id`);
+ * ```
+ */
+export function treePathRelation(
+  table: TableDef,
+  auth: SapportaAuthContext,
+  options: TreePathRelationOptions = {},
+): SQL {
+  const tree = table.meta.tree;
+  if (!tree) {
+    throw new Error(
+      `Table "${table.sqlName}" uses treePathRelation() but does not declare meta.tree.`,
+    );
+  }
+  const separator = options.separator ?? " > ";
+  const pk = findPkColumn(table);
+  const parent = requireColumn(table, tree.parentColumn);
+  const label =
+    options.column === undefined
+      ? rowLabelSql(table)
+      : sql`coalesce(${labelValueSql(requireColumn(table, options.column))}, '')`;
+  const access = auth.rowSecurity.forTable(table);
+  const tableName = sql.identifier(getTableConfig(table.drizzle).name);
+  const name = sql.identifier(options.name ?? "tree_paths");
+  const id = sql.identifier("sapporta_id");
+  const parentId = sql.identifier("sapporta_parent_id");
+  const rowLabel = sql.identifier("sapporta_label");
+  const v = sql.identifier("v");
+
+  // Each visible row is read through a subquery, so the table's own column
+  // names never clash with the relation's `id` and `path`.
+  const visible = sql`(select ${pk} as ${id}, ${parent} as ${parentId}, ${label} as ${rowLabel} from ${tableName} where ${access.ownedRows()})`;
+
+  // The walk starts at every visible row whose parent is NULL or hidden, and
+  // goes down one level of visible children per step.
+  return sql`${name}(id, parent_path, path) as (select ${v}.${id}, null, ${v}.${rowLabel} from ${visible} as ${v} where ${v}.${parentId} is null or ${v}.${parentId} not in (select ${id} from ${visible}) union all select ${v}.${id}, ${name}.path, ${name}.path || ${separator} || ${v}.${rowLabel} from ${visible} as ${v} join ${name} on ${v}.${parentId} = ${name}.id)`;
+}
+
+function requireColumn(table: TableDef, name: string): SQLiteColumn {
   const column = columnBySqlName(table, name);
   if (!column) {
     throw new Error(

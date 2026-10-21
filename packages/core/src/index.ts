@@ -35,6 +35,7 @@ export {
   text,
   timestamp,
   treePath,
+  treePathRelation,
 } from "./schema/table.js";
 export { columnBySqlName, columnPropertyName } from "./schema/column.js";
 export type {
@@ -43,6 +44,7 @@ export type {
   ComputedFieldKind,
   ComputedFieldLoader,
   TreePathOptions,
+  TreePathRelationOptions,
   TableDef,
   TableOptions,
   SapportaMeta,

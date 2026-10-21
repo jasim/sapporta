@@ -14,8 +14,11 @@
  * fallback rule.
  */
 
+import { sql, type SQL } from "drizzle-orm";
+import type { SQLiteColumn } from "drizzle-orm/sqlite-core";
 import type { TableDef } from "../schema/table.js";
 import { findPkColumn } from "../schema/pk.js";
+import { resolveRowFields } from "./row-fields.js";
 
 export interface RowLabeller {
   /** SQL name of the primary key column. */
@@ -52,4 +55,40 @@ export function rowLabeller(schema: TableDef): RowLabeller {
   };
 
   return { pkName, labelColumns: labelCols, label };
+}
+
+/**
+ * A column value as text, printed the way JavaScript's `String(v)` prints
+ * the value read from the database. SQLite's own cast prints a whole real
+ * number as `1.0`, where `String(1)` gives `1`, so a whole real is cast to
+ * an integer first. Text and integers cast unchanged.
+ */
+export function labelValueSql(column: SQLiteColumn): SQL {
+  return sql`(case when typeof(${column}) = 'real' and ${column} = cast(${column} as integer) then cast(cast(${column} as integer) as text) else cast(${column} as text) end)`;
+}
+
+/**
+ * The SQL twin of `rowLabeller(schema).label`: the row-label columns of the
+ * current row joined by a single space, with NULL and empty parts skipped,
+ * falling back to the primary key as text. Column references are those of
+ * the table itself, so the expression belongs in a query that reads the
+ * table once in its `from` clause.
+ */
+export function rowLabelSql(schema: TableDef): SQL {
+  const pk = findPkColumn(schema);
+  const columns = Object.values(
+    resolveRowFields(schema, findRowLabelColumns(schema)).databaseSelection,
+  );
+  let joined: SQL | null = null;
+  for (const column of columns) {
+    const part = sql`nullif(${labelValueSql(column)}, '')`;
+    // `a || ' ' || b` is NULL when either side is NULL, so coalesce keeps
+    // whichever side has a value.
+    joined =
+      joined === null
+        ? part
+        : sql`coalesce(${joined} || ' ' || ${part}, ${joined}, ${part})`;
+  }
+  const fallback = labelValueSql(pk);
+  return joined === null ? fallback : sql`coalesce(${joined}, ${fallback})`;
 }

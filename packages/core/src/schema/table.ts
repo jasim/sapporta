@@ -39,7 +39,12 @@ export {
   type ComputedFieldKind,
   type ComputedFieldLoader,
 } from "./computed-field.js";
-export { treePath, type TreePathOptions } from "../rows/tree-path.js";
+export {
+  treePath,
+  treePathRelation,
+  type TreePathOptions,
+  type TreePathRelationOptions,
+} from "../rows/tree-path.js";
 
 /**
  * Column factories live in `./columns.ts` — importing them here so users
