@@ -14,7 +14,13 @@ import {
 } from "./row-display";
 import { LookupPicker } from "./LookupPicker";
 import { tableDisplay } from "./table-display";
-import type { CellSlotProps, ReferenceSlotProps } from "./row-display-types";
+import type {
+  CellSlotProps,
+  LabelSlotProps,
+  ReferenceSlotProps,
+} from "./row-display-types";
+import { LookupCheckboxList } from "../table/filters/inputs/LookupCheckboxList";
+import { FilterCard } from "../table/filters/FilterCard";
 import { compileTGridRuntimeConfig } from "../table/tgrid/tgrid-runtime-config";
 import { createTGridColumnMapper } from "../table/tgrid/tgrid-column-mapper";
 import { createTGridColumnsBuilder } from "../table/tgrid/tgrid-column-spec";
@@ -388,3 +394,121 @@ function mockAccountLookups() {
   }));
   fetchLookupSearch.mockResolvedValue({ entries: [] });
 }
+
+describe("filters with a table's row data", () => {
+  const accountColumn = {
+    name: "account_id",
+    label: "Account",
+    kind: "number" as const,
+    foreignKey: { table: "accounts", column: "id" },
+  };
+
+  function mockFuelAccounts() {
+    const paths: Record<string, string> = {
+      "1": "Expenses > Car",
+      "2": "Expenses > Generator",
+    };
+    fetchLookup.mockImplementation(async (_table, ids: number[]) => ({
+      entries: ids.map((id) => ({ value: id, label: "Fuel", meta: {} })),
+      computed: {
+        parentPath: Object.fromEntries(
+          ids.map((id) => [String(id), paths[String(id)]]),
+        ),
+      },
+    }));
+    fetchLookupSearch.mockResolvedValue({
+      entries: [
+        { value: 1, label: "Fuel", meta: {} },
+        { value: 2, label: "Fuel", meta: {} },
+      ],
+    });
+  }
+
+  function chipCard(store: ReturnType<typeof createLookupStore>) {
+    return createElement(FilterCard, {
+      condition: {
+        id: "f1",
+        column: "account_id",
+        op: "in",
+        kind: "number",
+        values: [1, 2],
+      },
+      columns: [accountColumn],
+      lookupForColumn: (column) => store.foreignKey(column),
+      onUpdate: () => undefined,
+      onRemove: () => undefined,
+    });
+  }
+
+  it("draw the caption under each checklist option", async () => {
+    mockFuelAccounts();
+    const store = createLookupStore({ tables: () => [accounts] });
+
+    const container = await render(
+      createElement(LookupCheckboxList, {
+        values: [],
+        onChange: () => undefined,
+        column: accountColumn,
+        lookup: store.table("accounts"),
+      }),
+    );
+    await settle();
+
+    const captions = Array.from(
+      container.querySelectorAll("[data-row-caption]"),
+      (node) => node.textContent,
+    );
+    expect(captions).toEqual(["Expenses > Car", "Expenses > Generator"]);
+  });
+
+  it("draw a chip with the label only, and the caption as its title", async () => {
+    mockFuelAccounts();
+    const store = createLookupStore({ tables: () => [accounts] });
+
+    const container = await render(chipCard(store));
+    await settle();
+
+    const chips = Array.from(
+      container.querySelectorAll<HTMLElement>("[data-filter-value]"),
+    );
+    expect(chips.map((chip) => chip.textContent)).toEqual(["Fuel", "Fuel"]);
+    expect(chips.map((chip) => chip.title)).toEqual([
+      "Expenses > Car",
+      "Expenses > Generator",
+    ]);
+    expect(container.querySelector("[data-row-caption]")).toBeNull();
+  });
+
+  it("draw a chip with the label slot's chip rendering", async () => {
+    mockFuelAccounts();
+    function AccountLabel({
+      label,
+      computed,
+      context,
+      defaultContent,
+    }: LabelSlotProps) {
+      return context.surface === "chip"
+        ? createElement(
+            "span",
+            null,
+            `${label} (${String(computed.parentPath).split(" > ").at(-1)})`,
+          )
+        : defaultContent;
+    }
+    const store = createLookupStore({
+      tables: () => [accounts],
+      rowDisplays: {
+        accounts: { label: { needs: ["parentPath"], render: AccountLabel } },
+      },
+    });
+
+    const container = await render(chipCard(store));
+    await settle();
+
+    const summary = Array.from(
+      container.querySelectorAll("[data-filter-value]"),
+      (chip) => chip.textContent,
+    ).join(", ");
+    expect(summary).toBe("Fuel (Car), Fuel (Generator)");
+  });
+});

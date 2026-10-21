@@ -304,7 +304,8 @@ export function referenceEntryRenderer(args: {
     );
 }
 
-function rowOfEntry(entry: LookupEntry): Readonly<Row> | undefined {
+/** The row a lookup entry carries in its `meta`, if any. */
+export function rowOfEntry(entry: LookupEntry): Readonly<Row> | undefined {
   const meta = entry.meta;
   return typeof meta === "object" && meta !== null
     ? (meta as Readonly<Row>)

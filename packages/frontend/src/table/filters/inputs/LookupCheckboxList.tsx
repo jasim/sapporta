@@ -6,6 +6,8 @@ import {
   type LookupValue,
 } from "@sapporta/grid/lookup";
 import { useLookupOptions } from "@sapporta/grid/lookup/react";
+import { isTableRowData } from "../../../lookup/row-data";
+import { RowLabel, rowOfEntry } from "../../../lookup/row-display";
 import type { LookupListInputProps } from "./types";
 
 const SEARCH_LIMIT = 50;
@@ -16,6 +18,9 @@ export function LookupCheckboxList({
   lookup,
   autoFocus,
 }: LookupListInputProps) {
+  // A table's row data draws each option with the table's label slot, so
+  // rows of the same name are told apart by their caption.
+  const rowData = isTableRowData(lookup) ? lookup : undefined;
   const [query, setQuery] = useState("");
   const options = useLookupOptions({
     valueLookup: lookup.valueLookup,
@@ -65,7 +70,25 @@ export function LookupCheckboxList({
                 <span className="w-3 h-3 shrink-0 flex items-center justify-center text-sap-brand">
                   {active && <Check className="h-3 w-3" />}
                 </span>
-                <span className="flex-1 truncate">{option.label}</span>
+                {rowData ? (
+                  <span className="flex min-w-0 flex-1">
+                    <RowLabel
+                      data={rowData}
+                      id={value}
+                      label={option.label}
+                      row={rowOfEntry(option)}
+                      context={{
+                        as: "reference",
+                        surface: "option",
+                        density: "regular",
+                        hierarchyShown: false,
+                        selected: active,
+                      }}
+                    />
+                  </span>
+                ) : (
+                  <span className="flex-1 truncate">{option.label}</span>
+                )}
               </button>
             );
           })

@@ -1,12 +1,20 @@
-import { useState } from "react";
+import { Fragment, useState, type ReactNode } from "react";
 import { X } from "lucide-react";
 import type { TypedFilterCondition } from "@sapporta/shared/filter";
 import { encodeTypedValue } from "@sapporta/shared/filter";
 import type { ColumnSchema } from "@sapporta/shared/contracts";
 import { Popover, PopoverContent, PopoverTrigger } from "@sapporta/ui/popover";
-import { isLookupValue } from "@sapporta/grid/lookup";
+import { isLookupValue, type LookupValue } from "@sapporta/grid/lookup";
 import { useLookupValueLabels } from "@sapporta/grid/lookup/react";
 import type { LookupForColumn } from "../../lookup";
+import { isTableRowData, type TableRowData } from "../../lookup/row-data";
+import {
+  RowLabel,
+  rowCaptionField,
+  rowCaptionText,
+  rowOfEntry,
+  useRowComputedRecord,
+} from "../../lookup/row-display";
 import { ConditionEditor } from "./ConditionEditor";
 import { findEntryForCondition, inferFilterColumnType } from "./column-catalog";
 
@@ -121,22 +129,79 @@ export function summarizeOperator(
   ).label;
 }
 
+/** The filter's values, each lookup value drawn with its table's row
+ *  display, separated by commas. `null` when the operator takes no value. */
 function useFilterValueSummary(
   cond: TypedFilterCondition,
   column: ColumnSchema | null,
   lookupForColumn: LookupForColumn | undefined,
-): string {
+): ReactNode {
   const values =
     cond.op === "is" ? [] : "values" in cond ? cond.values : [cond.value];
   const lookup = column?.foreignKey ? lookupForColumn?.(column) : undefined;
+  const rowData = lookup && isTableRowData(lookup) ? lookup : undefined;
   const lookupValues = values.filter(isLookupValue);
   const labels = useLookupValueLabels(lookup?.valueLookup, lookupValues);
-  if (cond.op === "is") return "";
-  return values
-    .map((value) =>
-      isLookupValue(value)
-        ? (labels.labelFor(value) ?? String(value))
-        : encodeTypedValue(value),
-    )
-    .join(", ");
+  if (cond.op === "is" || values.length === 0) return null;
+  return values.map((value, index) => {
+    const separator = index > 0 ? ", " : null;
+    if (!isLookupValue(value)) {
+      return (
+        <Fragment key={index}>
+          {separator}
+          {encodeTypedValue(value)}
+        </Fragment>
+      );
+    }
+    const label = labels.labelFor(value) ?? String(value);
+    return (
+      <Fragment key={index}>
+        {separator}
+        {rowData ? (
+          <FilterValueChip data={rowData} id={value} label={label} />
+        ) : (
+          label
+        )}
+      </Fragment>
+    );
+  });
+}
+
+/** One chosen row in a filter chip: its label slot's chip drawing, with the
+ *  table's caption as the tooltip. */
+function FilterValueChip({
+  data,
+  id,
+  label,
+}: {
+  data: TableRowData;
+  id: LookupValue;
+  label: string;
+}) {
+  const schema = data.schema();
+  const captionField = rowCaptionField(schema);
+  const computed = useRowComputedRecord(
+    data,
+    id,
+    captionField ? [captionField] : [],
+  );
+  const entry = data.valueLookup.entryForValue(id);
+  const row = entry ? rowOfEntry(entry) : undefined;
+  const caption = rowCaptionText(schema, computed, row);
+  return (
+    <span title={caption ?? undefined} data-filter-value="">
+      <RowLabel
+        data={data}
+        id={id}
+        label={label}
+        row={row}
+        context={{
+          as: "reference",
+          surface: "chip",
+          density: "regular",
+          hierarchyShown: false,
+        }}
+      />
+    </span>
+  );
 }

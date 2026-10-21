@@ -15,9 +15,8 @@ import {
 import { useLookupOptions } from "@sapporta/grid/lookup/react";
 import { Combobox, comboboxClassNames } from "@sapporta/ui/combobox";
 import { cn } from "@sapporta/ui/cn";
-import type { Row } from "@sapporta/shared/contracts";
 import { isTableRowData, type TableRowData } from "./row-data";
-import { RowLabel } from "./row-display";
+import { RowLabel, rowOfEntry } from "./row-display";
 
 const DEFAULT_SEARCH_LIMIT = 50;
 
@@ -318,10 +317,6 @@ function LookupPickerItemContent<TValue extends LookupValue, TMeta>({
       ))}
     </span>
   );
-}
-
-function rowOfEntry(entry: LookupEntry): Readonly<Row> | undefined {
-  return isObject(entry.meta) ? (entry.meta as Readonly<Row>) : undefined;
 }
 
 function hasLookupEntryMeta<TValue extends LookupValue, TMeta>(
