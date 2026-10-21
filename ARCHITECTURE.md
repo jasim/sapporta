@@ -88,7 +88,7 @@ pnpm generate:api-reference   # pnpm check:api-reference fails if it is stale
 | `./temporal` | Date/time helpers over the Temporal polyfill |
 | `./daterange` | Date-range model and picker key space |
 | `./csv` | CSV serialization |
-| `./grid-dataset` | Zod schema of the report-grid wire format: columns, levels, footer rows, color rules |
+| `./grid-dataset` | Zod schema of the report-grid wire format: columns, levels, footer rows, color rules, row references |
 | `./record-id` | `RecordId` — a primary-key value in an address position (URL, query key), and `toRecordId` for crossing into one |
 | `./row-scope` | Row-scope column-name constants (`workspace_id`, `scoped_to_user_id`) |
 | `./error` | `ApiError` |

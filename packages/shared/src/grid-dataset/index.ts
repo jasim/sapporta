@@ -1,5 +1,6 @@
 export {
   gridDatasetColumnKindSchema,
+  gridDatasetColumnReferenceSchema,
   gridDatasetColumnSchema,
   gridDatasetFooterRowSchema,
   gridDatasetNodeSchema,
@@ -9,6 +10,7 @@ export {
   type GridDataset,
   type GridDatasetColumn,
   type GridDatasetColumnKind,
+  type GridDatasetColumnReference,
   type GridDatasetFooterRow,
   type GridDatasetLevel,
   type GridDatasetLevelTree,
@@ -16,6 +18,10 @@ export {
 } from "./result-schema.js";
 
 export { gridDatasetLinkProblems } from "./link-check.js";
+export {
+  gridDatasetReferenceIds,
+  gridDatasetReferenceProblems,
+} from "./reference-check.js";
 export {
   gridDatasetTreeColumn,
   gridDatasetTreeProblems,

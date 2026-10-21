@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { navLinkSchema } from "../contracts/meta-schema.js";
+import { computedValuesSchema } from "../contracts/table-schema.js";
 
 export const gridDatasetColumnKindSchema = z.enum([
   "text",
@@ -10,6 +11,17 @@ export const gridDatasetColumnKindSchema = z.enum([
 ]);
 export type GridDatasetColumnKind = z.output<
   typeof gridDatasetColumnKindSchema
+>;
+
+/** The table rows a report column names. */
+export const gridDatasetColumnReferenceSchema = z.object({
+  /** SQL name of the referenced table. */
+  table: z.string(),
+  /** Column of the level holding the referenced row's id. */
+  idColumn: z.string(),
+});
+export type GridDatasetColumnReference = z.output<
+  typeof gridDatasetColumnReferenceSchema
 >;
 
 export const gridDatasetColumnSchema = z.object({
@@ -34,6 +46,12 @@ export const gridDatasetColumnSchema = z.object({
    *  The first resolvable link renders as the cell's primary link; all
    *  resolvable links appear in the right-click context menu. */
   links: z.array(navLinkSchema).optional(),
+  /** The table row each cell of this column names, such as the account of
+   *  a ledger line. The cell's value stays the label text, chosen by the
+   *  report's SQL. `idColumn` names the row column holding the row's id,
+   *  usually visually hidden, as for `links`. The grid draws the cell with
+   *  the table's row display, such as its `label` slot. */
+  reference: gridDatasetColumnReferenceSchema.optional(),
 });
 export type GridDatasetColumn = z.output<typeof gridDatasetColumnSchema>;
 
@@ -106,5 +124,10 @@ export const gridDatasetSchema = z.object({
   levels: z.record(z.string(), gridDatasetLevelSchema),
   nodes: z.array(gridDatasetNodeSchema),
   footerRows: z.array(gridDatasetFooterRowSchema).optional(),
+  /** Computed field values of the rows that `reference` columns name, by
+   *  table name: field name, then row id, then value. The grid stores them
+   *  before it draws, so label slots draw without a further request.
+   *  `attachReferenceComputed()` in `@sapporta/server` fills it. */
+  computed: z.record(z.string(), computedValuesSchema).optional(),
 });
 export type GridDataset = z.output<typeof gridDatasetSchema>;
