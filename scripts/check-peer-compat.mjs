@@ -27,7 +27,7 @@ const minimumSpecs = {
   react: "19.1.0",
   "react-dom": "19.1.0",
   "react-router-dom": "7.13.1",
-  zod: "4.3.6",
+  zod: "4.6.7",
   zustand: "5.0.5",
 };
 

@@ -52,7 +52,7 @@
   "peerDependencies": {
     "@sapporta/rest-core": "3.52.2",
     "hono": "^4.7.4",
-    "zod": "^4.3.6"
+    "zod": "^4.6.7"
   },
   "dependencies": {
     "@sapporta/rest-open-api": "^3.52.2"
@@ -61,6 +61,6 @@
     "@sapporta/rest-core": "3.52.2",
     "hono": "^4.12.27",
     "typescript": "^6.0.3",
-    "zod": "^4.4.3"
+    "zod": "^4.6.7"
   }
 }

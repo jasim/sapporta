@@ -252,3 +252,191 @@ describe("TsRestApi body parsing", () => {
     expect(await response.json()).toMatchObject({ code: "BAD_JSON" });
   });
 });
+
+describe("TsRestApi.generateDocument components", () => {
+  const c = initContract();
+
+  type Doc = {
+    paths: Record<string, Record<string, any>>;
+    components?: { schemas?: Record<string, any> };
+  };
+
+  function documentOf(
+    routes: Record<string, Parameters<TsRestApi["register"]>[1]>,
+  ): Doc {
+    const api = new TsRestApi();
+    for (const [name, route] of Object.entries(routes)) {
+      api.register(name, route, () => ({ status: 200, body: {} }) as never);
+    }
+    return api.generateDocument(undefined, {
+      info: { title: "Test", version: "1" },
+    }) as Doc;
+  }
+
+  const bodyOf = (doc: Doc, path: string) =>
+    doc.paths[path]!.post.requestBody.content["application/json"].schema;
+  const responseOf = (doc: Doc, path: string) =>
+    doc.paths[path]!.get.responses["200"].content["application/json"].schema;
+
+  // Every local ref in the document leads somewhere in it.
+  function expectRefsResolve(doc: Doc) {
+    const refs: string[] = [];
+    JSON.stringify(doc, (key, value) => {
+      if (key === "$ref" && typeof value === "string") refs.push(value);
+      return value;
+    });
+    for (const ref of refs) {
+      expect(ref).toMatch(/^#\/components\/schemas\//);
+      const target = ref
+        .slice(2)
+        .split("/")
+        .reduce<any>((node, part) => node?.[part], doc);
+      expect(target, ref).toBeDefined();
+    }
+    expect(JSON.stringify(doc)).not.toMatch(/"(definitions|\$defs)"/);
+  }
+
+  const Account = z.object({ name: z.string() }).meta({ id: "SampleAccount" });
+  const accountSchema = {
+    type: "object",
+    properties: { name: { type: "string" } },
+    required: ["name"],
+  };
+
+  it("puts a root schema with an id in the components", () => {
+    const doc = documentOf({
+      create: c.mutation({
+        method: "POST",
+        path: "/accounts",
+        body: Account,
+        responses: { 200: z.object({}) },
+      }),
+    });
+
+    expect(bodyOf(doc, "/accounts")).toEqual({
+      $ref: "#/components/schemas/SampleAccount",
+    });
+    expect(doc.components?.schemas?.SampleAccount).toEqual(accountSchema);
+    expectRefsResolve(doc);
+  });
+
+  it("puts a nested schema with an id in the components, shared by the routes that use it", () => {
+    const doc = documentOf({
+      list: c.query({
+        method: "GET",
+        path: "/accounts",
+        responses: { 200: z.object({ rows: z.array(Account) }) },
+      }),
+      one: c.query({
+        method: "GET",
+        path: "/accounts/first",
+        responses: { 200: Account },
+      }),
+    });
+
+    expect(responseOf(doc, "/accounts").properties.rows.items).toEqual({
+      $ref: "#/components/schemas/SampleAccount",
+    });
+    expect(Object.keys(doc.components?.schemas ?? {})).toEqual([
+      "SampleAccount",
+    ]);
+    expectRefsResolve(doc);
+  });
+
+  it("names a recursive schema after its route, and points its self-ref there", () => {
+    type Category = { name: string; children: Category[] };
+    const Category: z.ZodType<Category> = z.object({
+      name: z.string(),
+      get children() {
+        return z.array(Category);
+      },
+    });
+    const doc = documentOf({
+      tree: c.query({
+        method: "GET",
+        path: "/tree",
+        responses: { 200: Category },
+      }),
+    });
+
+    expect(responseOf(doc, "/tree")).toEqual({
+      $ref: "#/components/schemas/tree_response",
+    });
+    expect(
+      doc.components?.schemas?.tree_response.properties.children.items,
+    ).toEqual({
+      $ref: "#/components/schemas/tree_response",
+    });
+    expectRefsResolve(doc);
+  });
+
+  it("keeps zod's generated names of different routes apart", () => {
+    const tree = <T extends z.ZodType>(leaf: T) => {
+      const node: z.ZodType = z.object({
+        leaf,
+        get children() {
+          return z.array(node);
+        },
+      });
+      return z.object({ root: node });
+    };
+    const doc = documentOf({
+      words: c.query({
+        method: "GET",
+        path: "/words",
+        responses: { 200: tree(z.string()) },
+      }),
+      numbers: c.query({
+        method: "GET",
+        path: "/numbers",
+        responses: { 200: tree(z.number()) },
+      }),
+    });
+
+    const words = responseOf(doc, "/words").properties.root.$ref;
+    const numbers = responseOf(doc, "/numbers").properties.root.$ref;
+    expect(words).not.toBe(numbers);
+    expect(
+      doc.components?.schemas?.[words.split("/").pop()].properties.leaf,
+    ).toEqual({ type: "string" });
+    expect(
+      doc.components?.schemas?.[numbers.split("/").pop()].properties.leaf,
+    ).toEqual({ type: "number" });
+    expectRefsResolve(doc);
+  });
+
+  it("refuses one id for two different schemas", () => {
+    const Other = z.object({ title: z.string() }).meta({ id: "SampleAccount" });
+
+    expect(() =>
+      documentOf({
+        a: c.query({ method: "GET", path: "/a", responses: { 200: Account } }),
+        b: c.query({ method: "GET", path: "/b", responses: { 200: Other } }),
+      }),
+    ).toThrow(
+      "Schema id 'SampleAccount' already exists with a different schema",
+    );
+  });
+
+  it("lists the query parameters of a schema with an id", () => {
+    const Query = z
+      .object({ search: z.string() })
+      .meta({ id: "SampleAccountQuery" });
+    const doc = documentOf({
+      find: c.query({
+        method: "GET",
+        path: "/accounts",
+        query: Query,
+        responses: { 200: Account },
+      }),
+    });
+
+    expect(doc.paths["/accounts"]!.get.parameters).toEqual([
+      expect.objectContaining({
+        name: "search",
+        in: "query",
+        schema: { type: "string" },
+      }),
+    ]);
+  });
+});

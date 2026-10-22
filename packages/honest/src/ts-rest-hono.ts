@@ -79,6 +79,7 @@ import type {
   ServerInferResponses,
 } from "@sapporta/rest-core";
 import { generateOpenApi } from "@sapporta/rest-open-api";
+import { ComponentSchemas, type SchemaPlace } from "./openapi-components.js";
 
 export type MaybePromise<T> = T | Promise<T>;
 export type HttpMethod = "get" | "post" | "put" | "patch" | "delete";
@@ -354,23 +355,27 @@ export interface GenerateOptions {
  * ts-rest 3.53's default transformer still delegates to `@anatine/zod-openapi`,
  * which peers Zod v3. Zod v4 ships its own JSON Schema emitter, so we plug
  * that in directly — zero v3 peer surface, and `.meta({ id })` component
- * ids survive into `$ref` form.
+ * ids survive into `$ref` form. The definitions zod writes beside a schema
+ * go to the document's components (openapi-components.ts).
  */
-const zodV4SchemaTransformer = ({ schema }: { schema: unknown }) => {
-  if (
-    schema &&
-    typeof schema === "object" &&
-    "_zod" in schema &&
-    typeof (schema as { parse?: unknown }).parse === "function"
-  ) {
-    return z.toJSONSchema(schema as z.ZodType, {
-      target: "openapi-3.0",
-      unrepresentable: "any",
-      io: "input",
-    }) as never;
-  }
-  return null;
-};
+const zodV4SchemaTransformer =
+  (components: ComponentSchemas) =>
+  ({ schema, ...place }: { schema: unknown } & SchemaPlace) => {
+    if (
+      schema &&
+      typeof schema === "object" &&
+      "_zod" in schema &&
+      typeof (schema as { parse?: unknown }).parse === "function"
+    ) {
+      const jsonSchema = z.toJSONSchema(schema as z.ZodType, {
+        target: "openapi-3.0",
+        unrepresentable: "any",
+        io: "input",
+      }) as Record<string, unknown>;
+      return components.hoist(jsonSchema, place) as never;
+    }
+    return null;
+  };
 
 /**
  * `TsRestApi` IS a Hono app.
@@ -550,10 +555,12 @@ export class TsRestApi<E extends Env = Env, DocCtx = void> extends Hono<E> {
       }
     }
     const { pathPrefix: _pp, ...genOpts } = options ?? {};
+    const components = new ComponentSchemas();
     const doc = generateOpenApi(router as AppRouter, apiDoc, {
-      schemaTransformer: zodV4SchemaTransformer,
+      schemaTransformer: zodV4SchemaTransformer(components),
       ...genOpts,
     }) as Record<string, unknown>;
+    components.addTo(doc);
     // `@sapporta/rest-open-api` emits `openapi: "3.0.2"`. We publish 3.1 specs
     // (the Zod-v4 transformer targets 3.0 schemas, which are a compatible
     // subset of 3.1). Downstream clients check for "3.1.0"; flip the

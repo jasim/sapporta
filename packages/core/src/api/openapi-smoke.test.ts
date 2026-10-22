@@ -19,6 +19,7 @@ import {
 } from "@sapporta/shared/grid-dataset";
 import { initContract } from "./index.js";
 import { createIntegrationApp } from "../integration/setup.js";
+import { resolveRefs, type OpenApiDoc } from "../cli/openapi-spec.js";
 
 async function createServedApp() {
   const { app } = await createIntegrationApp();
@@ -47,45 +48,46 @@ describe("openapi smoke — built-in sub-apps in /openapi.json", () => {
     expect(spec.paths["/api/tables/{tableName}"]).toBeUndefined();
 
     // The accounts fixture yields concrete /api/tables/accounts operations
-    // with a real row schema on create. The create body is emitted as a
-    // union (row | array<row> | master-with-$details) whose branches are
-    // registered as `$ref` components via `.meta({ id })`. Follow the
-    // first `$ref` back to the components dictionary to find the row
-    // schema and assert its `name` column survived specialization.
-    const fullSpec = spec as unknown as {
+    // with a real row schema on create. The create body is a union (row |
+    // array<row>) whose parts zod names, so they are components the body
+    // refers to. Resolved as the CLI resolves them for an agent, the row
+    // schema's `name` column survived specialization.
+    const fullSpec = spec as unknown as OpenApiDoc & {
       paths: Record<string, any>;
-      components?: { schemas?: Record<string, any> };
     };
     expect(fullSpec.paths["/api/tables/accounts"]).toBeDefined();
     expect(fullSpec.paths["/api/tables/{tableName}/_count"]).toBeDefined();
     const post = fullSpec.paths["/api/tables/accounts"].post;
-    const schema = post.requestBody.content["application/json"].schema;
+    const schema = resolveRefs(
+      post.requestBody.content["application/json"].schema,
+      fullSpec,
+    );
     const branches = schema.anyOf ?? schema.oneOf ?? [schema];
-
-    // Zod-v4's `toJSONSchema` emits a per-schema `definitions` dictionary
-    // alongside the wrapper (rather than promoting to the spec-level
-    // `components.schemas`). The test just cares that per-table columns
-    // survived; follow refs into either location.
-    const defs = schema.definitions ?? {};
-    const resolveBranch = (b: any): any => {
-      if (!b?.$ref) return b;
-      const ref = String(b.$ref);
-      if (ref.startsWith("#/definitions/")) {
-        return defs[ref.slice("#/definitions/".length)];
-      }
-      if (ref.startsWith("#/components/schemas/")) {
-        return fullSpec.components?.schemas?.[
-          ref.slice("#/components/schemas/".length)
-        ];
-      }
-      return b;
-    };
-
-    const objectBranch = branches
-      .map(resolveBranch)
-      .find((b: any) => b?.type === "object" && b.properties);
+    const objectBranch = branches.find(
+      (b: any) => b?.type === "object" && b.properties,
+    );
     expect(objectBranch).toBeDefined();
     expect(objectBranch.properties?.name).toBeDefined();
+  });
+
+  it("keeps every schema ref resolvable in the served document", async () => {
+    const app = await createServedApp();
+    const res = await app.request("/api/openapi.json");
+    const spec = (await res.json()) as OpenApiDoc;
+    const text = JSON.stringify(spec);
+
+    // zod writes a schema's shared parts as `definitions` beside it; in an
+    // OpenAPI document they belong in the components, where refs find them.
+    expect(text).not.toMatch(/"(definitions|\$defs)":/);
+    const refs = [...text.matchAll(/"\$ref":"([^"]*)"/g)].map((m) => m[1]!);
+    for (const ref of refs) {
+      expect(ref).toMatch(/^#\/components\/schemas\//);
+      const target = ref
+        .slice(2)
+        .split("/")
+        .reduce<any>((node, part) => node?.[part], spec);
+      expect(target, ref).toBeDefined();
+    }
   });
 
   it("every registered operation has at least one 2xx response", async () => {
