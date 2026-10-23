@@ -3,7 +3,12 @@ import { httpRequest, type HttpMethod } from "../http-client.js";
 import type { OpenApiDoc } from "../openapi-spec.js";
 import type { ApiTarget } from "../runtime-config.js";
 import type { CountQuery, TreeMatchContext } from "@sapporta/shared/contracts";
-import type { FilterNamespace } from "@sapporta/shared/filter";
+import {
+  decodeFilterObject,
+  encodeFilters,
+  FilterParseError,
+  type FilterNamespace,
+} from "@sapporta/shared/filter";
 
 export interface RowListOptions {
   limit?: number;
@@ -199,30 +204,29 @@ function rowListQuery(opts: RowListOptions): Record<string, unknown> {
   };
 }
 
+/**
+ * Encode a `--where` / `--fixed` JSON object as `filter[col][op]` query keys.
+ * Parsing and encoding live in `@sapporta/shared/filter`; this adapter only
+ * turns a grammar error into a CLI validation error.
+ */
 export function whereObjectToFilterParams(
   where: Record<string, unknown> | undefined,
   namespace: FilterNamespace = "filter",
 ): Record<string, string> {
   if (!where) return {};
-  const query: Record<string, string> = {};
-  for (const [column, clause] of Object.entries(where)) {
-    if (!isRecord(clause)) {
-      throw new OperationError(
-        `Filter for ${JSON.stringify(column)} must be an object of operators`,
-        ErrorCode.VALIDATION_FAILED,
-      );
+  try {
+    return Object.fromEntries(
+      encodeFilters(decodeFilterObject(where), namespace),
+    );
+  } catch (error) {
+    if (error instanceof FilterParseError) {
+      throw new OperationError(error.message, ErrorCode.VALIDATION_FAILED);
     }
-    for (const [operator, value] of Object.entries(clause)) {
-      query[`${namespace}[${column}][${operator}]`] =
-        filterValueToString(value);
-    }
+    throw error;
   }
-  return query;
 }
 
-function filterValueToString(value: unknown): string {
-  if (Array.isArray(value)) return value.map(filterValueToString).join(",");
-  if (value === null) return "null";
+function queryValueToString(value: unknown): string {
   if (
     typeof value === "string" ||
     typeof value === "number" ||
@@ -231,7 +235,7 @@ function filterValueToString(value: unknown): string {
     return String(value);
   }
   throw new OperationError(
-    "Filter values must be strings, numbers, booleans, null, or arrays of those values",
+    "Query values must be strings, numbers or booleans",
     ErrorCode.VALIDATION_FAILED,
   );
 }
@@ -242,11 +246,7 @@ function queryObjectToParams(
   const out: Record<string, string> = {};
   for (const [key, value] of Object.entries(query)) {
     if (value === undefined) continue;
-    out[key] = filterValueToString(value);
+    out[key] = queryValueToString(value);
   }
   return out;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
 }

@@ -5,19 +5,21 @@ import type { TagListInputProps } from "./types";
 
 /** Free-form tag entry for `in` / `nin` on text or number columns.
  *  Enter or comma commits the current input as a tag. Backspace on an
- *  empty field removes the last tag. */
+ *  empty field removes the last tag.
+ *
+ *  Pasted text such as "a, b" is split on commas when it is committed, the
+ *  same as typing a comma between the two. */
 export function TagInput({ values, onChange, autoFocus }: TagListInputProps) {
   const [draft, setDraft] = useState("");
   const inputRef = useRef<HTMLInputElement | null>(null);
 
   function commit() {
-    const trimmed = draft.trim();
-    if (!trimmed) return;
-    if (values.some((value) => String(value) === trimmed)) {
-      setDraft("");
-      return;
+    const next = [...values];
+    for (const part of draft.split(",")) {
+      const tag = part.trim();
+      if (tag && !next.includes(tag)) next.push(tag);
     }
-    onChange([...values, trimmed]);
+    if (next.length > values.length) onChange(next);
     setDraft("");
   }
 

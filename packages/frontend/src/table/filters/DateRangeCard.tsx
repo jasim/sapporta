@@ -112,6 +112,24 @@ export function DateRangeCard({
     onRemove(lte.id);
   }
 
+  // Clearing a picker removes that bound; the other bound stays as its own
+  // card. A filter has no empty date to compare against.
+  function setBound(bound: DateRange["gte"] | DateRange["lte"], day: string) {
+    const value = dateInputConditionValue(column, bound.op, day);
+    if (value === "") {
+      onRemove(bound.id);
+      return;
+    }
+    onUpdate(
+      bound.id,
+      materializeTypedFilterCondition(
+        { column: column.name, op: bound.op, value },
+        { columns: [column] },
+        bound.id,
+      ),
+    );
+  }
+
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <div className="inline-flex h-sap-ctl max-w-full items-stretch overflow-hidden rounded-md border border-sap-border">
@@ -148,24 +166,7 @@ export function DateRangeCard({
             <Input
               type="date"
               value={gteValue}
-              onChange={(e) =>
-                onUpdate(
-                  gte.id,
-                  materializeTypedFilterCondition(
-                    {
-                      column: column.name,
-                      op: "gte",
-                      value: dateInputConditionValue(
-                        column,
-                        "gte",
-                        e.target.value,
-                      ),
-                    },
-                    { columns: [column] },
-                    gte.id,
-                  ),
-                )
-              }
+              onChange={(e) => setBound(gte, e.target.value)}
               className="h-sap-ctl"
             />
           </FieldLabel>
@@ -173,24 +174,7 @@ export function DateRangeCard({
             <Input
               type="date"
               value={lteValue}
-              onChange={(e) =>
-                onUpdate(
-                  lte.id,
-                  materializeTypedFilterCondition(
-                    {
-                      column: column.name,
-                      op: "lte",
-                      value: dateInputConditionValue(
-                        column,
-                        "lte",
-                        e.target.value,
-                      ),
-                    },
-                    { columns: [column] },
-                    lte.id,
-                  ),
-                )
-              }
+              onChange={(e) => setBound(lte, e.target.value)}
               className="h-sap-ctl"
             />
           </FieldLabel>

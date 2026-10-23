@@ -328,6 +328,12 @@ describe("resolvePageQuery()", () => {
       ).toThrow(expect.objectContaining({ code: "bad_value" }));
     });
 
+    it("bad_value — an empty comparison value on a number column", () => {
+      expect(() => parseQuery({ "filter[amount][eq]": "" }, orders)).toThrow(
+        expect.objectContaining({ code: "bad_value" }),
+      );
+    });
+
     it("bad_value — in= empty", () => {
       expect(() => parseQuery({ "filter[status][in]": "" }, orders)).toThrow(
         expect.objectContaining({ code: "bad_value" }),

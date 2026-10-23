@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { SapportaCliClient, whereObjectToFilterParams } from "./app-client.js";
+import { OperationError } from "../../errors.js";
 import type { ApiTarget } from "../runtime-config.js";
 
 const LOCAL: ApiTarget = {
@@ -182,5 +183,31 @@ describe("SapportaCliClient", () => {
       "filter[amount][gte]": "100",
       "filter[status][nin]": "void,draft",
     });
+  });
+
+  it("sends a filter on empty text instead of dropping it", async () => {
+    mockJsonResponse({ ok: true, data: [] });
+    await new SapportaCliClient(LOCAL).listRows("people", {
+      where: { name: { eq: "" } },
+    });
+    expect(lastRequestUrl().searchParams.get("filter[name][eq]")).toBe("");
+  });
+
+  it("reports a filter the wire format cannot carry as a validation error", () => {
+    expect(() => whereObjectToFilterParams({ note: { eq: null } })).toThrow(
+      /use \{ "is": null \}/,
+    );
+    expect(() =>
+      whereObjectToFilterParams({ status: { in: ["a", ""] } }),
+    ).toThrow(OperationError);
+    expect(whereObjectToFilterParams({ id: { eq: 7 } }, "fixed")).toEqual({
+      "fixed[id][eq]": "7",
+    });
+  });
+
+  it("escapes a comma inside a list item", () => {
+    expect(
+      whereObjectToFilterParams({ terms: { in: ["Net 30, EOM", "Net 60"] } }),
+    ).toEqual({ "filter[terms][in]": "Net 30\\, EOM,Net 60" });
   });
 });

@@ -9,6 +9,7 @@ import type { ColumnSchema } from "@sapporta/shared/contracts";
 import { NumberInput } from "./ScalarInput";
 import { EnumCombobox } from "./EnumCombobox";
 import { LookupCheckboxList } from "./LookupCheckboxList";
+import { TagInput } from "./TagInput";
 
 (
   globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
@@ -138,6 +139,26 @@ describe("filter input drafts", () => {
     await click(remove);
 
     expect(onChange).toHaveBeenCalledWith(["draft"]);
+  });
+
+  it("splits pasted tag text on commas when it is committed", async () => {
+    const onChange = vi.fn();
+    const container = await render(
+      createElement(TagInput, {
+        values: ["a"],
+        onChange,
+        column: { name: "code", label: "Code", kind: "text" },
+      }),
+    );
+    const input = container.querySelector("input");
+    if (!input) throw new Error("Expected a tag input.");
+
+    await changeInput(input, " b, a ,, c ");
+    await act(async () => {
+      input.dispatchEvent(new FocusEvent("focusout", { bubbles: true }));
+    });
+
+    expect(onChange).toHaveBeenCalledWith(["a", "b", "c"]);
   });
 });
 

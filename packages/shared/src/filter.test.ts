@@ -16,17 +16,16 @@ import {
   LIST_OPS,
   parseFilterValue,
   checkOperatorApplicable,
-  materializeFilterCondition,
   parseFilterForTable,
   parseFilters,
   parseFiltersForTable,
   encodeFilters,
   encodeTypedFilters,
   decodeFilters,
+  decodeFilterObject,
   TypedFilterParseError,
   type FilterCondition,
   type FilterTableLike,
-  type NewFilterCondition,
   type TypedFilterCondition,
 } from "./filter.js";
 import { OPERATOR_APPLICABILITY, type ValueKind } from "./value-kind.js";
@@ -49,8 +48,11 @@ describe("parseFilterValue — number", () => {
     expect(parseFilterValue("number", "-42")).toBe(-42);
   });
 
-  it("empty string is null (cleared filter)", () => {
-    expect(parseFilterValue("number", "")).toBeNull();
+  it("rejects an empty or blank string, which Number() reads as 0", () => {
+    expect(() => parseFilterValue("number", "")).toThrow(TypedFilterParseError);
+    expect(() => parseFilterValue("number", " ")).toThrow(
+      TypedFilterParseError,
+    );
   });
 
   it("rejects non-numeric text", () => {
@@ -104,8 +106,8 @@ describe("parseFilterValue — date", () => {
     expect(v).toBeInstanceOf(Temporal.PlainDate);
   });
 
-  it("empty string is null", () => {
-    expect(parseFilterValue("date", "")).toBeNull();
+  it("rejects an empty string", () => {
+    expect(() => parseFilterValue("date", "")).toThrow(TypedFilterParseError);
   });
 
   it("wraps Temporal errors as TypedFilterParseError", () => {
@@ -124,8 +126,10 @@ describe("parseFilterValue — timestamp", () => {
     expect(v).toBeInstanceOf(Temporal.Instant);
   });
 
-  it("empty string is null", () => {
-    expect(parseFilterValue("timestamp", "")).toBeNull();
+  it("rejects an empty string", () => {
+    expect(() => parseFilterValue("timestamp", "")).toThrow(
+      TypedFilterParseError,
+    );
   });
 
   it("wraps Temporal errors as TypedFilterParseError", () => {
@@ -288,54 +292,6 @@ describe("parseFilterForTable / parseFiltersForTable", () => {
   });
 });
 
-describe("materializeFilterCondition", () => {
-  it("mints ids for scalar, list, and null draft variants", () => {
-    const drafts: NewFilterCondition[] = [
-      { column: "status", op: "eq", value: "paid" },
-      { column: "status", op: "in", values: ["paid", "void"] },
-      { column: "notes", op: "is", polarity: "null" },
-    ];
-
-    const materialized = drafts.map((draft) =>
-      materializeFilterCondition(draft),
-    );
-
-    expect(materialized[0]).toMatchObject({
-      column: "status",
-      op: "eq",
-      value: "paid",
-    });
-    expect(materialized[1]).toMatchObject({
-      column: "status",
-      op: "in",
-      values: ["paid", "void"],
-    });
-    expect(materialized[2]).toMatchObject({
-      column: "notes",
-      op: "is",
-      polarity: "null",
-    });
-    expect(
-      materialized.every((condition) => condition.id.startsWith("fc_")),
-    ).toBe(true);
-    expect(new Set(materialized.map((condition) => condition.id)).size).toBe(3);
-  });
-
-  it("preserves caller-supplied ids", () => {
-    expect(
-      materializeFilterCondition(
-        { column: "amount", op: "gte", value: "10" },
-        "existing-id",
-      ),
-    ).toEqual({
-      id: "existing-id",
-      column: "amount",
-      op: "gte",
-      value: "10",
-    });
-  });
-});
-
 // ── Layer 4: URL round-trip (grammar level) ─────────────────────────────
 
 describe("encodeFilters → decodeFilters → parseFilters round-trip", () => {
@@ -399,11 +355,11 @@ describe("encodeFilters → decodeFilters → parseFilters round-trip", () => {
 
   it("keeps the fixed and filter namespaces apart", () => {
     const params = encodeFilters(
-      [{ id: "a", column: "archived", op: "eq", value: "false" }],
+      [{ column: "archived", op: "eq", value: "false" }],
       "fixed",
     );
     for (const [key, value] of encodeFilters([
-      { id: "b", column: "name", op: "contains", value: "tax" },
+      { column: "name", op: "contains", value: "tax" },
     ])) {
       params.append(key, value);
     }
@@ -450,6 +406,113 @@ describe("encodeFilters → decodeFilters → parseFilters round-trip", () => {
       { column: "amount", op: "gt", value: "100" },
       { column: "due", op: "lte", value: "2024-12-31" },
     ]);
+  });
+});
+
+describe("decodeFilterObject", () => {
+  it("decodes each operator family and encodes to the wire format", () => {
+    const conds = decodeFilterObject({
+      amount: { gte: 100, lt: "500" },
+      status: { nin: ["void", "draft"] },
+      paid: { eq: true },
+      note: { is: null },
+      due: { is: "notnull" },
+    });
+    expect(conds).toEqual([
+      { column: "amount", op: "gte", value: "100" },
+      { column: "amount", op: "lt", value: "500" },
+      { column: "status", op: "nin", values: ["void", "draft"] },
+      { column: "paid", op: "eq", value: "true" },
+      { column: "note", op: "is", polarity: "null" },
+      { column: "due", op: "is", polarity: "notnull" },
+    ]);
+    expect(
+      decodeFilters(encodeFilters(conds)).map(({ id: _, ...c }) => c),
+    ).toEqual(conds);
+  });
+
+  it.each([
+    ["a non-object", ["x"], "unknown_filter_shape"],
+    ["a non-object clause", { amount: 5 }, "unknown_filter_shape"],
+    ["an unknown operator", { amount: { gtee: 1 } }, "unknown_op"],
+    ["an array on a scalar op", { amount: { eq: [1, 2] } }, "bad_value"],
+    ["null on a scalar op", { note: { eq: null } }, "bad_value"],
+    ["an empty list", { status: { in: [] } }, "bad_value"],
+    ["a nested array", { status: { in: [["a"]] } }, "bad_value"],
+    ["a bad is value", { note: { is: true } }, "bad_value"],
+    ["an empty list item", { status: { in: ["a", ""] } }, "bad_value"],
+  ])("rejects %s", (_label, where, code) => {
+    expect(() => decodeFilterObject(where)).toThrow(
+      expect.objectContaining({ name: "FilterParseError", code }),
+    );
+  });
+});
+
+describe("encodeFilters", () => {
+  it.each([
+    ["a column with ]", "a]b"],
+    ["an empty column", ""],
+  ])("rejects %s, which the key cannot carry", (_label, column) => {
+    expect(() => encodeFilters([{ column, op: "eq", value: "1" }])).toThrow(
+      expect.objectContaining({
+        name: "FilterParseError",
+        code: "unknown_filter_shape",
+      }),
+    );
+  });
+
+  it("rejects an empty list, which the decoder would reject", () => {
+    expect(() =>
+      encodeFilters([{ column: "status", op: "in", values: [] }]),
+    ).toThrow(
+      expect.objectContaining({ name: "FilterParseError", code: "bad_value" }),
+    );
+  });
+
+  it("writes number list items as strings", () => {
+    expect(
+      encodeFilters([{ column: "id", op: "in", values: [1, 2] }]).get(
+        "filter[id][in]",
+      ),
+    ).toBe("1,2");
+  });
+
+  it("rejects an empty list item, which the wire format cannot carry", () => {
+    expect(() =>
+      encodeFilters([{ column: "status", op: "nin", values: ["a", ""] }]),
+    ).toThrow(
+      expect.objectContaining({ name: "FilterParseError", code: "bad_value" }),
+    );
+  });
+
+  it("escapes commas and backslashes in list items and decodes them back", () => {
+    const values = ["Net 30, EOM", "C:\\temp", "a\\,b", ",", "\\"];
+    const params = encodeFilters([{ column: "terms", op: "in", values }]);
+    expect(params.get("filter[terms][in]")).toBe(
+      "Net 30\\, EOM,C:\\\\temp,a\\\\\\,b,\\,,\\\\",
+    );
+    expect(decodeFilters(params)).toMatchObject([
+      { column: "terms", op: "in", values },
+    ]);
+  });
+});
+
+describe("decodeFilters list escapes", () => {
+  it.each([
+    ["a backslash before another character", "a\\b"],
+    ["a trailing backslash", "a\\"],
+  ])("rejects %s", (_label, raw) => {
+    expect(() =>
+      decodeFilters(new URLSearchParams({ "filter[terms][in]": raw })),
+    ).toThrow(
+      expect.objectContaining({ name: "FilterParseError", code: "bad_value" }),
+    );
+  });
+
+  it("reads an unescaped comma as a separator", () => {
+    expect(
+      decodeFilters(new URLSearchParams({ "filter[terms][in]": "a,b" })),
+    ).toMatchObject([{ values: ["a", "b"] }]);
   });
 });
 

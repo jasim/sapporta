@@ -2,7 +2,11 @@ import { uiClient } from "../../platform/client";
 import type { LookupResponse, Row } from "@sapporta/shared/contracts";
 import type { LookupEntry, LookupValue } from "@sapporta/grid/lookup";
 import type { LookupSearchPage } from "@sapporta/grid/lookup";
-import { wireKey, type FilterDraftCondition } from "@sapporta/shared/filter";
+import {
+  encodeFilters,
+  type FilterDraftCondition,
+} from "@sapporta/shared/filter";
+import { appendQueryParam, type QueryParamRecord } from "@sapporta/shared";
 
 /**
  * Narrows a lookup's choices. Lookups by id are never narrowed, so a chosen
@@ -19,22 +23,10 @@ export type LookupNarrowing = {
 /** The query parameters of a narrowing. */
 export function lookupNarrowingQuery(
   narrowing: LookupNarrowing | undefined,
-): Record<string, string | string[]> {
-  const query: Record<string, string | string[]> = {};
-  for (const cond of narrowing?.filter ?? []) {
-    const key = wireKey(cond.column, cond.op);
-    const value =
-      "values" in cond
-        ? cond.values.map(String).join(",")
-        : "polarity" in cond
-          ? cond.polarity
-          : cond.value;
-    const existing = query[key];
-    // The grammar ANDs repeated conditions on one key.
-    query[key] =
-      existing === undefined
-        ? value
-        : [...(Array.isArray(existing) ? existing : [existing]), value];
+): QueryParamRecord {
+  const query: QueryParamRecord = {};
+  for (const [key, value] of encodeFilters(narrowing?.filter ?? [])) {
+    appendQueryParam(query, key, value);
   }
   if (narrowing?.notUnder !== undefined) {
     query.notUnder = String(narrowing.notUnder);

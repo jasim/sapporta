@@ -9,15 +9,18 @@
  * The same grammar can also be written under a second key prefix, as
  * `fixed[col][op]=value` (see `FilterNamespace`).
  *
- * `in`/`nin` pass comma-separated values. `is` carries the literal string
- * "null" or "notnull". Everything else is a single string.
+ * `in`/`nin` pass comma-separated values. Inside an item, `\,` stands for a
+ * comma and `\\` for a backslash. `is` carries the literal string "null" or
+ * "notnull". Everything else is a single string.
  *
  * `FilterCondition` is a discriminated union on `op`. The type system
  * guarantees the value shape at every call site — no runtime shape guards.
  *
  * `decodeFilters` validates everything grammar-level (key shape, op set,
- * `is` polarity, `in`/`nin` non-empty CSV) and fails with a typed
- * `FilterParseError`. The server wraps those errors into its
+ * `is` polarity, an `in`/`nin` list of one or more non-empty items) and
+ * fails with a typed `FilterParseError`. `encodeFilters` refuses a column
+ * the key cannot carry and a list the decoder would reject, so it never
+ * writes a filter that fails to parse. The server wraps those errors into its
  * `QueryParseError`; the server still owns column-existence checks and
  * SQL emission (both of which need schema/drizzle knowledge that can't
  * live in this package).
@@ -53,7 +56,8 @@ export type ScalarOp = (typeof SCALAR_OPS)[number];
 export type ListOp = (typeof LIST_OPS)[number];
 export type NullOp = (typeof NULL_OPS)[number];
 export type Operator = (typeof OPERATORS)[number];
-export type Polarity = "null" | "notnull";
+export const POLARITIES = ["null", "notnull"] as const;
+export type Polarity = (typeof POLARITIES)[number];
 
 export function isOperator(v: string): v is Operator {
   return (OPERATORS as readonly string[]).includes(v);
@@ -63,6 +67,9 @@ function isScalarOp(v: string): v is ScalarOp {
 }
 function isListOp(v: string): v is ListOp {
   return (LIST_OPS as readonly string[]).includes(v);
+}
+function isPolarity(v: string): v is Polarity {
+  return (POLARITIES as readonly string[]).includes(v);
 }
 
 /**
@@ -79,21 +86,13 @@ export type FilterCondition =
   | { id: string; column: string; op: ListOp; values: string[] }
   | { id: string; column: string; op: NullOp; polarity: Polarity };
 
-/**
- * A condition being authored — same shape as `FilterCondition` minus `id`,
- * which controllers mint on insert. Built as a distributive Omit so the
- * discriminated union is preserved; plain `Omit<FilterCondition, "id">`
- * collapses the union into `{column, op}` (only the shared keys survive)
- * and silently drops `value` / `values` / `polarity`.
- */
-export type NewFilterCondition = FilterCondition extends infer T
-  ? T extends { id: string }
-    ? Omit<T, "id">
-    : never
-  : never;
-
 export type FilterDraftValue = string | number;
 
+/**
+ * A condition without an id, such as one being authored or one about to be
+ * encoded. A list item may be a number, such as an account id; the encoder
+ * writes it as a string.
+ */
 export type FilterDraftCondition =
   | { column: string; op: ScalarOp; value: string }
   | { column: string; op: ListOp; values: readonly FilterDraftValue[] }
@@ -107,12 +106,26 @@ export type FilterDraftCondition =
  */
 export type FilterNamespace = "filter" | "fixed";
 
-/** Wire-format key for a column+op pair, such as `filter[col][op]`. */
+/** One bracketed part of a key: non-empty, with no `]`. */
+const FILTER_KEY_SEGMENT = "[^\\]]+";
+const FILTER_COLUMN_RE = new RegExp(`^${FILTER_KEY_SEGMENT}$`);
+
+/**
+ * Wire-format key for a column+op pair, such as `filter[col][op]`. Throws
+ * `FilterParseError` for a column the key cannot carry: an empty name or one
+ * containing `]`.
+ */
 export function wireKey(
   column: string,
   op: Operator,
   namespace: FilterNamespace = "filter",
 ): string {
+  if (!FILTER_COLUMN_RE.test(column)) {
+    throw new FilterParseError(
+      "unknown_filter_shape",
+      `Filter column ${JSON.stringify(column)} must be non-empty and must not contain "]"`,
+    );
+  }
   return `${namespace}[${column}][${op}]`;
 }
 
@@ -193,17 +206,23 @@ export class TypedFilterParseError extends Error {
  * Strict: malformed input throws. Coercion (e.g. `"$95k"` → 95000) is
  * NOT performed and never will be — see the "No Coercion" principle.
  *
- * Null/empty semantics: the empty string is treated as `null` for
- * non-text kinds (a user clearing a numeric filter sends `""`). For
- * text, empty string is a legitimate value (distinct from null) and
- * is returned as-is.
+ * The empty string is a value only for text, where it matches empty text.
+ * For every other kind it is a `bad_value`: a missing value is matched with
+ * the `is` operator, never with an empty comparison value.
  */
 export function parseFilterValue(kind: ValueKind, raw: string): TypedValue {
   switch (kind) {
     case "text":
       return raw;
     case "number": {
-      if (raw === "") return null;
+      // `Number("")` and `Number(" ")` are 0, so a blank value is
+      // rejected before it is converted.
+      if (raw.trim() === "") {
+        throw new TypedFilterParseError(
+          "bad_value",
+          `expected a number, got ${JSON.stringify(raw)}; use the is operator to match a missing value`,
+        );
+      }
       const n = Number(raw);
       if (!Number.isFinite(n)) {
         throw new TypedFilterParseError(
@@ -222,7 +241,6 @@ export function parseFilterValue(kind: ValueKind, raw: string): TypedValue {
       );
     }
     case "date": {
-      if (raw === "") return null;
       try {
         return parsePlainDate(raw);
       } catch (err) {
@@ -233,7 +251,6 @@ export function parseFilterValue(kind: ValueKind, raw: string): TypedValue {
       }
     }
     case "timestamp": {
-      if (raw === "") return null;
       try {
         return parseCanonicalInstant(raw);
       } catch (err) {
@@ -409,12 +426,20 @@ export function encodeTypedCondition(
   }
 }
 
-/** Serialize a condition's value for transmission. */
-export function encodeFilterValue(cond: FilterCondition): string {
+/**
+ * Serialize a condition's value for transmission. An `in`/`nin` item is
+ * written as a string, with its commas and backslashes escaped as `\,` and
+ * `\\`. Throws `FilterParseError` for an empty list or an empty item, which
+ * `decodeFilters` would reject.
+ */
+export function encodeFilterValue(cond: FilterDraftCondition): string {
   switch (cond.op) {
     case "in":
     case "nin":
-      return cond.values.join(",");
+      checkListValues(`Filter ${cond.column}.${cond.op}`, cond.values);
+      return cond.values
+        .map((item) => String(item).replace(/[\\,]/g, (char) => `\\${char}`))
+        .join(",");
     case "is":
       return cond.polarity;
     default:
@@ -428,7 +453,7 @@ export function encodeFilterValue(cond: FilterCondition): string {
  * so we call `append`, not `set`. Ids are intentionally not serialized.
  */
 export function encodeFilters(
-  filters: readonly FilterCondition[],
+  filters: readonly FilterDraftCondition[],
   namespace: FilterNamespace = "filter",
 ): URLSearchParams {
   const params = new URLSearchParams();
@@ -455,9 +480,11 @@ export function encodeTypedFilters(
 export type FilterParseErrorCode =
   "unknown_filter_shape" | "unknown_op" | "bad_value";
 
-/** Thrown by `decodeFilters` on a grammar violation. The UI catches
- *  `Error` at the route boundary; the server rewraps into its
- *  `QueryParseError` so the HTTP handler can turn it into a 400. */
+/** Thrown on a grammar violation: by `decodeFilters` and `decodeFilterObject`
+ *  on input, and by `wireKey` and `encodeFilterValue` for a filter the wire
+ *  format cannot carry. The UI catches `Error` at the route boundary; the
+ *  server rewraps into its `QueryParseError` so the HTTP handler can turn it
+ *  into a 400. */
 export class FilterParseError extends Error {
   public readonly code: FilterParseErrorCode;
   constructor(code: FilterParseErrorCode, message: string) {
@@ -468,8 +495,12 @@ export class FilterParseError extends Error {
 }
 
 const FILTER_KEY_RE: Readonly<Record<FilterNamespace, RegExp>> = {
-  filter: /^filter\[([^\]]+)\]\[([^\]]+)\]$/,
-  fixed: /^fixed\[([^\]]+)\]\[([^\]]+)\]$/,
+  filter: new RegExp(
+    `^filter\\[(${FILTER_KEY_SEGMENT})\\]\\[(${FILTER_KEY_SEGMENT})\\]$`,
+  ),
+  fixed: new RegExp(
+    `^fixed\\[(${FILTER_KEY_SEGMENT})\\]\\[(${FILTER_KEY_SEGMENT})\\]$`,
+  ),
 };
 
 /**
@@ -510,6 +541,106 @@ export function decodeFilters(
   return out;
 }
 
+/**
+ * Parse filter conditions written as a JSON object, such as the CLI's
+ * `--where` flag:
+ *
+ *     { "amount": { "gte": 100 }, "status": { "nin": ["void", "draft"] } }
+ *
+ * Each key is a column and maps to an object of operator → value. Scalar ops
+ * take a string, number or boolean. List ops take an array of those, with one
+ * or more items and no empty item. `is` takes `null`, `"null"` or
+ * `"notnull"`. An array on a scalar op and `null` on any op but `is` are
+ * rejected. `encodeFilters` rejects a column name the `filter[col][op]` key
+ * cannot carry, and the server checks that each column exists and that each
+ * value parses for its column's kind.
+ */
+export function decodeFilterObject(source: unknown): FilterDraftCondition[] {
+  if (!isPlainObject(source)) {
+    throw new FilterParseError(
+      "unknown_filter_shape",
+      "Filters must be an object of columns",
+    );
+  }
+  const out: FilterDraftCondition[] = [];
+  for (const [column, clause] of Object.entries(source)) {
+    if (!isPlainObject(clause)) {
+      throw new FilterParseError(
+        "unknown_filter_shape",
+        `Filter for ${JSON.stringify(column)} must be an object of operators`,
+      );
+    }
+    for (const [op, value] of Object.entries(clause)) {
+      if (!isOperator(op)) {
+        throw new FilterParseError(
+          "unknown_op",
+          `Unknown filter operator "${op}" on column "${column}"`,
+        );
+      }
+      out.push(filterObjectCondition(column, op, value));
+    }
+  }
+  return out;
+}
+
+function filterObjectCondition(
+  column: string,
+  op: Operator,
+  value: unknown,
+): FilterDraftCondition {
+  const at = `Filter ${column}.${op}`;
+  if (op === "is") {
+    // JSON `null` is this surface's spelling of the "null" polarity.
+    const polarity = value === null ? "null" : value;
+    if (typeof polarity !== "string" || !isPolarity(polarity)) {
+      throw new FilterParseError(
+        "bad_value",
+        `${at} must be null, "null" or "notnull", got ${JSON.stringify(value)}`,
+      );
+    }
+    return { column, op, polarity };
+  }
+  if (isListOp(op)) {
+    if (!Array.isArray(value)) {
+      throw new FilterParseError(
+        "bad_value",
+        `${at} requires an array of values`,
+      );
+    }
+    const values = value.map((item) => filterObjectValue(at, item));
+    checkListValues(at, values);
+    return { column, op, values };
+  }
+  if (isScalarOp(op)) return { column, op, value: filterObjectValue(at, value) };
+  // Unreachable: isOperator narrowed op to ScalarOp | ListOp | NullOp, and
+  // we've handled the latter two. Present only so the return type holds.
+  throw new FilterParseError("unknown_op", `Unhandled operator: ${op}`);
+}
+
+function filterObjectValue(at: string, value: unknown): string {
+  if (
+    typeof value === "string" ||
+    typeof value === "number" ||
+    typeof value === "boolean"
+  ) {
+    return String(value);
+  }
+  if (value === null) {
+    throw new FilterParseError(
+      "bad_value",
+      `${at} cannot be null; use { "is": null } to match a missing value`,
+    );
+  }
+  throw new FilterParseError(
+    "bad_value",
+    `${at} must be a string, number or boolean, got ${JSON.stringify(value)}`,
+  );
+}
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
 function* filterQueryEntries(
   source: URLSearchParams | Readonly<QueryParamRecord>,
   prefix: string,
@@ -542,23 +673,14 @@ function parseCondition(
 ): FilterCondition {
   const id = mintFilterId(column, op);
   if (isListOp(op)) {
-    if (raw === "") {
-      throw new FilterParseError(
-        "bad_value",
-        `${wireKey(column, op, namespace)} requires at least one value`,
-      );
-    }
-    const values = raw.split(",");
-    if (values.some((v) => v === "")) {
-      throw new FilterParseError(
-        "bad_value",
-        `${wireKey(column, op, namespace)} has an empty item in CSV list`,
-      );
-    }
+    // An empty value splits into one empty item, which `checkListValues`
+    // rejects.
+    const values = splitListValue(raw, wireKey(column, op, namespace));
+    checkListValues(wireKey(column, op, namespace), values);
     return { id, column, op, values };
   }
   if (op === "is") {
-    if (raw !== "null" && raw !== "notnull") {
+    if (!isPolarity(raw)) {
       throw new FilterParseError(
         "bad_value",
         `${wireKey(column, op, namespace)} must be "null" or "notnull", got ${JSON.stringify(raw)}`,
@@ -572,6 +694,53 @@ function parseCondition(
   throw new FilterParseError("unknown_op", `Unhandled operator: ${op}`);
 }
 
+/**
+ * Split an `in`/`nin` value on its unescaped commas, turning `\,` back into a
+ * comma and `\\` into a backslash. A backslash before any other character, or
+ * at the end, is a `bad_value`.
+ */
+function splitListValue(raw: string, key: string): string[] {
+  const items: string[] = [];
+  let item = "";
+  for (let i = 0; i < raw.length; i++) {
+    const char = raw[i];
+    if (char === ",") {
+      items.push(item);
+      item = "";
+    } else if (char !== "\\") {
+      item += char;
+    } else if (raw[i + 1] === "," || raw[i + 1] === "\\") {
+      item += raw[i + 1];
+      i++;
+    } else {
+      throw new FilterParseError(
+        "bad_value",
+        `${key} has a "\\" that is not followed by "," or "\\"`,
+      );
+    }
+  }
+  items.push(item);
+  return items;
+}
+
+/**
+ * An `in`/`nin` list has one or more items, and no item is empty. The
+ * comma-separated value cannot tell an empty list from a list holding one
+ * empty item, so neither is allowed, and an empty item is refused in every
+ * position so the rule does not depend on the list's length.
+ */
+function checkListValues(
+  at: string,
+  values: readonly FilterDraftValue[],
+): void {
+  if (values.length === 0 || values.some((item) => item === "")) {
+    throw new FilterParseError(
+      "bad_value",
+      `${at} needs one or more items, and no item may be empty`,
+    );
+  }
+}
+
 // ── Identity & equality ──────────────────────────────────────────────────
 
 let nextFilterId = 0;
@@ -581,26 +750,6 @@ let nextFilterId = 0;
 export function mintFilterId(column: string, op: string): string {
   nextFilterId += 1;
   return `fc_${nextFilterId}_${column}_${op}`;
-}
-
-export function materializeFilterCondition(
-  cond: NewFilterCondition,
-  id = mintFilterId(cond.column, cond.op),
-): FilterCondition {
-  switch (cond.op) {
-    case "in":
-    case "nin":
-      return { id, column: cond.column, op: cond.op, values: cond.values };
-    case "is":
-      return {
-        id,
-        column: cond.column,
-        op: cond.op,
-        polarity: cond.polarity,
-      };
-    default:
-      return { id, column: cond.column, op: cond.op, value: cond.value };
-  }
 }
 
 function resolveColumnKind(table: FilterTableInput, column: string): ValueKind {

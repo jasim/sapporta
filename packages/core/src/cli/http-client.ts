@@ -144,8 +144,10 @@ function requestUrl(
     relativePath,
     baseUrl.endsWith("/") ? baseUrl : baseUrl + "/",
   );
+  // Every value is sent as given, including an empty string; callers leave
+  // out the parameters they do not set.
   for (const [key, value] of Object.entries(queryParams ?? {})) {
-    if (value !== undefined && value !== "") url.searchParams.set(key, value);
+    url.searchParams.set(key, value);
   }
   return url;
 }
