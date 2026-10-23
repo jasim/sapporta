@@ -1,5 +1,20 @@
 # sapporta
 
+## 0.2.18
+
+### Patch Changes
+
+- Updated dependencies [cdefd83]
+- Updated dependencies [a3b6de0]
+- Updated dependencies [3db1aee]
+- Updated dependencies [7763d9e]
+- Updated dependencies [fe8fae6]
+- Updated dependencies [fe8fae6]
+- Updated dependencies [1b6200d]
+- Updated dependencies [2c79a53]
+- Updated dependencies [33e6dc2]
+  - @sapporta/server@0.9.0
+
 ## 0.2.17
 
 ### Patch Changes

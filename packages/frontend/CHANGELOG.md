@@ -1,5 +1,190 @@
 # @sapporta/frontend
 
+## 0.10.0
+
+### Minor Changes
+
+- 1e1df09: Filters draw the rows they pick with the table's row display, so two rows
+  with the same name can be told apart. Options in a filter's checklist show
+  the table's caption under the label, as pickers do. A filter chip draws each
+  chosen row with the label slot (`context.surface === "chip"`); by default it
+  shows the label alone, with the caption as its tooltip.
+- eb8fa6d: `invalidateRows(table?)` refreshes rows everywhere they are shown. A write in
+  one table grid now also refreshes the captions and labels in other grids,
+  pickers and forms on screen, not only its own. Call `invalidateRows` after
+  your own endpoints write, so Sapporta's screens show the new values. A store
+  made with `createLookupStore` joins with `connectRowDataStore(store)`;
+  grids and `useLookupStore` join on their own. `store.reloadLabels()` with no
+  table reloads every table's labels.
+- 52c8acd: Display slots now reach column cells, pickers and the record sheet.
+
+  - A `columns` slot draws one cell of a table's own rows:
+    `{ stocks: { columns: { buy: { needs: ["buyVolume"], render: BuyCell } } } }`.
+    Each level asks only for the needs of the columns it shows, so a hidden column
+    costs nothing. On a foreign-key column, `referenceNeeds` names computed fields
+    of the referenced row, which the slot receives as `reference`. A field drawn
+    by a slot stays in narrow cards when its own value is empty.
+  - `LookupPicker` given a table's lookup (`useTableLookup`, form fields) draws
+    its options with the table's label slot, and shows the chosen row's caption
+    beside the input, inside the field, without changing its height. It hides
+    while you type. `itemDisplay` still takes precedence.
+  - The record sheet draws references with the label slot, and fields with their
+    column slot.
+  - `useRowComputed(table, id, fields)` reads computed values in your own
+    components, batched per render; table grids provide their store, and
+    `RowDataStoreProvider` provides one elsewhere.
+  - `tableDisplay(schemas, display)` types a table's slots by the value schemas
+    of its computed fields.
+  - On a tree level, the parent column's picker shows each option's parent path.
+
+- 52c8acd: Rows are drawn with their table's `rowCaption`, and apps can change how rows
+  are drawn with display slots.
+
+  - A table whose metadata names a `rowCaption` shows it under the row's label
+    in pickers and editor options, such as an account's parent path under its
+    name. Grid cells keep one line.
+  - `RowDisplayProvider` takes display slots per table:
+    `{ accounts: { label: { needs: ["parentPath"], render: AccountName } } }`.
+    A `label` slot draws a row's own label cell and every reference to it, at
+    every grid level. `needs` lists the computed fields it reads; Sapporta asks
+    for them with the page and with lookups, and draws `render` once they are
+    known. `render` receives `context.surface` and `defaultContent`, so it can
+    keep the default on some surfaces. Providers nest and merge by table, then
+    by slot; `useTGridSession` reads the nearest provider.
+  - The session's `lookups` is now a row data store: besides labels, it holds the
+    computed values of the rows it has seen, with `computedFor`,
+    `ensureComputed` (batched per tick), `invalidateComputed()` and
+    `reloadLabels(table)`. A write through a table session reads every computed
+    value again, and the written table's labels; an answer to a read sent
+    before the write is drawn but read again. Call both after writes made
+    through your own endpoints. `createTGridSession(definition, { rowDisplays })` and
+    `createLookupStore({ rowDisplays })` take displays outside React.
+  - The FK cell editor's placeholder names the current value.
+
+- 68740a9: A table opens on the row you just created, on the page you left. New record
+  now returns to the table with the page, sort, search and filters it had, where
+  before it returned to the table's first page and default view. The cursor is
+  on the new row and it is scrolled into view; on a tree, the branches above it
+  open. On a flat table whose page doesn't hold the new row, the row is shown at
+  the top of that page, and the rows already there keep their places. The row
+  stays there until the rows are read again, such as on reload or a change of
+  page, sort, search or filter, which places it by sort like any other row.
+
+  To do the same from your own pages, use `session.showRow(rowKey, { savedRow })`,
+  passing the row as the table API returned it. Without `savedRow`, or on a tree,
+  it reads the rows again when the table doesn't have the row yet, and with
+  `clearQueryIfHidden` it clears a search or filter that leaves the row out,
+  putting it back when clearing doesn't bring the row. It resolves to `"shown"`,
+  or to `"not-found"` when the row is still not on screen. To open a table page
+  on a row, navigate to it with `showTableRowState(table, rowKey, savedRow)` as
+  the location state, or with `showCreatedRowState(table, created)` for a row the
+  table API just created. `navigateToNewRecord(table, tableSearch)` takes the
+  table page's query string so the form returns to the same view.
+
+- a3b6de0: Lookups can offer only some rows of a table.
+
+  - The lookup search takes `filter[col][op]=value`, the same filters as list
+    reads, so a picker can offer, say, accounts of one type. Lookups by id take
+    no filter, so a chosen row keeps its label after it stops matching.
+  - `notUnder=<id>` leaves out a row of a tree table and every row below it:
+    the choices for a row's parent, without the ones that would make a loop.
+  - `useTableLookup("accounts", { filter: [{ column: "account_type", op: "in",
+values: ["asset"] }], notUnder: accountId })` gives a `LookupPicker` that
+    searches only those rows. `store.table(name, narrowing)` does the same for
+    a row store.
+
+- 82ed158: `LookupPicker` keeps a table's row display when you customize it.
+
+  - `itemDisplay` now draws options over the table's label slot instead of
+    turning it off. Its `component` receives `defaultContent`, the option as the
+    label slot draws it, to wrap or replace; the chosen value keeps its caption.
+  - `selectedCaption: "below"` draws the chosen row's caption on its own line
+    under the field, at full width, instead of inside the field at its end. The
+    line is kept while empty, so picking a value moves nothing.
+
+- ed9d3a8: `ReportGridDataset` draws `reference` columns with the referenced table's
+  `label` slot. It uses the values the report sent in `computed`, and asks for
+  anything else in one lookup per table. A `renderCell` override for the column
+  receives the reference drawing as `defaultContent`, and column links keep
+  working.
+- a00f637: The parent of a tree table's row can no longer be set to the row itself or
+  to one of its descendants from Sapporta's own screens. The grid's parent
+  cell editor and the record sheet's parent field offer every other row.
+
+  - `@sapporta/grid`: lookup columns take `lookupForRow(row)`, the choices the
+    editor offers for one row; `rowLookupCapabilities(preset, row)` reads them.
+  - `@sapporta/frontend`: `buildRecordFormFields` takes the edited `rowId`,
+    and `LookupStore.table(name, narrowing?)` takes a narrowing.
+
+### Patch Changes
+
+- fe8fae6: `decodeFilterObject()` parses filter conditions written as a JSON object, such
+  as `{ "amount": { "gte": 100 } }`, into `NewFilterCondition[]`. It rejects an
+  array on a scalar operator and `null` on any operator but `is`.
+
+  An `in`/`nin` item can now contain a comma. Inside an item, `\,` stands for a
+  comma and `\\` for a backslash, so `filter[terms][in]=Net 30\, EOM,Net 60`
+  matches two options. `encodeFilters()` writes these escapes, and the server
+  reads them. A comma inside an item used to split it in two, so the filter
+  returned the wrong rows. A backslash before any other character is now a
+  `bad_value`, so an item containing a backslash must be written as `\\`.
+
+  `encodeFilters()` and `encodeFilterValue()` now accept conditions without an
+  `id`, and throw `FilterParseError` for an empty `in`/`nin` list or item, which
+  the server would reject. `wireKey()`, and so `encodeFilters()`, throws for an
+  empty column name or one containing `]`, which the key cannot carry.
+  `materializeFilterCondition()` is removed; it had no callers.
+
+  A lookup narrowing's `filter` is encoded by `encodeFilters()`.
+
+  The CLI's `--where` and `--fixed` flags use `decodeFilterObject()`, so
+  `sapporta rows list` and `sapporta rows count` reject those filters before
+  sending the request. Use `{ "is": null }` to match a missing value;
+  `{ "eq": null }` used to compare a text column against the string `"null"`.
+  A list operator now needs a JSON array: `{ "in": "a,b" }` is rejected. The
+  CLI no longer drops query parameters with an empty value, so
+  `{ "name": { "eq": "" } }` matches empty text instead of being ignored.
+
+  `sapporta api get|post|put|delete --query` now rejects array and `null`
+  values instead of joining an array with commas and sending `null` as the
+  string `"null"`. Write a list in the form the endpoint expects, such as
+  `{ "fields": "a,b" }`. Empty strings in `--query` are now sent as well.
+
+  The filter editor's tag input splits pasted text such as `a, b` on commas, the
+  same as typing a comma between the two.
+
+- fe8fae6: An empty filter value on a `number`, `date` or `timestamp` column is now a
+  `bad_value`. It used to be read as `NULL` and compared with `=` or `>=`, which
+  matched no rows without an error. `filter[amount][eq]=` now returns `400`; match
+  a missing value with `is`. On a `text` column an empty value still matches
+  empty text. `parseFilterValue()` throws `TypedFilterParseError` for an empty
+  or blank string on those kinds instead of returning `null`.
+
+  `NewFilterCondition` is removed. `encodeFilters()`, `encodeFilterValue()` and
+  `decodeFilterObject()` use `FilterDraftCondition`, so an `in`/`nin` list may
+  hold numbers, which are written as strings. `POLARITIES` lists the `is`
+  operator's values.
+
+  Clearing one date in a date-range filter card removes that bound and keeps
+  the other, instead of sending an empty date.
+
+- 33e6dc2: The packages now require zod 4.6.7 or later: their zod peer range is
+  `^4.6.7`, up from `^4.3.6`. Applications on an older zod 4 need to upgrade it.
+- Updated dependencies [cdefd83]
+- Updated dependencies [d35a5b4]
+- Updated dependencies [3f87101]
+- Updated dependencies [68740a9]
+- Updated dependencies [1ed5c05]
+- Updated dependencies [a3b6de0]
+- Updated dependencies [aaae9c2]
+- Updated dependencies [7763d9e]
+- Updated dependencies [fe8fae6]
+- Updated dependencies [fe8fae6]
+- Updated dependencies [a00f637]
+- Updated dependencies [33e6dc2]
+  - @sapporta/shared@0.5.0
+  - @sapporta/grid@0.9.0
+
 ## 0.9.1
 
 ### Patch Changes

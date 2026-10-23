@@ -1,5 +1,29 @@
 # @sapporta/honest
 
+## 0.3.18
+
+### Patch Changes
+
+- 293284b: `TsRestApi.route()` now merges the docs of a mounted `TsRestApi` into the
+  parent's OpenAPI document, joining each contract path to the mount path the
+  way Hono does. Custom routes that a scaffolded app mounts in `loadApp()` with
+  `app.route("/", featureApi)` now appear in `/api/openapi.json` and in
+  `sapporta endpoints list`. A sub-api mounted at two paths is documented at
+  both. An app that calls both `route()` and `extend()` for the same sub-api
+  still lists each route once. `route()` rejects a sub-api whose doc context
+  differs from the parent's, as `extend()` does.
+- 33e6dc2: The served OpenAPI document's schema refs now resolve. `z.toJSONSchema` writes
+  a schema's shared parts as `definitions` beside it, with refs such as
+  `#/definitions/AccountsInsert` that point nowhere in an OpenAPI document, and
+  since zod 4.6 a request or response schema with a `.meta({ id })` became only
+  such a ref. `generateDocument()` now moves those definitions to
+  `components.schemas` and points the refs there: an id names its component, and
+  one id used for two different schemas throws; zod's generated names and a
+  recursive schema's root are named after the route. Parameter schemas stay
+  inline, so their parameters are still listed.
+- 33e6dc2: The packages now require zod 4.6.7 or later: their zod peer range is
+  `^4.6.7`, up from `^4.3.6`. Applications on an older zod 4 need to upgrade it.
+
 ## 0.3.17
 
 ### Patch Changes

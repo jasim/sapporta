@@ -1,5 +1,53 @@
 # @sapporta/grid
 
+## 0.9.0
+
+### Minor Changes
+
+- d35a5b4: A grid level can show a row that was saved somewhere else, such as by a form:
+  `level.addSavedRow(node, atIndex)` adds it to the level's loaded rows without
+  saving it again and without reading the rows again, so the rows around it keep
+  their places. The next read, such as a reload or a change of page, sort or
+  filter, puts the row where that read places it. A data source supports this
+  through the optional `write.addSavedNode`, which `restLevelSource` provides.
+  `addSavedRow` returns false for a source without it, such as
+  `inMemoryLevelSource`, whose rows are all loaded and sorted on the client, and
+  for a readonly source.
+- 68740a9: A grid level can find one of its loaded rows: `level.focusRow(rowKey)` puts the
+  cursor on the row and scrolls it into view. On a tree level it first opens the
+  branches above the row, so a row under a collapsed parent is found too. In a
+  cell grid, `{ colId }` picks the cell the cursor lands on. It returns false when
+  the level's loaded rows don't include the row. Unlike a click, it does not
+  activate the row.
+- 1ed5c05: Lookup columns (`foreignKey`, `lookupValue`) take `renderEntry`, which draws
+  each entry in the column's cells and in its editor's options, with what the
+  column would draw as `defaultContent`. The cell editor's placeholder now names
+  the current value. `CachedValueLookup.reloadEntries()` reads every cached
+  entry again, and every entry whose first load is in flight, and
+  `CachedSearchLookup.markSearchesStale()` makes the next load of each search
+  read it again; both keep the old results readable until then, and an answer to
+  a request sent before them never replaces a newer one.
+- a00f637: The parent of a tree table's row can no longer be set to the row itself or
+  to one of its descendants from Sapporta's own screens. The grid's parent
+  cell editor and the record sheet's parent field offer every other row.
+
+  - `@sapporta/grid`: lookup columns take `lookupForRow(row)`, the choices the
+    editor offers for one row; `rowLookupCapabilities(preset, row)` reads them.
+  - `@sapporta/frontend`: `buildRecordFormFields` takes the edited `rowId`,
+    and `LookupStore.table(name, narrowing?)` takes a narrowing.
+
+### Patch Changes
+
+- 3f87101: Open select and lookup cell editors' option lists through Base UI's positioner, so the list opens above the cell when there is no room below it instead of being cut off at the bottom of the screen.
+- Updated dependencies [cdefd83]
+- Updated dependencies [a3b6de0]
+- Updated dependencies [aaae9c2]
+- Updated dependencies [7763d9e]
+- Updated dependencies [fe8fae6]
+- Updated dependencies [fe8fae6]
+- Updated dependencies [33e6dc2]
+  - @sapporta/shared@0.5.0
+
 ## 0.8.0
 
 ### Minor Changes

@@ -1,5 +1,135 @@
 # @sapporta/server
 
+## 0.9.0
+
+### Minor Changes
+
+- cdefd83: Tables can declare computed fields: named values of each row that the server
+  computes when a read asks for them, such as an account's parent path or an
+  item's stock on hand. Declare them with `computed: { name: computedField({
+kind, load }) }` in `sapportaTable`. A loader receives a batch of rows
+  (`table`, `ids`, `once()`, `db`, `auth`) and returns a value for every id, with
+  `null` for a row that has no value. Fields that share a query, or that build on
+  each other's values, share the work through `once()`. `treePath()` gives each
+  row of a tree table its ancestors' labels, such as "Expenses > Kitchen".
+
+  Every row read of the table API takes `computed=name,name2`: the list
+  (including tree reads and child levels), the single-row read and the lookup.
+  Create and update compute nothing, so a saved row is never reported as an
+  error. The response then carries `computed`, which maps each field
+  name to the row ids and their values. A field that fails, or that leaves out an
+  id, fails the request, and an unknown name is a 400. `computeFields()` runs
+  the same loaders from your own endpoints and reports.
+
+  `meta.rowCaption` names a column or computed field that the default display of
+  a row draws under its label. The table schema lists the computed fields
+  (`computed`) and the caption (`rowCaption`).
+
+- a3b6de0: Lookups can offer only some rows of a table.
+
+  - The lookup search takes `filter[col][op]=value`, the same filters as list
+    reads, so a picker can offer, say, accounts of one type. Lookups by id take
+    no filter, so a chosen row keeps its label after it stops matching.
+  - `notUnder=<id>` leaves out a row of a tree table and every row below it:
+    the choices for a row's parent, without the ones that would make a loop.
+  - `useTableLookup("accounts", { filter: [{ column: "account_type", op: "in",
+values: ["asset"] }], notUnder: accountId })` gives a `LookupPicker` that
+    searches only those rows. `store.table(name, narrowing)` does the same for
+    a row store.
+
+- 3db1aee: `attachReferenceComputed(dataset, { db, auth, tables, names })` computes, once
+  per report, the computed fields that the rows named by the dataset's
+  `reference` columns are drawn with (each table's computed `rowCaption`, plus
+  `names`), and returns the dataset with `computed` set. Call it on datasets
+  whose ids come from the report's own scoped reads.
+- 7763d9e: Table search (`?q=`) now requires every word of the term rather than the
+  whole term as one substring. Each word may match a different searched value
+  of the row, including a child row or a referenced row's label, so
+  `grocery 2500` finds a journal whose description says grocery and whose entry
+  is 2500. A double-quoted phrase is one word. Repeated words count once, and
+  words after the first 16 are ignored. Number columns match a numeric word by
+  its stored value (`2,500` and `2500.00` match 2500, `250` does not) and are
+  skipped for other words; before, their text was matched as a substring. A
+  percentage column is matched by its stored fraction, so `0.25` finds 25%.
+  Primary keys are still matched as text, so `250` finds row 2500.
+  `searchWords(term)` in `@sapporta/shared` returns the words the search uses,
+  for highlighting them in the browser.
+- fe8fae6: `decodeFilterObject()` parses filter conditions written as a JSON object, such
+  as `{ "amount": { "gte": 100 } }`, into `NewFilterCondition[]`. It rejects an
+  array on a scalar operator and `null` on any operator but `is`.
+
+  An `in`/`nin` item can now contain a comma. Inside an item, `\,` stands for a
+  comma and `\\` for a backslash, so `filter[terms][in]=Net 30\, EOM,Net 60`
+  matches two options. `encodeFilters()` writes these escapes, and the server
+  reads them. A comma inside an item used to split it in two, so the filter
+  returned the wrong rows. A backslash before any other character is now a
+  `bad_value`, so an item containing a backslash must be written as `\\`.
+
+  `encodeFilters()` and `encodeFilterValue()` now accept conditions without an
+  `id`, and throw `FilterParseError` for an empty `in`/`nin` list or item, which
+  the server would reject. `wireKey()`, and so `encodeFilters()`, throws for an
+  empty column name or one containing `]`, which the key cannot carry.
+  `materializeFilterCondition()` is removed; it had no callers.
+
+  A lookup narrowing's `filter` is encoded by `encodeFilters()`.
+
+  The CLI's `--where` and `--fixed` flags use `decodeFilterObject()`, so
+  `sapporta rows list` and `sapporta rows count` reject those filters before
+  sending the request. Use `{ "is": null }` to match a missing value;
+  `{ "eq": null }` used to compare a text column against the string `"null"`.
+  A list operator now needs a JSON array: `{ "in": "a,b" }` is rejected. The
+  CLI no longer drops query parameters with an empty value, so
+  `{ "name": { "eq": "" } }` matches empty text instead of being ignored.
+
+  `sapporta api get|post|put|delete --query` now rejects array and `null`
+  values instead of joining an array with commas and sending `null` as the
+  string `"null"`. Write a list in the form the endpoint expects, such as
+  `{ "fields": "a,b" }`. Empty strings in `--query` are now sent as well.
+
+  The filter editor's tag input splits pasted text such as `a, b` on commas, the
+  same as typing a comma between the two.
+
+- fe8fae6: An empty filter value on a `number`, `date` or `timestamp` column is now a
+  `bad_value`. It used to be read as `NULL` and compared with `=` or `>=`, which
+  matched no rows without an error. `filter[amount][eq]=` now returns `400`; match
+  a missing value with `is`. On a `text` column an empty value still matches
+  empty text. `parseFilterValue()` throws `TypedFilterParseError` for an empty
+  or blank string on those kinds instead of returning `null`.
+
+  `NewFilterCondition` is removed. `encodeFilters()`, `encodeFilterValue()` and
+  `decodeFilterObject()` use `FilterDraftCondition`, so an `in`/`nin` list may
+  hold numbers, which are written as strings. `POLARITIES` lists the `is`
+  operator's values.
+
+  Clearing one date in a date-range filter card removes that bound and keeps
+  the other, instead of sending an empty date.
+
+- 2c79a53: `treePathRelation(table, auth)` gives the paths of a tree table's rows to
+  reports and other code that runs raw SQL. It returns one member of a
+  `with recursive` list, `tree_paths(id, parent_path, path)`, with the same paths
+  as the `treePath()` computed field: it reads only rows the request may see, and
+  a path stops at the nearest ancestor the request cannot see. `name`,
+  `separator` and `column` options rename the relation, change the separator
+  (`" > "` by default) and name each row by one column instead of its label.
+  Rows in a loop of parents that never reaches a top-level row have no row.
+
+### Patch Changes
+
+- 1b6200d: New projects install TypeScript 6 instead of TypeScript 5.
+- 33e6dc2: The packages now require zod 4.6.7 or later: their zod peer range is
+  `^4.6.7`, up from `^4.3.6`. Applications on an older zod 4 need to upgrade it.
+- Updated dependencies [cdefd83]
+- Updated dependencies [293284b]
+- Updated dependencies [33e6dc2]
+- Updated dependencies [a3b6de0]
+- Updated dependencies [aaae9c2]
+- Updated dependencies [7763d9e]
+- Updated dependencies [fe8fae6]
+- Updated dependencies [fe8fae6]
+- Updated dependencies [33e6dc2]
+  - @sapporta/shared@0.5.0
+  - @sapporta/honest@0.3.18
+
 ## 0.8.1
 
 ### Patch Changes
