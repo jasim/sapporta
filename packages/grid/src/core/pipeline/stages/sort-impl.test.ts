@@ -81,16 +81,26 @@ describe("makeRowComparator", () => {
     ]);
   });
 
-  it("skips a column without a comparison or sort keys", () => {
-    const columns = [
-      column("date"),
-      column("amount", { compare: numberCompare }),
-    ];
-    expect(
-      sorted(columns, [
-        { colId: "date", direction: "asc" },
-        { colId: "amount", direction: "desc" },
-      ]),
-    ).toEqual(["donations", "groceries", "cabs"]);
+  it("throws on a column the level lacks, naming the level's columns", () => {
+    const columns = [column("date", { compare: textCompare })];
+    expect(() =>
+      makeRowComparator([{ colId: "missing", direction: "asc" }], columns),
+    ).toThrow(
+      'sort names column "missing", which is not a column of the level (columns: date)',
+    );
+  });
+
+  it("throws on a column without a comparison or sort keys", () => {
+    const columns = [column("date")];
+    expect(() =>
+      makeRowComparator([{ colId: "date", direction: "asc" }], columns),
+    ).toThrow('sort names column "date", which has no compare and no sortKeys');
+  });
+
+  it("throws on a column with empty sort keys", () => {
+    const columns = [column("date", { compare: textCompare, sortKeys: [] })];
+    expect(() =>
+      makeRowComparator([{ colId: "date", direction: "asc" }], columns),
+    ).toThrow('sort names column "date", which has no compare and no sortKeys');
   });
 });

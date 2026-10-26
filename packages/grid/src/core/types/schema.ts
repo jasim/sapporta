@@ -194,12 +194,14 @@ export type ColumnSchema = {
   // The cell aligns whatever `renderCell` returns, so content wrapped in a
   // link or a custom renderer keeps the column's alignment. Left if unset.
   readonly align?: ColumnAlign;
+  // How a sort orders this column's values. A sort on the column needs
+  // `compare` or `sortKeys`.
   readonly compare?: (a: unknown, b: unknown) => number;
   // The row fields a sort on this column orders by, in priority order, each
   // with its own comparison. Both follow the sort's direction. A field may
   // be one no column shows, such as a hidden sequence that orders rows of
-  // the same date. Without it, a sort orders by this column's own value
-  // with `compare`.
+  // the same date. List at least one key. Without it, a sort orders by
+  // this column's own value with `compare`.
   readonly sortKeys?: readonly ColumnSortKey[];
   readonly edit?: CellEditBehavior;
   readonly disableBackspaceCellClear?: true;

@@ -25,6 +25,9 @@
 //     not exposed as a generic grid command.
 //   - `sortMode: 'none'` / `filterMode: 'none'` means the source does not
 //     expose that query capability.
+//   - A sort naming a column the level lacks, or one with nothing to compare,
+//     throws from construction (`initialSort`) and rejects from `sort.set`,
+//     leaving the current sort in place.
 //   - With `tree`, a client filter keeps each match's ancestors (and, by
 //     default, its descendants) and publishes the ancestors that do not match
 //     as `treeContextRowKeys`. Sorting orders siblings at every depth.
@@ -72,6 +75,7 @@ import {
   sortSourceNodes,
   type TreeMatchContext,
 } from "../query-shaping";
+import { makeRowComparator } from "../../pipeline/stages/sort-impl";
 import {
   createStructuralSnapshotCache,
   snapshotFooterRows,
@@ -99,6 +103,8 @@ export type InMemoryLevelSourceOpts<F = unknown> = {
   // `'none'` the verb is ignored and the snapshot omits the field.
   initialSort?: readonly SortDescriptor[];
   initialFilter?: F;
+  // Names this level in error messages. Default "inMemoryLevelSource".
+  label?: string;
   initialPage?: number;
   initialPageSize?: number;
   footerRows?: readonly FooterRow[];
@@ -175,6 +181,11 @@ function buildCore<F>(opts: InMemoryLevelSourceOpts<F>): Core<F> {
   const initialPageSize = opts.initialPageSize ?? Number.POSITIVE_INFINITY;
   if (opts.paginationMode === "client") {
     assertPageWindow(initialPage, initialPageSize);
+  }
+  const label = opts.label ?? "inMemoryLevelSource";
+  // Throws on a sort this level cannot apply, before the source exists.
+  if (opts.sortMode === "client" && opts.initialSort) {
+    makeRowComparator(opts.initialSort, opts.columns, label);
   }
 
   // Snapshot on ingress so caller-owned nodes and column records cannot mutate
@@ -372,10 +383,11 @@ function buildCore<F>(opts: InMemoryLevelSourceOpts<F>): Core<F> {
     baseNodes = Object.freeze(next);
   }
 
-  function setSortQuery(
+  async function setSortQuery(
     nextSort: readonly SortDescriptor[] | undefined,
   ): Promise<SourceLoadResult> {
     if (sort === nextSort) return unchangedResult();
+    if (nextSort) makeRowComparator(nextSort, opts.columns, label);
     sort = nextSort ? Object.freeze([...nextSort]) : undefined;
     invalidate();
     notify();

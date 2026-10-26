@@ -14,22 +14,34 @@ export type RowComparator = (
 export function makeRowComparator(
   sort: readonly SortDescriptor[],
   columns: readonly ColumnSchema[],
+  label = "makeRowComparator",
 ): RowComparator {
   const colIndex: Record<string, ColumnSchema> = {};
   for (const c of columns) colIndex[c.id] = c;
-  // Each descriptor becomes the row fields its column orders by. A column
-  // without a comparison, or one this level lacks, does not sort.
+  // Each descriptor becomes the row fields its column orders by. A descriptor
+  // naming a column the level lacks, or a column with nothing to compare,
+  // throws: skipping it would leave rows in an order that looks sorted but is
+  // not.
   const keyed: {
     descriptor: SortDescriptor;
     keys: readonly ColumnSortKey[];
   }[] = [];
   for (const descriptor of sort) {
     const column = colIndex[descriptor.colId];
-    if (!column) continue;
+    if (!column) {
+      throw new Error(
+        `${label}: sort names column "${descriptor.colId}", which is not a column of the level (columns: ${columns.map((c) => c.id).join(", ")})`,
+      );
+    }
     const keys =
       column.sortKeys ??
       (column.compare ? [{ field: column.id, compare: column.compare }] : []);
-    if (keys.length > 0) keyed.push({ descriptor, keys });
+    if (keys.length === 0) {
+      throw new Error(
+        `${label}: sort names column "${column.id}", which has no compare and no sortKeys`,
+      );
+    }
+    keyed.push({ descriptor, keys });
   }
 
   return (a, b) => {

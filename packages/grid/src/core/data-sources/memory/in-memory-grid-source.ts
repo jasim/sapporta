@@ -89,6 +89,7 @@ export function inMemoryGridDataSource<F = unknown>(
       initialNodes,
       columns: levelSchema.columns,
       ...sourceOpts,
+      label: `${levelOpts.label ?? "inMemoryGridDataSource"} level "${levelName}"`,
       footerRows: footerRows ?? sourceOpts.footerRows,
       ...(levelSchema.tree
         ? {

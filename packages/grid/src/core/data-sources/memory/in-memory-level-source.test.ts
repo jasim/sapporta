@@ -493,6 +493,34 @@ describe("inMemoryLevelSource (writable)", () => {
     expect(duplicate).toHaveBeenCalledTimes(3);
   });
 
+  it("throws at construction on an initialSort naming a column the level lacks", () => {
+    expect(() =>
+      inMemoryLevelSource(
+        baseOpts({
+          label: "items",
+          initialSort: [{ colId: "missing", direction: "asc" }],
+        }),
+      ),
+    ).toThrow('items: sort names column "missing"');
+  });
+
+  it("query.sort rejects a column the level lacks and keeps the current sort", async () => {
+    const sort = [{ colId: "amount" as const, direction: "asc" as const }];
+    const src = inMemoryLevelSource(baseOpts({ initialSort: sort }));
+    const sub = vi.fn();
+    src.subscribe(sub);
+    await expect(
+      src.query!.sort!.set([{ colId: "missing", direction: "asc" }]),
+    ).rejects.toThrow('sort names column "missing"');
+    expect(src.query!.sort!.current()).toBe(sort);
+    expect(src.state().snapshot.nodes.map((n) => n.columns.id)).toEqual([
+      "b",
+      "c",
+      "a",
+    ]);
+    expect(sub).not.toHaveBeenCalled();
+  });
+
   it("query.sort with the same reference is a no-op (no notification)", async () => {
     const sort = [{ colId: "amount" as const, direction: "asc" as const }];
     const src = inMemoryLevelSource(baseOpts({ initialSort: sort }));

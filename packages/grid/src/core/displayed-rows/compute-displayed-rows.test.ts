@@ -231,35 +231,21 @@ describe("withSort", () => {
     ]);
   });
 
-  it("skips descriptors whose columns have no comparator", () => {
+  it("rejects descriptors whose columns have no comparator", () => {
     const protos = buildDataRows(nodes, opts);
     const unsortable = cols.map((c) =>
       c.id === "qty" ? { ...c, compare: undefined } : c,
     );
-    const out = withSort(
-      protos,
-      [{ colId: "qty", direction: "asc" }],
-      unsortable,
-    );
-    expect(out.map((r) => (r.kind === "data" ? r.columns.id : null))).toEqual([
-      "a",
-      "b",
-      "c",
-    ]);
+    expect(() =>
+      withSort(protos, [{ colId: "qty", direction: "asc" }], unsortable),
+    ).toThrow('sort names column "qty", which has no compare and no sortKeys');
   });
 
-  it("skips unknown sort columns", () => {
+  it("rejects unknown sort columns", () => {
     const protos = buildDataRows(nodes, opts);
-    const out = withSort(
-      protos,
-      [{ colId: "missing", direction: "asc" }],
-      cols,
-    );
-    expect(out.map((r) => (r.kind === "data" ? r.columns.id : null))).toEqual([
-      "a",
-      "b",
-      "c",
-    ]);
+    expect(() =>
+      withSort(protos, [{ colId: "missing", direction: "asc" }], cols),
+    ).toThrow('sort names column "missing"');
   });
 
   it("lets host comparator failures surface", () => {

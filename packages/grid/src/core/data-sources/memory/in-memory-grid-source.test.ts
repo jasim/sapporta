@@ -154,6 +154,24 @@ describe("inMemoryGridDataSource", () => {
     expect("setCell" in childSource).toBe(false);
   });
 
+  it("names the level when its initialSort names a column the level lacks", () => {
+    const ds = inMemoryGridDataSource(
+      baseOpts({
+        levels: {
+          orders: {
+            ...allClient,
+            initialSort: [{ colId: "missing", direction: "asc" }],
+          },
+          lines: allClient,
+          notes: allClient,
+        },
+      }),
+    );
+    expect(() => ds.rootSource()).toThrow(
+      'inMemoryGridDataSource level "orders": sort names column "missing"',
+    );
+  });
+
   it("publishes root and child footer rows from static tree data", () => {
     const tree = fixtureTree();
     tree[0] = {
