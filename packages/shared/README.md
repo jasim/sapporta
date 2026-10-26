@@ -103,6 +103,29 @@ does not have, or names a tree column that is not visible.
 `gridDatasetLinkProblems(dataset)` checks the columns that declarative links
 read.
 
+A column can sort by more than its own value. `sortBy` lists the columns of
+the level that a sort on this column orders by, first key first. Each listed
+column compares by its own `kind`, and all of them follow the direction chosen
+on this column. For example, postings in a ledger often share a date. A hidden
+number column `sequence` holds each posting's order in time, and the Date
+column sorts by the date and then by the sequence:
+
+```ts
+const posting: GridDatasetLevel = {
+  columns: [
+    { id: "date", label: "Date", kind: "date", sortBy: ["date", "sequence"] },
+    { id: "narration", label: "Narration", kind: "text" },
+    { id: "sequence", label: "Sequence", kind: "number", visuallyHidden: true },
+  ],
+  childLevels: [],
+  sort: [{ column: "date", direction: "desc" }],
+};
+```
+
+`sort` on a level is the order its rows start in; without it, rows start in
+the order of the nodes. `gridDatasetSortProblems(dataset)` returns one message
+for each `sortBy` entry that is not a column of the level.
+
 ### Other Utilities
 
 The package also exposes helpers for value kinds, date ranges, and record IDs:

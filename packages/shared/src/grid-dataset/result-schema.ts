@@ -39,6 +39,13 @@ export const gridDatasetColumnSchema = z.object({
   strong: z.boolean().optional(),
   notes: z.string().optional(),
   sortable: z.boolean().optional(),
+  /** Columns of the level a sort on this column orders by, in priority
+   *  order. Each compares by its own `kind`, and all follow the direction
+   *  chosen on this column, whose header shows the sort. Columns may be
+   *  visually hidden. Default: this column alone. A ledger whose postings
+   *  share dates declares `["date", "sequence"]`, with a hidden number
+   *  column `sequence` holding each posting's order in time. */
+  sortBy: z.array(z.string()).min(1).optional(),
   filterable: z.boolean().optional(),
   searchable: z.boolean().optional(),
   /** Declarative drill-down links for this column's cells. `bind` sources
@@ -100,6 +107,14 @@ export const gridDatasetLevelTreeSchema = z.object({
 });
 export type GridDatasetLevelTree = z.output<typeof gridDatasetLevelTreeSchema>;
 
+/** One key of a level's starting sort. */
+export const gridDatasetLevelSortSchema = z.object({
+  /** Column of the level whose header shows the sort. */
+  column: z.string(),
+  direction: z.enum(["asc", "desc"]),
+});
+export type GridDatasetLevelSort = z.output<typeof gridDatasetLevelSortSchema>;
+
 export const gridDatasetLevelSchema = z.object({
   label: z.string().optional(),
   columns: z.array(gridDatasetColumnSchema),
@@ -114,6 +129,9 @@ export const gridDatasetLevelSchema = z.object({
   /** Declarative row-level links for this level (related data, drill-into).
    *  Resolvable links appear in the row's right-click context menu. */
   rowLinks: z.array(navLinkSchema).optional(),
+  /** The level's rows start sorted this way, first key first. The viewer
+   *  can change it from the headers. Default: the order of the nodes. */
+  sort: z.array(gridDatasetLevelSortSchema).optional(),
 });
 export type GridDatasetLevel = z.output<typeof gridDatasetLevelSchema>;
 
