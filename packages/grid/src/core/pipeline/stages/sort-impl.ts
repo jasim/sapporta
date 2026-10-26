@@ -3,7 +3,7 @@
 // comparator means client-side and pipeline-side sorts cannot drift.
 
 import type { ColId } from "../../types/identity";
-import type { ColumnSchema } from "../../types/schema";
+import type { ColumnSchema, ColumnSortKey } from "../../types/schema";
 import type { SortDescriptor } from "../types";
 
 export type RowComparator = (
@@ -17,26 +17,27 @@ export function makeRowComparator(
 ): RowComparator {
   const colIndex: Record<string, ColumnSchema> = {};
   for (const c of columns) colIndex[c.id] = c;
-  const comparable = sort
-    .map((descriptor) => {
-      const column = colIndex[descriptor.colId];
-      return column?.compare ? { descriptor, column } : null;
-    })
-    .filter(
-      (
-        item,
-      ): item is {
-        descriptor: SortDescriptor;
-        column: ColumnSchema & {
-          compare: NonNullable<ColumnSchema["compare"]>;
-        };
-      } => item !== null,
-    );
+  // Each descriptor becomes the row fields its column orders by. A column
+  // without a comparison, or one this level lacks, does not sort.
+  const keyed: {
+    descriptor: SortDescriptor;
+    keys: readonly ColumnSortKey[];
+  }[] = [];
+  for (const descriptor of sort) {
+    const column = colIndex[descriptor.colId];
+    if (!column) continue;
+    const keys =
+      column.sortKeys ??
+      (column.compare ? [{ field: column.id, compare: column.compare }] : []);
+    if (keys.length > 0) keyed.push({ descriptor, keys });
+  }
 
   return (a, b) => {
-    for (const { descriptor, column } of comparable) {
-      const cmp = column.compare(a[descriptor.colId], b[descriptor.colId]);
-      if (cmp !== 0) return descriptor.direction === "asc" ? cmp : -cmp;
+    for (const { descriptor, keys } of keyed) {
+      for (const key of keys) {
+        const cmp = key.compare(a[key.field], b[key.field]);
+        if (cmp !== 0) return descriptor.direction === "asc" ? cmp : -cmp;
+      }
     }
     return 0;
   };

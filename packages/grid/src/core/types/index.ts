@@ -28,6 +28,7 @@ export {
 export type {
   ColumnAlign,
   ColumnSchema,
+  ColumnSortKey,
   GridCopyColumn,
   GridColumnCopyBehavior,
   CellEditGesture,

@@ -57,10 +57,11 @@ export type ProtoRow =
     };
 
 // Sort is the only per-column concern the grid takes a position on: a
-// column id plus a direction. Anything richer (multi-key sort priorities
-// with collation, locale-aware comparators, null ordering rules) is the
-// host's domain — `withSort` calls `makeRowComparator` over the column
-// schema and the host can override per-column comparators there.
+// column id plus a direction. The column decides what the id orders by: its
+// own value with `compare`, or several row fields with `sortKeys`.
+// Collation, locale and null ordering live in those comparators, which the
+// host supplies — `withSort` calls `makeRowComparator` over the column
+// schema.
 export type SortDescriptor = {
   readonly colId: ColId;
   readonly direction: "asc" | "desc";

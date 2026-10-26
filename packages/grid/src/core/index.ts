@@ -500,6 +500,7 @@ export type {
   PathDecomposition,
   ColumnAlign,
   ColumnSchema,
+  ColumnSortKey,
   GridCopyColumn,
   GridColumnCopyBehavior,
   CellEditGesture,

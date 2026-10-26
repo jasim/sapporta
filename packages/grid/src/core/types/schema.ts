@@ -182,6 +182,11 @@ export type GridColumnCopyBehavior = (context: {
 /** Where a column's cells place their content across the cell's width. */
 export type ColumnAlign = "left" | "right" | "center";
 
+export type ColumnSortKey = {
+  readonly field: ColId;
+  readonly compare: (a: unknown, b: unknown) => number;
+};
+
 export type ColumnSchema = {
   readonly id: ColId;
   readonly name: string;
@@ -190,6 +195,12 @@ export type ColumnSchema = {
   // link or a custom renderer keeps the column's alignment. Left if unset.
   readonly align?: ColumnAlign;
   readonly compare?: (a: unknown, b: unknown) => number;
+  // The row fields a sort on this column orders by, in priority order, each
+  // with its own comparison. Both follow the sort's direction. A field may
+  // be one no column shows, such as a hidden sequence that orders rows of
+  // the same date. Without it, a sort orders by this column's own value
+  // with `compare`.
+  readonly sortKeys?: readonly ColumnSortKey[];
   readonly edit?: CellEditBehavior;
   readonly disableBackspaceCellClear?: true;
   readonly activation?: CellActivation;
