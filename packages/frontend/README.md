@@ -173,6 +173,12 @@ expands or collapses the row. Rows start expanded; `defaultCollapsed: true` on
 the level starts them collapsed. The renderer does not add up amounts, so the
 dataset carries each parent row's total.
 
+Clicking a column header sorts the level's rows by that column, and footer
+rows stay last. A column that declares `sortBy` orders by the listed columns
+instead, hidden ones included, so ledger postings that share a date can follow
+a hidden `sequence` in both directions. A level's `sort` sets the order its
+rows start in.
+
 `ReportCellLinkContext.ancestors` holds the rows of enclosing levels only. A
 link resolver on a tree row reads its parent's key from the row's own
 `parent_id` value.

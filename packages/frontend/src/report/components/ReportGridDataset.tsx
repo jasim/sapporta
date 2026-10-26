@@ -25,6 +25,7 @@ import {
   type CellRenderProps,
   type CellActivationTrigger,
   type ColumnSchema,
+  type ColumnSortKey,
   type GridChromeContext,
   type GridCopyTarget,
   type GridPath,
@@ -40,6 +41,8 @@ import {
   columnPreset,
   columnPresetWidthForSizing,
   type ColumnSizingOptions,
+  type NumberColumnOptions,
+  type TextColumnOptions,
 } from "@sapporta/grid/column-preset";
 import type { LinkIcon } from "@sapporta/shared/contracts";
 import { titleCaseIdentifier } from "@sapporta/shared/labels";
@@ -47,6 +50,7 @@ import {
   gridDatasetLinkProblems,
   gridDatasetReferenceIds,
   gridDatasetReferenceProblems,
+  gridDatasetSortProblems,
   gridDatasetTreeColumn,
   gridDatasetTreeProblems,
   type GridDataset,
@@ -355,6 +359,7 @@ function buildReportGridDatasetModel<TInput>(
     ...gridDatasetLinkProblems(dataset),
     ...gridDatasetTreeProblems(dataset),
     ...gridDatasetReferenceProblems(dataset),
+    ...gridDatasetSortProblems(dataset),
   ];
   if (problems.length > 0) {
     throw new Error(problems.join("\n"));
@@ -426,7 +431,12 @@ function buildReportGridDatasetModel<TInput>(
       `Dataset "${dataset.name}"`,
     );
     sourceLevels[levelName] = {
+      label: `Dataset "${dataset.name}"`,
       sortMode: "client",
+      initialSort: level.sort?.map((key) => ({
+        colId: key.column,
+        direction: key.direction,
+      })),
       filterMode: "none",
       paginationMode: "none",
       readonly: true,
@@ -618,25 +628,14 @@ function gridColumnForDatasetColumn<TInput>({
     },
   };
 
-  let gridColumn: ColumnSchema;
-  if (column.kind === "number" && column.displayFormat === "currency") {
-    gridColumn = columnPreset.currency(options);
-  } else if (
-    column.kind === "number" &&
-    column.displayFormat === "percentage"
-  ) {
-    gridColumn = columnPreset.percentage(options);
-  } else if (column.kind === "number") {
-    gridColumn = columnPreset.number(options);
-  } else if (column.kind === "boolean") {
-    gridColumn = columnPreset.boolean(options);
-  } else if (column.kind === "date") {
-    gridColumn = columnPreset.date(options);
-  } else if (column.kind === "timestamp") {
-    gridColumn = columnPreset.timestamp(options);
-  } else {
-    gridColumn = columnPreset.text(options);
-  }
+  const gridColumn: ColumnSchema = {
+    ...presetColumnForDatasetColumn(column, options),
+    ...(column.sortBy
+      ? {
+          sortKeys: sortKeysForDatasetColumn(dataset, levelName, column.sortBy),
+        }
+      : {}),
+  };
 
   const presetRenderCell = gridColumn.renderCell;
   const reference = column.reference;
@@ -697,6 +696,44 @@ function gridColumnForDatasetColumn<TInput>({
   return expansionControl
     ? expansionControl.wrapColumn(columnWithLinks, { activation })
     : { ...columnWithLinks, activation };
+}
+
+// The preset that draws and compares a report column of this kind.
+function presetColumnForDatasetColumn<TMeta>(
+  column: GridDatasetColumn,
+  options: NumberColumnOptions<TMeta> & TextColumnOptions<TMeta>,
+): ColumnSchema {
+  if (column.kind === "number" && column.displayFormat === "currency") {
+    return columnPreset.currency(options);
+  }
+  if (column.kind === "number" && column.displayFormat === "percentage") {
+    return columnPreset.percentage(options);
+  }
+  if (column.kind === "number") return columnPreset.number(options);
+  if (column.kind === "boolean") return columnPreset.boolean(options);
+  if (column.kind === "date") return columnPreset.date(options);
+  if (column.kind === "timestamp") return columnPreset.timestamp(options);
+  return columnPreset.text(options);
+}
+
+// The grid's sort keys for a column's `sortBy`. Each named column, hidden
+// ones included, compares the way its own preset compares, so a hidden
+// number column orders 9 before 10.
+function sortKeysForDatasetColumn(
+  dataset: GridDataset,
+  levelName: string,
+  sortBy: readonly string[],
+): ColumnSortKey[] {
+  const levelColumns = dataset.levels[levelName]!.columns;
+  return sortBy.map((id) => {
+    // `gridDatasetSortProblems` has checked that the level has the column.
+    const target = levelColumns.find((candidate) => candidate.id === id)!;
+    const compare = presetColumnForDatasetColumn(target, {
+      id: target.id,
+      name: target.label,
+    }).compare!;
+    return { field: id, compare };
+  });
 }
 
 function renderReportCell<TInput>({
