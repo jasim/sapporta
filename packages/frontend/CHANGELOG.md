@@ -1,5 +1,24 @@
 # @sapporta/frontend
 
+## 0.11.0
+
+### Minor Changes
+
+- 54b1e68: `ReportGridDataset` sorts a column by its `sortBy` columns, so rows that tie on
+  the clicked column, such as ledger postings on one date, follow a declared
+  order in both directions. A level's `sort` sets the order its rows start in.
+  A `sortBy` entry the level lacks fails when the dataset is drawn; a level
+  `sort` on a column the level does not show fails when that level's rows are
+  drawn.
+
+### Patch Changes
+
+- Updated dependencies [97f62ca]
+- Updated dependencies [2679f98]
+- Updated dependencies [210d5d4]
+  - @sapporta/grid@0.10.0
+  - @sapporta/shared@0.6.0
+
 ## 0.10.0
 
 ### Minor Changes

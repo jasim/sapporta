@@ -1,5 +1,12 @@
 # @sapporta/server
 
+## 0.9.1
+
+### Patch Changes
+
+- Updated dependencies [210d5d4]
+  - @sapporta/shared@0.6.0
+
 ## 0.9.0
 
 ### Minor Changes

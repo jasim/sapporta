@@ -1,6 +1,6 @@
 {
   "name": "@sapporta/server",
-  "version": "0.9.0",
+  "version": "0.9.1",
   "type": "module",
   "description": "Sapporta server — schema-as-code tables, auto-generated CRUD, route primitives, and an OpenAPI-emitting Hono app, all wired up with Drizzle and SQLite.",
   "keywords": [

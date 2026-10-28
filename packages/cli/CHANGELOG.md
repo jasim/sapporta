@@ -1,5 +1,11 @@
 # sapporta
 
+## 0.2.19
+
+### Patch Changes
+
+- @sapporta/server@0.9.1
+
 ## 0.2.18
 
 ### Patch Changes

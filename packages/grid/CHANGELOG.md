@@ -1,5 +1,25 @@
 # @sapporta/grid
 
+## 0.10.0
+
+### Minor Changes
+
+- 97f62ca: A column can list `sortKeys`: the row fields a sort on it orders by, each with
+  its own `compare`. All keys follow the sort's direction, and the sort still
+  names the column, so its header shows the arrow. A field may be one no column
+  shows. Without `sortKeys`, a column orders by its own value with `compare`.
+- 2679f98: A sort that names a column the level lacks, or a column with neither `compare`
+  nor `sortKeys` entries, now throws instead of being ignored. An in-memory
+  source throws from construction for such an `initialSort`, and
+  `query.sort.set` rejects and keeps the current sort. `inMemoryLevelSource`
+  takes a `label` that names the level in the message; `inMemoryGridDataSource`
+  names the level itself.
+
+### Patch Changes
+
+- Updated dependencies [210d5d4]
+  - @sapporta/shared@0.6.0
+
 ## 0.9.0
 
 ### Minor Changes
