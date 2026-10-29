@@ -225,8 +225,8 @@ export function invalidateRowsExcept(
 }
 
 /** The computed fields every lookup of a table carries: what its label slot
- *  needs, its `rowCaption` when that is a computed field, and the
- *  `referenceNeeds` of foreign-key column slots that point at it. */
+ *  needs, its `rowCaption` when that is a computed field, its tree's `path`,
+ *  and the `referenceNeeds` of foreign-key column slots that point at it. */
 function lookupFieldsFor(
   tableName: string,
   rowDisplays: RowDisplays,
@@ -239,6 +239,7 @@ function lookupFieldsFor(
   if (caption && schema.computed?.some((field) => field.name === caption)) {
     fields.add(caption);
   }
+  if (schema?.tree?.path) fields.add(schema.tree.path);
   for (const [sourceName, display] of Object.entries(rowDisplays)) {
     for (const [columnName, slot] of Object.entries(display.columns ?? {})) {
       if (!slot.referenceNeeds?.length) continue;
@@ -256,6 +257,7 @@ class TableRowDataSource implements TableRowData {
   readonly tableName: string;
   readonly valueLookup: CachedTableLookupSource["valueLookup"];
   readonly searchLookup: CachedTableLookupSource["searchLookup"];
+  readonly treeLookup: CachedTableLookupSource["treeLookup"];
   private readonly lookupFields: () => readonly string[];
   readonly display: () => TableDisplay | undefined;
   readonly schema: () => TableSchema | undefined;
@@ -298,6 +300,7 @@ class TableRowDataSource implements TableRowData {
     );
     this.valueLookup = source.valueLookup;
     this.searchLookup = source.searchLookup;
+    this.treeLookup = source.treeLookup;
   }
 
   get generation(): number {
@@ -387,6 +390,7 @@ class TableRowDataSource implements TableRowData {
 
   reloadLabels(): void {
     this.searchLookup.markSearchesStale();
+    this.treeLookup.reload();
     this.valueLookup.reloadEntries().catch((error: unknown) => {
       console.error(
         `Could not read the labels of table '${this.tableName}' again.`,

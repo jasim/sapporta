@@ -219,6 +219,15 @@ export function RowLabel({
         {caption}
       </span>
     ) : null
+  ) : context.editing ? (
+    <span className="flex min-w-0 gap-1">
+      <DefaultRowLabel
+        label={label}
+        labelContent={labelContent}
+        caption={caption}
+      />
+      <span className="shrink-0 text-sap-muted">(being edited)</span>
+    </span>
   ) : (
     <DefaultRowLabel
       label={label}

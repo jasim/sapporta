@@ -1,9 +1,4 @@
-import {
-  useMemo,
-  useState,
-  type ComponentType,
-  type ReactNode,
-} from "react";
+import { useMemo, useState, type ComponentType, type ReactNode } from "react";
 import { Check, ChevronDown, X } from "lucide-react";
 import {
   lookupValueEquals,
@@ -17,6 +12,8 @@ import { Combobox, comboboxClassNames } from "@sapporta/ui/combobox";
 import { cn } from "@sapporta/ui/cn";
 import { isTableRowData, type TableRowData } from "./row-data";
 import { RowLabel, rowOfEntry } from "./row-display";
+import { LookupPickerItemContent } from "./lookup-picker-item";
+import { TreeLookupPicker } from "./TreeLookupPicker";
 
 const DEFAULT_SEARCH_LIMIT = 50;
 
@@ -55,8 +52,16 @@ export type LookupPickerProps<
   /** Where a table's lookup draws the chosen row's caption: `"inline"` inside
    *  the field, at its end; `"below"` on a line of its own under the field,
    *  at full width. The line under the field is kept even while it is empty,
-   *  so picking a value never moves what follows. */
+   *  so picking a value never moves what follows. A tree picker draws no
+   *  caption: the chosen row's parent path sits before its name. */
   selectedCaption?: "inline" | "below";
+  /**
+   * For a lookup of a table that declares `meta.tree`: `true` (the default)
+   * draws the table as an indented tree, lists a search's matches with their
+   * parent paths, and shows the chosen row's parent path before its name.
+   * `false` draws the flat search list of any other table.
+   */
+  tree?: boolean;
   placeholder?: string;
   disabled?: boolean;
   allowClear?: boolean;
@@ -76,6 +81,7 @@ export function LookupPicker<
   onChange,
   itemDisplay,
   selectedCaption = "inline",
+  tree = true,
   placeholder = "Select...",
   disabled,
   allowClear = true,
@@ -86,8 +92,68 @@ export function LookupPicker<
   ariaDescribedBy,
 }: LookupPickerProps<TValue, TMeta>) {
   // A table's row data draws options and the selected value with the
-  // table's label slot. `itemDisplay` draws options over it.
+  // table's label slot. `itemDisplay` draws options over it. A tree table's
+  // row data draws a tree picker.
   const rowData = isTableRowData(lookup) ? lookup : undefined;
+  const tableTree = tree ? rowData?.schema()?.tree : undefined;
+  if (rowData && tableTree) {
+    return (
+      <TreeLookupPicker<TValue, TMeta>
+        data={rowData}
+        tableTree={tableTree}
+        value={value}
+        onChange={onChange}
+        itemDisplay={itemDisplay}
+        placeholder={placeholder}
+        disabled={disabled}
+        allowClear={allowClear}
+        searchLimit={searchLimit}
+        id={id}
+        className={className}
+        ariaInvalid={ariaInvalid}
+        ariaDescribedBy={ariaDescribedBy}
+      />
+    );
+  }
+  return (
+    <FlatLookupPicker<TValue, TMeta>
+      lookup={lookup}
+      rowData={rowData}
+      value={value}
+      onChange={onChange}
+      itemDisplay={itemDisplay}
+      selectedCaption={selectedCaption}
+      placeholder={placeholder}
+      disabled={disabled}
+      allowClear={allowClear}
+      searchLimit={searchLimit}
+      id={id}
+      className={className}
+      ariaInvalid={ariaInvalid}
+      ariaDescribedBy={ariaDescribedBy}
+    />
+  );
+}
+
+function FlatLookupPicker<TValue extends LookupValue, TMeta>({
+  lookup,
+  rowData,
+  value,
+  onChange,
+  itemDisplay,
+  selectedCaption,
+  placeholder,
+  disabled,
+  allowClear,
+  searchLimit,
+  id,
+  className,
+  ariaInvalid,
+  ariaDescribedBy,
+}: Omit<LookupPickerProps<TValue, TMeta>, "tree"> & {
+  rowData: TableRowData | undefined;
+  searchLimit: number;
+}) {
   const [searchText, setSearchText] = useState("");
   const selectedValues = useMemo(() => (value == null ? [] : [value]), [value]);
   const entries = useLookupOptions({
@@ -153,16 +219,14 @@ export function LookupPicker<
           placeholder={placeholder}
           className={comboboxClassNames.input}
         />
-        {selectedCaption === "inline" &&
-          selectedLabel &&
-          searchText === "" && (
-            <span
-              className="pointer-events-none flex h-full max-w-[45%] shrink-0 items-center overflow-hidden whitespace-nowrap pe-1 text-sap-meta text-sap-muted"
-              data-lookup-selected-adornment=""
-            >
-              {selectedLabel}
-            </span>
-          )}
+        {selectedCaption === "inline" && selectedLabel && searchText === "" && (
+          <span
+            className="pointer-events-none flex h-full max-w-[45%] shrink-0 items-center overflow-hidden whitespace-nowrap pe-1 text-sap-meta text-sap-muted"
+            data-lookup-selected-adornment=""
+          >
+            {selectedLabel}
+          </span>
+        )}
         {allowClear && (
           <Combobox.Clear
             aria-label="Clear selection"
@@ -268,76 +332,4 @@ function RowOption({
       />
     </span>
   );
-}
-
-function LookupPickerItemContent<TValue extends LookupValue, TMeta>({
-  entry,
-  itemDisplay,
-  defaultContent,
-}: {
-  entry: LookupEntry<TValue, TMeta>;
-  itemDisplay: LookupPickerItemDisplay<TValue, TMeta> | undefined;
-  defaultContent: ReactNode;
-}) {
-  if (itemDisplay === undefined || !hasLookupEntryMeta(entry)) {
-    return defaultContent;
-  }
-
-  if (itemDisplay.component !== undefined) {
-    const ItemComponent = itemDisplay.component;
-    return <ItemComponent entry={entry} defaultContent={defaultContent} />;
-  }
-
-  if (itemDisplay.fields.length === 0 || !isObject(entry.meta)) {
-    return defaultContent;
-  }
-  const meta = entry.meta;
-
-  return (
-    <span
-      className="grid min-w-0 flex-1 items-center"
-      style={{
-        gridTemplateColumns: `repeat(${itemDisplay.fields.length}, minmax(0, 1fr))`,
-      }}
-    >
-      {itemDisplay.fields.map((field, index) => (
-        <span key={`${field}:${index}`} className="flex min-w-0 items-center">
-          <span className="min-w-0 flex-1 truncate">
-            {formatLookupFieldValue(Reflect.get(meta, field))}
-          </span>
-          {index < itemDisplay.fields.length - 1 && (
-            <span
-              aria-hidden="true"
-              className="shrink-0 px-2 text-muted-foreground"
-            >
-              |
-            </span>
-          )}
-        </span>
-      ))}
-    </span>
-  );
-}
-
-function hasLookupEntryMeta<TValue extends LookupValue, TMeta>(
-  entry: LookupEntry<TValue, TMeta>,
-): entry is LookupEntry<TValue, TMeta> & { meta: TMeta } {
-  return entry.meta !== undefined;
-}
-
-function isObject(value: unknown): value is object {
-  return typeof value === "object" && value !== null;
-}
-
-function formatLookupFieldValue(value: unknown): string {
-  if (value == null) return "";
-  if (
-    typeof value === "string" ||
-    typeof value === "number" ||
-    typeof value === "boolean" ||
-    typeof value === "bigint"
-  ) {
-    return String(value);
-  }
-  return "";
 }

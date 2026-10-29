@@ -1,5 +1,9 @@
 import { uiClient } from "../../platform/client";
-import type { LookupResponse, Row } from "@sapporta/shared/contracts";
+import type {
+  LookupResponse,
+  LookupTreeResponse,
+  Row,
+} from "@sapporta/shared/contracts";
 import type { LookupEntry, LookupValue } from "@sapporta/grid/lookup";
 import type { LookupSearchPage } from "@sapporta/grid/lookup";
 import {
@@ -99,6 +103,19 @@ export async function fetchLookupSearch(
       ...lookupNarrowingQuery(narrowing),
       ...buildLookupSearchQuery(searchText, limit, fields, computed),
     },
+  });
+}
+
+/** Every row of a tree table that the narrowing lets through, with the
+ *  ancestors that place it, in tree order. */
+export async function fetchLookupTree(
+  tableName: string,
+  computed?: readonly string[],
+  narrowing?: LookupNarrowing,
+): Promise<LookupTreeResponse> {
+  return uiClient.lookupTree({
+    params: { tableName },
+    query: { ...lookupNarrowingQuery(narrowing), ...computedQuery(computed) },
   });
 }
 

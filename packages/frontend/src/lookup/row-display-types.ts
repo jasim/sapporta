@@ -28,6 +28,11 @@ export type DisplayContext = {
   hierarchyShown: boolean;
   /** For options: the current value. */
   selected?: boolean;
+  /** For options in a tree picker: the row is the one being edited, such as
+   *  the account whose parent is being chosen. It is drawn where it sits, so
+   *  the person sees it, but it cannot be picked. Sapporta's default draws
+   *  "(being edited)" after the label. */
+  editing?: boolean;
 };
 
 /** Computed field values of one row, by field name. */
