@@ -31,6 +31,7 @@ import {
   getRowRoute,
   listRowsRoute,
   lookupRoute,
+  lookupTreeRoute,
   updateRowRoute,
 } from "./table-routes.js";
 
@@ -58,6 +59,7 @@ export const uiContract = c.router({
   updateRow: updateRowRoute,
   deleteRow: deleteRowRoute,
   lookup: lookupRoute,
+  lookupTree: lookupTreeRoute,
   count: countRoute,
 });
 

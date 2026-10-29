@@ -10,7 +10,7 @@
  * are what `@sapporta/ui` and other generic clients consume through
  * `uiContract`.
  *
- * `lookupRoute` and `countRoute` are registered verbatim as static
+ * `lookupRoute`, `lookupTreeRoute` and `countRoute` are registered verbatim as static
  * (non-family) routes by the server since their response shapes don't
  * vary by table.
  */
@@ -24,6 +24,8 @@ import {
   listRowsQuerySchema,
   lookupQuerySchema,
   lookupResponseSchema,
+  lookupTreeQuerySchema,
+  lookupTreeResponseSchema,
   paginatedRowsSchema,
   rowSchema,
   singleRowQuerySchema,
@@ -118,6 +120,22 @@ export const lookupRoute = c.query({
   query: lookupQuerySchema,
   responses: {
     200: lookupResponseSchema,
+    400: errorBodySchema,
+    404: errorBodySchema,
+  },
+});
+
+export const lookupTreeRoute = c.query({
+  method: "GET",
+  path: "/tables/:tableName/_lookup_tree",
+  summary: "Lookup the rows of a tree table as a tree",
+  description:
+    "Returns every row that passes the filters, with the ancestors that place it, depth-first. A tree larger than MAX_LOOKUP_TREE_ROWS is refused with tree_too_large.",
+  metadata: { tags: ["tables"] },
+  pathParams: tableNameParam,
+  query: lookupTreeQuerySchema,
+  responses: {
+    200: lookupTreeResponseSchema,
     400: errorBodySchema,
     404: errorBodySchema,
   },

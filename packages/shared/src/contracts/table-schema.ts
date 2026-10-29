@@ -132,6 +132,30 @@ export const lookupResponseSchema = z.object({
 });
 export type LookupResponse = z.output<typeof lookupResponseSchema>;
 
+/**
+ * What a row of a tree lookup is there for:
+ * - `"choice"`: it can be picked;
+ * - `"context"`: an ancestor of a choice that cannot be picked itself, drawn
+ *   only to place the rows under it;
+ * - `"editing"`: the `notUnder` row, drawn where it sits, without its branch.
+ */
+export const lookupTreeRoleSchema = z.enum(["choice", "context", "editing"]);
+export type LookupTreeRole = z.output<typeof lookupTreeRoleSchema>;
+
+/** One row of a tree lookup, in display order: depth-first, each row after
+ *  its parent. Top-level rows have depth 0. */
+export const lookupTreeEntrySchema = lookupEntrySchema.extend({
+  depth: z.number().int().nonnegative(),
+  role: lookupTreeRoleSchema,
+});
+export type LookupTreeEntry = z.output<typeof lookupTreeEntrySchema>;
+
+export const lookupTreeResponseSchema = z.object({
+  entries: z.array(lookupTreeEntrySchema),
+  computed: computedValuesSchema.optional(),
+});
+export type LookupTreeResponse = z.output<typeof lookupTreeResponseSchema>;
+
 const rowSelectionQueryShape = {
   sort: z.string().optional(),
   q: z.string().optional(),
@@ -149,6 +173,9 @@ export const MAX_PAGE = Math.floor(Number.MAX_SAFE_INTEGER / MAX_PAGE_SIZE);
 export const DEFAULT_LOOKUP_LIMIT = 50;
 export const MAX_LOOKUP_LIMIT = 500;
 export const MAX_LOOKUP_IDS = 500;
+/** The most rows a tree lookup returns. A larger tree is refused with
+ *  `tree_too_large` rather than cut short; search it instead. */
+export const MAX_LOOKUP_TREE_ROWS = 5000;
 
 /** Query shape shared by reads that select rows without pagination.
  *  Filters are additional `filter[col][op]` keys. Repeated filter keys remain
@@ -235,6 +262,22 @@ export const lookupQuerySchema = z.union([
   lookupBySearchQuerySchema,
 ]);
 export type LookupQuery = z.output<typeof lookupQuerySchema>;
+
+/**
+ * Query shape for a tree lookup: every row of a tree table that passes the
+ * narrowing, with the ancestors that place it, in tree order. It takes the
+ * same narrowing as a lookup search, `filter[col][op]=value` and `notUnder`,
+ * but no search: a search is a flat lookup.
+ */
+export const lookupTreeQuerySchema = z
+  .object({
+    computed: computedQuerySchema,
+    /** Draws this row where it sits, as the row being edited, and leaves out
+     *  the rows below it. */
+    notUnder: z.string().min(1).optional(),
+  })
+  .catchall(filterQueryValueSchema);
+export type LookupTreeQuery = z.output<typeof lookupTreeQuerySchema>;
 
 const countGroupValueSchema = z.union([
   z.string(),

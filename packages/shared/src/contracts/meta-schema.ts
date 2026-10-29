@@ -142,12 +142,25 @@ export const tableTreeSchema = z.object({
   defaultExpanded: z.boolean(),
   /** What a filter or search keeps besides the matching rows. */
   matchContext: treeMatchContextSchema,
+  /** Orders the top-level rows by the values of one column, in the listed
+   *  order. Top-level rows whose value is not listed come last. */
+  rootOrder: z
+    .object({ column: z.string(), values: z.array(z.string()).nonempty() })
+    .optional(),
+  /** The computed field, made with `treePath()`, that gives each row's
+   *  parent path. */
+  path: z.string().optional(),
+  /** The separator `path` joins names with. Set whenever `path` is. */
+  pathSeparator: z.string().optional(),
 });
 export type TableTree = z.output<typeof tableTreeSchema>;
 
-/** A table tree as declared, before defaults: only `parentColumn` is required. */
+/** A table tree as declared, before defaults: only `parentColumn` is
+ *  required. `rootOrder` and `path` are checked and resolved by the server. */
 export type TableTreeInput = Pick<TableTree, "parentColumn"> &
-  Partial<Omit<TableTree, "parentColumn">>;
+  Partial<
+    Omit<TableTree, "parentColumn" | "rootOrder" | "path" | "pathSeparator">
+  >;
 
 /**
  * Fills the defaults of a table tree: the first row-label column shows the
