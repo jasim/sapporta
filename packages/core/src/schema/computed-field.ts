@@ -83,6 +83,9 @@ export interface ComputedField<
    * the lookups a picker sends while someone types, so it must not write.
    */
   load: ComputedFieldLoader<TTable, TValue>;
+  /** Set by `treePath()`: the field is a tree table's parent path, joined
+   *  with `separator`. `meta.tree.path` names such a field. */
+  treePath?: { readonly separator: string };
 }
 
 /**

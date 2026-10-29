@@ -53,9 +53,11 @@ import {
   DEFAULT_PAGE_SIZE,
   MAX_LOOKUP_IDS,
   MAX_LOOKUP_LIMIT,
+  MAX_LOOKUP_TREE_ROWS,
   MAX_PAGE,
   MAX_PAGE_SIZE,
   type LookupEntry,
+  type LookupTreeEntry,
 } from "@sapporta/shared/contracts";
 import type { SapportaAuthContext } from "../auth/context.js";
 import { ValidationError } from "../errors.js";
@@ -68,7 +70,13 @@ import { resolveRowFields } from "./row-fields.js";
 import type { GroupCount } from "@sapporta/shared";
 import { countTableRows, countTableRowsBy } from "./count-rows.js";
 import { scanTableRows } from "./table-row-scan.js";
-import { treeMatchPredicates, type TreeMatchInput } from "./tree-rows.js";
+import {
+  notUnderPredicate,
+  treeDisplayOrder,
+  treeMatchPredicates,
+  treeRootOrderClause,
+  type TreeMatchInput,
+} from "./tree-rows.js";
 
 export type TableColumn<TTable extends AnySQLiteTable = AnySQLiteTable> =
   TTable["_"]["columns"][keyof TTable["_"]["columns"]];
@@ -135,6 +143,16 @@ export type LookupRowsBySearchInput<
 export type LookupRowsInput<TTable extends AnySQLiteTable = AnySQLiteTable> =
   LookupRowsByIdInput | LookupRowsBySearchInput<TTable>;
 
+/** The choices of a tree lookup. */
+export interface LookupTreeInput {
+  /** Narrows the choices, such as to accounts of one type. */
+  where?: SQL;
+  /** The row being edited, such as when choosing its parent: it is shown
+   *  where it sits but cannot be picked, and the rows below it are left
+   *  out. */
+  notUnder?: RecordId;
+}
+
 export interface CountRowsInput {
   where?: SQL;
 }
@@ -171,6 +189,7 @@ export interface ScopedRows<TTable extends AnySQLiteTable = AnySQLiteTable> {
   delete(id: RecordId): Promise<TableRow<TTable>>;
   scan(input?: RowsQuery): AsyncIterable<TableRow<TTable>>;
   lookup(input?: LookupRowsInput<TTable>): Promise<LookupEntry[]>;
+  lookupTree(input?: LookupTreeInput): Promise<LookupTreeEntry[]>;
   count(input?: CountRowsInput): Promise<number>;
   countBy(input: CountRowsByInput<TTable>): Promise<GroupCount[]>;
 }
@@ -186,6 +205,16 @@ export class RowNotFoundError extends Error {
   constructor() {
     super("Row not found.");
     this.name = "RowNotFoundError";
+  }
+}
+
+/** A tree lookup would return more than `MAX_LOOKUP_TREE_ROWS` rows. */
+export class TreeTooLargeError extends Error {
+  constructor(tableName: string) {
+    super(
+      `Table "${tableName}" has more than ${MAX_LOOKUP_TREE_ROWS} rows to show as a tree. Search it instead.`,
+    );
+    this.name = "TreeTooLargeError";
   }
 }
 
@@ -378,18 +407,8 @@ export function scopedRows<TTable extends AnySQLiteTable>(
       // Lookup backs foreign-key pickers and autocomplete. Optional ids preserve
       // selected entries. Search follows the fields displayed by the picker;
       // returned metadata contains only ordinary visible table fields.
-      const { pkName, labelColumns, label } = rowLabeller(table);
-      const visibleFields = getTableConfig(table.drizzle)
-        .columns.map((column) => column.name)
-        .filter(
-          (columnName) =>
-            table.meta.columns[columnName]?.visuallyHidden !== true,
-        );
-      const responseFields = resolveRowFields(table, visibleFields);
-      const queryFields = resolveRowFields(
-        table,
-        uniqueNames([pkName, ...labelColumns, ...visibleFields]),
-      );
+      const { pkName, labelColumns, label, responseFields, queryFields } =
+        lookupFields(table);
 
       let rows: Record<string, unknown>[];
       if (input.ids === undefined) {
@@ -437,6 +456,80 @@ export function scopedRows<TTable extends AnySQLiteTable>(
       return entries;
     },
 
+    async lookupTree(input = {}) {
+      // A tree picker draws every choice under its ancestors. The ancestors
+      // that are not choices themselves are drawn to place them, and the
+      // edited row is drawn where it sits; `treeMatchPredicates` keeps
+      // exactly those rows, so no branch without a choice is returned.
+      const tree = table.meta.tree;
+      if (!tree) {
+        throw new TypeError(
+          `Table "${table.sqlName}" does not declare meta.tree.`,
+        );
+      }
+      const { pkName, label, responseFields, queryFields } =
+        lookupFields(table);
+      const editing =
+        input.notUnder === undefined
+          ? undefined
+          : normalizeLookupIds([input.notUnder], table, pk.pkCol.name)[0]!;
+      const choice = and(
+        input.where,
+        editing === undefined
+          ? undefined
+          : notUnderPredicate(table, tree, toRecordId(editing)),
+      );
+      const shown =
+        editing === undefined ? choice : or(choice, eq(pk.drizzlePk, editing));
+      const where =
+        shown === undefined
+          ? undefined
+          : treeMatchPredicates(table, tree, auth, {
+              match: shown,
+              matchContext: "ancestors",
+            }).rows;
+      const order = [treeRootOrderClause(table, tree), table.meta.defaultSort]
+        .filter((clause) => clause !== undefined)
+        .concat(asc(pk.drizzlePk));
+      const rows = (await db
+        .select({
+          ...queryFields.databaseSelection,
+          [CHOICE_FIELD]: choice ? sql<number>`(${choice})` : sql<number>`1`,
+        })
+        .from(table.drizzle)
+        .where(access.ownedRows(where))
+        .orderBy(...order)
+        // One row more than the limit tells a tree that is too large from
+        // one that fills it exactly.
+        .limit(MAX_LOOKUP_TREE_ROWS + 1)) as Record<string, unknown>[];
+      if (rows.length > MAX_LOOKUP_TREE_ROWS) {
+        throw new TreeTooLargeError(table.sqlName);
+      }
+
+      const entries: LookupTreeEntry[] = [];
+      for (const { row, depth } of treeDisplayOrder(
+        rows,
+        pkName,
+        tree.parentColumn,
+      )) {
+        const value = row[pkName];
+        if (typeof value !== "string" && typeof value !== "number") continue;
+        entries.push({
+          value,
+          label: label(row),
+          meta: responseFields.pick(row),
+          depth,
+          role:
+            editing !== undefined && toRecordId(value) === toRecordId(editing)
+              ? "editing"
+              : row[CHOICE_FIELD]
+                ? "choice"
+                : "context",
+        });
+      }
+      return entries;
+    },
+
     count,
 
     async countBy(input) {
@@ -451,6 +544,31 @@ export function scopedRows<TTable extends AnySQLiteTable>(
         access.ownedRows(input.where),
       );
     },
+  };
+}
+
+// Whether a row of a tree lookup can be picked, selected beside its columns.
+// Sapporta reserves names that start with `$`, as for computed fields.
+const CHOICE_FIELD = "$choice";
+
+// The fields a lookup reads and returns: it reads the key, the label columns
+// and the visible columns, and returns only the visible ones.
+function lookupFields(table: TableDef) {
+  const { pkName, labelColumns, label } = rowLabeller(table);
+  const visibleFields = getTableConfig(table.drizzle)
+    .columns.map((column) => column.name)
+    .filter(
+      (columnName) => table.meta.columns[columnName]?.visuallyHidden !== true,
+    );
+  return {
+    pkName,
+    labelColumns,
+    label,
+    responseFields: resolveRowFields(table, visibleFields),
+    queryFields: resolveRowFields(
+      table,
+      uniqueNames([pkName, ...labelColumns, ...visibleFields]),
+    ),
   };
 }
 

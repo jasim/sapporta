@@ -100,6 +100,7 @@ export { savePipeline, insertRow, updateRow } from "./rows/save-pipeline.js";
 export {
   ImmutableTableOperationError,
   RowNotFoundError,
+  TreeTooLargeError,
   scopedRows,
 } from "./rows/scoped-rows.js";
 export type {
@@ -108,6 +109,7 @@ export type {
   FindManyRowsInput,
   LookupRowsByIdInput,
   LookupRowsBySearchInput,
+  LookupTreeInput,
   LookupRowsInput,
   PageRowsInput,
   PageRowsResult,

@@ -33,12 +33,12 @@ export interface TreePathOptions {
 /**
  * A computed field for a table with `meta.tree`: the labels of each row's
  * ancestors, from the top down, joined by `separator`. A top-level row has no
- * value (`null`).
+ * value (`null`). Name it in `meta.tree.path` so the table's pickers draw it.
  *
  * ```ts
  * meta: {
  *   rowLabelColumns: ["name"],
- *   tree: { parentColumn: "parent_id" },
+ *   tree: { parentColumn: "parent_id", path: "parentPath" },
  *   rowCaption: "parentPath",
  * },
  * computed: { parentPath: treePath() },
@@ -51,6 +51,7 @@ export function treePath(options: TreePathOptions = {}): ComputedField {
     ...(options.label !== undefined ? { label: options.label } : {}),
     notes: "Labels of the row's ancestors, from the top down.",
     load: (batch) => loadTreePaths(batch, separator, options.column),
+    treePath: { separator },
   };
 }
 

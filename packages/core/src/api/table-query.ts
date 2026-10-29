@@ -22,6 +22,7 @@ import type {
   ExportRowsQuery,
   ListRowsQuery,
   LookupQuery,
+  LookupTreeQuery,
 } from "@sapporta/shared/contracts";
 import {
   DEFAULT_COUNT_GROUP_LIMIT,
@@ -33,12 +34,13 @@ import type {
   CountRowsByInput,
   CountRowsInput,
   LookupRowsInput,
+  LookupTreeInput,
   PageRowsInput,
   RowsQuery,
   TableColumn,
   TreeMatchInput,
 } from "../rows/scoped-rows.js";
-import { notUnderPredicate } from "../rows/tree-rows.js";
+import { notUnderPredicate, treeRootOrderClause } from "../rows/tree-rows.js";
 import { findPkColumn } from "../schema/pk.js";
 import type { TableDef } from "../schema/table.js";
 import { columnBySqlName } from "../schema/column.js";
@@ -101,6 +103,7 @@ const PAGE_QUERY_KEYS = new Set([
 ]);
 const EXPORT_QUERY_KEYS = new Set(["sort", "q"]);
 const COUNT_QUERY_KEYS = new Set(["group_by", "order", "limit"]);
+const LOOKUP_TREE_QUERY_KEYS = new Set(["computed", "notUnder"]);
 const LOOKUP_SEARCH_QUERY_KEYS = new Set([
   "q",
   "fields",
@@ -136,7 +139,9 @@ const LOOKUP_SEARCH_QUERY_KEYS = new Set([
  *   computed=name,name2             computed fields to return beside the rows
  *   tree=ancestors                  on a table with `meta.tree`, return each
  *   tree=ancestors-and-descendants  filter or search match with its ancestors
- *                                   (and its descendants); list reads only
+ *                                   (and its descendants); list reads only.
+ *                                   Without `sort`, top-level rows follow
+ *                                   `meta.tree.rootOrder`
  *
  * Fixed conditions (list reads only):
  *   fixed[col][op]=value            a condition every returned row satisfies.
@@ -177,7 +182,9 @@ export function resolvePageQuery<TTable extends AnySQLiteTable>(
   );
   const matchContext = parseTreeMode(query.tree, table);
   const page = {
-    orderBy: parseSortClauses(query.sort, table),
+    orderBy: matchContext
+      ? treeSortClauses(query.sort, table)
+      : parseSortClauses(query.sort, table),
     page: query.page,
     limit: query.limit,
   };
@@ -191,6 +198,18 @@ export function resolvePageQuery<TTable extends AnySQLiteTable>(
     };
   }
   return { kind: "rows", input: { ...page, where: and(fixed, match) } };
+}
+
+// A tree read with no sort orders its top-level rows by `rootOrder`, then
+// every level by the table's default sort. A sort the user picks replaces
+// both.
+function treeSortClauses(raw: string | undefined, table: TableDef): SQL[] {
+  const tree = table.meta.tree!;
+  const rootOrder = treeRootOrderClause(table, tree);
+  if (raw || !rootOrder) return parseSortClauses(raw, table);
+  return table.meta.defaultSort
+    ? [rootOrder, table.meta.defaultSort]
+    : [rootOrder];
 }
 
 function parseTreeMode(
@@ -241,6 +260,34 @@ export function resolveLookupQuery<TTable extends AnySQLiteTable>(
     fields: resolveLookupFields(table, query.fields),
     limit: query.limit,
     ...(where ? { where } : {}),
+  };
+}
+
+/**
+ * A tree lookup takes the narrowing of a lookup search, without the search:
+ * `filter[col][op]=value` and `notUnder=<id>`.
+ */
+export function resolveLookupTreeQuery(
+  query: LookupTreeQuery,
+  table: TableDef,
+): LookupTreeInput {
+  if (!table.meta.tree) {
+    throw new QueryParseError(
+      "no_tree_config",
+      `Table \`${table.sqlName}\` does not declare meta.tree`,
+    );
+  }
+  const where = parseTableFilters(
+    extractFilterParams(query, LOOKUP_TREE_QUERY_KEYS, "tree lookup"),
+    table,
+  );
+  const notUnder =
+    query.notUnder === undefined
+      ? undefined
+      : parseLookupIds([query.notUnder], table, findPkColumn(table).name)[0];
+  return {
+    ...(where ? { where } : {}),
+    ...(notUnder !== undefined ? { notUnder } : {}),
   };
 }
 

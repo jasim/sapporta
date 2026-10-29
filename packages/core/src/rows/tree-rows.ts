@@ -31,6 +31,7 @@
 import { and, sql, type SQL } from "drizzle-orm";
 import { getTableConfig, type SQLiteColumn } from "drizzle-orm/sqlite-core";
 import type { TreeMatchContext } from "@sapporta/shared/contracts";
+import { toRecordId, type RecordId } from "@sapporta/shared/record-id";
 import type { SapportaAuthContext } from "../auth/context.js";
 import { columnBySqlName } from "../schema/column.js";
 import { findPkColumn } from "../schema/pk.js";
@@ -113,6 +114,87 @@ export function notUnderPredicate(
   const under = sql.identifier("sapporta_tree_under");
   const underId = sql.identifier("id");
   return sql`${pk} not in (with recursive ${under}(${underId}) as (select ${pk} from ${tableName} where ${pk} = ${id} union select ${pk} from ${tableName} join ${under} on ${parent} = ${under}.${underId}) select ${underId} from ${under})`;
+}
+
+/**
+ * An order clause that sorts the top-level rows of a tree by
+ * `tree.rootOrder`: rows whose `column` holds the first listed value come
+ * first, and rows whose value is not listed come last. Every row below the
+ * top level sorts the same, so siblings keep the order of the clauses after
+ * this one, such as the table's `defaultSort`. Absent without `rootOrder`.
+ */
+export function treeRootOrderClause(
+  table: TableDef,
+  tree: TreeMeta,
+): SQL | undefined {
+  const order = tree.rootOrder;
+  if (!order) return undefined;
+  const parent = requireColumn(table, tree.parentColumn);
+  const column = requireColumn(table, order.column);
+  const ranks = order.values.map(
+    (value, index) => sql`when ${value} then ${index}`,
+  );
+  return sql`case when ${parent} is null then (case ${column} ${sql.join(ranks, sql` `)} else ${order.values.length} end) else 0 end`;
+}
+
+/** A row of a tree in display order, and how deep it sits. */
+export interface TreeOrderedRow<TRow> {
+  readonly row: TRow;
+  readonly depth: number;
+}
+
+/**
+ * Puts the rows of a tree in display order: depth-first, each row followed by
+ * its children. Siblings keep the order of `rows`, so the query's order
+ * decides it.
+ *
+ * Every row is returned once. A row whose parent is not among `rows`, such as
+ * one under a row the request may not read, is shown at the top level. Rows
+ * in a loop of parents never reach a top-level row; the first of them in
+ * `rows` is shown at the top level, and the others under it.
+ */
+export function treeDisplayOrder<TRow extends Record<string, unknown>>(
+  rows: readonly TRow[],
+  keyColumn: string,
+  parentColumn: string,
+): TreeOrderedRow<TRow>[] {
+  const keyOf = (value: unknown): RecordId | null =>
+    typeof value === "string" || typeof value === "number"
+      ? toRecordId(value)
+      : null;
+  const keys = new Set(rows.map((row) => keyOf(row[keyColumn])));
+  const children = new Map<RecordId, TRow[]>();
+  const tops: TRow[] = [];
+  for (const row of rows) {
+    const parent = keyOf(row[parentColumn]);
+    if (parent === null || !keys.has(parent)) {
+      tops.push(row);
+      continue;
+    }
+    const siblings = children.get(parent) ?? [];
+    siblings.push(row);
+    children.set(parent, siblings);
+  }
+
+  const ordered: TreeOrderedRow<TRow>[] = [];
+  const placed = new Set<TRow>();
+  const place = (top: TRow) => {
+    const stack: TreeOrderedRow<TRow>[] = [{ row: top, depth: 0 }];
+    while (stack.length > 0) {
+      const next = stack.pop()!;
+      if (placed.has(next.row)) continue;
+      placed.add(next.row);
+      ordered.push(next);
+      const key = keyOf(next.row[keyColumn]);
+      const below = key === null ? [] : (children.get(key) ?? []);
+      for (let index = below.length - 1; index >= 0; index -= 1) {
+        stack.push({ row: below[index]!, depth: next.depth + 1 });
+      }
+    }
+  };
+  for (const top of tops) place(top);
+  for (const row of rows) place(row);
+  return ordered;
 }
 
 function requireColumn(table: TableDef, name: string): SQLiteColumn {

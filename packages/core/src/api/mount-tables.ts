@@ -13,7 +13,11 @@ import type { AppRoute } from "@sapporta/rest-core";
 import type { TableCatalog } from "../schema/catalog.js";
 import type { TableDef } from "../schema/table.js";
 import type { HttpMethod, RouteHandler, TsRestApi } from "@sapporta/honest";
-import { countRoute, lookupRoute } from "@sapporta/shared/contracts";
+import {
+  countRoute,
+  lookupRoute,
+  lookupTreeRoute,
+} from "@sapporta/shared/contracts";
 import { ErrorCode } from "../errors.js";
 import {
   createRoute,
@@ -43,6 +47,7 @@ export interface TableHandlers<E extends Env> {
   delete: TableFamilyHandler<ReturnType<typeof deleteRoute>, E>;
   exportCsv: TableFamilyHandler<ReturnType<typeof exportCsvRoute>, E>;
   lookup: RouteHandler<typeof lookupRoute, E>;
+  lookupTree: RouteHandler<typeof lookupTreeRoute, E>;
   count: RouteHandler<typeof countRoute, E>;
 }
 
@@ -112,10 +117,11 @@ export function mountTables<
   catalog: TableCatalog,
   handlers: TableHandlers<E>,
 ): TsRestApi<E, DocCtx> {
-  // Lookup and count are NOT family-specialized — their response schema is
+  // Lookup, tree lookup and count are NOT family-specialized — their response schema is
   // passthrough regardless of table. One contract each, registered as a
   // static route whose path happens to have a `:tableName` param.
   api.register("tablesLookup", lookupRoute, handlers.lookup);
+  api.register("tablesLookupTree", lookupTreeRoute, handlers.lookupTree);
   api.register("tablesCount", countRoute, handlers.count);
 
   // Individual calls (not a loop) because each family's AppRoute type is

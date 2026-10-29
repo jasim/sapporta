@@ -98,6 +98,21 @@ export interface TreeMetaInput {
    * subtree. `"ancestors"` keeps only the ancestors.
    */
   matchContext?: TreeMatchContext;
+  /**
+   * Orders the top-level rows by the values of one column, such as
+   * `{ column: "account_type", values: ["Asset", "Liability", "Equity",
+   * "Revenue", "Expense"] }`. Top-level rows whose value is not listed come
+   * last. Within one value, and below the top level, rows follow
+   * `defaultSort`. The table page's tree and the table's pickers use this
+   * order; a sort the user picks replaces it.
+   */
+  rootOrder?: { column: string; values: readonly string[] };
+  /**
+   * The computed field, made with `treePath()`, that gives each row's parent
+   * path. A picker on the table draws a chosen row with this path before its
+   * name, and each search match with its path.
+   */
+  path?: string;
 }
 
 /** `TreeMetaInput` with its defaults resolved. */
@@ -371,6 +386,7 @@ function normalizeSapportaMeta(
   tableColumns: readonly { name: string; notNull: boolean }[],
   input: SapportaTableInputMeta,
   factoryColumns: ReadonlyMap<string, FactoryColumnMeta>,
+  computed: Readonly<Record<string, ComputedField>>,
 ): SapportaMeta {
   const columnNames = tableColumns.map((column) => column.name);
   if (input.rowLabelColumns.length === 0) {
@@ -411,7 +427,14 @@ function normalizeSapportaMeta(
 
   const { tree: treeInput, ...rest } = input;
   const tree = treeInput
-    ? normalizeTreeMeta(sqlName, tableColumns, treeInput, input, columns)
+    ? normalizeTreeMeta(
+        sqlName,
+        tableColumns,
+        treeInput,
+        input,
+        columns,
+        computed,
+      )
     : undefined;
 
   return {
@@ -436,6 +459,7 @@ function normalizeTreeMeta(
   tree: TreeMetaInput,
   input: SapportaTableInputMeta,
   columns: Record<string, ColumnMeta>,
+  computed: Readonly<Record<string, ComputedField>>,
 ): TreeMeta {
   const parent = tableColumns.find(
     (column) => column.name === tree.parentColumn,
@@ -467,7 +491,42 @@ function normalizeTreeMeta(
       `Table "${sqlName}" declares a tree and also lists itself in meta.children. Remove the self-referencing child.`,
     );
   }
-  return resolved;
+  const rootOrder = tree.rootOrder;
+  if (rootOrder) {
+    if (
+      !tableColumns.some((candidate) => candidate.name === rootOrder.column)
+    ) {
+      throw new Error(
+        `Table "${sqlName}" tree.rootOrder names unknown column "${rootOrder.column}".`,
+      );
+    }
+    if (rootOrder.values.length === 0) {
+      throw new Error(
+        `Table "${sqlName}" tree.rootOrder lists no values for "${rootOrder.column}".`,
+      );
+    }
+  }
+  const pathSeparator =
+    tree.path === undefined
+      ? undefined
+      : computed[tree.path]?.treePath?.separator;
+  if (tree.path !== undefined && pathSeparator === undefined) {
+    throw new Error(
+      `Table "${sqlName}" tree.path "${tree.path}" must name a computed field made with treePath().`,
+    );
+  }
+  return {
+    ...resolved,
+    ...(rootOrder
+      ? {
+          rootOrder: {
+            column: rootOrder.column,
+            values: [...rootOrder.values],
+          },
+        }
+      : {}),
+    ...(tree.path !== undefined ? { path: tree.path, pathSeparator } : {}),
+  };
 }
 
 /**
@@ -525,6 +584,7 @@ export function sapportaTable<TTable extends AnySQLiteTable>(
       config.columns,
       options.meta,
       drained,
+      computed,
     ),
     ...(Object.keys(computed).length > 0 ? { computed } : {}),
     validate: options.validate

@@ -9,6 +9,7 @@ import {
 import { sapportaTable } from "../schema/table.js";
 import { createTestAuthContext } from "../testing/auth-context.js";
 import { createTestDb } from "../testing/test-utils.js";
+import { treeDisplayOrder } from "./tree-rows.js";
 import {
   scopedRows,
   type PageRowsInput,
@@ -324,5 +325,38 @@ describe("tree matches", () => {
         matchContext: "ancestors",
       }),
     ).rejects.toThrow(/does not declare meta.tree/);
+  });
+});
+
+describe("treeDisplayOrder", () => {
+  const order = (rows: { id: number; parent: number | null }[]) =>
+    treeDisplayOrder(rows, "id", "parent").map(
+      ({ row, depth }) => `${depth}:${row.id}`,
+    );
+
+  it("puts children after their parent, keeping sibling order", () => {
+    expect(
+      order([
+        { id: 3, parent: 1 },
+        { id: 1, parent: null },
+        { id: 2, parent: null },
+        { id: 4, parent: 1 },
+        { id: 5, parent: 3 },
+      ]),
+    ).toEqual(["0:1", "1:3", "2:5", "1:4", "0:2"]);
+  });
+
+  it("shows a row whose parent is missing at the top level", () => {
+    expect(order([{ id: 2, parent: 9 }])).toEqual(["0:2"]);
+  });
+
+  it("returns every row of a loop once", () => {
+    expect(
+      order([
+        { id: 1, parent: 2 },
+        { id: 2, parent: 1 },
+        { id: 3, parent: 2 },
+      ]),
+    ).toEqual(["0:1", "1:2", "2:3"]);
   });
 });

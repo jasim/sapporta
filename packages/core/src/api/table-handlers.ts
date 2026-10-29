@@ -26,6 +26,7 @@ import { savePipeline, savePipelineInsertSync } from "../rows/save-pipeline.js";
 import {
   ImmutableTableOperationError,
   RowNotFoundError,
+  TreeTooLargeError,
   scopedRows,
 } from "../rows/scoped-rows.js";
 import { cellToString, csvEscape } from "../rows/csv.js";
@@ -57,6 +58,7 @@ import {
   resolveCountQuery,
   resolveExportQuery,
   resolveLookupQuery,
+  resolveLookupTreeQuery,
   resolvePageQuery,
 } from "./table-query.js";
 
@@ -257,6 +259,34 @@ export function makeAuthorizedTableHandlers<E extends SapportaEnv>(
         return tableReadErrorResponse(c, err);
       }
     },
+    lookupTree: async ({ c, request }) => {
+      const tableName = request.params.tableName;
+      const def = catalog.get(tableName);
+      if (!def) return tableNotFoundResponse(tableName);
+      const auth = authorizeTableAction(c, guard(c), "read", def);
+      const rows = scopedRows(db, auth, def);
+      try {
+        const computed = resolveComputedQuery(request.query.computed, def);
+        const entries = await rows.lookupTree(
+          resolveLookupTreeQuery(request.query, def),
+        );
+        return c.json(
+          {
+            entries,
+            ...(await computedFor(
+              db,
+              auth,
+              def,
+              entries.map((entry) => toRecordId(entry.value)),
+              computed,
+            )),
+          },
+          200,
+        );
+      } catch (err) {
+        return tableReadErrorResponse(c, err);
+      }
+    },
     count: async ({ c, request }) => {
       const tableName = request.params.tableName;
       const def = catalog.get(tableName);
@@ -392,6 +422,13 @@ function tableReadErrorResponse<E extends Env>(
     return apiErrorResponse(c, {
       error: err.message,
       code: err.code,
+      status: 400,
+    });
+  }
+  if (err instanceof TreeTooLargeError) {
+    return apiErrorResponse(c, {
+      error: err.message,
+      code: ErrorCode.TREE_TOO_LARGE,
       status: 400,
     });
   }
