@@ -30,6 +30,10 @@ import { findMembership, membershipFromRow } from "./workspace.js";
  * raw token again after creation.
  */
 const TOKEN_PREFIX = "spat";
+const BEARER_TOKEN_PATTERN = new RegExp(
+  `^Bearer\\s+${TOKEN_PREFIX}_([^_]+)_(.+)$`,
+  "i",
+);
 
 interface PersonalAccessTokenRow {
   id: string;
@@ -61,6 +65,17 @@ export interface AuthTokenManagementScope {
 }
 
 /**
+ * Whether a request authenticates with an agent access token rather than a
+ * browser session: any non-empty `Authorization` header does. The resolver
+ * below reads the request this way, so a guard that asks gets the answer the
+ * request was authenticated by. An empty header is no credential, and the
+ * session decides.
+ */
+export function requestUsesToken(headers: Headers): boolean {
+  return (headers.get("authorization") ?? "") !== "";
+}
+
+/**
  * Resolve `Authorization: Bearer spat_<tokenId>_<secret>` into the same user
  * principal shape used by browser sessions.
  *
@@ -74,10 +89,9 @@ export function resolveBearerTokenPrincipal(
   conn: ProjectDbConnection,
   headers: Headers,
 ): AppPrincipal | null {
-  const authorization = headers.get("authorization");
-  if (!authorization) return null;
+  if (!requestUsesToken(headers)) return null;
 
-  const parsed = parseBearerToken(authorization);
+  const parsed = parseBearerToken(headers.get("authorization") ?? "");
   if (!parsed) throw new TokenAuthError("unauthenticated");
 
   const token = readToken(conn, parsed.id);
@@ -268,7 +282,7 @@ export function revokeAuthToken(
 function parseBearerToken(
   value: string,
 ): { id: string; secret: string } | null {
-  const match = value.match(/^Bearer\s+spat_([^_]+)_(.+)$/i);
+  const match = value.match(BEARER_TOKEN_PATTERN);
   if (!match) return null;
   return {
     id: match[1],

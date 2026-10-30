@@ -8,6 +8,7 @@ import type {
   WorkspaceGlobalOnlyAuthority,
   WorkspaceUserScopedAuthority,
 } from "@sapporta/server";
+import { requestUsesToken } from "./auth-tokens.js";
 import { authFailure } from "./errors.js";
 
 export type ResolveProjectAuth<E extends SapportaEnv = SapportaEnv> = (
@@ -234,7 +235,7 @@ export function requireAuthorizedInteractiveWorkspaceUserData<
   c: Context<E>,
   requirement: FeatureRequirement,
 ): AuthorizedWorkspaceUserDataContext {
-  if (requestUsesBearerToken(c)) throwAuth("forbidden");
+  if (requestUsesToken(c.req.raw.headers)) throwAuth("forbidden");
   return requireAuthorizedWorkspaceUserData(c, requirement);
 }
 
@@ -311,10 +312,6 @@ function withOnlyWorkspaceUserAuthority(
     dataAuthority: narrowed,
     rowSecurity: auth.rowSecurity.withDataAuthority(narrowed),
   } as AuthorizedWorkspaceUserDataContext;
-}
-
-function requestUsesBearerToken<E extends SapportaEnv>(c: Context<E>): boolean {
-  return c.req.header("authorization")?.match(/^Bearer\s+/i) !== undefined;
 }
 
 function throwAuth(code: Parameters<typeof authFailure>[0]): never {

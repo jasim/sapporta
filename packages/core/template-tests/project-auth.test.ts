@@ -61,6 +61,8 @@ import {
 import {
   createAuthToken,
   listAuthTokens,
+  requestUsesToken,
+  resolveBearerTokenPrincipal,
 } from "../src/templates/packages/api/project-auth/auth-tokens.js";
 
 const emptyCatalog = createTableCatalog([]);
@@ -985,6 +987,21 @@ describe("project auth template", () => {
       error: "Forbidden",
       code: "forbidden",
     });
+  });
+
+  it("reads an empty Authorization header as a session's request, like the resolver", () => {
+    const headers = (authorization?: string) =>
+      new Headers(authorization === undefined ? {} : { authorization });
+
+    expect(requestUsesToken(headers())).toBe(false);
+    expect(requestUsesToken(headers(""))).toBe(false);
+    expect(requestUsesToken(headers("Bearer spat_token_secret"))).toBe(true);
+    expect(requestUsesToken(headers("Basic sample"))).toBe(true);
+    // The resolver reads an empty header the same way: no token, so the
+    // session decides. Nothing is read, so no database.
+    expect(
+      resolveBearerTokenPrincipal({} as ProjectDbConnection, headers("")),
+    ).toBeNull();
   });
 
   it("auth resolver sets anonymous auth context when session is missing", async () => {
