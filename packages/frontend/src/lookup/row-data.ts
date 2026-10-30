@@ -17,6 +17,7 @@ import type {
 import {
   createTableLookupSource,
   type CachedTableLookupSource,
+  type LookupSearchMode,
   type TableLookupSource,
 } from "./source";
 import type { LookupStore } from "./store";
@@ -74,8 +75,13 @@ export type TableRowData = TableLookupSource & {
  */
 export type RowDataStore = {
   /** A table's row data. With `narrowing`, its search offers only the rows
-   *  that match; each narrowing has its own caches. */
-  table(tableName: string, narrowing?: LookupNarrowing): TableRowData;
+   *  that match; `options.search` says where the search runs. Each
+   *  narrowing and search has its own caches. */
+  table(
+    tableName: string,
+    narrowing?: LookupNarrowing,
+    options?: { search?: LookupSearchMode },
+  ): TableRowData;
   foreignKey(
     column: Parameters<LookupStore["foreignKey"]>[0],
   ): TableRowData | undefined;
@@ -125,8 +131,10 @@ export function createLookupStore(
   function table(
     tableName: string,
     narrowing?: LookupNarrowing,
+    options?: { search?: LookupSearchMode },
   ): TableRowDataSource {
-    const key = narrowingKey(tableName, narrowing);
+    const search = options?.search ?? "server";
+    const key = lookupKey(tableName, narrowing, search);
     const existing = byTable.get(key);
     if (existing) return existing;
     const created = new TableRowDataSource(tableName, {
@@ -135,6 +143,7 @@ export function createLookupStore(
       display: () => rowDisplays[tableName],
       schema: () => tableSchema(tableName),
       narrowing,
+      search,
     });
     byTable.set(key, created);
     return created;
@@ -174,17 +183,22 @@ export function createLookupStore(
   };
 }
 
-// One cache per table and narrowing. A narrowing with no conditions is the
-// table itself.
-function narrowingKey(
+// One cache per table, narrowing and search. A server search with no
+// conditions is the table itself.
+function lookupKey(
   tableName: string,
   narrowing: LookupNarrowing | undefined,
+  search: LookupSearchMode,
 ): string {
   const filter = narrowing?.filter ?? [];
-  if (filter.length === 0 && narrowing?.notUnder === undefined) {
+  if (
+    filter.length === 0 &&
+    narrowing?.notUnder === undefined &&
+    search === "server"
+  ) {
     return tableName;
   }
-  return `${tableName}\u0000${JSON.stringify([filter, narrowing?.notUnder ?? null])}`;
+  return `${tableName}\u0000${JSON.stringify([filter, narrowing?.notUnder ?? null, search])}`;
 }
 
 const connectedStores = new Set<RowDataStore>();
@@ -281,6 +295,7 @@ class TableRowDataSource implements TableRowData {
       display: () => TableDisplay | undefined;
       schema: () => TableSchema | undefined;
       narrowing?: LookupNarrowing;
+      search: LookupSearchMode;
     },
   ) {
     this.tableName = tableName;
@@ -297,6 +312,7 @@ class TableRowDataSource implements TableRowData {
         };
       },
       args.narrowing,
+      args.search,
     );
     this.valueLookup = source.valueLookup;
     this.searchLookup = source.searchLookup;

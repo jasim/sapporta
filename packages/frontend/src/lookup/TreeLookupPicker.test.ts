@@ -8,6 +8,7 @@ import { ApiError } from "@sapporta/shared/error";
 import type { LookupValue } from "@sapporta/grid/lookup";
 import { LookupPicker, type LookupPickerLabels } from "./LookupPicker";
 import { createLookupStore } from "./row-data";
+import type { LookupSearchMode } from "./source";
 
 (
   globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
@@ -71,6 +72,7 @@ async function renderPicker(args: {
   onChange?: (value: LookupValue | null) => void;
   tree?: boolean;
   labels?: LookupPickerLabels;
+  search?: LookupSearchMode;
 }): Promise<void> {
   const store = createLookupStore({ tables: () => [accounts] });
   const container = document.createElement("div");
@@ -80,7 +82,11 @@ async function renderPicker(args: {
   await act(async () => {
     root.render(
       createElement(LookupPicker, {
-        lookup: store.table("accounts"),
+        lookup: store.table(
+          "accounts",
+          undefined,
+          args.search === undefined ? undefined : { search: args.search },
+        ),
         value: args.value,
         onChange: args.onChange ?? (() => undefined),
         placeholder: "Pick a parent",
@@ -392,6 +398,61 @@ describe("LookupPicker on a tree table", () => {
     await waitFor(() =>
       expect(document.body.textContent).toContain("No account matches."),
     );
+  });
+
+  it("searches the tree it holds on the client, in tree order, without asking the server", async () => {
+    api.fetchLookupTree.mockResolvedValue({
+      entries: [
+        treeEntry(rows.assets!, 0, "context"),
+        treeEntry(rows.bank!, 1),
+        treeEntry(rows.savings!, 2),
+        treeEntry(rows.checking!, 2),
+        treeEntry(rows.cash!, 1),
+      ],
+      computed: pathsOf(Object.values(rows)),
+    });
+    await renderPicker({ value: null, search: "client" });
+    await pressKey("ArrowDown");
+    await waitFor(() => expect(options()).toHaveLength(5));
+    await type("ING");
+
+    await waitFor(() =>
+      expect(drawn()).toEqual([
+        "Assets > Bank Accounts > Savings",
+        "Assets > Bank Accounts > Checking",
+      ]),
+    );
+    // Assets matches "s" but is context, which cannot be picked.
+    await type("s");
+    await waitFor(() =>
+      expect(drawn()).toEqual([
+        "Assets > Bank Accounts",
+        "Assets > Bank Accounts > Savings",
+        "Assets > Cash",
+      ]),
+    );
+    expect(api.fetchLookupSearch).not.toHaveBeenCalled();
+  });
+
+  it("searches on the server when a client search has no tree to search", async () => {
+    api.fetchLookupTree.mockRejectedValue(
+      new ApiError(400, { error: "too large", code: "TREE_TOO_LARGE" }),
+    );
+    api.fetchLookupSearch.mockResolvedValue({
+      entries: [{ value: rows.cash!.id, label: "Cash", meta: {} }],
+      computed: pathsOf([rows.cash!]),
+    });
+    await renderPicker({ value: null, search: "client" });
+    await pressKey("ArrowDown");
+    await waitFor(() =>
+      expect(document.body.textContent).toContain(
+        "Too many rows to show here. Type to search.",
+      ),
+    );
+    await type("cash");
+
+    await waitFor(() => expect(drawn()).toEqual(["Assets > Cash"]));
+    expect(api.fetchLookupSearch).toHaveBeenCalled();
   });
 
   it("draws the flat list with tree={false}", async () => {

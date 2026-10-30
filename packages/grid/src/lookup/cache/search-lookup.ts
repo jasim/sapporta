@@ -1,3 +1,4 @@
+import { lookupEntryMatches } from "@sapporta/shared";
 import type {
   LookupEntry,
   LookupSubscription,
@@ -87,48 +88,6 @@ function searchRequestKey(request: LookupSearchRequest): string {
   });
 }
 
-function entryMatchesSearchText(
-  entry: LookupEntry<LookupValue, unknown>,
-  searchText: string,
-  fields: readonly string[],
-): boolean {
-  if (searchText === "") return true;
-
-  const lowerSearchText = searchText.toLocaleLowerCase();
-  return lookupEntrySearchValues(entry, fields).some((value) =>
-    value.toLocaleLowerCase().includes(lowerSearchText),
-  );
-}
-
-function lookupEntrySearchValues(
-  entry: LookupEntry<LookupValue, unknown>,
-  fields: readonly string[],
-): string[] {
-  const values = [entry.label];
-  if (isRecord(entry.meta)) {
-    for (const field of fields) {
-      const value = entry.meta[field];
-      if (isSearchableScalar(value)) values.push(String(value));
-    }
-  }
-  return values;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function isSearchableScalar(
-  value: unknown,
-): value is string | number | boolean | bigint {
-  return (
-    typeof value === "string" ||
-    typeof value === "number" ||
-    typeof value === "boolean" ||
-    typeof value === "bigint"
-  );
-}
-
 // Lookup caches are ordinary memoized objects; see value-lookup.ts for the
 // lifetime rationale. Stale search responses are rejected by request key, not
 // by disposal — a late response for a superseded search is dropped because its
@@ -196,7 +155,7 @@ export class StaticSearchLookup<
     if (cached) return cached;
 
     const entries = this.entries.filter((entry) =>
-      entryMatchesSearchText(entry, searchText, fields),
+      lookupEntryMatches(entry, searchText, fields),
     );
     this.entriesBySearchScope.set(scopeKey, entries);
     return entries;

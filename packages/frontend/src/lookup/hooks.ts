@@ -4,6 +4,7 @@ import type { Row } from "@sapporta/shared/contracts";
 import { connectRowDataStore, createLookupStore } from "./row-data";
 import type { RowDataStore } from "./row-data";
 import type { LookupNarrowing } from "./api/lookup";
+import type { LookupSearchMode } from "./source";
 import { useRowDisplays } from "./row-display";
 
 /**
@@ -37,14 +38,20 @@ export function useLookupStore(): RowDataStore {
  * `narrowing` limits the choices the search offers, such as
  * `{ filter: [{ column: "account_type", op: "in", values: ["asset"] }] }`,
  * or `{ notUnder: accountId }` for an account's parent.
+ *
+ * `options.search` says where typing is matched: `"server"` by default, or
+ * `"client"` to search a tree table's picker's tree in the browser; see
+ * `LookupSearchMode`.
  */
 export function useTableLookup<TValue extends LookupValue = LookupValue>(
   tableName: string,
   narrowing?: LookupNarrowing,
+  options?: { search?: LookupSearchMode },
 ): LookupCapabilities<TValue, Row> {
   const lookup: LookupCapabilities<LookupValue, Row> = useLookupStore().table(
     tableName,
     narrowing,
+    options,
   );
   return lookup as LookupCapabilities<TValue, Row>;
 }

@@ -10,4 +10,5 @@ export * from "./row-scope.js";
 export * from "./labels.js";
 export * from "./count.js";
 export * from "./search-words.js";
+export * from "./lookup-search.js";
 export * from "./validation/index.js";

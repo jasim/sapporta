@@ -5,6 +5,7 @@ import { sapportaTable } from "../schema/table.js";
 import { ValidationError } from "../errors.js";
 import { createTestAuthContext } from "../testing/auth-context.js";
 import { createTestDb } from "../testing/test-utils.js";
+import { lookupEntryMatches } from "@sapporta/shared";
 import {
   MAX_LOOKUP_IDS,
   MAX_LOOKUP_LIMIT,
@@ -461,6 +462,38 @@ describe("scopedRows", () => {
       },
     ]);
   });
+
+  // A search in the browser matches with `lookupEntryMatches`; the server's
+  // SQL must find the same rows.
+  it.each([
+    ["re", []],
+    ["  RE ", []],
+    ["cash", []],
+    ["sh", []],
+    ["asset", ["type"]],
+    ["ASSET", ["type"]],
+    ["25", ["balance"]],
+    ["re", ["type", "balance"]],
+    ["nothing", ["type"]],
+  ] as const)(
+    "matches %j over fields %j as lookupEntryMatches does",
+    async (search, fieldNames) => {
+      const { rows } = setupAccounts();
+      await rows.create({ name: "Cash", type: "asset", balance: 100 });
+      await rows.create({ name: "Revenue", type: "revenue", balance: 250 });
+      await rows.create({ name: "Rent", type: "expense", balance: 300 });
+      const all = await rows.lookup({ ids: ["1", "2", "3"] });
+      const fields = fieldNames.map((name) => accountsTable[name]);
+
+      const found = await rows.lookup({ search, fields });
+
+      expect(found.map((entry) => entry.value)).toEqual(
+        all
+          .filter((entry) => lookupEntryMatches(entry, search, fieldNames))
+          .map((entry) => entry.value),
+      );
+    },
+  );
 
   it("exposes lookup as distinct ID and search input shapes", () => {
     const { rows } = setupAccounts();
