@@ -39,6 +39,43 @@ export type LookupPickerItemDisplay<
   component?: ComponentType<LookupPickerItemProps<TValue, TMeta>>;
 };
 
+/**
+ * What a picker says, for wording in the application's own terms, such as
+ * "Make it a top-level account" for the clear button of a parent picker.
+ * Each one left out keeps Sapporta's default.
+ */
+export type LookupPickerLabels = {
+  /** The clear button's accessible name. Default: "Clear selection". */
+  clear?: string;
+  /** The button that opens the list, its accessible name. Default:
+   *  "Open popup". */
+  open?: string;
+  /** The list when nothing matches. Default: "No results." */
+  empty?: string;
+  /** A tree picker's list while the tree is read. Default: "Loading…" */
+  loading?: string;
+  /** A tree picker's list when the tree is too large to send. Default:
+   *  "Too many rows to show here. Type to search." */
+  tooLarge?: string;
+  /** A tree picker's list when the tree could not be read. Default:
+   *  "Could not load the choices." */
+  loadFailed?: string;
+  /** Drawn after the label of the row being edited, in a tree picker
+   *  narrowed with `notUnder`. Default: "(being edited)". */
+  editing?: string;
+};
+
+/** Sapporta's wording, for each label a picker leaves out. */
+export const DEFAULT_LOOKUP_PICKER_LABELS: Required<LookupPickerLabels> = {
+  clear: "Clear selection",
+  open: "Open popup",
+  empty: "No results.",
+  loading: "Loading…",
+  tooLarge: "Too many rows to show here. Type to search.",
+  loadFailed: "Could not load the choices.",
+  editing: "(being edited)",
+};
+
 export type LookupPickerProps<
   TValue extends LookupValue = LookupValue,
   TMeta = unknown,
@@ -62,6 +99,8 @@ export type LookupPickerProps<
    * `false` draws the flat search list of any other table.
    */
   tree?: boolean;
+  /** The picker's wording; see `LookupPickerLabels`. */
+  labels?: LookupPickerLabels;
   placeholder?: string;
   disabled?: boolean;
   allowClear?: boolean;
@@ -82,6 +121,7 @@ export function LookupPicker<
   itemDisplay,
   selectedCaption = "inline",
   tree = true,
+  labels,
   placeholder = "Select...",
   disabled,
   allowClear = true,
@@ -95,6 +135,7 @@ export function LookupPicker<
   // table's label slot. `itemDisplay` draws options over it. A tree table's
   // row data draws a tree picker.
   const rowData = isTableRowData(lookup) ? lookup : undefined;
+  const wording = { ...DEFAULT_LOOKUP_PICKER_LABELS, ...labels };
   const tableTree = tree ? rowData?.schema()?.tree : undefined;
   if (rowData && tableTree) {
     return (
@@ -104,6 +145,7 @@ export function LookupPicker<
         value={value}
         onChange={onChange}
         itemDisplay={itemDisplay}
+        labels={wording}
         placeholder={placeholder}
         disabled={disabled}
         allowClear={allowClear}
@@ -122,6 +164,7 @@ export function LookupPicker<
       value={value}
       onChange={onChange}
       itemDisplay={itemDisplay}
+      labels={wording}
       selectedCaption={selectedCaption}
       placeholder={placeholder}
       disabled={disabled}
@@ -141,6 +184,7 @@ function FlatLookupPicker<TValue extends LookupValue, TMeta>({
   value,
   onChange,
   itemDisplay,
+  labels,
   selectedCaption,
   placeholder,
   disabled,
@@ -150,8 +194,9 @@ function FlatLookupPicker<TValue extends LookupValue, TMeta>({
   className,
   ariaInvalid,
   ariaDescribedBy,
-}: Omit<LookupPickerProps<TValue, TMeta>, "tree"> & {
+}: Omit<LookupPickerProps<TValue, TMeta>, "tree" | "labels"> & {
   rowData: TableRowData | undefined;
+  labels: Required<LookupPickerLabels>;
   searchLimit: number;
 }) {
   const [searchText, setSearchText] = useState("");
@@ -229,14 +274,14 @@ function FlatLookupPicker<TValue extends LookupValue, TMeta>({
         )}
         {allowClear && (
           <Combobox.Clear
-            aria-label="Clear selection"
+            aria-label={labels.clear}
             className={comboboxClassNames.action}
           >
             <X aria-hidden />
           </Combobox.Clear>
         )}
         <Combobox.Trigger
-          aria-label="Open popup"
+          aria-label={labels.open}
           className={cn(comboboxClassNames.action, "me-1")}
         >
           <ChevronDown aria-hidden />
@@ -250,7 +295,7 @@ function FlatLookupPicker<TValue extends LookupValue, TMeta>({
         >
           <Combobox.Popup className={comboboxClassNames.popup}>
             <Combobox.Empty className={comboboxClassNames.empty}>
-              No results.
+              {labels.empty}
             </Combobox.Empty>
             <Combobox.List className={comboboxClassNames.list}>
               {(entry: LookupEntry<TValue, TMeta>) => (

@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { LookupTreeEntry, TableSchema } from "@sapporta/shared/contracts";
 import { ApiError } from "@sapporta/shared/error";
 import type { LookupValue } from "@sapporta/grid/lookup";
-import { LookupPicker } from "./LookupPicker";
+import { LookupPicker, type LookupPickerLabels } from "./LookupPicker";
 import { createLookupStore } from "./row-data";
 
 (
@@ -70,6 +70,7 @@ async function renderPicker(args: {
   value: number | null;
   onChange?: (value: LookupValue | null) => void;
   tree?: boolean;
+  labels?: LookupPickerLabels;
 }): Promise<void> {
   const store = createLookupStore({ tables: () => [accounts] });
   const container = document.createElement("div");
@@ -84,6 +85,7 @@ async function renderPicker(args: {
         onChange: args.onChange ?? (() => undefined),
         placeholder: "Pick a parent",
         ...(args.tree === undefined ? {} : { tree: args.tree }),
+        ...(args.labels === undefined ? {} : { labels: args.labels }),
       }),
     );
   });
@@ -139,6 +141,14 @@ async function type(value: string): Promise<void> {
       }),
     );
   });
+}
+
+function buttonByLabel(label: string): HTMLButtonElement {
+  const button = document.querySelector<HTMLButtonElement>(
+    `button[aria-label="${label}"]`,
+  );
+  if (!button) throw new Error(`No button named ${label}.`);
+  return button;
 }
 
 function options(): HTMLElement[] {
@@ -238,7 +248,7 @@ describe("LookupPicker on a tree table", () => {
     await waitFor(() =>
       expect(drawn()).toEqual([
         "Assets",
-        "  Bank Accounts(being edited) [off]",
+        "  Bank Accounts (being edited) [off]",
         "  Cash",
       ]),
     );
@@ -335,6 +345,52 @@ describe("LookupPicker on a tree table", () => {
       expect(document.body.textContent).toContain(
         "Too many rows to show here. Type to search.",
       ),
+    );
+  });
+
+  it("says what the application's labels say", async () => {
+    api.fetchLookupTree.mockResolvedValue({
+      entries: [
+        treeEntry(rows.assets!, 0),
+        treeEntry(rows.bank!, 1, "editing"),
+      ],
+    });
+    await renderPicker({
+      value: rows.assets!.id,
+      labels: {
+        clear: "Make it a top-level account",
+        open: "Show the accounts",
+        editing: "(this account)",
+      },
+    });
+    await act(async () => buttonByLabel("Show the accounts").click());
+
+    await waitFor(() =>
+      expect(drawn()).toEqual([
+        "Assets",
+        "  Bank Accounts (this account) [off]",
+      ]),
+    );
+    expect(buttonByLabel("Make it a top-level account")).toBeDefined();
+  });
+
+  it("says the application's words when nothing matches or the tree fails", async () => {
+    api.fetchLookupTree.mockRejectedValue(new Error("offline"));
+    await renderPicker({
+      value: null,
+      labels: {
+        empty: "No account matches.",
+        loadFailed: "Could not read the chart.",
+      },
+    });
+    await pressKey("ArrowDown");
+    await waitFor(() =>
+      expect(document.body.textContent).toContain("Could not read the chart."),
+    );
+
+    await type("zzz");
+    await waitFor(() =>
+      expect(document.body.textContent).toContain("No account matches."),
     );
   });
 

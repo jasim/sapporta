@@ -16,7 +16,7 @@ import { Combobox, comboboxClassNames } from "@sapporta/ui/combobox";
 import { cn } from "@sapporta/ui/cn";
 import type { TableRowData } from "./row-data";
 import { RowLabel, rowOfEntry, useRowComputedRecord } from "./row-display";
-import type { LookupPickerProps } from "./LookupPicker";
+import type { LookupPickerLabels, LookupPickerProps } from "./LookupPicker";
 import { LookupPickerItemContent } from "./lookup-picker-item";
 
 /*
@@ -42,6 +42,7 @@ export function TreeLookupPicker<TValue extends LookupValue, TMeta>({
   value,
   onChange,
   itemDisplay,
+  labels,
   placeholder,
   disabled,
   allowClear,
@@ -52,9 +53,10 @@ export function TreeLookupPicker<TValue extends LookupValue, TMeta>({
   ariaDescribedBy,
 }: Omit<
   LookupPickerProps<TValue, TMeta>,
-  "lookup" | "selectedCaption" | "tree"
+  "lookup" | "selectedCaption" | "tree" | "labels"
 > & {
   data: TableRowData;
+  labels: Required<LookupPickerLabels>;
   tableTree: TableTree;
   searchLimit: number;
 }) {
@@ -141,14 +143,14 @@ export function TreeLookupPicker<TValue extends LookupValue, TMeta>({
         />
         {allowClear && (
           <Combobox.Clear
-            aria-label="Clear selection"
+            aria-label={labels.clear}
             className={comboboxClassNames.action}
           >
             <X aria-hidden />
           </Combobox.Clear>
         )}
         <Combobox.Trigger
-          aria-label="Open popup"
+          aria-label={labels.open}
           className={cn(comboboxClassNames.action, "me-1")}
         >
           <ChevronDown aria-hidden />
@@ -168,15 +170,15 @@ export function TreeLookupPicker<TValue extends LookupValue, TMeta>({
                 className="px-3 py-2 text-sap-body text-sap-muted"
                 role="status"
               >
-                {treeErrorText(treeState.error)}
+                {treeErrorText(treeState.error, labels)}
               </div>
             )}
             <Combobox.Empty className={comboboxClassNames.empty}>
               {!searching && treeState.status === "error"
                 ? null
                 : !searching && treeState.status !== "ready"
-                  ? "Loading…"
-                  : "No results."}
+                  ? labels.loading
+                  : labels.empty}
             </Combobox.Empty>
             <Combobox.List className={comboboxClassNames.list}>
               {(option: TreeOption) => (
@@ -226,7 +228,7 @@ export function TreeLookupPicker<TValue extends LookupValue, TMeta>({
                               value != null &&
                               lookupValueEquals(option.entry.value, value),
                             ...(option.role === "editing"
-                              ? { editing: true }
+                              ? { editingNote: labels.editing }
                               : {}),
                           }}
                         />
@@ -279,7 +281,10 @@ function ParentPath({
   );
 }
 
-function treeErrorText(error: unknown): string {
+function treeErrorText(
+  error: unknown,
+  labels: Required<LookupPickerLabels>,
+): string {
   if (
     error instanceof ApiError &&
     typeof error.body === "object" &&
@@ -287,7 +292,7 @@ function treeErrorText(error: unknown): string {
     "code" in error.body &&
     error.body.code === "TREE_TOO_LARGE"
   ) {
-    return "Too many rows to show here. Type to search.";
+    return labels.tooLarge;
   }
-  return "Could not load the choices.";
+  return labels.loadFailed;
 }

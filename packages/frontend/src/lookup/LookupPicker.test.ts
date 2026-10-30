@@ -14,6 +14,7 @@ import {
 import {
   LookupPicker,
   type LookupPickerItemDisplay,
+  type LookupPickerLabels,
   type LookupPickerItemProps,
 } from "./LookupPicker";
 
@@ -32,6 +33,7 @@ async function renderLookupPicker<TValue extends LookupValue, TMeta = unknown>(
     disabled?: boolean;
     allowClear?: boolean;
     id?: string;
+    labels?: LookupPickerLabels;
   },
 ): Promise<HTMLElement> {
   const container = document.createElement("div");
@@ -48,6 +50,7 @@ async function renderLookupPicker<TValue extends LookupValue, TMeta = unknown>(
         value: args.value,
         onChange,
         itemDisplay: args.itemDisplay,
+        labels: args.labels,
         placeholder: "Select person",
         disabled: args.disabled,
         allowClear: args.allowClear,
@@ -286,6 +289,44 @@ describe("LookupPicker", () => {
     await click(buttonByLabel("Clear selection"));
 
     expect(onChange).toHaveBeenCalledWith(null);
+  });
+
+  it("names its buttons in the application's words", async () => {
+    const onChange = vi.fn();
+    const lookup: LookupCapabilities = {
+      valueLookup: new StaticValueLookup([{ value: 7, label: "Seven" }]),
+      searchLookup: new StaticSearchLookup([{ value: 7, label: "Seven" }]),
+    };
+
+    await renderLookupPicker(lookup, {
+      value: 7,
+      onChange,
+      labels: { clear: "Show everyone", open: "Show the people" },
+    });
+    await waitFor(() => {
+      expect(comboboxInput().value).toBe("Seven");
+    });
+    expect(buttonByLabel("Show the people")).toBeDefined();
+    await click(buttonByLabel("Show everyone"));
+
+    expect(onChange).toHaveBeenCalledWith(null);
+  });
+
+  it("says the application's words when nothing matches", async () => {
+    const lookup: LookupCapabilities = {
+      valueLookup: new StaticValueLookup([]),
+      searchLookup: new StaticSearchLookup([]),
+    };
+
+    await renderLookupPicker(lookup, {
+      value: null,
+      labels: { empty: "Nobody matches." },
+    });
+    await pressKey(comboboxInput(), "ArrowDown");
+
+    await waitFor(() => {
+      expect(document.body.textContent).toContain("Nobody matches.");
+    });
   });
 
   it.each([
