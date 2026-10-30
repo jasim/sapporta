@@ -8,7 +8,7 @@ data
 *.log
 *.tsbuildinfo
 **/*.tsbuildinfo
-.env
-.env.local
-.env.*.local
-.env.agent*
+# Root env files hold development secrets and the agents' token; the image is
+# configured from the host's environment instead. A root-only pattern, so
+# packages/frontend/.env.production still reaches `vite build`.
+.env*
