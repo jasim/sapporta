@@ -6,6 +6,11 @@ import {
   type CliRuntimeConfig,
 } from "../runtime-config.js";
 import { readProjectApiUrl } from "../project-api-url.js";
+import {
+  PROJECT_API_TOKEN_FILE,
+  readProjectApiToken,
+} from "../../project/agent-token-file.js";
+import { findProjectRootFrom } from "../../project/project-paths.js";
 import { renderCommandError, renderCommandResult } from "../render/output.js";
 import type { CliCommandContext, CliCommandSpec, CliProgram } from "./types.js";
 
@@ -29,7 +34,7 @@ export function createCliProgram(
     )
     .option(
       "--api-token <token>",
-      "Bearer token for authenticated API requests (prefer SAPPORTA_API_TOKEN)",
+      `Bearer token for authenticated API requests (overrides SAPPORTA_API_TOKEN and the surrounding project's ${PROJECT_API_TOKEN_FILE}; prefer either over the flag)`,
     )
     .option(
       "--output <format>",
@@ -126,11 +131,17 @@ function createCommandContext(config: CliRuntimeConfig): CliCommandContext {
 
 function safeResolveRuntimeConfig(program: Command): CliRuntimeConfig {
   try {
+    const projectRoot = findProjectRootFrom(process.cwd());
     return resolveCliRuntimeConfig(
       readRecord(program.opts()),
       process.env,
       process.stdout,
-      readProjectApiUrl(),
+      projectRoot === null
+        ? {}
+        : {
+            apiUrl: readProjectApiUrl(projectRoot),
+            apiToken: readProjectApiToken(projectRoot),
+          },
     );
   } catch (err) {
     if (err instanceof OperationError) {

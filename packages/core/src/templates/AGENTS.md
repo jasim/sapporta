@@ -128,8 +128,11 @@ existing Sapporta components and local patterns to new abstractions.
 - Do not ask for an access token to read the schema or to change source files.
   Read `packages/api/schema/` directly, or use `endpoints list` and
   `endpoints show`, which need no credential against `pnpm dev`. Only `rows`,
-  `sql`, `tables`, and `api` need `SAPPORTA_API_TOKEN`, and only a signed-in
-  person can create one from `/account/profile?token=new`.
+  `sql`, `tables`, and `api` need a token, from `SAPPORTA_API_TOKEN` or else
+  the project's gitignored `.env.agent`, and only a signed-in person can
+  create one from `/account/profile?token=new`. The `.env.agent` token is
+  sent only to this project's own API, never to a URL set by `--api-url` or
+  `SAPPORTA_API_URL`.
   https://sapporta.com/docs/guides/security/agent-access-and-scoped-tokens.md
 - `@sapporta/*` are installed dependencies. Resolve one from the workspace
   package that declares it rather than hand-writing or globbing a

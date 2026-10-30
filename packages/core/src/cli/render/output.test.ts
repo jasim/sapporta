@@ -96,7 +96,7 @@ describe("renderCommandError", () => {
       "Error: Authentication required",
       "  Requested http://localhost:3000/api/meta/tables",
       "  API URL from the built-in default — set SAPPORTA_API_URL or pass --api-url",
-      "  No API token sent — set SAPPORTA_API_TOKEN or pass --api-token",
+      "  No API token sent — set SAPPORTA_API_TOKEN, pass --api-token, or put the token in this project's .env.agent",
     ]);
   });
 

@@ -1,6 +1,7 @@
 import { ErrorCode, OperationError } from "../../errors.js";
 import { formatTable } from "../format.js";
 import { ApiRequestError } from "../http-client.js";
+import { PROJECT_API_TOKEN_FILE } from "../../project/agent-token-file.js";
 import type { CliCommandResult } from "../commands/types.js";
 import type {
   ApiTokenSource,
@@ -42,7 +43,9 @@ const API_URL_SOURCES: Record<ApiUrlSource, string> = {
 const API_TOKEN_SOURCES: Record<ApiTokenSource, string> = {
   flag: "API token from --api-token",
   env: "API token from SAPPORTA_API_TOKEN",
-  none: "No API token sent — set SAPPORTA_API_TOKEN or pass --api-token",
+  project: `API token from this project's ${PROJECT_API_TOKEN_FILE}`,
+  withheld: `No API token sent — this project's ${PROJECT_API_TOKEN_FILE} token is not sent to an API URL from --api-url or SAPPORTA_API_URL; pass --api-token or set SAPPORTA_API_TOKEN to send one there`,
+  none: `No API token sent — set SAPPORTA_API_TOKEN, pass --api-token, or put the token in this project's ${PROJECT_API_TOKEN_FILE}`,
 };
 
 interface FailedTarget {

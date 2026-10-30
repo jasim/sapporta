@@ -27,7 +27,7 @@ pnpm exec sapporta endpoints list
 Do not install `sapporta` globally. A global copy stays at the version you
 installed and drifts from the project's `@sapporta/server`.
 
-For API-backed data commands, set `SAPPORTA_API_URL` when the app API is not on `http://localhost:3000`. For protected apps, expose `SAPPORTA_API_TOKEN` to the agent or session. Use `--api-url` for one-off overrides; avoid passing raw tokens on the command line unless there is no safer option.
+For API-backed data commands, set `SAPPORTA_API_URL` when the app API is not on `http://localhost:3000`. For protected apps, expose `SAPPORTA_API_TOKEN` to the agent or session, or keep it in the project's gitignored `.env.agent` as `SAPPORTA_API_TOKEN=…`, which the CLI reads when neither the flag nor the environment sets one. The CLI sends that token only to the project's own API: when `--api-url` or `SAPPORTA_API_URL` chooses the URL, it is withheld. Use `--api-url` for one-off overrides; avoid passing raw tokens on the command line unless there is no safer option.
 
 The package is intentionally thin. It provides the `sapporta` executable and delegates command behavior to `@sapporta/server`.
 

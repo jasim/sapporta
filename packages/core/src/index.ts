@@ -220,5 +220,12 @@ export {
 } from "./project/project-paths.js";
 export { dataPath, databasePath } from "./project/data-dir.js";
 
+// The project's agent token file, which the CLI reads after the flag and env
+export {
+  PROJECT_API_TOKEN_FILE,
+  readProjectApiToken,
+  writeProjectApiToken,
+} from "./project/agent-token-file.js";
+
 // Contract-driven API (ts-rest + Hono)
 export * from "./api/index.js";

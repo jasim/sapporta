@@ -13,7 +13,7 @@ export type OutputFormat = "table" | "json";
  * holds for a token that was never set.
  */
 export type ApiUrlSource = "flag" | "env" | "project" | "default";
-export type ApiTokenSource = "flag" | "env" | "none";
+export type ApiTokenSource = "flag" | "env" | "project" | "withheld" | "none";
 
 /** The deployment an API-backed command talks to, and how it was chosen. */
 export interface ApiTarget {
@@ -36,19 +36,20 @@ export interface TerminalInfo {
  *
  * Flags are explicit one-off overrides. Environment variables are the stable
  * automation interface, especially for credentials injected into an agent
- * session outside the visible command text. `projectApiUrl` is what the
- * surrounding project says about its own API, read at the command boundary so
- * this function stays a decision over given values.
+ * session outside the visible command text. `project` is what the
+ * surrounding project says about its own API and its agents' token, read at
+ * the command boundary so this function stays a decision over given values.
  */
 export function resolveCliRuntimeConfig(
   flags: Record<string, unknown>,
   env: Record<string, string | undefined> = process.env,
   terminal: TerminalInfo = process.stdout,
-  projectApiUrl?: string,
+  project: { apiUrl?: string; apiToken?: string } = {},
 ): CliRuntimeConfig {
+  const url = resolveApiUrl(flags, env, project.apiUrl);
   return {
-    ...resolveApiUrl(flags, env, projectApiUrl),
-    ...resolveApiToken(flags, env),
+    ...url,
+    ...resolveApiToken(flags, env, project.apiToken, url.apiUrlSource),
     output: resolveOutputFormat(flags, env, terminal),
   };
 }
@@ -80,15 +81,29 @@ function trimTrailingSlashes(url: string): string {
   return url.replace(/\/+$/, "");
 }
 
+/**
+ * The project's token is for the project's own API. When the URL was chosen by
+ * `--api-url` or `SAPPORTA_API_URL`, the command is reaching some other server
+ * on purpose, so the project's token is withheld rather than sent there.
+ */
 function resolveApiToken(
   flags: Record<string, unknown>,
   env: Record<string, string | undefined>,
+  projectApiToken: string | undefined,
+  apiUrlSource: ApiUrlSource,
 ): { apiToken?: string; apiTokenSource: ApiTokenSource } {
   const flagToken = readString(flags.apiToken);
   if (flagToken) return { apiToken: flagToken, apiTokenSource: "flag" };
 
   const envToken = readString(env.SAPPORTA_API_TOKEN);
   if (envToken) return { apiToken: envToken, apiTokenSource: "env" };
+
+  if (projectApiToken !== undefined) {
+    if (apiUrlSource === "flag" || apiUrlSource === "env") {
+      return { apiTokenSource: "withheld" };
+    }
+    return { apiToken: projectApiToken, apiTokenSource: "project" };
+  }
 
   return { apiTokenSource: "none" };
 }

@@ -1,13 +1,12 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { parseEnv } from "node:util";
-import { findProjectRootFrom } from "../project/project-paths.js";
 
 const DEV_ENV_FILE = ".env.development";
 const MAX_PORT = 65535;
 
 /**
- * The API URL of the project the CLI is running inside, if there is one.
+ * The API URL of the project at `projectRoot`, if it records one.
  *
  * API-backed commands are clients of a running app. A project already records
  * the port its API binds, in `SAPPORTA_API_PORT` in its `.env.development`, so
@@ -30,18 +29,15 @@ const MAX_PORT = 65535;
  * public domain reached through a reverse proxy; it says nothing about where
  * the API process listens on this machine.
  *
- * Returns `undefined` outside a project, when neither the environment nor the
- * file sets the port, and when the port is unusable. Each of those leaves the
+ * Returns `undefined` when neither the environment nor the file sets the
+ * port, and when the port is unusable. Each of those leaves the
  * built-in default in place instead of failing a command over a convenience
  * lookup.
  */
 export function readProjectApiUrl(
-  cwd: string = process.cwd(),
+  projectRoot: string,
   env: Record<string, string | undefined> = process.env,
 ): string | undefined {
-  const projectRoot = findProjectRootFrom(cwd);
-  if (projectRoot === null) return undefined;
-
   const devEnv = { ...readEnvFile(join(projectRoot, DEV_ENV_FILE)), ...env };
   const port = parsePort(devEnv.SAPPORTA_API_PORT);
   if (port === undefined) return undefined;

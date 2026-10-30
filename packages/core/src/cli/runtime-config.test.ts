@@ -71,7 +71,7 @@ describe("resolveCliRuntimeConfig", () => {
         {},
         {},
         { isTTY: false },
-        "http://localhost:3117",
+        { apiUrl: "http://localhost:3117" },
       ),
     ).toEqual({
       apiUrl: "http://localhost:3117",
@@ -87,7 +87,7 @@ describe("resolveCliRuntimeConfig", () => {
         {},
         { SAPPORTA_API_URL: "https://env.example.com" },
         { isTTY: false },
-        "http://localhost:3117",
+        { apiUrl: "http://localhost:3117" },
       ).apiUrl,
     ).toBe("https://env.example.com");
 
@@ -96,9 +96,76 @@ describe("resolveCliRuntimeConfig", () => {
         { apiUrl: "https://flag.example.com" },
         { SAPPORTA_API_URL: "https://env.example.com" },
         { isTTY: false },
-        "http://localhost:3117",
+        { apiUrl: "http://localhost:3117" },
       ).apiUrl,
     ).toBe("https://flag.example.com");
+  });
+
+  it("sends the surrounding project's token after an explicit flag or env", () => {
+    const apiToken = "spat_0505050001_project";
+    expect(
+      resolveCliRuntimeConfig({}, {}, { isTTY: false }, { apiToken }),
+    ).toMatchObject({ apiToken, apiTokenSource: "project" });
+    expect(
+      resolveCliRuntimeConfig(
+        {},
+        {},
+        { isTTY: false },
+        { apiUrl: "http://localhost:3117", apiToken },
+      ),
+    ).toMatchObject({ apiToken, apiTokenSource: "project" });
+    expect(
+      resolveCliRuntimeConfig(
+        {},
+        { SAPPORTA_API_TOKEN: "spat_0505050002_env" },
+        { isTTY: false },
+        { apiToken },
+      ),
+    ).toMatchObject({ apiToken: "spat_0505050002_env", apiTokenSource: "env" });
+    expect(
+      resolveCliRuntimeConfig(
+        { apiToken: "spat_0505050003_flag" },
+        {},
+        { isTTY: false },
+        { apiToken },
+      ),
+    ).toMatchObject({
+      apiToken: "spat_0505050003_flag",
+      apiTokenSource: "flag",
+    });
+    expect(
+      resolveCliRuntimeConfig({}, { SAPPORTA_API_TOKEN: "" }, { isTTY: false }),
+    ).toMatchObject({ apiTokenSource: "none" });
+  });
+
+  it("withholds the project's token from an API URL chosen by flag or env", () => {
+    const apiToken = "spat_0505050001_project";
+    const fromFlag = resolveCliRuntimeConfig(
+      { apiUrl: "https://flag.example.com" },
+      {},
+      { isTTY: false },
+      { apiToken },
+    );
+    expect(fromFlag.apiTokenSource).toBe("withheld");
+    expect(fromFlag.apiToken).toBeUndefined();
+
+    const fromEnv = resolveCliRuntimeConfig(
+      {},
+      { SAPPORTA_API_URL: "https://env.example.com" },
+      { isTTY: false },
+      { apiToken },
+    );
+    expect(fromEnv.apiTokenSource).toBe("withheld");
+    expect(fromEnv.apiToken).toBeUndefined();
+
+    expect(
+      resolveCliRuntimeConfig(
+        { apiUrl: "https://flag.example.com" },
+        { SAPPORTA_API_TOKEN: "spat_0505050002_env" },
+        { isTTY: false },
+        { apiToken },
+      ),
+    ).toMatchObject({ apiToken: "spat_0505050002_env", apiTokenSource: "env" });
   });
 
   it("rejects unknown output formats", () => {
