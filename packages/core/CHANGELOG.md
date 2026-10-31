@@ -1,5 +1,44 @@
 # @sapporta/server
 
+## 0.10.0
+
+### Minor Changes
+
+- 5d5de68: The CLI reads the API token from the surrounding project's `.env.agent`
+  (`SAPPORTA_API_TOKEN=…`) when neither `--api-token` nor `SAPPORTA_API_TOKEN`
+  sets one, the way it reads the project's port, and reports that source as
+  `project`. `PROJECT_API_TOKEN_FILE`, `readProjectApiToken` and
+  `writeProjectApiToken` are exported, so an app that provisions its agents'
+  token writes the file the CLI reads.
+
+  - The project's token goes only to the project's own API. When `--api-url` or
+    `SAPPORTA_API_URL` chooses the URL, it is withheld, and an auth failure
+    says so (`withheld`); pass `--api-token` or set `SAPPORTA_API_TOKEN` to send
+    a token there.
+  - An `.env.agent` that exists but cannot be read stops every CLI command with
+    an error naming the file.
+  - `writeProjectApiToken` writes a new owner-only file and renames it into
+    place, so a symlink at the path is replaced, not followed. It throws on a
+    comment that spans lines and on a token the file would not read back as
+    written, such as a blank one or one containing `#` or quotes.
+  - New projects' `.dockerignore` keeps `.env.agent` out of the Docker build
+    context. Existing projects keep their copy; add `.env.agent*` to it.
+
+### Patch Changes
+
+- 6cbe917: New projects' `.dockerignore` keeps every root `.env*` file out of the Docker
+  build context, so `.env.development` (with `BETTER_AUTH_SECRET` and SMTP
+  settings) and `.env.agent` are no longer uploaded to a build host or copied
+  into the build stage. The pattern matches only at the project root, so
+  `packages/frontend/.env.production` still reaches `vite build`. Existing
+  projects keep their copy; replace its `.env` lines with `.env*` to match.
+- f328e55: New projects' token screens treat an empty `Authorization` header beside a
+  session cookie as the session, as the token resolver already did, instead of
+  refusing it as a token request. `requestUsesToken` in the template's
+  `auth-tokens.ts` states the rule once; existing projects keep their copy.
+- Updated dependencies [b551df8]
+  - @sapporta/shared@0.7.0
+
 ## 0.9.1
 
 ### Patch Changes

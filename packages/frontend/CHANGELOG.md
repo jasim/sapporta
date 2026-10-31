@@ -1,5 +1,41 @@
 # @sapporta/frontend
 
+## 0.12.0
+
+### Minor Changes
+
+- b551df8: `useTableLookup` and a lookup store's `table()` take `{ search: "client" }`,
+  for a tree table whose whole narrowed tree a picker already holds. Typing
+  then matches that tree in the browser: every match, in tree order, without a
+  request per keystroke. Until the tree is read, or when it could not be read,
+  such as one too large to send, the search runs on the server. `"server"`
+  stays the default, as a grid's foreign-key cell needs.
+  `createTableLookupSource` takes the search as its fourth argument, which is
+  now required, as are `computed` and `narrowing` before it (pass `undefined`
+  for none).
+
+  `lookupEntryMatches` in `@sapporta/shared` is the rule a lookup search
+  follows: the text, ignoring case, inside the label or a displayed field. The
+  server's lookup search, the client search and `StaticSearchLookup` all find
+  the same rows by it.
+
+- 235d532: `LookupPicker` takes `labels`, for wording in the application's own terms:
+  the clear and open buttons' names, the empty list, a tree picker's loading,
+  too-large and failed messages, and the note after the row being edited, such
+  as `{ clear: "Make it a top-level account", editing: "(this account)" }`.
+  Each label left out keeps Sapporta's default, listed in
+  `DEFAULT_LOOKUP_PICKER_LABELS`.
+
+  A tree picker passes the edited row's note to the table's label slot as
+  `DisplayContext.editingNote`, so a slot that draws its own content can use
+  the picker's wording. The note is now read as a separate word.
+
+### Patch Changes
+
+- Updated dependencies [b551df8]
+  - @sapporta/shared@0.7.0
+  - @sapporta/grid@0.10.1
+
 ## 0.11.0
 
 ### Minor Changes

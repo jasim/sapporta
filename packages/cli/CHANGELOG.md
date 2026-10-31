@@ -1,5 +1,15 @@
 # sapporta
 
+## 0.2.20
+
+### Patch Changes
+
+- cli: read the API token from the project's .env.agent
+- Updated dependencies [5d5de68]
+- Updated dependencies [6cbe917]
+- Updated dependencies [f328e55]
+  - @sapporta/server@0.10.0
+
 ## 0.2.19
 
 ### Patch Changes
